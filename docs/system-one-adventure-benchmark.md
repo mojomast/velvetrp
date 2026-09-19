@@ -1,6 +1,6 @@
 # System One (Jev) L2 adventure-selection benchmark
 
-Generated 2026-09-19T18:58:09.798Z by `scripts/evaluate-system-one-adventure-lane.ts` using the live System One adapter.
+Generated 2026-09-19T21:48:20.220Z by `scripts/evaluate-system-one-adventure-lane.ts` using the live System One adapter.
 
 ## What this measures
 
@@ -133,7 +133,7 @@ agent-reviewed rows are summarized separately below.
 | harvested:643d8f61c4c6 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:649f071cf0e1 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:66711ff7099e | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:6b8359ca620b | harvested | dev | harvested (agent) | combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:6b8359ca620b | harvested | dev | harvested (agent) | combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d | 3 | 1 | 1/3 | 1/3 | 0 | defer 2, combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d 1 |
 | harvested:6ef5508ce70e | harvested | dev | harvested (agent) | check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:70699991a6e3 | harvested | dev | harvested (agent) | quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:74cbab9ca6f0 | harvested | dev | harvested (agent) | check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
@@ -206,10 +206,10 @@ stability roll-up.
 | --- | ---: |
 | Cases | 100 |
 | Graded calls | 300 |
-| Acted calls | 3 |
+| Acted calls | 4 |
 | Acted accuracy | 100.0% |
-| Exact preferred | 234/300 |
-| Asserted-subset correctness | 78.0% |
+| Exact preferred | 235/300 |
+| Asserted-subset correctness | 78.3% |
 
 ## Decision stability
 
@@ -225,8 +225,8 @@ reserved for dedicated stability probes.
 | --- | ---: |
 | Mean agreement | 100.0% |
 | Conflict cases | 0 of 131 (0.0%) |
-| Mean signal std dev | 0.0116 |
-| Max signal std dev | 0.0287 |
+| Mean signal std dev | 0.0111 |
+| Max signal std dev | 0.0249 |
 
 Honesty: stability is repeatability, not accuracy; a consistently deferred case is stable and still
 a coverage miss, and a conflicted case may still have every individual pick labeled acceptable.
@@ -248,12 +248,12 @@ so `Acted` and `Coverage` are over named calls, not over every graded call.
 | ---: | ---: | ---: | ---: |
 | 0.35 | 54/54 | 100.0% | 100.0% |
 | 0.40 | 54/54 | 100.0% | 100.0% |
-| 0.45 | 50/54 | 92.6% | 100.0% |
+| 0.45 | 49/54 | 90.7% | 100.0% |
 | 0.50 | 47/54 | 87.0% | 100.0% |
-| 0.55 | 34/54 | 63.0% | 100.0% |
-| 0.60 | 23/54 | 42.6% | 100.0% |
+| 0.55 | 38/54 | 70.4% | 100.0% |
+| 0.60 | 25/54 | 46.3% | 100.0% |
 | 0.65 | 10/54 | 18.5% | 100.0% |
-| 0.70 | 6/54 | 11.1% | 100.0% |
+| 0.70 | 9/54 | 16.7% | 100.0% |
 | 0.75 | 6/54 | 11.1% | 100.0% |
 
 Selected recommended action threshold: **0.40** (coverage 100.0%, acted accuracy 100.0% over 54 acted).
@@ -266,10 +266,10 @@ Selected recommended action threshold: **0.40** (coverage 100.0%, acted accuracy
 | ---: | ---: | ---: | ---: |
 | 0.35 | 36/36 | 100.0% | 100.0% |
 | 0.40 | 36/36 | 100.0% | 100.0% |
-| 0.45 | 35/36 | 97.2% | 100.0% |
+| 0.45 | 34/36 | 94.4% | 100.0% |
 | 0.50 | 33/36 | 91.7% | 100.0% |
-| 0.55 | 24/36 | 66.7% | 100.0% |
-| 0.60 | 15/36 | 41.7% | 100.0% |
+| 0.55 | 26/36 | 72.2% | 100.0% |
+| 0.60 | 19/36 | 52.8% | 100.0% |
 | 0.65 | 7/36 | 19.4% | 100.0% |
 | 0.70 | 6/36 | 16.7% | 100.0% |
 | 0.75 | 6/36 | 16.7% | 100.0% |
@@ -278,7 +278,7 @@ Selected recommended action threshold: **0.40** (coverage 100.0%, acted accuracy
 
 | Configuration | Threshold | Gate | Samples | Accuracy | Brier | ECE |
 | --- | ---: | :---: | ---: | ---: | ---: | ---: |
-| Server default | 0.75 | NOT READY | 6 | 100.0% | 0.0000 | 0.0045 |
+| Server default | 0.75 | NOT READY | 6 | 100.0% | 0.0000 | 0.0043 |
 | Recommended | 0.40 | PROMOTE | 54 | 100.0% | 0.0002 | 0.0109 |
 
 ## Calibration
@@ -289,12 +289,12 @@ Gate scope: these rows cover the frozen corpus plus human-confirmed harvested ca
 
 | Split / signal | Accuracy | Brier | ECE |
 | --- | ---: | ---: | ---: |
-| all acted, raw (6) | 100.0% | 0.0458 | 0.2133 |
-| all acted, calibrated (6) | 100.0% | 0.0000 | 0.0045 |
+| all acted, raw (6) | 100.0% | 0.0434 | 0.2083 |
+| all acted, calibrated (6) | 100.0% | 0.0000 | 0.0043 |
 | held-out acted, raw (0) | n/a | 0.0000 | 0.0000 |
 | held-out acted, calibrated (0) | n/a | 0.0000 | 0.0000 |
 
-Map: `sigmoid(a * logit(p) + b)` with a = 2.8577, b = 1.6996 (fit on 6 development acted decision(s); held out 0).
+Map: `sigmoid(a * logit(p) + b)` with a = 2.8504, b = 1.6371 (fit on 6 development acted decision(s); held out 0).
 
 ## Promotion gate — `adventure-selection`
 
@@ -314,7 +314,7 @@ All gates passed.
 
 ### Server-default verdict (0.75)
 
-Metrics scored on the calibrated acted signal at the composed default threshold: samples 6, accuracy 100.0%, Brier 0.0000, ECE 0.0045.
+Metrics scored on the calibrated acted signal at the composed default threshold: samples 6, accuracy 100.0%, Brier 0.0000, ECE 0.0043.
 
 **NOT READY**
 
@@ -328,12 +328,12 @@ Metrics scored on the calibrated acted signal at the composed default threshold:
   "metrics": {
     "samples": 54,
     "accuracy": 1,
-    "brier": 0.00015509870746567884,
-    "expectedCalibrationError": 0.010910119079130975
+    "brier": 0.00016062806188880792,
+    "expectedCalibrationError": 0.010867609023415992
   },
   "calibration": {
-    "a": 1.5257316562040386,
-    "b": 4.144215800217139
+    "a": 1.6183609094547773,
+    "b": 4.0798252567100874
   },
   "promotedAt": "2026-09-19",
   "evidence": "docs/system-one-adventure-benchmark.md"
@@ -342,11 +342,11 @@ Metrics scored on the calibrated acted signal at the composed default threshold:
 
 ## Observations
 
-- **Coverage.** 9 of 393 graded calls acted (9 act / 72 confirm / 312 fallback); the rest deferred. 267 of 384 deferral(s) were in the acceptable set.
-- **Decisive accuracy.** Among acted decisions, 9/9 (100.0%) were in the acceptable set and 9/9 (100.0%) matched the single preferred call.
-- **Under-confidence.** 123 readout(s) named a candidate; 114 named one but deferred, with signals 0.20–0.71, and 105 of those named picks were acceptable. The raw model is right but under the 0.75 bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays 0.75.
+- **Coverage.** 10 of 393 graded calls acted (10 act / 72 confirm / 311 fallback); the rest deferred. 267 of 383 deferral(s) were in the acceptable set.
+- **Decisive accuracy.** Among acted decisions, 10/10 (100.0%) were in the acceptable set and 10/10 (100.0%) matched the single preferred call.
+- **Under-confidence.** 123 readout(s) named a candidate; 113 named one but deferred, with signals 0.21–0.74, and 104 of those named picks were acceptable. The raw model is right but under the 0.75 bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays 0.75.
 - **Acted errors.** No acted decision fell outside its case's acceptable set.
-- **Calibration.** Held-out calibrated Brier 0.0000 and ECE 0.0000; all-acted calibrated Brier 0.0000 and ECE 0.0045. The acted subset has no observed errors, so the calibration tail is untested.
+- **Calibration.** Held-out calibrated Brier 0.0000 and ECE 0.0000; all-acted calibrated Brier 0.0000 and ECE 0.0043. The acted subset has no observed errors, so the calibration tail is untested.
 
 ## Honesty notes
 

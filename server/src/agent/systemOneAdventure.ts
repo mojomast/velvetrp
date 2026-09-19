@@ -11,10 +11,13 @@ import { bandForConfidence, type SystemOneBand } from "./systemOnePolicy.js";
  * committing one of these?"), a relevance `score` per interchangeable candidate group, and one
  * aggregate `best_candidate` choice that collapses each group to its deterministic representative
  * (with a fail-closed `none_of_these`), so the model never sees indistinguishable duplicate
- * options. Code composes the answer: a candidate must be advertised, the aggregate choice must
- * name its group, and both the choice probability and the `supported` probability must clear the
- * same threshold band. The lane never adds, drops, or authorizes a candidate, and the existing
- * digest re-validation and command bridge remain authoritative.
+ * options. Code composes the answer: a candidate must be advertised, and both the declaration
+ * support and the selection signal must clear the same threshold band. With several groups the
+ * selection signal is the probability the aggregate choice assigned to the group it named; when
+ * the battery collapses to exactly one group there is nothing to disambiguate, so the aggregate
+ * choice is ignored and the group's relevance score is the selection signal instead. The lane
+ * never adds, drops, or authorizes a candidate, and the existing digest re-validation and command
+ * bridge remain authoritative.
  *
  * The lane is ADVISORY and has no active path: composition is recorded for evaluation only.
  */
@@ -171,15 +174,20 @@ export function adventureCandidateRelevance(
  * Composes an exact-candidate selection from the battery.
  *
  * 1. With no advertised candidates there is nothing to select, so the lane defers.
- * 2. The aggregate choice must name an advertised candidate (never `none_of_these`, never an
- *    undeclared id). Interchangeable instances collapse to their group's deterministic
- *    representative, so the selection is always the representative id with its own digest.
- * 3. The lane is only as confident as the weaker of the two independent claims — the
- *    declaration supports some advertised candidate (`supported`) and this is the best one
- *    (the choice's probability mass for the option it named) — so the combined signal is
- *    their minimum. An act band selects; a confirm band records a lower-confidence
- *    selection; anything below defers.
- * 4. Otherwise the lane defers and the caller keeps its existing deterministic selection.
+ * 2. With exactly one interchangeable candidate group there is nothing to disambiguate, so the
+ *    aggregate choice is ignored: the group's deterministic representative is composed from
+ *    `supported` and the group's relevance score alone, and the combined signal is their
+ *    minimum. The aggregate question stays in the battery for observability, but a sole group
+ *    must not defer merely because the model hedged with `none_of_these`.
+ * 3. With several groups the aggregate choice must name an advertised group (never
+ *    `none_of_these`, never an undeclared id). Interchangeable instances collapse to their
+ *    group's deterministic representative, so the selection is always the representative id
+ *    with its own digest. The combined signal is the weaker of the declaration support and the
+ *    probability mass the choice assigned to the option it named — not the distribution
+ *    maximum, so a flat split cannot masquerade as a confident pick.
+ * 4. An act band selects; a confirm band records a lower-confidence selection; anything below
+ *    defers, as does a missing or malformed `supported`/relevance answer.
+ * 5. Otherwise the lane defers and the caller keeps its existing deterministic selection.
  *
  * The caller re-validates the representative's digest before any commit, so collapsing adds no
  * authority: it only removes indistinguishable duplicates from the battery.
@@ -189,37 +197,40 @@ export function composeAdventureSelection(
   answers: Record<string, SystemOneAnswer>,
   thresholds: SystemOneConfidenceThresholds,
 ): AdventureSelectionComposition {
-  if (candidates.length === 0) {
-    return { band: "fallback", method: "defer", selection: null, topSignal: null };
-  }
-  const best = answers[ADVENTURE_BEST_KEY];
-  if (!best || best.type !== "choice" || best.choice === ADVENTURE_NONE) {
-    return { band: "fallback", method: "defer", selection: null, topSignal: null };
-  }
-  // A named representative resolves to its own group; a named interchangeable member resolves to
-  // the same group's representative, so every instance composes to one id and digest.
-  const group = adventureSelectionGroups(candidates)
-    .find(({ members }) => members.some((entry) => entry.candidateId === best.choice));
-  if (!group) {
-    return { band: "fallback", method: "defer", selection: null, topSignal: null };
-  }
-  const candidate = group.representative;
+  const defer = (topSignal: number | null = null): AdventureSelectionComposition =>
+    ({ band: "fallback", method: "defer", selection: null, topSignal });
+  if (candidates.length === 0) return defer();
   const supported = noulSignal(answers, ADVENTURE_SUPPORTED_KEY);
-  if (supported === null) {
-    return { band: "fallback", method: "defer", selection: null, topSignal: null };
+  if (supported === null) return defer();
+  const groups = adventureSelectionGroups(candidates);
+  let candidate: AdventureSelectionCandidate;
+  let signal: number;
+  if (groups.length === 1) {
+    // Nothing to disambiguate: the sole group always composes from `supported` and its own
+    // relevance score, and the aggregate `best_candidate` answer is advisory only.
+    candidate = groups[0]!.representative;
+    const relevance = adventureCandidateRelevance(answers, candidate.candidateId);
+    if (relevance === null) return defer();
+    signal = Math.min(supported, relevance);
+  } else {
+    const best = answers[ADVENTURE_BEST_KEY];
+    if (!best || best.type !== "choice" || best.choice === ADVENTURE_NONE) return defer();
+    // A named representative resolves to its own group; a named interchangeable member resolves
+    // to the same group's representative, so every instance composes to one id and digest.
+    const group = groups.find(({ members }) => members.some((entry) => entry.candidateId === best.choice));
+    if (!group) return defer();
+    candidate = group.representative;
+    // The confidence in the selection is the probability the model assigned to the option it
+    // named, not the distribution maximum: a flat split with a large `none_of_these` must not
+    // masquerade as confidence in a weak pick.
+    const chosenProbability = best.probabilities[best.choice];
+    const choiceProbability = typeof chosenProbability === "number" && Number.isFinite(chosenProbability)
+      ? Math.max(0, Math.min(1, chosenProbability))
+      : 0;
+    signal = Math.min(choiceProbability, supported);
   }
-  // The confidence in the selection is the probability the model assigned to the option it
-  // named, not the distribution maximum: a flat split with a large `none_of_these` must not
-  // masquerade as confidence in a weak pick.
-  const chosenProbability = best.probabilities[best.choice];
-  const choiceProbability = typeof chosenProbability === "number" && Number.isFinite(chosenProbability)
-    ? Math.max(0, Math.min(1, chosenProbability))
-    : 0;
-  const signal = Math.min(choiceProbability, supported);
   const band = bandForConfidence(signal, thresholds);
-  if (band === "fallback") {
-    return { band: "fallback", method: "defer", selection: null, topSignal: signal };
-  }
+  if (band === "fallback") return defer(signal);
   return {
     band,
     method: "choice",

@@ -3,7 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { listSystemOneDecisionsByLane, recordSystemOneDecision, type RecordSystemOneDecisionInput } from "../src/repo/index.js";
 import { recordAdventureShadowDecision, type SystemOneAdventureDependency } from "../src/agent/adventureOrchestrator.js";
-import { ADVENTURE_BEST_KEY, ADVENTURE_NONE, ADVENTURE_SUPPORTED_KEY,
+import { ADVENTURE_BEST_KEY, ADVENTURE_NONE, ADVENTURE_RELEVANCE_PREFIX, ADVENTURE_SUPPORTED_KEY,
   type AdventureSelectionCandidate } from "../src/agent/systemOneAdventure.js";
 import { defaultSystemOneLaneModes, defaultSystemOneSettings } from "../src/defaults.js";
 import { createFakeSystemOneCaller } from "../src/provider/systemOneFake.js";
@@ -149,6 +149,9 @@ describe("lane-origin exact combat proposals", () => {
       kind: "exact_combat_power.select", label: "Use power: Second Wind" };
     const caller = createFakeSystemOneCaller({ scripted: {
       [ADVENTURE_SUPPORTED_KEY]: { type: "noul", noul: 0.9 },
+      // The battery collapses to one group, so the composer reads its relevance directly; the
+      // aggregate choice stays in the answers for observability only.
+      [`${ADVENTURE_RELEVANCE_PREFIX}${candidate.candidateId}`]: { type: "score", score: 2.7, confidence: 0.9, legend: {}, probabilities: {} },
       [ADVENTURE_BEST_KEY]: { type: "choice", choice: candidate.candidateId, confidence: 0.9,
         probabilities: { [candidate.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 } },
     } });

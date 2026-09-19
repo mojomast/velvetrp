@@ -241,6 +241,15 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   100% over 300 calls (exact preferred 234/300, asserted 78.0%). Stability measured **100.0%
   (0/131)** this run; the previous single conflict was model variance on the same state and may
   recur, so it is not reported as fixed.
+- **Ninth wave (single-group composition).** The measured single-option hedging failure — a sole
+  potion candidate after duplicate collapse, deferred because the aggregate choice answered
+  `none_of_these` 0.59 against the candidate 0.41 despite 0.92 relevance and 0.91 support — is
+  fixed: single-group batteries now compose `min(supported, relevance)` for the representative and
+  ignore the aggregate choice, while multi-group batteries keep the choice requirement and every
+  malformed-answer path still defers. Counterfactual replay of the live turn's recorded answers
+  composes `act` at 0.910. Benchmark: the gated record is unchanged (54 acted/100%, Brier 0.0002,
+  ECE 0.0109 at 0.40); the agent subset moved from 3 to **4 acted calls at 100%** over 300 calls
+  (exact preferred 235/300, asserted 78.3%); stability 100% (0/131).
 - **Combat gap (found by the sixth wave, fixed).** Focused combat batches surfaced that the
   adventure path never resolved D&D enemy turns, so a goblin that won initiative wedged the
   encounter in `failed` player turns. The deterministic fallback now invokes

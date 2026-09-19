@@ -255,12 +255,17 @@ The two tuning notes above are implemented, plus the diversity signal the SRD re
   approved, and a lane-origin execution committed (no provider evidence, combat revision 10) and
   healed the fighter to 10 HP; a sibling proposal the persona never approved correctly did not
   execute.
-- **Residual: single-option choice hedging.** With two interchangeable potions collapsed to one
-  battery question, the model still answered `best_candidate = none_of_these` (0.59) against the
-  sole candidate (0.41) while scoring its relevance 0.92 and `supported` 0.91, so the lane
-  deferred and the provider committed the potion instead. The collapse fixed duplicate ambiguity;
-  the aggregate choice question remains the deferral bottleneck when only one candidate is
-  offered, and is the next composer iteration.
+- **Single-option choice hedging fixed (2026-09-19).** With two interchangeable potions collapsed
+  to one battery question, the model had answered `best_candidate = none_of_these` (0.59) against
+  the sole candidate (0.41) while scoring its relevance 0.92 and `supported` 0.91, so the lane
+  deferred and the provider committed the potion instead. The composer now treats single-group
+  batteries structurally: with nothing to disambiguate it ignores the aggregate choice and composes
+  `min(supported, relevance)` for the group's representative, keeping the aggregate choice for
+  multi-group batteries and keeping every fail-closed guard (missing/malformed answers defer).
+  Counterfactual replay of the exact recorded answers on the live deferred turn composes `act` at
+  signal 0.910 (previously `fallback/defer`); the regenerated benchmark shows the gated record
+  unchanged (54 acted/100%, Brier 0.0002, ECE 0.0109 at 0.40) and the agent subset moved from 3 to
+  **4 acted calls at 100% accuracy** over 300 calls, with stability still 100%.
 
 ### Adventure consistency audit (2026-09-19)
 

@@ -20635,12 +20635,12 @@
   "agentHarvested": {
     "cases": 100,
     "calls": 300,
-    "acted": 3,
-    "actedCorrect": 3,
+    "acted": 4,
+    "actedCorrect": 4,
     "actedAccuracy": 1,
-    "exact": 234,
-    "correct": 234,
-    "accuracy": 0.78,
+    "exact": 235,
+    "correct": 235,
+    "accuracy": 0.7833333333333333,
     "note": "agent-reviewed harvested cases are scored and reported but excluded from the calibration fit, the dev/holdout split, the threshold sweep, the promotion gate, and the proposed record"
   },
   "harvest": {
@@ -20669,7 +20669,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.51,
+      "topSignal": 0.57,
       "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
     },
     {
@@ -20682,130 +20682,130 @@
       "candidateId": "travel:mill-01",
       "acceptable": [
         "travel:mill-01"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.52,
-      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
-    },
-    {
-      "id": "direct-travel-mill",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "travel:mill-01",
-      "acceptable": [
-        "travel:mill-01"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.53,
-      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
-    },
-    {
-      "id": "direct-travel-harbor",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "travel:harbor-04",
-      "acceptable": [
-        "travel:harbor-04"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.43,
-      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
-    },
-    {
-      "id": "direct-travel-harbor",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "travel:harbor-04",
-      "acceptable": [
-        "travel:harbor-04"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.4,
-      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
-    },
-    {
-      "id": "direct-travel-harbor",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "travel:harbor-04",
-      "acceptable": [
-        "travel:harbor-04"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.43,
-      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
-    },
-    {
-      "id": "direct-check-climb",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "check:climb-05",
-      "acceptable": [
-        "check:climb-05"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.5,
-      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
-    },
-    {
-      "id": "direct-check-climb",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "check:climb-05",
-      "acceptable": [
-        "check:climb-05"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.5,
-      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
-    },
-    {
-      "id": "direct-check-climb",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "check:climb-05",
-      "acceptable": [
-        "check:climb-05"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.54,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
+    {
+      "id": "direct-travel-mill",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:mill-01",
+      "acceptable": [
+        "travel:mill-01"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.57,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.42,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.44,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.41,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
     },
     {
@@ -20822,7 +20822,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.77,
+      "topSignal": 0.79,
       "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
     },
     {
@@ -20839,7 +20839,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.76,
+      "topSignal": 0.78,
       "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
     },
     {
@@ -20856,8 +20856,42 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.8,
+      "topSignal": 0.79,
       "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
     },
     {
       "id": "direct-quest-accept",
@@ -20873,42 +20907,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.47,
+      "topSignal": 0.49,
       "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
-    },
-    {
-      "id": "direct-quest-accept",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-09",
-      "acceptable": [
-        "quest:accept-harbor-09"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.51,
-      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
-    },
-    {
-      "id": "direct-quest-accept",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-09",
-      "acceptable": [
-        "quest:accept-harbor-09"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.5,
-      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
     },
     {
       "id": "direct-progression-level",
@@ -20924,7 +20924,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.61,
+      "topSignal": 0.62,
       "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
     },
     {
@@ -20941,7 +20941,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.63,
+      "topSignal": 0.62,
       "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
     },
     {
@@ -20975,7 +20975,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.56,
+      "topSignal": 0.53,
       "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
     },
     {
@@ -21009,7 +21009,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.56,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
     },
     {
@@ -21026,7 +21026,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.61,
       "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
     },
     {
@@ -21056,120 +21056,154 @@
       "candidateId": "travel:watchtower-16",
       "acceptable": [
         "travel:watchtower-16"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
+    },
+    {
+      "id": "ambig-travel-two-roads",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null,
+        "travel:mill-east-17",
+        "travel:mill-west-18"
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "ambig-travel-two-roads",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null,
+        "travel:mill-east-17",
+        "travel:mill-west-18"
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "ambig-travel-two-roads",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null,
+        "travel:mill-east-17",
+        "travel:mill-west-18"
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.67,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.64,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.64,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.59,
-      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
-    },
-    {
-      "id": "ambig-travel-two-roads",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null,
-        "travel:mill-east-17",
-        "travel:mill-west-18"
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "ambig-travel-two-roads",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null,
-        "travel:mill-east-17",
-        "travel:mill-west-18"
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "ambig-travel-two-roads",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null,
-        "travel:mill-east-17",
-        "travel:mill-west-18"
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "ambig-power-target",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "power:mending-bryn-19",
-      "acceptable": [
-        "power:mending-bryn-19"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.65,
-      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
-    },
-    {
-      "id": "ambig-power-target",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "power:mending-bryn-19",
-      "acceptable": [
-        "power:mending-bryn-19"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.64,
-      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
-    },
-    {
-      "id": "ambig-power-target",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "power:mending-bryn-19",
-      "acceptable": [
-        "power:mending-bryn-19"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.64,
-      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
     },
     {
       "id": "ambig-combat-power-target",
@@ -21189,105 +21223,71 @@
       "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
     },
     {
-      "id": "ambig-combat-power-target",
+      "id": "ambig-commerce-sell",
       "category": "ambiguous",
       "holdout": true,
       "band": "confirm",
       "method": "choice",
       "selected": null,
-      "candidateId": "combat:firebolt-bandit-22",
+      "candidateId": "shop:sell-ring-24",
       "acceptable": [
-        "combat:firebolt-bandit-22"
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.7,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.7,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.71,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-consumable-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "consumable:heal-aster-25",
+      "acceptable": [
+        "consumable:heal-aster-25"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.6,
-      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
-    },
-    {
-      "id": "ambig-combat-power-target",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat:firebolt-bandit-22",
-      "acceptable": [
-        "combat:firebolt-bandit-22"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.62,
-      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
-    },
-    {
-      "id": "ambig-commerce-sell",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "shop:sell-ring-24",
-      "acceptable": [
-        "shop:sell-ring-24"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.69,
-      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
-    },
-    {
-      "id": "ambig-commerce-sell",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "shop:sell-ring-24",
-      "acceptable": [
-        "shop:sell-ring-24"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.69,
-      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
-    },
-    {
-      "id": "ambig-commerce-sell",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "shop:sell-ring-24",
-      "acceptable": [
-        "shop:sell-ring-24"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.68,
-      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
-    },
-    {
-      "id": "ambig-consumable-target",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "consumable:heal-aster-25",
-      "acceptable": [
-        "consumable:heal-aster-25"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.62,
       "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
     },
     {
@@ -21304,7 +21304,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.58,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
     },
     {
@@ -21321,25 +21321,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.57,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
-    },
-    {
-      "id": "multi-check-vs-travel-trap",
-      "category": "multi-family",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "check:force-gate-28",
-      "acceptable": [
-        "check:force-gate-28"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.58,
-      "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
       "id": "multi-check-vs-travel-trap",
@@ -21372,7 +21355,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.57,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
+    },
+    {
+      "id": "multi-check-vs-travel-trap",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:force-gate-28",
+      "acceptable": [
+        "check:force-gate-28"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.58,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
@@ -21389,7 +21389,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.45,
+      "topSignal": 0.46,
+      "reason": "deferred (fallback); expected check:row-30; not acceptable"
+    },
+    {
+      "id": "multi-row-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check:row-30",
+      "acceptable": [
+        "check:row-30"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.43,
       "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
@@ -21410,23 +21427,6 @@
       "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
-      "id": "multi-row-vs-travel",
-      "category": "multi-family",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check:row-30",
-      "acceptable": [
-        "check:row-30"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.45,
-      "reason": "deferred (fallback); expected check:row-30; not acceptable"
-    },
-    {
       "id": "multi-quest-vs-travel",
       "category": "multi-family",
       "holdout": false,
@@ -21440,7 +21440,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.5,
+      "topSignal": 0.51,
       "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
     },
     {
@@ -21457,7 +21457,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.52,
+      "topSignal": 0.51,
       "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
     },
     {
@@ -21491,42 +21491,59 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
+      "topSignal": 0.8,
+      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
+    },
+    {
+      "id": "multi-commerce-vs-inventory",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-33",
+      "candidateId": "shop:buy-rope-33",
+      "acceptable": [
+        "shop:buy-rope-33"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.8,
+      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
+    },
+    {
+      "id": "multi-commerce-vs-inventory",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-33",
+      "candidateId": "shop:buy-rope-33",
+      "acceptable": [
+        "shop:buy-rope-33"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
       "topSignal": 0.79,
       "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
     },
     {
-      "id": "multi-commerce-vs-inventory",
+      "id": "multi-power-vs-rest",
       "category": "multi-family",
-      "holdout": false,
-      "band": "act",
+      "holdout": true,
+      "band": "confirm",
       "method": "choice",
-      "selected": "shop:buy-rope-33",
-      "candidateId": "shop:buy-rope-33",
+      "selected": null,
+      "candidateId": "rest:long-35",
       "acceptable": [
-        "shop:buy-rope-33"
+        "rest:long-35"
       ],
-      "selectedCorrect": true,
-      "deferred": false,
-      "correct": true,
-      "topSignal": 0.8,
-      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
-    },
-    {
-      "id": "multi-commerce-vs-inventory",
-      "category": "multi-family",
-      "holdout": false,
-      "band": "act",
-      "method": "choice",
-      "selected": "shop:buy-rope-33",
-      "candidateId": "shop:buy-rope-33",
-      "acceptable": [
-        "shop:buy-rope-33"
-      ],
-      "selectedCorrect": true,
-      "deferred": false,
-      "correct": true,
-      "topSignal": 0.8,
-      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.55,
+      "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
     },
     {
       "id": "multi-power-vs-rest",
@@ -21559,24 +21576,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.53,
-      "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
-    },
-    {
-      "id": "multi-power-vs-rest",
-      "category": "multi-family",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "rest:long-35",
-      "acceptable": [
-        "rest:long-35"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.53,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
     },
     {
@@ -21593,914 +21593,931 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
-      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
-    },
-    {
-      "id": "multi-combat-vs-power",
-      "category": "multi-family",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat:firebolt-wolf-37",
-      "acceptable": [
-        "combat:firebolt-wolf-37"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.6,
-      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
-    },
-    {
-      "id": "multi-combat-vs-power",
-      "category": "multi-family",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat:firebolt-wolf-37",
-      "acceptable": [
-        "combat:firebolt-wolf-37"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.59,
-      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
-    },
-    {
-      "id": "unsupported-question",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-question",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-question",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-hypothetical",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-hypothetical",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-hypothetical",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-two-actions",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-two-actions",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-two-actions",
-      "category": "unsupported",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-choice-question",
-      "category": "unsupported",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-choice-question",
-      "category": "unsupported",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unsupported-choice-question",
-      "category": "unsupported",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-fireball",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-fireball",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-fireball",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-destination",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-destination",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-destination",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-sword",
-      "category": "unadvertised",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-sword",
-      "category": "unadvertised",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-sword",
-      "category": "unadvertised",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-no-candidates",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-no-candidates",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "unadvertised-no-candidates",
-      "category": "unadvertised",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-weather",
-      "category": "small-talk",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-weather",
-      "category": "small-talk",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-weather",
-      "category": "small-talk",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-innkeeper",
-      "category": "small-talk",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-innkeeper",
-      "category": "small-talk",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-innkeeper",
-      "category": "small-talk",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-joke",
-      "category": "small-talk",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-joke",
-      "category": "small-talk",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "smalltalk-joke",
-      "category": "small-talk",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:04e62a0ddd47",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:04e62a0ddd47",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:04e62a0ddd47",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:09c974ce40a5",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        "inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2; not acceptable"
-    },
-    {
-      "id": "harvested:09c974ce40a5",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        "inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2; not acceptable"
-    },
-    {
-      "id": "harvested:09c974ce40a5",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        "inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2; not acceptable"
-    },
-    {
-      "id": "harvested:0afb961efdec",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:0afb961efdec",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:0afb961efdec",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:0ec73aec02e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:0ec73aec02e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:0ec73aec02e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:0ed8b80e4a05",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:0ed8b80e4a05",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:0ed8b80e4a05",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:159e90a93cb6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
       "topSignal": 0.62,
-      "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
+      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
     },
     {
-      "id": "harvested:159e90a93cb6",
-      "category": "harvested",
-      "holdout": false,
+      "id": "multi-combat-vs-power",
+      "category": "multi-family",
+      "holdout": true,
       "band": "confirm",
       "method": "choice",
       "selected": null,
-      "candidateId": "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0",
+      "candidateId": "combat:firebolt-wolf-37",
       "acceptable": [
-        null
+        "combat:firebolt-wolf-37"
       ],
-      "selectedCorrect": true,
+      "selectedCorrect": false,
       "deferred": true,
-      "correct": true,
-      "topSignal": 0.58,
-      "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:159e90a93cb6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
+      "correct": false,
       "topSignal": 0.59,
+      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
+    },
+    {
+      "id": "multi-combat-vs-power",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-wolf-37",
+      "acceptable": [
+        "combat:firebolt-wolf-37"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.59,
+      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
+    },
+    {
+      "id": "unsupported-question",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-question",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-question",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-hypothetical",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-hypothetical",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-hypothetical",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-two-actions",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-two-actions",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-two-actions",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-choice-question",
+      "category": "unsupported",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-choice-question",
+      "category": "unsupported",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-choice-question",
+      "category": "unsupported",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-fireball",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-fireball",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-fireball",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-destination",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-destination",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-destination",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-sword",
+      "category": "unadvertised",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-sword",
+      "category": "unadvertised",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-sword",
+      "category": "unadvertised",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-no-candidates",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-no-candidates",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-no-candidates",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-weather",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-weather",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-weather",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-innkeeper",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-innkeeper",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-innkeeper",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-joke",
+      "category": "small-talk",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-joke",
+      "category": "small-talk",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-joke",
+      "category": "small-talk",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:04e62a0ddd47",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:04e62a0ddd47",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:04e62a0ddd47",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:09c974ce40a5",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2; not acceptable"
+    },
+    {
+      "id": "harvested:09c974ce40a5",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2; not acceptable"
+    },
+    {
+      "id": "harvested:09c974ce40a5",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected inventory-candidate:fed332e8091405e4ee6b0cccacc4c01cb5c7acad79236ad2; not acceptable"
+    },
+    {
+      "id": "harvested:0afb961efdec",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:0afb961efdec",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:0afb961efdec",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:0ec73aec02e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:0ec73aec02e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:0ec73aec02e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:0ed8b80e4a05",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:0ed8b80e4a05",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:0ed8b80e4a05",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:159e90a93cb6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.65,
+      "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:159e90a93cb6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:159e90a93cb6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.63,
       "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
     },
     {
       "id": "harvested:1826f4fd5e50",
       "category": "harvested",
       "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9",
+      "acceptable": [
+        "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.48,
+      "reason": "deferred (fallback); expected combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9; not acceptable"
+    },
+    {
+      "id": "harvested:1826f4fd5e50",
+      "category": "harvested",
+      "holdout": false,
       "band": "confirm",
       "method": "choice",
       "selected": null,
@@ -22511,7 +22528,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.5,
+      "topSignal": 0.51,
       "reason": "deferred (confirm, recorded combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9); expected combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9; not acceptable"
     },
     {
@@ -22529,23 +22546,6 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.5,
-      "reason": "deferred (confirm, recorded combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9); expected combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9; not acceptable"
-    },
-    {
-      "id": "harvested:1826f4fd5e50",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9",
-      "acceptable": [
-        "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.52,
       "reason": "deferred (confirm, recorded combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9); expected combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9; not acceptable"
     },
     {
@@ -22868,7 +22868,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.27,
+      "topSignal": 0.21,
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
@@ -22885,7 +22885,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.27,
+      "topSignal": 0.23,
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
@@ -22970,7 +22970,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.42,
+      "topSignal": 0.38,
       "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
     },
     {
@@ -22987,7 +22987,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.45,
+      "topSignal": 0.4,
       "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
     },
     {
@@ -23004,7 +23004,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.39,
+      "topSignal": 0.41,
       "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
     },
     {
@@ -23480,7 +23480,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.57,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
     },
     {
@@ -23497,7 +23497,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.54,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
     },
     {
@@ -24133,8 +24133,8 @@
       "id": "harvested:5b3104cae1dc",
       "category": "harvested",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
       "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
       "acceptable": [
@@ -24143,15 +24143,15 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.49,
-      "reason": "deferred (fallback); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
+      "topSignal": 0.5,
+      "reason": "deferred (confirm, recorded rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
     },
     {
       "id": "harvested:5b3104cae1dc",
       "category": "harvested",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
       "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
       "acceptable": [
@@ -24160,15 +24160,15 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.46,
-      "reason": "deferred (fallback); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
+      "topSignal": 0.5,
+      "reason": "deferred (confirm, recorded rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
     },
     {
       "id": "harvested:5b3104cae1dc",
       "category": "harvested",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
       "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
       "acceptable": [
@@ -24177,8 +24177,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.49,
-      "reason": "deferred (fallback); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
+      "topSignal": 0.51,
+      "reason": "deferred (confirm, recorded rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
     },
     {
       "id": "harvested:62684602d7e6",
@@ -24296,24 +24296,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.6900000000000001,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:649f071cf0e1",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.66,
+      "topSignal": 0.67,
       "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
     },
     {
@@ -24334,6 +24317,23 @@
       "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
     },
     {
+      "id": "harvested:649f071cf0e1",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.66,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
+    },
+    {
       "id": "harvested:66711ff7099e",
       "category": "harvested",
       "holdout": false,
@@ -24398,7 +24398,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.64,
+      "topSignal": 0.74,
       "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
     },
     {
@@ -24415,25 +24415,25 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.63,
+      "topSignal": 0.72,
       "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
     },
     {
       "id": "harvested:6b8359ca620b",
       "category": "harvested",
       "holdout": false,
-      "band": "confirm",
+      "band": "act",
       "method": "choice",
-      "selected": null,
+      "selected": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
       "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
       "acceptable": [
         "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
       ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.63,
-      "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.75,
+      "reason": "selected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d (act); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; acceptable"
     },
     {
       "id": "harvested:6ef5508ce70e",
@@ -24449,7 +24449,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.45,
+      "topSignal": 0.43,
       "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
     },
     {
@@ -24466,7 +24466,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.44,
+      "topSignal": 0.46,
       "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
     },
     {
@@ -24500,7 +24500,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.43,
+      "topSignal": 0.44,
       "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
     },
     {
@@ -24534,7 +24534,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.44,
+      "topSignal": 0.43,
       "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
     },
     {
@@ -24551,7 +24551,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.54,
+      "topSignal": 0.55,
       "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
     },
     {
@@ -24568,7 +24568,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.54,
+      "topSignal": 0.53,
       "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
     },
     {
@@ -24653,7 +24653,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.71,
+      "topSignal": 0.68,
       "reason": "deferred (confirm, recorded combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7); expected combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7; not acceptable"
     },
     {
@@ -24976,7 +24976,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.63,
       "reason": "deferred (confirm, recorded combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376); expected combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376; not acceptable"
     },
     {
@@ -24993,7 +24993,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.63,
+      "topSignal": 0.64,
       "reason": "deferred (confirm, recorded combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376); expected combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376; not acceptable"
     },
     {
@@ -25112,7 +25112,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.57,
+      "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
+    },
+    {
+      "id": "harvested:8edfb9c0137e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a",
+      "acceptable": [
+        "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.57,
       "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
     },
     {
@@ -25130,23 +25147,6 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.58,
-      "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
-    },
-    {
-      "id": "harvested:8edfb9c0137e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a",
-      "acceptable": [
-        "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
     },
     {
@@ -25384,7 +25384,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.37,
       "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
     },
     {
@@ -25401,7 +25401,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.35,
       "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
     },
     {
@@ -25520,23 +25520,6 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.79,
-      "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
-    },
-    {
-      "id": "harvested:ad10f3fc27d7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "act",
-      "method": "choice",
-      "selected": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
-      "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
-      "acceptable": [
-        "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
-      ],
-      "selectedCorrect": true,
-      "deferred": false,
-      "correct": true,
       "topSignal": 0.78,
       "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
     },
@@ -25554,7 +25537,24 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.78,
+      "topSignal": 0.76,
+      "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
+    },
+    {
+      "id": "harvested:ad10f3fc27d7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+      "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+      "acceptable": [
+        "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.81,
       "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
     },
     {
@@ -25606,6 +25606,23 @@
       "deferred": true,
       "correct": true,
       "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:adbcb3b5ee1a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.23,
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
@@ -25639,24 +25656,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.2,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:adbcb3b5ee1a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.21,
+      "topSignal": 0.22,
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
@@ -25724,7 +25724,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.37,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -25741,7 +25741,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.35,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -25758,7 +25758,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.34,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -26030,7 +26030,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.68,
+      "topSignal": 0.66,
       "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
@@ -26047,7 +26047,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.64,
+      "topSignal": 0.67,
       "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
@@ -26064,7 +26064,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.68,
+      "topSignal": 0.69,
       "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
@@ -26285,24 +26285,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
-      "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
-    },
-    {
-      "id": "harvested:c6487802fc34",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e",
-      "acceptable": [
-        "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.4,
+      "topSignal": 0.43,
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
@@ -26323,21 +26306,21 @@
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
-      "id": "harvested:ccc2d2cf0d15",
+      "id": "harvested:c6487802fc34",
       "category": "harvested",
       "holdout": false,
       "band": "fallback",
       "method": "defer",
       "selected": null,
-      "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80",
+      "candidateId": "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e",
       "acceptable": [
-        "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
+        "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.31,
-      "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
+      "topSignal": 0.42,
+      "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
       "id": "harvested:ccc2d2cf0d15",
@@ -26370,7 +26353,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.35,
+      "topSignal": 0.31,
+      "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
+    },
+    {
+      "id": "harvested:ccc2d2cf0d15",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80",
+      "acceptable": [
+        "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.37,
       "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
     },
     {
@@ -26785,23 +26785,6 @@
       "id": "harvested:e6f52fea4ac9",
       "category": "harvested",
       "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
-      "acceptable": [
-        "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.53,
-      "reason": "deferred (confirm, recorded rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
-    },
-    {
-      "id": "harvested:e6f52fea4ac9",
-      "category": "harvested",
-      "holdout": false,
       "band": "fallback",
       "method": "defer",
       "selected": null,
@@ -26812,7 +26795,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.46,
+      "topSignal": 0.44,
       "reason": "deferred (fallback); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
     },
     {
@@ -26829,7 +26812,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.49,
+      "topSignal": 0.48,
+      "reason": "deferred (fallback); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
+    },
+    {
+      "id": "harvested:e6f52fea4ac9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
+      "acceptable": [
+        "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.47000000000000003,
       "reason": "deferred (fallback); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
     },
     {
@@ -27086,23 +27086,6 @@
       "correct": true,
       "topSignal": null,
       "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:f2733fc20223",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941",
-      "acceptable": [
-        "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.26,
-      "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
     },
     {
       "id": "harvested:f2733fc20223",
@@ -27119,6 +27102,23 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.25,
+      "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
+    },
+    {
+      "id": "harvested:f2733fc20223",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941",
+      "acceptable": [
+        "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.26,
       "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
     },
     {
@@ -27353,8 +27353,8 @@
           "travel:mill-01"
         ],
         "conflicted": false,
-        "meanSignal": 0.52,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.5599999999999999,
+        "signalStdDev": 0.01414213562373091
       },
       {
         "caseId": "direct-travel-harbor",
@@ -27364,8 +27364,8 @@
           "travel:harbor-04"
         ],
         "conflicted": false,
-        "meanSignal": 0.42,
-        "signalStdDev": 0.014142135623730937
+        "meanSignal": 0.42333333333333334,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "direct-check-climb",
@@ -27375,8 +27375,8 @@
           "check:climb-05"
         ],
         "conflicted": false,
-        "meanSignal": 0.5133333333333333,
-        "signalStdDev": 0.018856180831641284
+        "meanSignal": 0.5366666666666667,
+        "signalStdDev": 0.016996731711975962
       },
       {
         "caseId": "direct-commerce-rope",
@@ -27386,8 +27386,8 @@
           "shop:buy-rope-07"
         ],
         "conflicted": false,
-        "meanSignal": 0.7766666666666667,
-        "signalStdDev": 0.016996731711975962
+        "meanSignal": 0.7866666666666667,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "direct-quest-accept",
@@ -27397,8 +27397,8 @@
           "quest:accept-harbor-09"
         ],
         "conflicted": false,
-        "meanSignal": 0.49333333333333335,
-        "signalStdDev": 0.016996731711975965
+        "meanSignal": 0.51,
+        "signalStdDev": 0.014142135623730965
       },
       {
         "caseId": "direct-progression-level",
@@ -27409,7 +27409,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.6233333333333334,
-        "signalStdDev": 0.009428090415820642
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "ambig-rest-long-short",
@@ -27419,8 +27419,8 @@
           "rest:long-12"
         ],
         "conflicted": false,
-        "meanSignal": 0.5566666666666668,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.5566666666666666,
+        "signalStdDev": 0.024944382578492918
       },
       {
         "caseId": "ambig-travel-watchtower",
@@ -27430,7 +27430,7 @@
           "travel:watchtower-16"
         ],
         "conflicted": false,
-        "meanSignal": 0.5966666666666667,
+        "meanSignal": 0.6033333333333334,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -27452,8 +27452,8 @@
           "power:mending-bryn-19"
         ],
         "conflicted": false,
-        "meanSignal": 0.6433333333333334,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.65,
+        "signalStdDev": 0.014142135623730963
       },
       {
         "caseId": "ambig-combat-power-target",
@@ -27463,8 +27463,8 @@
           "combat:firebolt-bandit-22"
         ],
         "conflicted": false,
-        "meanSignal": 0.6133333333333333,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.6066666666666666,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "ambig-commerce-sell",
@@ -27474,8 +27474,8 @@
           "shop:sell-ring-24"
         ],
         "conflicted": false,
-        "meanSignal": 0.6866666666666666,
-        "signalStdDev": 0.004714045207910269
+        "meanSignal": 0.7033333333333333,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "ambig-consumable-target",
@@ -27485,8 +27485,8 @@
           "consumable:heal-aster-25"
         ],
         "conflicted": false,
-        "meanSignal": 0.59,
-        "signalStdDev": 0.021602468994692887
+        "meanSignal": 0.6,
+        "signalStdDev": 0
       },
       {
         "caseId": "multi-check-vs-travel-trap",
@@ -27496,8 +27496,8 @@
           "check:force-gate-28"
         ],
         "conflicted": false,
-        "meanSignal": 0.57,
-        "signalStdDev": 0.008164965809277223
+        "meanSignal": 0.5800000000000001,
+        "signalStdDev": 0.016329931618554488
       },
       {
         "caseId": "multi-row-vs-travel",
@@ -27507,8 +27507,8 @@
           "check:row-30"
         ],
         "conflicted": false,
-        "meanSignal": 0.4466666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.44333333333333336,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "multi-quest-vs-travel",
@@ -27519,7 +27519,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.5166666666666667,
-        "signalStdDev": 0.012472191289246483
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "multi-commerce-vs-inventory",
@@ -27540,8 +27540,8 @@
           "rest:long-35"
         ],
         "conflicted": false,
-        "meanSignal": 0.54,
-        "signalStdDev": 0.014142135623730963
+        "meanSignal": 0.5566666666666668,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "multi-combat-vs-power",
@@ -27551,8 +27551,8 @@
           "combat:firebolt-wolf-37"
         ],
         "conflicted": false,
-        "meanSignal": 0.5966666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.6,
+        "signalStdDev": 0.014142135623730963
       },
       {
         "caseId": "unsupported-question",
@@ -27738,8 +27738,8 @@
           "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0"
         ],
         "conflicted": false,
-        "meanSignal": 0.5966666666666667,
-        "signalStdDev": 0.016996731711975962
+        "meanSignal": 0.6266666666666666,
+        "signalStdDev": 0.020548046676563275
       },
       {
         "caseId": "harvested:1826f4fd5e50",
@@ -27749,8 +27749,8 @@
           "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9"
         ],
         "conflicted": false,
-        "meanSignal": 0.5066666666666667,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.49666666666666665,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "harvested:1939fe92d69c",
@@ -27826,8 +27826,8 @@
           "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365"
         ],
         "conflicted": false,
-        "meanSignal": 0.25,
-        "signalStdDev": 0.028284271247461912
+        "meanSignal": 0.21666666666666667,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "harvested:21db70ab1dba",
@@ -27848,8 +27848,8 @@
           "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
         ],
         "conflicted": false,
-        "meanSignal": 0.42,
-        "signalStdDev": 0.02449489742783178
+        "meanSignal": 0.39666666666666667,
+        "signalStdDev": 0.012472191289246462
       },
       {
         "caseId": "harvested:22a75d63ff9d",
@@ -27958,8 +27958,8 @@
           "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
         ],
         "conflicted": false,
-        "meanSignal": 0.5633333333333334,
-        "signalStdDev": 0.016996731711975913
+        "meanSignal": 0.5666666666666668,
+        "signalStdDev": 0.00942809041582059
       },
       {
         "caseId": "harvested:3b8fd99efe8a",
@@ -28101,8 +28101,8 @@
           "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20"
         ],
         "conflicted": false,
-        "meanSignal": 0.48,
-        "signalStdDev": 0.014142135623730937
+        "meanSignal": 0.5033333333333333,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:62684602d7e6",
@@ -28134,8 +28134,8 @@
           "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92"
         ],
         "conflicted": false,
-        "meanSignal": 0.6666666666666666,
-        "signalStdDev": 0.016996731711975962
+        "meanSignal": 0.66,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "harvested:66711ff7099e",
@@ -28156,8 +28156,8 @@
           "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
         ],
         "conflicted": false,
-        "meanSignal": 0.6333333333333333,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.7366666666666667,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "harvested:6ef5508ce70e",
@@ -28168,7 +28168,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.4466666666666667,
-        "signalStdDev": 0.004714045207910321
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "harvested:70699991a6e3",
@@ -28190,7 +28190,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.5333333333333333,
-        "signalStdDev": 0.009428090415820642
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "harvested:787b57d44cdc",
@@ -28211,8 +28211,8 @@
           "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7"
         ],
         "conflicted": false,
-        "meanSignal": 0.6966666666666667,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.6866666666666666,
+        "signalStdDev": 0.004714045207910268
       },
       {
         "caseId": "harvested:7bc78db301fd",
@@ -28277,8 +28277,8 @@
           "combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376"
         ],
         "conflicted": false,
-        "meanSignal": 0.6166666666666667,
-        "signalStdDev": 0.012472191289246483
+        "meanSignal": 0.63,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "harvested:8b7843704f48",
@@ -28310,8 +28310,8 @@
           "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
         ],
         "conflicted": false,
-        "meanSignal": 0.58,
-        "signalStdDev": 0.016329931618554488
+        "meanSignal": 0.5733333333333333,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:92970b2d312b",
@@ -28366,7 +28366,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.35666666666666663,
-        "signalStdDev": 0.004714045207910321
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "harvested:9d1a3d4d3df1",
@@ -28399,7 +28399,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.7833333333333333,
-        "signalStdDev": 0.004714045207910321
+        "signalStdDev": 0.020548046676563275
       },
       {
         "caseId": "harvested:ad383d4f9924",
@@ -28420,8 +28420,8 @@
           "quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a"
         ],
         "conflicted": false,
-        "meanSignal": 0.20666666666666667,
-        "signalStdDev": 0.004714045207910308
+        "meanSignal": 0.22,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "harvested:b1446f731e6d",
@@ -28442,8 +28442,8 @@
           "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7"
         ],
         "conflicted": false,
-        "meanSignal": 0.36000000000000004,
-        "signalStdDev": 5.551115123125783e-17
+        "meanSignal": 0.35333333333333333,
+        "signalStdDev": 0.012472191289246462
       },
       {
         "caseId": "harvested:b2c96f78d1fb",
@@ -28508,8 +28508,8 @@
           "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
         ],
         "conflicted": false,
-        "meanSignal": 0.6666666666666666,
-        "signalStdDev": 0.018856180831641284
+        "meanSignal": 0.6733333333333333,
+        "signalStdDev": 0.012472191289246433
       },
       {
         "caseId": "harvested:baf07348c6f2",
@@ -28563,8 +28563,8 @@
           "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e"
         ],
         "conflicted": false,
-        "meanSignal": 0.3833333333333333,
-        "signalStdDev": 0.016996731711975962
+        "meanSignal": 0.41333333333333333,
+        "signalStdDev": 0.01699673171197594
       },
       {
         "caseId": "harvested:ccc2d2cf0d15",
@@ -28574,8 +28574,8 @@
           "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
         ],
         "conflicted": false,
-        "meanSignal": 0.33,
-        "signalStdDev": 0.016329931618554512
+        "meanSignal": 0.33666666666666667,
+        "signalStdDev": 0.02494438257849294
       },
       {
         "caseId": "harvested:d00089bb4860",
@@ -28673,8 +28673,8 @@
           "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
         ],
         "conflicted": false,
-        "meanSignal": 0.49333333333333335,
-        "signalStdDev": 0.02867441755680876
+        "meanSignal": 0.4633333333333333,
+        "signalStdDev": 0.016996731711975948
       },
       {
         "caseId": "harvested:e806de3c9818",
@@ -28791,27 +28791,27 @@
     "meanAgreement": 1,
     "conflictCases": 0,
     "conflictRate": 0,
-    "meanSignalStdDev": 0.011602375538012136,
-    "maxSignalStdDev": 0.02867441755680876
+    "meanSignalStdDev": 0.011148978478816537,
+    "maxSignalStdDev": 0.02494438257849294
   },
   "calibration": {
     "fitted": {
-      "a": 2.857713846084124,
-      "b": 1.6996289711812833
+      "a": 2.850378478423435,
+      "b": 1.6370941693696432
     },
     "devSamples": 6,
     "holdoutSamples": 0,
     "allRaw": {
       "samples": 6,
       "accuracy": 1,
-      "brier": 0.04576666666666665,
-      "expectedCalibrationError": 0.2133333333333332
+      "brier": 0.04344999999999998,
+      "expectedCalibrationError": 0.20833333333333326
     },
     "allCalibrated": {
       "samples": 6,
       "accuracy": 1,
-      "brier": 0.000021919002938162112,
-      "expectedCalibrationError": 0.004501997109673694
+      "brier": 0.000019055986395911968,
+      "expectedCalibrationError": 0.004334591151736844
     },
     "holdoutRaw": {
       "samples": 0,
@@ -28870,9 +28870,9 @@
       },
       {
         "threshold": 0.45,
-        "acted": 50,
+        "acted": 49,
         "total": 54,
-        "coverage": 0.9259259259259259,
+        "coverage": 0.9074074074074074,
         "actedAccuracy": 1
       },
       {
@@ -28884,16 +28884,16 @@
       },
       {
         "threshold": 0.55,
-        "acted": 34,
+        "acted": 38,
         "total": 54,
-        "coverage": 0.6296296296296297,
+        "coverage": 0.7037037037037037,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 23,
+        "acted": 25,
         "total": 54,
-        "coverage": 0.42592592592592593,
+        "coverage": 0.46296296296296297,
         "actedAccuracy": 1
       },
       {
@@ -28905,9 +28905,9 @@
       },
       {
         "threshold": 0.7,
-        "acted": 6,
+        "acted": 9,
         "total": 54,
-        "coverage": 0.1111111111111111,
+        "coverage": 0.16666666666666666,
         "actedAccuracy": 1
       },
       {
@@ -28935,9 +28935,9 @@
       },
       {
         "threshold": 0.45,
-        "acted": 35,
+        "acted": 34,
         "total": 36,
-        "coverage": 0.9722222222222222,
+        "coverage": 0.9444444444444444,
         "actedAccuracy": 1
       },
       {
@@ -28949,16 +28949,16 @@
       },
       {
         "threshold": 0.55,
-        "acted": 24,
+        "acted": 26,
         "total": 36,
-        "coverage": 0.6666666666666666,
+        "coverage": 0.7222222222222222,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 15,
+        "acted": 19,
         "total": 36,
-        "coverage": 0.4166666666666667,
+        "coverage": 0.5277777777777778,
         "actedAccuracy": 1
       },
       {
@@ -29014,16 +29014,16 @@
       },
       {
         "threshold": 0.55,
-        "acted": 10,
+        "acted": 12,
         "total": 18,
-        "coverage": 0.5555555555555556,
+        "coverage": 0.6666666666666666,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 8,
+        "acted": 6,
         "total": 18,
-        "coverage": 0.4444444444444444,
+        "coverage": 0.3333333333333333,
         "actedAccuracy": 1
       },
       {
@@ -29035,10 +29035,10 @@
       },
       {
         "threshold": 0.7,
-        "acted": 0,
+        "acted": 3,
         "total": 18,
-        "coverage": 0,
-        "actedAccuracy": 0
+        "coverage": 0.16666666666666666,
+        "actedAccuracy": 1
       },
       {
         "threshold": 0.75,
@@ -29073,9 +29073,9 @@
         },
         {
           "threshold": 0.45,
-          "acted": 50,
+          "acted": 49,
           "total": 54,
-          "coverage": 0.9259259259259259,
+          "coverage": 0.9074074074074074,
           "actedAccuracy": 1
         },
         {
@@ -29087,16 +29087,16 @@
         },
         {
           "threshold": 0.55,
-          "acted": 34,
+          "acted": 38,
           "total": 54,
-          "coverage": 0.6296296296296297,
+          "coverage": 0.7037037037037037,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.6,
-          "acted": 23,
+          "acted": 25,
           "total": 54,
-          "coverage": 0.42592592592592593,
+          "coverage": 0.46296296296296297,
           "actedAccuracy": 1
         },
         {
@@ -29108,9 +29108,9 @@
         },
         {
           "threshold": 0.7,
-          "acted": 6,
+          "acted": 9,
           "total": 54,
-          "coverage": 0.1111111111111111,
+          "coverage": 0.16666666666666666,
           "actedAccuracy": 1
         },
         {
@@ -29130,22 +29130,22 @@
       "threshold": 0.75,
       "calibration": {
         "fitted": {
-          "a": 2.857713846084124,
-          "b": 1.6996289711812833
+          "a": 2.850378478423435,
+          "b": 1.6370941693696432
         },
         "devSamples": 6,
         "holdoutSamples": 0,
         "allRaw": {
           "samples": 6,
           "accuracy": 1,
-          "brier": 0.04576666666666665,
-          "expectedCalibrationError": 0.2133333333333332
+          "brier": 0.04344999999999998,
+          "expectedCalibrationError": 0.20833333333333326
         },
         "allCalibrated": {
           "samples": 6,
           "accuracy": 1,
-          "brier": 0.000021919002938162112,
-          "expectedCalibrationError": 0.004501997109673694
+          "brier": 0.000019055986395911968,
+          "expectedCalibrationError": 0.004334591151736844
         },
         "holdoutRaw": {
           "samples": 0,
@@ -29181,34 +29181,34 @@
       "threshold": 0.4,
       "calibration": {
         "fitted": {
-          "a": 1.5257316562040386,
-          "b": 4.144215800217139
+          "a": 1.6183609094547773,
+          "b": 4.0798252567100874
         },
         "devSamples": 36,
         "holdoutSamples": 18,
         "allRaw": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.18317037037037037,
-          "expectedCalibrationError": 0.4166666666666668
+          "brier": 0.1759925925925926,
+          "expectedCalibrationError": 0.40814814814814815
         },
         "allCalibrated": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.00015509870746567884,
-          "expectedCalibrationError": 0.010910119079130975
+          "brier": 0.00016062806188880792,
+          "expectedCalibrationError": 0.010867609023415992
         },
         "holdoutRaw": {
           "samples": 18,
           "accuracy": 1,
-          "brier": 0.20265,
-          "expectedCalibrationError": 0.44166666666666665
+          "brier": 0.19544444444444442,
+          "expectedCalibrationError": 0.43333333333333335
         },
         "holdoutCalibrated": {
           "samples": 18,
           "accuracy": 1,
-          "brier": 0.00020512503913757633,
-          "expectedCalibrationError": 0.012540898545092105
+          "brier": 0.00021526695289937115,
+          "expectedCalibrationError": 0.012616405201879899
         }
       },
       "gate": {
@@ -29227,12 +29227,12 @@
         "metrics": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.00015509870746567884,
-          "expectedCalibrationError": 0.010910119079130975
+          "brier": 0.00016062806188880792,
+          "expectedCalibrationError": 0.010867609023415992
         },
         "calibration": {
-          "a": 1.5257316562040386,
-          "b": 4.144215800217139
+          "a": 1.6183609094547773,
+          "b": 4.0798252567100874
         },
         "promotedAt": "2026-09-19",
         "evidence": "docs/system-one-adventure-benchmark.md"
@@ -29243,12 +29243,12 @@
     "metrics": {
       "samples": 54,
       "accuracy": 1,
-      "brier": 0.00015509870746567884,
-      "expectedCalibrationError": 0.010910119079130975
+      "brier": 0.00016062806188880792,
+      "expectedCalibrationError": 0.010867609023415992
     },
     "calibration": {
-      "a": 1.5257316562040386,
-      "b": 4.144215800217139
+      "a": 1.6183609094547773,
+      "b": 4.0798252567100874
     },
     "promotedAt": "2026-09-19",
     "evidence": "docs/system-one-adventure-benchmark.md"
