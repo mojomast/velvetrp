@@ -255,6 +255,28 @@ The two tuning notes above are implemented, plus the diversity signal the SRD re
   approved, and a lane-origin execution committed (no provider evidence, combat revision 10) and
   healed the fighter to 10 HP; a sibling proposal the persona never approved correctly did not
   execute.
+- **Residual: single-option choice hedging.** With two interchangeable potions collapsed to one
+  battery question, the model still answered `best_candidate = none_of_these` (0.59) against the
+  sole candidate (0.41) while scoring its relevance 0.92 and `supported` 0.91, so the lane
+  deferred and the provider committed the potion instead. The collapse fixed duplicate ambiguity;
+  the aggregate choice question remains the deferral bottleneck when only one candidate is
+  offered, and is the next composer iteration.
+
+### Adventure consistency audit (2026-09-19)
+
+`scripts/audit-adventure-consistency.ts` joins, per adventure turn: the declaration, the
+adventure-selection lane pick, provider tool calls, proposals and confirmation decisions,
+per-turn receipts, and the narration. It emits conservative review signals in five classes:
+`claim-without-receipt` (a narrated action family has no matching receipt or proposal; receipt
+content counts, so a healing combat power backs a healing claim), `receipt-without-claim`
+(informational), `lane-act-uncommitted` (an act pick with no proposal is actionable; a bound
+proposal awaiting confirmation is informational), `combat-outcome-mismatch` (hit/miss/defeat
+claims against combat receipt outcomes and standing combatants), and `narration-missing`. Every
+flag carries its matched evidence and a `signal` confidence; the lexical detection is deliberately
+bounded and documented as a review aid, not a verdict. First runs were clean on the combat world
+(three lane/provider commits) and produced a single informational flag on the earlier world where
+a persona rejected a lane potion proposal; the audit also caught and fixed one of its own false
+positives (a healing combat power not backing a healing claim) before use.
 
 ## Method survey
 
