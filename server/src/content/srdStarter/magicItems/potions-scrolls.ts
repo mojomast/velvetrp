@@ -15,9 +15,9 @@ export function magicPotionsScrolls(refs: StarterReferences): object[] {
     key, power: ref("spell", `srd-5.1:spell:${slug}`), requireAttunement: false, actionCost, cost: 0,
   });
 
-  const consumable = (id: string, name: string, description: string, kind: "potion" | "scroll", amount: number, grantedPowers: object[] = []) => ({
+  const consumable = (id: string, name: string, description: string, kind: "potion" | "scroll", amount: number, grantedPowers: object[] = [], effects: object[] = []) => ({
     reference: ref("item", `srd-5.1:item:${id}`), name, description, tags: ["srd-5.1", "magic-item", kind],
-    mechanics: { category: "consumable", stackable: true, slot: null, price: { currency, amount }, effects: [], magic: { attunement: null, charges: null, passiveModifiers: [], grantedPowers } },
+    mechanics: { category: "consumable", stackable: true, slot: null, price: { currency, amount }, effects, magic: { attunement: null, charges: null, passiveModifiers: [], grantedPowers } },
   });
 
   return [
@@ -38,10 +38,10 @@ export function magicPotionsScrolls(refs: StarterReferences): object[] {
     consumable("potion-of-cloud-giant-strength", "Potion of Cloud Giant Strength", "A potion that raises the drinker's Strength score to 27 for 1 hour.", "potion", 50000),
     consumable("potion-of-storm-giant-strength", "Potion of Storm Giant Strength", "A potion that raises the drinker's Strength score to 29 for 1 hour.", "potion", 500000),
     consumable("potion-of-growth", "Potion of Growth", "A potion that enlarges its drinker as the enlarge effect of the enlarge/reduce spell for 1d4 hours.", "potion", 500, [granted("potion-growth-enlarge-reduce", "enlarge-reduce")]),
-    consumable("potion-of-healing", "Potion of Healing", "A common potion that restores 2d4 + 2 hit points to the creature that drinks it.", "potion", 50),
-    consumable("potion-of-healing-greater", "Potion of Greater Healing", "An uncommon potion that restores 4d4 + 4 hit points to the creature that drinks it.", "potion", 500),
-    consumable("potion-of-healing-superior", "Potion of Superior Healing", "A rare potion that restores 8d4 + 8 hit points to the creature that drinks it.", "potion", 5000),
-    consumable("potion-of-healing-supreme", "Potion of Supreme Healing", "A very rare potion that restores 10d4 + 20 hit points to the creature that drinks it.", "potion", 50000),
+    consumable("potion-of-healing", "Potion of Healing", "A common potion that restores 2d4 + 2 hit points to the creature that drinks it.", "potion", 50, [], [{ type: "healing", dice: { count: 2, sides: 4, modifier: 2 } }]),
+    consumable("potion-of-healing-greater", "Potion of Greater Healing", "An uncommon potion that restores 4d4 + 4 hit points to the creature that drinks it.", "potion", 500, [], [{ type: "healing", dice: { count: 4, sides: 4, modifier: 4 } }]),
+    consumable("potion-of-healing-superior", "Potion of Superior Healing", "A rare potion that restores 8d4 + 8 hit points to the creature that drinks it.", "potion", 5000, [], [{ type: "healing", dice: { count: 8, sides: 4, modifier: 8 } }]),
+    consumable("potion-of-healing-supreme", "Potion of Supreme Healing", "A very rare potion that restores 10d4 + 20 hit points to the creature that drinks it.", "potion", 50000, [], [{ type: "healing", dice: { count: 10, sides: 4, modifier: 20 } }]),
     consumable("potion-of-heroism", "Potion of Heroism", "A potion that grants 10 temporary hit points and the effects of the heroism spell for 1 hour.", "potion", 5000, [granted("potion-heroism-heroism", "heroism")]),
     consumable("potion-of-invisibility", "Potion of Invisibility", "A potion that turns its drinker and carried gear invisible for 1 hour.", "potion", 50000, [granted("potion-invisibility-invisibility", "invisibility")]),
     consumable("potion-of-mind-reading", "Potion of Mind Reading", "A potion that grants its drinker the effects of the detect thoughts spell for 1 hour.", "potion", 5000, [granted("potion-mind-reading-detect-thoughts", "detect-thoughts")]),
