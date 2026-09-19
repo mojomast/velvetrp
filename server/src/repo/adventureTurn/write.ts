@@ -37,6 +37,17 @@ export interface AppendAdventureRestProposalFromLaneInput {
   idempotencyKey: string;
 }
 
+/** One lane-origin combat proposal request binding an already-recorded decision to an advertised candidate. */
+export interface AppendAdventureCombatProposalFromLaneInput {
+  turnId: string;
+  decisionId: string;
+  candidateId: string;
+  digest: string;
+  expectedTurnRevision: number;
+  expectedCampaignRevision: number;
+  idempotencyKey: string;
+}
+
 type Database = DatabaseDriver.Database;
 type AggregateKind = "turn" | "draft";
 type Action = "turn" | "provider" | "draft";
@@ -57,6 +68,14 @@ export interface AdventureTurnWriteRepository {
    * confirmation API. Replay-safe per decision and selection.
    */
   appendAdventureRestProposalFromLane(principalId: string, input: AppendAdventureRestProposalFromLaneInput): PrivateAdventureTurn;
+  /**
+   * Appends the normal confirmation-required combat proposal for one advertised lane candidate.
+   * The already-recorded decision, the advertised `combat-consumable`/`combat-power` digest, and
+   * the exact provider-shaped tool arguments derived from the candidate are validated, the binding
+   * is written with `origin='lane'` and the decision id, and mechanics still commit only through
+   * the ordinary confirmation API. Replay-safe per decision and selection.
+   */
+  appendAdventureCombatProposalFromLane(principalId: string, input: AppendAdventureCombatProposalFromLaneInput): PrivateAdventureTurn;
   /** Persists the exact confirmation wait command and immutable result. */
   waitForToolConfirmation(principalId: string, input: TurnMutationInput): PrivateAdventureTurn;
   /** Records one exact, non-expired proposal decision. */
@@ -92,7 +111,7 @@ export interface AdventureTurnWriteRepository {
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, nested) => nested && typeof nested === "object" && !Array.isArray(nested)
   ? Object.fromEntries(Object.entries(nested as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right))) : nested);
 const sha256 = (value: string): string => createHash("sha256").update(value).digest("hex");
-const laneRestProposalInputSchema = z.object({
+const laneProposalInputSchema = z.object({
   turnId: resourceIdSchema,
   decisionId: resourceIdSchema,
   candidateId: resourceIdSchema,
@@ -367,25 +386,29 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
           const args=input.arguments as Record<string,unknown>,kind=commandType(input.toolName)==="power_action"?"power":commandType(input.toolName)==="rest_action"?"rest":commandType(input.toolName)==="combat_consumable_action"?"combat-consumable":commandType(input.toolName)==="combat_power_action"?"combat-power":commandType(input.toolName)==="progression_action"?"progression":input.toolName==="quest_accept"?"quest-accept":input.toolName==="quest_abandon"?"quest-abandon":"quest-reward";
           const candidate=db.prepare("SELECT candidate_digest,action_kind,public_json,session_id,batch_id FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?")
             .get(args.candidateId,row.id)as any;
-          const laneDecisionId=kind==="rest"&&typeof args.systemOneDecisionId==="string"?args.systemOneDecisionId:null;
+          const laneKinds=kind==="rest"||kind==="combat-consumable"||kind==="combat-power";
+          const laneDecisionId=laneKinds&&typeof args.systemOneDecisionId==="string"?args.systemOneDecisionId:null;
           if(laneDecisionId){
-            // Lane-origin rest proposal: the decision must already exist and match the turn, the
-            // selection must be an advertised rest candidate whose batch projection verifies, and
-            // the derived server policy must still require confirmation. Only the ordinary
-            // confirmation API can approve the proposal; nothing commits here.
+            // Lane-origin proposal: the decision must already exist and match the turn, the
+            // selection must be an advertised exact-action candidate whose batch projection
+            // verifies, and the derived server policy must still require confirmation. Only the
+            // ordinary confirmation API can approve the proposal; nothing commits here. Rest
+            // derives its tool name from the advertised rest kind; the combat families expose
+            // fixed server tool names.
             const batch=candidate&&db.prepare("SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?").get(candidate.batch_id)as any;
             let projection:any=null;try{projection=batch&&JSON.parse(batch.projection_json);}catch{projection=null;}
             const decision=db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(laneDecisionId)as any;
             let publicValue:any=null;try{publicValue=candidate&&JSON.parse(candidate.public_json);}catch{publicValue=null;}
-            const derivedToolName=publicValue?.restKind==="short"?"rest_short":publicValue?.restKind==="long"?"rest_long":null;
-            if(!candidate||candidate.action_kind!=="rest"||candidate.candidate_digest!==args.digest||!batch
+            const derivedToolName=kind==="rest"?(publicValue?.restKind==="short"?"rest_short":publicValue?.restKind==="long"?"rest_long":null)
+              :kind==="combat-consumable"?"combat_consumable_use":"combat_power_use";
+            if(!candidate||candidate.action_kind!==kind||candidate.candidate_digest!==args.digest||!batch
               ||sha256(batch.projection_json)!==batch.projection_digest||!Array.isArray(projection?.candidates)
               ||!projection.candidates.some((entry:any)=>entry?.candidateId===args.candidateId&&entry?.digest===args.digest)
               ||!decision||decision.turn_id!==row.id||derivedToolName!==input.toolName
               ||(decision.campaign_id!==null&&decision.campaign_id!==row.campaign_id)
               ||(decision.session_id!==null&&decision.session_id!==candidate.session_id))
-              throw new AdventureTurnConflictError("adventure rest proposal is not bound to an advertised lane candidate");
-            if(!policy.requiresConfirmation)throw new AdventureTurnConflictError("adventure rest proposal requires confirmation");
+              throw new AdventureTurnConflictError(`adventure ${kind} proposal is not bound to an advertised lane candidate`);
+            if(!policy.requiresConfirmation)throw new AdventureTurnConflictError(`adventure ${kind} proposal requires confirmation`);
             db.prepare(`INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,origin,
               provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,'lane',NULL,NULL,?,?,?)`)
               .run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,kind,laneDecisionId,executionKey,at);
@@ -420,7 +443,7 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       return finish("turn", row, principalId, "proposal-append", input, input.expectedTurnRevision, "proposed", "none", at, () => privateTurn(principalId, row.id));
     }); },
     appendAdventureRestProposalFromLane(principalId, raw) {
-      const input = laneRestProposalInputSchema.parse(raw);
+      const input = laneProposalInputSchema.parse(raw);
       return immediate(() => {
         const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
         const candidate = db.prepare(`SELECT candidate_id,candidate_digest,action_kind,public_json,session_id,batch_id
@@ -454,6 +477,67 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
           toolName: restKind === "short" ? "rest_short" : "rest_long",
           arguments: { candidateId: input.candidateId, digest: input.digest, systemOneDecisionId: input.decisionId,
             restName: publicValue.restName, recovery: publicValue.recovery },
+          requiresConfirmation: true,
+          confirmationExpiresAt: utcIsoTimestampSchema.parse(new Date(context.clock.now().getTime() + 30 * 60_000).toISOString()),
+          expectedTurnRevision: input.expectedTurnRevision,
+          expectedCampaignRevision: input.expectedCampaignRevision,
+          idempotencyKey: input.idempotencyKey,
+        });
+      });
+    },
+    appendAdventureCombatProposalFromLane(principalId, raw) {
+      const input = laneProposalInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const candidate = db.prepare(`SELECT candidate_id,candidate_digest,action_kind,public_json,private_json,session_id,batch_id
+          FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?`).get(input.candidateId, row.id) as any;
+        const batch = candidate && db.prepare("SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?")
+          .get(candidate.batch_id) as any;
+        let projection: any = null; try { projection = batch && JSON.parse(batch.projection_json); } catch { projection = null; }
+        let publicValue: any = null; try { publicValue = candidate && JSON.parse(candidate.public_json); } catch { publicValue = null; }
+        let privateValue: any = null; try { privateValue = candidate && JSON.parse(candidate.private_json); } catch { privateValue = null; }
+        const decision = db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(input.decisionId) as any;
+        const actionKind = candidate?.action_kind;
+        const combatKind = actionKind === "combat-consumable" || actionKind === "combat-power";
+        if (!candidate || !combatKind || candidate.candidate_digest !== input.digest || !batch
+          || sha256(batch.projection_json) !== batch.projection_digest || !Array.isArray(projection?.candidates)
+          || !projection.candidates.some((entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest)
+          || !decision || decision.turn_id !== row.id
+          || (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id)
+          || (decision.session_id !== null && decision.session_id !== candidate.session_id))
+          throw new AdventureTurnConflictError("adventure combat proposal is not bound to an advertised lane candidate");
+        const existing = db.prepare("SELECT binding.* FROM adventure_exact_action_proposal_bindings_v56 binding WHERE binding.campaign_id=? AND binding.turn_id=?")
+          .get(row.campaign_id, row.id) as any;
+        if (existing) {
+          if (existing.origin === "lane" && existing.system_one_decision_id === input.decisionId
+            && existing.candidate_id === input.candidateId && existing.candidate_digest === input.digest)
+            return privateTurn(principalId, row.id);
+          throw new AdventureTurnConflictError("adventure combat proposal replay changed");
+        }
+        // The advertised candidate owns every mechanical field; the lane proposal mirrors the
+        // provider path's exact argument shape minus its provider evidence. A candidate that
+        // cannot produce that shape stays advisory and is rejected before any proposal is written.
+        const consumable = actionKind === "combat-consumable";
+        const powerName = consumable ? publicValue?.itemName : publicValue?.powerName;
+        const powerCosts = consumable
+          ? ["1 action", `consume ${publicValue?.quantity} ${publicValue?.itemName}`]
+          : ["1 action", ...(Array.isArray(publicValue?.costs) ? publicValue.costs : [])];
+        const exactConsequences = Array.isArray(publicValue?.consequences);
+        if (typeof powerName !== "string" || !powerName || typeof publicValue?.target !== "string" || !publicValue.target
+          || !exactConsequences || (consumable && (!Number.isSafeInteger(publicValue?.quantity) || publicValue.quantity < 1))
+          || typeof privateValue?.encounterId !== "string" || !privateValue.encounterId
+          || !Number.isSafeInteger(privateValue?.expectedCombatRevision))
+          throw new AdventureTurnConflictError("adventure combat candidate is unavailable");
+        // The single shared proposal implementation derives the confirmation policy, writes the
+        // origin='lane' binding through its exact-action branch, and advances the turn to `proposed`.
+        return repository.appendToolProposal(principalId, {
+          turnId: input.turnId,
+          toolName: consumable ? "combat_consumable_use" : "combat_power_use",
+          arguments: { candidateId: input.candidateId, digest: input.digest, systemOneDecisionId: input.decisionId,
+            powerName, powerTargets: [publicValue.target], powerCosts,
+            ...(consumable ? { combatConsumableConsequences: publicValue.consequences }
+              : { combatPowerConsequences: publicValue.consequences }),
+            encounterId: privateValue.encounterId, expectedCombatRevision: privateValue.expectedCombatRevision },
           requiresConfirmation: true,
           confirmationExpiresAt: utcIsoTimestampSchema.parse(new Date(context.clock.now().getTime() + 30 * 60_000).toISOString()),
           expectedTurnRevision: input.expectedTurnRevision,

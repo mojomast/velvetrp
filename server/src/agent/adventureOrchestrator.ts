@@ -71,7 +71,8 @@ const productionDependencies: AdventureAgentDependencies = {
  * Resolves the adventure-selection lane when the feature, setting, and key are on and the lane
  * mode is not `off`. An `active` mode is only meaningful when the lane is promoted: the
  * orchestrator then commits a check pick directly and prepares the normal confirmation-required
- * rest proposal; every other case records an advisory shadow decision and keeps the provider path.
+ * rest or combat proposal; every other case records an advisory shadow decision and keeps the
+ * provider path.
  */
 export async function resolveSystemOneAdventure(): Promise<SystemOneAdventureDependency | undefined> {
   if (!readRpgFeatureFlags().systemOne) return undefined;
@@ -191,13 +192,13 @@ export function adventureShadowCandidateUnion(families: {
  * the turn.
  *
  * Active branch: when the lane mode is `active`, the lane is promoted, the composed band is
- * `act`, and the composed pick is exactly an `exact_srd_check.select` or `exact_rest.select`
- * candidate, the pick is committed through the lane-origin repository path and the refreshed
- * turn is returned so the caller can skip provider planning. The check commits directly; a rest
- * proposal always requires confirmation, so the lane only appends the normal
- * confirmation-required proposal (bound with `origin='lane'`) and the turn waits for the normal
- * confirmation API — a lane-origin rest commit can never bypass confirmation. Every other case
- * stays record-only.
+ * `act`, and the composed pick is exactly an `exact_srd_check.select` or an
+ * `exact_rest.select`/`exact_combat_consumable.select`/`exact_combat_power.select` candidate, the
+ * pick is committed through the lane-origin repository path and the refreshed turn is returned so
+ * the caller can skip provider planning. The check commits directly; a rest or combat proposal
+ * always requires confirmation, so the lane only appends the normal confirmation-required
+ * proposal (bound with `origin='lane'`) and the turn waits for the normal confirmation API — a
+ * lane-origin commit can never bypass confirmation. Every other case stays record-only.
  *
  * Decision ordering: the lane-origin commit validates that the decision row already exists and
  * `system_one_decisions_v1` is insert-only (update/delete/replace all abort), so a `shadow:false`
@@ -263,10 +264,11 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
       repository.executeAdventureCheckCandidateFromLane(OWNER, { turnId: turn.turnId, decisionId, selection });
       return { turn: privateTurn(repository, turn.turnId), outcome: "mechanics-committed" };
     }
-    // The rest family keeps the provider path's confirmation rule: the lane only appends the
-    // normal confirmation-required proposal (binding origin='lane'), then the turn waits for the
-    // ordinary confirmation API. The approved proposal commits on the normal resume loop through
-    // executeApprovedAgentProposalAtomically; an unapproved lane proposal can never commit.
+    // The rest and combat families keep the provider path's confirmation rule: the lane only
+    // appends the normal confirmation-required proposal (binding origin='lane'), then the turn
+    // waits for the ordinary confirmation API. The approved proposal commits on the normal resume
+    // loop through executeApprovedAgentProposalAtomically; an unapproved lane proposal can never
+    // commit.
     if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
       && isLanePromoted("adventure-selection") && composed.band === "act"
       && selection !== null && picked?.kind === "exact_rest.select") {
@@ -278,6 +280,31 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
       });
       const proposal = proposed.toolCalls.at(-1)?.proposal;
       if (!proposal) throw new Error("lane rest proposal is unavailable");
+      if (proposal.confirmation.state === "pending") {
+        const waiting = repository.waitForToolConfirmation(OWNER, { turnId: proposed.turnId, expectedTurnRevision: proposed.revision,
+          expectedCampaignRevision: proposed.campaignRevision, idempotencyKey: key("agent-wait", proposed.turnId, proposal.proposalId) });
+        return { turn: waiting, outcome: "awaiting-confirmation" };
+      }
+      const execution = repository.executeApprovedAgentProposalAtomically(OWNER, proposed.turnId, proposal.proposalId);
+      if (execution.status === "replan") return null;
+      return { turn: execution.turn, outcome: "mechanics-committed" };
+    }
+    // The combat families follow the same lane path. The repository derives the exact
+    // `combat_consumable_use`/`combat_power_use` arguments from the advertised candidate and
+    // rejects an unadvertised, tampered, or undecidable candidate before any proposal is written,
+    // so a failure here records advisory only and the provider path stays unchanged.
+    if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
+      && isLanePromoted("adventure-selection") && composed.band === "act"
+      && selection !== null
+      && (picked?.kind === "exact_combat_consumable.select" || picked?.kind === "exact_combat_power.select")) {
+      record(true);
+      const proposed = repository.appendAdventureCombatProposalFromLane(OWNER, {
+        turnId: turn.turnId, decisionId, candidateId: selection.candidateId, digest: selection.digest,
+        expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
+        idempotencyKey: key("agent-lane-combat-proposal", turn.turnId, decisionId),
+      });
+      const proposal = proposed.toolCalls.at(-1)?.proposal;
+      if (!proposal) throw new Error("lane combat proposal is unavailable");
       if (proposal.confirmation.state === "pending") {
         const waiting = repository.waitForToolConfirmation(OWNER, { turnId: proposed.turnId, expectedTurnRevision: proposed.revision,
           expectedCampaignRevision: proposed.campaignRevision, idempotencyKey: key("agent-wait", proposed.turnId, proposal.proposalId) });
@@ -965,10 +992,10 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
 
   // Every recovery and resume path has returned above, so this is a fresh planning dispatch.
   // The adventure-selection lane is advisory unless it is promoted and active and confidently
-  // picks an `exact_srd_check.select` or `exact_rest.select` candidate; only then does it commit
-  // the check directly or leave the confirmation-required rest proposal waiting and return
-  // without provider planning. A lane failure is swallowed so it cannot affect a turn the provider
-  // would otherwise handle.
+  // picks an `exact_srd_check.select`, `exact_rest.select`, `exact_combat_consumable.select`, or
+  // `exact_combat_power.select` candidate; only then does it commit the check directly or leave
+  // the confirmation-required rest/combat proposal waiting and return without provider planning.
+  // A lane failure is swallowed so it cannot affect a turn the provider would otherwise handle.
   if (shadowCandidates.length > 0 && dependencies.getSystemOneAdventure) {
     try {
       const lane = await dependencies.getSystemOneAdventure();
