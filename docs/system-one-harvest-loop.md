@@ -250,6 +250,21 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   composes `act` at 0.910. Benchmark: the gated record is unchanged (54 acted/100%, Brier 0.0002,
   ECE 0.0109 at 0.40); the agent subset moved from 3 to **4 acted calls at 100%** over 300 calls
   (exact preferred 235/300, asserted 78.3%); stability 100% (0/131).
+- **Tenth wave (human-review tooling and thin-family coverage).** The gate's ceiling is human
+  review: only 1 of 105 cases is human-confirmed while agent-reviewed cases can never gate.
+  `scripts/review-adventure-cases.ts` now renders a review packet (ordered: receipt-backed picks,
+  corrected picks, deferrals) and applies human annotations deterministically, promoting only
+  `reviewer: "human"` + `verdict: "correct"` cases to `review-annotated`; 25 focused tests cover
+  ordering, rendering, promotion/validation and byte-identical re-runs. On the real corpus the
+  packet shows 21 receipt-backed picks, 3 corrected picks and 77 deferrals ready for review.
+  Coverage batches targeted the thin families: inventory and quest batteries advertised on every
+  targeted turn (quest-lifecycle acted once), progression and commerce on half, but the targeted
+  inventory/progression/commerce turns all deferred on their multi-option batteries; the four
+  harvested acts came from later quest/travel/check turns. The corpus reached **105 cases**; the
+  regenerated benchmark holds the gated record (54 acted/100%, Brier 0.0002, ECE 0.0107 at 0.40)
+  while the agent subset reads 3 acted at 100% over 312 calls (exact preferred 234/312, asserted
+  75.0%); stability 99.8% with the previously recorded variance case
+  `harvested:b1e4dfc2f2e2` recurring exactly as flagged.
 - **Combat gap (found by the sixth wave, fixed).** Focused combat batches surfaced that the
   adventure path never resolved D&D enemy turns, so a goblin that won initiative wedged the
   encounter in `failed` player turns. The deterministic fallback now invokes

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lane": "adventure-selection",
-  "generatedAt": "2026-09-19T18:52:48.050Z",
+  "generatedAt": "2026-09-19T23:06:54.598Z",
   "proposals": [
     {
       "proposalId": "04e62a0ddd4776fc3701aa5bd97c70fa8909c4578d2defcbf74dff7cb2a7de70",
@@ -634,6 +634,210 @@
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
+      "proposalId": "0bdf136e64d446be49c6985f9116132e735a07ee60f6fa49d709e0a290679044",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "9f0661fd-9194-4180-9c3f-98c93a925d33",
+      "createdAt": "2026-09-19T23:04:16.223Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "i head dow the quay toward breakwater cave, and on the way i ask maren what exaclty marks the lens secuerd.",
+        "candidates": [
+          {
+            "candidateId": "ace41eae-5ef2-44cf-999b-53ccf1b8f8cf",
+            "digest": "advisory-not-a-digest:ace41eae-5ef2-44cf-999b-53ccf1b8f8cf:actor.travel:v1",
+            "kind": "exact_actor_travel.select",
+            "label": "Travel: Lantern Quay → Breakwater Cave"
+          },
+          {
+            "candidateId": "a8aca34b-5a0b-476f-b9a4-56f3f577315e",
+            "digest": "advisory-not-a-digest:a8aca34b-5a0b-476f-b9a4-56f3f577315e:actor.travel:v1",
+            "kind": "exact_actor_travel.select",
+            "label": "Travel: Lantern Quay → Keeper House"
+          },
+          {
+            "candidateId": "quest-candidate:52a69831874165d99c6b3600086d60388ae9c5750e738eeb",
+            "digest": "52a69831874165d99c6b3600086d60388ae9c5750e738eebe49d5fa38f4ce351",
+            "kind": "exact_quest_objective.select",
+            "label": "Advance quest objective: Restore the Harbor Light → Secure the harbor lens."
+          },
+          {
+            "candidateId": "check-candidate:01f24b1a59c2ec594e0c138d2814331a9d642a63c2b34a3e",
+            "digest": "01f24b1a59c2ec594e0c138d2814331a9d642a63c2b34a3e161cd0daa855b2c1",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Deception (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:0e6428295f6403be5672c759c806a0a0a60f50b78735ebc1",
+            "digest": "0e6428295f6403be5672c759c806a0a0a60f50b78735ebc1e6a9d2fb91166c2f",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Constitution (Constitution), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:134165afd5fc27fd9d83304ec64d72d5d72e9361397df76c",
+            "digest": "134165afd5fc27fd9d83304ec64d72d5d72e9361397df76c1b4e27679eb3546f",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Insight (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:14a59d56d92de1c55d96642798a1069595d0a0a9511de2de",
+            "digest": "14a59d56d92de1c55d96642798a1069595d0a0a9511de2de1208111be80738bf",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Sleight of Hand (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:17e25ba380b88eb2e30b1c8fa1a055fac4bd659b407d8e96",
+            "digest": "17e25ba380b88eb2e30b1c8fa1a055fac4bd659b407d8e96f47916c071799c71",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:2ddd473e434dc01ca5432ace3a6b7eba28022711ef931d4f",
+            "digest": "2ddd473e434dc01ca5432ace3a6b7eba28022711ef931d4f050b3e783803f0d3",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Strength (Strength), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:2e1d6cd562081843db348d4b9b8e648f45157464a2763734",
+            "digest": "2e1d6cd562081843db348d4b9b8e648f45157464a27637340be0878608263cd6",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: History (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:41932f2c23e17684e6ef1d46d27454986e759053ffbd2551",
+            "digest": "41932f2c23e17684e6ef1d46d27454986e759053ffbd25511e63f97bbe36413a",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Dexterity (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:4c327f251d4d9759b013c45e374bff356dae2e5025196d62",
+            "digest": "4c327f251d4d9759b013c45e374bff356dae2e5025196d626a827c8ad1a2563a",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Athletics (Strength), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:58d65ba598273b288c33d57631aaecf6d599aa390ba4bbb3",
+            "digest": "58d65ba598273b288c33d57631aaecf6d599aa390ba4bbb3507164cc3bf3c8a9",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Persuasion (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:6454c0e5031c8488b87c23c50a3f3d9a4d0e64600bf181bc",
+            "digest": "6454c0e5031c8488b87c23c50a3f3d9a4d0e64600bf181bc3bc55ca77f014d12",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Arcana (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:6a4a5560cd686b56ad04e94bd6f05f62f0ff2ae3c7f6748e",
+            "digest": "6a4a5560cd686b56ad04e94bd6f05f62f0ff2ae3c7f6748e48a05d19897d05c3",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Survival (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:708563890d1ecff927eaaf146b194340d069b43fea0db34a",
+            "digest": "708563890d1ecff927eaaf146b194340d069b43fea0db34ab34a06c139df8bb9",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Religion (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:888429feef61b2a632d5b3f610c49ed2135f09a4dab0b7d2",
+            "digest": "888429feef61b2a632d5b3f610c49ed2135f09a4dab0b7d228410f986466f648",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Nature (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:8fd43a233add71a1d9d5a963f287b1ee53685d98fd3ef0ef",
+            "digest": "8fd43a233add71a1d9d5a963f287b1ee53685d98fd3ef0ef55793656ca2cddc5",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Intimidation (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:99626a8c59737b1aaa48da56e9fb667b4a81b9c20c67b331",
+            "digest": "99626a8c59737b1aaa48da56e9fb667b4a81b9c20c67b3315d0d0d5bb0b4c26e",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Performance (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:9d57c592859f3adff442be513a049ed4534890032d693b7d",
+            "digest": "9d57c592859f3adff442be513a049ed4534890032d693b7da3c2cbb952846136",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Investigation (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:ade3f71478ae1b7b108fb40f94cdc9ae5e4c4d9b6ff4a0e5",
+            "digest": "ade3f71478ae1b7b108fb40f94cdc9ae5e4c4d9b6ff4a0e5f8c97999065a6e80",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Animal Handling (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:b411ade13f4a56b4f96d7831ec5bb6b6f3b0051ac2906547",
+            "digest": "b411ade13f4a56b4f96d7831ec5bb6b6f3b0051ac2906547b1ba305e6f351409",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Stealth (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:d04695fb62cafa0834a3745d3934bba7d7b80646ddaa8bb7",
+            "digest": "d04695fb62cafa0834a3745d3934bba7d7b80646ddaa8bb7334a431494faa3fc",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Acrobatics (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:d11e23478a51ec1d7d67eef7f2c866bf5274bebeeb967531",
+            "digest": "d11e23478a51ec1d7d67eef7f2c866bf5274bebeeb96753109d5b17e3c13463a",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Charisma (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:d99fd92cadde8a211d28412947427d4a6e8467856290c893",
+            "digest": "d99fd92cadde8a211d28412947427d4a6e8467856290c8932ac9e4f2667c7af9",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Intelligence (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:fb3302f41f6a54a84ef8c9b0de65f80f9ba130f392efd740",
+            "digest": "fb3302f41f6a54a84ef8c9b0de65f80f9ba130f392efd74074cd2ff5bd9500b2",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Medicine (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:fe2d0c2c360bb9d468d04712d6c12b535e4426b632fd4a0d",
+            "digest": "fe2d0c2c360bb9d468d04712d6c12b535e4426b632fd4a0d1ffadf7983406c3b",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Perception (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "inventory-candidate:3604f841f4ed4181229dd6f38a03fd8ae013ad08d73839a5",
+            "digest": "3604f841f4ed4181229dd6f38a03fd8ae013ad08d73839a50b9e30ee49d4ac6a",
+            "kind": "exact_inventory_action.select",
+            "label": "unequip: Longsword → hand"
+          },
+          {
+            "candidateId": "inventory-candidate:b0cf13831d16264b80dbd2d37bbc86f051879fd6fd9fd3e4",
+            "digest": "b0cf13831d16264b80dbd2d37bbc86f051879fd6fd9fd3e40a037a0c584c8c14",
+            "kind": "exact_inventory_action.select",
+            "label": "drop: Acolyte Equipment"
+          },
+          {
+            "candidateId": "rest-candidate:a9f1f01f47d37808b326028715ba169e722b00df413ef02c",
+            "digest": "a9f1f01f47d37808b326028715ba169e722b00df413ef02c08c4a3703f8e8753",
+            "kind": "exact_rest.select",
+            "label": "Short rest: Short rest → Source actor"
+          },
+          {
+            "candidateId": "quest-abandon-candidate:7fc24eb45895892bd1bd6155056338f795ff8d2b3554ac51",
+            "digest": "7fc24eb45895892bd1bd6155056338f795ff8d2b3554ac51a4e1648440de713e",
+            "kind": "exact_quest_lifecycle.select",
+            "label": "abandon: Restore the Harbor Light"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "ace41eae-5ef2-44cf-999b-53ccf1b8f8cf"
+      },
+      "note": "Coverage batch: declaration walks down the quay toward Breakwater Cave while asking Maren about the lens; the lane picked the advertised exact_actor_travel candidate (Lantern Quay -> Breakwater Cave) at 0.64.",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
+    },
+    {
       "proposalId": "0ec73aec02e34913ff0b68c240b353c0d293c0cc1c8d301bc7d8de2752e33468",
       "lane": "adventure-selection",
       "sourceDecisionId": "a8e4924a-df3b-472e-9996-75aa8dbb8595",
@@ -1051,6 +1255,210 @@
         "candidateId": null
       },
       "note": "impatient.v1 declared drinking a potion from the pack; the advertised inventory candidates are only gift/drop of Acolyte Equipment and the provider committed no mechanics, so the deferral is correct.",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
+    },
+    {
+      "proposalId": "11cd7c76513fbe3f66c9f38cb62420bb93d22250eb97f7d6948e7dc382deb98f",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "9e4b468b-25a1-4081-9cce-eda53457540d",
+      "createdAt": "2026-09-19T23:05:43.652Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "I take Keeper Maren's lantern up the stairs and relight the harbor beacon, closing out this objective.",
+        "candidates": [
+          {
+            "candidateId": "ab7caf45-ae23-4381-b9b7-9ecc3ed68267",
+            "digest": "advisory-not-a-digest:ab7caf45-ae23-4381-b9b7-9ecc3ed68267:actor.travel:v1",
+            "kind": "exact_actor_travel.select",
+            "label": "Travel: Lantern Quay → Breakwater Cave"
+          },
+          {
+            "candidateId": "a2a6c6d2-c2a8-4510-a91f-f8dbc354fa82",
+            "digest": "advisory-not-a-digest:a2a6c6d2-c2a8-4510-a91f-f8dbc354fa82:actor.travel:v1",
+            "kind": "exact_actor_travel.select",
+            "label": "Travel: Lantern Quay → Keeper House"
+          },
+          {
+            "candidateId": "quest-candidate:db2684f8269c16da84735f162e0f784758e5e2159a2a8983",
+            "digest": "db2684f8269c16da84735f162e0f784758e5e2159a2a89831ede361182c17b7a",
+            "kind": "exact_quest_objective.select",
+            "label": "Advance quest objective: Restore the Harbor Light → Relight the harbor beacon."
+          },
+          {
+            "candidateId": "check-candidate:055c8c1ea79bb86245e45d659647d1708c6ee31897863969",
+            "digest": "055c8c1ea79bb86245e45d659647d1708c6ee31897863969dc25e800ecfb15ba",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Investigation (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:0cb20e1b2afb57d8baccd5a8143f6f24f69301d31e813a7d",
+            "digest": "0cb20e1b2afb57d8baccd5a8143f6f24f69301d31e813a7dfe8177a6e65b3ecf",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Acrobatics (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:16e298af4fef8b440ae322fc5e3d331f5f6824a7f0203a9d",
+            "digest": "16e298af4fef8b440ae322fc5e3d331f5f6824a7f0203a9d8f0eafb580dfb06b",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Stealth (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:38fba1f06cb06263d040509e0489f23cff761fff22d54a4f",
+            "digest": "38fba1f06cb06263d040509e0489f23cff761fff22d54a4f2458f86650420510",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Deception (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:41afbd2dee3ce28f737ddc766fe2c8e5bff531d5e8b62d4e",
+            "digest": "41afbd2dee3ce28f737ddc766fe2c8e5bff531d5e8b62d4e0e7b604c07cd753b",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Charisma (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:5566ef6e402660d5114f15d5f5f47d7911321c53712fa873",
+            "digest": "5566ef6e402660d5114f15d5f5f47d7911321c53712fa8735e3aef40203dbd08",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Athletics (Strength), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:56f262b187cad1b5b3681727c7993301191b5aab943e1cfc",
+            "digest": "56f262b187cad1b5b3681727c7993301191b5aab943e1cfc1b869c60bc84e4b6",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Persuasion (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:749735c80edfac8d696b4ddb1c148c2ccda0452ac9a36e8f",
+            "digest": "749735c80edfac8d696b4ddb1c148c2ccda0452ac9a36e8f3849c61e661bfa54",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:77e83c3f16093e1715d5d91db02eae9e98f1fcb83faede45",
+            "digest": "77e83c3f16093e1715d5d91db02eae9e98f1fcb83faede45c33aae4b102a424f",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Perception (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:7a6b9bd73ad1fe288bc832b66198696f012b085f00e34bac",
+            "digest": "7a6b9bd73ad1fe288bc832b66198696f012b085f00e34bace0ad36d2e74e087d",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Intimidation (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:87d57833c291531576caac7a861ff713eca2de1f5ce65004",
+            "digest": "87d57833c291531576caac7a861ff713eca2de1f5ce65004a610bfd2f816dfc5",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Religion (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:889b144394daa8fa9beb229fa5a3eabc1b2c209375e146ea",
+            "digest": "889b144394daa8fa9beb229fa5a3eabc1b2c209375e146eaa1cc8a1098b23dd8",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Arcana (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:90757ce4a0c6604b9f07be0757fb9c7a44d465b8571705b5",
+            "digest": "90757ce4a0c6604b9f07be0757fb9c7a44d465b8571705b577d1fc0fdc937bb4",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Animal Handling (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:9adaa1136ce8f7d6d7cafa0d50115308d02a8e4e7fdc839d",
+            "digest": "9adaa1136ce8f7d6d7cafa0d50115308d02a8e4e7fdc839db89b899779ebd5e7",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Sleight of Hand (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:9d921d077a56e6d3d30014d72b8f603138fb757a866cb064",
+            "digest": "9d921d077a56e6d3d30014d72b8f603138fb757a866cb0642e3ded60b92495aa",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Dexterity (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:a604350b8d89505d67b89f62acab870e5764710704e2b8d1",
+            "digest": "a604350b8d89505d67b89f62acab870e5764710704e2b8d173a251338cc423ae",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Intelligence (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:a71362b0f42a368b19a52bb96645ff7ee2eb59c343b3d512",
+            "digest": "a71362b0f42a368b19a52bb96645ff7ee2eb59c343b3d51240e1aa252fe9d2f3",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Performance (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:b218fc6fb2095bc84d4081fdc35f35e8a2e22be609974f84",
+            "digest": "b218fc6fb2095bc84d4081fdc35f35e8a2e22be609974f847328b024a2602562",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Survival (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:bd6c8cb653e8bd3abedaeea4ed61e00006486eefd4b6afa4",
+            "digest": "bd6c8cb653e8bd3abedaeea4ed61e00006486eefd4b6afa4abb01b36c12870fc",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Strength (Strength), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:c1b10aade39fc8a4fe983aeea84fafab03e1ea77ec8aa812",
+            "digest": "c1b10aade39fc8a4fe983aeea84fafab03e1ea77ec8aa81200c563288ee3f770",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: History (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:c7fb7cb5e2d765a8efb6583262f0ff39b714d530dd62dc3b",
+            "digest": "c7fb7cb5e2d765a8efb6583262f0ff39b714d530dd62dc3bee905301a65ddd5b",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Insight (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:d14a0de93b8669f20202a1b09c3acf963d512dd719389480",
+            "digest": "d14a0de93b8669f20202a1b09c3acf963d512dd71938948023b0f0fc599e9926",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Constitution (Constitution), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:f56fb2a0896302f8d535467d5f71efe48ce937475d020061",
+            "digest": "f56fb2a0896302f8d535467d5f71efe48ce937475d020061fda2fdbf1efc1163",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Medicine (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:f6a12f691336ab64f18384568edb4f38eca94b2a73aa5180",
+            "digest": "f6a12f691336ab64f18384568edb4f38eca94b2a73aa518070ca7827bb852598",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Nature (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "inventory-candidate:a29d06dc173867f6af884a8e41ca210c3d57ae3678cfd0dd",
+            "digest": "a29d06dc173867f6af884a8e41ca210c3d57ae3678cfd0dd78bf3143879376b6",
+            "kind": "exact_inventory_action.select",
+            "label": "unequip: Longsword → hand"
+          },
+          {
+            "candidateId": "inventory-candidate:ac74f792be3f260cda925ee83acf5a44e872e900185d28f9",
+            "digest": "ac74f792be3f260cda925ee83acf5a44e872e900185d28f9b5989e7965bea040",
+            "kind": "exact_inventory_action.select",
+            "label": "drop: Acolyte Equipment"
+          },
+          {
+            "candidateId": "rest-candidate:d80d3554c06d5ab5781e062cc8e216d1c566b6262e4e3fe4",
+            "digest": "d80d3554c06d5ab5781e062cc8e216d1c566b6262e4e3fe4692e8ee6ccaa4ac6",
+            "kind": "exact_rest.select",
+            "label": "Short rest: Short rest → Source actor"
+          },
+          {
+            "candidateId": "quest-abandon-candidate:1a12c33db20eb0c44bf34911d0ab4a02aa2bb78d7d067660",
+            "digest": "1a12c33db20eb0c44bf34911d0ab4a02aa2bb78d7d067660125d76deeeeb2cc5",
+            "kind": "exact_quest_lifecycle.select",
+            "label": "abandon: Restore the Harbor Light"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "quest-candidate:db2684f8269c16da84735f162e0f784758e5e2159a2a8983"
+      },
+      "note": "Coverage batch: declaration relights the harbor beacon and closes the objective; the lane picked the advertised quest-objective candidate (Relight the harbor beacon) at 0.85.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -1501,6 +1909,210 @@
         "candidateId": null
       },
       "note": "achiever.v1 declared leaving the harbor for the landward gate; no travel candidate was advertised and the provider committed nothing, so the deferral is correct.",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
+    },
+    {
+      "proposalId": "195a18777be1e4bb74cff0d53b2c20a9e578fe484275eada05155cb0e45cfa09",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "ac6f2c63-fd3f-437b-b96c-d1e62ca8cfbc",
+      "createdAt": "2026-09-19T23:04:47.211Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "I stow the harbor lens w/ the crate, secure it, and mark that objective done for the light.",
+        "candidates": [
+          {
+            "candidateId": "c5dbb5f6-dcb2-4f35-bb29-5bf6aa26c5de",
+            "digest": "advisory-not-a-digest:c5dbb5f6-dcb2-4f35-bb29-5bf6aa26c5de:actor.travel:v1",
+            "kind": "exact_actor_travel.select",
+            "label": "Travel: Lantern Quay → Breakwater Cave"
+          },
+          {
+            "candidateId": "4743ebfd-44ff-40ea-8169-a7b60b37de19",
+            "digest": "advisory-not-a-digest:4743ebfd-44ff-40ea-8169-a7b60b37de19:actor.travel:v1",
+            "kind": "exact_actor_travel.select",
+            "label": "Travel: Lantern Quay → Keeper House"
+          },
+          {
+            "candidateId": "quest-candidate:90869640364244bd8deb6137c93a1db153167370c18a4ac4",
+            "digest": "90869640364244bd8deb6137c93a1db153167370c18a4ac4b616b243542e7f6b",
+            "kind": "exact_quest_objective.select",
+            "label": "Advance quest objective: Restore the Harbor Light → Secure the harbor lens."
+          },
+          {
+            "candidateId": "check-candidate:07a332e0de23bb5ea68df5abd6d49ecfa2a1ddf78c17ed61",
+            "digest": "07a332e0de23bb5ea68df5abd6d49ecfa2a1ddf78c17ed61ae9a606833ca4525",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Intelligence (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:1721c1f497efd914fc8d7ad6c76685e60105127447df28af",
+            "digest": "1721c1f497efd914fc8d7ad6c76685e60105127447df28af29921bc37653440e",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Constitution (Constitution), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:1f736af240859bc2ff9e3e622b7dbaf3d73fc96084643456",
+            "digest": "1f736af240859bc2ff9e3e622b7dbaf3d73fc960846434560ed6c5e01cb30db1",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Medicine (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:30874b672233fa8f84d0a78cbbf4a0a4dcaf5ea2c4833aa7",
+            "digest": "30874b672233fa8f84d0a78cbbf4a0a4dcaf5ea2c4833aa7f134d54be7dc62fb",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Intimidation (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:351ee3abfe9a7e670622e063fc00c48b257f824000668349",
+            "digest": "351ee3abfe9a7e670622e063fc00c48b257f8240006683496ba2bfeede7d73f8",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Dexterity (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:4565d097338a71487bd4d466c688aa7eaeee87621835b2b2",
+            "digest": "4565d097338a71487bd4d466c688aa7eaeee87621835b2b2d28576f930ec97ca",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Acrobatics (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:4dcc397d934ac5fb0f6a47c8b49ef5cc71781b773f536511",
+            "digest": "4dcc397d934ac5fb0f6a47c8b49ef5cc71781b773f536511d8faa3ae5338371b",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Deception (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:56278393b52300812127c66252e43654ffc74d0588ff738c",
+            "digest": "56278393b52300812127c66252e43654ffc74d0588ff738c5755912f8a7137e8",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Religion (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:5d7200711f60f6d4a3643485cb3e0075c23ac908944acf12",
+            "digest": "5d7200711f60f6d4a3643485cb3e0075c23ac908944acf12c2080ac8f383bec8",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Performance (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:6240a929c475747807863a972d134c8b7bac915caed479a4",
+            "digest": "6240a929c475747807863a972d134c8b7bac915caed479a4f796a0f0e95da51c",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Insight (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:77f6652f1ad89000bcdab580beef3ce4e846542f166a0675",
+            "digest": "77f6652f1ad89000bcdab580beef3ce4e846542f166a06756f1c29d600e11382",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: History (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:8496218fe7098dc573616cc3e6cecffd58b56cd89b5262dd",
+            "digest": "8496218fe7098dc573616cc3e6cecffd58b56cd89b5262dd442a47ac898b8122",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Survival (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:95987fbfa3ebf14bf2db577273ad258935426b5b40a31dbd",
+            "digest": "95987fbfa3ebf14bf2db577273ad258935426b5b40a31dbd5e618efbfa35ecd3",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Arcana (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:9af72f1daf4e0a546afbaf39db294680589f880d1e7f6584",
+            "digest": "9af72f1daf4e0a546afbaf39db294680589f880d1e7f6584f0764aefeb41e498",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Strength (Strength), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:abc6b67bffc3ce6da25db8ffee47ba3047553ac318ea5cd6",
+            "digest": "abc6b67bffc3ce6da25db8ffee47ba3047553ac318ea5cd637f8d46ff07c89c2",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:ac2a3c11912e2e204c154f93d5dfc08b701abc500dfb50e3",
+            "digest": "ac2a3c11912e2e204c154f93d5dfc08b701abc500dfb50e3b22576ee43f72bde",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Charisma (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:b07044c1c165e8ded4496c50a1d08aa6166188e1527a4767",
+            "digest": "b07044c1c165e8ded4496c50a1d08aa6166188e1527a4767a356b432151300bf",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Persuasion (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:c7de5a5b29b1ea974a9bafbb2d1493b49db5a083a0dfa6ce",
+            "digest": "c7de5a5b29b1ea974a9bafbb2d1493b49db5a083a0dfa6cec795b08bd3a3eb43",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Stealth (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:cc64b60ca158e9c01700edd47cbb62dbe0e074e16e4f081d",
+            "digest": "cc64b60ca158e9c01700edd47cbb62dbe0e074e16e4f081d76515aa5acb545d5",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Perception (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:d03a2e07c826c8c7ce5f54527657b5ca4c681636b6d23568",
+            "digest": "d03a2e07c826c8c7ce5f54527657b5ca4c681636b6d23568279837d950c5bfd8",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Nature (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:d064e358c87728256556173634ca57533da812bca4cf9dea",
+            "digest": "d064e358c87728256556173634ca57533da812bca4cf9dea61e567d2acc2897a",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Sleight of Hand (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:d433cb5aeffe9bf7c7d7b56bc07e249e3c3b9bf7dd183592",
+            "digest": "d433cb5aeffe9bf7c7d7b56bc07e249e3c3b9bf7dd18359254d616819e744b2b",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Investigation (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:ec6d6bc10120506f148e57e34aee80367c51f89c4e011ea4",
+            "digest": "ec6d6bc10120506f148e57e34aee80367c51f89c4e011ea4b2d960b62aaae7d8",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Athletics (Strength), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:ef1f63a34c84266323944272eb61be5bbcab3d52777c6094",
+            "digest": "ef1f63a34c84266323944272eb61be5bbcab3d52777c60944002bbf14dc8af0d",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Animal Handling (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "inventory-candidate:8a1480ce77e5c20615c5a2062169dfa9a905eed4d1893157",
+            "digest": "8a1480ce77e5c20615c5a2062169dfa9a905eed4d189315795504b004bc87fa9",
+            "kind": "exact_inventory_action.select",
+            "label": "drop: Acolyte Equipment"
+          },
+          {
+            "candidateId": "inventory-candidate:8b04605cbb7dd2deaca963b6aa7dabd418ef1f10f62d4f00",
+            "digest": "8b04605cbb7dd2deaca963b6aa7dabd418ef1f10f62d4f00465cf7fe760b1eb1",
+            "kind": "exact_inventory_action.select",
+            "label": "unequip: Longsword → hand"
+          },
+          {
+            "candidateId": "rest-candidate:c614be13ad59b8485a03043d5038b353af4cf65ae5303d7c",
+            "digest": "c614be13ad59b8485a03043d5038b353af4cf65ae5303d7ca65ed6280aa46f0f",
+            "kind": "exact_rest.select",
+            "label": "Short rest: Short rest → Source actor"
+          },
+          {
+            "candidateId": "quest-abandon-candidate:64d936eeff407e631668977f9a0fc8bc0a5e2c3459e28d9b",
+            "digest": "64d936eeff407e631668977f9a0fc8bc0a5e2c3459e28d9bc79d1e78581e9251",
+            "kind": "exact_quest_lifecycle.select",
+            "label": "abandon: Restore the Harbor Light"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "quest-candidate:90869640364244bd8deb6137c93a1db153167370c18a4ac4"
+      },
+      "note": "Coverage batch: declaration stows and secures the harbor lens and marks the objective done; the lane picked the advertised quest-objective candidate (Secure the harbor lens) at 0.75.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -10081,6 +10693,210 @@
         "candidateId": null
       },
       "note": "explorer.v1 declared choosing one specific vendor without buying; the commerce batch held 0 candidates and the provider committed nothing, so the deferral is correct.",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
+    },
+    {
+      "proposalId": "7fa7573d172e4eaecb3e64ea2590ef29da929e04f2db5e73d7c35da662817c25",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "bf69df4b-0545-4de4-8512-a0c4ad9de3dd",
+      "createdAt": "2026-09-19T23:06:09.976Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "Hold on, scratch that — ACtually, I re-open the harbor lens crate and count the packing slats, no — the straw, looking for a manifest page.",
+        "candidates": [
+          {
+            "candidateId": "31d36681-3e6e-4d7b-8cb1-54637a7b5afc",
+            "digest": "advisory-not-a-digest:31d36681-3e6e-4d7b-8cb1-54637a7b5afc:actor.travel:v1",
+            "kind": "exact_actor_travel.select",
+            "label": "Travel: Lantern Quay → Breakwater Cave"
+          },
+          {
+            "candidateId": "778a4147-00c7-4a4b-9588-c816e0fa8bd1",
+            "digest": "advisory-not-a-digest:778a4147-00c7-4a4b-9588-c816e0fa8bd1:actor.travel:v1",
+            "kind": "exact_actor_travel.select",
+            "label": "Travel: Lantern Quay → Keeper House"
+          },
+          {
+            "candidateId": "quest-candidate:00836544a722f817e3c9258ed6fb14571af518bc883e7806",
+            "digest": "00836544a722f817e3c9258ed6fb14571af518bc883e78063be4166d1c890f17",
+            "kind": "exact_quest_objective.select",
+            "label": "Advance quest objective: Restore the Harbor Light → Relight the harbor beacon."
+          },
+          {
+            "candidateId": "check-candidate:104cedfcd91caf0ef9c44edd693a16381a9a0399449e3c8f",
+            "digest": "104cedfcd91caf0ef9c44edd693a16381a9a0399449e3c8f01c3254d9ec3ff06",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Acrobatics (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:144c13ca2388ee9db9b36d25109f5bdcb61143fddfcda88e",
+            "digest": "144c13ca2388ee9db9b36d25109f5bdcb61143fddfcda88ee0a22a83187ce02e",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Charisma (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:2548f06a92eef1b1d509cadc8e1720c1dd67fc3239255284",
+            "digest": "2548f06a92eef1b1d509cadc8e1720c1dd67fc32392552847bff3e1c062480ca",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Survival (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:3936cd499d1231c44ed3f0ea3c59f0609875075f73f1069b",
+            "digest": "3936cd499d1231c44ed3f0ea3c59f0609875075f73f1069b5994b26e5013e627",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:3b1dcbb255e069bf166c2e8c09baceaf07a4499d036e1e6b",
+            "digest": "3b1dcbb255e069bf166c2e8c09baceaf07a4499d036e1e6b762ff8444891d85b",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: History (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:3ea1509af3f28bff5ccf6092b1c6a6ba441d131867c3a2d0",
+            "digest": "3ea1509af3f28bff5ccf6092b1c6a6ba441d131867c3a2d0bb87bf9084bc47d4",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Performance (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:5b461f39f27be30c2ddce0e2491ff3bae7f518f0b67fc38a",
+            "digest": "5b461f39f27be30c2ddce0e2491ff3bae7f518f0b67fc38a000531dda309d3d3",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Athletics (Strength), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:5c993eb22d8abfa74846295681d77ef08078e87c6fdc2b87",
+            "digest": "5c993eb22d8abfa74846295681d77ef08078e87c6fdc2b87aa18dd065fd8e9ca",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Dexterity (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:60c8d827510ad282ac99ecb3e87be04a5fef4d34e8827507",
+            "digest": "60c8d827510ad282ac99ecb3e87be04a5fef4d34e8827507a72e66b61c633b64",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Stealth (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:6d58f631d256759b38c46d1a893c2a6f96ed83e74a941c84",
+            "digest": "6d58f631d256759b38c46d1a893c2a6f96ed83e74a941c84de1f04c9f26dc02a",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Intimidation (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:70c5e601f763570c4908fc2330dc8786cc4ecdb85ef20fe2",
+            "digest": "70c5e601f763570c4908fc2330dc8786cc4ecdb85ef20fe2f6d6b409cb5c7607",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Nature (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:895a91824af74122c10edcbb874cc441827a9651bc7d35f3",
+            "digest": "895a91824af74122c10edcbb874cc441827a9651bc7d35f32e83f9f91fe60909",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Investigation (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:8e6d3418b75e57f06997af0bac0665cf3fe631dd29c86ef7",
+            "digest": "8e6d3418b75e57f06997af0bac0665cf3fe631dd29c86ef78454703d0a38bc5b",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Medicine (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:9098921bde667f6877c2575a2e2d43080c1011b348c22edb",
+            "digest": "9098921bde667f6877c2575a2e2d43080c1011b348c22edb44ab33bbacb75ad7",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Perception (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:b25d31e06489c99de565e5ded6226363b05e907bd6ee5e43",
+            "digest": "b25d31e06489c99de565e5ded6226363b05e907bd6ee5e43665565585d3b664d",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Arcana (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:cb352311d63c92f600b3ba1d2fe012b0adb4b42c023d76a6",
+            "digest": "cb352311d63c92f600b3ba1d2fe012b0adb4b42c023d76a6bbe48c4837a10d38",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Constitution (Constitution), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:cb4e2d678d931c57beacf91249cde8c45e286cda894f71da",
+            "digest": "cb4e2d678d931c57beacf91249cde8c45e286cda894f71da1d022695ff380f08",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Animal Handling (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:d31e8673fa96fdf0a8bbf0b2e347d0488e59b3e55fa671bf",
+            "digest": "d31e8673fa96fdf0a8bbf0b2e347d0488e59b3e55fa671bf97e36e8770876e3d",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Sleight of Hand (Dexterity), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:dafba6e5ddeac0bdfb31d9f920e1a21146b639c62ed1e9b0",
+            "digest": "dafba6e5ddeac0bdfb31d9f920e1a21146b639c62ed1e9b0f5cf9c24e673c8eb",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Strength (Strength), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:e5bffbe096f37a9612b6c0a1cbb7bab354bf4bdb0d8ed5f3",
+            "digest": "e5bffbe096f37a9612b6c0a1cbb7bab354bf4bdb0d8ed5f3eddaba7ced11b6ae",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Deception (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:e701a28d262094af04611c583954f7b00316809a7a6aee41",
+            "digest": "e701a28d262094af04611c583954f7b00316809a7a6aee41e37bc2ed183148da",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Persuasion (Charisma), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:eaf928c3a295e23561fc3f92138c691a7602811dea4d4303",
+            "digest": "eaf928c3a295e23561fc3f92138c691a7602811dea4d4303bbd4c69263a40e54",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Insight (Wisdom), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:f12be9c84c20227ca8f63015614b31834ed87b25a32c0c33",
+            "digest": "f12be9c84c20227ca8f63015614b31834ed87b25a32c0c336a36a0927110a8b6",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Intelligence (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "check-candidate:f366ee0e36547689ff2809d97e0cbe21f5cbbaa94b5b285d",
+            "digest": "f366ee0e36547689ff2809d97e0cbe21f5cbbaa94b5b285d0549615ae557bc44",
+            "kind": "exact_srd_check.select",
+            "label": "Resolve SRD check: Religion (Intelligence), Medium difficulty, normal"
+          },
+          {
+            "candidateId": "inventory-candidate:2816cf0bfb302c86f96dcd5c88d8be3f42e42c20b5232293",
+            "digest": "2816cf0bfb302c86f96dcd5c88d8be3f42e42c20b5232293e2d9e5476a691fb0",
+            "kind": "exact_inventory_action.select",
+            "label": "unequip: Longsword → hand"
+          },
+          {
+            "candidateId": "inventory-candidate:9601549c87fde17275cb3dfd3d7d31f86426633739d6c73b",
+            "digest": "9601549c87fde17275cb3dfd3d7d31f86426633739d6c73bf4a4be442fd6aeb8",
+            "kind": "exact_inventory_action.select",
+            "label": "drop: Acolyte Equipment"
+          },
+          {
+            "candidateId": "rest-candidate:fe0dc7d91f74f6006e927edc6bb7564c01517ac512b74130",
+            "digest": "fe0dc7d91f74f6006e927edc6bb7564c01517ac512b74130fe421bd4ed4d1034",
+            "kind": "exact_rest.select",
+            "label": "Short rest: Short rest → Source actor"
+          },
+          {
+            "candidateId": "quest-abandon-candidate:6d073509ab7168d26ef36594169c813b199ba53c6c6142ff",
+            "digest": "6d073509ab7168d26ef36594169c813b199ba53c6c6142ff3865527518390aff",
+            "kind": "exact_quest_lifecycle.select",
+            "label": "abandon: Restore the Harbor Light"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "check-candidate:895a91824af74122c10edcbb874cc441827a9651bc7d35f3"
+      },
+      "note": "Coverage batch: declaration self-corrects into reopening the lens crate and counting the packing straw; the lane picked the advertised Investigation check candidate at 0.41, just over the live action threshold. Correct but borderline and worth human review.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
