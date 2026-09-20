@@ -265,6 +265,16 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   while the agent subset reads 3 acted at 100% over 312 calls (exact preferred 234/312, asserted
   75.0%); stability 99.8% with the previously recorded variance case
   `harvested:b1e4dfc2f2e2` recurring exactly as flagged.
+- **Human review pass 1 (2026-09-20).** The first packet review confirmed 22 of 25 receipt-backed
+  picks (one excluded for an unclear objective link, one for a conditional Survival rationale, and
+  one held pending an explanation of its self-target label); human-confirmed cases now number 23
+  and join the frozen corpus in the gate. Measured movement: gated acted samples at the default
+  0.75 rose from 6 to 11 at 100% accuracy (Brier 0.0000, ECE 0.0046), the sweep's recommended
+  threshold moved from 0.40 to 0.35 (105 gated samples at 100% accuracy, Brier 0.0001, ECE 0.0104),
+  and the gate default still reports insufficient samples (11 < 30) with a 0.7412 lower bound — the
+  expected Wilson bound at 11/11, so roughly 19 more human-confirmed acts at the default would
+  clear the floor. The agent-reviewed remainder is 82 cases over 246 calls with 0 acted at 0.75
+  (exact preferred 231/246, asserted 93.9%); stability is 99.8% with the recorded variance case.
 - **Combat gap (found by the sixth wave, fixed).** Focused combat batches surfaced that the
   adventure path never resolved D&D enemy turns, so a goblin that won initiative wedged the
   encounter in `failed` player turns. The deterministic fallback now invokes

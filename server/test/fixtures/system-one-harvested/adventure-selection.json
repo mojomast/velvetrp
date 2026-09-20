@@ -638,7 +638,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "9f0661fd-9194-4180-9c3f-98c93a925d33",
       "createdAt": "2026-09-19T23:04:16.223Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "i head dow the quay toward breakwater cave, and on the way i ask maren what exaclty marks the lens secuerd.",
@@ -834,7 +834,7 @@
       "expected": {
         "candidateId": "ace41eae-5ef2-44cf-999b-53ccf1b8f8cf"
       },
-      "note": "Coverage batch: declaration walks down the quay toward Breakwater Cave while asking Maren about the lens; the lane picked the advertised exact_actor_travel candidate (Lantern Quay -> Breakwater Cave) at 0.64.",
+      "note": "Coverage batch: declaration walks down the quay toward Breakwater Cave while asking Maren about the lens; the lane picked the advertised exact_actor_travel candidate (Lantern Quay -> Breakwater Cave) at 0.64.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -1262,7 +1262,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "9e4b468b-25a1-4081-9cce-eda53457540d",
       "createdAt": "2026-09-19T23:05:43.652Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I take Keeper Maren's lantern up the stairs and relight the harbor beacon, closing out this objective.",
@@ -1458,7 +1458,7 @@
       "expected": {
         "candidateId": "quest-candidate:db2684f8269c16da84735f162e0f784758e5e2159a2a8983"
       },
-      "note": "Coverage batch: declaration relights the harbor beacon and closes the objective; the lane picked the advertised quest-objective candidate (Relight the harbor beacon) at 0.85.",
+      "note": "Coverage batch: declaration relights the harbor beacon and closes the objective; the lane picked the advertised quest-objective candidate (Relight the harbor beacon) at 0.85.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -1916,7 +1916,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "ac6f2c63-fd3f-437b-b96c-d1e62ca8cfbc",
       "createdAt": "2026-09-19T23:04:47.211Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I stow the harbor lens w/ the crate, secure it, and mark that objective done for the light.",
@@ -2112,7 +2112,7 @@
       "expected": {
         "candidateId": "quest-candidate:90869640364244bd8deb6137c93a1db153167370c18a4ac4"
       },
-      "note": "Coverage batch: declaration stows and secures the harbor lens and marks the objective done; the lane picked the advertised quest-objective candidate (Secure the harbor lens) at 0.75.",
+      "note": "Coverage batch: declaration stows and secures the harbor lens and marks the objective done; the lane picked the advertised quest-objective candidate (Secure the harbor lens) at 0.75.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -3590,7 +3590,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "d63f9475-6d55-4193-b21c-381368472f6d",
       "createdAt": "2026-09-17T20:39:43.687Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I restt. Just do the fast rets thing and get me back to the figth.",
@@ -3792,7 +3792,7 @@
       "expected": {
         "candidateId": "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
       },
-      "note": "Synthetic persona impatient.v1 declared an explicit short rest ('I restt. Just do the fast rets thing'); the advertised rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1 is the matching candidate and the provider committed exactly it (receipt 8d7afc7e, Health 8 to 12, Hit Dice 1 to 0), so the pick is correct.",
+      "note": "Synthetic persona impatient.v1 declared an explicit short rest ('I restt. Just do the fast rets thing'); the advertised rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1 is the matching candidate and the provider committed exactly it (receipt 8d7afc7e, Health 8 to 12, Hit Dice 1 to 0), so the pick is correct.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -5060,7 +5060,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "2700371e-dbc5-4fc0-b1c6-80e86bf3121f",
       "createdAt": "2026-09-18T23:23:19.463Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I ease the crate lid open with caerful hands and lift the harbor lens otu.",
@@ -5256,7 +5256,7 @@
       "expected": {
         "candidateId": "quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538"
       },
-      "note": "Turn e09dd9bc: declaration opens the crate and lifts the harbor lens; lane picked the advertised Secure the harbor lens objective at 0.54.",
+      "note": "Turn e09dd9bc: declaration opens the crate and lifts the harbor lens; lane picked the advertised Secure the harbor lens objective at 0.54.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -5684,7 +5684,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "124f56d1-b1b4-4659-a086-48b15785d7ab",
       "createdAt": "2026-09-18T19:57:44.359Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "Enough pacing the shore like a man waiting for the tide to apologize. The light on the harbor is dead and I have knelt at its cold bones once already and learned nothing worth keeping, so I will take the burden up properly: I swear to restore the Harbor Light — I'll walk the waystones and the breakwater and every grey mile between, and I won't come back to Lantern Quay until that flame stands up in the dark again and the ships can find their way home by it. Bind me to it. Say the words back to me plain, and I'll start with the trail beyond that first waystone whose face I stopped trying to read.",
@@ -5862,7 +5862,7 @@
       "expected": {
         "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
       },
-      "note": "The player swears to restore the Harbor Light and asks to be bound to it, which is exactly the advertised accept: Restore the Harbor Light action.",
+      "note": "The player swears to restore the Harbor Light and asks to be bound to it, which is exactly the advertised accept: Restore the Harbor Light action.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -8348,7 +8348,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "86d5a0a1-49f1-4195-9054-97623b9d0391",
       "createdAt": "2026-09-18T23:23:11.163Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "rcate can wait — i'm wounded and running thin, so i sit down in the keeper house and take a short rest to get my wind back, sword across my knees.",
@@ -8544,7 +8544,7 @@
       "expected": {
         "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20"
       },
-      "note": "Turn 23ce984e: declaration sits down in the keeper house for a short rest to get wind back; lane picked Short rest at 0.92.",
+      "note": "Turn 23ce984e: declaration sits down in the keeper house for a short rest to get wind back; lane picked Short rest at 0.92.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -9392,7 +9392,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "171a3cbb-639f-4b87-ad88-b84658783fba",
       "createdAt": "2026-09-18T21:32:34.940Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "i'll set the extra-action trick aside for a moment and just use my second wind to steady myself, then see where that leaves me.",
@@ -9408,7 +9408,7 @@
       "expected": {
         "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
       },
-      "note": "Turn 903e05f4: declaration asks to use Second Wind to steady; the only advertised candidate was that combat power, picked at 0.78.",
+      "note": "Turn 903e05f4: declaration asks to use Second Wind to steady; the only advertised candidate was that combat power, picked at 0.78.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -9416,7 +9416,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "f71458d1-4ee9-407d-a2d5-1292d7cb570b",
       "createdAt": "2026-09-18T03:21:54.420Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I keep to the stonier fork and climb until the wind cuts clean across the ridge, then halt exactly where the crow's-beak line of the old map crosses the marker stone's bearing. I read the ground against the map — the packed ash, the bent grass, the run of black rock — and I test the slope with my staff, tapping ahdead of me before I trust it, watching for any cairn or cut in the rock that says someone has walked this way before. If the ridge is lying abuot which way the crest runs, I mean to catch it before the wind does, and take the higher ground only when the ground confesses the line is true.",
@@ -9618,7 +9618,7 @@
       "expected": {
         "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
       },
-      "note": "explorer.v1 declared the same terrain-reading/tracking intent, and the lane promoted the advertised Survival (Wisdom), Medium check (lane commit, roll 16 vs DC 15 success), which matches the declaration.",
+      "note": "explorer.v1 declared the same terrain-reading/tracking intent, and the lane promoted the advertised Survival (Wisdom), Medium check (lane commit, roll 16 vs DC 15 success), which matches the declaration.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -9824,7 +9824,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "af432c62-1dfb-4bba-94e3-04564519444b",
       "createdAt": "2026-09-18T02:49:38.202Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I put my shoulder to the gate and try to force it open.",
@@ -10026,7 +10026,7 @@
       "expected": {
         "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
       },
-      "note": "Hand-written canary: forcing the gate open is the advertised Athletics (Strength), Medium check, and the lane promoted exactly that candidate (lane commit, roll 7+3=10 vs DC 15 failure), matching the declaration.",
+      "note": "Hand-written canary: forcing the gate open is the advertised Athletics (Strength), Medium check, and the lane promoted exactly that candidate (lane commit, roll 7+3=10 vs DC 15 failure), matching the declaration.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -10244,7 +10244,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "dc4e85b0-3bc5-4935-963c-c2af8f85931b",
       "createdAt": "2026-09-19T18:51:27.972Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I grit my teeth and use Second Wind to get back in the fight.",
@@ -10272,7 +10272,7 @@
       "expected": {
         "candidateId": "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7"
       },
-      "note": "Live SRD combat, fighter at 3 HP: declaration explicitly uses Second Wind; the lane picked the advertised exact_combat_power candidate at 0.96, appended a lane-origin confirmation-required proposal, the proposal was approved through the ordinary confirmation API, and a lane-origin execution committed (origin=lane, no provider evidence) healing the fighter 3 -> 12 (1d10+1).",
+      "note": "Live SRD combat, fighter at 3 HP: declaration explicitly uses Second Wind; the lane picked the advertised exact_combat_power candidate at 0.96, appended a lane-origin confirmation-required proposal, the proposal was approved through the ordinary confirmation API, and a lane-origin execution committed (origin=lane, no provider evidence) healing the fighter 3 -> 12 (1d10+1).\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -10700,7 +10700,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "bf69df4b-0545-4de4-8512-a0c4ad9de3dd",
       "createdAt": "2026-09-19T23:06:09.976Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "Hold on, scratch that — ACtually, I re-open the harbor lens crate and count the packing slats, no — the straw, looking for a manifest page.",
@@ -10896,7 +10896,7 @@
       "expected": {
         "candidateId": "check-candidate:895a91824af74122c10edcbb874cc441827a9651bc7d35f3"
       },
-      "note": "Coverage batch: declaration self-corrects into reopening the lens crate and counting the packing straw; the lane picked the advertised Investigation check candidate at 0.41, just over the live action threshold. Correct but borderline and worth human review.",
+      "note": "Coverage batch: declaration self-corrects into reopening the lens crate and counting the packing straw; the lane picked the advertised Investigation check candidate at 0.41, just over the live action threshold. Correct but borderline and worth human review.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -11528,7 +11528,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "09951482-1c5e-47dc-9658-681073c9a023",
       "createdAt": "2026-09-19T15:54:05.311Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "At one hit point, I pull the potion of healing and drink it, staying ready to move.",
@@ -11550,7 +11550,7 @@
       "expected": {
         "candidateId": "combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376"
       },
-      "note": "Live SRD combat, fighter at 1 HP: declaration explicitly drinks the potion; the lane picked the advertised exact_combat_consumable candidate at 0.95; confirmation approved and the lane-origin execution committed (origin=lane, no provider evidence, combat revision 10). The potion healed the fighter 1 -> 10 HP.",
+      "note": "Live SRD combat, fighter at 1 HP: declaration explicitly drinks the potion; the lane picked the advertised exact_combat_consumable candidate at 0.95; confirmation approved and the lane-origin execution committed (origin=lane, no provider evidence, combat revision 10). The potion healed the fighter 1 -> 10 HP.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -11978,7 +11978,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "6128f65c-afd1-43c7-ae62-29a83e98d634",
       "createdAt": "2026-09-18T23:23:04.244Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "no wait, forget my last idea — rest... no, i'll find a safe spot and take a short rest.",
@@ -12174,7 +12174,7 @@
       "expected": {
         "candidateId": "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
       },
-      "note": "Turn 93978c5f: declaration self-corrects to finding a safe spot and taking a short rest; lane picked Short rest at 0.85.",
+      "note": "Turn 93978c5f: declaration self-corrects to finding a safe spot and taking a short rest; lane picked Short rest at 0.85.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -13022,7 +13022,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "dceaa5f6-0e73-4fef-9368-af7d74a6e02c",
       "createdAt": "2026-09-18T02:49:41.467Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I move quietly along the wall, keeping to the shadows.",
@@ -13224,7 +13224,7 @@
       "expected": {
         "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
       },
-      "note": "Hand-written canary: moving quietly along the wall in shadow is the advertised Stealth (Dexterity), Medium check, and the lane promoted exactly that candidate (lane commit, roll 6+2=8 vs DC 15 failure), matching the declaration.",
+      "note": "Hand-written canary: moving quietly along the wall in shadow is the advertised Stealth (Dexterity), Medium check, and the lane promoted exactly that candidate (lane commit, roll 6+2=8 vs DC 15 failure), matching the declaration.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -13652,7 +13652,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "5481f185-7cac-4ad3-82e7-a3da57e29867",
       "createdAt": "2026-09-18T21:32:03.105Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "Aster Vale plants his feet, breathes deep, and uses Second Wind—he's not done yet.",
@@ -13668,7 +13668,7 @@
       "expected": {
         "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
       },
-      "note": "Turn b1367b78: declaration explicitly names Second Wind and the lane picked the only advertised candidate (that combat power) at 0.96.",
+      "note": "Turn b1367b78: declaration explicitly names Second Wind and the lane picked the only advertised candidate (that combat power) at 0.96.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -14300,7 +14300,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "b7b87ff4-0bc6-4a91-96d3-c7c86f02c84d",
       "createdAt": "2026-09-18T19:55:42.747Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I kneel at the cold beacon and study its mechanism, trying to work out why it will not light.",
@@ -14496,7 +14496,7 @@
       "expected": {
         "candidateId": "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7"
       },
-      "note": "Studying the beacon's mechanism to learn why it will not light is a natural reading of an Investigation check; Arcana or Perception would also have been defensible, but the committed pick is acceptable.",
+      "note": "Studying the beacon's mechanism to learn why it will not light is a natural reading of an Investigation check; Arcana or Perception would also have been defensible, but the committed pick is acceptable.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -15554,7 +15554,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "3391e8fd-3e56-40cf-9130-06ae77c1997d",
       "createdAt": "2026-09-18T19:59:46.085Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "Keeper house it is, then. I leave Maren on the stairs with the unlit lantern and walk up the quay behind them — shutters latched, she said, the crate under the bench. I don't dawdle and I don't haggle with anyone on the way; the lens is what this whole thing hangs on and I want it in my hands before the light goes. When I get there I let myself in the way keepers let themselves in, kneel down, pull the crate out from under the bench, and open it to put my own eyes on the harbor lens — whole, unclouded, and mine to carry back down.",
@@ -15744,7 +15744,7 @@
       "expected": {
         "candidateId": "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
       },
-      "note": "The declaration announces 'Keeper house it is, then' and describes walking there to open the crate, so Travel: Lantern Quay → Keeper House is directly requested.",
+      "note": "The declaration announces 'Keeper house it is, then' and describes walking there to open the crate, so Travel: Lantern Quay → Keeper House is directly requested.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -16586,7 +16586,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "196f640f-aa41-420f-beba-de348fab4e62",
       "createdAt": "2026-09-18T02:49:34.360Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I study the rusted gate closely for any mechanism or rune before touching it.",
@@ -16788,7 +16788,7 @@
       "expected": {
         "candidateId": "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e"
       },
-      "note": "Hand-written canary: studying the rusted gate for a mechanism or rune maps to the advertised Investigation (Intelligence), Medium check, and the lane promoted exactly that candidate (lane commit, roll 9+1=10 vs DC 15 failure), so the pick and receipt are sensible for the declaration.",
+      "note": "Hand-written canary: studying the rusted gate for a mechanism or rune maps to the advertised Investigation (Intelligence), Medium check, and the lane promoted exactly that candidate (lane commit, roll 9+1=10 vs DC 15 failure), so the pick and receipt are sensible for the declaration.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -16796,7 +16796,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "ffcfa389-2c2e-4d02-b545-cfbde0b22c9f",
       "createdAt": "2026-09-18T19:58:16.388Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "i stop circling it. i pick my pack up off the wet stone, walk it back to the beacon stairs where maren hasn't moved, set the pack down at her feet, and say it flat: i swore to put that flame back up, and i've knelt at the cold bones of it once already and learned nothing worth keeping. so tell me — what does the light actually need from me? say the whole of it, no trimming. i'm listening, and i'm not walking off this quay until you've finished. (and while she talks i'm still sizing the stairs and the stone behind me, half wondering whether this spot would even hold me for a night if the answer runs long — one thing at a time though; the asking comes first.)",
@@ -16998,7 +16998,7 @@
       "expected": {
         "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
       },
-      "note": "The player walks to Maren and asks what the light needs, so advancing the objective to 'Hear Keeper Maren's request' matches the declaration.",
+      "note": "The player walks to Maren and asks what the light needs, so advancing the objective to 'Hear Keeper Maren's request' matches the declaration.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -18686,7 +18686,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "d3138cf4-df15-45c3-8d8c-3431dddf3f53",
       "createdAt": "2026-09-18T23:22:17.395Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "Hmm, actually no — I’ll attempt a short rest—rather, I’ll find cover and rest exactly long enough to treat this wound.",
@@ -18876,7 +18876,7 @@
       "expected": {
         "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
       },
-      "note": "Turn c7b40fb1: declaration self-corrects to finding cover and resting long enough to treat the wound; lane picked the advertised Short rest candidate at 0.62.",
+      "note": "Turn c7b40fb1: declaration self-corrects to finding cover and resting long enough to treat the wound; lane picked the advertised Short rest candidate at 0.62.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
@@ -19934,7 +19934,7 @@
       "lane": "adventure-selection",
       "sourceDecisionId": "bdee5b9e-1a2c-483e-b742-2884f4540827",
       "createdAt": "2026-09-18T19:57:34.882Z",
-      "provenance": "agent-review",
+      "provenance": "review-annotated",
       "status": "confirmed",
       "state": {
         "declaration": "I stop my count at ten, open my eyes to the grey sky, and plant my feet wide in the dust. My lungs are still burning from the climb, but I've been through worse. I close my eyes again and reach deep for that second wind — the one that's always waiting when the road gets long. Let it come.",
@@ -20130,7 +20130,7 @@
       "expected": {
         "candidateId": "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941"
       },
-      "note": "The declaration explicitly reaches for 'that second wind', so committing the advertised Second Wind power for Aster Vale is directly requested.",
+      "note": "The declaration explicitly reaches for 'that second wind', so committing the advertised Second Wind power for Aster Vale is directly requested.\n\nHuman review: Human review 2026-09-20 (batch 1): declaration and pick match on the review packet.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
