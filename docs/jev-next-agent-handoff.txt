@@ -1,0 +1,54 @@
+Jev reliability and evaluation handoff
+
+Repository: https://github.com/mojomast/velvetrp
+Branch: fix/jev-validation-budget
+Local review checkout: /home/mojo/.hermes-instances/fresh/workspace/velvetrp-jev-review
+Implementation tip before this handoff: 175b586
+
+Scope completed (inspect commits for exact changes):
+508a7bc: score validation and individually tracked concurrent budget reservations.
+7a24b95: total retry deadlines, cancellation propagation and bounded background advisory queue.
+e6786e2: relevance-aware, family-diverse SHADOW shortlist; active strategy unchanged.
+40dbbfc: version-bound promotion evidence for active speaker/adventure decisions.
+fe5fefa: request-time adventure evaluation evidence capture.
+3a789cb: scoped speaker benchmark evidence capture.
+69d2841: evaluation-only shared-context adventure request builder.
+175b586: adventure benchmark --payload shared-context variant; legacy default.
+
+Current boundaries:
+No deployment or paid API evaluation was performed in this work. Push is requested separately by the owner. Do not treat a push as a deployment or approval to incur API costs.
+Historical promotion records deliberately lack evaluatedBindings. On deployment, they cannot authorize active Jev decisions; existing provider fallback remains. Never fabricate/backfill bindings from current settings.
+Curated benchmark candidates bypass production shortlisting. Their evidence cannot approve production candidate selection. Per-family production-path metrics are still needed.
+Shared-context payload is available in the benchmark CLI but is not wired into runtime. It has distinct question/state binding versions. Keep legacy runtime behavior until evaluated.
+Background observations are best-effort: queue overflow/shutdown may lose pending work. No durability guarantee.
+Contract revisions are explicit, not automatic source hashes; semantic changes require revision updates.
+
+Next recommended task:
+Implement an automated paired comparison of legacy and shared-context adventure payloads on identical cases, without running paid calls by default. Preserve per-attempt evidence, distinct bindings, failures, returned models and request/corpus hashes. Report agreement, grading metrics and payload bytes separately from measured provider tokens/cost/latency. Do not synthesize unavailable measurements.
+Cover empty inputs, synonyms, negation, malicious-looking declarations, duplicate groups and large candidate sets. Existing four constructed shortlist cases are not representative accuracy evidence.
+Then add production-path evaluation and separate action-family metrics before considering promotion. Ask the owner for a bounded live API budget before real provider calls.
+
+Start reading:
+scripts/evaluate-system-one-adventure-lane.ts
+scripts/benchmark-system-one-lanes.ts
+scripts/system-one-evidence.ts
+server/src/agent/systemOneAdventure.ts
+server/src/agent/systemOneBinding.ts
+server/src/agent/systemOnePromotion.ts
+docs/jev-promotion-binding.md
+docs/jev-shared-context-experiment.md
+Note: older prose in the latter two documents predates speaker capture / benchmark payload integration. This handoff and implementation commits describe the newer state.
+
+Fresh pre-push validation:
+npx tsx --test scripts/test/adventure-payload-variant.test.ts scripts/test/system-one-evidence.test.ts
+Result: 10 tests passed, 0 failed.
+npm run typecheck:hydration-cli
+Result: passed.
+git diff --check
+Result: passed.
+Earlier conversation reports broader server validations; these were not rerun for this documentation-only handoff. Follow AGENTS.md and run affected tests plus owning typechecks for new code. CI is the broad validation gate.
+
+Preserve unrelated local files:
+docs/jev-implementation-review.txt
+scripts/jev-review-probes.ts
+Both were untracked on arrival for this handoff; neither is included in the commit. Do not stage, delete or publish them without inspection and scope confirmation.
