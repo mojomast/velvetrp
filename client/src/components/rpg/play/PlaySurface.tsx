@@ -3,8 +3,12 @@ import "./playSurface.css";
 
 export const ATLAS_TOOLS = ["character", "inventory", "advancement", "travel", "dice", "context", "combat", "gm", "security", "create", "director", "images", "help"] as const;
 export type AtlasTool = (typeof ATLAS_TOOLS)[number];
-/** Screen edge a tool drawer attaches to. */
-export type AtlasDrawerSide = "left" | "right";
+/** Screen edge a tool drawer attaches to. Top and bottom drawers occupy the centre lane. */
+export type AtlasDrawerSide = "top" | "bottom" | "left" | "right";
+/** Clockwise from the top edge; shared by the header control and the Display dialog. */
+export const ATLAS_DRAWER_SIDES: readonly AtlasDrawerSide[] = ["top", "right", "bottom", "left"];
+export const atlasDrawerSideLabels: Record<AtlasDrawerSide, string> = { top: "Top", right: "Right", bottom: "Bottom", left: "Left" };
+const atlasDrawerSideGlyphs: Record<AtlasDrawerSide, string> = { top: "↑", right: "→", bottom: "↓", left: "←" };
 export const atlasToolLabels: Record<AtlasTool, string> = {
   character: "Character", inventory: "Inventory & equipment", advancement: "Advancement", travel: "Travel", dice: "Dice", context: "Field journal", combat: "Combat & rewards", gm: "GM tools", security: "Rules & safety", create: "Create character", director: "Director", images: "Scene images", help: "Help",
 };
@@ -71,14 +75,27 @@ export function PlaySurface({ headingRef, title, role, phase, actor, tools, acti
   </main>;
 }
 
+/** Four-way edge control. Renders nothing unless the caller persists side changes. */
+export function AtlasDrawerSideControl({ tool, side, onSideChange }: { tool: AtlasTool; side: AtlasDrawerSide;
+  onSideChange?: (side: AtlasDrawerSide) => void }) {
+  if (!onSideChange) return null;
+  return <div className="atlas-drawer-side-control" role="group" aria-label={`${atlasToolLabels[tool]} drawer position`}>
+    {ATLAS_DRAWER_SIDES.map((option) => <button type="button" key={option} aria-pressed={side === option}
+      aria-label={`Open drawer at ${option}`} title={`Open drawer at ${option}`} onClick={() => onSideChange(option)}>{atlasDrawerSideGlyphs[option]}</button>)}
+  </div>;
+}
+
 /** Non-modal: the map and composer remain keyboard reachable while a tool is open. */
-export function AtlasDrawer({ tool, open, onClose, side = "right", children }: { tool: AtlasTool; open: boolean; onClose: () => void; side?: AtlasDrawerSide; children: ReactNode }) {
+export function AtlasDrawer({ tool, open, onClose, side = "right", onSideChange, children }: { tool: AtlasTool; open: boolean;
+  onClose: () => void; side?: AtlasDrawerSide; onSideChange?: (side: AtlasDrawerSide) => void; children: ReactNode }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (open) headingRef.current?.focus({ preventScroll: true }); }, [open]);
-  return <div id={`atlas-${tool}`} className="atlas-drawer-slot" data-side={side} hidden={!open}>
+  const horizontal = side === "top" || side === "bottom";
+  return <div id={`atlas-${tool}`} className="atlas-drawer-slot" data-side={side} data-orientation={horizontal ? "horizontal" : "vertical"} hidden={!open}>
     <aside className="atlas-drawer" role="dialog" aria-modal="false" aria-labelledby={`atlas-${tool}-heading`} tabIndex={-1}>
       <header className="atlas-drawer-heading"><div><span className="atlas-kicker">AT THE TABLE</span><h2 ref={headingRef} tabIndex={-1} id={`atlas-${tool}-heading`}>{atlasToolLabels[tool]}</h2></div>
-        <button type="button" onClick={onClose} aria-label={`Close ${atlasToolLabels[tool]}`}>Close</button></header>
+        <div className="atlas-drawer-controls"><AtlasDrawerSideControl tool={tool} side={side} onSideChange={onSideChange} />
+          <button type="button" onClick={onClose} aria-label={`Close ${atlasToolLabels[tool]}`}>Close</button></div></header>
       <div className="atlas-drawer-content">{children}</div>
     </aside>
   </div>;

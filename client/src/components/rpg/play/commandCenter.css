@@ -28,14 +28,52 @@
 .campaign-play-page .conversation-exchange p { margin-top: 4px; }
 .campaign-play-page .conversation-exchange time { margin-top: 5px; }
 /* Tool drawers overlay the table from a fixed edge slot; the open drawer sits above
-   its scrim, and each tool can attach to the left or right edge from Display. */
-.campaign-drawers-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+   its scrim, and each tool can attach to the top, bottom, left, or right edge.
+   Top and bottom drawers keep to the centre lane: CampaignPlayPage publishes the
+   visible side-column widths as --drawer-inset-left/right. */
+.campaign-drawers-overlay {
+  /* The shared atlas drawer styles were written against the legacy living-atlas
+     palette, which only exists inside .living-atlas. Map it to the Command Center
+     theme so every drawer background, border, and text colour stays opaque. */
+  --atlas-deep: var(--surface);
+  --atlas-paper: var(--text);
+  --atlas-line: var(--border);
+  --atlas-brass: var(--accent);
+  --atlas-muted: var(--muted);
+  --drawer-inset-left: 0px;
+  --drawer-inset-right: 0px;
+  position: fixed; inset: 0; pointer-events: none; z-index: 60;
+}
 .campaign-drawers-overlay .campaign-drawers-scrim { position: fixed; inset: 0; pointer-events: auto; margin: 0; padding: 0; min-height: 0; border: 0; border-radius: 0; background: color-mix(in srgb, #000 45%, transparent); backdrop-filter: blur(1px); cursor: pointer; }
 .campaign-drawers-overlay .campaign-drawers-scrim:hover { background: color-mix(in srgb, #000 52%, transparent); }
-.campaign-drawers-overlay .atlas-drawer-slot { pointer-events: auto; z-index: 1; }
-.campaign-drawers-overlay .atlas-drawer-slot[data-side="right"] { inset: 0 0 0 auto; box-shadow: -16px 0 45px #0005; }
-.campaign-drawers-overlay .atlas-drawer-slot[data-side="left"] { inset: 0 auto 0 0; box-shadow: 16px 0 45px #0005; }
+.campaign-drawers-overlay .atlas-drawer-slot { position: absolute; pointer-events: auto; z-index: 1; }
+.campaign-drawers-overlay .atlas-drawer-slot[data-side="right"] { inset: 0 0 0 auto; width: min(680px, 75vw); box-shadow: -16px 0 45px #0005; }
+.campaign-drawers-overlay .atlas-drawer-slot[data-side="left"] { inset: 0 auto 0 0; width: min(680px, 75vw); box-shadow: 16px 0 45px #0005; }
+.campaign-drawers-overlay .atlas-drawer-slot[data-side="top"] { inset: 0 var(--drawer-inset-right) auto var(--drawer-inset-left); width: auto; height: min(60vh, 540px); box-shadow: 0 16px 45px #0005; }
+.campaign-drawers-overlay .atlas-drawer-slot[data-side="bottom"] { inset: auto var(--drawer-inset-right) 0 var(--drawer-inset-left); width: auto; height: min(60vh, 540px); box-shadow: 0 -16px 45px #0005; }
 .campaign-drawers-overlay .atlas-drawer-slot[hidden] { display: none; }
+/* Explicit opaque surfaces: the mapped atlas variables cover the shared styles, and
+   these rules keep the drawer opaque even if a legacy override loses the variables. */
+.campaign-drawers-overlay .atlas-drawer { background: var(--surface); color: var(--text); }
+.campaign-drawers-overlay .atlas-drawer-heading { background: var(--surface-2); }
+.campaign-drawers-overlay .atlas-drawer-content { flex: 1 1 auto; max-height: none; background: var(--surface); }
+.campaign-drawers-overlay .atlas-drawer-controls button { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+.campaign-drawers-overlay .atlas-drawer-controls button:hover:not(:disabled) { border-color: var(--accent); }
+.campaign-drawers-overlay .atlas-drawer-controls button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+/* The character reference slot wraps the gameplay sheet directly. Pin the sheet to the
+   slot so the reference follows the chosen edge and scrolls inside the drawer. */
+.campaign-drawers-overlay .atlas-character-reference > .gameplay-sheet-drawer {
+  position: static; inset: auto; width: 100%; height: auto; max-height: none; flex: 1 1 auto; min-height: 0;
+  margin: 0; border: 0; border-radius: 0; box-shadow: none;
+}
+/* Top and bottom drawers get a wide, short canvas: content reflows into auto-fit
+   columns instead of the single-file column used by side drawers. */
+.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-heading h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-content :is(.session-control-grid, .scene-image-dm, .combat-layout, .combat-actor-lanes, .workbench-preference-grid, .table-dice-form, .encounter-setup, .combat-binding, .atlas-actor-sections, .atlas-world-locations) {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-content .atlas-domain-heading { flex-wrap: nowrap; }
+.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-content > .gameplay-sheet-drawer { max-height: none; }
 .workbench-dialog .drawer-side-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
 .workbench-dialog .drawer-side-grid label { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .workbench-dialog .drawer-side-grid span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -62,4 +100,11 @@
 @media (max-width: 1100px) {
   .campaign-play-page .campaign-play-grid.has-context.has-quick-tools { grid-template-columns: minmax(220px, var(--campaign-context-width)) 8px minmax(420px, 1fr); }
   .campaign-play-page .campaign-nav-group-setup { margin-left: 0; }
+  /* The tools column becomes a full-width row, so top/bottom drawers may use the right edge. */
+  .campaign-drawers-overlay { --drawer-inset-right: 0px !important; }
+}
+@media (max-width: 900px) {
+  /* The workbench stacks into one column; the centre lane is the whole viewport. */
+  .campaign-drawers-overlay { --drawer-inset-left: 0px !important; --drawer-inset-right: 0px !important; }
+  .campaign-drawers-overlay .atlas-drawer-slot[data-side="right"], .campaign-drawers-overlay .atlas-drawer-slot[data-side="left"] { width: min(680px, 100vw); }
 }

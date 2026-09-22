@@ -22,7 +22,7 @@ export interface CampaignWorkbenchPreferences {
 export const CAMPAIGN_WORKBENCH_PREFERENCES_KEY = "velvet.campaign-workbench.v1";
 export const CAMPAIGN_CONTEXT_WIDGETS: readonly CampaignContextWidget[] = ["location", "cast", "objectives", "resources", "encounter"];
 
-/** Every tool defaults to the right edge; Command Center readers override per tool. */
+/** Every tool defaults to the right edge; the header control overrides per tool. */
 export function defaultCampaignDrawerSides(): Record<AtlasTool, AtlasDrawerSide> {
   return Object.fromEntries(ATLAS_TOOLS.map((tool) => [tool, "right"])) as Record<AtlasTool, AtlasDrawerSide>;
 }
@@ -41,7 +41,7 @@ export const DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES: CampaignWorkbenchPreference
 
 const themes = new Set<CampaignTheme>(["system", "light", "dark", "contrast"]);
 const densities = new Set<CampaignDensity>(["compact", "comfortable", "spacious"]);
-const drawerSideValues = new Set<AtlasDrawerSide>(["left", "right"]);
+const drawerSideValues = new Set<AtlasDrawerSide>(["top", "bottom", "left", "right"]);
 const clampWidth = (value: unknown, fallback: number) => typeof value === "number" && Number.isFinite(value)
   ? Math.max(220, Math.min(520, Math.round(value))) : fallback;
 
@@ -71,6 +71,7 @@ export function readCampaignWorkbenchPreferences(): CampaignWorkbenchPreferences
       quickToolsWidth: clampWidth(value.quickToolsWidth, DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES.quickToolsWidth),
       // Persisted v1 payloads written before drawer sides lack the key; migration keeps
       // every tool on the right edge rather than inventing a side for unknown tools.
+      // Stored top/bottom/left values from the four-way control are preserved.
       drawerSides: readDrawerSides(value.drawerSides),
       // Persisted payloads written before automatic mechanics narration lack the key;
       // migration keeps the enabled default rather than silently disabling provider prose.

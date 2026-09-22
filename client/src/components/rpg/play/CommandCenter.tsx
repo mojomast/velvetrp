@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
-import { ATLAS_TOOLS, atlasToolLabels, type AtlasDrawerSide, type AtlasTool } from "./PlaySurface";
+import { ATLAS_DRAWER_SIDES, ATLAS_TOOLS, atlasDrawerSideLabels, atlasToolLabels, type AtlasDrawerSide, type AtlasTool } from "./PlaySurface";
 import "./commandCenter.css";
 import {
   CAMPAIGN_CONTEXT_WIDGETS,
@@ -75,10 +75,10 @@ function WorkbenchPreferencesDialog({ dialogRef, preferences, onChange }: { dial
     <div className="workbench-preference-grid"><label>Theme<select value={preferences.theme} onChange={(event) => onChange({ ...preferences, theme: event.target.value as CampaignWorkbenchPreferences["theme"] })}><option value="system">System</option><option value="light">Light</option><option value="dark">Velvet dark</option><option value="contrast">High contrast</option></select></label>
       <label>Layout density<select value={preferences.density} onChange={(event) => onChange({ ...preferences, density: event.target.value as CampaignWorkbenchPreferences["density"] })}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label></div>
     <fieldset><legend>Panels</legend><label><input type="checkbox" checked={preferences.contextVisible} onChange={(event) => onChange({ ...preferences, contextVisible: event.target.checked })} /> Campaign context and map</label><label><input type="checkbox" checked={preferences.quickToolsVisible} onChange={(event) => onChange({ ...preferences, quickToolsVisible: event.target.checked })} /> Tools and character summary</label></fieldset>
-    <fieldset><legend>Drawer sides</legend><p className="builder-help">Each tool drawer opens from its own screen edge.</p>
+    <fieldset><legend>Drawer sides</legend><p className="builder-help">Each tool drawer opens from its own screen edge; top and bottom drawers keep to the centre lane.</p>
       <div className="drawer-side-grid">{ATLAS_TOOLS.map((tool) => <label key={tool}><span>{atlasToolLabels[tool]}</span>
         <select aria-label={`${atlasToolLabels[tool]} drawer side`} value={preferences.drawerSides?.[tool] ?? "right"} onChange={(event) => setDrawerSide(tool, event.target.value as AtlasDrawerSide)}>
-          <option value="right">Right</option><option value="left">Left</option>
+          {ATLAS_DRAWER_SIDES.map((side) => <option key={side} value={side}>{atlasDrawerSideLabels[side]}</option>)}
         </select></label>)}</div>
     </fieldset>
     <fieldset><legend>Narration</legend><label><input type="checkbox" checked={preferences.autoNarrateMechanics} onChange={(event) => onChange({ ...preferences, autoNarrateMechanics: event.target.checked })} /> Auto-narrate committed mechanics (uses the configured provider)</label></fieldset>

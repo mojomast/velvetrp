@@ -60,6 +60,10 @@
 .atlas-drawer, .living-atlas .atlas-drawer-slot > .gameplay-sheet-drawer { position: static; inset: auto; width: 100%; height: 100%; max-height: none; max-width: none; margin: 0; border: 0; border-left: 1px solid var(--atlas-brass); border-radius: 0; background: var(--atlas-deep); color: var(--atlas-paper); box-shadow: none; }
 .atlas-drawer { display: flex; flex-direction: column; }.atlas-drawer-heading { display: flex; justify-content: space-between; gap: .75rem; align-items: center; flex-shrink: 0; padding: 1rem 1.25rem; border-bottom: 1px solid var(--atlas-line); }.atlas-drawer-heading h2 { margin: .2rem 0 0; font: 400 1.45rem Georgia, serif; }
 .atlas-drawer-content { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 1rem 1.25rem; }
+.atlas-drawer-controls { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.atlas-drawer-side-control { display: flex; gap: 2px; }
+.atlas-drawer-side-control button { display: inline-flex; align-items: center; justify-content: center; width: 24px; min-width: 24px; height: 24px; min-height: 24px; padding: 0; font-size: .85rem; line-height: 1; }
+.atlas-drawer-side-control button[aria-pressed="true"] { border-color: var(--atlas-brass); color: var(--atlas-brass); }
 .living-atlas .atlas-drawer-slot > .gameplay-sheet-drawer { overflow: auto; padding: 1rem 1.25rem; }.living-atlas .gameplay-sheet-drawer > header { position: sticky; top: -1rem; z-index: 1; background: var(--atlas-deep); padding-block: 1rem; }
 .atlas-drawer-content .campaign-context-drawer { position: static; width: 100%; max-height: none; background: transparent; border: 0; padding: 0; }.atlas-drawer-content .session-controls { margin: 0; padding: 0; border: 0; background: transparent; }
 .atlas-drawer-content :is(.session-control-grid, .combat-layout, .combat-actor-lanes) { display: grid; grid-template-columns: minmax(0, 1fr); }.atlas-drawer-content :is(.combat-shell, .combat-main-column, .combat-binding, .combat-panel, .legal-action-tray, .initiative-rail) { min-width: 0; max-width: 100%; position: static; }

@@ -1,4 +1,5 @@
 import type { ActorGameplaySheetResponse } from "@velvet/contracts";
+import { AtlasDrawerSideControl, type AtlasDrawerSide } from "./PlaySurface";
 
 export interface GameplaySheetDrawerProps {
   sheet: ActorGameplaySheetResponse;
@@ -6,6 +7,9 @@ export interface GameplaySheetDrawerProps {
   onClose: () => void;
   onReference: (fragment: string) => void;
   closeButtonRef?: React.RefObject<HTMLButtonElement>;
+  /** Command Center only: current drawer edge and the four-way persistence hook. */
+  side?: AtlasDrawerSide;
+  onSideChange?: (side: AtlasDrawerSide) => void;
 }
 
 const signed = (value: number) => value >= 0 ? `+${value}` : String(value);
@@ -41,7 +45,7 @@ const derivedEntries = (sheet: ActorGameplaySheetResponse): Array<readonly [stri
 };
 
 /** Read-only actor projection. Reference controls only compose text for an explicit later declaration. */
-export function GameplaySheetDrawer({ sheet, canReference, onClose, onReference, closeButtonRef }: GameplaySheetDrawerProps) {
+export function GameplaySheetDrawer({ sheet, canReference, onClose, onReference, closeButtonRef, side = "right", onSideChange }: GameplaySheetDrawerProps) {
   const hintId = "gameplay-sheet-reference-hint";
   const reference = (label: string, fragment: string, available = true) => (
     <button type="button" disabled={!canReference || !available} aria-describedby={hintId} onClick={() => onReference(fragment)}>{label}</button>
@@ -50,7 +54,8 @@ export function GameplaySheetDrawer({ sheet, canReference, onClose, onReference,
 
   return <aside className="gameplay-sheet-drawer" role="dialog" aria-modal="false" aria-labelledby="gameplay-sheet-title" aria-describedby={hintId}>
     <header><div><p className="eyebrow">READ-ONLY REFERENCE · {sheet.rulesetId ?? "velvet-starter-v1"} @ {sheet.rulesetVersion ?? "1.0.0"}</p><h2 id="gameplay-sheet-title">{sheet.identity.name}&apos;s character sheet</h2></div>
-      <button ref={closeButtonRef} type="button" aria-label="Close character sheet" onClick={onClose}>Close</button></header>
+      <div className="atlas-drawer-controls"><AtlasDrawerSideControl tool="character" side={side} onSideChange={onSideChange} />
+        <button ref={closeButtonRef} type="button" aria-label="Close character sheet" onClick={onClose}>Close</button></div></header>
     <p id={hintId} className="gameplay-sheet-hint">Reference buttons only append words to your existing declaration draft and move focus to the composer. They never submit, roll, use an item or power, or change character state. Review and explicitly press Declare action to proceed.{!canReference && " References are disabled until play is ready and unambiguous."}</p>
 
     <section aria-labelledby="gameplay-sheet-identity"><h3 id="gameplay-sheet-identity">Identity</h3><dl>

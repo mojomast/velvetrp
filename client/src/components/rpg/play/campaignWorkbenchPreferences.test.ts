@@ -28,12 +28,14 @@ describe("campaign workbench preferences", () => {
     expect(new Set(Object.values(defaults.drawerSides))).toEqual(new Set(["right"]));
     expect(defaults.drawerSides.director).toBe("right");
     expect(defaults.drawerSides.help).toBe("right");
-    // Missing and unknown values fall back to right; tools the build does not know are ignored.
-    localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ drawerSides: { director: "left", character: "sideways", "not-a-tool": "left" } }));
+    // Missing and unknown values fall back to right; the four known sides are preserved.
+    localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ drawerSides: { director: "top", character: "sideways", dice: "bottom", travel: "left", "not-a-tool": "left" } }));
     const migrated = readCampaignWorkbenchPreferences();
-    expect(migrated.drawerSides.director).toBe("left");
+    expect(migrated.drawerSides.director).toBe("top");
+    expect(migrated.drawerSides.dice).toBe("bottom");
+    expect(migrated.drawerSides.travel).toBe("left");
     expect(migrated.drawerSides.character).toBe("right");
-    expect(migrated.drawerSides.dice).toBe("right");
+    expect(migrated.drawerSides.help).toBe("right");
     expect("not-a-tool" in migrated.drawerSides).toBe(false);
     // A payload with no drawerSides key at all still produces a complete record.
     localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ theme: "dark" }));

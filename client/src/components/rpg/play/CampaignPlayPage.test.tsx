@@ -151,9 +151,39 @@ describe("CampaignPlayPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Display" }));
     const directorSide = screen.getByLabelText("Director drawer side") as HTMLSelectElement;
     expect(directorSide.value).toBe("left");
+    expect(Array.from(directorSide.options).map((option) => option.value)).toEqual(["top", "right", "bottom", "left"]);
     fireEvent.change(directorSide, { target: { value: "right" } });
     expect(document.querySelector("#atlas-director")?.getAttribute("data-side")).toBe("right");
     expect(JSON.parse(localStorage.getItem("velvet.campaign-workbench.v1") ?? "null")).toMatchObject({ drawerSides: { director: "right" } });
+  });
+  it("moves an open drawer to any edge from its header control and persists the choice", async () => {
+    localStorage.setItem("velvet.campaign-workbench.v1", JSON.stringify({ drawerSides: { director: "right", character: "left" } }));
+    const client = api();
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Adventure room" });
+    fireEvent.click(screen.getByRole("button", { name: "Director" }));
+    const slot = document.querySelector("#atlas-director") as HTMLElement;
+    // The drawer keeps its opaque structure while the edge changes.
+    expect(slot.querySelector(".atlas-drawer > .atlas-drawer-heading")).toBeTruthy();
+    expect(slot.querySelector(".atlas-drawer > .atlas-drawer-content")).toBeTruthy();
+    expect(slot.getAttribute("data-orientation")).toBe("vertical");
+    fireEvent.click(screen.getByRole("button", { name: "Open drawer at top" }));
+    expect(slot.getAttribute("data-side")).toBe("top");
+    expect(slot.getAttribute("data-orientation")).toBe("horizontal");
+    expect(screen.getByRole("button", { name: "Open drawer at top" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Open drawer at right" }).getAttribute("aria-pressed")).toBe("false");
+    expect(JSON.parse(localStorage.getItem("velvet.campaign-workbench.v1") ?? "null")).toMatchObject({ drawerSides: { director: "top" } });
+
+    // The character reference slot carries the same four-way control.
+    fireEvent.click(screen.getByRole("button", { name: "Character" }));
+    const character = document.querySelector("#atlas-character") as HTMLElement;
+    expect(character.getAttribute("data-side")).toBe("left");
+    const sheetDrawer = await screen.findByRole("dialog", { name: "Aria's character sheet" });
+    expect(character.querySelector(".gameplay-sheet-drawer")).toBeTruthy();
+    fireEvent.click(within(sheetDrawer).getByRole("button", { name: "Open drawer at bottom" }));
+    expect(character.getAttribute("data-side")).toBe("bottom");
+    expect(character.getAttribute("data-orientation")).toBe("horizontal");
+    expect(JSON.parse(localStorage.getItem("velvet.campaign-workbench.v1") ?? "null")).toMatchObject({ drawerSides: { character: "bottom" } });
   });
   it("places the compact DM chronicle in the right rail with its own expand control", async () => {
     const client = api();
