@@ -1,4 +1,5 @@
 import type { SystemOneLane } from "../types.js";
+import { matchesSystemOneBinding, type SystemOneEvaluationBinding } from "./systemOneBinding.js";
 import type { PlattCalibration } from "./systemOneCalibration.js";
 import { wilsonLowerBound } from "./systemOneGateStatistics.js";
 
@@ -274,6 +275,8 @@ export function assertPromoted(result: SystemOnePromotionResult): void {
  * act — the runtime records their decisions but never lets them change behavior.
  */
 export interface SystemOnePromotionRecord {
+  /** Frozen evaluation configurations. Legacy unbound metrics remain evidence only. */
+  evaluatedBindings?: readonly SystemOneEvaluationBinding[];
   metrics: CalibrationMetrics;
   /** The Platt map that produced the calibrated metrics, to mirror in settings. */
   calibration: PlattCalibration | null;
@@ -403,12 +406,13 @@ export function promotionRecord(lane: SystemOneLane): SystemOnePromotionRecord |
 }
 
 /**
- * Whether a lane may leave shadow mode. A lane is promoted only when it has a record and
- * that record still clears the lane's gate. The runtime checks this before acting, so an
- * unpromoted lane records its decisions but never changes behavior.
+ * Whether this exact evaluated configuration may leave shadow mode. A record must
+ * match the current binding and still clear its metrics gate. Legacy unbound evidence
+ * cannot authorize execution; callers without a binding fail closed.
  */
-export function isLanePromoted(lane: SystemOneLane): boolean {
+export function isLanePromoted(lane: SystemOneLane, current?: SystemOneEvaluationBinding): boolean {
   const record = promotionRecord(lane);
-  if (!record) return false;
+  if (!record || !current || current.lane !== lane
+    || !record.evaluatedBindings?.some(binding => matchesSystemOneBinding(binding, current))) return false;
   return evaluatePromotionGate(lane, record.metrics).promoted;
 }

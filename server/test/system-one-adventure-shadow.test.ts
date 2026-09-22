@@ -1,4 +1,6 @@
 import { systemOneShadowQueue } from "../src/agent/systemOneShadow.js";
+import { approveTestSystemOne } from "./fixtures/systemOnePromotion.js";
+import { SYSTEM_ONE_PROMOTION_RECORDS } from "../src/agent/systemOnePromotion.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
@@ -38,6 +40,8 @@ afterEach(() => {
 });
 
 function lane(caller: SystemOneCaller, overrides: Partial<SystemOneSettings> = {}): SystemOneAdventureDependency {
+  approveTestSystemOne({ ...defaultSystemOneSettings(), ...overrides }, "adventure-selection",
+    ["exact_srd_check.select", "exact_rest.select"]);
   return { settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key", ...overrides }, caller };
 }
 
@@ -124,7 +128,8 @@ async function runTurn(laneFactory?: () => SystemOneAdventureDependency) {
  * that advances the actor's check revision while the lane model call is in flight, which the
  * lane-origin repository path must reject as stale.
  */
-async function runCheckLaneTurn(options: { mode: "shadow" | "active"; pick: "check" | "objective"; staleCheckOnLaneCall?: boolean }) {
+async function runCheckLaneTurn(options: { mode: "shadow" | "active"; pick: "check" | "objective"; staleCheckOnLaneCall?: boolean;
+  approval?: "missing" | "stale" | "other-family" }) {
   const { f, created, check, objective } = await checkAdventureTurn();
   // Test lane execution, not hash-dependent recall through the 32-row shortlist.
   // Without this, the scripted Easy/normal check is sometimes never advertised.
@@ -140,6 +145,11 @@ async function runCheckLaneTurn(options: { mode: "shadow" | "active"; pick: "che
   });
   const caller: SystemOneCaller = async (input) => {
     const result = await base(input);
+    if (options.approval) {
+      const record = SYSTEM_ONE_PROMOTION_RECORDS["adventure-selection"]!;
+      record.evaluatedBindings = options.approval === "missing" ? [] : record.evaluatedBindings!.map(binding => ({ ...binding,
+        ...(options.approval === "stale" ? { questionVersion: "old-questions" } : { actionFamily: "exact_inventory_action.select" }) }));
+    }
     if (options.staleCheckOnLaneCall) {
       const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
       db.prepare("INSERT INTO adventure_check_revisions_v54 VALUES(?,?,?,?)")
@@ -367,6 +377,13 @@ describe("System One adventure-selection shadow lane", () => {
 });
 
 describe("System One adventure-selection active check lane", () => {
+  it.each(["missing", "stale", "other-family"] as const)("keeps provider planning for %s approval", { timeout: 30_000 }, async approval => {
+    const run = await runCheckLaneTurn({ mode: "active", pick: "check", approval });
+    expect(run.execution).toBeUndefined();
+    expect(run.providerCalls).toBeGreaterThan(0);
+    expect(run.decisions).toHaveLength(1);
+    expect(run.decisions[0]).toMatchObject({ shadow: true, fallbackUsed: true });
+  });
   // These tests boot a full repository fixture; the 30s budgets are load headroom under parallel
   // forks, not relaxed assertions.
   it("commits a promoted active lane check and skips provider planning", { timeout: 30_000 }, async () => {

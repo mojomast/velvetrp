@@ -20,6 +20,7 @@ import { buildRoomRoutingQuestions, composeRoomRoutingSelection } from "./agent/
 import { calibrateTopSignal } from "./agent/systemOneCalibration.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./agent/systemOnePolicy.js";
 import { isLanePromoted } from "./agent/systemOnePromotion.js";
+import { systemOneEvaluationBinding } from "./agent/systemOneBinding.js";
 import { estimateTurnTokens } from "./agent/turnBudget.js";
 import { systemOneLaneBudgets } from "./agent/systemOneBudget.js";
 import { systemOneLaneMode } from "./defaults.js";
@@ -176,7 +177,9 @@ async function trySystemOneRoomRouting(input: {
     const composed = composeRoomRoutingSelection(projection, result.answers, thresholds, maxSpeakers);
     // A lane changes behavior only when it is `active` and has a recorded, passing promotion.
     // Otherwise it still records the would-be decision.
-    const active = systemOneLaneMode(systemOne.settings, "speaker-routing") === "active" && isLanePromoted("speaker-routing");
+    const active = systemOneLaneMode(systemOne.settings, "speaker-routing") === "active"
+      && isLanePromoted("speaker-routing", systemOneEvaluationBinding("speaker-routing",
+        systemOne.settings, result.model.responseModel, "room-speaker-selection", {}, thresholds));
     const decision: SystemOneRoomRoutingDecision = {
       lane: "speaker-routing",
       provider: "typesafe",

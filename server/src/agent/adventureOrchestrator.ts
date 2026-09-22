@@ -19,6 +19,7 @@ import { getHarnessSettings, getProviderSettings, getSystemOneSettings, recordSy
 import type { HarnessSettings, ProviderSettings, SystemOneSettings } from "../types.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
 import { isLanePromoted } from "./systemOnePromotion.js";
+import { systemOneEvaluationBinding } from "./systemOneBinding.js";
 import { calibrateTopSignal } from "./systemOneCalibration.js";
 import { buildAdventureSelectionQuestions, composeAdventureSelection, type AdventureSelectionCandidate } from "./systemOneAdventure.js";
 import { buildRerankQuestions, composeRerankOrder, type RerankCandidate } from "./systemOneRerank.js";
@@ -270,10 +271,12 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
     });
     const selection = composed.selection;
     const picked = selection === null ? undefined : candidates.find((candidate) => candidate.candidateId === selection.candidateId);
+    const promoted = picked !== undefined && isLanePromoted("adventure-selection",
+      systemOneEvaluationBinding("adventure-selection", lane.settings, result.model.responseModel, picked.kind));
     // The deterministic, confirmation-free SRD check family commits directly; only a promoted
     // lane, an act band, and exactly `exact_srd_check.select` may commit here.
     if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
-      && isLanePromoted("adventure-selection") && composed.band === "act"
+      && promoted && composed.band === "act"
       && selection !== null && picked?.kind === "exact_srd_check.select") {
       // Advisory-first ordering (see the function note): the lane-origin commit needs the decision
       // row to exist, and the row cannot be retracted or promoted afterwards, so it never claims
@@ -288,7 +291,7 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
     // loop through executeApprovedAgentProposalAtomically; an unapproved lane proposal can never
     // commit.
     if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
-      && isLanePromoted("adventure-selection") && composed.band === "act"
+      && promoted && composed.band === "act"
       && selection !== null && picked?.kind === "exact_rest.select") {
       record(true);
       const proposed = repository.appendAdventureRestProposalFromLane(OWNER, {
@@ -312,7 +315,7 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
     // rejects an unadvertised, tampered, or undecidable candidate before any proposal is written,
     // so a failure here records advisory only and the provider path stays unchanged.
     if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
-      && isLanePromoted("adventure-selection") && composed.band === "act"
+      && promoted && composed.band === "act"
       && selection !== null
       && (picked?.kind === "exact_combat_consumable.select" || picked?.kind === "exact_combat_power.select")) {
       record(true);

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { approveTestSystemOne } from "./fixtures/systemOnePromotion.js";
+import { SYSTEM_ONE_PROMOTION_RECORDS } from "../src/agent/systemOnePromotion.js";
 import { defaultHarnessSettings, defaultProviderSettings, defaultSystemOneLaneModes, defaultSystemOneSettings } from "../src/defaults.js";
 import {
   buildRoomRoutingQuestions,
@@ -29,6 +31,7 @@ function activeSpeakerRouting(): SystemOneSettings["laneModes"] {
 }
 
 function systemOneLane(caller: SystemOneCaller, overrides: Partial<RoomRoutingSystemOne["settings"]> = {}): RoomRoutingSystemOne {
+  approveTestSystemOne({ ...defaultSystemOneSettings(), ...overrides }, "speaker-routing", ["room-speaker-selection"]);
   return {
     settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: activeSpeakerRouting(), apiKey: "test-key", ...overrides },
     caller,
@@ -56,6 +59,18 @@ afterEach(async () => {
 });
 
 describe("System One room routing lane", () => {
+  it.each(["missing", "model", "threshold"])("falls back with %s evaluation binding", async reason => {
+    fake = await startFakeProvider({ replyTexts: ['["Aria"]'] });
+    const caller = createFakeSystemOneCaller({ scripted: { c1: { type: "noul", noul: 0.1 }, c2: { type: "noul", noul: 0.99 } },
+      ...(reason === "model" ? { responseModel: "unevaluated-model" } : {}) });
+    const dependency = systemOneLane(caller);
+    if (reason === "missing") delete SYSTEM_ONE_PROMOTION_RECORDS["speaker-routing"]!.evaluatedBindings;
+    if (reason === "threshold") dependency.thresholds = { actionThreshold: 0.9, reviewThreshold: 0.8 };
+    const selection = await route(dependency, fake.baseUrl);
+    expect(selection.kind).toBe("llm");
+    expect(selection.speakerIds).toEqual(["c1"]);
+    expect(selection.systemOneDecision).toMatchObject({ shadow: true, fallbackUsed: true });
+  });
   it("builds one atomic noul question per participant plus an aggregate best-speaker choice", () => {
     const questions = buildRoomRoutingQuestions(projection, "Rowan, your call?", "Aria: hello");
     expect(Object.keys(questions)).toEqual(["c1", "c2", ROOM_ROUTING_BEST_SPEAKER_KEY]);
@@ -108,7 +123,7 @@ describe("System One room routing lane", () => {
       responseModel: "jev-1.13.0",
       usage: { input_tokens: 210, output_tokens: 6 },
     });
-    const selection = await route(systemOneLane(caller));
+    const selection = await route(systemOneLane(caller, { model: "jev-1.13.0" }));
     expect(selection.speakerIds).toEqual(["c2"]);
     expect(selection.source).toBe("model");
     expect(selection.kind).toBe("system-one");
@@ -148,7 +163,7 @@ describe("System One room routing lane", () => {
 
   it("attaches an auditable decision payload when it acts", async () => {
     const caller = createFakeSystemOneCaller({ scripted: { c1: { type: "noul", noul: 0.2 }, c2: { type: "noul", noul: 0.95 } }, responseModel: "jev-1.13.0" });
-    const selection = await route(systemOneLane(caller));
+    const selection = await route(systemOneLane(caller, { model: "jev-1.13.0" }));
     expect(selection.kind).toBe("system-one");
     expect(selection.systemOneDecision).toMatchObject({
       lane: "speaker-routing", provider: "typesafe", model: "jev-1.13.0", shadow: false, fallbackUsed: false,

@@ -1,4 +1,5 @@
 import DatabaseDriver from "better-sqlite3";
+import { approveTestSystemOne } from "./fixtures/systemOnePromotion.js";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { listSystemOneDecisionsByLane, recordSystemOneDecision, type RecordSystemOneDecisionInput } from "../src/repo/index.js";
@@ -158,6 +159,7 @@ describe("lane-origin exact combat proposals", () => {
     const lane: SystemOneAdventureDependency = { settings: { ...defaultSystemOneSettings(), enabled: true,
       laneModes: { ...defaultSystemOneLaneModes(), "adventure-selection": "active" }, apiKey: "test-key" }, caller };
 
+    approveTestSystemOne(lane.settings, "adventure-selection", ["exact_combat_power.select"]);
     const commit = await recordAdventureShadowDecision(created, [selection], lane, f.repo);
     expect(commit?.outcome).toBe("awaiting-confirmation");
     const awaiting = commit!.turn;

@@ -177,7 +177,7 @@ describe("System One promotion gate", () => {
     }
   });
 
-  it("promotes exactly the lanes with a recorded, passing gate", () => {
+  it("retains legacy evidence but does not promote unbound configurations", () => {
     expect(promotionRecord("speaker-routing")).toMatchObject({ evidence: "docs/system-one-benchmark.md" });
     expect(promotionRecord("cost-router")).toMatchObject({ evidence: "docs/system-one-router-benchmark.md" });
     expect(promotionRecord("narration-verification")).toMatchObject({ evidence: "docs/system-one-narration-benchmark.md" });
@@ -186,7 +186,7 @@ describe("System One promotion gate", () => {
     expect(promotionRecord("adventure-selection")).toMatchObject({ evidence: "docs/system-one-adventure-benchmark.md" });
     expect(promotionRecord("guardrails")).toMatchObject({ evidence: "docs/system-one-guardrails-benchmark.md" });
     const promoted = SYSTEM_ONE_LANES.filter((lane) => isLanePromoted(lane));
-    expect([...promoted].sort()).toEqual(["adventure-selection", "cost-router", "director-selection", "guardrails", "memory-reranking", "narration-verification", "speaker-routing"]);
+    expect(promoted).toEqual([]);
   });
 
   it("has a default gate for every System One lane", () => {
@@ -230,7 +230,7 @@ describe("System One promotion gate v2 criteria", () => {
       coverage: { actedSamples: 5, opportunities: 0 },
     });
     expect(ignored.promoted).toBe(true);
-    expect(isLanePromoted("guardrails")).toBe(true);
+    expect(isLanePromoted("guardrails")).toBe(false); // Metrics alone are no longer authority.
   });
 
   it("adopts the accuracy lower bound in the default gates by tier", () => {
