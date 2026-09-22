@@ -105,11 +105,13 @@ export function createEncounterReadRepository(
   const combatantRows = (encounterId: string): any[] => db.prepare(`SELECT c.*,survival.successes survival_successes,survival.failures survival_failures,
     COALESCE(temporary.hit_points,0) temporary_hit_points,
     provenance.pack_id provenance_pack_id,provenance.pack_version provenance_pack_version,
-    provenance.definition_id provenance_definition_id
+    provenance.definition_id provenance_definition_id,stored_label.label stored_label
     FROM combatant c LEFT JOIN combat_survival_v61 survival ON survival.encounter_id=c.encounter_id AND survival.combatant_id=c.combatant_id
       LEFT JOIN combat_temporary_hit_points_v62 temporary ON temporary.encounter_id=c.encounter_id AND temporary.combatant_id=c.combatant_id
       LEFT JOIN encounter_enemy_provenance_v31 provenance
       ON provenance.encounter_id=c.encounter_id AND provenance.combatant_id=c.combatant_id
+      LEFT JOIN encounter_combatant_label_v67 stored_label
+      ON stored_label.encounter_id=c.encounter_id AND stored_label.combatant_id=c.combatant_id
     WHERE c.encounter_id=? ORDER BY c.combatant_id`).all(encounterId) as any[];
 
   const publicCombatant = (row: any) => row.combatant_kind === "actor"
@@ -139,6 +141,9 @@ export function createEncounterReadRepository(
       WHERE actor.campaign_id=? AND actor.id=?`).get(campaignId, actorId) as { name: string } | undefined;
     return row?.name?.trim() ? row.name : null;
   };
+  /** Stored target-initiated label; wins over the borrowed enemy-template name. */
+  const storedCombatantLabel = (value: unknown): string | null =>
+    typeof value === "string" && value.trim() ? value : null;
   const enemyDisplayName = (template: { packId: string; packVersion: string; definitionId: string } | null): string | null => {
     if (!template) return null;
     const row = db.prepare(`SELECT public_definition_json FROM rpg_catalog_definition_visibility
@@ -247,7 +252,7 @@ export function createEncounterReadRepository(
       combatants: rows.map((row) => {
         const identity = publicCombatant(row);
         const displayName = identity.kind === "actor" ? actorDisplayName(encounter.campaign_id, identity.actorId)
-          : enemyDisplayName(identity.template);
+          : storedCombatantLabel(row.stored_label) ?? enemyDisplayName(identity.template);
         const markers = dndCombat ? combatMarkers(combatId, row.combatant_id) : [];
         return {
           ...identity,

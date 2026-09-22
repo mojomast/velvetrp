@@ -183,7 +183,7 @@ describe("initiateCombatFromTarget", () => {
     });
     const enemy = combatants.find((combatant) => combatant.kind === "enemy")!;
     expect(enemy).toMatchObject({ team: "enemies", template: { definitionId: CULTIST } });
-    expect(enemy).toMatchObject({ displayName: enemyTemplate(CULTIST).name });
+    expect(enemy).toMatchObject({ displayName: "Old Hob" });
     expect(f.db.prepare("SELECT pack_id,pack_version,definition_id FROM encounter_enemy_provenance_v31 WHERE combatant_id=?")
       .get(enemy.combatantId)).toMatchObject({
         pack_id: enemyTemplate(CULTIST).reference.packId, definition_id: CULTIST,
@@ -193,7 +193,7 @@ describe("initiateCombatFromTarget", () => {
     expect(map).toMatchObject({ mode: "combat", active: 1 });
     expect(tokens).toHaveLength(2);
     expect(tokens.find((token) => token.combatant_id === enemy.combatantId)).toEqual({
-      combatant_id: enemy.combatantId, label: enemyTemplate(CULTIST).name, disposition: "hostile",
+      combatant_id: enemy.combatantId, label: "Old Hob", disposition: "hostile",
     });
     expect(tokens.find((token) => token.disposition === "friendly")?.label).toBe("Aster Vale");
     expect(result.combat.encounterId).toBe(result.encounterId);

@@ -136,7 +136,8 @@ const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta
   + "\n" + readFileSync(new URL("./combatMarkerSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./attunementSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./combatReadyActionSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8");
+  + "\n" + readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8")
+  + "\n" + readFileSync(new URL("./combatantLabelSchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
@@ -265,6 +266,28 @@ export function upgradeCombatMarkerSchema(
   if (db.inTransaction) throw new Error("combat marker upgrade requires an independent transaction");
   db.transaction(() => {
     for (const object of expected.filter((object) => markerNames.has(object.name))) db.exec(object.sql);
+    validate();
+  }).immediate();
+  return true;
+}
+
+/** Upgrades only the complete schema that predates the encounter combatant label table. */
+export function upgradeCombatantLabelSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const labelNames = new Set([
+    "encounter_combatant_label_v67",
+    "encounter_combatant_label_v67_immutable_update",
+    "encounter_combatant_label_v67_immutable_delete",
+  ]);
+  const previous = expected.filter((object) => !labelNames.has(object.name));
+  if (JSON.stringify(actual) !== JSON.stringify(previous)) return false;
+  if (db.inTransaction) throw new Error("combatant label upgrade requires an independent transaction");
+  db.transaction(() => {
+    for (const object of expected.filter((object) => labelNames.has(object.name))) db.exec(object.sql);
     validate();
   }).immediate();
   return true;
@@ -495,6 +518,7 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     const attunementSql = readFileSync(new URL("./attunementSchema.sql", import.meta.url), "utf8");
     const readyActionSql = readFileSync(new URL("./combatReadyActionSchema.sql", import.meta.url), "utf8");
     const systemOneSql = readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8");
+    const combatantLabelSql = readFileSync(new URL("./combatantLabelSchema.sql", import.meta.url), "utf8");
     const actual = schemaObjects(db);
     const missingRecall = !actual.some(object => object.name === "adventure_narration_contexts");
     const missingInspection = !actual.some(object => object.name === "campaign_context_inspection_headers_v61");
@@ -503,7 +527,8 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     const missingAttunements = !actual.some(object => object.name.startsWith("actor_item_attunements_"));
     const missingReadyActions = !actual.some(object => object.name.startsWith("combat_ready_actions_"));
     const missingSystemOne = !actual.some(object => object.name.startsWith("system_one_"));
-    const missingLateSchema = missingRecall || missingInspection || missingKnowledge || missingMarkers || missingAttunements || missingReadyActions || missingSystemOne;
+    const missingCombatantLabels = !actual.some(object => object.name.startsWith("encounter_combatant_label_"));
+    const missingLateSchema = missingRecall || missingInspection || missingKnowledge || missingMarkers || missingAttunements || missingReadyActions || missingSystemOne || missingCombatantLabels;
     const expected = expectedObjects().filter(object =>
       !(missingRecall && object.name.startsWith("adventure_narration_contexts"))
       && !(missingInspection && object.name.startsWith("campaign_context_inspection_"))
@@ -511,7 +536,8 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       && !(missingMarkers && object.name.startsWith("combat_markers_"))
       && !(missingAttunements && object.name.startsWith("actor_item_attunements_"))
       && !(missingReadyActions && object.name.startsWith("combat_ready_actions_"))
-      && !(missingSystemOne && (object.name.startsWith("system_one_") || object.tbl_name === "system_one_decisions_v1")));
+      && !(missingSystemOne && (object.name.startsWith("system_one_") || object.tbl_name === "system_one_decisions_v1"))
+      && !(missingCombatantLabels && object.name.startsWith("encounter_combatant_label_")));
     if (mismatchReason(actual, expected) === null) {
       if (!missingLateSchema) {
         assertCurrentDatabase(db, databasePath);
@@ -525,6 +551,7 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
         if (missingAttunements) db.exec(attunementSql);
         if (missingReadyActions) db.exec(readyActionSql);
         if (missingSystemOne) db.exec(systemOneSql);
+        if (missingCombatantLabels) db.exec(combatantLabelSql);
         assertCurrentDatabase(db, databasePath);
       }).immediate();
       return;
@@ -534,6 +561,7 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       && !upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
       && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCombatMarkerSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeCombatantLabelSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCombatConditionsSchema(db, schemaObjects(db), expected, validate)
       && !upgradeAdvancementCatalogSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCatalogAttestationLimitSchema(db, schemaObjects(db), expected, validate)

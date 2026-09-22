@@ -127,6 +127,11 @@ function actorLabel(db: DatabaseDriver.Database, campaignId: string, actorId: st
 }
 
 function enemyLabel(db: DatabaseDriver.Database, encounterId: string, combatantId: string): string | null {
+  // A target-initiated NPC label names the specific NPC; the enemy-template
+  // name is only the fallback for GM-created encounters.
+  const stored = db.prepare(`SELECT label FROM encounter_combatant_label_v67
+    WHERE encounter_id=? AND combatant_id=?`).get(encounterId, combatantId) as { label: string } | undefined;
+  if (stored?.label?.trim()) return stored.label;
   const row = db.prepare(`SELECT visibility.public_definition_json
     FROM encounter_enemy_provenance_v31 provenance
     JOIN rpg_catalog_definition_visibility visibility

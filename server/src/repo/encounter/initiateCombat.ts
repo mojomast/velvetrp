@@ -28,6 +28,7 @@ import {
   encounterStartCommandRequestSchema,
   idempotencyKeySchema,
   resourceIdSchema,
+  utcIsoTimestampSchema,
   type EncounterCreateRequest,
 } from "@velvet/contracts";
 import { z } from "zod";
@@ -298,6 +299,26 @@ export function initiateCombatFromTarget(
     try {
       const created = createCreateLifecycleEncounter(db, deps)(authority, campaignId, createRequest);
       encounterId = created.encounter.encounterId;
+      // Label the materialized enemy with the NPC's public name before the
+      // start command generates the tactical map. The combat tracker and the
+      // map token then identify the specific NPC instead of the borrowed
+      // template. Only target-initiated NPC combat is labeled; GM-created
+      // encounters and actor targets keep their persona/template names.
+      if (profile) {
+        const enemy = db.prepare(`SELECT provenance.combatant_id FROM encounter_enemy_provenance_v31 provenance
+          JOIN combatant participant ON participant.encounter_id=provenance.encounter_id
+            AND participant.combatant_id=provenance.combatant_id
+          WHERE provenance.encounter_id=? AND provenance.campaign_id=? AND provenance.pack_id=?
+            AND provenance.pack_version=? AND provenance.definition_id=? AND participant.combatant_kind='enemy'`)
+          .get(encounterId, campaignId, profile.template.packId, profile.template.packVersion,
+            profile.template.definitionId) as { combatant_id: string } | undefined;
+        if (enemy) {
+          db.prepare(`INSERT OR IGNORE INTO encounter_combatant_label_v67
+            (combatant_id,encounter_id,campaign_id,label,created_at) VALUES(?,?,?,?,?)`)
+            .run(enemy.combatant_id, encounterId, campaignId, profile.name,
+              utcIsoTimestampSchema.parse(deps.clock.now().toISOString()));
+        }
+      }
       const priorStart = db.prepare("SELECT canonical_request_json FROM combat_commands_v27 WHERE encounter_id=? AND idempotency_key=?")
         .get(encounterId, startKey) as { canonical_request_json: string } | undefined;
       const startCommand = priorStart
