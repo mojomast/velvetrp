@@ -275,6 +275,25 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   expected Wilson bound at 11/11, so roughly 19 more human-confirmed acts at the default would
   clear the floor. The agent-reviewed remainder is 82 cases over 246 calls with 0 acted at 0.75
   (exact preferred 231/246, asserted 93.9%); stability is 99.8% with the recorded variance case.
+- **Eleventh wave (fresh SRD 5.1 campaign end-to-end).** To remove the stale and cross-version
+  caveats from the production-path evidence, a brand-new campaign was generated through the
+  production hydration path with a bounded committed recipe
+  (`scripts/recipes/synth-fresh-srd.json`, four jobs): `--starter srd-5.1` produced Bramford's
+  autumn market fair, the drowned courier, the old watch, two locations, two NPCs (Margery Fenn,
+  Hob Corr), a quest and an encounter; one stale fill was deliberately regenerated (the resume
+  applied extra outlines, recorded as a hydration observation). A production-built SRD fighter was
+  created through the same builder repository path, a session attached and activated, and three
+  live synthetic personas played 12 turns — all completed, the lane advertised on every targeted
+  turn, and three acts were harvested (quest accept 0.90, Second Wind 0.72 and 0.96), taking the
+  corpus to **108 cases (23 human-confirmed + 85 agent-reviewed)**. The repeat-3 benchmark reports
+  9 acted at the default at 100% accuracy, Brier 0.0001, stability 100% (0/138), recommended
+  threshold 0.35, and the default gate still short of 30 samples. The six-world production-path
+  evaluation now reads 173 decisions with 19/19 provider alignment same-id, and the consistency
+  audit on the fresh world produced its first real divergences: **3 actionable
+  claim-without-receipt flags** where the narration claims movement ("walk", "travel") with no
+  movement receipt. The audit also learned to classify shadow lane acts as informational
+  no-commits, since the version-bound promotion rule means advisory decisions cannot commit by
+  design.
 - **Combat gap (found by the sixth wave, fixed).** Focused combat batches surfaced that the
   adventure path never resolved D&D enemy turns, so a goblin that won initiative wedged the
   encounter in `failed` player turns. The deterministic fallback now invokes

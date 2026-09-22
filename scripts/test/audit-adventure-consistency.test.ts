@@ -52,6 +52,13 @@ const ACT_LANE = {
   method: "choice",
   candidateId: "candidate-1",
   hasSelection: true,
+  shadow: false,
+} as const;
+
+const SHADOW_ACT_LANE = {
+  ...ACT_LANE,
+  decisionId: "decision-shadow",
+  shadow: true,
 } as const;
 
 test("CLAIM_LEXICON covers every family with patterns and receipt sources", () => {
@@ -181,43 +188,60 @@ test("a family-based healing receipt still satisfies a healing claim without con
   assert.deepEqual(flags, []);
 });
 
-test("parseLaneSelection reads candidate picks and tolerates malformed JSON", () => {
+test("parseLaneSelection reads candidate picks, shadow mode, and tolerates malformed JSON", () => {
   const parsed = parseLaneSelection({
     decisionId: "decision-1",
     confidenceBand: "act",
     selectionJson: JSON.stringify({ method: "choice", selection: { candidateId: "candidate-1" } }),
+    shadow: true,
   });
   assert.equal(parsed.hasSelection, true);
   assert.equal(parsed.candidateId, "candidate-1");
   assert.equal(parsed.method, "choice");
+  assert.equal(parsed.shadow, true);
 
   const deferred = parseLaneSelection({
     decisionId: "decision-2",
     confidenceBand: "fallback",
     selectionJson: JSON.stringify({ method: "defer", selection: null }),
+    shadow: false,
   });
   assert.equal(deferred.hasSelection, false);
+  assert.equal(deferred.shadow, false);
 
-  const malformed = parseLaneSelection({ decisionId: "decision-3", confidenceBand: "act", selectionJson: "{" });
+  const malformed = parseLaneSelection({ decisionId: "decision-3", confidenceBand: "act", selectionJson: "{", shadow: false });
   assert.equal(malformed.hasSelection, false);
   assert.equal(malformed.method, null);
 });
 
-test("classifyLaneActUncommitted separates missing commits from confirmation waits", () => {
+test("classifyLaneActUncommitted separates missing commits from confirmation waits and shadow records", () => {
   assert.equal(classifyLaneActUncommitted({
-    confidenceBand: "fallback", hasSelection: true, hasExecution: false, hasProposalBinding: false,
+    confidenceBand: "fallback", hasSelection: true, hasExecution: false, hasProposalBinding: false, shadow: false,
   }), null);
   assert.equal(classifyLaneActUncommitted({
-    confidenceBand: "act", hasSelection: false, hasExecution: false, hasProposalBinding: false,
+    confidenceBand: "act", hasSelection: false, hasExecution: false, hasProposalBinding: false, shadow: false,
   }), null);
   assert.equal(classifyLaneActUncommitted({
-    confidenceBand: "act", hasSelection: true, hasExecution: false, hasProposalBinding: false,
+    confidenceBand: "act", hasSelection: true, hasExecution: false, hasProposalBinding: false, shadow: false,
   }), "missing");
   assert.equal(classifyLaneActUncommitted({
-    confidenceBand: "act", hasSelection: true, hasExecution: false, hasProposalBinding: true,
+    confidenceBand: "act", hasSelection: true, hasExecution: false, hasProposalBinding: true, shadow: false,
   }), "awaiting-confirmation");
   assert.equal(classifyLaneActUncommitted({
-    confidenceBand: "act", hasSelection: true, hasExecution: true, hasProposalBinding: true,
+    confidenceBand: "act", hasSelection: true, hasExecution: true, hasProposalBinding: true, shadow: false,
+  }), null);
+
+  assert.equal(classifyLaneActUncommitted({
+    confidenceBand: "act", hasSelection: true, hasExecution: false, hasProposalBinding: false, shadow: true,
+  }), "shadow-no-commit");
+  assert.equal(classifyLaneActUncommitted({
+    confidenceBand: "act", hasSelection: true, hasExecution: false, hasProposalBinding: true, shadow: true,
+  }), "awaiting-confirmation", "a bound proposal is a wait even for a shadow decision");
+  assert.equal(classifyLaneActUncommitted({
+    confidenceBand: "act", hasSelection: true, hasExecution: true, hasProposalBinding: false, shadow: true,
+  }), null, "an executed shadow decision did commit");
+  assert.equal(classifyLaneActUncommitted({
+    confidenceBand: "fallback", hasSelection: true, hasExecution: false, hasProposalBinding: false, shadow: true,
   }), null);
 });
 
@@ -322,6 +346,29 @@ test("auditTurn keeps cancelled-turn lane misses informational", () => {
   );
 });
 
+test("auditTurn reads shadow decisions as informational no-commits instead of missing commits", () => {
+  const shadow = auditTurn(makeTurn({
+    declaration: "I wait and watch the water.",
+    narration: "The lantern gutters.",
+    lane: SHADOW_ACT_LANE,
+  }));
+  assert.deepEqual(
+    shadow.map((flag) => `${flag.class}:${flag.verdict}:${flag.severity}`),
+    ["lane-act-uncommitted:shadow-no-commit:informational"],
+  );
+  assert.match(shadow[0]!.evidence, /the decision is shadow \(advisory\), so it cannot commit by design/);
+
+  const unshadowed = auditTurn(makeTurn({
+    declaration: "I wait and watch the water.",
+    narration: "The lantern gutters.",
+    lane: ACT_LANE,
+  }));
+  assert.deepEqual(
+    unshadowed.map((flag) => `${flag.class}:${flag.verdict}:${flag.severity}`),
+    ["lane-act-uncommitted:missing:actionable"],
+  );
+});
+
 test("auditTurn surfaces a confirmation wait for a rejected pick without firing a commit miss", () => {
   const flags = auditTurn(makeTurn({
     lane: ACT_LANE,
@@ -345,7 +392,7 @@ test("familyForExactActionKind and familiesForToolName map onto claim families",
   assert.deepEqual(familiesForToolName("quest_reward_claim"), ["quest"]);
 });
 
-test("flagsTriggeringFailure skips expected confirmation waits but honors named classes", () => {
+test("flagsTriggeringFailure skips expected lane states but honors named classes", () => {
   const waiting = auditTurn(makeTurn({
     lane: ACT_LANE,
     laneProposalBinding: true,
@@ -353,6 +400,17 @@ test("flagsTriggeringFailure skips expected confirmation waits but honors named 
     receiptFamilies: ["rest"],
   }));
   assert.deepEqual(flagsTriggeringFailure(waiting, ["lane-act-uncommitted"]), []);
+
+  const shadow = auditTurn(makeTurn({
+    lane: SHADOW_ACT_LANE,
+    declaration: "I wait and watch the water.",
+    narration: "The lantern gutters.",
+  }));
+  assert.equal(
+    flagsTriggeringFailure(shadow, ["lane-act-uncommitted"]).length,
+    0,
+    "a shadow advisory no-commit is expected and never a failure",
+  );
 
   const missing = auditTurn(makeTurn({ lane: ACT_LANE, declaration: "I go." }));
   assert.equal(flagsTriggeringFailure(missing, ["lane-act-uncommitted"]).length, 1);

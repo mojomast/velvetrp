@@ -15,7 +15,9 @@
  *     [--json /tmp/audit.json] [--md /tmp/audit.md] [--fail-on <class>[,<class>...]]...
  *
  * Exit code is 0 unless `--fail-on <class>` names a class whose flags were emitted. Informational
- * flags (ambient receipt families, expected confirmation flows) only fail when explicitly named.
+ * flags (ambient receipt families, expected confirmation flows) only fail when explicitly named,
+ * except the expected lane states — a confirmation wait and a shadow (advisory) no-commit — which
+ * are never failures.
  *
  * Env: none; the world path is explicit so the audit never guesses a data directory.
  */
@@ -41,8 +43,10 @@ export const AUDIT_HEADER_NOTE =
   "Lexical flags are review signals, not verdicts. A missing receipt can be legitimate ambient"
   + " narration: a turn may describe scenery, intent, or consequences that are not tracked by any"
   + " receipt family. Confirm every flag against the turn declaration, proposals, and receipts"
-  + " before treating it as a divergence. `receipt-without-claim` and the confirmation wait states"
-  + " of `lane-act-uncommitted` are informational by design.";
+  + " before treating it as a divergence. `receipt-without-claim` and the confirmation wait and"
+  + " shadow (advisory) no-commit states of `lane-act-uncommitted` are informational by design:"
+  + " a shadow decision is recorded advisory-only, so it cannot commit until the lane is promoted;"
+  + " only a non-shadow act pick with no execution and no proposal binding is a missing commit.";
 
 export type AuditSeverity = "actionable" | "informational";
 
@@ -54,8 +58,12 @@ export interface AuditFlag {
   evidence: string;
   confidence: "signal";
   severity: AuditSeverity;
-  /** Only set for `lane-act-uncommitted`: distinguishes a genuinely missing commit from a wait. */
-  verdict?: "missing" | "awaiting-confirmation";
+  /**
+   * Only set for `lane-act-uncommitted`: distinguishes a genuinely missing commit from a wait
+   * (`awaiting-confirmation`) or a shadow (advisory) pick that cannot commit by design
+   * (`shadow-no-commit`).
+   */
+  verdict?: "missing" | "awaiting-confirmation" | "shadow-no-commit";
 }
 
 const SEVERITY_ORDER: Record<AuditSeverity, number> = { actionable: 0, informational: 1 };
@@ -404,17 +412,25 @@ export function jsonHasHealingEvidence(resultJson: string): boolean {
 // Pure classifier 3: adventure-selection lane picks without a commit
 // -------------------------------------------------------------------------------------------------
 
-export type LaneActVerdict = "missing" | "awaiting-confirmation";
+export type LaneActVerdict = "missing" | "awaiting-confirmation" | "shadow-no-commit";
 
+/**
+ * Classifies an act-band lane pick with no execution. A bound proposal is an expected confirmation
+ * wait. Without a binding, a shadow (advisory-only) decision cannot commit by design — it is
+ * informational — while a non-shadow decision is a genuinely missing commit.
+ */
 export function classifyLaneActUncommitted(input: {
   confidenceBand: string | null;
   hasSelection: boolean;
   hasExecution: boolean;
   hasProposalBinding: boolean;
+  /** True when the decision is recorded advisory-only (`system_one_decisions_v1.shadow`). */
+  shadow: boolean;
 }): LaneActVerdict | null {
   if (input.confidenceBand !== "act" || !input.hasSelection) return null;
   if (input.hasExecution) return null;
-  return input.hasProposalBinding ? "awaiting-confirmation" : "missing";
+  if (input.hasProposalBinding) return "awaiting-confirmation";
+  return input.shadow ? "shadow-no-commit" : "missing";
 }
 
 export interface LaneSelectionSnapshot {
@@ -423,6 +439,8 @@ export interface LaneSelectionSnapshot {
   method: string | null;
   candidateId: string | null;
   hasSelection: boolean;
+  /** Advisory-only decision: it cannot commit until the lane binding promotes it. */
+  shadow: boolean;
 }
 
 /**
@@ -433,6 +451,7 @@ export function parseLaneSelection(row: {
   decisionId: string;
   confidenceBand: string | null;
   selectionJson: string | null;
+  shadow: boolean;
 }): LaneSelectionSnapshot {
   let method: string | null = null;
   let candidateId: string | null = null;
@@ -463,6 +482,7 @@ export function parseLaneSelection(row: {
     method,
     candidateId,
     hasSelection: candidateId !== null,
+    shadow: row.shadow,
   };
 }
 
@@ -750,24 +770,33 @@ export function auditTurn(input: TurnAuditInput): AuditFlag[] {
       hasSelection: input.lane.hasSelection,
       hasExecution: input.laneExecution,
       hasProposalBinding: input.laneProposalBinding,
+      shadow: input.lane.shadow,
     });
     if (verdict !== null) {
       const pick = input.lane.candidateId ?? "an unknown candidate";
       const cancelled = input.state === "cancelled" || input.state === "failed";
-      const evidence = verdict === "missing"
-        ? `adventure-selection band act picked ${pick}`
+      let evidence: string;
+      if (verdict === "missing") {
+        evidence = `adventure-selection band act picked ${pick}`
           + ` (method ${input.lane.method ?? "unknown"}) for decision ${input.lane.decisionId}`
-          + ` but no execution and no proposal binding is attached to that decision`
-        : `adventure-selection band act picked ${pick} for decision ${input.lane.decisionId};`
+          + ` but no execution and no proposal binding is attached to that decision`;
+      } else if (verdict === "shadow-no-commit") {
+        evidence = `adventure-selection band act picked ${pick}`
+          + ` (method ${input.lane.method ?? "unknown"}) for decision ${input.lane.decisionId}`
+          + ` but no execution and no proposal binding is attached to that decision;`
+          + ` the decision is shadow (advisory), so it cannot commit by design`;
+      } else {
+        evidence = `adventure-selection band act picked ${pick} for decision ${input.lane.decisionId};`
           + ` binding(s)=[${input.laneBindingEvidence.join(", ") || "unlisted"}]`
           + ` exist without an execution`
           + `${input.confirmationEvidence ? `; confirmation: ${input.confirmationEvidence}` : ""}`
           + " (expected confirmation flow)";
+      }
       flags.push({
         ...base,
         class: "lane-act-uncommitted",
         evidence: appendContext(evidence, input.context),
-        severity: verdict === "awaiting-confirmation" || cancelled ? "informational" : "actionable",
+        severity: verdict === "missing" && !cancelled ? "actionable" : "informational",
         verdict,
       });
     }
@@ -826,7 +855,8 @@ export const USAGE =
   + `flag classes: ${AUDIT_FLAG_CLASSES.join(", ")}\n`
   + "--json writes the machine-readable report; --md writes a Markdown report\n"
   + "--fail-on may repeat and accepts comma-separated classes; exit code becomes 1 when a\n"
-  + "  matching flag is emitted (the expected confirmation wait of lane-act-uncommitted never fails)\n";
+  + "  matching flag is emitted (the expected confirmation wait and the shadow advisory\n"
+  + "  no-commit of lane-act-uncommitted never fail)\n";
 
 export function isAuditFlagClass(value: string): value is AuditFlagClass {
   return (AUDIT_FLAG_CLASSES as readonly string[]).includes(value);
@@ -1017,7 +1047,7 @@ function buildTurnInputs(
   for (const row of readTable(
     db,
     "system_one_decisions_v1",
-    "SELECT decision_id, turn_id, confidence_band, selection_json FROM system_one_decisions_v1"
+    "SELECT decision_id, turn_id, confidence_band, shadow, selection_json FROM system_one_decisions_v1"
     + " WHERE lane = 'adventure-selection' ORDER BY created_at ASC, rowid ASC",
     notices,
   )) {
@@ -1028,6 +1058,8 @@ function buildTurnInputs(
       decisionId,
       confidenceBand: asString(row["confidence_band"]),
       selectionJson: asString(row["selection_json"]),
+      // Legacy rows without the flag fall back to non-shadow: fail toward `missing`, not silence.
+      shadow: (asNumber(row["shadow"]) ?? 0) === 1,
     }));
   }
 
@@ -1654,8 +1686,9 @@ export function renderAuditMarkdown(document: AuditReportDocument): string {
 
 /**
  * Flags that make `--fail-on` exit non-zero. Naming a class is an explicit request, so
- * informational flags of that class count too; the only exception is the expected confirmation
- * wait of `lane-act-uncommitted`, which is never a failure.
+ * informational flags of that class count too; the exceptions are the expected states of
+ * `lane-act-uncommitted` — a confirmation wait and a shadow (advisory) pick that cannot commit
+ * by design — which are never failures.
  */
 export function flagsTriggeringFailure(
   flags: readonly AuditFlag[],
@@ -1664,7 +1697,7 @@ export function flagsTriggeringFailure(
   if (failOn.length === 0) return [];
   return flags.filter((flag) => {
     if (!failOn.includes(flag.class)) return false;
-    if (flag.verdict === "awaiting-confirmation") return false;
+    if (flag.verdict === "awaiting-confirmation" || flag.verdict === "shadow-no-commit") return false;
     return true;
   });
 }

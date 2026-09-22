@@ -1,8 +1,8 @@
 # System One production-path evaluation — adventure-selection
 
-Generated 2026-09-22T14:09:55.170Z by `scripts/evaluate-system-one-production-path.ts` (read-only, offline).
+Generated 2026-09-22T14:34:32.526Z by `scripts/evaluate-system-one-production-path.ts` (read-only, offline).
 
-Worlds: `.velvet/synth-srd-1`, `.velvet/synth-srd-2`, `.velvet/synth-srd-3`, `.velvet/synth-srd-4`, `.velvet/emberwake-reach-run2`.
+Worlds: `.velvet/synth-srd-1`, `.velvet/synth-srd-2`, `.velvet/synth-srd-3`, `.velvet/synth-srd-4`, `.velvet/synth-srd-5`, `.velvet/emberwake-reach-run2`.
 
 ## What this measures
 
@@ -36,22 +36,22 @@ Family resolution: candidate kinds through `resolveMechanicFamily` (`MECHANIC_FA
 
 | Metric | Value |
 | --- | --- |
-| Decisions | 161 |
-| Shadow decisions | 161 |
-| Decisions with a shortlist | 160 |
+| Decisions | 173 |
+| Shadow decisions | 173 |
+| Decisions with a shortlist | 172 |
 | Decisions without a shortlist | 1 |
 | Decisions with an unjoined turn | 0 |
-| Distinct turns / multi-decision turns | 158 / 3 |
+| Distinct turns / multi-decision turns | 170 / 3 |
 | Malformed state_json / selection_json | 1 / 0 |
 | Skipped candidate entries | 0 |
-| First / last recorded | 2026-09-17T15:29:04.216Z … 2026-09-19T23:06:09.976Z |
-| Lane picks (method=choice) | 33 |
+| First / last recorded | 2026-09-17T15:29:04.216Z … 2026-09-22T14:28:53.430Z |
+| Lane picks (method=choice) | 36 |
 | Picks resolved as unknown family | 0 |
 | Picks missing from the shortlist | 0 |
 | Lane proposals / executions | 7 / 9 |
 | Proposal / execution candidate mismatches | 0 / 0 |
-| Provider pick turns / extra calls | 46 / 16 |
-| Alignment compared / same id / same family / divergent / unknown | 17 / 17 / 0 / 0 / 0 |
+| Provider pick turns / extra calls | 48 / 18 |
+| Alignment compared / same id / same family / divergent / unknown | 19 / 19 / 0 / 0 / 0 |
 | Confirmations approved / rejected / pending | 6 / 1 / 0 |
 | Confirmations other / not required / unknown | 0 / 0 / 0 |
 | Approved but not executed | 3 |
@@ -60,20 +60,20 @@ Family resolution: candidate kinds through `resolveMechanicFamily` (`MECHANIC_FA
 
 | Family | Advertised | Reach | Act | Confirm | Fallback | Defer | Defer rate | Picks | Signal mean | Signal median | Committed | Advisory act | Awaiting confirm | Other uncommitted | Lane proposals | Lane executions | Approved | Rejected | Pending | Approved not executed | Provider compared | Same id | Same family | Divergent | Alignment unknown |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| travel | 37 | 23.0% | 16 | 0 | 21 | 21 | 56.8% | 2 | 0.635 | 0.635 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 |
-| srd-check | 145 | 90.1% | 24 | 4 | 117 | 117 | 80.7% | 7 | 0.567 | 0.550 | 6 | 0 | 1 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
-| inventory | 139 | 86.3% | 24 | 4 | 111 | 111 | 79.9% | 1 | 0.680 | 0.680 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
+| travel | 37 | 21.4% | 16 | 0 | 21 | 21 | 56.8% | 2 | 0.635 | 0.635 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 |
+| srd-check | 157 | 90.8% | 27 | 4 | 126 | 126 | 80.3% | 7 | 0.567 | 0.550 | 6 | 0 | 1 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
+| inventory | 151 | 87.3% | 27 | 4 | 120 | 120 | 79.5% | 1 | 0.680 | 0.680 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
 | commerce | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| power | 93 | 57.8% | 8 | 2 | 83 | 83 | 89.2% | 2 | 0.805 | 0.805 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
-| rest | 38 | 23.6% | 13 | 2 | 23 | 23 | 60.5% | 8 | 0.777 | 0.825 | 1 | 7 | 0 | 0 | 4 | 1 | 4 | 0 | 0 | 3 | 7 | 7 | 0 | 0 | 0 |
-| combat-consumable | 8 | 5.0% | 3 | 0 | 5 | 5 | 62.5% | 2 | 0.920 | 0.920 | 1 | 1 | 0 | 0 | 2 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| combat-power | 14 | 8.7% | 5 | 0 | 9 | 9 | 64.3% | 3 | 0.900 | 0.960 | 1 | 2 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 |
-| quest-lifecycle | 139 | 86.3% | 24 | 4 | 111 | 111 | 79.9% | 3 | 0.680 | 0.640 | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
-| quest-objective | 53 | 32.9% | 15 | 0 | 38 | 38 | 71.7% | 5 | 0.684 | 0.750 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 |
+| power | 101 | 58.4% | 11 | 2 | 88 | 88 | 87.1% | 4 | 0.823 | 0.805 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 |
+| rest | 38 | 22.0% | 13 | 2 | 23 | 23 | 60.5% | 8 | 0.777 | 0.825 | 1 | 7 | 0 | 0 | 4 | 1 | 4 | 0 | 0 | 3 | 7 | 7 | 0 | 0 | 0 |
+| combat-consumable | 8 | 4.6% | 3 | 0 | 5 | 5 | 62.5% | 2 | 0.920 | 0.920 | 1 | 1 | 0 | 0 | 2 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| combat-power | 14 | 8.1% | 5 | 0 | 9 | 9 | 64.3% | 3 | 0.900 | 0.960 | 1 | 2 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 |
+| quest-lifecycle | 151 | 87.3% | 27 | 4 | 120 | 120 | 79.5% | 4 | 0.735 | 0.770 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 |
+| quest-objective | 53 | 30.6% | 15 | 0 | 38 | 38 | 71.7% | 5 | 0.684 | 0.750 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 0 |
 | progression | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | unknown | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
-Provider alignment: compared 17; same id 17 (100.0%); same family 0 (0.0%); divergent 0 (0.0%); family unknown 0 (0.0%)
+Provider alignment: compared 19; same id 19 (100.0%); same family 0 (0.0%); divergent 0 (0.0%); family unknown 0 (0.0%)
 
 ### Anomalies
 
@@ -266,6 +266,53 @@ Database: `/home/mojo/projects/velvet-mvp/.velvet/synth-srd-4/velvet.sqlite`
 | unknown | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 Provider alignment: compared 0; same id 0 (—); same family 0 (—); divergent 0 (—); family unknown 0 (—)
+
+## World: `.velvet/synth-srd-5`
+
+Database: `/home/mojo/projects/velvet-mvp/.velvet/synth-srd-5/velvet.sqlite`
+
+### Totals
+
+| Metric | Value |
+| --- | --- |
+| Decisions | 12 |
+| Shadow decisions | 12 |
+| Decisions with a shortlist | 12 |
+| Decisions without a shortlist | 0 |
+| Decisions with an unjoined turn | 0 |
+| Distinct turns / multi-decision turns | 12 / 0 |
+| Malformed state_json / selection_json | 0 / 0 |
+| Skipped candidate entries | 0 |
+| First / last recorded | 2026-09-22T14:26:33.471Z … 2026-09-22T14:28:53.430Z |
+| Lane picks (method=choice) | 3 |
+| Picks resolved as unknown family | 0 |
+| Picks missing from the shortlist | 0 |
+| Lane proposals / executions | 0 / 0 |
+| Proposal / execution candidate mismatches | 0 / 0 |
+| Provider pick turns / extra calls | 2 / 2 |
+| Alignment compared / same id / same family / divergent / unknown | 2 / 2 / 0 / 0 / 0 |
+| Confirmations approved / rejected / pending | 0 / 0 / 0 |
+| Confirmations other / not required / unknown | 0 / 0 / 0 |
+| Approved but not executed | 0 |
+
+### Per-family table
+
+| Family | Advertised | Reach | Act | Confirm | Fallback | Defer | Defer rate | Picks | Signal mean | Signal median | Committed | Advisory act | Awaiting confirm | Other uncommitted | Lane proposals | Lane executions | Approved | Rejected | Pending | Approved not executed | Provider compared | Same id | Same family | Divergent | Alignment unknown |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| travel | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| srd-check | 12 | 100.0% | 3 | 0 | 9 | 9 | 75.0% | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| inventory | 12 | 100.0% | 3 | 0 | 9 | 9 | 75.0% | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| commerce | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| power | 8 | 66.7% | 3 | 0 | 5 | 5 | 62.5% | 2 | 0.840 | 0.840 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
+| rest | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| combat-consumable | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| combat-power | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| quest-lifecycle | 12 | 100.0% | 3 | 0 | 9 | 9 | 75.0% | 1 | 0.900 | 0.900 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
+| quest-objective | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| progression | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| unknown | 0 | 0.0% | 0 | 0 | 0 | 0 | — | 0 | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+Provider alignment: compared 2; same id 2 (100.0%); same family 0 (0.0%); divergent 0 (0.0%); family unknown 0 (0.0%)
 
 ## World: `.velvet/emberwake-reach-run2`
 

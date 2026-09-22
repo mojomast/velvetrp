@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "name": "Fresh SRD 5.1 Synthetic Playground",
+  "tone": "grounded low-fantasy frontier; dangerous roads, uneasy neighbors, small mercies",
+  "exclusions": ["modern technology", "established metropolises", "cosmic horror"],
+  "stages": [
+    {
+      "id": "foundation",
+      "jobs": [
+        {
+          "id": "frontier-foundation",
+          "sections": ["outline", "locations"],
+          "brief": "Establish a playable opening around a small river market town and a ruined watchtower a short ride away. Create the market town and one nearby dangerous location, with a usable route between them.",
+          "desiredCounts": { "outlines": 1, "locations": 2, "connections": 1 }
+        }
+      ]
+    },
+    {
+      "id": "locals",
+      "dependsOn": ["foundation"],
+      "jobs": [
+        {
+          "id": "town-npcs",
+          "sections": ["npcs"],
+          "brief": "Populate the market town with two publicly visible locals: one who needs help and one with useful knowledge about the old watchtower.",
+          "expandFrom": [{ "jobId": "frontier-foundation", "fields": ["locations"], "limit": 1 }],
+          "desiredCounts": { "npcs": 2 }
+        }
+      ]
+    },
+    {
+      "id": "story",
+      "dependsOn": ["locals"],
+      "jobs": [
+        {
+          "id": "tower-quest",
+          "sections": ["quests", "clues"],
+          "brief": "Create one local quest about the ruined watchtower and two discoverable clues, grounded in the town and its people.",
+          "expandFrom": [
+            { "jobId": "frontier-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "town-npcs", "fields": ["npcs"], "limit": 2 }
+          ],
+          "desiredCounts": { "quests": 1, "clues": 2 }
+        }
+      ]
+    },
+    {
+      "id": "threat",
+      "dependsOn": ["story"],
+      "jobs": [
+        {
+          "id": "tower-threat",
+          "sections": ["encounters"],
+          "brief": "Create one grounded encounter at the ruined watchtower suitable for a level-1 party, with a non-combat resolution option.",
+          "expandFrom": [{ "jobId": "frontier-foundation", "fields": ["locations"], "limit": 1 }],
+          "desiredCounts": { "encounters": 1 }
+        }
+      ]
+    }
+  ]
+}

@@ -274,7 +274,8 @@ adventure-selection lane pick, provider tool calls, proposals and confirmation d
 per-turn receipts, and the narration. It emits conservative review signals in five classes:
 `claim-without-receipt` (a narrated action family has no matching receipt or proposal; receipt
 content counts, so a healing combat power backs a healing claim), `receipt-without-claim`
-(informational), `lane-act-uncommitted` (an act pick with no proposal is actionable; a bound
+(informational), `lane-act-uncommitted` (an act pick with no proposal is actionable unless the
+decision is shadow/advisory, which cannot commit by design and is informational; a bound
 proposal awaiting confirmation is informational), `combat-outcome-mismatch` (hit/miss/defeat
 claims against combat receipt outcomes and standing combatants), and `narration-missing`. Every
 flag carries its matched evidence and a `signal` confidence; the lexical detection is deliberately
