@@ -37,6 +37,8 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.
 - [DM evaluation](dm-evaluation.md) - Deterministic and live DM behavior evaluation guidance.
 - [Campaign generation and expansion](campaign-generation.md) - Reviewed generation, dependency-aware apply, planning projections, provider attempt handling, and explicit material delivery; subordinate to the API reference for HTTP contracts.
+- [Scene image integration](scene-image-integration.md) - Optional DM scene illustrations from the private Supra2 service: server-mediated boundaries, the five `VELVET_SCENE_IMAGES_*` keys, manual/automatic limits and cooldown, dedup and stale-scene protection, sidecar retention and campaign-authorized serving, DM and player access, security rules, prompting primer, and verification.
+- [Supra2 service deployment](supra2-service-deployment.md) - Inference-host runbook for the private Supra2-IMG service: Strix Halo and ROCm prerequisites, pinned checkpoint verification, the current `/health`, `/api/status`, `/api/generate`, `/api/batch`, `/api/cancel`, and `/images/...` contract, tailnet authorization, persistence, historical timings, and upgrade/license policy.
 - [Interactive gameplay agent instructions](interactive-gameplay-agent-instructions.md) - Trusted-local operator workflow, discovery, character/campaign setup, play, and no-retry reconciliation.
 - [Planning board](planning-board.md) - Internal contributor workflow for the repository-specific planning board.
 
