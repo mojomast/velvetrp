@@ -288,12 +288,15 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   corpus to **108 cases (23 human-confirmed + 85 agent-reviewed)**. The repeat-3 benchmark reports
   9 acted at the default at 100% accuracy, Brier 0.0001, stability 100% (0/138), recommended
   threshold 0.35, and the default gate still short of 30 samples. The six-world production-path
-  evaluation now reads 173 decisions with 19/19 provider alignment same-id, and the consistency
-  audit on the fresh world produced its first real divergences: **3 actionable
-  claim-without-receipt flags** where the narration claims movement ("walk", "travel") with no
-  movement receipt. The audit also learned to classify shadow lane acts as informational
-  no-commits, since the version-bound promotion rule means advisory decisions cannot commit by
-  design.
+  evaluation now reads 173 decisions with 19/19 provider alignment same-id. The audit's first
+  fresh-world movement flags were reviewed the same day: directive phrasing ("this is what it asks
+  of you: walk…") and sight metaphors are now excluded by assertion-shape matching, and the chase
+  closed a real server gap — the narration travel guard now also rejects walk/head/ride/march/
+  set-out/make-for claims with no travel receipt (clause-aware, with the receipt-grounding
+  vocabulary extended to match) — leaving two ambient flags that describe an NPC's backstory
+  movement rather than player movement. The audit also learned to classify shadow lane acts as
+  informational no-commits, since the version-bound promotion rule means advisory decisions cannot
+  commit by design.
 - **Combat gap (found by the sixth wave, fixed).** Focused combat batches surfaced that the
   adventure path never resolved D&D enemy turns, so a goblin that won initiative wedged the
   encounter in `failed` player turns. The deterministic fallback now invokes

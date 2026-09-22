@@ -93,11 +93,63 @@ export const CLAIM_FAMILIES = ["healing", "rest", "check", "attack", "power", "m
 export type ClaimFamily = (typeof CLAIM_FAMILIES)[number];
 
 export interface ClaimFamilyRule {
-  /** Narration patterns that assert this family. Order matters: the first match wins. */
+  /** Narration patterns that assert this family. Order matters: the first non-guarded match wins. */
   readonly patterns: readonly RegExp[];
   /** Receipt/proposal shapes the audit treats as backing for this family (evidence text only). */
   readonly receiptSources: readonly string[];
 }
+
+/**
+ * Movement assertion shape. Movement verbs are the same for directives and intent, so a bare
+ * lexicon hit ("walk" in "this is what it asks of you: walk the hill track", "travel" in "her
+ * eyes travel the page") is not a claim. Two shapes assert movement:
+ *  - completed past/perfect forms (`walked`, `travelled`/`traveled`, `arrived`, `reached`,
+ *    `entered`, `left`, `headed`, `rode`, `marched`, `sailed`, `journeyed`, `moved`,
+ *    `set out`/`set off`, `made for`), which assert movement on their own; and
+ *  - present action statements with an actor subject (`you walk`, `the party travels`, `you are
+ *    traveling`), which require the subject from `MOVEMENT_ACTION_SUBJECT_RE`.
+ * `MOVEMENT_NON_ASSERTION_PREFIXES` plus the question and idiom checks in
+ * `isMovementAssertionMatch` cancel a hit of either shape: after "asks of you:", modal verbs,
+ * "before you", "if you", "in order to", "the way to", a bare infinitive, or future "will";
+ * questions; sight metaphors; adjective "left"; passive "made for"; and "reached for" /
+ * "arrived at a decision".
+ */
+export const MOVEMENT_FRAME_WINDOW = 80;
+
+/** Completed past/perfect movement forms; they assert movement without needing an actor subject. */
+export const MOVEMENT_COMPLETED_RE =
+  /\b(?:walked|travell?ed|arrived|reached|entered|left|headed|rode|marched|sailed|journeyed|moved|set (?:out|off)|made for)\b/i;
+
+/** Present movement forms; a claim only with an actor subject from `MOVEMENT_ACTION_SUBJECT_RE`. */
+export const MOVEMENT_PRESENT_RE =
+  /\b(?:walks?|walking|travell?ing|travels?|arrives?|arriving|reaches?|reaching|enters?|entering|leaves?|leaving|heads?|heading|rides?|riding|marches?|marching|sails?|sailing|journeys?|journeying|moves?|moving|sets? (?:out|off)|makes? for)\b/i;
+
+/**
+ * Actor subjects that turn a present movement form into an action statement: the player/party
+ * pronouns (optionally contracted and across a be-auxiliary: "you're traveling") and party-shaped
+ * noun phrases ("the party travels"). Other subjects such as body parts ("her eyes travel") are
+ * metaphors, not movement.
+ */
+export const MOVEMENT_ACTION_SUBJECT_RE =
+  /(?:\b(?:i|we|you|they|he|she)(?:['’](?:m|re|s|ve))?\s+(?:(?:am|are|is|was|were|be|been|being)\s+)?(?:\w+ly\s+)*|\b(?:the|our|your|their|his|her|my)\s+(?:party|group|company|caravan|expedition|crew|troupe|band)\s+(?:(?:am|are|is|was|were|be|been|being)\s+)?(?:\w+ly\s+)*)$/i;
+
+/** Prefix frames that make a movement hit a directive, intent, conditional, or future statement. */
+export const MOVEMENT_NON_ASSERTION_PREFIXES: readonly RegExp[] = [
+  /\basks of you:?\s*$/i,
+  /\b(?:could|might|should|would|may|can|must|shall|need to|have to|has to|had to|ought to)\s+(?:(?:have|has|had|be|been|being)\s+)?(?:\w+ly\s+)*$/i,
+  /\b(?:before|if)\s+you\s+(?:\w+ly\s+)*$/i,
+  /\bin order to\s*$/i,
+  /\bthe way to\s*$/i,
+  /\bto\s*$/i,
+  /\b(?:will|shall)\s+(?:\w+\s+)?$/i,
+];
+
+/** Sight/body-part subjects whose "travel" is metaphor ("her eyes travel the page"). */
+const MOVEMENT_SIGHT_SUBJECT_RE = /\b(?:eyes?|gaze|glances?|looks?|fingers?|thoughts?|mind)\s+(?:\w+\s+)?$/i;
+/** Determiners and prepositions that make "left" a direction or side rather than a departure. */
+const LEFT_AS_MODIFIER_RE = /\b(?:the|a|an|on|to|from|at|his|her|its|my|your|our|their|with)\s+$/i;
+/** Passive markers that make "made for" a match rather than travel ("they were made for each other"). */
+const PASSIVE_AUX_RE = /\b(?:is|are|was|were|be|been|being)\s+$/i;
 
 export const CLAIM_LEXICON: Readonly<Record<ClaimFamily, ClaimFamilyRule>> = {
   healing: {
@@ -188,16 +240,9 @@ export const CLAIM_LEXICON: Readonly<Record<ClaimFamily, ClaimFamilyRule>> = {
     ],
   },
   movement: {
-    patterns: [
-      /\bheads? (?:to|for|toward|towards|north|south|east|west)\b/i,
-      /\btravels?(?:led|ling|ed|ing)?\b/i,
-      /\bwalks?(?:ed|ing)?\b/i,
-      /\bsails?(?:ed|ing)?\b/i,
-      /\bsets? (?:out|off)\b/i,
-      /\bjourneys?(?:ed|ing)?\b/i,
-      /\bmarches?(?:ed|ing)?\b/i,
-      /\bmoves? (?:to|toward|towards|north|south|east|west|into|out of)\b/i,
-    ],
+    // Movement needs an assertion shape instead of a base-form hit; see MOVEMENT_COMPLETED_RE /
+    // MOVEMENT_PRESENT_RE and `isMovementAssertionMatch` for the directive frames and idioms.
+    patterns: [MOVEMENT_COMPLETED_RE, MOVEMENT_PRESENT_RE],
     receiptSources: [
       "final_receipt_links -> world_receipts_v28",
       "world_travel_elapsed_v60",
@@ -228,7 +273,9 @@ const NEGATION_WINDOW = 24;
 /**
  * True when a lexicon hit is negated or idiomatic rather than an assertion. The guard is
  * deliberately narrow: "no movement", "didn't search", and "the rest of the party" do not claim
- * the family, while "I attack" and "we take a long rest" do.
+ * the family, while "I attack" and "we take a long rest" do. Movement additionally needs an
+ * assertion shape (`isMovementAssertionMatch`): directives such as "walk the hill track" after
+ * "asks of you:" and hypotheticals such as "you might travel" are not claims.
  */
 export function isGuardedClaimMatch(
   family: ClaimFamily,
@@ -242,7 +289,33 @@ export function isGuardedClaimMatch(
   if (family === "rest" && /\bthe\s*$/i.test(before) && /^\s+of\b/i.test(after)) return true;
   if (family === "rest" && /^\s+assured\b/i.test(after)) return true;
   if (family === "attack" && /^hits?$/i.test(token) && /^\s*points?\b/i.test(after)) return true;
+  if (family === "movement" && !isMovementAssertionMatch(text, index, token)) return true;
   return false;
+}
+
+/**
+ * True when a movement lexicon hit carries an assertion shape: a completed past/perfect form, or
+ * a present form with an actor subject (`MOVEMENT_ACTION_SUBJECT_RE`), in both cases outside the
+ * directive/intent/question frames and idioms documented on `MOVEMENT_COMPLETED_RE`.
+ */
+export function isMovementAssertionMatch(text: string, index: number, token: string): boolean {
+  const before = text.slice(Math.max(0, index - MOVEMENT_FRAME_WINDOW), index);
+  const after = text.slice(index + token.length);
+  if (MOVEMENT_NON_ASSERTION_PREFIXES.some((pattern) => pattern.test(before))) return false;
+  // A question is a request or a hypothetical, not a claim that movement happened.
+  const terminator = /[.!?]/.exec(after);
+  if (terminator !== null && terminator[0] === "?") return false;
+  if (MOVEMENT_SIGHT_SUBJECT_RE.test(before)) return false;
+  if (/^left$/i.test(token) && LEFT_AS_MODIFIER_RE.test(before)) return false;
+  if (/^made for$/i.test(token) && PASSIVE_AUX_RE.test(before)) return false;
+  if (/^headed$/i.test(token) && /^\s+by\b/i.test(after)) return false;
+  if (/^reached$/i.test(token) && /^\s+for\b/i.test(after)) return false;
+  if (/^arrived$/i.test(token)
+    && /^\s+at\s+(?:an?|the)\s+(?:decision|conclusion|agreement|compromise|verdict|answer|understanding)\b/i.test(after)) {
+    return false;
+  }
+  if (MOVEMENT_COMPLETED_RE.test(token)) return true;
+  return MOVEMENT_ACTION_SUBJECT_RE.test(before);
 }
 
 export interface ClaimMatch {

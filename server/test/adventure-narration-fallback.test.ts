@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { narrationFallback } from "../src/routes/rpg/v1/adventureTurns.js";
+import { narrationFallback, providerNarrationMatchesReceipts } from "../src/routes/rpg/v1/adventureTurns.js";
 
 const combat = (action: string, outcome: unknown, roundBefore = 1, roundAfter = 1) => ({ kind: "combat", action, outcome, roundBefore, roundAfter });
 const fallback = (values: unknown[]) => narrationFallback("I act.", values as never);
@@ -33,5 +33,32 @@ describe("deterministic combat narration fallback", () => {
     expect(fallback([combat("death-save", { kind: "survival", successes: 0, failures: 3, statusAfter: "dead" })]))
       .toContain("0 successes and 3 failures");
     expect(fallback([combat("stabilize", { kind: "survival", successes: 0, failures: 0, statusAfter: "stable" })])).toContain("stabilized");
+  });
+});
+
+const travel = (destination: string) => ({ kind: "travel", destination } as const);
+// Mirrors the route: prose the gate rejects settles on the receipt-only fallback narration.
+const settleNarration = (text: string, values: unknown[]) => providerNarrationMatchesReceipts(text, values as never)
+  ? { text, source: "provider-assisted" as const }
+  : { text: fallback(values), source: "deterministic-fallback" as const };
+
+describe("unsupported travel narration without a receipt", () => {
+  it("rejects a walking claim, settles on the fallback, and accepts the same claim with a travel receipt", () => {
+    const rejected = settleNarration("You walk to the market square.", []);
+    expect(rejected.source).toBe("deterministic-fallback");
+    expect(rejected.text).toContain("no movement or other campaign change is established");
+    expect(settleNarration("You walk to the market square.", [travel("the market square")]))
+      .toEqual({ text: "You walk to the market square.", source: "provider-assisted" });
+  });
+
+  it("rejects the other added movement verbs in subject form without a travel receipt", () => {
+    for (const narration of ["The party heads east.", "You ride to the gate.", "The group marches at dawn.",
+      "You set out for the mill.", "The party sets off downriver.", "You make for the harbor."]) {
+      expect(providerNarrationMatchesReceipts(narration, []), narration).toBe(false);
+    }
+  });
+
+  it("keeps a directive's imperative out of the subject form", () => {
+    expect(providerNarrationMatchesReceipts("The Bell asks of you: walk the hill track before the fair.", [])).toBe(true);
   });
 });

@@ -206,6 +206,10 @@ const negatedCurrencyPattern=/\b(?:no|not|without|never)\s+(?:a\s+|any\s+|the\s+
 // A hyphenated compound reads as an object only when it is not followed by the noun it modifies
 // ("lift the brass lamp-trimmer off it" is an item; "take the well-worn path" is an adjective).
 const hyphenatedItemPattern=/\b[a-z]+-[a-z]+(?=\s+(?:off|from|onto|into|out|down|up|away|aside|back|over|under|and|then|before|after|with|to|for|in|on|at|by|near|beside|against|towards?|across|through|past|around|behind|between|as|it|them|him|her|you|your|my|his|their|our)\b|\s*$)/;
+// Unsupported travel must keep the movement verb in the same clause as its subject. A colon folds
+// to a space in normalizedNarration, so a directive such as "what it asks of you: walk the hill
+// track" would otherwise read as "you walk" and reject grounded narration.
+const travelClaimPattern=/\b(?:you|the party|the group)\s+(?:arrive|arrives|arrived|reach|reaches|reached|enter|enters|entered|travel|travels|traveled|journey|journeys|journeyed|leave|leaves|left|walk|walks|walked|head|heads|headed|ride|rides|rode|march|marches|marched|set out|sets out|set off|sets off|make for|makes for|made for)\b/;
 function assertsTransactionOrAcquisition(normalized:string):boolean{
   for(const verb of normalized.matchAll(transactionVerbPattern)){
     const window=normalized.slice(verb.index??0,(verb.index??0)+64).replace(negatedCurrencyPattern,"");
@@ -232,7 +236,7 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
   const allowedHealing=values.flatMap(value=>value.kind==="combat-consumable"||value.kind==="combat-power"
     ?value.outcomes.flatMap(outcome=>outcome.kind==="healing"?[outcome.applied]:[]):[]);
   if(damageClaims.some(amount=>!allowedDamage.includes(amount))||healingClaims.some(amount=>!allowedHealing.includes(amount)))return false;
-  const unsupportedTravel=!hasKind("travel")&&/\b(?:you|the party|the group)\s+(?:arrive|arrives|arrived|reach|reaches|reached|enter|enters|entered|travel|travels|traveled|journey|journeys|journeyed|leave|leaves|left)\b/.test(normalized);
+  const unsupportedTravel=!hasKind("travel")&&text.split(/[.!?;:\n]+/).some(clause=>travelClaimPattern.test(normalizedNarration(clause)));
   const unsupportedInventory=!hasKind("inventory","commerce","quest-lifecycle")&&/\b(?:you|they|the party|the group)\s+(?:gain|gains|gained|receive|receives|received|obtain|obtains|obtained|acquire|acquires|acquired|lose|loses|lost|drop|drops|dropped|consume|consumes|consumed|equip|equips|equipped|unequip|unequips|unequipped|buy|buys|bought|sell|sells|sold)\b.{0,80}\b(?:gold|coins?|currency|credits?|potion|weapon|armor|item|inventory|reward|sword|shield|bow|dagger|ring|amulet|scroll)\b/.test(normalized);
   const unsupportedCurrency=!hasKind("commerce","quest-lifecycle")&&/(?:\b(?:gain|gains|gained|receive|receives|received|lose|loses|lost|spend|spends|spent|pay|pays|paid|earn|earns|earned)\b.{0,40}\b(?:gold|coins?|currency|credits?)\b|\b\d+\s+(?:gold|coins?|credits?)\b)/.test(normalized);
   const unsupportedQuest=!hasKind("quest","quest-lifecycle")&&/(?:\bquest\b.{0,50}\b(?:accept|accepted|abandon|abandoned|advance|advanced|progress|complete|completed|reward|claimed)\b|\b(?:accept|accepted|abandon|abandoned|advance|advanced|complete|completed|claim|claimed)\b.{0,50}\bquest\b)/.test(normalized);
@@ -256,7 +260,8 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
     if(value.kind==="travel"){
       const arrivalClaims=[...text.matchAll(/\b(?:arriv(?:e|es|ed|ing)|arrival)\s+(?:at|in)\s+([^.!?;\n]{1,200})/gi)].map(match=>match[1]!);
       return includesFact(text,value.destination)&&arrivalClaims.every(claim=>includesFact(claim,value.destination))
-        &&includesAny(text,["arrive","arrives","arrived","reach","reaches","reached","travel","travels","traveled","move","moves","moved","enter","enters","entered"]);
+        &&includesAny(text,["arrive","arrives","arrived","reach","reaches","reached","travel","travels","traveled","move","moves","moved","enter","enters","entered",
+          "walk","walks","walked","head","heads","headed","ride","rides","rode","march","marches","marched","set out","sets out","set off","sets off","make for","makes for","made for"]);
     }
     if(value.kind==="inventory")return includesFact(text,value.itemLabel)&&includesNumber(text,value.quantity)&&includesAny(text,value.action==="equip"?["equip"]:value.action==="unequip"?["unequip"]:value.action==="drop"?["drop","discard"]:value.action==="gift"?["give","gives","gave","gift"]:["consume","consumes","consumed","remove","removes","removed"]);
     if(value.kind==="commerce")return includesFact(text,value.itemLabel)&&includesFact(text,value.vendorLabel)&&includesNumber(text,value.quantity)&&includesNumber(text,value.balanceAfter)&&includesAny(text,value.action==="buy"?["buy","buys","bought","purchase"]:value.action==="sell"?["sell","sells","sold","sale"]:["give","gives","gave","transfer"]);

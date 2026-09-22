@@ -91,6 +91,58 @@ test("detectClaimFamilies ignores negated and idiomatic phrases", () => {
   assert.deepEqual(detectClaimFamilies("I didn't search the room."), []);
 });
 
+function claimsMovement(text: string): boolean {
+  return detectClaimFamilies(text).includes("movement");
+}
+
+test("movement claims ignore directive and intent phrasing", () => {
+  const directive = "You stand in Bramford's square, and this is what it asks of you:"
+    + " walk the hill track above town before the fair fills the square;"
+    + " learn what stopped the rider.";
+  assert.equal(claimsMovement(directive), false);
+  assert.deepEqual(
+    auditTurn(makeTurn({ narration: directive }))
+      .filter((flag) => flag.class === "claim-without-receipt"),
+    [],
+  );
+
+  assert.equal(claimsMovement("You might walk the hill track later."), false);
+  assert.equal(claimsMovement("You could travel by river; you should head north."), false);
+  assert.equal(claimsMovement("If you walk the hill track, you will find the watch."), false);
+  assert.equal(claimsMovement("Check the traps before you leave town."), false);
+  assert.equal(claimsMovement("You take the old road in order to reach the watch."), false);
+  assert.equal(claimsMovement("You will travel the north road tomorrow."), false);
+  assert.equal(claimsMovement("Do you walk the hill track before the fair?"), false);
+  assert.equal(claimsMovement("Her eyes travel the row of your gear."), false);
+});
+
+test("movement claims accept completed forms and present action statements", () => {
+  assert.equal(claimsMovement("The party traveled the coast road all morning."), true);
+  assert.equal(claimsMovement("We reached the watch by noon."), true);
+  assert.equal(claimsMovement("Margery left the stall for the hill pastures."), true);
+  assert.equal(claimsMovement("They set out at first light."), true);
+  assert.equal(claimsMovement("You walk the hill track above town."), true);
+  assert.equal(claimsMovement("The party travels the coast road."), true);
+  assert.equal(claimsMovement("You are traveling by night."), true);
+
+  const past = auditTurn(makeTurn({
+    declaration: "I follow the hill track.",
+    narration: "You traveled the north road all morning.",
+  })).filter((flag) => flag.class === "claim-without-receipt");
+  assert.equal(past.length, 1);
+  assert.match(past[0]!.evidence, /narration claims movement \(matched "traveled"\)/);
+
+  const subject = auditTurn(makeTurn({
+    declaration: "I walk the hill track.",
+    narration: "You walk the hill track above town.",
+  })).filter((flag) => flag.class === "claim-without-receipt");
+  assert.equal(subject.length, 1);
+  assert.match(subject[0]!.evidence, /narration claims movement \(matched "walk"\)/);
+
+  const modal = auditTurn(makeTurn({ narration: "You might walk the hill track later." }));
+  assert.deepEqual(modal.filter((flag) => flag.class === "claim-without-receipt"), []);
+});
+
 test("analyzeClaimReceipts separates missing backing from ambient receipts", () => {
   const missing = analyzeClaimReceipts({
     narration: "I take a long rest by the fire.",
