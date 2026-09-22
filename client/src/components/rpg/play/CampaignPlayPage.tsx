@@ -563,7 +563,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
         api={sceneImageApi} onOpenControls={audience === "gm" ? () => openTool("images") : undefined} />
     : null;
   const centerNode = <>
-    <div className="room-top">{sceneImageNode}{noticesNode}{reconcileNode}</div>
+    <div className="room-top">{noticesNode}{reconcileNode}</div>
     <div className="room-main">{conversationNode}</div>
     <div className="room-bottom"><div className="room-toolbar">{dmNoticeNode}{replayToggleNode}{voiceNode}</div>{situationNode}{composerNode}</div>
   </>;
@@ -614,7 +614,10 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   if (surface === "atlas") return <PlaySurface headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
     tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
     map={contextNode} conversation={<>{sceneImageNode}{noticesNode}{reconcileNode}{conversationNode}</>} activity={activityNode} composer={composerNode} drawers={drawersMount} />;
-  return <CommandCenter headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
-    tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
-    context={contextNode} center={centerNode} tool={drawersMount} campaignNav={campaignNav} preferences={preferences} onPreferences={onPreferences} />;
+  return <>
+    <CommandCenter headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
+      tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
+      context={contextNode} center={centerNode} tool={<>{sceneImageNode}{quickNode}</>} campaignNav={campaignNav} preferences={preferences} onPreferences={onPreferences} />
+    <div className="campaign-drawers-overlay">{drawersNode}</div>
+  </>;
 }

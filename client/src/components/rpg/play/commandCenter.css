@@ -1,6 +1,5 @@
-/* Command Center: the one-screen table. The legacy atlas drawer styles are
-   neutralized here so tool content can live in the right pane instead of
-   overlaying the map. */
+/* Command Center: the one-screen table. The right pane is the scene rail
+   (illustration + character quick panel); tool content overlays as drawers. */
 .campaign-play-page { --panel-gap: 12px; --panel-padding: 14px; --campaign-context-width: 320px; --campaign-quick-width: 340px; }
 .campaign-play-page [hidden] { display: none !important; }
 .campaign-play-page .campaign-play-title { display: grid; gap: 2px; min-width: 0; flex: 0 0 auto; }
@@ -14,9 +13,12 @@
 .campaign-play-page .campaign-quick-tools { min-width: 0; min-height: 0; max-height: 100%; overflow: auto; overscroll-behavior: contain; outline: none; position: relative; z-index: 20; }
 .campaign-play-page .campaign-quick-tools > .campaign-quick-panel { position: static; max-height: none; overflow: visible; }
 .campaign-play-page .campaign-quick-tools > .campaign-quick-panel > header { position: static; }
-.campaign-play-page .atlas-drawer-slot { position: static; inset: auto; width: 100%; min-height: 0; box-shadow: none; }
-.campaign-play-page .atlas-drawer { position: static; height: auto; max-height: none; margin: 0; border: 1px solid var(--control-border); border-radius: 13px; background: var(--surface); box-shadow: none; }
-.campaign-play-page .atlas-drawer-content { overflow: visible; padding: var(--panel-padding); }
+.campaign-play-page .campaign-quick-tools > .scene-illustration { margin-bottom: var(--panel-gap); }
+.campaign-play-page .campaign-quick-tools .scene-illustration-figure img { width: 100%; }
+/* Tool drawers overlay the table from a fixed right-edge slot. */
+.campaign-drawers-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+.campaign-drawers-overlay .atlas-drawer-slot { pointer-events: auto; box-shadow: -16px 0 45px #0005; }
+.campaign-drawers-overlay .atlas-drawer-slot[hidden] { display: none; }
 .campaign-play-page .atlas-drawer-content .campaign-context-drawer { position: static; max-height: none; }
 .campaign-play-page .gameplay-sheet-drawer { position: static; width: 100%; height: auto; max-height: none; }
 .campaign-play-page .atlas-character-actions { border-radius: 10px 10px 0 0; }

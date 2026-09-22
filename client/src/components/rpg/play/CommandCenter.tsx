@@ -113,7 +113,8 @@ export function CommandCenter({ headingRef, title, role, phase, actor, tools, ac
   }, [onTool, preferences.contextVisible, preferences.quickToolsVisible]);
 
   const gridStyle = { "--campaign-context-width": `${preferences.contextWidth}px`, "--campaign-quick-width": `${preferences.quickToolsWidth}px` } as CSSProperties;
-  const gridClass = `campaign-play-grid ${preferences.contextVisible ? "has-context" : ""} ${preferences.quickToolsVisible ? "has-quick-tools" : ""}`;
+  const quickToolsShown = preferences.quickToolsVisible && Boolean(tool);
+  const gridClass = `campaign-play-grid ${preferences.contextVisible ? "has-context" : ""} ${quickToolsShown ? "has-quick-tools" : ""}`;
   const sessionTools = tools.filter((tool) => !SETUP_TOOLS.has(tool));
   const setupTools = tools.filter((tool) => SETUP_TOOLS.has(tool));
   const toolButton = (tool: AtlasTool) => {
@@ -145,8 +146,8 @@ export function CommandCenter({ headingRef, title, role, phase, actor, tools, ac
       {preferences.contextVisible && <>{context}<PanelSeparator side="left" value={preferences.contextWidth} controls="campaign-context-panel"
         label="Resize campaign context" onChange={(contextWidth) => onPreferences({ ...preferences, contextWidth })} onCollapse={() => onPreferences({ ...preferences, contextVisible: false })} /></>}
       <section ref={centerRef} tabIndex={-1} className="campaign-play-center" aria-label="Campaign narration and actions">{center}</section>
-      {preferences.quickToolsVisible && <><PanelSeparator side="right" value={preferences.quickToolsWidth} controls="campaign-quick-tools"
-        label="Resize tools and character summary" onChange={(quickToolsWidth) => onPreferences({ ...preferences, quickToolsWidth })} onCollapse={() => onPreferences({ ...preferences, quickToolsVisible: false })} />
+      {quickToolsShown && <><PanelSeparator side="right" value={preferences.quickToolsWidth} controls="campaign-quick-tools"
+        label="Resize scene and character panel" onChange={(quickToolsWidth) => onPreferences({ ...preferences, quickToolsWidth })} onCollapse={() => onPreferences({ ...preferences, quickToolsVisible: false })} />
         <div id="campaign-quick-tools" className="campaign-quick-tools" tabIndex={-1}>{tool}</div></>}
     </div>
     <WorkbenchPreferencesDialog dialogRef={preferencesDialogRef} preferences={preferences} onChange={onPreferences} />
