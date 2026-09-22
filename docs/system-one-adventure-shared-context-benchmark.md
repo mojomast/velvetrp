@@ -1,8 +1,8 @@
-> Payload variant: legacy. Reproduce with --payload legacy. Shared-context is experimental and does not mirror the production question/state payload.
+> Payload variant: shared-context. Reproduce with --payload shared-context. Shared-context is experimental and does not mirror the production question/state payload.
 
 # System One (Jev) L2 adventure-selection benchmark
 
-Generated 2026-09-22T13:29:40.982Z by `scripts/evaluate-system-one-adventure-lane.ts` using the live System One adapter.
+Generated 2026-09-22T13:30:55.220Z by `scripts/evaluate-system-one-adventure-lane.ts` using the live System One adapter.
 
 ## What this measures
 
@@ -62,25 +62,25 @@ agent-reviewed rows are summarized separately below.
 
 | Case | Category | Split | Provenance | Expected | Calls | Acted | Exact | Correct | Errors | Effective outcomes |
 | --- | --- | :---: | :---: | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| direct-travel-mill | direct-match | dev | frozen | travel:mill-01 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| direct-travel-harbor | direct-match | holdout | frozen | travel:harbor-04 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| direct-check-climb | direct-match | dev | frozen | check:climb-05 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| direct-travel-mill | direct-match | dev | frozen | travel:mill-01 | 3 | 3 | 3/3 | 3/3 | 0 | travel:mill-01 3 |
+| direct-travel-harbor | direct-match | holdout | frozen | travel:harbor-04 | 3 | 3 | 3/3 | 3/3 | 0 | travel:harbor-04 3 |
+| direct-check-climb | direct-match | dev | frozen | check:climb-05 | 3 | 2 | 2/3 | 2/3 | 0 | defer 1, check:climb-05 2 |
 | direct-commerce-rope | direct-match | dev | frozen | shop:buy-rope-07 | 3 | 3 | 3/3 | 3/3 | 0 | shop:buy-rope-07 3 |
-| direct-quest-accept | direct-match | holdout | frozen | quest:accept-harbor-09 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| direct-progression-level | direct-match | dev | frozen | level:advance-11 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| ambig-rest-long-short | ambiguous | dev | frozen | rest:long-12 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| ambig-travel-watchtower | ambiguous | dev | frozen | travel:watchtower-16 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| direct-quest-accept | direct-match | holdout | frozen | quest:accept-harbor-09 | 3 | 3 | 3/3 | 3/3 | 0 | quest:accept-harbor-09 3 |
+| direct-progression-level | direct-match | dev | frozen | level:advance-11 | 3 | 3 | 3/3 | 3/3 | 0 | level:advance-11 3 |
+| ambig-rest-long-short | ambiguous | dev | frozen | rest:long-12 | 3 | 3 | 3/3 | 3/3 | 0 | rest:long-12 3 |
+| ambig-travel-watchtower | ambiguous | dev | frozen | travel:watchtower-16 | 3 | 3 | 3/3 | 3/3 | 0 | travel:watchtower-16 3 |
 | ambig-travel-two-roads | ambiguous | dev | frozen | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| ambig-power-target | ambiguous | dev | frozen | power:mending-bryn-19 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| ambig-combat-power-target | ambiguous | holdout | frozen | combat:firebolt-bandit-22 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| ambig-commerce-sell | ambiguous | holdout | frozen | shop:sell-ring-24 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| ambig-consumable-target | ambiguous | dev | frozen | consumable:heal-aster-25 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| multi-check-vs-travel-trap | multi-family | dev | frozen | check:force-gate-28 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| multi-row-vs-travel | multi-family | dev | frozen | check:row-30 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| multi-quest-vs-travel | multi-family | dev | frozen | quest:accept-harbor-31 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| ambig-power-target | ambiguous | dev | frozen | power:mending-bryn-19 | 3 | 3 | 3/3 | 3/3 | 0 | power:mending-bryn-19 3 |
+| ambig-combat-power-target | ambiguous | holdout | frozen | combat:firebolt-bandit-22 | 3 | 3 | 3/3 | 3/3 | 0 | combat:firebolt-bandit-22 3 |
+| ambig-commerce-sell | ambiguous | holdout | frozen | shop:sell-ring-24 | 3 | 3 | 3/3 | 3/3 | 0 | shop:sell-ring-24 3 |
+| ambig-consumable-target | ambiguous | dev | frozen | consumable:heal-aster-25 | 3 | 3 | 3/3 | 3/3 | 0 | consumable:heal-aster-25 3 |
+| multi-check-vs-travel-trap | multi-family | dev | frozen | check:force-gate-28 | 3 | 3 | 3/3 | 3/3 | 0 | check:force-gate-28 3 |
+| multi-row-vs-travel | multi-family | dev | frozen | check:row-30 | 3 | 3 | 3/3 | 3/3 | 0 | check:row-30 3 |
+| multi-quest-vs-travel | multi-family | dev | frozen | quest:accept-harbor-31 | 3 | 3 | 3/3 | 3/3 | 0 | quest:accept-harbor-31 3 |
 | multi-commerce-vs-inventory | multi-family | dev | frozen | shop:buy-rope-33 | 3 | 3 | 3/3 | 3/3 | 0 | shop:buy-rope-33 3 |
-| multi-power-vs-rest | multi-family | holdout | frozen | rest:long-35 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| multi-combat-vs-power | multi-family | holdout | frozen | combat:firebolt-wolf-37 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| multi-power-vs-rest | multi-family | holdout | frozen | rest:long-35 | 3 | 3 | 3/3 | 3/3 | 0 | rest:long-35 3 |
+| multi-combat-vs-power | multi-family | holdout | frozen | combat:firebolt-wolf-37 | 3 | 3 | 3/3 | 3/3 | 0 | combat:firebolt-wolf-37 3 |
 | unsupported-question | unsupported | dev | frozen | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | unsupported-hypothetical | unsupported | dev | frozen | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | unsupported-two-actions | unsupported | dev | frozen | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -98,9 +98,9 @@ agent-reviewed rows are summarized separately below.
 | harvested:0bdf136e64d4 | harvested | dev | harvested (human) | ace41eae-5ef2-44cf-999b-53ccf1b8f8cf | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:0ec73aec02e3 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:0ed8b80e4a05 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:11cd7c76513f | harvested | dev | harvested (human) | quest-candidate:db2684f8269c16da84735f162e0f784758e5e2159a2a8983 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:11cd7c76513f | harvested | dev | harvested (human) | quest-candidate:db2684f8269c16da84735f162e0f784758e5e2159a2a8983 | 3 | 3 | 3/3 | 3/3 | 0 | quest-candidate:db2684f8269c16da84735f162e0f784758e5e2159a2a8983 3 |
 | harvested:159e90a93cb6 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:1826f4fd5e50 | harvested | dev | harvested (agent) | combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:1826f4fd5e50 | harvested | dev | harvested (agent) | combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9 | 3 | 3 | 3/3 | 3/3 | 0 | combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9 3 |
 | harvested:1939fe92d69c | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:195a18777be1 | harvested | dev | harvested (human) | quest-candidate:90869640364244bd8deb6137c93a1db153167370c18a4ac4 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:19a51723b16c | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -110,7 +110,7 @@ agent-reviewed rows are summarized separately below.
 | harvested:1f8bed7eac50 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:21809db95252 | harvested | dev | harvested (agent) | check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:21db70ab1dba | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:2292dac40705 | harvested | dev | harvested (human) | rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:2292dac40705 | harvested | dev | harvested (human) | rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1 | 3 | 3 | 3/3 | 3/3 | 0 | rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1 3 |
 | harvested:22a75d63ff9d | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:25dc8a20a935 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:2a2221ccc772 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -120,7 +120,7 @@ agent-reviewed rows are summarized separately below.
 | harvested:332daeb09896 | harvested | dev | harvested (human) | quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:38c1efae5452 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:38f48e37c916 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:3ac1630d0dc9 | harvested | dev | harvested (human) | quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:3ac1630d0dc9 | harvested | dev | harvested (human) | quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd | 3 | 3 | 3/3 | 3/3 | 0 | quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd 3 |
 | harvested:3b8fd99efe8a | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:3d1b3a8ec7b5 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:3d2cb0327352 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -133,27 +133,27 @@ agent-reviewed rows are summarized separately below.
 | harvested:50144e777c5d | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:50885adc8a9a | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:51c7db5efd8d | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:5b3104cae1dc | harvested | dev | harvested (human) | rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:5b3104cae1dc | harvested | dev | harvested (human) | rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20 | 3 | 3 | 3/3 | 3/3 | 0 | rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20 3 |
 | harvested:62684602d7e6 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:643d8f61c4c6 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:649f071cf0e1 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:66711ff7099e | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:6b8359ca620b | harvested | dev | harvested (human) | combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d | 3 | 1 | 1/3 | 1/3 | 0 | defer 2, combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d 1 |
+| harvested:6b8359ca620b | harvested | dev | harvested (human) | combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d | 3 | 3 | 3/3 | 3/3 | 0 | combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d 3 |
 | harvested:6ef5508ce70e | harvested | dev | harvested (human) | check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:70699991a6e3 | harvested | dev | harvested (agent) | quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:74cbab9ca6f0 | harvested | dev | harvested (human) | check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:787b57d44cdc | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:7aff1bb8977a | harvested | dev | harvested (human) | combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:7aff1bb8977a | harvested | dev | harvested (human) | combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7 | 3 | 3 | 3/3 | 3/3 | 0 | combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7 3 |
 | harvested:7bc78db301fd | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:7e1b86a0ed87 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:7fa7573d172e | harvested | dev | harvested (human) | check-candidate:895a91824af74122c10edcbb874cc441827a9651bc7d35f3 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:812ec5a90895 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:846cec6d7815 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:8726afca6973 | harvested | dev | harvested (agent) | check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| harvested:88c3eefcdc91 | harvested | dev | harvested (human) | combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:88c3eefcdc91 | harvested | dev | harvested (human) | combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376 | 3 | 3 | 3/3 | 3/3 | 0 | combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376 3 |
 | harvested:8b7843704f48 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:8c3a66c3946f | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:8edfb9c0137e | harvested | dev | harvested (human) | rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:8edfb9c0137e | harvested | dev | harvested (human) | rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a | 3 | 3 | 3/3 | 3/3 | 0 | rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a 3 |
 | harvested:92970b2d312b | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:95f80eb4a1b7 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:99038ff406e7 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -177,7 +177,7 @@ agent-reviewed rows are summarized separately below.
 | harvested:bf4eacd2676f | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:c3e16ca55a84 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:c6487802fc34 | harvested | dev | harvested (human) | check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
-| harvested:ccc2d2cf0d15 | harvested | dev | harvested (human) | quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:ccc2d2cf0d15 | harvested | dev | harvested (human) | quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80 | 3 | 1 | 1/3 | 1/3 | 0 | defer 2, quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80 1 |
 | harvested:d00089bb4860 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:da7b70b651ce | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:db0272898001 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -192,7 +192,7 @@ agent-reviewed rows are summarized separately below.
 | harvested:eac8cb0df78d | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:ee122c33b2f2 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:f1959cc7da5e | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
-| harvested:f2733fc20223 | harvested | dev | harvested (human) | power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:f2733fc20223 | harvested | dev | harvested (human) | power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941 | 3 | 3 | 3/3 | 3/3 | 0 | power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941 3 |
 | harvested:f37ba9fb92bf | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:f5fc508589e4 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:ff86af2cbc48 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -212,10 +212,10 @@ stability roll-up.
 | --- | ---: |
 | Cases | 82 |
 | Graded calls | 246 |
-| Acted calls | 0 |
-| Acted accuracy | n/a |
-| Exact preferred | 231/246 |
-| Asserted-subset correctness | 93.9% |
+| Acted calls | 3 |
+| Acted accuracy | 100.0% |
+| Exact preferred | 234/246 |
+| Asserted-subset correctness | 95.1% |
 
 ## Decision stability
 
@@ -229,13 +229,15 @@ reserved for dedicated stability probes.
 
 | Metric | Value |
 | --- | ---: |
-| Mean agreement | 99.8% |
-| Conflict cases | 1 of 135 (0.7%) |
-| Mean signal std dev | 0.0133 |
-| Max signal std dev | 0.0544 |
+| Mean agreement | 99.3% |
+| Conflict cases | 3 of 135 (2.2%) |
+| Mean signal std dev | 0.0105 |
+| Max signal std dev | 0.0330 |
 
 Conflicted cases:
-- `harvested:332daeb09896` (agreement 66.7%): quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538 / defer
+- `harvested:adbcb3b5ee1a` (agreement 66.7%): defer / quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a
+- `harvested:c3e16ca55a84` (agreement 66.7%): defer / quest-candidate:6783a700b2db923cdb69af8071596e9fd4b1557ddcb870a2
+- `harvested:f1959cc7da5e` (agreement 66.7%): check-candidate:3c4760c1eb3c73fd70819bb14c60d33541ab9c9e941f711e / defer
 
 Honesty: stability is repeatability, not accuracy; a consistently deferred case is stable and still
 a coverage miss, and a conflicted case may still have every individual pick labeled acceptable.
@@ -255,40 +257,39 @@ so `Acted` and `Coverage` are over named calls, not over every graded call.
 
 | Action threshold | Acted | Coverage | Acted accuracy |
 | ---: | ---: | ---: | ---: |
-| 0.35 | 108/115 | 93.9% | 100.0% |
-| 0.40 | 97/115 | 84.3% | 100.0% |
-| 0.45 | 86/115 | 74.8% | 100.0% |
-| 0.50 | 76/115 | 66.1% | 100.0% |
-| 0.55 | 62/115 | 53.9% | 100.0% |
-| 0.60 | 39/115 | 33.9% | 100.0% |
-| 0.65 | 23/115 | 20.0% | 100.0% |
-| 0.70 | 11/115 | 9.6% | 100.0% |
-| 0.75 | 10/115 | 8.7% | 100.0% |
+| 0.35 | 117/120 | 97.5% | 97.4% |
+| 0.40 | 117/120 | 97.5% | 97.4% |
+| 0.45 | 117/120 | 97.5% | 97.4% |
+| 0.50 | 112/120 | 93.3% | 97.3% |
+| 0.55 | 107/120 | 89.2% | 98.1% |
+| 0.60 | 102/120 | 85.0% | 100.0% |
+| 0.65 | 93/120 | 77.5% | 100.0% |
+| 0.70 | 89/120 | 74.2% | 100.0% |
+| 0.75 | 84/120 | 70.0% | 100.0% |
 
-Selected recommended action threshold: **0.35** (coverage 93.9%, acted accuracy 100.0% over 108 acted).
-- filtered 3 of 9 threshold(s) for failing actedAccuracy >= 0.9 with at least 30 acted decisions
-- selected greatest-coverage threshold 0.35 (coverage 0.9391304347826087) meeting actedAccuracy >= 0.9 with at least 30 acted decisions
+Selected recommended action threshold: **0.45** (coverage 97.5%, acted accuracy 97.4% over 117 acted).
+- selected greatest-coverage threshold 0.45 (coverage 0.975) meeting actedAccuracy >= 0.9 with at least 30 acted decisions
 
 ### Development split
 
 | Action threshold | Acted | Coverage | Acted accuracy |
 | ---: | ---: | ---: | ---: |
-| 0.35 | 90/97 | 92.8% | 100.0% |
-| 0.40 | 79/97 | 81.4% | 100.0% |
-| 0.45 | 71/97 | 73.2% | 100.0% |
-| 0.50 | 63/97 | 64.9% | 100.0% |
-| 0.55 | 51/97 | 52.6% | 100.0% |
-| 0.60 | 32/97 | 33.0% | 100.0% |
-| 0.65 | 19/97 | 19.6% | 100.0% |
-| 0.70 | 11/97 | 11.3% | 100.0% |
-| 0.75 | 10/97 | 10.3% | 100.0% |
+| 0.35 | 99/102 | 97.1% | 97.0% |
+| 0.40 | 99/102 | 97.1% | 97.0% |
+| 0.45 | 99/102 | 97.1% | 97.0% |
+| 0.50 | 94/102 | 92.2% | 96.8% |
+| 0.55 | 89/102 | 87.3% | 97.8% |
+| 0.60 | 84/102 | 82.4% | 100.0% |
+| 0.65 | 75/102 | 73.5% | 100.0% |
+| 0.70 | 71/102 | 69.6% | 100.0% |
+| 0.75 | 66/102 | 64.7% | 100.0% |
 
 ### Verdict comparison
 
 | Configuration | Threshold | Gate | Samples | Accuracy | Brier | ECE |
 | --- | ---: | :---: | ---: | ---: | ---: | ---: |
-| Server default | 0.75 | NOT READY | 10 | 100.0% | 0.0000 | 0.0046 |
-| Recommended | 0.35 | PROMOTE | 108 | 100.0% | 0.0001 | 0.0104 |
+| Server default | 0.75 | PROMOTE | 84 | 100.0% | 0.0000 | 0.0030 |
+| Recommended | 0.45 | PROMOTE | 117 | 97.4% | 0.0234 | 0.0112 |
 
 ## Calibration
 
@@ -298,12 +299,12 @@ Gate scope: these rows cover the frozen corpus plus human-confirmed harvested ca
 
 | Split / signal | Accuracy | Brier | ECE |
 | --- | ---: | ---: | ---: |
-| all acted, raw (10) | 100.0% | 0.0486 | 0.2200 |
-| all acted, calibrated (10) | 100.0% | 0.0000 | 0.0046 |
-| held-out acted, raw (0) | n/a | 0.0000 | 0.0000 |
-| held-out acted, calibrated (0) | n/a | 0.0000 | 0.0000 |
+| all acted, raw (84) | 100.0% | 0.0150 | 0.1067 |
+| all acted, calibrated (84) | 100.0% | 0.0000 | 0.0030 |
+| held-out acted, raw (18) | 100.0% | 0.0075 | 0.0789 |
+| held-out acted, calibrated (18) | 100.0% | 0.0000 | 0.0010 |
 
-Map: `sigmoid(a * logit(p) + b)` with a = 2.8716, b = 1.7568 (fit on 10 development acted decision(s); held out 0).
+Map: `sigmoid(a * logit(p) + b)` with a = 2.5217, b = 1.1902 (fit on 66 development acted decision(s); held out 18).
 
 ## Promotion gate — `adventure-selection`
 
@@ -313,9 +314,9 @@ recommended-threshold verdict, because that is the configuration the evidence su
 Gate scope: frozen corpus plus human-confirmed harvested cases only. The 82 agent-reviewed
 harvested case(s) never enter these verdicts or the proposed record.
 
-### Recommended-threshold verdict (0.35)
+### Recommended-threshold verdict (0.45)
 
-Metrics scored on the calibrated acted signal at this threshold: samples 108, accuracy 100.0%, Brier 0.0001, ECE 0.0104.
+Metrics scored on the calibrated acted signal at this threshold: samples 117, accuracy 97.4%, Brier 0.0234, ECE 0.0112.
 
 **PROMOTE**
 
@@ -323,26 +324,25 @@ All gates passed.
 
 ### Server-default verdict (0.75)
 
-Metrics scored on the calibrated acted signal at the composed default threshold: samples 10, accuracy 100.0%, Brier 0.0000, ECE 0.0046.
+Metrics scored on the calibrated acted signal at the composed default threshold: samples 84, accuracy 100.0%, Brier 0.0000, ECE 0.0030.
 
-**NOT READY**
+**PROMOTE**
 
-- insufficient samples: 10 < 30
-- accuracy lower bound below minimum: 0.7225 < 0.8000
+All gates passed.
 
 ### Proposed `adventure-selection` promotion record (recommended threshold)
 
 ```json
 {
   "metrics": {
-    "samples": 108,
-    "accuracy": 1,
-    "brier": 0.00012376357511907003,
-    "expectedCalibrationError": 0.010401474605041927
+    "samples": 117,
+    "accuracy": 0.9743589743589743,
+    "brier": 0.02342713829857503,
+    "expectedCalibrationError": 0.011187299747032049
   },
   "calibration": {
-    "a": 0.8085671719179794,
-    "b": 4.426501453958626
+    "a": 2.026161600315864,
+    "b": 1.6384930823500092
   },
   "promotedAt": "2026-09-22",
   "evidence": "docs/system-one-adventure-benchmark.md"
@@ -351,11 +351,11 @@ Metrics scored on the calibrated acted signal at the composed default threshold:
 
 ## Observations
 
-- **Coverage.** 10 of 405 graded calls acted (10 act / 73 confirm / 322 fallback); the rest deferred. 267 of 395 deferral(s) were in the acceptable set.
-- **Decisive accuracy.** Among acted decisions, 10/10 (100.0%) were in the acceptable set and 10/10 (100.0%) matched the single preferred call.
-- **Under-confidence.** 133 readout(s) named a candidate; 123 named one but deferred, with signals 0.20–0.73, and 114 of those named picks were acceptable. The raw model is right but under the 0.75 bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays 0.75.
+- **Coverage.** 87 of 405 graded calls acted (87 act / 37 confirm / 281 fallback); the rest deferred. 267 of 318 deferral(s) were in the acceptable set.
+- **Decisive accuracy.** Among acted decisions, 87/87 (100.0%) were in the acceptable set and 87/87 (100.0%) matched the single preferred call.
+- **Under-confidence.** 154 readout(s) named a candidate; 67 named one but deferred, with signals 0.10–0.74, and 39 of those named picks were acceptable. The raw model is right but under the 0.75 bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays 0.75.
 - **Acted errors.** No acted decision fell outside its case's acceptable set.
-- **Calibration.** Held-out calibrated Brier 0.0000 and ECE 0.0000; all-acted calibrated Brier 0.0000 and ECE 0.0046. The acted subset has no observed errors, so the calibration tail is untested.
+- **Calibration.** Held-out calibrated Brier 0.0000 and ECE 0.0010; all-acted calibrated Brier 0.0000 and ECE 0.0030. The acted subset has no observed errors, so the calibration tail is untested.
 
 ## Honesty notes
 
@@ -386,6 +386,6 @@ set -a; . /tmp/opencode/jev/jev.env; set +a   # TYPESAFE_API_KEY
 npx tsx scripts/evaluate-system-one-adventure-lane.ts --repeat 3
 ```
 
-Raw per-call data: `docs/system-one-adventure-benchmark.json`.
+Raw per-call data: `docs/system-one-adventure-shared-context-benchmark.json`.
 
 > Binding scope: curated benchmark candidates, not production shortlist coverage. Per-call request-time bindings and input hashes are in the JSON readouts. Metrics-only proposed records do not authorize execution; fitted calibration and swept thresholds are not evaluated runtime bindings.
