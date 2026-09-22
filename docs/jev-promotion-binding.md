@@ -31,8 +31,15 @@ contract. Only the currently actionable speaker/adventure lanes have contract co
 
 Capture systemOneEvaluationBinding alongside an evaluation's immutable inputs, model
 metadata, metrics, dataset/version, and evidence artifact. This helper only constructs data;
-it does not approve anything. Existing benchmark scripts are NOT yet wired to emit bindings.
-That integration and a new evaluated artifact are required before production approval.
+it does not approve anything. The adventure evaluator now emits per-successful-call bindings,
+request/corpus SHA-256 hashes, case/repeat identifiers and capture timestamps in JSON readouts.
+Configuration is captured before transport, credentials are excluded, and missing returned-model
+metadata is left empty. Each call retains its own returned model rather than inheriting another's.
+Its strategy is explicitly `benchmark-curated-candidates-v1`: it bypasses production shortlisting
+and cannot approve the active contract. Bindings describe candidate kinds present, not per-family
+accuracy. Runtime calibration/thresholds are captured, not post-hoc fitted/swept replacements.
+Metrics-only proposed records remain unbound. Other benchmark scripts still need integration;
+production-path evaluation and separately reviewed family metrics remain required for approval.
 Do not reconstruct the binding later from mutable settings or current contract constants.
 If multiple response models or action families occur, report separately and evaluate every
 binding being approved; aggregate lane accuracy alone cannot establish family coverage.

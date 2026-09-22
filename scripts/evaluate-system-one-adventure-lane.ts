@@ -39,6 +39,7 @@
  *   TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-adventure-lane.ts [--repeat 3] [--out docs/system-one-adventure-benchmark.md]
  */
 import { readFile, writeFile } from "node:fs/promises";
+import { beginAdventureEvidence } from "./system-one-evidence.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -114,6 +115,7 @@ export const ADVENTURE_THRESHOLD_GRID: readonly number[] = [
 
 /** One graded live composition: the composed outcome plus its label comparison. */
 export interface AdventureReadout {
+  evidence?: ReturnType<ReturnType<typeof beginAdventureEvidence>>;
   id: string;
   category: AdventureEvalCategory;
   holdout: boolean;
@@ -1324,6 +1326,10 @@ async function main(): Promise<void> {
     // decorrelator for dedicated stability probes. Stability samples are still collected per repeat.
     const state = adventureRequestState(testCase);
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
+      const finishEvidence = beginAdventureEvidence({
+        settings, caseId: testCase.id, repeat, state, questions,
+        candidates: testCase.candidates, corpus: cases,
+      });
       try {
         const result = await completeWithSystemOne({
           settings,
@@ -1331,11 +1337,11 @@ async function main(): Promise<void> {
           questions,
         });
         model = result.model.responseModel ?? model;
-        readouts.push(gradeAdventureCase(
+        readouts.push({ ...gradeAdventureCase(
           testCase,
           composeAdventureSelection(testCase.candidates, result.answers, thresholds),
           result.answers,
-        ));
+        ), evidence: finishEvidence(result.model.responseModel) });
       } catch (error) {
         failures.push({ id: testCase.id, repeat, error: error instanceof Error ? error.message : "error" });
       }
@@ -1370,7 +1376,7 @@ async function main(): Promise<void> {
     cases,
     harvest: harvestReport,
   });
-  await writeFile(outPath, report, "utf8");
+  await writeFile(outPath, `${report}\n> Binding scope: curated benchmark candidates, not production shortlist coverage. Per-call request-time bindings and input hashes are in the JSON readouts. Metrics-only proposed records do not authorize execution; fitted calibration and swept thresholds are not evaluated runtime bindings.\n`, "utf8");
   await writeFile(outPath.replace(/\.md$/, ".json"), `${JSON.stringify({
     model,
     baseUrl: settings.baseUrl,
