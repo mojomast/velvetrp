@@ -1,8 +1,49 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { beginAdventureEvidence } from "../system-one-evidence.js";
+import { beginAdventureEvidence, beginSpeakerEvidence } from "../system-one-evidence.js";
 import { defaultSystemOneSettings } from "../../server/src/defaults.js";
 import { matchesSystemOneBinding, systemOneEvaluationBinding } from "../../server/src/agent/systemOneBinding.js";
+
+test("speaker evidence freezes settings and describes raw composition, not post-hoc calibration", () => {
+  const input = fixture();
+  input.settings.apiKey = "speaker-test-secret";
+  input.settings.confidenceCalibration["speaker-routing"] = { a: 2, b: 3 };
+  const expected = systemOneEvaluationBinding("speaker-routing", input.settings, "m", "speaker-selection");
+  const finish = beginSpeakerEvidence(input);
+  input.settings.model = "changed";
+  input.settings.confidencePolicy["speaker-routing"].actionThreshold = 0.999;
+  const row = finish("m");
+  assert.equal(row.bindings[0]!.requestedModel, expected.requestedModel);
+  assert.equal(row.bindings[0]!.actionThreshold, expected.actionThreshold);
+  assert.equal(row.bindings[0]!.calibrationA, 1);
+  assert.equal(row.bindings[0]!.calibrationB, 0);
+  assert.equal(matchesSystemOneBinding(row.bindings[0]!, expected), false);
+  assert.equal(row.approvalEligible, false);
+  assert.equal(JSON.stringify(row).includes(input.settings.apiKey), false);
+});
+
+test("speaker observations do not inherit response metadata or mutable bindings", () => {
+  const finish = beginSpeakerEvidence(fixture());
+  const row = finish("model-a");
+  row.bindings[0]!.requestedModel = "tampered";
+  assert.equal(finish(undefined).bindings[0]!.responseModel, "");
+  assert.equal(finish(null).bindings[0]!.responseModel, "");
+  assert.notEqual(finish("model-b").bindings[0]!.requestedModel, "tampered");
+});
+
+test("speaker evidence identifies case, repeat, request and corpus independently", () => {
+  const input = fixture();
+  const first = beginSpeakerEvidence(input)("m");
+  input.state.declaration = "another speaker";
+  input.repeat = 2;
+  const second = beginSpeakerEvidence(input)("m");
+  assert.equal(second.caseId, input.caseId);
+  assert.equal(second.repeat, 2);
+  assert.notEqual(first.requestDigest, second.requestDigest);
+  assert.equal(first.corpusDigest, second.corpusDigest);
+  input.corpus[0]!.expected = "different";
+  assert.notEqual(second.corpusDigest, beginSpeakerEvidence(input)("m").corpusDigest);
+});
 
 function fixture() {
   return { settings: defaultSystemOneSettings(), caseId: "case-1", repeat: 1,

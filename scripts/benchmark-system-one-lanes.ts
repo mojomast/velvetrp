@@ -15,6 +15,7 @@
  *      BENCH_LIMIT (optional scenario cap), BENCH_OUT (default docs/system-one-benchmark.md).
  */
 import { writeFile } from "node:fs/promises";
+import { beginSpeakerEvidence } from "./system-one-evidence.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildRoomRoutingQuestions, composeRoomRoutingSelection, type RoomRoutingParticipant } from "../server/src/agent/systemOneRoomRouting.js";
@@ -48,6 +49,7 @@ interface Scenario {
 }
 
 interface RawCall {
+  evidence?: ReturnType<ReturnType<typeof beginSpeakerEvidence>>;
   scenarioId: string;
   arm: ArmId;
   repeat: number;
@@ -220,6 +222,9 @@ async function main(): Promise<void> {
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
       // Jev arm: the real System One transport + lane composition.
       const jevStart = performance.now();
+      const finishEvidence = beginSpeakerEvidence({
+        settings: jevSettings, caseId: scenario.id, repeat, state, questions, corpus: scenarios,
+      });
       try {
         const result = await completeWithSystemOne({ settings: jevSettings, state, questions });
         const composed = composeRoomRoutingSelection(participants, result.answers, thresholds, scenario.maxSpeakers);
@@ -231,6 +236,7 @@ async function main(): Promise<void> {
         const selectedNames = ids.map((id) => participants.find((participant) => participant.id === id)?.name ?? id);
         calls.push({
           scenarioId: scenario.id, arm: "jev", repeat, ok: true, deferred: composed.band !== "act",
+          evidence: finishEvidence(result.model.responseModel),
           latencyMs: Math.max(0, Math.round(performance.now() - jevStart)),
           inputTokens: cost.input, outputTokens: cost.output, costUsd: cost.cost,
           predictedProbability: composed.topSignal,
@@ -239,6 +245,7 @@ async function main(): Promise<void> {
       } catch (error) {
         calls.push({
           scenarioId: scenario.id, arm: "jev", repeat, ok: false, deferred: true, error: error instanceof Error ? error.message : "error",
+          evidence: finishEvidence(undefined),
           latencyMs: Math.max(0, Math.round(performance.now() - jevStart)),
           inputTokens: 0, outputTokens: 0, costUsd: 0, selectedNames: [], expectedNames: scenario.expectedNames,
           exact: false, precision: 0, recall: 0, f1: 0,
@@ -520,7 +527,9 @@ function renderReport(input: {
   if (routingGate.reasons.length === 0) lines.push("All gates passed.");
   else for (const reason of routingGate.reasons) lines.push(`- ${reason}`);
   lines.push("");
-  lines.push("A passing gate is what the runtime checks before letting the lane act; until then it records only.");
+  lines.push("This is an exploratory statistical gate, not a production approval. Runtime also requires matching version-bound evidence.");
+  lines.push("Per-call evidence covers the direct Jev arm only, including failed attempts with missing model metadata. The gated/fallback arm is not attributed to that evidence.");
+  lines.push("Direct composition uses raw signals (identity calibration); the fitted map below is post-hoc analysis, not an evaluated runtime configuration. Repeats do not add unique scenarios.");
   lines.push("");
   lines.push("### Calibration (fit on bridge/tavern, scored on the held-out archive)");
   lines.push("");
