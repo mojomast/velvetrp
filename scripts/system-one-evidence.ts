@@ -42,10 +42,12 @@ export function beginAdventureEvidence(input: {
   questions: unknown;
   candidates: readonly { kind: string }[];
   corpus: unknown;
+  payloadVersions?: { questionVersion: string; stateVersion: string };
 }) {
   const digest = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
   const bindings = [...new Set(input.candidates.map(candidate => candidate.kind))].sort().map(kind =>
     systemOneEvaluationBinding("adventure-selection", input.settings, null, kind, {
+      ...input.payloadVersions,
       candidateStrategy: "benchmark-curated-candidates-v1",
     }));
   const snapshot = {

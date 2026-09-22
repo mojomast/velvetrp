@@ -52,6 +52,8 @@ import {
   ADVENTURE_NONE,
   ADVENTURE_SUPPORTED_KEY,
   buildAdventureSelectionQuestions,
+  buildAdventureSharedContextRequest,
+  ADVENTURE_SHARED_CONTEXT_VERSIONS,
   composeAdventureSelection,
   type AdventureSelectionCandidate,
   type AdventureSelectionComposition,
@@ -1284,6 +1286,21 @@ export function parseAdventureArgs(args: readonly string[]): { repeats: number; 
   return { repeats, out };
 }
 
+export function parseAdventureVariant(args: readonly string[]): "legacy" | "shared-context" {
+  const variant = parseFlag(args, "--payload") ?? (args.includes("--payload") ? "" : "legacy");
+  if (variant !== "legacy" && variant !== "shared-context") throw new Error("--payload must be legacy or shared-context");
+  return variant;
+}
+
+export function buildAdventureBenchmarkRequest(
+  testCase: Pick<AdventureEvalCase, "declaration" | "candidates">,
+  variant: "legacy" | "shared-context",
+) {
+  return variant === "shared-context"
+    ? buildAdventureSharedContextRequest(testCase.declaration, testCase.candidates)
+    : { state: adventureRequestState(testCase), questions: buildAdventureSelectionQuestions(testCase.declaration, testCase.candidates) };
+}
+
 async function main(): Promise<void> {
   const key = process.env.TYPESAFE_API_KEY?.trim() ?? "";
   if (!key) {
@@ -1291,7 +1308,11 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { repeats, out } = parseAdventureArgs(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  const payloadVariant = parseAdventureVariant(args);
+  const parsed = parseAdventureArgs(args);
+  const repeats = parsed.repeats;
+  const out = parseFlag(args, "--out") ?? (payloadVariant === "legacy" ? parsed.out : "docs/system-one-adventure-shared-context-benchmark.md");
   const outPath = path.resolve(ROOT, out);
   const settings = { ...defaultSystemOneSettings(), apiKey: key };
   const thresholds = settings.confidencePolicy[PROMOTION_LANE];
@@ -1319,16 +1340,17 @@ async function main(): Promise<void> {
   console.log(`harvested cases: ${harvest.cases.length} (${harvest.humanCases} human-confirmed gated, ${harvest.agentCases} agent-reviewed not gated)${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`);
 
   for (const testCase of cases) {
-    const questions = buildAdventureSelectionQuestions(testCase.declaration, testCase.candidates);
+    const { questions, state } = buildAdventureBenchmarkRequest(testCase, payloadVariant);
     // Gate runs mirror the production request, which carries no `uid`: a uid decorrelator was
     // measured on the Director lane to move the selected threshold and produce a degenerate
     // calibration map, so this lane keeps the same-state production draw and reserves the vendor
     // decorrelator for dedicated stability probes. Stability samples are still collected per repeat.
-    const state = adventureRequestState(testCase);
+
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
       const finishEvidence = beginAdventureEvidence({
         settings, caseId: testCase.id, repeat, state, questions,
         candidates: testCase.candidates, corpus: cases,
+        ...(payloadVariant === "shared-context" ? { payloadVersions: ADVENTURE_SHARED_CONTEXT_VERSIONS } : {}),
       });
       try {
         const result = await completeWithSystemOne({
@@ -1376,9 +1398,10 @@ async function main(): Promise<void> {
     cases,
     harvest: harvestReport,
   });
-  await writeFile(outPath, `${report}\n> Binding scope: curated benchmark candidates, not production shortlist coverage. Per-call request-time bindings and input hashes are in the JSON readouts. Metrics-only proposed records do not authorize execution; fitted calibration and swept thresholds are not evaluated runtime bindings.\n`, "utf8");
+  await writeFile(outPath, `> Payload variant: ${payloadVariant}. Reproduce with --payload ${payloadVariant}. Shared-context is experimental and does not mirror the production question/state payload.\n\n${report}\n> Binding scope: curated benchmark candidates, not production shortlist coverage. Per-call request-time bindings and input hashes are in the JSON readouts. Metrics-only proposed records do not authorize execution; fitted calibration and swept thresholds are not evaluated runtime bindings.\n`, "utf8");
   await writeFile(outPath.replace(/\.md$/, ".json"), `${JSON.stringify({
     model,
+    payloadVariant,
     baseUrl: settings.baseUrl,
     repeats,
     thresholds,
