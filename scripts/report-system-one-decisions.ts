@@ -104,6 +104,12 @@ function formatCalibration(record: SystemOnePromotionRecord): string {
   return `a=${formatRate(calibration.a)}, b=${formatRate(calibration.b)}`;
 }
 
+/** Renders a recorded-but-unbound lane as explicitly inactive rather than a bare "no". */
+function promotionLabel(status: LanePromotionStatus): string {
+  if (status.promoted) return "yes";
+  return status.record && !(status.record.evaluatedBindings?.length) ? "no (unbound)" : "no";
+}
+
 /**
  * Pure rendering of the promotion section. Every lane appears exactly once; a lane with no
  * record reads as unpromoted/not-recorded rather than being omitted.
@@ -116,7 +122,7 @@ export function buildPromotionSection(statuses: readonly LanePromotionStatus[]):
   lines.push("| --- | --- | --- | --- | --- |");
   for (const status of statuses) {
     lines.push(
-      `| ${status.lane} | ${status.promoted ? "yes" : "no"}`
+      `| ${status.lane} | ${promotionLabel(status)}`
       + ` | ${status.record?.promotedAt ?? NONE}`
       + ` | ${status.record?.evidence ?? NOT_RECORDED}`
       + ` | ${status.record ? (status.gate?.promoted ? "pass" : "fail") : NOT_RECORDED} |`,
@@ -126,7 +132,10 @@ export function buildPromotionSection(statuses: readonly LanePromotionStatus[]):
   for (const status of statuses) {
     lines.push(`### ${status.lane}`);
     lines.push("");
-    lines.push(`- Promoted: ${status.promoted ? "yes" : "no"}`);
+    lines.push(`- Promoted: ${promotionLabel(status)}`);
+    if (status.record && !(status.record.evaluatedBindings?.length)) {
+      lines.push("- Active binding: missing (historical record cannot authorize active decisions)");
+    }
     if (!status.record) {
       lines.push(`- Promoted at: ${NONE}`);
       lines.push(`- Evidence: ${NOT_RECORDED}`);
