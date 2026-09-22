@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "name": "Larkspur Falls: The Great Pie Caper",
+  "tone": "warm comedic high fantasy; kind neighbors, absurd trouble, slapstick danger that never turns grim",
+  "exclusions": ["grimdark", "cosmic horror", "graphic violence", "modern technology"],
+  "stages": [
+    {
+      "id": "foundation",
+      "jobs": [
+        {
+          "id": "festival-town",
+          "sections": ["outline", "locations"],
+          "brief": "Establish Larkspur Falls, a riverside festival town of painted bridges, pie stalls, and an annual duck race, plus two nearby playful trouble spots: a giggling mushroom hollow and a broken-down carnival barge moored downriver. Connect them with easy walking routes.",
+          "desiredCounts": { "outlines": 1, "locations": 3, "connections": 2 }
+        }
+      ]
+    },
+    {
+      "id": "locals",
+      "dependsOn": ["foundation"],
+      "jobs": [
+        {
+          "id": "festival-folk",
+          "sections": ["npcs"],
+          "brief": "Populate Larkspur Falls with four publicly visible locals: the harried pie judge who has lost the prize entry, the boastful reigning duck-race champion, a retired wizard running a very sincere jam stall, and a cheerful goblin chef who insists he is completely innocent.",
+          "expandFrom": [{ "jobId": "festival-town", "fields": ["locations"], "limit": 2 }],
+          "desiredCounts": { "npcs": 4 }
+        }
+      ]
+    },
+    {
+      "id": "story",
+      "dependsOn": ["locals"],
+      "jobs": [
+        {
+          "id": "pie-caper",
+          "sections": ["quests", "clues"],
+          "brief": "Create two light-hearted local quests: recover the stolen Gilded Gooseberry Pie before the festival judging, and untangle who really took it (a prank gone sideways rather than malice). Add three discoverable clues that point at the truth with humor and kindness.",
+          "expandFrom": [
+            { "jobId": "festival-town", "fields": ["locations"], "limit": 3 },
+            { "jobId": "festival-folk", "fields": ["npcs"], "limit": 4 }
+          ],
+          "desiredCounts": { "quests": 2, "clues": 3 }
+        }
+      ]
+    },
+    {
+      "id": "threat",
+      "dependsOn": ["story"],
+      "jobs": [
+        {
+          "id": "playful-trouble",
+          "sections": ["encounters"],
+          "brief": "Create two light-hearted encounters at the trouble spots, suitable for a powerful party: a mud-wrestling goblin picnic in the mushroom hollow, and a runaway carnival bumble-bee balloon dragging its tether along the riverbank. Give each a non-combat resolution that is funnier than fighting.",
+          "expandFrom": [{ "jobId": "festival-town", "fields": ["locations"], "limit": 2 }],
+          "desiredCounts": { "encounters": 2 }
+        }
+      ]
+    }
+  ]
+}
