@@ -21,7 +21,7 @@ import { adventureProviderPromptEstimate, createAdventureTurnBudgetPolicy, effec
 import type { Repository } from "../../../repo/index.js";
 import { completeWithProvider } from "../../../provider/index.js";
 import { getPromptPreset } from "../../../presets.js";
-import { adventureNarrationMessages } from "../../../agent/adventurePrompt.js";
+import { adventureNarrationMessages, conversationNarrationMessages } from "../../../agent/adventurePrompt.js";
 import { adventureTurnBudgets } from "../../../agent/turnBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "../../../agent/directToolReasoning.js";
 import type { CompletionFunctionTool, ProviderCompletionInput } from "../../../provider/index.js";
@@ -83,6 +83,41 @@ const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve
   | {kind:"rest";restKind:"short"|"long";restName:"Short rest"|"Long rest";recovery:Array<{label:string;before:number;after:number}>};
 type NarrationResult={turn:PrivateAdventureTurn;text:string;source:"provider-assisted"|"deterministic-fallback"};
 const NARRATION_TOOL_NAME = "submit_adventure_narration";
+/** Prompt provenance recorded for a receipt-free narration derivative of a settled hold. */
+export const CONVERSATION_NARRATION_PROMPT_VERSION = "adventure-conversation-narration-v1";
+/** Short-prose bound for conversation narration; the receipt-bound prompt keeps its own limits. */
+export const CONVERSATION_NARRATION_MAX_CHARACTERS = 2_000;
+export const CONVERSATION_NARRATION_MAX_WORDS = 120;
+/** Structural slice of the narrated derivative the conversation guard reads. */
+export interface ConversationNarrationTurnProjection { mode: string; priorTurnId: string | null; receiptLinks: readonly unknown[]; }
+/** Structural slice of the prior turn the conversation guard reads. */
+export interface ConversationNarrationPriorProjection {
+  mode: string; state: string; receiptLinks: readonly unknown[];
+  toolCalls: ReadonlyArray<{ status: string; proposal: { confirmation: { state: string } } }>;
+}
+/**
+ * A narration derivative may write receipt-free conversation prose only when its immediate prior
+ * is a settled original hold: `mode: "original"`, `state: "completed"`, zero receipts, and no
+ * pending or committed mechanics. A derivative of a derivative, a cancelled or failed ancestor,
+ * and any mechanics turn all stay on the existing receipt-bound path.
+ */
+export function conversationNarrationEligible(turn: ConversationNarrationTurnProjection,
+  prior: ConversationNarrationPriorProjection | null): boolean {
+  if (!prior || turn.mode === "original" || !turn.priorTurnId || turn.receiptLinks.length > 0) return false;
+  if (prior.mode !== "original" || prior.state !== "completed" || prior.receiptLinks.length > 0) return false;
+  if (prior.toolCalls.some((call) => call.proposal.confirmation.state === "pending")) return false;
+  return !prior.toolCalls.some((call) => call.status === "approved" || call.status === "committed");
+}
+/**
+ * Conversation output is bounded, non-empty, and subject to the same zero-receipt mechanical gate
+ * as every grounded hold: unsupported movement, transactions, damage, quest, and progression
+ * claims are rejected, and an exact current location must be acknowledged when one exists.
+ */
+export function conversationNarrationMatches(text: string, currentLocation: string | null = null): boolean {
+  if (!text || text.length > CONVERSATION_NARRATION_MAX_CHARACTERS) return false;
+  if (text.split(/\s+/).filter(Boolean).length > CONVERSATION_NARRATION_MAX_WORDS) return false;
+  return providerNarrationMatchesReceipts(text, [], currentLocation);
+}
 const NARRATION_TOOL_PARAMETERS: CompletionFunctionTool["parameters"] = {
   type: "object",
   properties: { narration: { type: "string", minLength: 1, maxLength: 8_000 } },
@@ -319,14 +354,28 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
     catch { return { turn, text: fallbackText, source: "deterministic-fallback" }; }
     const publicContext=publicNarrationContext(repo,turn);
     if(!publicContext)return {turn,text:fallbackText,source:"deterministic-fallback"};
+    // Receipt-free conversation narration applies only to a narration derivative whose immediate
+    // prior is a settled original hold. The prior is resolved fresh and never via the chain, so a
+    // derivative of a derivative, a pending confirmation, or any inherited mechanics stays on the
+    // receipt-bound path below.
+    const priorProjection = safeReceipts.length === 0 && turn.mode !== "original" && turn.priorTurnId
+      ? repo.getAdventureTurn(OWNER, turn.priorTurnId) : null;
+    const conversation = conversationNarrationEligible(turn,
+      priorProjection && "declaration" in priorProjection ? priorProjection : null);
     const completionLimit = effectiveAdventureTurnMaxTokens(provider);
     const completionInput: ProviderCompletionInput = { provider: { ...provider, samplers: { ...provider.samplers, maxTokens: completionLimit } },
       harness, preset: getPromptPreset("default"), tools: [{ name: NARRATION_TOOL_NAME,
-        description: "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+        description: conversation ? "Submit short grounded conversational prose for a held turn with no committed mechanics."
+          : "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
         parameters: NARRATION_TOOL_PARAMETERS }], toolChoice: { name: NARRATION_TOOL_NAME }, signal,
       bodyOverrides: DIRECT_TOOL_BODY_OVERRIDES,
-      parallelToolCalls:false,promptVersion: "adventure-narration-v1", schemaVersion: "adventure-narration-v1",
-      messages: adventureNarrationMessages({ declaration: turn.declaration, receipts: safeReceipts,
+      parallelToolCalls:false,promptVersion: conversation ? CONVERSATION_NARRATION_PROMPT_VERSION : "adventure-narration-v1",
+      schemaVersion: "adventure-narration-v1",
+      messages: conversation ? conversationNarrationMessages({ declaration: turn.declaration,
+        currentLocation:publicContext.currentLocation,currentActorName:publicContext.currentActorName,publicContext:publicContext.context,harness, history,
+        rulesetDescriptor:publicContext.ruleset.descriptor,
+        safetyPolicy: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId) })
+        : adventureNarrationMessages({ declaration: turn.declaration, receipts: safeReceipts,
         currentLocation:publicContext.currentLocation,currentActorName:publicContext.currentActorName,publicContext:publicContext.context,harness, history,
         rulesetDescriptor:publicContext.ruleset.descriptor,
         safetyPolicy: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId) }) };
@@ -386,7 +435,8 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       if (JSON.stringify(publicNarrationContext(repo, turn)) !== JSON.stringify(publicContext)) throw new Error("narration public context is stale");
       if(!currentSnapshot?.ruleset||currentSnapshot.ruleset.id!==publicContext.ruleset.id||currentSnapshot.ruleset.version!==publicContext.ruleset.version
         ||JSON.stringify(currentSnapshot.ruleset.descriptor)!==JSON.stringify(publicContext.ruleset.descriptor))throw new Error("narration ruleset context is stale");
-      if(!providerNarrationMatchesReceipts(providerText,safeReceipts,publicContext.currentLocation))throw new Error("narration contradicts or omits verified current facts");
+      if(!(conversation ? conversationNarrationMatches(providerText,publicContext.currentLocation)
+        : providerNarrationMatchesReceipts(providerText,safeReceipts,publicContext.currentLocation)))throw new Error("narration contradicts or omits verified current facts");
        claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"provider-assisted",narration:providerText,
          outcomeCode:usageEstimated?"ok-estimated":"ok",promptTokens:measuredUsage.promptTokens,completionTokens:measuredUsage.completionTokens});
     } catch {

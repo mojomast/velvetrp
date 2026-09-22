@@ -14,15 +14,30 @@ function api(): CampaignPlayApi {
     getCampaignWorld: vi.fn().mockResolvedValue({ revision: 0, data: { currentLocations: [], visibleLocations: [], visibleConnections: [] } }), listCampaignNpcs: vi.fn().mockResolvedValue({ revision: 0, data: { npcs: [] } }), listCampaignQuests: vi.fn().mockResolvedValue({ revision: 0, data: { quests: [], objectives: [] } }), getActorResources: vi.fn().mockResolvedValue({ resources: [], revision: 0 }), getActorGameplaySheet: vi.fn().mockResolvedValue(sheet), listCampaignEncounters: vi.fn().mockResolvedValue({ encounters: [] }), getCombatState: vi.fn() };
 }
 
+type CompletedTurnOverride = { mode?: "original" | "narration-retry" | "narration-swipe"; priorTurnId?: string | null;
+  receipts?: AdventureTurnGetResponse["receipts"]; narrationStatus?: AdventureTurnGetResponse["narrationStatus"];
+  proposals?: AdventureTurnGetResponse["proposals"]; confirmation?: AdventureTurnGetResponse["confirmation"] };
+
 /** Completed receipt turn used by the automatic narration retry suites. */
-function completedReceiptTurn(override: { mode?: "original" | "narration-retry" | "narration-swipe"; priorTurnId?: string | null;
-  receipts?: AdventureTurnGetResponse["receipts"]; narrationStatus?: AdventureTurnGetResponse["narrationStatus"] } = {}): AdventureTurnGetResponse {
+function completedReceiptTurn(override: CompletedTurnOverride = {}): AdventureTurnGetResponse {
   return { turn: { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", mode: override.mode ?? "original",
     priorTurnId: override.priorTurnId ?? null, declaration: "I search the archive.", state: "completed", revision: 2,
-    createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z" }, proposals: [], confirmation: { state: "none" },
+    createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z" }, proposals: override.proposals ?? [],
+    confirmation: override.confirmation ?? { state: "none" },
     receipts: override.receipts ?? [{ commandId: "command", proposalId: null, linkedAt: "2030-01-01T00:00:00.000Z" }],
     narrationStatus: override.narrationStatus ?? { status: "completed", text: "The archive yields a sealed ledger.", source: "deterministic-fallback" } };
 }
+
+/** Authoritative hold line returned when an original turn commits no mechanics. */
+const heldNarration = { status: "completed" as const, text: "The scene holds. Your intended action remains pending; no movement or other campaign change is established.", source: "deterministic-fallback" as const };
+/** Completed held turn: an original deterministic turn that committed no receipt. */
+function completedHeldTurn(override: CompletedTurnOverride = {}): AdventureTurnGetResponse {
+  return completedReceiptTurn({ ...override, receipts: [], narrationStatus: override.narrationStatus ?? heldNarration });
+}
+const pendingProposal: AdventureTurnGetResponse["proposals"][number] = { proposalId: "proposal", position: 0, toolName: "travel",
+  proposedAt: "2030-01-01T00:00:00.000Z", policy: { version: "v1", category: "ambiguous-consequential-change", requiresConfirmation: true,
+    requiredAuthorizer: "controller", review: { summary: "Travel to the harbor", consequences: [{ kind: "campaign-change", text: "The party moves" }] } },
+  confirmation: { state: "pending", expiresAt: "2030-01-01T00:05:00.000Z" } };
 
 /** Persists the active-turn locator and waits until the page and the transcript have settled. */
 function renderPersistedTurn(client: CampaignPlayApi, text: string) {
@@ -304,6 +319,8 @@ describe("CampaignPlayPage", () => {
 
   it("reconciles a persisted turn by GET without replaying its declaration", async () => {
     localStorage.clear(); localStorage.setItem("velvet.campaign-play.v1:campaign:session", JSON.stringify({ turnId: "turn", selectedActorId: "actor", streamPhase: "ambiguous" }));
+    // This suite covers authoritative reconciliation; automatic retries are disabled.
+    localStorage.setItem("velvet.campaign-workbench.v1", JSON.stringify({ autoNarrateMechanics: false }));
     const client = api(); vi.mocked(client.getAdventureTurn).mockResolvedValue({ turn: { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", mode: "original", priorTurnId: null, declaration: "private declaration", state: "completed", revision: 2, createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z" }, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Fallback narration", source: "deterministic-fallback" } });
     render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByText("Fallback narration"); expect(client.getAdventureTurn).toHaveBeenCalledWith("turn", { campaignId: "campaign", sessionId: "session", actorId: "actor", turnId: "turn" }); expect(client.streamAdventureTurn).not.toHaveBeenCalled();
@@ -368,19 +385,59 @@ describe("CampaignPlayPage", () => {
   it("never auto-narrates a derivative turn", async () => {
     localStorage.clear();
     const client = api();
-    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn({ mode: "narration-retry", priorTurnId: "prior" }));
-    renderPersistedTurn(client, "The archive yields a sealed ledger.");
+    // A derivative never carries receipts, so a held-shape derivative is the real guard case.
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedHeldTurn({ mode: "narration-retry", priorTurnId: "prior" }));
+    renderPersistedTurn(client, heldNarration.text);
     await settleLiveRefresh(client);
     expect(client.streamAdventureTurn).not.toHaveBeenCalled();
   });
 
-  it("does not auto-narrate a completed turn without committed receipts", async () => {
+  it("auto-dispatches one narration retry for a completed held turn", async () => {
     localStorage.clear();
     const client = api();
-    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn({ receipts: [] }));
-    renderPersistedTurn(client, "The archive yields a sealed ledger.");
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedHeldTurn());
+    const { view } = renderPersistedTurn(client, heldNarration.text);
+    await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(client.streamAdventureTurn).mock.calls[0]?.[0]).toMatchObject({ kind: "narration-retry", campaignId: "campaign",
+      sessionId: "session", actorId: "actor", priorTurnId: "turn", expectedRevision: 7 });
+    // Re-rendering after the dispatch never queues a second provider call for the hold.
+    view.rerender(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not auto-narrate a held turn while the aggregate confirmation is pending", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedHeldTurn({
+      confirmation: { state: "pending", proposalIds: ["proposal"], expiresAt: "2030-01-01T00:05:00.000Z" } }));
+    renderPersistedTurn(client, heldNarration.text);
     await settleLiveRefresh(client);
     expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-narrate a held turn while a proposal confirmation is pending", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedHeldTurn({ proposals: [pendingProposal] }));
+    renderPersistedTurn(client, heldNarration.text);
+    await settleLiveRefresh(client);
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("does not loop or repeat when the held-turn narration retry is rejected", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedHeldTurn());
+    const rejection = new ApiError(400, "narration rejected");
+    vi.mocked(client.streamAdventureTurn).mockReturnValue({ turnId: Promise.reject(rejection), done: Promise.reject(rejection), cancelDelivery: vi.fn() });
+    renderPersistedTurn(client, heldNarration.text);
+    await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
+    // The failure surfaces once through the existing derivative path and is never replayed.
+    await screen.findByText("No derivative turn identity was received. The narration request will not be replayed automatically.");
+    await settleLiveRefresh(client);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 
   it("does not auto-narrate narration that is already provider-assisted", async () => {
@@ -409,6 +466,19 @@ describe("CampaignPlayPage", () => {
     const client = api();
     vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn());
     renderPersistedTurn(client, "The archive yields a sealed ledger.");
+    await settleLiveRefresh(client);
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry narration" }));
+    await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(client.streamAdventureTurn).mock.calls[0]?.[0]).toMatchObject({ kind: "narration-retry", priorTurnId: "turn", expectedRevision: 7 });
+  });
+
+  it("submits nothing for a held turn while the auto-narration preference is off", async () => {
+    localStorage.clear();
+    localStorage.setItem("velvet.campaign-workbench.v1", JSON.stringify({ autoNarrateMechanics: false }));
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedHeldTurn());
+    renderPersistedTurn(client, heldNarration.text);
     await settleLiveRefresh(client);
     expect(client.streamAdventureTurn).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Retry narration" }));

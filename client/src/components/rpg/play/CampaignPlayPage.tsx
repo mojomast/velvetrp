@@ -429,16 +429,19 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   }, [campaignId, openStream, phase, refreshBootstrap, roomToolsLocked, selectedActorId, sessionId, sessionLocked, turn]);
 
   /**
-   * One automatic receipt-bound narration retry per original deterministic turn.
+   * One automatic narration retry per original deterministic turn.
    * The committed turn and its receipts stay authoritative: the retry is the existing
    * narration derivative, which never re-executes mechanics, and a failed or rejected
    * provider call settles back to the same deterministic line. Trigger rule:
    * the preference is on, play is ready (actionable, actor selected, idle/terminal,
    * unlocked), the active turn is a completed original for the selected actor whose
-   * authoritative narration source is `deterministic-fallback`, and it carries public
-   * receipts. Derivative turns are never auto-narrated. The attempted set plus the
-   * active-derivative and transcript checks keep refreshes, re-renders, and delivery
-   * recovery from dispatching a second provider call for the same turn.
+   * authoritative narration source is `deterministic-fallback`, and it either carries
+   * public receipts (a mechanics turn) or is a hold: an original turn with no committed
+   * receipt and no pending confirmation or proposal, whose deterministic fallback would
+   * otherwise be the player's only narration. Derivative turns are never auto-narrated.
+   * The attempted set plus the active-derivative and transcript checks keep refreshes,
+   * re-renders, and delivery recovery from dispatching a second provider call for the
+   * same turn.
    */
   useEffect(() => {
     if (!preferences.autoNarrateMechanics || !bootstrap || !turn || !selectedActorId) return;
@@ -446,9 +449,14 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       || !bootstrap.session.active || bootstrap.playableActors.length === 0) return;
     if (sessionLocked || roomToolsLocked || !["idle", "terminal"].includes(phase)) return;
     const projection = turn.turn;
-    if (projection.state !== "completed" || projection.priorTurnId || projection.actorId !== selectedActorId) return;
-    if (turn.receipts.length === 0 || turn.narrationStatus.status !== "completed"
-      || turn.narrationStatus.source !== "deterministic-fallback") return;
+    if (projection.state !== "completed" || projection.mode !== "original" || projection.priorTurnId
+      || projection.actorId !== selectedActorId) return;
+    if (turn.narrationStatus.status !== "completed" || turn.narrationStatus.source !== "deterministic-fallback") return;
+    // A held turn commits no mechanics receipts; the deterministic fallback is its only
+    // narration. Retry it too, but only once every confirmation and proposal has settled.
+    const held = turn.receipts.length === 0;
+    if (held && (turn.confirmation.state === "pending"
+      || turn.proposals.some((proposal) => proposal.confirmation.state === "pending"))) return;
     if (autoNarratedTurnsRef.current.has(projection.turnId)) return;
     // Wait for the authoritative transcript before deciding whether a derivative
     // already narrated this root in an earlier page session.
