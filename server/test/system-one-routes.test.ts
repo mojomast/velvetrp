@@ -55,7 +55,7 @@ describe("System One provider api", () => {
     const body = response.json();
     expect(response.statusCode).toBe(200);
     expect(Object.keys(body)).toEqual([
-      "id", "providerType", "enabled", "laneModes", "baseUrl", "model", "hasApiKey", "requestTimeoutSeconds",
+      "id", "providerType", "enabled", "laneModes", "shadowAdventurePayload", "baseUrl", "model", "hasApiKey", "requestTimeoutSeconds",
       "pricing", "budget", "confidencePolicy", "confidenceCalibration", "updatedAt",
     ]);
     expect(body.id).toBe("system-one");

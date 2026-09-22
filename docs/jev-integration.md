@@ -859,6 +859,7 @@ above into a measured number before any lane is enabled.
 | `budget.*` | setting | bounded | Lane-specific, never shared |
 | `confidencePolicy.<lane>.*` | setting | conservative | `reviewThreshold`/`actionThreshold` |
 | `confidenceCalibration.<lane>.*` | setting | identity | Platt `{ a, b }` on recorded confidence; never changes the band |
+| `shadowAdventurePayload` | setting | `legacy` | Adventure-selection shadow battery only (`legacy` or evaluation-only `shared-context`); never changes provider planning and never grants commit authority |
 
 Any new environment variable must be added to the `docs/operations.md` environment
 table and both `.env.example` files, or the documentation-drift test will fail.

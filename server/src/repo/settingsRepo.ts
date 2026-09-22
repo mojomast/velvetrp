@@ -9,6 +9,7 @@ import {
   defaultHarnessSettings,
   defaultProviderSettings,
   defaultSystemOneSettings,
+  isSystemOneAdventurePayloadVariant,
   isSystemOneLaneMode,
   now,
   toPublicProvider,
@@ -197,6 +198,11 @@ export function readSystemOne(db: DatabaseDriver.Database): SystemOneSettings {
       ...rest,
       id: "system-one",
       providerType: "system-one",
+      // A malformed persisted variant fails closed to the production legacy payload instead of
+      // leaking a string the orchestrator cannot interpret.
+      shadowAdventurePayload: isSystemOneAdventurePayloadVariant(parsed.shadowAdventurePayload)
+        ? parsed.shadowAdventurePayload
+        : defaults.shadowAdventurePayload,
       laneModes: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
         lane,
         migrateSystemOneLaneMode(parsed.laneModes?.[lane], legacyShadow),
@@ -247,6 +253,11 @@ export async function updateSystemOneSettings(patch: UpdateSystemOneInput): Prom
       const requested = patch.laneModes?.[lane];
       return [lane, isSystemOneLaneMode(requested) ? requested : next.laneModes[lane]];
     })) as SystemOneSettings["laneModes"];
+  }
+  if (patch.shadowAdventurePayload !== undefined) {
+    next.shadowAdventurePayload = isSystemOneAdventurePayloadVariant(patch.shadowAdventurePayload)
+      ? patch.shadowAdventurePayload
+      : next.shadowAdventurePayload;
   }
   if (patch.baseUrl !== undefined) next.baseUrl = clampText(patch.baseUrl, 300);
   if (patch.model !== undefined) next.model = clampText(patch.model, 120);

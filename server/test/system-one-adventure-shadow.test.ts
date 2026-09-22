@@ -17,7 +17,9 @@ import {
 import {
   ADVENTURE_BEST_KEY,
   ADVENTURE_NONE,
+  ADVENTURE_SHARED_CONTEXT_VERSIONS,
   ADVENTURE_SUPPORTED_KEY,
+  type AdventureSelectionCandidate,
 } from "../src/agent/systemOneAdventure.js";
 import {
   defaultHarnessSettings,
@@ -27,7 +29,8 @@ import {
 } from "../src/defaults.js";
 import { createFakeSystemOneCaller } from "../src/provider/systemOneFake.js";
 import type { SystemOneAnswer, SystemOneCaller } from "../src/provider/systemOneCompletion.js";
-import { createRepository, listSystemOneDecisionsByLane, updateSystemOneSettings } from "../src/repo/index.js";
+import { createRepository, getPublicSystemOneSettings, getSystemOneSettings, listSystemOneDecisionsByLane,
+  updateSystemOneSettings, assertSystemOneDecisionIntegrity } from "../src/repo/index.js";
 import type { SystemOneSettings } from "../src/types.js";
 import { dmFixture } from "./fixtures/dmCampaign.js";
 import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
@@ -373,6 +376,134 @@ describe("System One adventure-selection shadow lane", () => {
     expect(caller.calls).toHaveLength(0);
     expect(listSystemOneDecisionsByLane("adventure-selection", 10)).toHaveLength(0);
     f.repo.close();
+  });
+});
+
+describe("System One adventure-selection shared-context payload setting", () => {
+  /** The evaluation-only payload provenance read back from a recorded decision's selection JSON. */
+  function payloadEvidence(selection: unknown): { variant: string; binding: Record<string, unknown> } | undefined {
+    return (selection as { payloadEvidence?: { variant: string; binding: Record<string, unknown> } }).payloadEvidence;
+  }
+
+  it("defaults to the legacy payload and records legacy version evidence", async () => {
+    const caller = createFakeSystemOneCaller();
+    const run = await runTurn(() => lane(caller));
+
+    expect(run.decisions).toHaveLength(1);
+    const decision = run.decisions[0]!;
+    // The legacy battery keeps the declaration embedded in the question instructions.
+    expect(JSON.stringify(caller.calls[0]!.questions)).toContain("I complete the gate quest.");
+    const evidence = payloadEvidence(decision.selection);
+    expect(evidence?.variant).toBe("legacy");
+    expect(evidence?.binding).toMatchObject({
+      lane: "adventure-selection", questionVersion: "adventure-grouped-v1",
+      stateVersion: "adventure-declaration-candidates-v1", requestedModel: "jev-latest", responseModel: "jev-latest",
+    });
+  });
+
+  it("composes the shared request and records its distinct versions when selected", async () => {
+    const { f, created, candidate } = await adventureTurn();
+    const caller = createFakeSystemOneCaller();
+    const candidates: AdventureSelectionCandidate[] = [{
+      candidateId: candidate.candidateId, digest: candidate.digest, kind: "exact_quest_objective.select",
+      label: `Advance quest objective: ${candidate.objectiveDescription}`,
+    }];
+    await recordAdventureShadowDecision(created, candidates, lane(caller, { shadowAdventurePayload: "shared-context" }));
+
+    expect(caller.calls).toHaveLength(1);
+    const request = caller.calls[0]!;
+    // Content lives in state; instructions reference it structurally instead of embedding it.
+    expect(request.state).toEqual({ declaration: created.declaration, candidates });
+    expect(JSON.stringify(request.questions)).not.toContain("I complete the gate quest.");
+    expect(JSON.stringify(request.questions[ADVENTURE_SUPPORTED_KEY]!.instructions)).toContain("state.declaration");
+
+    const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
+    expect(decisions).toHaveLength(1);
+    const decision = decisions[0]!;
+    expect(request.state).toEqual(decision.state);
+    expect(decision.shadow).toBe(true);
+    const evidence = payloadEvidence(decision.selection);
+    expect(evidence?.variant).toBe("shared-context");
+    expect(evidence?.binding).toMatchObject({ ...ADVENTURE_SHARED_CONTEXT_VERSIONS, responseModel: "jev-latest" });
+    // Recording is replay-safe: the digests re-derive from the stored JSON.
+    expect(() => assertSystemOneDecisionIntegrity(decision.decisionId)).not.toThrow();
+    f.repo.close();
+  });
+
+  it("leaves the provider planning request and turn identical to the legacy payload", async () => {
+    const legacyCaller = createFakeSystemOneCaller();
+    const legacy = await runTurn(() => lane(legacyCaller));
+    makeTmpDataDir();
+    const sharedCaller = createFakeSystemOneCaller();
+    const shared = await runTurn(() => lane(sharedCaller, { shadowAdventurePayload: "shared-context" }));
+
+    expect(shared.providerCalls).toBe(1);
+    expect(shared.providerCalls).toBe(legacy.providerCalls);
+    expect(shared.advertisedTools).toEqual(legacy.advertisedTools);
+    expect(shared.messageCount).toBe(legacy.messageCount);
+    expect(turnProjection(shared.result)).toEqual(turnProjection(legacy.result));
+    // Only the recorded shadow payload differs between the two runs.
+    expect(JSON.stringify(sharedCaller.calls[0]!.questions)).not.toEqual(JSON.stringify(legacyCaller.calls[0]!.questions));
+  });
+
+  it("never reaches an active commit branch even when promoted and at act band", async () => {
+    const { f, created } = await adventureTurn();
+    const families = ["exact_srd_check.select", "exact_rest.select", "exact_combat_consumable.select", "exact_combat_power.select"];
+    const touched: string[] = [];
+    // Any lane-origin commit or proposal path is observable; none may run for shared context.
+    const repository = new Proxy(f.repo, {
+      get(target, property, receiver) {
+        if (typeof property === "string" && property.endsWith("FromLane")) touched.push(property);
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    for (const kind of families) {
+      const candidates: AdventureSelectionCandidate[] = [
+        { candidateId: `${kind}:target`, digest: "a".repeat(64), kind, label: `Target ${kind}` },
+        { candidateId: "exact_quest_objective.select:decoy", digest: "b".repeat(64), kind: "exact_quest_objective.select", label: "Decoy objective" },
+      ];
+      const caller = createFakeSystemOneCaller({ scripted: {
+        [ADVENTURE_SUPPORTED_KEY]: { type: "noul", noul: 0.9 },
+        [ADVENTURE_BEST_KEY]: { type: "choice", choice: candidates[0]!.candidateId, confidence: 0.9,
+          probabilities: { [candidates[0]!.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 } },
+      } });
+      const dependency = lane(caller, { laneModes: { ...defaultSystemOneLaneModes(), "adventure-selection": "active" },
+        shadowAdventurePayload: "shared-context" });
+      // Synthetic promotion for every committing family; the shared payload must ignore all of it.
+      approveTestSystemOne(dependency.settings, "adventure-selection", families);
+      expect(await recordAdventureShadowDecision(created, candidates, dependency, repository)).toBeNull();
+      expect(caller.calls).toHaveLength(1);
+    }
+    expect(touched).toEqual([]);
+    const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
+    expect(decisions).toHaveLength(families.length);
+    expect(decisions.every((decision) => decision.shadow)).toBe(true);
+    expect(decisions.map((decision) => decision.confidenceBand)).toEqual(families.map(() => "act"));
+    expect(decisions.every((decision) => payloadEvidence(decision.selection)?.variant === "shared-context")).toBe(true);
+    f.repo.close();
+  });
+
+  it("round-trips the variant through settings and fails closed on malformed values", async () => {
+    createRepository();
+    expect(defaultSystemOneSettings().shadowAdventurePayload).toBe("legacy");
+    expect((await getPublicSystemOneSettings()).shadowAdventurePayload).toBe("legacy");
+
+    const shared = await updateSystemOneSettings({ enabled: true, apiKey: "round-trip-secret", shadowAdventurePayload: "shared-context" });
+    expect(shared.shadowAdventurePayload).toBe("shared-context");
+    expect(shared).not.toHaveProperty("apiKey");
+    expect(JSON.stringify(shared)).not.toContain("round-trip-secret");
+    expect((await getSystemOneSettings()).shadowAdventurePayload).toBe("shared-context");
+
+    // An unknown value never replaces a valid selection.
+    const ignored = await updateSystemOneSettings({ shadowAdventurePayload: "bogus" as never });
+    expect(ignored.shadowAdventurePayload).toBe("shared-context");
+
+    // A malformed persisted value fails closed to the production legacy payload on read.
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    db.prepare("INSERT INTO provider (id, payload) VALUES ('system-one', ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload")
+      .run(JSON.stringify({ enabled: true, shadowAdventurePayload: 42 }));
+    db.close();
+    expect((await getSystemOneSettings()).shadowAdventurePayload).toBe("legacy");
   });
 });
 

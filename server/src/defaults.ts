@@ -4,13 +4,14 @@ import type {
   PublicProviderSettings,
   PublicSystemOneSettings,
   SamplerSettings,
+  SystemOneAdventurePayloadVariant,
   SystemOneCalibration,
   SystemOneConfidenceThresholds,
   SystemOneLane,
   SystemOneLaneMode,
   SystemOneSettings,
 } from "./types.js";
-import { SYSTEM_ONE_LANES } from "./types.js";
+import { SYSTEM_ONE_ADVENTURE_PAYLOAD_VARIANTS, SYSTEM_ONE_LANES } from "./types.js";
 
 /** Safe default: a lane records its would-be decision but never changes behavior. */
 export const DEFAULT_SYSTEM_ONE_LANE_MODE: SystemOneLaneMode = "shadow";
@@ -30,6 +31,25 @@ export function defaultSystemOneLaneModes(): Record<SystemOneLane, SystemOneLane
 export function systemOneLaneMode(settings: SystemOneSettings, lane: SystemOneLane): SystemOneLaneMode {
   const mode = settings.laneModes?.[lane];
   return isSystemOneLaneMode(mode) ? mode : DEFAULT_SYSTEM_ONE_LANE_MODE;
+}
+
+/** The safe evaluation default: the production battery, never the experimental payload. */
+export const DEFAULT_SYSTEM_ONE_ADVENTURE_PAYLOAD: SystemOneAdventurePayloadVariant = "legacy";
+
+/** Whether an arbitrary value is a valid adventure-selection shadow payload variant. */
+export function isSystemOneAdventurePayloadVariant(value: unknown): value is SystemOneAdventurePayloadVariant {
+  return typeof value === "string" && (SYSTEM_ONE_ADVENTURE_PAYLOAD_VARIANTS as readonly string[]).includes(value);
+}
+
+/**
+ * The effective adventure-selection shadow payload, defaulting to the production legacy battery
+ * for any missing or malformed value. It selects only what the advisory shadow lane composes and
+ * records; it never changes provider planning and never grants commit authority.
+ */
+export function systemOneAdventurePayload(settings: SystemOneSettings): SystemOneAdventurePayloadVariant {
+  return isSystemOneAdventurePayloadVariant(settings.shadowAdventurePayload)
+    ? settings.shadowAdventurePayload
+    : DEFAULT_SYSTEM_ONE_ADVENTURE_PAYLOAD;
 }
 
 export function now(): string {
@@ -114,6 +134,7 @@ export function defaultSystemOneSettings(updatedAt = now()): SystemOneSettings {
     providerType: "system-one",
     enabled: false,
     laneModes: defaultSystemOneLaneModes(),
+    shadowAdventurePayload: DEFAULT_SYSTEM_ONE_ADVENTURE_PAYLOAD,
     baseUrl: process.env.TYPESAFE_BASE_URL ?? "https://api.typesafe.ai/v1",
     model: process.env.TYPESAFE_MODEL ?? "jev-latest",
     apiKey: process.env.TYPESAFE_API_KEY ?? "",
@@ -132,6 +153,7 @@ export function toPublicSystemOne(settings: SystemOneSettings): PublicSystemOneS
     providerType: "system-one",
     enabled: settings.enabled,
     laneModes: settings.laneModes,
+    shadowAdventurePayload: settings.shadowAdventurePayload,
     baseUrl: settings.baseUrl,
     model: settings.model,
     hasApiKey: settings.apiKey.length > 0,

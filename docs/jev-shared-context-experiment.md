@@ -1,6 +1,6 @@
 # Adventure shared-context experiment
 
-`buildAdventureSharedContextRequest` in `server/src/agent/systemOneAdventure.ts` returns a complete state/questions pair for offline comparison or a future explicitly authorized model evaluation. It is not connected to runtime traffic or the benchmark CLI yet.
+`buildAdventureSharedContextRequest` in `server/src/agent/systemOneAdventure.ts` returns a complete state/questions pair for offline comparison, the benchmark CLI's paired runner, and the evaluation-only shadow setting described below. It is never the provider planning payload.
 
 The player declaration and candidate labels appear only in state. Relevance questions reference exact candidate IDs using structured instructions; aggregate choices reference those same IDs. All advertised candidates and their digests remain in state, including duplicate instances. Grouping and deterministic representatives remain unchanged. Duplicate, empty, or reserved candidate IDs fail closed. The returned state copies candidate records to avoid mutation through the original input.
 
@@ -51,10 +51,13 @@ coverage from 0% to 17-100% across travel, rest, powers, consumables, and quests
 measured input tokens and derived cost versus legacy. Still required before any production
 decision: production-path behavior of the current production payload is now characterized
 read-only across five worlds in
-[system-one-production-path-evaluation.md](system-one-production-path-evaluation.md); shared
-context is not wired, so no production-path comparison of the two payloads exists yet. Still
-required before any production decision: that comparison (after an authorized wiring evaluation)
-and an evaluated promotion binding once a payload is chosen. Do not change live shadow or active
-payloads until then.
+[system-one-production-path-evaluation.md](system-one-production-path-evaluation.md); the
+adventure-selection shadow lane can now evaluate the shared-context payload on the production
+path by setting `shadowAdventurePayload: "shared-context"` (default `legacy`), which records the
+distinct question/state versions as `selection.payloadEvidence` on each advisory decision and
+never commits, regardless of band, lane mode, or promotion. No production-path comparison of the
+two payloads has been run or reviewed yet. Still required before any production decision: that
+comparison and an evaluated promotion binding once a payload is chosen. Do not change the
+default shadow or active payload until then.
 
 Vendor guidance checked via WebXNG/SearXNG discovery and direct retrieval of https://docs.typesafe.ai/concepts/state.md: all questions evaluate the same shared state independently; content and supporting facts belong in state while questions describe judgments.

@@ -12,7 +12,7 @@ import { callSystemOne, completeWithProvider, type CompletionMessage, type Provi
   type ProviderCompletionResult, type SystemOneCaller } from "../provider/index.js";
 import { canUseSystemOne } from "../provider/providerTransport.js";
 import { readRpgFeatureFlags } from "../features.js";
-import { systemOneLaneMode } from "../defaults.js";
+import { systemOneAdventurePayload, systemOneLaneMode } from "../defaults.js";
 import type { CampaignRecallHit } from "../repo/campaign/campaignRecallReadRepo.js";
 import type { Repository } from "../repo/index.js";
 import { getHarnessSettings, getProviderSettings, getSystemOneSettings, recordSystemOneDecision } from "../repo/index.js";
@@ -21,7 +21,8 @@ import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
 import { isLanePromoted } from "./systemOnePromotion.js";
 import { systemOneEvaluationBinding } from "./systemOneBinding.js";
 import { calibrateTopSignal } from "./systemOneCalibration.js";
-import { buildAdventureSelectionQuestions, composeAdventureSelection, type AdventureSelectionCandidate } from "./systemOneAdventure.js";
+import { buildAdventureSelectionQuestions, buildAdventureSharedContextRequest, composeAdventureSelection,
+  ADVENTURE_SHARED_CONTEXT_VERSIONS, type AdventureSelectionCandidate } from "./systemOneAdventure.js";
 import { buildRerankQuestions, composeRerankOrder, type RerankCandidate } from "./systemOneRerank.js";
 import { ADVENTURE_TOOL_LIMITATIONS, executeAdventureRead, parseAdventureToolArguments,
   selectAdventureTools, type AdventureToolName, type ProviderSafeQuestObjectiveCandidate, type SelectedAdventureTool } from "./toolRegistry.js";
@@ -228,6 +229,12 @@ export function adventureShadowCandidateUnion(families: {
  * caller keeps the unchanged provider path.
  *
  * Returns the refreshed turn and outcome when a lane-origin commit was prepared, otherwise null.
+ *
+ * Payload variant: `settings.shadowAdventurePayload` selects only which battery this advisory lane
+ * composes and records. The default `legacy` payload keeps the exact production battery and the
+ * unchanged authority rules. The experimental `shared-context` payload moves declaration and
+ * candidate content into shared state, records the distinct question/state versions as evidence,
+ * and can never reach an active branch: no band, lane mode, or promotion authorizes it.
  */
 export type AdventureShadowCommit = { turn: PrivateAdventureTurn; outcome: "mechanics-committed" | "awaiting-confirmation" };
 
@@ -237,16 +244,22 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
   try {
     if (signal?.aborted || systemOneLaneMode(lane.settings, "adventure-selection") === "off") return null;
     if (candidates.length === 0) return null;
-    const questions = buildAdventureSelectionQuestions(turn.declaration, candidates);
-    // Keep the state structured (the vendor recommends it, and the harvest loop reads the same
-    // shape back); digests are derived from the value by the decision repo, so no canonicalization
-    // is needed here.
-    const state = { declaration: turn.declaration, candidates } as never;
+    const payloadVariant = systemOneAdventurePayload(lane.settings);
+    const sharedContext = payloadVariant === "shared-context";
+    const { state, questions } = sharedContext
+      ? buildAdventureSharedContextRequest(turn.declaration, candidates)
+      // Keep the state structured (the vendor recommends it, and the harvest loop reads the same
+      // shape back); digests are derived from the value by the decision repo, so no canonicalization
+      // is needed here.
+      : { state: { declaration: turn.declaration, candidates } as never,
+          questions: buildAdventureSelectionQuestions(turn.declaration, candidates) };
     const startedAt = performance.now();
     const result = await lane.caller({ settings: lane.settings, state, questions, ...(signal ? { signal } : {}) });
     if (signal?.aborted) return null;
     const composed = composeAdventureSelection(candidates, result.answers, lane.settings.confidencePolicy["adventure-selection"]);
     const decisionId = randomUUID();
+    const selection = composed.selection;
+    const picked = selection === null ? undefined : candidates.find((candidate) => candidate.candidateId === selection.candidateId);
     const record = (shadow: boolean): void => recordSystemOneDecision({
       decisionId,
       lane: "adventure-selection",
@@ -259,9 +272,15 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
       state,
       questions,
       answers: result.answers,
-      // The recorded confidence is calibrated for observability; the band is decided on raw signals.
       selection: { method: composed.method, selection: composed.selection,
-        topSignal: calibrateTopSignal(composed.topSignal, lane.settings.confidenceCalibration["adventure-selection"]) },
+        // The recorded confidence is calibrated for observability; the band is decided on raw signals.
+        topSignal: calibrateTopSignal(composed.topSignal, lane.settings.confidenceCalibration["adventure-selection"]),
+        // Evaluation-only payload provenance for readouts: the variant that produced this record
+        // and the exact versions it was built from, via the lane evaluation binding. It is not an
+        // execution binding, never promotion evidence, and never changes authority.
+        payloadEvidence: { variant: payloadVariant,
+          binding: systemOneEvaluationBinding("adventure-selection", lane.settings, result.model.responseModel,
+            picked?.kind ?? "unselected", sharedContext ? ADVENTURE_SHARED_CONTEXT_VERSIONS : {}) } },
       confidenceBand: composed.band,
       fallbackUsed: true,
       shadow,
@@ -269,14 +288,15 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
       latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
       createdAt: new Date().toISOString(),
     });
-    const selection = composed.selection;
-    const picked = selection === null ? undefined : candidates.find((candidate) => candidate.candidateId === selection.candidateId);
-    const promoted = picked !== undefined && isLanePromoted("adventure-selection",
+    // Authority gate: only the promoted, active legacy payload may reach a commit branch. The
+    // shared-context payload is evaluation-only, so it is excluded regardless of band, lane mode,
+    // or promotion; the promotion binding never describes it.
+    const activeLane = !sharedContext && systemOneLaneMode(lane.settings, "adventure-selection") === "active";
+    const promoted = activeLane && picked !== undefined && isLanePromoted("adventure-selection",
       systemOneEvaluationBinding("adventure-selection", lane.settings, result.model.responseModel, picked.kind));
     // The deterministic, confirmation-free SRD check family commits directly; only a promoted
     // lane, an act band, and exactly `exact_srd_check.select` may commit here.
-    if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
-      && promoted && composed.band === "act"
+    if (repository && activeLane && promoted && composed.band === "act"
       && selection !== null && picked?.kind === "exact_srd_check.select") {
       // Advisory-first ordering (see the function note): the lane-origin commit needs the decision
       // row to exist, and the row cannot be retracted or promoted afterwards, so it never claims
@@ -290,8 +310,7 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
     // waits for the ordinary confirmation API. The approved proposal commits on the normal resume
     // loop through executeApprovedAgentProposalAtomically; an unapproved lane proposal can never
     // commit.
-    if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
-      && promoted && composed.band === "act"
+    if (repository && activeLane && promoted && composed.band === "act"
       && selection !== null && picked?.kind === "exact_rest.select") {
       record(true);
       const proposed = repository.appendAdventureRestProposalFromLane(OWNER, {
@@ -314,8 +333,7 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
     // `combat_consumable_use`/`combat_power_use` arguments from the advertised candidate and
     // rejects an unadvertised, tampered, or undecidable candidate before any proposal is written,
     // so a failure here records advisory only and the provider path stays unchanged.
-    if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
-      && promoted && composed.band === "act"
+    if (repository && activeLane && promoted && composed.band === "act"
       && selection !== null
       && (picked?.kind === "exact_combat_consumable.select" || picked?.kind === "exact_combat_power.select")) {
       record(true);

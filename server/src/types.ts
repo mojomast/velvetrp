@@ -417,6 +417,16 @@ export interface SystemOneBudgetSettings {
   rateWindowMs: number;
 }
 
+/**
+ * Evaluation-only payload variants for the adventure-selection shadow battery. `legacy` is the
+ * production battery; `shared-context` moves declaration/candidate content into shared state and
+ * is recorded as evidence only. Selection can never grant authority: a shared-context decision
+ * never commits, regardless of lane mode, band, or promotion.
+ */
+export const SYSTEM_ONE_ADVENTURE_PAYLOAD_VARIANTS = ["legacy", "shared-context"] as const;
+
+export type SystemOneAdventurePayloadVariant = (typeof SYSTEM_ONE_ADVENTURE_PAYLOAD_VARIANTS)[number];
+
 /** The independent System One provider profile; never shares the OpenAI-compatible row. */
 export interface SystemOneSettings {
   id: "system-one";
@@ -424,6 +434,12 @@ export interface SystemOneSettings {
   enabled: boolean;
   /** Per-lane participation: `off`, `shadow` (record-only), or `active` (act when promoted). */
   laneModes: Record<SystemOneLane, SystemOneLaneMode>;
+  /**
+   * Evaluation-only: which payload the adventure-selection shadow lane composes and records.
+   * `legacy` is the production battery and the default; `shared-context` is experimental
+   * evidence and can never act. Never changes the provider planning request.
+   */
+  shadowAdventurePayload: SystemOneAdventurePayloadVariant;
   baseUrl: string;
   model: string;
   apiKey: string;
@@ -440,6 +456,7 @@ export interface PublicSystemOneSettings {
   providerType: "system-one";
   enabled: boolean;
   laneModes: Record<SystemOneLane, SystemOneLaneMode>;
+  shadowAdventurePayload: SystemOneAdventurePayloadVariant;
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
@@ -454,6 +471,7 @@ export interface PublicSystemOneSettings {
 export interface UpdateSystemOneInput {
   enabled?: boolean;
   laneModes?: Partial<Record<SystemOneLane, SystemOneLaneMode>>;
+  shadowAdventurePayload?: SystemOneAdventurePayloadVariant;
   baseUrl?: string;
   model?: string;
   apiKey?: string;
