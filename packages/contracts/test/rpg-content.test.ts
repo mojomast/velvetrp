@@ -202,8 +202,8 @@ describe("RPG rules and content contracts", () => {
     expect(installContentPackInputSchema.parse(supplied).classes).toEqual(supplied.classes);
   });
 
-  it("accepts exact per-kind and aggregate definition limits and rejects one beyond either limit", () => {
-    const makeDefinitions = (kind: "class" | "race" | "background" | "item", count: number) =>
+  it("accepts every kind at its per-kind limit and keeps the aggregate cap above the reachable maximum", () => {
+    const makeDefinitions = <K extends (typeof definitionKindSchema.options)[number]>(kind: K, count: number) =>
       Array.from({ length: count }, (_, index) => ({
         definitionId: `${kind}-${index}`,
         kind,
@@ -216,22 +216,27 @@ describe("RPG rules and content contracts", () => {
       classes: [...fullKind, { ...fullKind[0], definitionId: "class-over-limit" }],
     }).success).toBe(false);
 
-    const exactTotal = {
+    // Every kind at its per-kind limit is the largest pack the current kind set
+    // can produce, so the aggregate cap has to stay above that maximum. The
+    // 4096 cap is a forward-looking ceiling for future kinds or per-kind raises;
+    // no valid pack can reach its rejection path today.
+    const kindCount = definitionKindSchema.options.length;
+    expect(kindCount * MAX_DEFINITIONS_PER_KIND).toBeLessThanOrEqual(MAX_DEFINITIONS_PER_PACK);
+    const reachableMaximum = {
       ...pack,
-      classes: makeDefinitions("class", 256),
-      races: makeDefinitions("race", 256),
-      backgrounds: makeDefinitions("background", 256),
-      items: makeDefinitions("item", 256),
-      spells: [],
-      abilities: [],
-      enemies: [],
+      classes: makeDefinitions("class", MAX_DEFINITIONS_PER_KIND),
+      races: makeDefinitions("race", MAX_DEFINITIONS_PER_KIND),
+      backgrounds: makeDefinitions("background", MAX_DEFINITIONS_PER_KIND),
+      items: makeDefinitions("item", MAX_DEFINITIONS_PER_KIND),
+      spells: makeDefinitions("spell", MAX_DEFINITIONS_PER_KIND),
+      abilities: makeDefinitions("ability", MAX_DEFINITIONS_PER_KIND),
+      enemies: makeDefinitions("enemy", MAX_DEFINITIONS_PER_KIND),
     };
-    expect(exactTotal.classes.length + exactTotal.races.length + exactTotal.backgrounds.length + exactTotal.items.length)
-      .toBe(MAX_DEFINITIONS_PER_PACK);
-    expect(installContentPackInputSchema.safeParse(exactTotal).success).toBe(true);
-    expect(installContentPackInputSchema.safeParse({
-      ...exactTotal,
-      spells: [{ ...definitions.spells[0], definitionId: "aggregate-over-limit" }],
-    }).success).toBe(false);
+    const reachableTotal = reachableMaximum.classes.length + reachableMaximum.races.length
+      + reachableMaximum.backgrounds.length + reachableMaximum.items.length
+      + reachableMaximum.spells.length + reachableMaximum.abilities.length + reachableMaximum.enemies.length;
+    expect(reachableTotal).toBe(kindCount * MAX_DEFINITIONS_PER_KIND);
+    expect(reachableTotal).toBeLessThanOrEqual(MAX_DEFINITIONS_PER_PACK);
+    expect(installContentPackInputSchema.safeParse(reachableMaximum).success).toBe(true);
   });
 });
