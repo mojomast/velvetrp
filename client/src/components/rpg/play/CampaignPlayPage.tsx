@@ -331,7 +331,10 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
 
   // Narration retries are derivatives, not new mechanical evidence. Resolve the
   // original explicitly so opening the Director after an automatic retry does
-  // not silently drop the completed action from Continue scene.
+  // not silently drop the completed action from Continue scene. Projections the
+  // client already rendered are cached so the common retry resolves
+  // synchronously; the fetched walk below covers fresh page loads onto a retry.
+  const observedTurnsRef = useRef(new Map<string, { mode: AdventureTurnGetResponse["turn"]["mode"]; state: AdventureTurnGetResponse["turn"]["state"]; priorTurnId: string | null }>());
   const [derivedEvidence, setDerivedEvidence] = useState<{ source: string; root: string } | null>(null);
   useEffect(() => {
     let current = true;
@@ -353,9 +356,23 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     })().catch(() => { /* No guessed evidence on failed or unauthorized reads. */ });
     return () => { current = false; };
   }, [api, campaignId, sessionId, turn]);
-  const evidenceTurnId = turn?.turn.state === "completed" && turn.turn.campaignId === campaignId && turn.turn.sessionId === sessionId
-    ? turn.turn.mode === "original" ? turn.turn.turnId : derivedEvidence?.source === turn.turn.turnId ? derivedEvidence.root : undefined
-    : undefined;
+  if (turn && turn.turn.campaignId === campaignId && turn.turn.sessionId === sessionId) {
+    observedTurnsRef.current.set(turn.turn.turnId, { mode: turn.turn.mode, state: turn.turn.state, priorTurnId: turn.turn.priorTurnId });
+  }
+  const evidenceTurnId = (() => {
+    if (!turn || turn.turn.state !== "completed" || turn.turn.campaignId !== campaignId || turn.turn.sessionId !== sessionId) return undefined;
+    if (turn.turn.mode === "original") return turn.turn.turnId;
+    let prior = turn.turn.priorTurnId;
+    const visited = new Set<string>([turn.turn.turnId]);
+    while (prior && visited.size < 32 && !visited.has(prior)) {
+      visited.add(prior);
+      const known = observedTurnsRef.current.get(prior);
+      if (!known) break;
+      if (known.mode === "original") return known.state === "completed" ? prior : undefined;
+      prior = known.priorTurnId;
+    }
+    return derivedEvidence?.source === turn.turn.turnId ? derivedEvidence.root : undefined;
+  })();
 
   const receive = useCallback((event: AdventureTurnStreamEvent) => {
     if (!activeRef.current) return;
