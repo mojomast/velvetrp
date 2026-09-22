@@ -544,7 +544,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       current={turn} liveEvents={liveEvents} actorNames={actorNames} onPrefillChoice={prefill} canPrefill={referenceReady} />
     {actionable && pending && activeBinding && <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} binding={activeBinding} api={confirmationApi} restoreFocusRef={composerRef}
       onReconciled={(value, token) => { void applyReconciled({ ...value, ...(token ? { resumeToken: token } : {}) }, true); }} />}
-    {turn && <MechanicReceiptCard campaignId={campaignId} links={turn.receipts} api={api} />}
+    {turn && <MechanicReceiptCard campaignId={campaignId} links={turn.receipts} api={api} compact />}
     {actionable && turn && ["completed", "cancelled", "failed"].includes(turn.turn.state) && <div className="atlas-turn-tools" aria-label="Adventure narration alternatives">
       <button type="button" disabled={!referenceReady} onClick={() => void narrateVariant("narration-swipe")}>Swipe narration</button>
       <button type="button" disabled={!referenceReady} onClick={() => void narrateVariant("narration-retry")}>Retry narration</button></div>}
