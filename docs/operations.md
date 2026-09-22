@@ -74,6 +74,12 @@ Velvet does not auto-load `.env`. Export variables in the shell or configure the
 | `VELVET_VOICE_TIMEOUT_MS` | server-runtime | `300000` | Per-utterance synthesis deadline, bounded to 1000–600000 ms; never retries game commands. |
 | `VELVET_VOICE_ALLOWED_ORIGINS` | server-runtime | Unset | Optional comma-separated trusted browser origins for a Host-rewriting development proxy; no wildcard or added Studio CORS. |
 | `FEATURE_IMAGES` | server-runtime | Disabled | Image discovery flag; exact lowercase `true` only. |
+| `VELVET_IMAGES_ENABLED` | server-runtime | Disabled | Exact `true` opts into optional image generation; separate from discovery-only `FEATURE_IMAGES`. Enabled only when a valid `VELVET_IMAGES_BASE_URL` is also configured. |
+| `VELVET_IMAGES_BASE_URL` | server-runtime | Unset | Operator-configured image-generation HTTP(S) root; `http:` is accepted only for loopback, RFC1918 private, or Tailscale CGNAT/`*.ts.net` hosts. |
+| `VELVET_IMAGES_TOKEN` | server-runtime | Blank | Optional bearer credential sent only to the configured image-generation base URL. Keep empty in examples. |
+| `VELVET_IMAGES_MODEL` | server-runtime | Unset | Operator-declared image model identifier used for health reporting; server-side only. |
+| `VELVET_IMAGES_TIMEOUT_MS` | server-runtime | `120000` | Per-generation request deadline, bounded to 1000–600000 ms; a failed or ambiguous call is never retried automatically. |
+| `VELVET_IMAGES_MAX_BYTES` | server-runtime | `8388608` | Decoded byte budget per generated image, bounded to 1024–67108864 bytes. |
 | `FEATURE_RPG_CAMPAIGN` | server-runtime | Disabled | Base RPG campaign/API rollout flag. |
 | `FEATURE_RPG_MECHANICS` | server-runtime | Disabled | Mechanics routes require this and campaign. |
 | `FEATURE_RPG_COMBAT` | server-runtime | Disabled | Combat routes require combat, mechanics, and campaign. |
