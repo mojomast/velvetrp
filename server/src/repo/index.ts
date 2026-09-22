@@ -114,6 +114,8 @@ export { createSpellcastingRepository, SpellcastingUnavailableError, Spellcastin
 export { M16AuthorizationError, M16StaleError, M16ConflictError, EffectUnavailableError, EffectImmuneError, type ActorEffectSnapshot, type EffectRepository } from "./effectRepo.js";
 export { EncounterAuthorizationError, EncounterStaleError, EncounterConflictError, EncounterUnavailableError, EncounterTurnError, type EncounterRepository } from "./encounterRepo.js";
 export { TacticalMapAuthorizationError, TacticalMapUnavailableError, TacticalMapStaleError, TacticalMapConflictError, type TacticalMapRepository } from "./tacticalMapRepo.js";
+export { ensureCombatTacticalMap, inferCombatMapKind, combatMapSeed, type EnsureCombatTacticalMapDependencies,
+  type EnsureCombatTacticalMapContext, type EnsureCombatTacticalMapInput, type EnsureCombatTacticalMapResult } from "./combatTacticalMap.js";
 export { WorldAuthorizationError, WorldStaleError, WorldConflictError, WorldUnavailableError, type WorldRepository } from "./worldRepo.js";
 export { createEncounterPlanningService, type EncounterPlanningService, type EncounterPlanningDependencies,
   type EncounterCatalogDefinition, type EncounterCandidate, type EncounterPlanningDifficulty,

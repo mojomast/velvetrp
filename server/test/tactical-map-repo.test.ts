@@ -115,7 +115,9 @@ describe("tactical map repository", () => {
         const message = "campaign ruleset binding is unavailable";
         // Even a zero-cost request must not create a preview or commit.
         for (const destination of [{ x: 1, y: 1 }, { x: 2, y: 1 }]) {
-          const request = { actorId, destination, expectedMapRevision: 0, expectedTokenRevision: 0 };
+          // Encounter start now generates the initial combat map (revision 0), so
+          // the explicit generation above is revision 1.
+          const request = { actorId, destination, expectedMapRevision: 1, expectedTokenRevision: 0 };
           expect(() => repo.previewTacticalMapMove("reader", campaignId, sessionId, "combat", request)).toThrow(message);
           expect(() => repo.moveTacticalMapToken("reader", campaignId, sessionId, "combat", { ...request, previewId: "unintegrated-preview", idempotencyKey: "blocked-map-move" })).toThrow(message);
         }
@@ -186,21 +188,22 @@ describe("tactical map repository", () => {
     const actorCombatant = combat.combatants.find((value) => value.kind === "actor")!;
     repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, { mode: "combat", encounterId: prepared.encounter.encounterId, kind: "arena", seed: "combat-map", width: 12, height: 10,
       tokens: [{ tokenId: actorId, actorId, combatantId: actorCombatant.combatantId, label: "Aster", position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly", hidden: false }], idempotencyKey: "combat-map-generate" });
+    // The automatic start map occupies revision 0; the explicit map is revision 1.
     if (combat.currentCombatant !== actorCombatant.combatantId) {
       expect(() => repo.getTacticalMap("local-owner", campaignId, sessionId, "combat", actorId)).toThrow(TacticalMapConflictError);
       combat = repo.resolveCombatAction("local-owner", combat.combatId, { legalActionId: "end-turn", targetIds: [], choices: [], expectedRevision: combat.revision, idempotencyKey: "map-enemy-end" }).combat;
     }
     expect(combat.currentCombatant).toBe(actorCombatant.combatantId);
     const current = repo.getTacticalMap("local-owner", campaignId, sessionId, "combat", actorId)!; expect(current.movement?.budgetFeet).toBe(30);
-    const priorRound = repo.previewTacticalMapMove("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 2, y: 1 }, expectedMapRevision: 0, expectedTokenRevision: 0 });
+    const priorRound = repo.previewTacticalMapMove("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 2, y: 1 }, expectedMapRevision: 1, expectedTokenRevision: 0 });
     combat = repo.resolveCombatAction("local-owner", combat.combatId, { legalActionId: "end-turn", targetIds: [], choices: [], expectedRevision: combat.revision, idempotencyKey: "map-actor-end" }).combat;
     combat = repo.resolveCombatAction("local-owner", combat.combatId, { legalActionId: "end-turn", targetIds: [], choices: [], expectedRevision: combat.revision, idempotencyKey: "map-enemy-next-end" }).combat;
     expect(combat.currentCombatant).toBe(actorCombatant.combatantId);
-    expect(() => repo.moveTacticalMapToken("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 2, y: 1 }, previewId: priorRound.previewId, expectedMapRevision: 0, expectedTokenRevision: 0, idempotencyKey: "stale-round-map-move" })).toThrow(TacticalMapConflictError);
-    const preview = repo.previewTacticalMapMove("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 7, y: 1 }, expectedMapRevision: 0, expectedTokenRevision: 0 }); expect(preview.pathCostFeet).toBe(30);
-    repo.moveTacticalMapToken("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 7, y: 1 }, previewId: preview.previewId, expectedMapRevision: 0, expectedTokenRevision: 0, idempotencyKey: "combat-map-move" });
+    expect(() => repo.moveTacticalMapToken("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 2, y: 1 }, previewId: priorRound.previewId, expectedMapRevision: 1, expectedTokenRevision: 0, idempotencyKey: "stale-round-map-move" })).toThrow(TacticalMapConflictError);
+    const preview = repo.previewTacticalMapMove("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 7, y: 1 }, expectedMapRevision: 1, expectedTokenRevision: 0 }); expect(preview.pathCostFeet).toBe(30);
+    repo.moveTacticalMapToken("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 7, y: 1 }, previewId: preview.previewId, expectedMapRevision: 1, expectedTokenRevision: 0, idempotencyKey: "combat-map-move" });
     expect(repo.getTacticalMap("local-owner", campaignId, sessionId, "combat", actorId)?.movement?.budgetFeet).toBe(0);
-    expect(() => repo.previewTacticalMapMove("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 8, y: 1 }, expectedMapRevision: 0, expectedTokenRevision: 1 })).toThrow(TacticalMapConflictError);
+    expect(() => repo.previewTacticalMapMove("local-owner", campaignId, sessionId, "combat", { actorId, destination: { x: 8, y: 1 }, expectedMapRevision: 1, expectedTokenRevision: 1 })).toThrow(TacticalMapConflictError);
     repo.close();
   });
 });
@@ -215,7 +218,8 @@ async function dndMapFixture(withEnemy = false) {
   const generation = { mode: "combat" as const, encounterId: combat.combatId, kind: "arena" as const, seed: "movement", width: 12, height: 10, idempotencyKey: "generate",
     tokens: [{ tokenId: actorId, actorId, combatantId: combat.currentCombatant, label: "Aster", position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly" as const, hidden: false }] };
   repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, generation);
-  const request = { actorId, destination: { x: 2, y: 1 }, expectedMapRevision: 0, expectedTokenRevision: 0 };
+  // Encounter start owns revision 0; the explicit map above is revision 1.
+  const request = { actorId, destination: { x: 2, y: 1 }, expectedMapRevision: 1, expectedTokenRevision: 0 };
   const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
   const state = () => ["tactical_maps_v58", "tactical_map_tokens_v58", "tactical_map_previews_v58", "tactical_map_commands_v58", "tactical_map_exploration_v58", "tactical_map_combat_movement_v58", "combat_turn_economy_v60", "encounter", "combat_mutation_revisions_v27"].map(table => db.prepare(`SELECT * FROM ${table}`).all());
   return { ...base, combat, generation, request, db, state };
@@ -267,7 +271,7 @@ describe("D&D tactical movement economy", () => {
         expect(reopened.getTacticalMap("local-owner", campaignId, sessionId, "combat", actorId)?.movement?.budgetFeet).toBe(25);
         // Spending an action does not spend or prevent movement.
         db.prepare("UPDATE combat_turn_economy_v60 SET action_used=1 WHERE turn_id=?").run(combat.turnEconomy!.turnId);
-        const full = { ...request, expectedMapRevision: 1, destination: { x: 6, y: 1 } };
+        const full = { ...request, expectedMapRevision: 2, destination: { x: 6, y: 1 } };
         const exact = reopened.previewTacticalMapMove("local-owner", campaignId, sessionId, "combat", full);
         expect(exact.pathCostFeet).toBe(25);
         expect(reopened.moveTacticalMapToken("local-owner", campaignId, sessionId, "combat", { ...full, previewId: exact.previewId, idempotencyKey: "full" }).snapshot.movement?.budgetFeet).toBe(0);
@@ -333,9 +337,13 @@ describe("D&D tactical movement economy", () => {
         expect(state()).toEqual(before); db.exec(restore);
       }
       repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, { ...generation, mode: "exploration", encounterId: null, tokens: generation.tokens.map(token => ({ ...token, combatantId: null })) });
-      expect(repo.getTacticalMap("reader", campaignId, sessionId, "exploration", actorId)?.movement?.budgetFeet).toBe(0);
-      expect(() => repo.previewTacticalMapMove("reader", campaignId, sessionId, "exploration", request)).toThrow("exploration movement");
-      expect(() => repo.moveTacticalMapToken("reader", campaignId, sessionId, "exploration", { ...request, previewId: "bypass", idempotencyKey: "bypass" })).toThrow("exploration movement");
+      const exploration = repo.getTacticalMap("reader", campaignId, sessionId, "exploration", actorId);
+      expect(exploration?.movement?.budgetFeet).toBe(0);
+      // Encounter start owns the first combat revision, so read the exploration
+      // map's own revisions instead of reusing the combat fixture's numbers.
+      const explorationRequest = { ...request, expectedMapRevision: exploration!.mapRevision, expectedTokenRevision: exploration!.tokenRevision };
+      expect(() => repo.previewTacticalMapMove("reader", campaignId, sessionId, "exploration", explorationRequest)).toThrow("exploration movement");
+      expect(() => repo.moveTacticalMapToken("reader", campaignId, sessionId, "exploration", { ...explorationRequest, previewId: "bypass", idempotencyKey: "bypass" })).toThrow("exploration movement");
       // The DB guard also works when the active combat has corrupt/missing economy.
       db.prepare("UPDATE combat_turn_economy_v60 SET ended_at=started_at WHERE turn_id=?").run(combat.turnEconomy!.turnId);
       expect(() => db.exec("UPDATE tactical_map_tokens_v58 SET x=2 WHERE map_id IN(SELECT map_id FROM tactical_maps_v58 WHERE mode='exploration')")).toThrow("exploration movement");
@@ -367,7 +375,7 @@ describe("D&D tactical movement economy", () => {
       expect(target).toBeDefined();
       const origin = map.tiles.find(tile => !tile.blocksMovement && Math.abs(tile.position.x-target.position.x)+Math.abs(tile.position.y-target.position.y)===1)!;
       repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, { ...generation, ...options, idempotencyKey: "terrain-map", tokens: generation.tokens.map(token => ({ ...token, position: origin.position })) });
-      const input = { ...request, destination: target.position, expectedMapRevision: 1 };
+      const input = { ...request, destination: target.position, expectedMapRevision: 2 };
       const preview = repo.previewTacticalMapMove("reader", campaignId, sessionId, "combat", input);
       expect(preview.pathCostFeet).toBe(10);
       repo.moveTacticalMapToken("reader", campaignId, sessionId, "combat", { ...input, previewId: preview.previewId, idempotencyKey: "terrain" });

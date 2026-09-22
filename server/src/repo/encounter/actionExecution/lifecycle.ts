@@ -1,5 +1,6 @@
 import type DatabaseDriver from "better-sqlite3";
 import { resourceIdSchema, encounterCreateRequestSchema, encounterStartCommandRequestSchema, type EncounterCreateRequest, type EncounterStartCommandRequest } from "@velvet/contracts";
+import { ensureCombatTacticalMap } from "../../combatTacticalMap.js";
 import { EncounterAuthorizationError, EncounterConflictError, EncounterStaleError, EncounterUnavailableError } from "../encounterErrors.js";
 import type { EncounterCombatSnapshot, EncounterLifecycleSnapshot } from "../encounterReadRepo.js";
 import { beginDndCombatTurn } from "../combatActionPlan.js";
@@ -123,6 +124,11 @@ export function createStartLifecycleEncounter(db:DatabaseDriver.Database,deps:En
       db.prepare(`UPDATE encounter SET status='active',round_number=1,current_turn_combatant_id=?,
         state_revision=state_revision+1,updated_at=? WHERE encounter_id=?`).run(first.combatant_id,at,encounterId);
       beginDndCombatTurn(db,encounter.campaign_id,encounterId,first.combatant_id,1,id(deps),at);
+      // Every started encounter owns a tactical map. Generation shares this
+      // transaction, so the map and the activated encounter commit together and
+      // a replayed start returns the stored receipt without generating again.
+      ensureCombatTacticalMap(db, deps, { principalId: p, campaignId: encounter.campaign_id,
+        sessionId: encounter.session_id, encounterId });
       advanceRevision(db,encounterId,after,at);
       const combat=deps.reads.getCombatState(p,encounterId);
       if(!combat)throw new Error("started combat projection is unavailable");
