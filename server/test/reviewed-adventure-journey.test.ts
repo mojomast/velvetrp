@@ -391,7 +391,10 @@ describe("reviewed adventure HTTP journey", () => {
         expect(inspection.statusCode, inspection.body).toBe(200);
         expect(inspection.body).not.toContain(REVIEWED_ADVENTURE_PRIVATE_SENTINEL);
         expect(streamEvents(inspection.body).at(-1)).toMatchObject({ type: "terminal", payload: {
-          turn: { mode: "original", declaration: "I inspect the public Saltglass Trail rather than retry the check." }, receipts: [],
+          turn: { mode: "original", declaration: "I inspect the public Saltglass Trail rather than retry the check." },
+          // "I inspect ..." is a concrete attempt, so the universal-resolution fallback commits the
+          // mapped Investigation check instead of holding; it is not a retry of the Insight check.
+          receipts: [expect.objectContaining({ commandId: expect.stringMatching(/^check-command:/), proposalId: null })],
         } });
         expect(checkSelections).toBe(1);
         const alternate = await app.inject({ method: "POST", url: `${room}/beat-commands`, headers, payload: { intent: "continue", expectedModeRevision: mode === "ai" ? 1 : 0, idempotencyKey: `saltglass-${mode}` } });

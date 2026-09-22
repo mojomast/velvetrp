@@ -28,6 +28,7 @@ import { ADVENTURE_TOOL_LIMITATIONS, executeAdventureRead, parseAdventureToolArg
   selectAdventureTools, type AdventureToolName, type ProviderSafeQuestObjectiveCandidate, type SelectedAdventureTool } from "./toolRegistry.js";
 import { adventurePlanningMessages } from "./adventurePrompt.js";
 import { candidateLabels, labeled, type LabeledCandidate } from "./providerCandidateProjection.js";
+import { declarationCheckCandidateLabel, mapDeclarationToCheck } from "./declarationCheckMap.js";
 import { adventureTurnBudgets, type TurnBudgetPolicy } from "./turnBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "./directToolReasoning.js";
 import { detectAttackTarget } from "./attackIntent.js";
@@ -364,6 +365,74 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
   return null;
 }
 
+/**
+ * Deterministic server fallback for a provider hold on a concrete attempt.
+ *
+ * A provider response of `result: "complete"` with no tool calls is the provider's only deliberate
+ * hold: it found no advertised exact action to commit. When the declaration maps strongly to one
+ * advertised SRD skill, the server commits that skill's Medium-difficulty, normal-mode check
+ * itself, so the turn produces a receipt and grounded narration instead of the empty hold line.
+ *
+ * Authority and evidence:
+ * - Original turns only (`turn.mode === "original"`), and only with no committed receipts and no
+ *   tool proposals, so committed mechanics and pending confirmations are never overridden.
+ * - The caller additionally gates out any active encounter: check candidates are not generated in
+ *   combat and this helper is only called when the audience snapshot has no encounter.
+ * - Advisory-first ordering matches `recordAdventureShadowDecision`: a `shadow: true` decision row
+ *   is recorded first, and the lane-origin execution row linked by `system_one_decision_id` is the
+ *   authoritative evidence. The row's `provider`/`model`/`selection` fields mark it explicitly as
+ *   the deterministic server fallback, so it is distinguishable from a promoted lane decision.
+ * - This path is independent of the System One lane: it never reads lane mode or promotion state
+ *   and therefore does not weaken or bypass the lane's promotion gate, which still guards every
+ *   `recordAdventureShadowDecision` commit.
+ * - Idempotent: the decision id and candidate selection derive from the turn id and candidate id,
+ *   and the execution table is unique per turn, so a retry replays the same committed check.
+ *
+ * Returns true only when an execution row is committed (or replayed) for this turn.
+ */
+export function resolveHeldDeclarationAsCheck(repository: Repository, turn: PrivateAdventureTurn,
+  candidates: ReturnType<Repository["generateAdventureCheckCandidates"]>, now: Date): boolean {
+  try {
+    if (turn.mode !== "original" || turn.receiptLinks.length > 0 || turn.toolCalls.length > 0) return false;
+    const mapping = mapDeclarationToCheck(turn.declaration);
+    if (!mapping || mapping.confidence !== "strong") return false;
+    const candidate = candidates.find((entry) => entry.label === declarationCheckCandidateLabel(mapping));
+    if (!candidate) return false;
+    const selection = { candidateId: candidate.candidateId, digest: candidate.digest };
+    const decisionId = id("server-declaration-check", turn.turnId, candidate.candidateId);
+    const idempotencyKey = key("agent-declaration-check", turn.turnId, candidate.candidateId);
+    try {
+      recordSystemOneDecision({
+        decisionId,
+        lane: "adventure-selection",
+        campaignId: turn.campaignId,
+        sessionId: turn.sessionId,
+        turnId: turn.turnId,
+        provider: "server-fallback",
+        model: "declaration-check-map-v1",
+        confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+        state: { declaration: turn.declaration, mapping, idempotencyKey },
+        questions: { resolution: "deterministic declaration-to-check mapping" },
+        answers: mapping,
+        selection: { method: "server-fallback", ...selection, rationale: mapping.rationale, idempotencyKey },
+        confidenceBand: "act",
+        fallbackUsed: true,
+        shadow: true,
+        usage: null,
+        latencyMs: 0,
+        createdAt: now.toISOString(),
+      });
+    } catch {
+      // The insert-only row can only collide with a retry of this same deterministic decision; the
+      // execution replay below still has to confirm the original committed evidence.
+    }
+    repository.executeAdventureCheckCandidateFromLane(OWNER, { turnId: turn.turnId, decisionId, selection });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Upper bound on the recall rows projected into one shadow rerank battery. */
 export const RERANK_SHADOW_CANDIDATE_CAP = 8;
 
@@ -527,12 +596,21 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw signal.reason ?? new Error("adventure orchestration aborted");
 }
 
-function relevantCheckCandidates<T extends {label:string}>(candidates:readonly T[],declaration:string):T[]{
+export function relevantCheckCandidates<T extends {label:string}>(candidates:readonly T[],declaration:string):T[]{
   const words=[...new Set(declaration.toLowerCase().match(/[a-z]+/gu)??[])].filter((word)=>word.length>=4);
   const scored=candidates.map((candidate)=>({candidate,score:words.filter((word)=>candidate.label.toLowerCase().includes(word)).length}));
   const maximum=Math.max(0,...scored.map(({score})=>score));
-  return maximum>0?scored.filter(({score})=>score===maximum).map(({candidate})=>candidate)
+  const relevant=maximum>0?scored.filter(({score})=>score===maximum).map(({candidate})=>candidate)
     :candidates.filter((candidate)=>candidate.label.includes("Medium difficulty, normal"));
+  // A declaration that maps to a skill ranks that skill's Medium/normal candidate first, ahead of
+  // the existing word scoring and the Medium/normal fallback, and includes it when the existing
+  // selection omitted it so the deterministic hold fallback can find it by label. A null mapping
+  // leaves the existing selection exactly as it was.
+  const mapping=mapDeclarationToCheck(declaration);
+  if(!mapping)return relevant;
+  const preferred=candidates.find((candidate)=>candidate.label===declarationCheckCandidateLabel(mapping));
+  if(!preferred||relevant[0]===preferred)return relevant;
+  return [preferred,...relevant.filter((candidate)=>candidate!==preferred)];
 }
 
 export const effectiveAdventureTurnMaxTokens = (provider: ProviderSettings) => provider.samplers.maxTokens ?? 4_096;
@@ -1277,6 +1355,14 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
       idempotencyKey: key("agent-decision", turn.turnId, String(round)) });
 
     if (batch.result === "complete") {
+      // A "complete" result with no tool calls is the provider's only deliberate hold protocol, and
+      // this is the only seam where a fresh planning dispatch settles as a hold: every mutation and
+      // confirmation path returned earlier, and the no-receipt returns above are provider or
+      // authority failure lanes, not holds. A concrete attempt that maps strongly to an advertised
+      // SRD skill commits that Medium/normal check deterministically instead of settling empty.
+      if (!snapshot.encounter && resolveHeldDeclarationAsCheck(repository, turn, checkCandidates, dependencies.now())) {
+        return { turn: privateTurn(repository, turn.turnId), outcome: "mechanics-committed", limitations: ADVENTURE_TOOL_LIMITATIONS };
+      }
       safeEnemyFallback(repository, snapshot, turn.turnId);
       return { turn: privateTurn(repository, turn.turnId), outcome: "completed", limitations: ADVENTURE_TOOL_LIMITATIONS };
     }
