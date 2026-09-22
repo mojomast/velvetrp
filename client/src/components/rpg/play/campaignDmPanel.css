@@ -9,6 +9,15 @@
 .dm-chronicle article { border-left: 2px solid #b98746; padding-left: 1rem; margin: 1rem 0; }
 .dm-chronicle p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .dm-chronicle small { display: block; }
+/* Compact card for the Command Center right rail: smaller heading, clamped narration,
+   and the same expand/collapse control as the full chronicle. */
+.dm-chronicle.is-compact { padding: 8px 10px; border: 1px solid var(--border); border-bottom: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.dm-chronicle.is-compact h3 { margin: 0; color: var(--muted); font: 700 10px/1.3 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.dm-chronicle.is-compact article { margin: .5rem 0 0; padding-left: .6rem; }
+.dm-chronicle.is-compact article h4 { margin: 0; font-size: 12px; }
+.dm-chronicle-narration { margin: .25rem 0 0; }
+.dm-chronicle-narration.is-clamped { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.dm-chronicle-toggle { min-height: 24px; margin-top: 4px; padding: 2px 8px; font-size: 11px; }
 .dm-readiness { border: 1px solid #73664a; padding: 1rem; display: grid; gap: .75rem; }
 .dm-readiness-heading { display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap; }
 .dm-readiness-heading h4, .dm-readiness-section h5 { margin: 0; }

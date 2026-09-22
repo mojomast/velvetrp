@@ -1,7 +1,10 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import "./playSurface.css";
 
-export type AtlasTool = "character" | "inventory" | "advancement" | "travel" | "dice" | "context" | "combat" | "gm" | "security" | "create" | "director" | "images" | "help";
+export const ATLAS_TOOLS = ["character", "inventory", "advancement", "travel", "dice", "context", "combat", "gm", "security", "create", "director", "images", "help"] as const;
+export type AtlasTool = (typeof ATLAS_TOOLS)[number];
+/** Screen edge a tool drawer attaches to. */
+export type AtlasDrawerSide = "left" | "right";
 export const atlasToolLabels: Record<AtlasTool, string> = {
   character: "Character", inventory: "Inventory & equipment", advancement: "Advancement", travel: "Travel", dice: "Dice", context: "Field journal", combat: "Combat & rewards", gm: "GM tools", security: "Rules & safety", create: "Create character", director: "Director", images: "Scene images", help: "Help",
 };
@@ -69,10 +72,10 @@ export function PlaySurface({ headingRef, title, role, phase, actor, tools, acti
 }
 
 /** Non-modal: the map and composer remain keyboard reachable while a tool is open. */
-export function AtlasDrawer({ tool, open, onClose, children }: { tool: AtlasTool; open: boolean; onClose: () => void; children: ReactNode }) {
+export function AtlasDrawer({ tool, open, onClose, side = "right", children }: { tool: AtlasTool; open: boolean; onClose: () => void; side?: AtlasDrawerSide; children: ReactNode }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (open) headingRef.current?.focus({ preventScroll: true }); }, [open]);
-  return <div id={`atlas-${tool}`} className="atlas-drawer-slot" hidden={!open}>
+  return <div id={`atlas-${tool}`} className="atlas-drawer-slot" data-side={side} hidden={!open}>
     <aside className="atlas-drawer" role="dialog" aria-modal="false" aria-labelledby={`atlas-${tool}-heading`} tabIndex={-1}>
       <header className="atlas-drawer-heading"><div><span className="atlas-kicker">AT THE TABLE</span><h2 ref={headingRef} tabIndex={-1} id={`atlas-${tool}-heading`}>{atlasToolLabels[tool]}</h2></div>
         <button type="button" onClick={onClose} aria-label={`Close ${atlasToolLabels[tool]}`}>Close</button></header>

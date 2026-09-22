@@ -134,6 +134,31 @@ describe("SceneIllustration", () => {
     expect(caption.getAttribute("title")).toContain("iron hinges");
   });
 
+  it("expands and collapses the clamped location description at the same size", async () => {
+    const client = sceneApi({ getGallery: vi.fn().mockResolvedValue({ images: [readyImage()] }) });
+    const description = "A cold gate above the harbor, its iron hinges furred with salt, and beyond it the drowned road climbs"
+      + " toward the lampless quarter where the fog never lifts and the bell buoys answer only the tide.";
+    render(<SceneIllustration campaignId="campaign" sessionId="room" sceneKey="location:gate" sceneLabel="Old North Gate"
+      sceneDescription={description} audience="player" enabled api={client} />);
+    const caption = await screen.findByText(description);
+    expect(caption.className).toContain("scene-illustration-caption");
+    expect(caption.className).not.toContain("is-expanded");
+    expect(caption.getAttribute("title")).toBe(description);
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(caption.className).toContain("is-expanded");
+    expect(screen.getByRole("button", { name: "Less" })).toBeTruthy();
+    // Expanding keeps the caption paragraph and its full text, only the clamp changes.
+    expect(caption.textContent).toBe(description);
+    fireEvent.click(screen.getByRole("button", { name: "Less" }));
+    expect(caption.className).not.toContain("is-expanded");
+  });
+
+  it("renders no description control when the scene has no description", async () => {
+    render(<SceneIllustration campaignId="campaign" sessionId="room" sceneKey="location:gate" sceneLabel="Old North Gate" audience="player" enabled api={sceneApi()} />);
+    await screen.findByText(/No illustration has been selected for this scene yet/);
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+  });
+
   it("keeps player alt text free of prompt facts and falls back to text when the gallery fails", async () => {
     const client = sceneApi({ getGallery: vi.fn().mockResolvedValue({ images: [readyImage()] }) });
     const { unmount } = render(<SceneIllustration campaignId="campaign" sessionId="room" sceneKey="location:gate" sceneLabel="Old North Gate" audience="player" enabled api={client} />);

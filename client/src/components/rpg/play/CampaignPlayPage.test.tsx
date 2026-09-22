@@ -122,6 +122,53 @@ describe("CampaignPlayPage", () => {
     HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.open = false; });
   });
   afterEach(() => { cleanup(); localStorage.clear(); resetNarrativeMutationRegistryForTests(); });
+  it("renders a scrim behind the open drawer and closes the drawer when it is clicked", async () => {
+    const client = api();
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Adventure room" });
+    expect(document.querySelector(".campaign-drawers-scrim")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Director" }));
+    await screen.findByRole("dialog", { name: "Director" });
+    const scrim = document.querySelector(".campaign-drawers-scrim");
+    expect(scrim).toBeTruthy();
+    fireEvent.click(scrim as HTMLElement);
+    await waitFor(() => expect(document.querySelector(".campaign-drawers-scrim")).toBeNull());
+    expect(screen.queryByRole("dialog", { name: "Director" })).toBeNull();
+    // Escape keeps working after the scrim closes the first drawer.
+    fireEvent.click(screen.getByRole("button", { name: "Dice" }));
+    await screen.findByRole("dialog", { name: "Dice" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(document.querySelector(".campaign-drawers-scrim")).toBeNull());
+  });
+  it("opens each drawer from its configured side and edits sides in the Display dialog", async () => {
+    localStorage.setItem("velvet.campaign-workbench.v1", JSON.stringify({ drawerSides: { director: "left", character: "left" } }));
+    const client = api();
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Adventure room" });
+    expect(document.querySelector("#atlas-director")?.getAttribute("data-side")).toBe("left");
+    expect(document.querySelector("#atlas-character")?.getAttribute("data-side")).toBe("left");
+    expect(document.querySelector("#atlas-dice")?.getAttribute("data-side")).toBe("right");
+    fireEvent.click(screen.getByRole("button", { name: "Display" }));
+    const directorSide = screen.getByLabelText("Director drawer side") as HTMLSelectElement;
+    expect(directorSide.value).toBe("left");
+    fireEvent.change(directorSide, { target: { value: "right" } });
+    expect(document.querySelector("#atlas-director")?.getAttribute("data-side")).toBe("right");
+    expect(JSON.parse(localStorage.getItem("velvet.campaign-workbench.v1") ?? "null")).toMatchObject({ drawerSides: { director: "right" } });
+  });
+  it("places the compact DM chronicle in the right rail with its own expand control", async () => {
+    const client = api();
+    const run = { runId: "opening", campaignId: "campaign", sessionId: "session", intent: "open" as const, mode: "human" as const, modeRevision: 0, revision: 1,
+      state: "completed" as const, narration: "Lanterns stir above the quay and the fog answers.", receipts: [], blockers: [], createdAt: "2030-01-01T00:00:00.000Z" };
+    vi.mocked(client.dm.getCampaignDmHistory).mockResolvedValue({ control: { campaignId: "campaign", mode: "human", revision: 0 }, runs: [run] });
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const chronicle = await screen.findByRole("region", { name: "DM chronicle" });
+    const rail = document.querySelector("#campaign-quick-tools");
+    expect(rail?.contains(chronicle)).toBe(true);
+    expect(chronicle.className).toContain("is-compact");
+    expect(within(chronicle).getByRole("heading", { name: "Opening scene" })).toBeTruthy();
+    fireEvent.click(within(chronicle).getByRole("button", { name: "More" }));
+    expect(within(chronicle).getByRole("button", { name: "Less" })).toBeTruthy();
+  });
   it("keeps travel review in-room and locks the composer even when its drawer is closed", async () => {
     const client = api(), navigate = vi.fn();
     const at = "2030-01-01T00:00:00.000Z";

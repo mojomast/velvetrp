@@ -22,4 +22,21 @@ describe("campaign workbench preferences", () => {
     localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ autoNarrateMechanics: "no" }));
     expect(readCampaignWorkbenchPreferences()).toMatchObject({ autoNarrateMechanics: true });
   });
+
+  it("defaults every tool drawer to the right edge and migrates stored sides", () => {
+    const defaults = readCampaignWorkbenchPreferences();
+    expect(new Set(Object.values(defaults.drawerSides))).toEqual(new Set(["right"]));
+    expect(defaults.drawerSides.director).toBe("right");
+    expect(defaults.drawerSides.help).toBe("right");
+    // Missing and unknown values fall back to right; tools the build does not know are ignored.
+    localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ drawerSides: { director: "left", character: "sideways", "not-a-tool": "left" } }));
+    const migrated = readCampaignWorkbenchPreferences();
+    expect(migrated.drawerSides.director).toBe("left");
+    expect(migrated.drawerSides.character).toBe("right");
+    expect(migrated.drawerSides.dice).toBe("right");
+    expect("not-a-tool" in migrated.drawerSides).toBe(false);
+    // A payload with no drawerSides key at all still produces a complete record.
+    localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ theme: "dark" }));
+    expect(new Set(Object.values(readCampaignWorkbenchPreferences().drawerSides))).toEqual(new Set(["right"]));
+  });
 });

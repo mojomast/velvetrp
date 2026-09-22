@@ -72,8 +72,11 @@ export function SceneIllustration({ campaignId, sessionId, sceneKey, sceneLabel,
   const [preferences, updatePreferences] = useSceneImagePreferences();
   const [gallery, setGallery] = useState<GalleryLoad>({ state: "loading" });
   const [display, setDisplay] = useState<"loading" | "ready" | "error">("loading");
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [refreshRequest, setRefreshRequest] = useState(0);
   const fetching = enabled && !preferences.hideImages && !preferences.reducedBandwidth;
+
+  useEffect(() => { setDescriptionExpanded(false); }, [sceneDescription, sceneKey]);
 
   useEffect(() => {
     if (!fetching) return;
@@ -117,7 +120,10 @@ export function SceneIllustration({ campaignId, sessionId, sceneKey, sceneLabel,
                   onLoad={() => setDisplay("ready")} onError={() => setDisplay("error")} />
                 {display === "loading" && <figcaption role="status">Loading illustration…</figcaption>}
               </figure>}
-    {sceneDescription ? <p className="scene-illustration-caption" title={sceneDescription}>{sceneDescription}</p> : null}
+    {sceneDescription ? <div className="scene-illustration-description">
+      <p className={`scene-illustration-caption${descriptionExpanded ? " is-expanded" : ""}`} title={sceneDescription}>{sceneDescription}</p>
+      <button type="button" className="ghost scene-illustration-caption-toggle" aria-expanded={descriptionExpanded} onClick={() => setDescriptionExpanded((value) => !value)}>{descriptionExpanded ? "Less" : "More"}</button>
+    </div> : null}
   </section>;
 }
 

@@ -253,10 +253,21 @@ export function CampaignDmPanel({ bootstrap, api, blocked, canAct, evidenceTurnI
   </section>;
 }
 
-export function CampaignDmChronicle({ history }: { history: CampaignDmHistory | null }) {
-  return <section className="dm-chronicle" aria-label="DM chronicle"><h3>From the DM</h3>
+function ChronicleEntry({ run, compact }: { run: CampaignDmRun; compact: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  return <article>
+    <h4>{run.intent === "open" ? "Opening scene" : "Scene continuation"}</h4>
+    <p className={`dm-chronicle-narration${compact && !expanded ? " is-clamped" : ""}`}>{run.narration}</p>
+    {compact && <button type="button" className="ghost dm-chronicle-toggle" aria-expanded={expanded}
+      onClick={() => setExpanded((value) => !value)}>{expanded ? "Less" : "More"}</button>}
+    {run.receipts.map((receipt, index) => <small key={index}>Committed: {receipt.summary}</small>)}
+  </article>;
+}
+
+export function CampaignDmChronicle({ history, compact = false }: { history: CampaignDmHistory | null; compact?: boolean }) {
+  return <section className={`dm-chronicle${compact ? " is-compact" : ""}`} aria-label="DM chronicle"><h3>From the DM</h3>
     {!history && <p>Loading director history...</p>}
     {history && !history.runs.some(run => run.narration) && <p>No narrated scene yet. Open Director to request the opening.</p>}
-    {history?.runs.filter(run => run.narration).slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(run => <article key={run.runId}><h4>{run.intent === "open" ? "Opening scene" : "Scene continuation"}</h4><p>{run.narration}</p>{run.receipts.map((receipt, index) => <small key={index}>Committed: {receipt.summary}</small>)}</article>)}
+    {history?.runs.filter(run => run.narration).slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(run => <ChronicleEntry key={run.runId} run={run} compact={compact} />)}
   </section>;
 }

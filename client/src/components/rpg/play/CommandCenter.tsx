@@ -1,9 +1,10 @@
 import { useEffect, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
-import { atlasToolLabels, type AtlasTool } from "./PlaySurface";
+import { ATLAS_TOOLS, atlasToolLabels, type AtlasDrawerSide, type AtlasTool } from "./PlaySurface";
 import "./commandCenter.css";
 import {
   CAMPAIGN_CONTEXT_WIDGETS,
   DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES,
+  defaultCampaignDrawerSides,
   type CampaignContextWidget,
   type CampaignWorkbenchPreferences,
 } from "./campaignWorkbenchPreferences";
@@ -65,14 +66,24 @@ function WorkbenchPreferencesDialog({ dialogRef, preferences, onChange }: { dial
     const widgets = [...preferences.widgets]; [widgets[index], widgets[target]] = [widgets[target]!, widgets[index]!];
     onChange({ ...preferences, widgets });
   };
+  const setDrawerSide = (tool: AtlasTool, side: AtlasDrawerSide) => {
+    const drawerSides = preferences.drawerSides ?? defaultCampaignDrawerSides();
+    onChange({ ...preferences, drawerSides: { ...drawerSides, [tool]: side } });
+  };
   return <dialog ref={dialogRef} className="workbench-dialog" aria-labelledby="workbench-preferences-heading"><form method="dialog">
     <header><div><p className="eyebrow">LOCAL DISPLAY</p><h2 id="workbench-preferences-heading">Campaign workbench</h2></div><button className="ghost" value="close">Close</button></header>
     <div className="workbench-preference-grid"><label>Theme<select value={preferences.theme} onChange={(event) => onChange({ ...preferences, theme: event.target.value as CampaignWorkbenchPreferences["theme"] })}><option value="system">System</option><option value="light">Light</option><option value="dark">Velvet dark</option><option value="contrast">High contrast</option></select></label>
       <label>Layout density<select value={preferences.density} onChange={(event) => onChange({ ...preferences, density: event.target.value as CampaignWorkbenchPreferences["density"] })}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label></div>
     <fieldset><legend>Panels</legend><label><input type="checkbox" checked={preferences.contextVisible} onChange={(event) => onChange({ ...preferences, contextVisible: event.target.checked })} /> Campaign context and map</label><label><input type="checkbox" checked={preferences.quickToolsVisible} onChange={(event) => onChange({ ...preferences, quickToolsVisible: event.target.checked })} /> Tools and character summary</label></fieldset>
+    <fieldset><legend>Drawer sides</legend><p className="builder-help">Each tool drawer opens from its own screen edge.</p>
+      <div className="drawer-side-grid">{ATLAS_TOOLS.map((tool) => <label key={tool}><span>{atlasToolLabels[tool]}</span>
+        <select aria-label={`${atlasToolLabels[tool]} drawer side`} value={preferences.drawerSides?.[tool] ?? "right"} onChange={(event) => setDrawerSide(tool, event.target.value as AtlasDrawerSide)}>
+          <option value="right">Right</option><option value="left">Left</option>
+        </select></label>)}</div>
+    </fieldset>
     <fieldset><legend>Narration</legend><label><input type="checkbox" checked={preferences.autoNarrateMechanics} onChange={(event) => onChange({ ...preferences, autoNarrateMechanics: event.target.checked })} /> Auto-narrate committed mechanics (uses the configured provider)</label></fieldset>
     <fieldset><legend>Context widgets and order</legend>{CAMPAIGN_CONTEXT_WIDGETS.map((widget) => { const index = preferences.widgets.indexOf(widget); const enabled = index >= 0; return <div className="widget-preference" key={widget}><label><input type="checkbox" checked={enabled} onChange={(event) => onChange({ ...preferences, widgets: event.target.checked ? [...preferences.widgets, widget] : preferences.widgets.filter((item) => item !== widget) })} /> {widgetLabels[widget]}</label><div className="button-row"><button type="button" className="ghost" aria-label={`Move ${widgetLabels[widget]} earlier`} disabled={!enabled || index === 0} onClick={() => moveWidget(widget, -1)}>Up</button><button type="button" className="ghost" aria-label={`Move ${widgetLabels[widget]} later`} disabled={!enabled || index === preferences.widgets.length - 1} onClick={() => moveWidget(widget, 1)}>Down</button></div></div>; })}</fieldset>
-    <button type="button" className="ghost" onClick={() => onChange({ ...DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES, widgets: [...CAMPAIGN_CONTEXT_WIDGETS] })}>Reset workbench</button>
+    <button type="button" className="ghost" onClick={() => onChange({ ...DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES, widgets: [...CAMPAIGN_CONTEXT_WIDGETS], drawerSides: defaultCampaignDrawerSides() })}>Reset workbench</button>
   </form></dialog>;
 }
 
