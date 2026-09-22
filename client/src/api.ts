@@ -3250,6 +3250,7 @@ export interface SceneImageJob {
 
 /** One gallery row. `sceneKey` is an additive projection; the frozen contract omits it. */
 export interface SceneImageGalleryItem {
+  selections?: { sceneKey: string; revision: number }[];
   assetId: string;
   jobId: string;
   prompt: string;
@@ -3301,6 +3302,7 @@ export interface SceneImageGenerateResponse {
 }
 
 export interface SceneImageGalleryResponse {
+  jobs?: SceneImageJob[];
   images: SceneImageGalleryItem[];
 }
 

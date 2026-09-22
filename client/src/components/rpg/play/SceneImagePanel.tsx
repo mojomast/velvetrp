@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { SceneImageApi, SceneImageGalleryItem, SceneImageSettings } from "../../../api";
+import { useEffect, useMemo, useState, useRef } from "react";
+import type { SceneImageApi, SceneImageGalleryItem, SceneImageSettings, SceneImageJob } from "../../../api";
 import { ApiError } from "../../../api";
 import { createClientId } from "../../../utils/clientId";
 import {
@@ -81,12 +81,15 @@ export function SceneIllustration({ campaignId, sessionId, sceneKey, sceneLabel,
   useEffect(() => {
     if (!fetching) return;
     let current = true;
-    setGallery({ state: "loading" });
-    void api.getGallery(campaignId, sessionId).then((value) => {
+    let inFlight = false;
+    const refresh = () => { if (inFlight || !current) return; inFlight = true; void api.getGallery(campaignId, sessionId).then((value) => {
       if (current) setGallery({ state: "ready", images: value.images });
-    }).catch(() => { if (current) setGallery({ state: "error" }); });
-    return () => { current = false; };
-  }, [api, campaignId, fetching, refreshRequest, sessionId]);
+    }).catch(() => { if (current) setGallery({ state: "error" }); }).finally(() => { inFlight = false; }); };
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
+    window.addEventListener("scene-image-selected", refresh);
+    return () => { current = false; window.clearInterval(timer); window.removeEventListener("scene-image-selected", refresh); };
+  }, [api, campaignId, fetching, refreshRequest, sessionId, sceneKey]);
 
   const records = useMemo(() => readSceneImageScenes(campaignId, sessionId), [campaignId, sessionId, gallery]);
   const image = gallery.state === "ready" ? findActiveSceneImage(gallery.images, sceneKey, records) : null;
@@ -154,10 +157,18 @@ export function SceneImageDmPanel({ campaignId, sessionId, sceneKey, sceneLabel,
   const [comparisonGuidance, setComparisonGuidance] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [images, setImages] = useState<SceneImageGalleryItem[]>([]);
+  const [jobs, setJobs] = useState<SceneImageJob[]>([]);
   const [galleryState, setGalleryState] = useState<"loading" | "ready" | "error">("loading");
   const [galleryRefresh, setGalleryRefresh] = useState(0);
   const [selectionRevision, setSelectionRevision] = useState(0);
   const [expanded, setExpanded] = useState<SceneImageGalleryItem | null>(null);
+  const fullViewRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!expanded) return;
+    const previous = document.activeElement as HTMLElement | null;
+    fullViewRef.current?.querySelector("button")?.focus();
+    return () => { if (previous?.isConnected) previous.focus(); };
+  }, [expanded]);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [loadedThumbs, setLoadedThumbs] = useState<string[]>([]);
   const audience = canManage ? "gm" as const : "player" as const;
@@ -180,13 +191,17 @@ export function SceneImageDmPanel({ campaignId, sessionId, sceneKey, sceneLabel,
 
   useEffect(() => {
     let current = true;
-    setGalleryState("loading");
-    void api.getGallery(campaignId, sessionId).then((value) => {
+    let inFlight = false;
+    const refresh = () => { if (inFlight || !current) return; inFlight = true; void api.getGallery(campaignId, sessionId).then((value) => {
       if (!current) return;
       setImages(value.images); setGalleryState("ready");
-    }).catch(() => { if (current) setGalleryState("error"); });
-    return () => { current = false; };
-  }, [api, campaignId, galleryRefresh, sessionId]);
+      setJobs(value.jobs ?? []);
+      setSelectionRevision(value.images.flatMap((image) => image.selections ?? []).find((selection) => selection.sceneKey === sceneKey)?.revision ?? 0);
+    }).catch(() => { if (current) setGalleryState("error"); }).finally(() => { inFlight = false; }); };
+    refresh();
+    const timer = window.setInterval(refresh, 3000);
+    return () => { current = false; window.clearInterval(timer); };
+  }, [api, campaignId, galleryRefresh, sessionId, sceneKey]);
 
   const records = useMemo(() => readSceneImageScenes(campaignId, sessionId), [campaignId, sessionId, galleryRefresh]);
   const groups = useMemo(() => groupSceneImages(images, records, sceneKey, sceneLabel), [images, records, sceneKey, sceneLabel]);
@@ -291,9 +306,11 @@ export function SceneImageDmPanel({ campaignId, sessionId, sceneKey, sceneLabel,
       const nextRevision = receiptRevisionAfter(result.receipt);
       if (nextRevision !== null) setSelectionRevision(nextRevision);
       setNotice({ kind: "status", text: `Selected this illustration for ${sceneLabel}.` });
+      window.dispatchEvent(new Event("scene-image-selected"));
       setGalleryRefresh((value) => value + 1);
     } catch (error) {
       setNotice({ kind: "alert", text: errorMessage(error, "The selection was not confirmed.") });
+      setGalleryRefresh((value) => value + 1);
     } finally { setDispatching(false); }
   }
 
@@ -341,8 +358,8 @@ export function SceneImageDmPanel({ campaignId, sessionId, sceneKey, sceneLabel,
     <fieldset className="scene-image-group" disabled={dispatching}>
       <legend>Prompt and style</legend>
       <label className="field"><span>Style preset text</span><input type="text" maxLength={200} value={settings.stylePhrase} onChange={(event) => updateSettings({ stylePhrase: event.target.value })} placeholder="consistent campaign art style" /></label>
-      <label className="field"><span>Generated prompt (editable)</span><textarea rows={4} maxLength={500} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Leave empty to let the server build the prompt from spoiler-filtered scene facts." /></label>
-      <p className="builder-help">The prompt is saved as this scene's override when you save settings; an empty field clears the override.</p>
+      <label className="field"><span>Prompt override (optional)</span><textarea rows={4} maxLength={500} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Leave empty to let the server build the prompt from spoiler-filtered scene facts." /></label>
+      <p className="builder-help">The prompt is saved as this scene's override when you save settings; an empty field clears the override. This is not a preview of the automatic prompt. Generation runs in the background and candidates require selection before players see them.</p>
     </fieldset>
 
     <fieldset className="scene-image-group" disabled={dispatching}>
@@ -390,6 +407,7 @@ export function SceneImageDmPanel({ campaignId, sessionId, sceneKey, sceneLabel,
     </div>
 
     <section className="scene-image-gallery" aria-label="Scene image gallery">
+      {jobs.length > 0 && <details><summary>Generation activity ({jobs.length})</summary><ul aria-label="Generation jobs">{jobs.map((job) => <li key={job.jobId}>{job.sceneKey ?? "Scene"}: {sceneImageStatusLabel(job.status)}{job.status === "uncertain" ? " — submission unconfirmed; do not blindly retry" : ""}</li>)}</ul></details>}
       <div className="admin-section-heading"><div><h3>Generated images</h3><p>Grouped by scene; the active scene is marked. Compare any two images side by side.</p></div></div>
       <div className="scene-image-gallery-tools">
         <button type="button" className="ghost" disabled={galleryState === "loading"} onClick={() => setGalleryRefresh((value) => value + 1)}>Refresh gallery</button>
@@ -414,7 +432,7 @@ export function SceneImageDmPanel({ campaignId, sessionId, sceneKey, sceneLabel,
               <p>{formatSceneImageCreatedAt(item.createdAt)}</p>
             </div>
             <div className="button-row">
-              <button type="button" disabled={dispatching || item.selected} onClick={() => void selectAsset(item)}>Use for active scene</button>
+              <button type="button" disabled={dispatching || (item.selections ? item.selections.some((selection) => selection.sceneKey === sceneKey) : item.selected && item.sceneKey === sceneKey) || item.status !== "ready"} onClick={() => void selectAsset(item)}>Use for active scene</button>
               <button type="button" disabled={dispatching} onClick={() => void regenerate(item)}>Regenerate</button>
               <button type="button" onClick={() => reuseSettings(item)}>Reuse settings</button>
               <button type="button" aria-pressed={compareIds.includes(item.assetId)} onClick={() => toggleCompare(item)}>Compare</button>
@@ -429,7 +447,7 @@ export function SceneImageDmPanel({ campaignId, sessionId, sceneKey, sceneLabel,
         </figure>)}</div>
         <button type="button" className="ghost" onClick={() => setCompareIds([])}>Clear comparison</button>
       </section>}
-      {expanded && <section className="scene-image-full" role="dialog" aria-label="Full illustration">
+      {expanded && <section ref={fullViewRef} className="scene-image-full" role="dialog" aria-label="Full illustration" onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setExpanded(null); } }}>
         <header><h4>Full image</h4><button type="button" onClick={() => setExpanded(null)}>Close full view</button></header>
         <img src={api.assetUrl(campaignId, expanded.assetId)} alt={sceneImageAltText(sceneLabel, expanded, audience)} />
         <p>seed {expanded.seed} · steps {expanded.steps} · guidance {expanded.guidance}{formatSceneImageSeconds(expanded.seconds) ? ` · ${formatSceneImageSeconds(expanded.seconds)}` : ""} · {sceneImageStatusLabel(expanded.status)}</p>

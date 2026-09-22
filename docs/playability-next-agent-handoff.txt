@@ -1,0 +1,16 @@
+Playability and chat UX handoff
+
+Branch: fix/playability-chat-ux. Base: 4c31274.
+
+Changes: conservative attack/check detection; colocated party participation in NPC encounters with retry-stable membership; separate scene image generation candidates from publication; authoritative scene bindings and selection revisions; image status refreshing; distinct conversation text styles and stable character-name colors; jump-to-latest; preserve action evidence across automatic narration retries.
+
+Fresh verification in this continuation:
+Server: 348 files passed; 3873 tests passed, 1 skipped.
+Client: 86 files passed; 961 tests passed.
+Server and client typechecks passed. git diff --check passed.
+Playwright playability config: both reviewed harbor human and AI adventure tests passed (20.3 seconds).
+Contracts: 72 files passed, 1 failed; 464 tests passed, 1 failed. Existing test/rpg-content.test.ts:230 expects four groups of 256 to equal the now-4096 aggregate cap. Per-kind cap remains 256 and only seven kinds exist, so the aggregate boundary cannot currently be reached by a valid pack. Resolve intended content capacity policy separately; do not simply weaken the assertion to hide this discrepancy.
+
+Remaining: manual visual/accessibility assessment of chat colors, keyboard/focus behavior, mobile layout, and a live two-client DM/player generate-review-publish workflow. Automated adventure tests are not a substitute for that assessment. Contextual checks remain a conservative first pass, not comprehensive difficulty/tools adjudication. Full CI and deployment remain separate gates. No paid API calls or service restarts in this continuation.
+
+Existing docs/playability-audit.txt is the original audit and is left outside this implementation commit. No production deployment performed.

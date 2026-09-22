@@ -210,6 +210,13 @@ export function mapDeclarationToCheck(declaration: string): DeclarationCheckMapp
   if (!text) return null;
   const lowered = text.toLocaleLowerCase("en-US");
   if (isQuestion(lowered) || isGreeting(lowered) || isMetaTalk(lowered)) return null;
+  // Classification is not adjudication. Ambiguous, negated or routine prose must
+  // remain with the director rather than silently spending a mechanical turn.
+  if (/\b(?:not|never|if|unless|would|could|might|ask|says|said)\b|\b(?:don['’]t|won['’]t|can['’]t)\b/u.test(lowered)) return null;
+  if (/\b(?:hello|greet|greetings|say hi)\b/u.test(lowered)) return null;
+  if (/\bclimb\b.*\b(?:ladder|stairs)\b/u.test(lowered) && !/\b(?:broken|icy|slippery|combat|danger)\b/u.test(lowered)) return null;
+  // Lock picking needs a tool-aware ruling, not a fabricated Sleight of Hand roll.
+  if (/\bpick(?:ing)?\b.*\block\b/u.test(lowered)) return null;
   const tokens = lowered.match(/[a-z0-9]+/gu) ?? [];
   if (tokens.length === 0) return null;
   const strongHits: Array<{ ability: string; skill: string; trigger: string }> = [];
@@ -224,8 +231,9 @@ export function mapDeclarationToCheck(declaration: string): DeclarationCheckMapp
   if (strongSkills.length > 1) return null;
   if (strongSkills.length === 1) {
     const hit = strongHits.find((candidate) => candidate.skill === strongSkills[0]!)!;
-    return { ability: hit.ability, skill: hit.skill, confidence: "strong",
-      rationale: `Strong ${hit.skill} trigger "${hit.trigger}" for ${hit.ability}.` };
+    const contextual = /\b(?:icy|sheer|slippery|impossible|underwater|raging|blindfolded|broken|disadvantage|advantage)\b/u.test(lowered);
+    return { ability: hit.ability, skill: hit.skill, confidence: contextual ? "weak" : "strong",
+      rationale: contextual ? `Situational ${hit.skill} attempt requires director adjudication of difficulty and roll mode.` : `Strong ${hit.skill} trigger "${hit.trigger}" for ${hit.ability}.` };
   }
   const weakSkills = [...new Set(weakHits.map((hit) => hit.skill))];
   if (weakSkills.length !== 1) return null;

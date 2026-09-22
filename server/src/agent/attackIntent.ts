@@ -63,7 +63,7 @@ function escapeRegExp(value: string): string {
 /** Case-insensitive whole-word phrase match: `Hob` matches `Hob's ferry` but never `Hobgoblin`. */
 function containsBoundedPhrase(declaration: string, phrase: string): boolean {
   if (phrase.length === 0) return false;
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(phrase)}(?![\\p{L}\\p{N}])`, "u").test(declaration);
+  return new RegExp(`^(?:the\\s+)?${escapeRegExp(phrase)}(?![\\p{L}\\p{N}])`, "u").test(declaration);
 }
 
 /** Regular finite forms of one verb head: attacks/attacked/attacking, stabs/stabbed/stabbing. */
@@ -131,7 +131,15 @@ export function detectAttackTarget(
 ): CombatInitiationCandidate | null {
   if (typeof declaration !== "string" || declaration.trim().length === 0) return null;
   const normalized = normalize(declaration).replace(/\s+/gu, " ").trim();
-  if (!ATTACK_VERB_PATTERN.test(normalized)) return null;
+  // Fail closed: dialogue, negation and hypothetical violence are not consent to combat.
+  if (/[?\u201c\u201d"]|\b(?:not|never|no|if|unless|would|could|might|ask|asks|say|says|said|who|whether|and|or)\b|\b(?:don['’]t|won['’]t|can['’]t)\b/u.test(normalized)) return null;
+  const verb = ATTACK_VERB_PATTERN.exec(normalized);
+  if (!verb) return null;
+  const prefix = normalized.slice(0, verb.index).trim();
+  if (!/^(?:i(?:\s+(?:will|am|try to|attempt to))?\s*)?$/u.test(prefix)) return null;
+  // Only names in the attack's object can be targets; never names in its subject.
+  const object = normalized.slice(verb.index + verb[0].length).trim();
+  if (!object || /[\p{L}]['’]s\b/u.test(object)) return null;
 
   const unique = new Map<string, CombatInitiationCandidate>();
   for (const candidate of candidates) {
@@ -139,7 +147,7 @@ export function detectAttackTarget(
     unique.set(`${candidate.kind}:${candidate.id}`, candidate);
   }
   const scored = [...unique.values()]
-    .map((candidate) => ({ candidate, strength: candidateNameMatch(normalized, candidate.name) }))
+    .map((candidate) => ({ candidate, strength: candidateNameMatch(object, candidate.name) }))
     .filter((match) => match.strength > 0);
   if (scored.length === 0) return null;
   if (scored.length === 1) return scored[0]!.candidate;

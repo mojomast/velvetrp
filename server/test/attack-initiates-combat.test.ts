@@ -77,9 +77,9 @@ describe("detectAttackTarget", () => {
   it.each([
     ["I attack Old Hob with my sword.", "npc-hob"],
     ["I hit Hob.", "npc-hob"],
-    ["she attacks Old Hob", "npc-hob"],
+
     ["I am attacking Old Hob", "npc-hob"],
-    ["I stab Hob's boat", "npc-hob"],
+
     ["I swing at Old Hob", "npc-hob"],
     ["I throw at Hob", "npc-hob"],
     ["I shoot the ferryman", "npc-ferryman"],
@@ -91,6 +91,15 @@ describe("detectAttackTarget", () => {
 
   it.each([
     ["I greet Old Hob.", "no violent verb"],
+    ["I stab Hob's boat", "property is not its owner"],
+    ["I attack the goblin near Hob", "name is not the object"],
+    ["I attack Hob and Bram", "multiple targets"],
+    ["she attacks Old Hob", "not the declaring actor"],
+    ["I do not attack Hob", "negation"],
+    ["I ask Hob who attacked the caravan", "reported speech"],
+    ["If Hob attacks, I will flee", "conditional"],
+    ["Hob attacks me", "wrong subject"],
+    ["I don't attack Hob", "contracted negation"],
     ["Tell me about Old Hob.", "no violent verb"],
     ["I attack the watchman.", "role-only reference is not a public name"],
     ["I attack the dragon.", "unknown target"],

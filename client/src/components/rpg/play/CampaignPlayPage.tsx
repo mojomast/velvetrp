@@ -329,6 +329,34 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     });
   }, [bootstrap, campaignId, initial.turnId, initialTurnId, pendingInitial, reconcile, selectedActorId, sessionId]);
 
+  // Narration retries are derivatives, not new mechanical evidence. Resolve the
+  // original explicitly so opening the Director after an automatic retry does
+  // not silently drop the completed action from Continue scene.
+  const [derivedEvidence, setDerivedEvidence] = useState<{ source: string; root: string } | null>(null);
+  useEffect(() => {
+    let current = true;
+    if (!turn || turn.turn.state !== "completed" || turn.turn.mode === "original") return;
+    const source = turn.turn;
+    void (async () => {
+      let prior = source.priorTurnId;
+      const visited = new Set<string>([source.turnId]);
+      while (prior && visited.size < 32 && !visited.has(prior)) {
+        visited.add(prior);
+        const value = await api.getAdventureTurn(prior, { campaignId, sessionId, actorId: source.actorId, turnId: prior });
+        if (!current) return;
+        if (value.turn.mode === "original") {
+          if (value.turn.state === "completed") setDerivedEvidence({ source: source.turnId, root: value.turn.turnId });
+          return;
+        }
+        prior = value.turn.priorTurnId;
+      }
+    })().catch(() => { /* No guessed evidence on failed or unauthorized reads. */ });
+    return () => { current = false; };
+  }, [api, campaignId, sessionId, turn]);
+  const evidenceTurnId = turn?.turn.state === "completed" && turn.turn.campaignId === campaignId && turn.turn.sessionId === sessionId
+    ? turn.turn.mode === "original" ? turn.turn.turnId : derivedEvidence?.source === turn.turn.turnId ? derivedEvidence.root : undefined
+    : undefined;
+
   const receive = useCallback((event: AdventureTurnStreamEvent) => {
     if (!activeRef.current) return;
     setLiveEvents((events) => [...events, event]);
@@ -632,7 +660,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
         blocked={sessionLocked || combatLocked || travelLocked || inventoryLocked || advancementLocked || !["idle", "terminal"].includes(phase)}
         canAct={authorizationCanAct} onHistory={setDmHistory} onLockChange={setDmLocked} onStateChange={refreshAfterTool}
         contextTurnId={turn?.turn.campaignId === campaignId && turn.turn.sessionId === sessionId ? turn.turn.turnId : undefined}
-        evidenceTurnId={turn?.turn.state === "completed" && turn.turn.mode === "original" && turn.turn.campaignId === campaignId && turn.turn.sessionId === sessionId ? turn.turn.turnId : undefined} />
+        evidenceTurnId={evidenceTurnId} />
     </AtlasDrawer>
     <div id="atlas-character" className="atlas-drawer-slot atlas-character-reference" data-side={characterSide}
       data-orientation={characterSide === "top" || characterSide === "bottom" ? "horizontal" : "vertical"} hidden={activeTool !== "character"}>

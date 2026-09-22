@@ -194,6 +194,7 @@ function projectGalleryImage(image: SceneImageGalleryImage, jobs: readonly Scene
     seconds: null,
     createdAt: image.createdAt,
     selected: image.selected,
+    selections: image.selections ?? [],
     ...(job ? { sceneKey: job.sceneKey } : {}),
   };
 }
@@ -470,7 +471,7 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       try {
         const gallery = service.listGallery(OWNER, campaignId.data, { sessionId: query.sessionId });
         const jobs = gallery.jobs ?? [];
-        return reply.send({ images: gallery.images.map((image) => projectGalleryImage(image, jobs)) });
+        return reply.send({ images: gallery.images.map((image) => projectGalleryImage(image, jobs)), ...(gallery.jobs ? { jobs: jobs.filter((job) => job.sessionId === query.sessionId).map(projectJob) } : {}) });
       } catch (error) {
         return mapSceneImageFailure(request, reply, error);
       }

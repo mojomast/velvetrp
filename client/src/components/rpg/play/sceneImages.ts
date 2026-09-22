@@ -270,7 +270,7 @@ export function findSceneImageRecord(records: readonly SceneImageSceneRecord[], 
 }
 
 function sceneKeyForImage(image: SceneImageGalleryItem, records: readonly SceneImageSceneRecord[]): string | null {
-  return image.sceneKey ?? findSceneImageRecord(records, image.jobId)?.sceneKey ?? null;
+  return image.sceneKey?.trim() || findSceneImageRecord(records, image.jobId)?.sceneKey || null;
 }
 
 function newestFirst(images: readonly SceneImageGalleryItem[]): SceneImageGalleryItem[] {
@@ -278,14 +278,12 @@ function newestFirst(images: readonly SceneImageGalleryItem[]): SceneImageGaller
 }
 
 /** The selected illustration for one active scene, or null when none is known. */
-export function findActiveSceneImage(images: readonly SceneImageGalleryItem[], sceneKey: string, records: readonly SceneImageSceneRecord[]): SceneImageGalleryItem | null {
+export function findActiveSceneImage(images: readonly SceneImageGalleryItem[], sceneKey: string, _records: readonly SceneImageSceneRecord[]): SceneImageGalleryItem | null {
   const ready = newestFirst(images.filter(isSceneImageRenderable));
   if (ready.length === 0) return null;
-  const exactSelected = ready.find((image) => image.selected && sceneKeyForImage(image, records) === sceneKey);
-  if (exactSelected) return exactSelected;
-  const unboundSelected = ready.find((image) => image.selected && sceneKeyForImage(image, records) === null);
-  if (unboundSelected) return unboundSelected;
-  return ready.find((image) => sceneKeyForImage(image, records) === sceneKey) ?? null;
+  return ready.find((image) => image.selections !== undefined
+    ? image.selections.some((selection) => selection.sceneKey === sceneKey)
+    : image.selected && image.sceneKey === sceneKey) ?? null;
 }
 
 export interface SceneImageGroup {

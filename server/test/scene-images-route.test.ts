@@ -246,10 +246,11 @@ describe("scene image routes", () => {
     const dmApp = sceneImageApp({ service: dmService });
     const dmRead = await dmApp.inject({ method: "GET", url: paths.gallery });
     expect(dmRead.statusCode).toBe(200);
-    expect(dmRead.json()).toEqual({
+    expect(dmRead.json().jobs).toEqual([expect.objectContaining({ jobId: "job-1" })]);
+    expect(dmRead.json()).toMatchObject({
       images: [{
         assetId: "asset-1", jobId: "job-1", prompt: "a ruined mill above a still pond", seed: 7, steps: 20,
-        guidance: 3, status: "ready", seconds: null, createdAt: AT, selected: true, sceneKey: "location:loc-1",
+        guidance: 3, status: "ready", seconds: null, createdAt: AT, selected: true, sceneKey: "location:loc-1", selections: [],
       }],
     });
     expect(dmService.listGallery).toHaveBeenCalledWith("local-owner", CAMPAIGN, { sessionId: "session-1" });

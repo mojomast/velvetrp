@@ -266,9 +266,20 @@ export function initiateCombatFromTarget(
     const startKey = `initiate-combat:start:${requestDigest}`;
 
     const combatants: EncounterCreateRequest["combatants"] = [{ kind: "actor", actorId, team: "allies" }];
+    // A scene encounter includes colocated campaign actors, not off-screen
+    // characters. Actor-v-actor encounters stay explicit duels; do not choose
+    // sides for uninvolved players. Adding initiative never transfers control.
+    if (target.kind === "npc") {
+      const nearby = db.prepare(`SELECT ally.actor_id FROM campaign_actor_locations_v28 origin
+        JOIN campaign_actor_locations_v28 ally ON ally.campaign_id=origin.campaign_id
+          AND ally.session_id=origin.session_id AND ally.location_id=origin.location_id
+        WHERE origin.campaign_id=? AND origin.session_id=? AND origin.actor_id=? AND ally.actor_id<>?
+        ORDER BY ally.actor_id`).all(campaignId, sessionId, actorId, actorId) as { actor_id: string }[];
+      for (const ally of nearby) combatants.push({ kind: "actor", actorId: ally.actor_id, team: "allies" });
+    }
     if (profile) combatants.push({ kind: "enemy", template: profile.template, team: "enemies" });
     else if (target.kind === "actor") combatants.push({ kind: "actor", actorId: target.actorId, team: "enemies" });
-    const createRequest = encounterCreateRequestSchema.parse({
+    let createRequest = encounterCreateRequestSchema.parse({
       sessionId,
       name: encounterName(initiator.name, targetName),
       combatants,
@@ -280,8 +291,16 @@ export function initiateCombatFromTarget(
     const replay = db.prepare(`SELECT encounter_id,canonical_create_request_json FROM encounter_lifecycle_v31
       WHERE campaign_id=? AND create_idempotency_key=?`).get(campaignId, createKey) as
       { encounter_id: string; canonical_create_request_json: string } | undefined;
-    if (replay && replay.canonical_create_request_json !== canonical(createRequest)) {
-      throw new CombatInitiationError("COMBAT_INITIATION_CONFLICT", "idempotency key was reused for a different combat initiation");
+    if (replay) {
+      const stored = encounterCreateRequestSchema.parse(JSON.parse(replay.canonical_create_request_json));
+      const identity = (request: EncounterCreateRequest) => ({ ...request,
+        combatants: [request.combatants[0], request.combatants.at(-1)] });
+      if (canonical(identity(stored)) !== canonical(identity(createRequest))) {
+        throw new CombatInitiationError("COMBAT_INITIATION_CONFLICT", "idempotency key was reused for a different combat initiation");
+      }
+      // Colocated allies are a creation-time snapshot. Movement after creation
+      // must not change the meaning of an exact retry or reroll initiative.
+      createRequest = stored;
     }
 
     if (!replay) {

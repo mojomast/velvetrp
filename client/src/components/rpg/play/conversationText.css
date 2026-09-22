@@ -1,0 +1,15 @@
+.campaign-conversation .conversation-speaker { color: var(--speaker-color); }
+.conversation-text { line-height: 1.7; overflow-wrap: anywhere; max-width: 78ch; }
+.conversation-text p { white-space: pre-wrap; margin: .45rem 0 .85rem; }
+.conversation-kind { display: block; font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; opacity: .85; }
+.text-action { border-left: 3px solid #93c5fd; padding-left: .8rem; }
+.text-narration { border-left: 3px solid #c4b5fd; padding-left: .8rem; }
+.text-system { border-left: 3px solid #fde68a; padding-left: .8rem; }
+.conversation-dialogue { color: #fde68a; }
+.conversation-roll { color: #86efac; background: #15352a; border: 1px solid #86efac; border-radius: 4px; padding: .1em .3em; font-variant-numeric: tabular-nums; }
+.conversation-action { color: #93c5fd; }
+.campaign-conversation .live-proposal, .campaign-conversation .live-receipts { border-left: 3px solid #86efac; padding: .5rem .8rem; color: #86efac; }
+.campaign-conversation .live-confirmation { border-left: 3px solid #fde68a; padding: .5rem .8rem; color: #fde68a; }
+.campaign-conversation .live-agent-status, .campaign-conversation .live-terminal { font-size: .85rem; }
+.conversation-jump { margin: .5rem 0; min-height: 44px; }
+@media (max-width: 600px) { .conversation-text { font-size: 1rem; } .conversation-exchange { min-width: 0; } .conversation-choices { display: flex; flex-wrap: wrap; } .conversation-choices button { min-height: 44px; white-space: normal; text-align: left; } }
