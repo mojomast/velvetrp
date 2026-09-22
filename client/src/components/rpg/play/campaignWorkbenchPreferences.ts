@@ -12,6 +12,8 @@ export interface CampaignWorkbenchPreferences {
   contextWidth: number;
   quickToolsWidth: number;
   widgets: CampaignContextWidget[];
+  /** Automatic receipt-bound narration retry after a deterministic mechanics-only turn. */
+  autoNarrateMechanics: boolean;
 }
 
 export const CAMPAIGN_WORKBENCH_PREFERENCES_KEY = "velvet.campaign-workbench.v1";
@@ -25,6 +27,7 @@ export const DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES: CampaignWorkbenchPreference
   contextWidth: 280,
   quickToolsWidth: 300,
   widgets: [...CAMPAIGN_CONTEXT_WIDGETS],
+  autoNarrateMechanics: true,
 };
 
 const themes = new Set<CampaignTheme>(["system", "light", "dark", "contrast"]);
@@ -46,6 +49,9 @@ export function readCampaignWorkbenchPreferences(): CampaignWorkbenchPreferences
       quickToolsVisible: typeof value.quickToolsVisible === "boolean" ? value.quickToolsVisible : true,
       contextWidth: clampWidth(value.contextWidth, DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES.contextWidth),
       quickToolsWidth: clampWidth(value.quickToolsWidth, DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES.quickToolsWidth),
+      // Persisted payloads written before automatic mechanics narration lack the key;
+      // migration keeps the enabled default rather than silently disabling provider prose.
+      autoNarrateMechanics: typeof value.autoNarrateMechanics === "boolean" ? value.autoNarrateMechanics : true,
       widgets: [...new Set(ordered)],
     };
   } catch {

@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AdventureTurnGetResponse } from "@velvet/contracts";
 import { ApiError } from "../../../api";
 import { CampaignPlayPage, type CampaignPlayApi } from "./CampaignPlayPage";
 import type { RpgCharacterSheetApi } from "../actor/RpgCharacterSheetPage";
@@ -11,6 +12,31 @@ const sheet = { identity: { actorId: "actor", name: "Aria" }, race: { reference:
 function api(): CampaignPlayApi {
   return { dm: { commandCampaignDmSceneBinding: vi.fn(), getBindingStory: vi.fn(), getBindingQuests: vi.fn(), listCampaignEncounters: vi.fn(), getCampaignDmHistory: vi.fn().mockResolvedValue({ control: { campaignId: "campaign", mode: "human", revision: 0 }, runs: [] }), commandCampaignDmMode: vi.fn(), commandCampaignDmBeat: vi.fn(), commandCampaignDmDecision: vi.fn(), getCampaignDmRun: vi.fn(), getCampaignDmProposal: vi.fn(), resumeCampaignDmRun: vi.fn() }, getCampaignPlayBootstrap: vi.fn().mockResolvedValue({ ...bootstrap, dm: { mode: "human", revision: 0 } }), getAdventureTurnTranscript: vi.fn().mockResolvedValue({ campaignId: "campaign", sessionId: "session", turns: [] }), streamAdventureTurn: vi.fn().mockImplementation(() => ({ turnId: Promise.resolve("turn"), done: new Promise<void>(() => undefined), cancelDelivery: vi.fn() })), getAdventureTurn: vi.fn(), reconcileInitialAdventureTurn: vi.fn(), confirmAdventureTurn: vi.fn(), getCampaignCommandReceipt: vi.fn().mockRejectedValue(new Error("receipt unavailable")),
     getCampaignWorld: vi.fn().mockResolvedValue({ revision: 0, data: { currentLocations: [], visibleLocations: [], visibleConnections: [] } }), listCampaignNpcs: vi.fn().mockResolvedValue({ revision: 0, data: { npcs: [] } }), listCampaignQuests: vi.fn().mockResolvedValue({ revision: 0, data: { quests: [], objectives: [] } }), getActorResources: vi.fn().mockResolvedValue({ resources: [], revision: 0 }), getActorGameplaySheet: vi.fn().mockResolvedValue(sheet), listCampaignEncounters: vi.fn().mockResolvedValue({ encounters: [] }), getCombatState: vi.fn() };
+}
+
+/** Completed receipt turn used by the automatic narration retry suites. */
+function completedReceiptTurn(override: { mode?: "original" | "narration-retry" | "narration-swipe"; priorTurnId?: string | null;
+  receipts?: AdventureTurnGetResponse["receipts"]; narrationStatus?: AdventureTurnGetResponse["narrationStatus"] } = {}): AdventureTurnGetResponse {
+  return { turn: { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", mode: override.mode ?? "original",
+    priorTurnId: override.priorTurnId ?? null, declaration: "I search the archive.", state: "completed", revision: 2,
+    createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z" }, proposals: [], confirmation: { state: "none" },
+    receipts: override.receipts ?? [{ commandId: "command", proposalId: null, linkedAt: "2030-01-01T00:00:00.000Z" }],
+    narrationStatus: override.narrationStatus ?? { status: "completed", text: "The archive yields a sealed ledger.", source: "deterministic-fallback" } };
+}
+
+/** Persists the active-turn locator and waits until the page and the transcript have settled. */
+function renderPersistedTurn(client: CampaignPlayApi, text: string) {
+  localStorage.setItem("velvet.campaign-play.v1:campaign:session", JSON.stringify({ turnId: "turn", selectedActorId: "actor", streamPhase: "ambiguous" }));
+  const view = render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+  return { view, settled: screen.findByText(text) };
+}
+
+/** Settles every pending effect by forcing the periodic live refresh and waiting for it to land. */
+async function settleLiveRefresh(client: CampaignPlayApi) {
+  const bootstrapCalls = vi.mocked(client.getCampaignPlayBootstrap).mock.calls.length;
+  window.dispatchEvent(new Event("focus"));
+  await waitFor(() => expect(client.getCampaignPlayBootstrap).toHaveBeenCalledTimes(bootstrapCalls + 1));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 }
 
 describe("CampaignPlayPage", () => {
@@ -79,6 +105,17 @@ describe("CampaignPlayPage", () => {
     expect(within(setup).getByRole("button", { name: "GM tools" })).toBeTruthy();
     expect(within(setup).getByRole("button", { name: "Display" })).toBeTruthy();
     expect(within(setup).getByRole("button", { name: "Shortcuts" })).toBeTruthy();
+  });
+  it("offers automatic mechanics narration in the Display dialog and persists the choice", async () => {
+    localStorage.clear(); const client = api();
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Adventure room" });
+    fireEvent.click(screen.getByRole("button", { name: "Display" }));
+    const toggle = screen.getByRole("checkbox", { name: "Auto-narrate committed mechanics (uses the configured provider)" }) as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    fireEvent.click(toggle);
+    expect(toggle.checked).toBe(false);
+    expect(JSON.parse(localStorage.getItem("velvet.campaign-workbench.v1") ?? "null")).toMatchObject({ autoNarrateMechanics: false });
   });
   beforeEach(() => {
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; });
@@ -205,6 +242,8 @@ describe("CampaignPlayPage", () => {
     ["omits cross-session turn evidence", { sessionId: "other-session" }, false],
   ] as const)("%s", async (_name, override, includesEvidence) => {
     localStorage.setItem("velvet.campaign-play.v1:campaign:session", JSON.stringify({ turnId: "turn", selectedActorId: "actor", streamPhase: "ambiguous" }));
+    // This suite isolates DM evidence selection from automatic narration retries.
+    localStorage.setItem("velvet.campaign-workbench.v1", JSON.stringify({ autoNarrateMechanics: false }));
     const client = api();
     const history = { control: { campaignId: "campaign", mode: "ai" as const, revision: 0 }, runs: [{ runId: "opening", campaignId: "campaign", sessionId: "session", intent: "open" as const, mode: "ai" as const, modeRevision: 0, revision: 1, state: "completed" as const, narration: null, receipts: [], blockers: [], createdAt: "2030-01-01T00:00:00.000Z" }] };
     vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({ ...bootstrap, principal: { role: "owner", control: "all" }, dm: { mode: "ai", revision: 0 } });
@@ -221,6 +260,83 @@ describe("CampaignPlayPage", () => {
     const request = vi.mocked(client.dm.commandCampaignDmBeat).mock.calls[0]![2];
     expect(request).toEqual(expect.objectContaining({ intent: "continue", ...(includesEvidence ? { evidenceTurnId: "turn" } : {}) }));
     if (!includesEvidence) expect(request).not.toHaveProperty("evidenceTurnId");
+  });
+
+  it("auto-dispatches one receipt-bound narration retry for a completed deterministic turn", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn());
+    const { view } = renderPersistedTurn(client, "The archive yields a sealed ledger.");
+    await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(client.streamAdventureTurn).mock.calls[0]?.[0]).toMatchObject({ kind: "narration-retry", campaignId: "campaign",
+      sessionId: "session", actorId: "actor", priorTurnId: "turn", expectedRevision: 7 });
+    // Re-rendering after the dispatch never queues a second provider call.
+    view.rerender(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it("records the automatic attempt so delivery recovery cannot dispatch a second provider call", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn());
+    vi.mocked(client.streamAdventureTurn).mockReturnValue({ turnId: Promise.resolve("turn"), done: Promise.reject(new Error("delivery lost")), cancelDelivery: vi.fn() });
+    renderPersistedTurn(client, "The archive yields a sealed ledger.");
+    await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
+    // Losing delivery reconciles the same original turn back to terminal; the attempt set still holds it.
+    await waitFor(() => expect(client.getAdventureTurn).toHaveBeenCalledTimes(2));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it("never auto-narrates a derivative turn", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn({ mode: "narration-retry", priorTurnId: "prior" }));
+    renderPersistedTurn(client, "The archive yields a sealed ledger.");
+    await settleLiveRefresh(client);
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-narrate a completed turn without committed receipts", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn({ receipts: [] }));
+    renderPersistedTurn(client, "The archive yields a sealed ledger.");
+    await settleLiveRefresh(client);
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-narrate narration that is already provider-assisted", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn({ narrationStatus: { status: "completed", text: "Provider prose about the archive.", source: "provider-assisted" } }));
+    renderPersistedTurn(client, "Provider prose about the archive.");
+    await settleLiveRefresh(client);
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-narrate when the transcript already reports derivative prose for the root", async () => {
+    localStorage.clear();
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn());
+    vi.mocked(client.getAdventureTurnTranscript).mockResolvedValue({ campaignId: "campaign", sessionId: "session", turns: [{ turnId: "turn", actorId: "actor",
+      declaration: "I search the archive.", narration: "Provider prose about the sealed ledger.", completedAt: "2030-01-01T00:01:00.000Z" }] });
+    renderPersistedTurn(client, "Provider prose about the sealed ledger.");
+    await settleLiveRefresh(client);
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("honours a disabled auto-narration preference and keeps manual retry", async () => {
+    localStorage.clear();
+    localStorage.setItem("velvet.campaign-workbench.v1", JSON.stringify({ autoNarrateMechanics: false }));
+    const client = api();
+    vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn());
+    renderPersistedTurn(client, "The archive yields a sealed ledger.");
+    await settleLiveRefresh(client);
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry narration" }));
+    await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(client.streamAdventureTurn).mock.calls[0]?.[0]).toMatchObject({ kind: "narration-retry", priorTurnId: "turn", expectedRevision: 7 });
   });
 
   it("uses the App turn locator before local fallback and reconnects only with a recovered token", async () => {

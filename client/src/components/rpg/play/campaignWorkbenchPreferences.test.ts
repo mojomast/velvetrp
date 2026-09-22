@@ -11,4 +11,15 @@ describe("campaign workbench preferences", () => {
     applyCampaignWorkbenchPreferences(value);
     expect(document.documentElement.dataset).toMatchObject({ theme: "contrast", density: "compact" });
   });
+
+  it("defaults automatic mechanics narration on and migrates stored payloads", () => {
+    expect(readCampaignWorkbenchPreferences()).toMatchObject({ autoNarrateMechanics: true });
+    // Older v1 payloads predate the key; migration must keep provider prose enabled.
+    localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ theme: "dark", density: "compact" }));
+    expect(readCampaignWorkbenchPreferences()).toMatchObject({ theme: "dark", autoNarrateMechanics: true });
+    localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ autoNarrateMechanics: false }));
+    expect(readCampaignWorkbenchPreferences()).toMatchObject({ autoNarrateMechanics: false });
+    localStorage.setItem(CAMPAIGN_WORKBENCH_PREFERENCES_KEY, JSON.stringify({ autoNarrateMechanics: "no" }));
+    expect(readCampaignWorkbenchPreferences()).toMatchObject({ autoNarrateMechanics: true });
+  });
 });

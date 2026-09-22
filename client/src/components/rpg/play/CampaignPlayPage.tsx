@@ -177,6 +177,8 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const [liveRefreshRevision, setLiveRefreshRevision] = useState(0);
   const streamRef = useRef<AdventureTurnStreamHandle | null>(null);
   const deliveryTurnIdRef=useRef<string|null>(null);
+  // Original turns already handed to the automatic narration retry in this page session.
+  const autoNarratedTurnsRef = useRef<Set<string>>(new Set());
   const activeRef = useRef(true);
   const headingRef = useRef<HTMLHeadingElement>(null); const composerRef = useRef<HTMLTextAreaElement>(null);
   const headingFocusedRef = useRef(false);
@@ -416,7 +418,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     } catch { setPhase("ambiguous"); setError("Authoritative initial-turn reconciliation is unavailable. The declaration remains locked."); }
   }
 
-  async function narrateVariant(kind: "narration-retry" | "narration-swipe") {
+  const narrateVariant = useCallback(async (kind: "narration-retry" | "narration-swipe") => {
     if (sessionLocked || roomToolsLocked || !turn || !["completed", "cancelled", "failed"].includes(turn.turn.state) || !["idle", "terminal"].includes(phase) || !selectedActorId) return;
     setPhase("streaming");
     try {
@@ -424,7 +426,43 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       openStream({ kind, campaignId, sessionId, actorId: selectedActorId, priorTurnId: turn.turn.turnId,
         expectedRevision: latest.expectedRevision, idempotencyKey: idempotency() });
     } catch { setPhase("terminal"); setError("Latest play state could not be loaded. No narration variant was submitted."); }
-  }
+  }, [campaignId, openStream, phase, refreshBootstrap, roomToolsLocked, selectedActorId, sessionId, sessionLocked, turn]);
+
+  /**
+   * One automatic receipt-bound narration retry per original deterministic turn.
+   * The committed turn and its receipts stay authoritative: the retry is the existing
+   * narration derivative, which never re-executes mechanics, and a failed or rejected
+   * provider call settles back to the same deterministic line. Trigger rule:
+   * the preference is on, play is ready (actionable, actor selected, idle/terminal,
+   * unlocked), the active turn is a completed original for the selected actor whose
+   * authoritative narration source is `deterministic-fallback`, and it carries public
+   * receipts. Derivative turns are never auto-narrated. The attempted set plus the
+   * active-derivative and transcript checks keep refreshes, re-renders, and delivery
+   * recovery from dispatching a second provider call for the same turn.
+   */
+  useEffect(() => {
+    if (!preferences.autoNarrateMechanics || !bootstrap || !turn || !selectedActorId) return;
+    if (!authorizationCanAct || bootstrap.principal.role === "observer" || !bootstrap.session.adventureEligible
+      || !bootstrap.session.active || bootstrap.playableActors.length === 0) return;
+    if (sessionLocked || roomToolsLocked || !["idle", "terminal"].includes(phase)) return;
+    const projection = turn.turn;
+    if (projection.state !== "completed" || projection.priorTurnId || projection.actorId !== selectedActorId) return;
+    if (turn.receipts.length === 0 || turn.narrationStatus.status !== "completed"
+      || turn.narrationStatus.source !== "deterministic-fallback") return;
+    if (autoNarratedTurnsRef.current.has(projection.turnId)) return;
+    // Wait for the authoritative transcript before deciding whether a derivative
+    // already narrated this root in an earlier page session.
+    if (transcriptState === "loading") return;
+    // The transcript collapses every derivative onto its root turn and reports that
+    // root's own deterministic text until a derivative durably writes prose. Different
+    // text for this root therefore means a derivative already narrated it. The one case
+    // this cannot see is a derivative that also fell back to identical text; the
+    // attempted set remains the only in-session guard there.
+    if (transcript.some((entry) => entry.turnId === projection.turnId && entry.narration !== turn.narrationStatus.text)) return;
+    autoNarratedTurnsRef.current.add(projection.turnId);
+    void narrateVariant("narration-retry");
+  }, [authorizationCanAct, bootstrap, narrateVariant, phase, preferences.autoNarrateMechanics, roomToolsLocked,
+    selectedActorId, sessionLocked, transcript, transcriptState, turn]);
 
   const setActor = (actorId: string) => { if (!bootstrap?.playableActors.some((actor) => actor.actorId === actorId)) return;
     if (sessionLocked || roomToolsLocked || !authorizationCanAct || !["idle", "terminal"].includes(phase)) return;
