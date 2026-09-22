@@ -197,9 +197,9 @@ describe("conversation narration for held turns", () => {
     await app.close();
   });
 
-  it("validates conversation output as bounded, location-grounded, and free of mechanical claims", () => {
+  it("validates conversation output as bounded and free of mechanical claims", () => {
     expect(conversationNarrationMatches("At Lantern Quay, the keeper answers quietly and waits.", "Lantern Quay")).toBe(true);
-    expect(conversationNarrationMatches("The keeper answers quietly and waits.", "Lantern Quay")).toBe(false);
+    expect(conversationNarrationMatches("The keeper answers quietly and waits.", "Lantern Quay")).toBe(true);
     expect(conversationNarrationMatches("", null)).toBe(false);
     expect(conversationNarrationMatches("x".repeat(2_001), null)).toBe(false);
     expect(conversationNarrationMatches(Array.from({ length: 121 }, () => "word").join(" "), null)).toBe(false);

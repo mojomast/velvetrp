@@ -126,7 +126,7 @@ describe("CampaignPlayPage", () => {
     render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: "Adventure room" });
     fireEvent.click(screen.getByRole("button", { name: "Display" }));
-    const toggle = screen.getByRole("checkbox", { name: "Auto-narrate committed mechanics (uses the configured provider)" }) as HTMLInputElement;
+    const toggle = screen.getByRole("checkbox", { name: "Auto-narrate turns, including conversation (uses the configured provider)" }) as HTMLInputElement;
     expect(toggle.checked).toBe(true);
     fireEvent.click(toggle);
     expect(toggle.checked).toBe(false);

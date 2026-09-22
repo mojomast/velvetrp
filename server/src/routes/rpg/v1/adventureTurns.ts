@@ -111,12 +111,14 @@ export function conversationNarrationEligible(turn: ConversationNarrationTurnPro
 /**
  * Conversation output is bounded, non-empty, and subject to the same zero-receipt mechanical gate
  * as every grounded hold: unsupported movement, transactions, damage, quest, and progression
- * claims are rejected, and an exact current location must be acknowledged when one exists.
+ * claims are rejected. Naming the current location is deliberately not required, because pure
+ * dialogue should not be forced to restate the scene just to be accepted.
  */
 export function conversationNarrationMatches(text: string, currentLocation: string | null = null): boolean {
+  void currentLocation;
   if (!text || text.length > CONVERSATION_NARRATION_MAX_CHARACTERS) return false;
   if (text.split(/\s+/).filter(Boolean).length > CONVERSATION_NARRATION_MAX_WORDS) return false;
-  return providerNarrationMatchesReceipts(text, [], currentLocation);
+  return providerNarrationMatchesReceipts(text, [], null);
 }
 const NARRATION_TOOL_PARAMETERS: CompletionFunctionTool["parameters"] = {
   type: "object",
@@ -439,7 +441,9 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
         : providerNarrationMatchesReceipts(providerText,safeReceipts,publicContext.currentLocation)))throw new Error("narration contradicts or omits verified current facts");
        claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"provider-assisted",narration:providerText,
          outcomeCode:usageEstimated?"ok-estimated":"ok",promptTokens:measuredUsage.promptTokens,completionTokens:measuredUsage.completionTokens});
-    } catch {
+    } catch (error) {
+      if (process.env.VELVET_NARRATION_DEBUG === "1") console.warn("[narration-failed]",
+        error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : "unknown");
       if (!budgetSettled) { measuredUsage = adventureTurnBudgets.settle(turn.turnId, callId, {}); usageEstimated = true; }
        claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"deterministic-fallback",narration:fallbackText,
          outcomeCode:usageEstimated?"narration-failed-estimated":"narration-failed",promptTokens:measuredUsage?.promptTokens??null,

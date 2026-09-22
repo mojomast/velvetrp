@@ -85,6 +85,7 @@ Velvet does not auto-load `.env`. Export variables in the shell or configure the
 | `VELVET_SCENE_IMAGES_ORIGIN` | server-runtime | Base URL origin | `Origin` header sent on POST submissions because the service checks it as a request guard; not an authentication credential. |
 | `VELVET_SCENE_IMAGES_TIMEOUT_MS` | server-runtime | `120000` | Per-request deadline bounded to 1000–600000 ms; an ambiguous submission is never retried automatically. |
 | `VELVET_SCENE_IMAGES_MAX_BYTES` | server-runtime | `8388608` | Decoded PNG byte budget bounded to 1024–67108864 bytes. |
+| `VELVET_NARRATION_DEBUG` | server-runtime | Disabled | Exact `1` logs a bounded narration failure reason (error name and message only, never campaign content) to the server console; diagnostic only. |
 | `FEATURE_RPG_CAMPAIGN` | server-runtime | Disabled | Base RPG campaign/API rollout flag. |
 | `FEATURE_RPG_MECHANICS` | server-runtime | Disabled | Mechanics routes require this and campaign. |
 | `FEATURE_RPG_COMBAT` | server-runtime | Disabled | Combat routes require combat, mechanics, and campaign. |
