@@ -32,12 +32,19 @@ per-family production-path metrics are still required before any decision.
 
 ## Remaining work
 
-The variant and version-bound evidence now exist, and both batteries have been compared on
-identical declarations/candidates once. What remains is the automated paired runner: fixed
-per-attempt evidence and failure capture, offline regression tests over empty inputs, synonyms,
-negation, malicious-looking text, duplicate groups, and large candidate sets, plus measured
-provider tokens/cost/latency reported separately from payload bytes. Do not change live shadow or
-active payloads until that evaluation is complete; production shortlisting and per-family
-promotion evaluation remain separate work.
+The automated paired runner now exists (`scripts/compare-system-one-adventure-payloads.ts`):
+offline by default, with a bounded `--live` mode (hard cap 600 calls) that preserves per-attempt
+evidence, failures, returned models, request and corpus digests, and exact payload/state bindings.
+Its first live paired run (270 calls, one repeat, zero failures) is recorded in
+[system-one-adventure-payload-comparison.md](system-one-adventure-payload-comparison.md): 10 of
+135 cases conflicted across variants, shared context acted on 29 calls at 100% accuracy versus 3
+for legacy, and — importantly — the smaller serialized payload did **not** reduce measured provider
+input tokens (1.24M vs 1.01M): payload bytes are not tokens. The adversarial/offline edge cases
+(empty inputs, synonyms, negation, malicious-looking text, duplicate groups, large candidate sets)
+are covered by `scripts/test/adventure-payload-edge-cases.test.ts`.
+
+Still required before any production decision: repeated live runs over the runner's conflict
+breakdown, per-family and production-path metrics, and an evaluated promotion binding once the
+payload is chosen. Do not change live shadow or active payloads until that evaluation is complete.
 
 Vendor guidance checked via WebXNG/SearXNG discovery and direct retrieval of https://docs.typesafe.ai/concepts/state.md: all questions evaluate the same shared state independently; content and supporting facts belong in state while questions describe judgments.
