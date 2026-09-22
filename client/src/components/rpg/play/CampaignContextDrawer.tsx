@@ -44,6 +44,8 @@ export interface CampaignContextDrawerProps {
   hideMaps?: boolean;
   readOnly?: boolean;
   commandsBlocked?: boolean;
+  /** Emits the active scene identity (current location, or the room) for the play surface. */
+  onSceneResolved?: (scene: { sceneKey: string; label: string } | null) => void;
 }
 
 function status<T>(load: Load<T>, empty: boolean, label: string) {
@@ -80,7 +82,7 @@ function refreshing<T>(old: Load<T>): Load<T> {
 }
 
 function BoundCampaignContextDrawer({ campaignId, sessionId, selectedActorId, playableActorIds, audience, authorizationGeneration, api,
-  widgets = ["location", "cast", "objectives", "resources", "encounter"], refreshKey = 0, onPrefillDeclaration = () => undefined, onOpenWorld = () => undefined, onOpenCombat, mapsOnly = false, hideMaps = false, readOnly = false, commandsBlocked = false }: CampaignContextDrawerProps) {
+  widgets = ["location", "cast", "objectives", "resources", "encounter"], refreshKey = 0, onPrefillDeclaration = () => undefined, onOpenWorld = () => undefined, onOpenCombat, mapsOnly = false, hideMaps = false, readOnly = false, commandsBlocked = false, onSceneResolved = () => undefined }: CampaignContextDrawerProps) {
   const [combatRefresh, setCombatRefresh] = useState(0);
   const [mapMode, setMapMode] = useState<"exploration" | "combat">("exploration");
   const [world, setWorld] = useState<Load<CampaignWorldHttpResponse>>({ state: "loading" });
@@ -175,6 +177,15 @@ function BoundCampaignContextDrawer({ campaignId, sessionId, selectedActorId, pl
   const tacticalLocation = tacticalLocations.length === 1 ? tacticalLocations[0] : undefined;
   const tacticalPlace = worldValue?.visibleLocations.find((entry) => entry.locationId === tacticalLocation?.locationId);
   const exits = useMemo(() => actorLocation ? (worldValue?.visibleConnections.filter((entry) => entry.fromLocationId === actorLocation.locationId) ?? []) : [], [actorLocation, worldValue]);
+  const sceneLocationId = actorLocation?.locationId ?? null;
+  const sceneLocationName = location?.name ?? null;
+  const sceneCallbackRef = useRef(onSceneResolved); sceneCallbackRef.current = onSceneResolved;
+  useEffect(() => {
+    // Ground the active scene in the acting character's location row; fall back
+    // to the room only while no authoritative location is known.
+    if (sceneLocationId) sceneCallbackRef.current({ sceneKey: `location:${sceneLocationId}`, label: sceneLocationName?.trim() || "Current scene" });
+    else sceneCallbackRef.current({ sceneKey: `session:${sessionId}`, label: "This room" });
+  }, [sceneLocationId, sceneLocationName, sessionId]);
   const rosterValue = roster.state === "ready" ? roster.value : roster.stale;
   const loadedCast = cast.state === "ready" ? cast.value : cast.stale;
   const castValue = loadedCast?.audience === audience ? loadedCast : undefined;

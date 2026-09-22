@@ -33,7 +33,7 @@ const widgetLabels: Record<CampaignContextWidget, string> = {
 };
 
 /** Tools that configure or administer the table rather than drive the current scene. */
-const SETUP_TOOLS: ReadonlySet<AtlasTool> = new Set(["director", "gm", "security", "create"]);
+const SETUP_TOOLS: ReadonlySet<AtlasTool> = new Set(["director", "gm", "security", "create", "images"]);
 
 function clampPaneWidth(value: number) { return Math.max(220, Math.min(520, Math.round(value))); }
 

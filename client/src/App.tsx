@@ -6,6 +6,7 @@ import {
   applyCampaignImport, castActorSpell, changeActorResource, claimCombatReward, commandActorCheck, commandActorEconomy, commandActorEffect,
   commandActorAttunement, commandActorInventory, commandActorPower, commandActorRest, commandCombatConsumable, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, confirmAdventureTurn, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorAttunements, getActorInventory, getActorPowers, getActorResources, getActorWallet, getAdventureTurn, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignPlayBootstrap, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatConsumableActions, getCombatConsumableResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession, grantCharacterXp, requestVendorSaleQuote,
    getSessionContext, getSiblings, getUsage, getAdventureTurnTranscript, getCampaignDiceHistory, rollCampaignDice, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession, getDirectCombatPowerActions, commandDirectCombatPower, getDirectCombatPowerResult, getCampaignContextInspectionReferences, getCampaignContextInspection,
+  generateSceneImage, getSceneImageGallery, getSceneImageJob, getSceneImageSettings, putSceneImageSettings, sceneImageAssetUrl, selectSceneImage,
   commandCompanionAdministration, getCompanionAdministration, listCampaignMemberships, listCampaignRooms,
   endCombat, establishActorCamp, generateTacticalMap, getTacticalMap, listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, listCombatRewards, moveTacticalMapToken, placeActor, previewTacticalMapMove, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, reconcileInitialAdventureTurn, rerollCharacterDraft, resolveCombatAction, startEncounter, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateSessionContext, validateContentPackDraft,
 } from "./api";
@@ -33,6 +34,7 @@ import { CampaignEventLogPage, type CampaignHistoryApi } from "./components/rpg/
 import { CampaignImportWizard, type CampaignImportApi } from "./components/rpg/transfer/CampaignImportWizard";
 import { CampaignExportDialog, type CampaignExportApi } from "./components/rpg/transfer/CampaignExportDialog";
 import { StudioAuthorizationProvider, type StudioAuthorization } from "./components/rpg/StudioAuthorization";
+import type { SceneImageApi } from "./api";
 import { sanitizeCampaignNarrativeMutations } from "./components/rpg/narrativeMutationRegistry";
 import { CampaignPlayPage, type CampaignPlayApi } from "./components/rpg/play/CampaignPlayPage";
 import { campaignDmApi } from "./components/rpg/play/CampaignDmPanel";
@@ -106,6 +108,10 @@ const campaignPlayApi: CampaignPlayApi = { dm: { ...campaignDmApi, getCampaignCo
   getCampaignCommandReceipt, getCampaignWorld, listCampaignNpcs, listCampaignQuests, getActorResources, getActorGameplaySheet,
   listCampaignEncounters, getCombatState, getTacticalMap, generateTacticalMap, previewTacticalMapMove, moveTacticalMapToken,
   getCampaignDiceHistory, rollCampaignDice };
+const sceneImageApi: SceneImageApi = {
+  getSettings: getSceneImageSettings, putSettings: putSceneImageSettings, generate: generateSceneImage,
+  getGallery: getSceneImageGallery, select: selectSceneImage, getJob: getSceneImageJob, assetUrl: sceneImageAssetUrl,
+};
 
 function CampaignAuthorizationGate({campaignId,onUnavailable,children}:{campaignId:string;onUnavailable:()=>void;children:(authorization:StudioAuthorization)=>ReactNode}){
   const { report } = useCampaignShell();
@@ -742,7 +748,7 @@ export default function App() {
       setSession(null); setMessages([]); setView("campaign-detail"); };
     return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={returnToCampaign}>{(authorization) =>
       <CampaignPlayPage key={authorization.generation} campaignId={activeCampaignId} sessionId={session.id} authorizationGeneration={authorization.generation} api={campaignPlayApi}
-        surface={playSurface}
+        surface={playSurface} imagesEnabled={features.images} sceneImageApi={sceneImageApi}
         authorizationCanAct={authorization.role !== "observer"} initialSelectedActorId={playSelectedActorId} initialTurnId={playTurnId || undefined} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
         onTurnIdChange={(turnId) => setPlayTurnId(turnId ?? "")} focusHeading={combatReturnView !== "campaign-play"} combatAvailable={combatAvailable} combatApi={combatTrackerApi}
         authorization={authorization} worldApi={campaignMechanicsAvailable ? worldExplorerApi : undefined} actorToolsApi={rpgCharacterSheetApi} advancementApi={atlasAdvancementApi}

@@ -102,7 +102,7 @@ export async function getCampaignContextInspection(campaignId: string, sessionId
   return value;
 }
 import { createClientId } from "./utils/clientId";
-import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
+import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, idempotencyKeySchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
 import type { ApiProblem, CampaignAccess as ContractCampaignAccess, CampaignCharacterCreateRequest, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignCharacterWorkspaceResponse, CampaignCreateRequest, CampaignCreateResponse, CampaignDetail as ContractCampaignDetail, CampaignDetailResponse as ContractCampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollRequest, CampaignDiceRollResponse, CampaignListResponse as ContractCampaignListResponse, CampaignRenameRequest, CampaignRenameResponse, CampaignRoomAttachRequest, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, RoleplayFeatureFlags, RpgFeatureFlags } from "@velvet/contracts";
 import {
   campaignAdministrationHttpArchiveRequestSchema,
@@ -3175,4 +3175,424 @@ export function preflightSystemOne(): Promise<SystemOnePreflightResult> {
     cache: "no-store",
     body: "{}",
   });
+}
+
+/* ------------------------------------------------------------------------- *
+ * Scene images
+ *
+ * Frozen HTTP contract under /rpg/v1/campaigns/:campaignId/scene-images.
+ * The server routes land separately; these bindings validate the documented
+ * shape locally and never send provider credentials. Settings mirror the pure
+ * server scene-image settings module (including the workflow preset bounds)
+ * so the DM panel can round-trip without translation.
+ * ------------------------------------------------------------------------- */
+
+/** How the image path participates in play. */
+export type SceneImageMode = "off" | "manual" | "automatic";
+/** Whether seeds are sampled per image or pinned to `fixedSeed`. */
+export type SceneImageSeedMode = "random" | "fixed";
+/** How much image data a client is willing to receive. */
+export type SceneImageBandwidth = "full" | "reduced" | "text-only";
+/** Known job statuses; servers may add values, so consumers must tolerate unknown strings. */
+export type SceneImageStatus = "queued" | "running" | "ready" | "failed" | "cancelled" | (string & {});
+
+export const SCENE_IMAGE_STEPS_MIN = 10;
+export const SCENE_IMAGE_STEPS_MAX = 100;
+export const SCENE_IMAGE_GUIDANCE_MIN = 1;
+export const SCENE_IMAGE_GUIDANCE_MAX = 8;
+export const SCENE_IMAGE_VARIATION_MIN = 1;
+export const SCENE_IMAGE_VARIATION_MAX = 32;
+export const SCENE_IMAGE_AUTO_SESSION_LIMIT_MIN = 0;
+export const SCENE_IMAGE_AUTO_SESSION_LIMIT_MAX = 32;
+export const SCENE_IMAGE_COOLDOWN_MIN_SECONDS = 0;
+export const SCENE_IMAGE_COOLDOWN_MAX_SECONDS = 3_600;
+export const SCENE_IMAGE_MIN_SEED = 0;
+export const SCENE_IMAGE_MAX_SEED = 2_147_483_647;
+export const SCENE_IMAGE_GENERATE_MAX_PROMPT = 2_000;
+
+const SCENE_IMAGE_MODES: readonly SceneImageMode[] = ["off", "manual", "automatic"];
+const SCENE_IMAGE_SEED_MODES: readonly SceneImageSeedMode[] = ["random", "fixed"];
+const SCENE_IMAGE_BANDWIDTHS: readonly SceneImageBandwidth[] = ["full", "reduced", "text-only"];
+
+/** Strict persisted scene-image settings; every field is present after parsing. */
+export interface SceneImageSettings {
+  enabled: boolean;
+  mode: SceneImageMode;
+  stylePresetId: string;
+  stylePhrase: string;
+  promptOverrides: Record<string, string>;
+  steps: number;
+  guidance: number;
+  seedMode: SceneImageSeedMode;
+  fixedSeed: number;
+  variationCount: number;
+  autoPerSessionLimit: number;
+  cooldownSeconds: number;
+  bandwidth: SceneImageBandwidth;
+  hideImages: boolean;
+  advancedOnlyDm: boolean;
+}
+
+/** One durable scene-image job as projected to the client. */
+export interface SceneImageJob {
+  jobId: string;
+  sessionId?: string;
+  sceneKey?: string;
+  assetId?: string | null;
+  prompt?: string;
+  seed?: number;
+  steps?: number;
+  guidance?: number;
+  status: SceneImageStatus;
+  seconds?: number | null;
+  createdAt?: string;
+}
+
+/** One gallery row. `sceneKey` is an additive projection; the frozen contract omits it. */
+export interface SceneImageGalleryItem {
+  assetId: string;
+  jobId: string;
+  prompt: string;
+  seed: number;
+  steps: number;
+  guidance: number;
+  status: SceneImageStatus;
+  seconds?: number | null;
+  createdAt: string;
+  selected: boolean;
+  sceneKey?: string;
+}
+
+/** Opaque mutation receipt; only `revisionAfter` is interpreted by the client. */
+export type SceneImageReceipt = Record<string, unknown>;
+
+export interface SceneImageSettingsResponse {
+  settings: SceneImageSettings;
+  revision: number;
+}
+
+export interface SceneImageSettingsPutRequest {
+  expectedRevision: number;
+  idempotencyKey: string;
+  settings: SceneImageSettings;
+}
+
+export interface SceneImageSettingsPutResponse {
+  settings: SceneImageSettings;
+  revision: number;
+  receipt: SceneImageReceipt;
+}
+
+export interface SceneImageGenerateRequest {
+  sessionId: string;
+  sceneKey: string;
+  prompt?: string;
+  seed?: number;
+  steps?: number;
+  guidance?: number;
+  count?: number;
+  auto?: boolean;
+  idempotencyKey: string;
+}
+
+export interface SceneImageGenerateResponse {
+  job: SceneImageJob;
+  deduped: boolean;
+}
+
+export interface SceneImageGalleryResponse {
+  images: SceneImageGalleryItem[];
+}
+
+export interface SceneImageSelectRequest {
+  sessionId: string;
+  sceneKey: string;
+  assetId: string;
+  expectedRevision: number;
+  idempotencyKey: string;
+}
+
+export interface SceneImageSelection {
+  sceneKey?: string;
+  assetId?: string;
+  selectedAt?: string;
+}
+
+export interface SceneImageSelectResponse {
+  selection: SceneImageSelection;
+  receipt: SceneImageReceipt;
+}
+
+export interface SceneImageJobResponse {
+  job: SceneImageJob;
+}
+
+/** Narrow role-appropriate API consumed by the play surface and DM panel. */
+export interface SceneImageApi {
+  getSettings: (campaignId: string) => Promise<SceneImageSettingsResponse>;
+  putSettings: (campaignId: string, input: SceneImageSettingsPutRequest) => Promise<SceneImageSettingsPutResponse>;
+  generate: (campaignId: string, input: SceneImageGenerateRequest) => Promise<SceneImageGenerateResponse>;
+  getGallery: (campaignId: string, sessionId: string) => Promise<SceneImageGalleryResponse>;
+  select: (campaignId: string, input: SceneImageSelectRequest) => Promise<SceneImageSelectResponse>;
+  getJob: (campaignId: string, jobId: string) => Promise<SceneImageJobResponse>;
+  assetUrl: (campaignId: string, assetId: string) => string;
+}
+
+function sceneImageObjectBody(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${label} was malformed`);
+  return value as Record<string, unknown>;
+}
+
+/** Strict local validation of the documented scene-image settings payload. */
+function sceneImageSettingsPayload(value: unknown): SceneImageSettings {
+  const raw = sceneImageObjectBody(value, "Scene-image settings payload");
+  const bool = (key: string): boolean => {
+    const field = raw[key];
+    if (typeof field !== "boolean") throw new Error(`Scene-image settings ${key} was malformed`);
+    return field;
+  };
+  const text = (key: string): string => {
+    const field = raw[key];
+    if (typeof field !== "string") throw new Error(`Scene-image settings ${key} was malformed`);
+    return field;
+  };
+  const number = (key: string, integer: boolean): number => {
+    const field = raw[key];
+    if (typeof field !== "number" || !Number.isFinite(field) || (integer && !Number.isInteger(field))) {
+      throw new Error(`Scene-image settings ${key} was malformed`);
+    }
+    return field;
+  };
+  const member = <T extends string>(key: string, allowed: readonly T[]): T => {
+    const field = raw[key];
+    if (typeof field !== "string" || !(allowed as readonly string[]).includes(field)) {
+      throw new Error(`Scene-image settings ${key} was malformed`);
+    }
+    return field as T;
+  };
+  const overridesRaw = sceneImageObjectBody(raw.promptOverrides, "Scene-image settings promptOverrides");
+  const promptOverrides: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(overridesRaw)) {
+    if (typeof entry !== "string") throw new Error("Scene-image settings promptOverrides was malformed");
+    promptOverrides[key] = entry;
+  }
+  return {
+    enabled: bool("enabled"),
+    mode: member("mode", SCENE_IMAGE_MODES),
+    stylePresetId: text("stylePresetId"),
+    stylePhrase: text("stylePhrase"),
+    promptOverrides,
+    steps: number("steps", true),
+    guidance: number("guidance", false),
+    seedMode: member("seedMode", SCENE_IMAGE_SEED_MODES),
+    fixedSeed: number("fixedSeed", true),
+    variationCount: number("variationCount", true),
+    autoPerSessionLimit: number("autoPerSessionLimit", true),
+    cooldownSeconds: number("cooldownSeconds", true),
+    bandwidth: member("bandwidth", SCENE_IMAGE_BANDWIDTHS),
+    hideImages: bool("hideImages"),
+    advancedOnlyDm: bool("advancedOnlyDm"),
+  };
+}
+
+function sceneImageRevisionPayload(value: unknown, label: string): number {
+  const raw = sceneImageObjectBody(value, label);
+  const revision = raw.revision;
+  if (typeof revision !== "number" || !Number.isInteger(revision) || revision < 0) throw new Error(`${label} revision was malformed`);
+  return revision;
+}
+
+function sceneImageReceiptPayload(value: unknown, label: string): SceneImageReceipt {
+  return sceneImageObjectBody(value, label);
+}
+
+function sceneImageJobPayload(value: unknown): SceneImageJob {
+  const raw = sceneImageObjectBody(value, "Scene-image job payload");
+  if (typeof raw.jobId !== "string" || raw.jobId.length === 0) throw new Error("Scene-image job payload was malformed");
+  if (typeof raw.status !== "string" || raw.status.length === 0) throw new Error("Scene-image job payload was malformed");
+  const optionalString = (key: string): string | undefined => {
+    const field = raw[key];
+    if (field === undefined || field === null) return undefined;
+    if (typeof field !== "string") throw new Error(`Scene-image job ${key} was malformed`);
+    return field;
+  };
+  const optionalNumber = (key: string): number | undefined => {
+    const field = raw[key];
+    if (field === undefined || field === null) return undefined;
+    if (typeof field !== "number" || !Number.isFinite(field)) throw new Error(`Scene-image job ${key} was malformed`);
+    return field;
+  };
+  const job: SceneImageJob = { jobId: raw.jobId, status: raw.status as SceneImageStatus };
+  const sessionId = optionalString("sessionId"); if (sessionId !== undefined) job.sessionId = sessionId;
+  const sceneKey = optionalString("sceneKey"); if (sceneKey !== undefined) job.sceneKey = sceneKey;
+  const assetId = optionalString("assetId"); if (assetId !== undefined) job.assetId = assetId;
+  const prompt = optionalString("prompt"); if (prompt !== undefined) job.prompt = prompt;
+  const createdAt = optionalString("createdAt"); if (createdAt !== undefined) job.createdAt = createdAt;
+  const seed = optionalNumber("seed"); if (seed !== undefined) job.seed = seed;
+  const steps = optionalNumber("steps"); if (steps !== undefined) job.steps = steps;
+  const guidance = optionalNumber("guidance"); if (guidance !== undefined) job.guidance = guidance;
+  const seconds = optionalNumber("seconds"); if (seconds !== undefined) job.seconds = seconds;
+  if ("assetId" in raw && raw.assetId === null) job.assetId = null;
+  if ("seconds" in raw && raw.seconds === null) job.seconds = null;
+  return job;
+}
+
+function sceneImageGenerateBody(input: SceneImageGenerateRequest): SceneImageGenerateRequest {
+  const raw = sceneImageObjectBody(input, "Scene-image generation request");
+  const sceneKey = typeof raw.sceneKey === "string" ? raw.sceneKey.trim() : "";
+  if (sceneKey.length === 0 || sceneKey.length > 128) throw new ApiInputError();
+  const body: SceneImageGenerateRequest = {
+    sessionId: parseApiInput(() => resourceIdSchema.parse(raw.sessionId)),
+    sceneKey,
+    idempotencyKey: parseApiInput(() => idempotencyKeySchema.parse(raw.idempotencyKey)),
+  };
+  if (raw.prompt !== undefined) {
+    if (typeof raw.prompt !== "string") throw new ApiInputError();
+    const prompt = raw.prompt.trim();
+    if (prompt.length > SCENE_IMAGE_GENERATE_MAX_PROMPT) throw new ApiInputError();
+    if (prompt.length > 0) body.prompt = prompt;
+  }
+  if (raw.seed !== undefined) {
+    const seed = raw.seed;
+    if (typeof seed !== "number" || !Number.isInteger(seed) || seed < SCENE_IMAGE_MIN_SEED || seed > SCENE_IMAGE_MAX_SEED) throw new ApiInputError();
+    body.seed = seed;
+  }
+  if (raw.steps !== undefined) {
+    const steps = raw.steps;
+    if (typeof steps !== "number" || !Number.isInteger(steps) || steps < SCENE_IMAGE_STEPS_MIN || steps > SCENE_IMAGE_STEPS_MAX) throw new ApiInputError();
+    body.steps = steps;
+  }
+  if (raw.guidance !== undefined) {
+    const guidance = raw.guidance;
+    if (typeof guidance !== "number" || !Number.isFinite(guidance)
+      || guidance < SCENE_IMAGE_GUIDANCE_MIN || guidance > SCENE_IMAGE_GUIDANCE_MAX) throw new ApiInputError();
+    body.guidance = guidance;
+  }
+  if (raw.count !== undefined) {
+    const count = raw.count;
+    if (typeof count !== "number" || !Number.isInteger(count) || count < SCENE_IMAGE_VARIATION_MIN || count > SCENE_IMAGE_VARIATION_MAX) throw new ApiInputError();
+    body.count = count;
+  }
+  if (raw.auto !== undefined) body.auto = Boolean(raw.auto);
+  return body;
+}
+
+function sceneImagePath(campaignId: string, suffix = ""): string {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  return `/rpg/v1/campaigns/${encodeURIComponent(campaign)}/scene-images${suffix}`;
+}
+
+/** Reads campaign scene-image settings exactly; players may only see them if the server allows it. */
+export async function getSceneImageSettings(campaignId: string): Promise<SceneImageSettingsResponse> {
+  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/settings"), { cache: "no-store" });
+  requireStatus(success, 200, "Scene-image settings read");
+  return { settings: sceneImageSettingsPayload(sceneImageObjectBody(success.body, "Scene-image settings response").settings),
+    revision: sceneImageRevisionPayload(success.body, "Scene-image settings response") };
+}
+
+/** Writes scene-image settings with one optimistic revision and idempotency key. */
+export async function putSceneImageSettings(campaignId: string, input: SceneImageSettingsPutRequest): Promise<SceneImageSettingsPutResponse> {
+  const raw = sceneImageObjectBody(input, "Scene-image settings write");
+  const expectedRevision = raw.expectedRevision;
+  if (!Number.isInteger(expectedRevision) || (expectedRevision as number) < 0) throw new ApiInputError();
+  const body: SceneImageSettingsPutRequest = {
+    expectedRevision: expectedRevision as number,
+    idempotencyKey: parseApiInput(() => idempotencyKeySchema.parse(raw.idempotencyKey)),
+    settings: sceneImageSettingsPayload(raw.settings),
+  };
+  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/settings"), { method: "PUT", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Scene-image settings write");
+  const response = sceneImageObjectBody(success.body, "Scene-image settings write response");
+  const revision = sceneImageRevisionPayload(success.body, "Scene-image settings write response");
+  if (revision <= body.expectedRevision) throw new Error("Scene-image settings revision did not advance");
+  const settings = sceneImageSettingsPayload(response.settings);
+  if (JSON.stringify(settings) !== JSON.stringify(body.settings)) throw new Error("Scene-image settings write response did not match the request");
+  return { settings, revision, receipt: sceneImageReceiptPayload(response.receipt, "Scene-image settings write receipt") };
+}
+
+/** Starts one bounded generation. The documented success status is 202. */
+export async function generateSceneImage(campaignId: string, input: SceneImageGenerateRequest): Promise<SceneImageGenerateResponse> {
+  const body = sceneImageGenerateBody(input);
+  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/generate"),
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) },
+    { status: 202, message: "Scene-image generation status was not confirmed" });
+  const response = sceneImageObjectBody(success.body, "Scene-image generation response");
+  if (typeof response.deduped !== "boolean") throw new Error("Scene-image generation response was malformed");
+  const job = sceneImageJobPayload(response.job);
+  if (job.sessionId !== undefined && job.sessionId !== body.sessionId) throw new Error("Scene-image job did not match the requested room");
+  if (job.sceneKey !== undefined && job.sceneKey !== body.sceneKey) throw new Error("Scene-image job did not match the requested scene");
+  return { job, deduped: response.deduped };
+}
+
+/** Reads the session gallery exactly, without caching. */
+export async function getSceneImageGallery(campaignId: string, sessionId: string): Promise<SceneImageGalleryResponse> {
+  const room = parseApiInput(() => resourceIdSchema.parse(sessionId));
+  const success = await requestResponse<unknown>(`${sceneImagePath(campaignId, "/gallery")}?sessionId=${encodeURIComponent(room)}`, { cache: "no-store" });
+  requireStatus(success, 200, "Scene-image gallery read");
+  const raw = sceneImageObjectBody(success.body, "Scene-image gallery response");
+  if (!Array.isArray(raw.images)) throw new Error("Scene-image gallery response was malformed");
+  const images = raw.images.map((entry) => {
+    const item = sceneImageObjectBody(entry, "Scene-image gallery row");
+    const string = (key: string) => { const field = item[key]; if (typeof field !== "string") throw new Error(`Scene-image gallery ${key} was malformed`); return field; };
+    const number = (key: string) => { const field = item[key]; if (typeof field !== "number" || !Number.isFinite(field)) throw new Error(`Scene-image gallery ${key} was malformed`); return field; };
+    if (typeof item.selected !== "boolean") throw new Error("Scene-image gallery selected was malformed");
+    if (item.seconds !== undefined && item.seconds !== null && (typeof item.seconds !== "number" || !Number.isFinite(item.seconds))) {
+      throw new Error("Scene-image gallery seconds was malformed");
+    }
+    if (item.sceneKey !== undefined && typeof item.sceneKey !== "string") throw new Error("Scene-image gallery sceneKey was malformed");
+    const row: SceneImageGalleryItem = {
+      assetId: string("assetId"), jobId: string("jobId"), prompt: string("prompt"),
+      seed: number("seed"), steps: number("steps"), guidance: number("guidance"),
+      status: string("status"), createdAt: string("createdAt"), selected: item.selected,
+    };
+    if (item.seconds !== undefined) row.seconds = item.seconds as number | null;
+    if (item.sceneKey !== undefined) row.sceneKey = item.sceneKey;
+    return row;
+  });
+  return { images };
+}
+
+/** Selects one asset for one scene with an optimistic revision. */
+export async function selectSceneImage(campaignId: string, input: SceneImageSelectRequest): Promise<SceneImageSelectResponse> {
+  const raw = sceneImageObjectBody(input, "Scene-image selection request");
+  const expectedRevision = raw.expectedRevision;
+  if (!Number.isInteger(expectedRevision) || (expectedRevision as number) < 0) throw new ApiInputError();
+  const sceneKey = typeof raw.sceneKey === "string" ? raw.sceneKey.trim() : "";
+  if (sceneKey.length === 0 || sceneKey.length > 128) throw new ApiInputError();
+  const body: SceneImageSelectRequest = {
+    sessionId: parseApiInput(() => resourceIdSchema.parse(raw.sessionId)),
+    sceneKey,
+    assetId: parseApiInput(() => resourceIdSchema.parse(raw.assetId)),
+    expectedRevision: expectedRevision as number,
+    idempotencyKey: parseApiInput(() => idempotencyKeySchema.parse(raw.idempotencyKey)),
+  };
+  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/select"), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Scene-image selection");
+  const response = sceneImageObjectBody(success.body, "Scene-image selection response");
+  const selection = sceneImageObjectBody(response.selection, "Scene-image selection");
+  if (selection.sceneKey !== undefined && selection.sceneKey !== body.sceneKey) throw new Error("Scene-image selection did not match the requested scene");
+  if (selection.assetId !== undefined && selection.assetId !== body.assetId) throw new Error("Scene-image selection did not match the requested asset");
+  return { selection: selection as SceneImageSelection, receipt: sceneImageReceiptPayload(response.receipt, "Scene-image selection receipt") };
+}
+
+/** Reads one exact job without caching. */
+export async function getSceneImageJob(campaignId: string, jobId: string): Promise<SceneImageJobResponse> {
+  const job = parseApiInput(() => resourceIdSchema.parse(jobId));
+  const success = await requestResponse<unknown>(sceneImagePath(campaignId, `/jobs/${encodeURIComponent(job)}`), { cache: "no-store" });
+  requireStatus(success, 200, "Scene-image job read");
+  const response = sceneImageObjectBody(success.body, "Scene-image job response");
+  const value = sceneImageJobPayload(response.job);
+  if (value.jobId !== job) throw new Error("Scene-image job response did not match the request");
+  return { job: value };
+}
+
+/**
+ * Same-origin URL for image bytes. The route serves the bytes directly, so
+ * this is the only scene-image helper that does not go through the JSON
+ * request boundary. Private, non-secret, and safe for an `<img src>`.
+ */
+export function sceneImageAssetUrl(campaignId: string, assetId: string): string {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const asset = parseApiInput(() => resourceIdSchema.parse(assetId));
+  return `/api/rpg/v1/campaigns/${encodeURIComponent(campaign)}/scene-images/assets/${encodeURIComponent(asset)}`;
 }

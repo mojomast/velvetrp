@@ -1,9 +1,9 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import "./playSurface.css";
 
-export type AtlasTool = "character" | "inventory" | "advancement" | "travel" | "dice" | "context" | "combat" | "gm" | "security" | "create" | "director" | "help";
+export type AtlasTool = "character" | "inventory" | "advancement" | "travel" | "dice" | "context" | "combat" | "gm" | "security" | "create" | "director" | "images" | "help";
 export const atlasToolLabels: Record<AtlasTool, string> = {
-  character: "Character", inventory: "Inventory & equipment", advancement: "Advancement", travel: "Travel", dice: "Dice", context: "Field journal", combat: "Combat & rewards", gm: "GM tools", security: "Rules & safety", create: "Create character", director: "Director", help: "Help",
+  character: "Character", inventory: "Inventory & equipment", advancement: "Advancement", travel: "Travel", dice: "Dice", context: "Field journal", combat: "Combat & rewards", gm: "GM tools", security: "Rules & safety", create: "Create character", director: "Director", images: "Scene images", help: "Help",
 };
 
 /** Legacy living-atlas surface, retained for reference. The Command Center is the primary room surface. */
