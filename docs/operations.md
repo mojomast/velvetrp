@@ -80,6 +80,11 @@ Velvet does not auto-load `.env`. Export variables in the shell or configure the
 | `VELVET_IMAGES_MODEL` | server-runtime | Unset | Operator-declared image model identifier used for health reporting; server-side only. |
 | `VELVET_IMAGES_TIMEOUT_MS` | server-runtime | `120000` | Per-generation request deadline, bounded to 1000–600000 ms; a failed or ambiguous call is never retried automatically. |
 | `VELVET_IMAGES_MAX_BYTES` | server-runtime | `8388608` | Decoded byte budget per generated image, bounded to 1024–67108864 bytes. |
+| `VELVET_SCENE_IMAGES_ENABLED` | server-runtime | Disabled | Exact `true` opts into the private Supra2 scene-image service; requires a valid base URL and the deployment's Tailscale identity authorization. |
+| `VELVET_SCENE_IMAGES_BASE_URL` | server-runtime | Unset | Operator-configured Supra2 HTTP(S) root; `http:` is accepted only for loopback, RFC1918 private, or Tailscale CGNAT/`*.ts.net` hosts. |
+| `VELVET_SCENE_IMAGES_ORIGIN` | server-runtime | Base URL origin | `Origin` header sent on POST submissions because the service checks it as a request guard; not an authentication credential. |
+| `VELVET_SCENE_IMAGES_TIMEOUT_MS` | server-runtime | `120000` | Per-request deadline bounded to 1000–600000 ms; an ambiguous submission is never retried automatically. |
+| `VELVET_SCENE_IMAGES_MAX_BYTES` | server-runtime | `8388608` | Decoded PNG byte budget bounded to 1024–67108864 bytes. |
 | `FEATURE_RPG_CAMPAIGN` | server-runtime | Disabled | Base RPG campaign/API rollout flag. |
 | `FEATURE_RPG_MECHANICS` | server-runtime | Disabled | Mechanics routes require this and campaign. |
 | `FEATURE_RPG_COMBAT` | server-runtime | Disabled | Combat routes require combat, mechanics, and campaign. |
