@@ -169,7 +169,7 @@ export async function recordGuardrailShadowDecision(
   try {
     if (systemOneLaneMode(settings, "guardrails") === "off") return;
     const boundaries = (input.declaredBoundaries ?? []).map((line) => line.trim()).filter(Boolean);
-    const state = boundaries.length > 0
+    const state: { message: string; declaredBoundaries: string[] } | { message: string } = boundaries.length > 0
       ? { message: input.content, declaredBoundaries: boundaries }
       : { message: input.content };
     const questions = buildGuardrailQuestions(state);
