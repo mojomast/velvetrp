@@ -1,6 +1,7 @@
 # Supra2-IMG inference setup handoff prompt
 
-Status: paste-ready handoff for an agent on another tailnet machine to self-host the
+Status: paste-ready handoff for an agent on another tailnet machine (target hardware: AMD Ryzen
+AI MAX+ 395 "Strix Halo" with unified memory) to self-host the
 `SupraLabs/Supra2-IMG` text-to-image service used by the image generation plan
 ([image-generation-integration.md](image-generation-integration.md)). It is written to be copied
 verbatim into that agent's session. The service is private to the Tailscale tailnet, token
@@ -18,15 +19,33 @@ GOAL
 Serve SupraLabs/Supra2-IMG (104M text-to-image DiT, fixed 256x256) over a small
 token-authenticated HTTP API that the Velvet dev box can call.
 
-STEP 1 — Prerequisites
-- Python 3.10–3.12, pip, git, curl. NVIDIA GPU strongly preferred (CPU works but is slow).
-- Record: GPU model, VRAM, `nvidia-smi` driver/CUDA version, Python version.
+STEP 1 — Prerequisites (AMD Ryzen AI MAX+ 395 "Strix Halo", unified memory)
+- OS: native Linux (Ubuntu 24.04+ or similar) is the supported ROCm path. If this machine
+  runs Windows, use WSL2 with ROCm and verify the GPU is visible there; if ROCm cannot see
+  the iGPU, run on CPU for now (the script supports it) and report the latency.
+- GPU: integrated Radeon 8060S (RDNA 3.5, gfx1151). The XDNA2 NPU is NOT usable for this
+  model — do not install Ryzen AI / ONNX NPU tooling for it.
+- Firmware: set the UMA Frame Buffer / Variable Graphics Memory carve-out to at least 8 GB
+  (16 GB+ is comfortable). This model needs roughly 1.8 GB of weights; the carve-out only
+  has to cover weights plus activations.
+- Optional Linux tuning so the iGPU can map more system RAM as GTT (not required at this
+  model size; useful if larger models are tried later): add `amdgpu.gttsize=65536
+  ttm.pages_limit=16777216` to the kernel command line.
+- ROCm: install a build that includes gfx1151 (ROCm 6.4+ or 7.x, or a TheRock nightly).
+  Verify with `rocminfo | grep -m1 gfx` and
+  `python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0), torch.version.hip)"`.
+  If the runtime rejects the arch, export `HSA_OVERRIDE_GFX_VERSION=11.0.0` for the service.
+- Record: OS/kernel, total unified RAM, carve-out size, rocminfo gfx target, ROCm version.
+- Python 3.10–3.12, pip, git, curl.
 
 STEP 2 — Workspace
 mkdir -p ~/supra2-service && cd ~/supra2-service
 python3 -m venv .venv && . .venv/bin/activate
 pip install --upgrade pip
-pip install torch torchvision transformers diffusers sentencepiece tqdm huggingface_hub fastapi uvicorn
+# ROCm PyTorch: use the index matching the installed ROCm (example: rocm7.0).
+# Do NOT install PyPI torch on AMD — those are CUDA wheels.
+pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm7.0
+pip install transformers diffusers sentencepiece tqdm huggingface_hub fastapi uvicorn
 
 STEP 3 — Vendor the model pinned (do not use transformers AutoModel; its config is broken)
 COMMIT=10dec6e4b4b5d1c44fd1d7d3fe5e50137333da5b
@@ -39,9 +58,12 @@ wget -O model_final_ema.pt https://huggingface.co/SupraLabs/Supra2-IMG/resolve/$
 - If the pinned commit no longer resolves, use the current main commit and report it.
 
 STEP 4 — Smoke-test the original script before writing any server
+(ROCm masquerades as CUDA inside PyTorch, so `torch.cuda.is_available()` is the check.
+ If the first run fails on the gfx target, retry with `HSA_OVERRIDE_GFX_VERSION=11.0.0`.)
 python inference.py --prompt "a weathered harbor lighthouse at dusk, painterly" \
   --seed 0 --cfg 3.0 --steps 50 --n 1 --out /tmp/supra2-smoke.png
-- Report: success/failure, whether CUDA or CPU was used, wall-clock seconds, image size.
+- Report: success/failure, the device actually used (rocm/cuda/cpu), wall-clock seconds,
+  image size, and the exact `torch.version.hip` value.
 
 STEP 5 — Write server.py (FastAPI + uvicorn) with EXACTLY this contract
 - Load the model once at startup (DiT + flan-t5-base + sd-vae-ft-mse), keep it warm,
@@ -50,7 +72,7 @@ STEP 5 — Write server.py (FastAPI + uvicorn) with EXACTLY this contract
 - Auth: generate TOKEN=$(openssl rand -hex 32). Require header
   `Authorization: Bearer $TOKEN` on /generate. /health may be unauthenticated.
 - Endpoints:
-  * GET /health -> {"status":"ok","model":"SupraLabs/Supra2-IMG","commit":"<commit>","device":"cuda"|"cpu"}
+  * GET /health -> {"status":"ok","model":"SupraLabs/Supra2-IMG","commit":"<commit>","device":"rocm"|"cuda"|"cpu"}
   * POST /generate
       request: {"prompt": string(1..2000), "seed": int 0..2147483647 = 0,
                 "steps": int 10..100 = 50, "guidanceScale": number 1..8 = 3,
@@ -87,11 +109,13 @@ generate response: <base64 length, seed, seconds; do not paste the whole base64>
 tailnet reachability: <curl output from the tailnet IP>
 model commit: <hash used>
 checkpoint sha256: <hash> (<bytes> bytes)
-device: <cuda|cpu>; GPU: <model>; VRAM: <GB>
+device: <rocm|cuda|cpu>; GPU: Radeon 8060S; torch.hip: <version or none>
+unified memory: <GB total>, carve-out <GB>; HSA_OVERRIDE_GFX_VERSION used: <yes/no>
+rocm: <version>; kernel: <version>
 versions: python <x.y.z>, torch <x.y.z>, transformers <x.y.z>, diffusers <x.y.z>
 service: <systemd unit name | pid | other>
 latency: <seconds per 256x256, 50-step image, cold and warm>
-quirks: <anything unusual: warnings, download issues, memory, CUDA issues>
+quirks: <anything unusual: warnings, download issues, memory, ROCm/gfx issues>
 
 Keep the token private outside this report. If anything fails, report exactly where
 and the error output rather than guessing.
