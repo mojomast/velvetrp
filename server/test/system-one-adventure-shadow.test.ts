@@ -541,6 +541,38 @@ describe("adventure-selection candidate union projection", () => {
     semanticLabel: { action, source: `${action} ${index}`, target: null, cost: null, consequence: "Select this server-issued candidate." },
   });
 
+  it.each(["srdCheck", "inventory", "power", "combatPower"] as const)("recovers a late relevant %s candidate without crowding other families", (family) => {
+    const rows = Array.from({ length: 40 }, (_, i) => shadowRow(family, i, "Ordinary action"));
+    rows[39] = shadowRow(family, 39, "Examine moonstone");
+    const input = { ...families, [family]: rows, rest: [shadowRow("rest", 0, "Rest")] };
+    const before = adventureShadowCandidateUnion(input);
+    const after = adventureShadowCandidateUnion(input, { declaration: "Examine moonstone" });
+    expect(before.some(row => row.candidateId === `${family}:39`)).toBe(false);
+    expect(after).toHaveLength(ADVENTURE_SHADOW_CANDIDATE_CAP);
+    expect(after.find(row => row.candidateId === `${family}:39`)?.digest).toBe(rows[39]!.digest);
+    expect(after.some(row => row.candidateId === "rest:0")).toBe(true);
+    expect(adventureShadowCandidateUnion(input, { declaration: "Examine moonstone" })).toEqual(after);
+  });
+
+  it("filters unavailable tools before allocating the cap", () => {
+    const input = { ...families,
+      inventory: Array.from({ length: 40 }, (_, i) => shadowRow("item", i, "Equip")),
+      power: Array.from({ length: 40 }, (_, i) => shadowRow("power", i, "Cast")) };
+    const result = adventureShadowCandidateUnion(input, { allowedTools: new Set(["exact_power_use.select"]) });
+    expect(result).toHaveLength(ADVENTURE_SHADOW_CANDIDATE_CAP);
+    expect(result.every(row => row.kind === "exact_power_use.select")).toBe(true);
+    expect(adventureShadowCandidateUnion(input, { allowedTools: new Set() })).toEqual([]);
+  });
+
+  it("preserves under-cap and no-match ordering and never mutates input", () => {
+    const input = { ...families, inventory: Array.from({ length: 40 }, (_, i) => shadowRow("item", i, "Equip")) };
+    const copy = structuredClone(input);
+    expect(adventureShadowCandidateUnion(input, { declaration: "unrelated" })).toEqual(adventureShadowCandidateUnion(input));
+    const small = { ...families, inventory: input.inventory.slice(0, 3) };
+    expect(adventureShadowCandidateUnion(small, { declaration: "Equip" })).toEqual(adventureShadowCandidateUnion(small));
+    expect(input).toEqual(copy);
+  });
+
   it("projects a travel row with an explicit advisory binding instead of a digest", () => {
     const union = adventureShadowCandidateUnion({ ...families, travel: [{ candidateId: "travel-candidate:x", kind: "actor.travel", version: "v1",
       label: { format: "message-key-v1", key: "candidate.actor.travel.label", routeOption: 1 },

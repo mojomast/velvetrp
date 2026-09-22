@@ -1,0 +1,10 @@
+Jev shortlist coverage: shadow-only lexical strategy
+
+Scope
+Within each eligible family, prioritize declaration/label token overlap when the total exceeds 32. Preserve round-robin family allocation, original output ordering, stable ties, server-issued identities and digests. Filter unavailable tools before allocating shadow slots. Active mode intentionally retains its existing strategy; no new gameplay authority or promotion is introduced.
+
+Evidence
+Six added regression cases cover late relevant candidates in check, inventory, noncombat power and combat power families; unavailable-tool allocation; under-cap/no-match stability and input immutability. All four constructed late-target fixtures exclude the target with the legacy strategy and include it with the shadow strategy. These are deterministic retrieval fixtures, not a representative gameplay benchmark or evidence of model accuracy. Both adventure System One test files pass (47 tests). Server source and test typechecks pass.
+
+Limits and follow-up
+Token overlap is lexical, not semantic intent, and does not handle negation or synonyms. Matching labels never authorizes an action. Dense families can still exceed their allocated slots. Candidate generation upstream can still exclude targets. Add reviewed, realistic recall fixtures and promotion fingerprint binding before considering active adoption. Shared-state prompt deduplication and broader promotion changes are not part of this commit. No API requests or paid benchmark were run.

@@ -139,8 +139,11 @@ function travelShadowCandidate(candidate: ProviderSafeExactCandidate): Adventure
  *
  * The cap is filled round-robin across families: pass 0 offers every non-empty family its first
  * advertised row before pass 1 offers anyone a second, so one large family cannot crowd another
- * family's advertised rows out of the battery. Selected rows are emitted in advertised order, so
- * any union at or under the cap is byte-for-byte the advertised concatenation.
+ * family's advertised rows out of the battery. When an optional declaration is supplied and
+ * eligible rows exceed the cap, token overlap ranks rows within each family before allocation.
+ * Ties retain advertised order; selected rows are emitted in original advertised order.
+ * Optional allowedTools filtering happens before allocation. This relevance strategy is shadow-only;
+ * the promoted active path retains the legacy selection until separately evaluated.
  */
 export function adventureShadowCandidateUnion(families: {
   travel: readonly ProviderSafeExactCandidate[];
@@ -154,7 +157,7 @@ export function adventureShadowCandidateUnion(families: {
   combatPower: readonly ShadowLabeledCandidate[];
   questLifecycle: readonly ShadowLabeledCandidate[];
   progression: readonly ShadowLabeledCandidate[];
-}): AdventureSelectionCandidate[] {
+}, options: { declaration?: string; allowedTools?: ReadonlySet<string> } = {}): AdventureSelectionCandidate[] {
   // The advertised concatenation, kept grouped by family so each row's advertised position survives.
   const advertised: readonly AdventureSelectionCandidate[][] = [
     families.travel.map(travelShadowCandidate),
@@ -172,18 +175,31 @@ export function adventureShadowCandidateUnion(families: {
   // Round-robin selection: each pass takes at most one row per family, families and rows in
   // advertised order, until the cap is reached or every advertised row has been taken. The
   // per-family row counts are then emitted in full advertised order.
-  const take = advertised.map(() => 0);
-  const total = advertised.reduce((count, group) => count + group.length, 0);
+  // Exclude unavailable tools BEFORE allocating scarce slots. Lexical relevance only
+  // prioritizes server-issued rows; it is not intent classification or authorization.
+  const eligible = advertised.map(group => group.filter(candidate =>
+    !options.allowedTools || options.allowedTools.has(candidate.kind)));
+  const total = eligible.reduce((count, group) => count + group.length, 0);
+  const words = new Set((options.declaration?.toLocaleLowerCase("en-US").match(/[\p{L}\p{N}]+/gu) ?? [])
+    .filter(word => word.length > 2 && !["the", "and", "with", "this", "that", "want", "use"].includes(word)));
+  const score = (candidate: AdventureSelectionCandidate) => {
+    const tokens = new Set(candidate.label.toLocaleLowerCase("en-US").match(/[\p{L}\p{N}]+/gu) ?? []);
+    return [...words].reduce((sum, word) => sum + Number(tokens.has(word)), 0);
+  };
+  const ranked = eligible.map(group => total > ADVENTURE_SHADOW_CANDIDATE_CAP && words.size
+    ? [...group].sort((a, b) => score(b) - score(a)) : group);
+  const take = ranked.map(() => 0);
   const bound = Math.min(total, ADVENTURE_SHADOW_CANDIDATE_CAP);
   for (let picked = 0, pass = 0; picked < bound; pass += 1) {
-    for (const [family, group] of advertised.entries()) {
+    for (const [family, group] of ranked.entries()) {
       if (picked >= bound) break;
       if (pass >= group.length) continue;
       take[family] = pass + 1;
       picked += 1;
     }
   }
-  return advertised.flatMap((group, family) => group.slice(0, take[family]!));
+  const selectedRows = new Set(ranked.flatMap((group, family) => group.slice(0, take[family]!)));
+  return eligible.flatMap(group => group.filter(row => selectedRows.has(row)));
 }
 
 /**
@@ -859,11 +875,16 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   // The L2 shadow lane reasons over the exact same advertised rows the provider sees, minus the
   // non-candidate attribute/combat-action families, capped and bound to advertised tools only.
   const advertisedToolNames = new Set<string>(selected.map((tool) => tool.name));
-  const shadowCandidates = adventureShadowCandidateUnion({
+  const shadowFamilies = {
     travel: providerTravel, questObjective: modelQuest, srdCheck: providerChecks, inventory: providerInventory,
     commerce: providerCommerce, power: providerPowers, rest: providerRests, combatConsumable: providerConsumables,
     combatPower: providerCombatPowers, questLifecycle: providerQuestLifecycle, progression: providerProgression,
-  }).filter((candidate) => advertisedToolNames.has(candidate.kind));
+  };
+  // Keep the promoted active strategy unchanged until the new strategy is evaluated.
+  const shadowCandidates = adventureShadowCandidateUnion(shadowFamilies)
+    .filter((candidate) => advertisedToolNames.has(candidate.kind));
+  const relevanceCandidates = adventureShadowCandidateUnion(shadowFamilies,
+    { declaration: turn.declaration, allowedTools: advertisedToolNames });
   const messages = adventurePlanningMessages({
     authorityContext: basketText,
     candidateContext:adventureCandidateContext(candidateOptions),
@@ -999,13 +1020,13 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   // `exact_combat_power.select` candidate; only then does it commit the check directly or leave
   // the confirmation-required rest/combat proposal waiting and return without provider planning.
   // A lane failure is swallowed so it cannot affect a turn the provider would otherwise handle.
-  if (shadowCandidates.length > 0 && dependencies.getSystemOneAdventure) {
+  if ((shadowCandidates.length > 0 || relevanceCandidates.length > 0) && dependencies.getSystemOneAdventure) {
     try {
       const lane = await dependencies.getSystemOneAdventure();
       if (lane) {
         if (systemOneLaneMode(lane.settings, "adventure-selection") === "shadow") {
           const snapshot = structuredClone(turn);
-          const candidates = structuredClone(shadowCandidates);
+          const candidates = structuredClone(relevanceCandidates);
           const frozenLane = { ...lane, settings: structuredClone(lane.settings) };
           // No repository is passed: background work cannot commit a gameplay action.
           systemOneShadowQueue.submit(() => recordAdventureShadowDecision(snapshot, candidates, frozenLane, undefined, signal));
