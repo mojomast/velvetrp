@@ -102,7 +102,7 @@ test("director persists explicit delegation, bounded scenes and human review wit
     const map = await page.getByRole("region", { name: "Campaign maps", exact: true }).elementHandle();
     await page.getByRole("button", { name: "Review AI delegation", exact: true }).click();
     await expect(composer).toBeDisabled();
-    await expect(page.getByRole("combobox", { name: "Map actor", exact: true })).toBeDisabled();
+    await expect(page.getByRole("combobox", { name: "Acting character", exact: true })).toBeDisabled();
     expect(writes).toEqual([]);
     await page.getByRole("button", { name: "Confirm AI delegation", exact: true }).click();
     await expect(page.getByRole("heading", { name: "AI DM / no human DM", exact: true })).toBeVisible();
@@ -137,7 +137,7 @@ test("director persists explicit delegation, bounded scenes and human review wit
     await page.getByRole("button", { name: "Close Director", exact: true }).click();
     await expect(composer).toBeDisabled();
     await expect(composer).toHaveValue("My unsubmitted player choice");
-    await expect(page.getByRole("combobox", { name: "Map actor", exact: true })).toBeDisabled();
+    await expect(page.getByRole("combobox", { name: "Acting character", exact: true })).toBeDisabled();
     expect(await map!.evaluate(node => node.isConnected)).toBe(true);
     const awaiting = (await history()).runs.find(run => run.state === "awaiting-approval")!;
     const writesBeforeRead = [...writes];

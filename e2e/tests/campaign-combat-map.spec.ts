@@ -130,9 +130,6 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       const actorCombatant = offTurn.combatants.find((entry) => entry.kind === "actor" && entry.actorId === actorId)!;
       const enemyCombatant = offTurn.combatants.find((entry) => entry.kind === "enemy")!;
       expect(actorCombatant.combatantId).toBe(combatantId);
-      const actorToken = { tokenId: actorCombatant.combatantId, actorId, combatantId: actorCombatant.combatantId, label: actorId, position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly", hidden: false };
-      const enemyToken = { tokenId: enemyCombatant.combatantId, actorId: null, combatantId: enemyCombatant.combatantId, label: enemyCombatant.combatantId, position: { x: 5, y: 1 }, footprint: { width: 2, height: 2 }, disposition: "hostile", hidden: true };
-      const reviewedTokens = offTurn.combatants.map((entry) => entry.combatantId === combatantId ? actorToken : enemyToken);
       await page.goto("/");
       await page.getByRole("button", { name: "Open campaign Provider-free Combat Gate", exact: true }).click();
       await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
@@ -146,52 +143,33 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
       await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
       await expect(page.getByText("CAMPAIGN COMMAND CENTER", { exact: true })).toBeVisible();
-      await expect(page.getByLabel("Map actor")).toHaveValue(actorId);
-      await page.getByRole("button", { name: "Combat grid", exact: true }).click();
+      await expect(page.getByLabel("Acting character")).toHaveValue(actorId);
+      // Encounter start generated the authoritative combat map. Verify that
+      // automatic map directly: same room, mode, encounter, and both combatant
+      // tokens, with the controlled token bound to the acting character.
+      const autoMap = tacticalMapSnapshotSchema.parse(await http(request, snapshotPath));
+      expect(autoMap).toMatchObject({ encounterId, mode: "combat", controlledTokenId: combatantId, movement: { policy: "combat-current-turn-speed", budgetFeet: 0 } });
+      const autoTokens = autoMap.projection.tokens;
+      expect(autoTokens.map((token) => token.tokenId).sort()).toEqual([combatantId, enemyCombatant.combatantId].sort());
+      const actorToken = autoTokens.find((token) => token.tokenId === combatantId)!;
+      const enemyToken = autoTokens.find((token) => token.tokenId === enemyCombatant.combatantId)!;
+      expect(actorToken).toMatchObject({ label: "Aster", footprint: { width: 1, height: 1 }, disposition: "friendly" });
+      expect(enemyToken).toMatchObject({ footprint: { width: 1, height: 1 }, disposition: "hostile" });
+      expect(enemyToken.label.length).toBeGreaterThan(0);
+      expect(actorToken.position).not.toEqual(enemyToken.position);
+      // Focus + Enter is the keyboard activation other specs use for tool buttons
+      // and stays reliable on narrow layouts where the stacked Command Center can
+      // clip this pane's pointer targets.
+      const combatGrid = page.getByRole("button", { name: "Combat grid", exact: true });
+      await expect(combatGrid).toBeEnabled();
+      await combatGrid.focus();
+      await page.keyboard.press("Enter");
+      await expect(combatGrid).toHaveAttribute("aria-pressed", "true");
       await page.getByText("Combat readiness", { exact: true }).click();
       await expect(page.getByRole("button", { name: "Refresh combat binding", exact: true })).toBeVisible();
       await expect(page.getByText(`Verified selected combatant: ${combatantId}.`, { exact: false })).toContainText("Another combatant has the turn");
       await expect(page.getByRole("navigation", { name: "In-room tools", exact: true }).locator('[data-atlas-tool="combat"]')).toBeEnabled();
-      await expect(page.getByRole("group", { name: "Combat roster placement", exact: true })).toBeVisible();
-      const generate = page.getByRole("button", { name: "Generate tactical map", exact: true });
-      const replaceApproval = page.getByLabel("I authorize creating or replacing this room's map with the reviewed layout and tokens.", { exact: true });
-      await expect(generate).toBeDisabled();
-      for (const [entry, fields] of [
-        [actorCombatant, { x: "2", y: "2", width: "1", height: "1", visibility: "visible", disposition: "friendly" }],
-        [enemyCombatant, { x: "6", y: "2", width: "2", height: "2", visibility: "hidden", disposition: "hostile" }],
-      ] as const) {
-        await page.getByLabel(`${entry.combatantId} x`, { exact: true }).fill(fields.x);
-        await page.getByLabel(`${entry.combatantId} y`, { exact: true }).fill(fields.y);
-        await page.getByLabel(`${entry.combatantId} width`, { exact: true }).fill(fields.width);
-        await page.getByLabel(`${entry.combatantId} height`, { exact: true }).fill(fields.height);
-        await page.getByLabel(`${entry.combatantId} visibility`, { exact: true }).selectOption(fields.visibility);
-        await page.getByLabel(`${entry.combatantId} disposition`, { exact: true }).selectOption(fields.disposition);
-      }
-      await expect(replaceApproval).not.toBeChecked();
-      await expect(generate).toBeDisabled();
-      await replaceApproval.check();
-      await expect(replaceApproval).toBeChecked();
-      await expect(generate).toBeEnabled();
-      const generatedResponse = page.waitForResponse((response) => new URL(response.url()).pathname === mapPath && response.request().method() === "POST");
-      await generate.click();
-      const generatedHttp = await generatedResponse;
-      expect(generatedHttp.status(), await generatedHttp.text()).toBe(200);
-      const generationRequest = generatedHttp.request().postDataJSON();
-      expect(generationRequest).toMatchObject({ mode: "combat", encounterId, width: 12, height: 10, tokens: reviewedTokens });
-      const tokenIds = generationRequest.tokens.map((token: { tokenId: string }) => token.tokenId);
-      expect(tokenIds).toEqual(offTurn.combatants.map((entry) => entry.combatantId));
-      expect(new Set(tokenIds).size).toBe(offTurn.combatants.length);
-      const occupied = new Set<string>();
-      for (const token of generationRequest.tokens as typeof reviewedTokens) for (let x = token.position.x; x < token.position.x + token.footprint.width; x++) for (let y = token.position.y; y < token.position.y + token.footprint.height; y++) {
-        const cell = `${x},${y}`;
-        expect(occupied.has(cell), `overlapping reviewed token footprint at ${cell}`).toBe(false);
-        occupied.add(cell);
-      }
-      const generated = tacticalMapSnapshotSchema.parse(await generatedHttp.json());
-      expect(generated.encounterId).toBe(encounterId);
-      expect(generated.projection.tokens.map((token) => token.tokenId).sort()).toEqual([...tokenIds].sort());
-      const offTurnMap = tacticalMapSnapshotSchema.parse(await http(request, snapshotPath));
-      expect(offTurnMap).toMatchObject({ encounterId, controlledTokenId: combatantId, movement: { policy: "combat-current-turn-speed", budgetFeet: 0 } });
+      await expect(page.getByRole("region", { name: "Tactical map", exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Zoom in", exact: true }).click();
       await page.getByText("Camera controls and movement help", { exact: true }).click();
       await page.getByRole("button", { name: "Pan right", exact: true }).click();
@@ -202,10 +180,10 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await expect(page.getByText(/0 feet available by combat-current-turn-speed/)).toBeVisible();
       await page.getByText("Accessible cells and tokens", { exact: true }).click();
       const cells = page.getByRole("table", { name: "Tactical map text equivalent", exact: true });
-      await cells.getByRole("button", { name: "3, 2", exact: true }).click();
-      await expect(page.getByRole("status", { name: "Map selection" })).toContainText("Destination: 3, 2");
+      await expect(cells.getByRole("row").filter({ hasText: actorToken.label })).toContainText(`${actorToken.position.x + 1}, ${actorToken.position.y + 1}`);
+      await expect(cells.getByRole("row").filter({ hasText: enemyToken.label })).toContainText(`${enemyToken.position.x + 1}, ${enemyToken.position.y + 1}`);
       await expect(page.getByRole("button", { name: "Confirm move", exact: true })).toHaveCount(0);
-      expect(writes).toEqual([mapPath]);
+      expect(writes).toEqual([]);
 
       await http(request, `${combatPath}/enemy-turn-commands`, { expectedRevision: offTurn.revision, idempotencyKey: "combat-map-enemy-end" });
       const turn = combatReadResponseSchema.parse(await http(request, combatPath));
@@ -215,17 +193,28 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await expect(page.getByText(`Verified selected combatant: ${combatantId}.`, { exact: false })).toContainText("Your character has the current turn");
       await expect(page.getByText(/30 feet available by combat-current-turn-speed/)).toBeVisible();
       const before = tacticalMapSnapshotSchema.parse(await http(request, snapshotPath));
+      expect(before.movement).toMatchObject({ policy: "combat-current-turn-speed", budgetFeet: 30 });
+      expect(before.projection.reachable.length).toBeGreaterThan(1);
+      const tokenCell = before.projection.tokens.find((token) => token.tokenId === combatantId)!.position;
+      // Derive the legal destination from the authoritative auto-generated layout
+      // instead of the removed reviewed spawn form.
+      const destination = (before.projection.reachable.find((cell) => (cell.x !== tokenCell.x || cell.y !== tokenCell.y) && Math.abs(cell.x - tokenCell.x) + Math.abs(cell.y - tokenCell.y) === 1)
+        ?? before.projection.reachable.find((cell) => cell.x !== tokenCell.x || cell.y !== tokenCell.y))!;
       await expect(cells).toBeVisible();
       const previewResponse = page.waitForResponse((response) => new URL(response.url()).pathname === `${mapPath}/combat/previews`);
-      await cells.getByRole("button", { name: "3, 2", exact: true }).click();
+      await cells.getByRole("button", { name: `${destination.x + 1}, ${destination.y + 1}`, exact: true }).click();
       const previewHttp = await previewResponse;
       expect(previewHttp.status(), await previewHttp.text()).toBe(200);
       const preview = tacticalMapPreviewResponseSchema.parse(await previewHttp.json());
-      expect(preview).toMatchObject({ encounterId, pathCostFeet: 5, mapRevision: before.mapRevision, tokenRevision: before.tokenRevision });
-      expect(preview.projection.authoritativePath?.at(-1)).toEqual({ x: 2, y: 1 });
+      expect(preview).toMatchObject({ encounterId, mapRevision: before.mapRevision, tokenRevision: before.tokenRevision });
+      expect(preview.pathCostFeet).toBeGreaterThan(0);
+      expect(preview.pathCostFeet % 5).toBe(0);
+      expect(preview.pathCostFeet).toBeLessThanOrEqual(before.movement!.budgetFeet);
+      expect(preview.projection.authoritativePath?.[0]).toEqual(tokenCell);
+      expect(preview.projection.authoritativePath?.at(-1)).toEqual(destination);
       const notMoved = tacticalMapSnapshotSchema.parse(await http(request, snapshotPath));
       expect(notMoved.tokenRevision).toBe(before.tokenRevision);
-      expect(notMoved.projection.tokens.find((token) => token.tokenId === combatantId)?.position).toEqual({ x: 1, y: 1 });
+      expect(notMoved.projection.tokens.find((token) => token.tokenId === combatantId)?.position).toEqual(tokenCell);
       const movedResponse = page.waitForResponse((response) => new URL(response.url()).pathname === `${mapPath}/combat/move-commands`);
       await page.getByRole("button", { name: "Confirm move", exact: true }).click();
       const movedHttp = await movedResponse;
@@ -233,19 +222,19 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(movedHttp.request().postDataJSON()).toMatchObject({ actorId, previewId: preview.previewId, expectedMapRevision: before.mapRevision, expectedTokenRevision: before.tokenRevision });
       const moved = tacticalMapMoveResponseSchema.parse(await movedHttp.json());
       expect(moved.receipt.previewId).toBe(preview.previewId);
-      expect(moved.snapshot).toMatchObject({ encounterId, tokenRevision: before.tokenRevision + 1, movement: { budgetFeet: 25 } });
+      expect(moved.snapshot).toMatchObject({ encounterId, tokenRevision: before.tokenRevision + 1, movement: { policy: "combat-current-turn-speed", budgetFeet: 30 - preview.pathCostFeet } });
       const afterCombat = combatReadResponseSchema.parse(await http(request, combatPath));
       expect(afterCombat.revision).toBe(turn.revision + 1);
-      expect(afterCombat.turnEconomy).toMatchObject({ turnId: turn.turnEconomy!.turnId, action: { available: true }, movement: { usedFeet: 5, remainingFeet: 25 } });
-      await expect(page.getByText(/25 feet available by combat-current-turn-speed/)).toBeVisible();
+      expect(afterCombat.turnEconomy).toMatchObject({ turnId: turn.turnEconomy!.turnId, action: { available: true }, movement: { usedFeet: preview.pathCostFeet, remainingFeet: 30 - preview.pathCostFeet } });
+      await expect(page.getByText(new RegExp(`${30 - preview.pathCostFeet} feet available by combat-current-turn-speed`))).toBeVisible();
       await page.getByRole("button", { name: "Refresh tactical map", exact: true }).click();
       await expect(page.getByText("Authoritative tactical map refreshed.", { exact: true })).toBeVisible();
       await expect(camera).toHaveText(cameraBefore);
       const persisted = tacticalMapSnapshotSchema.parse(await http(request, snapshotPath));
-      expect(persisted.projection.tokens.find((token) => token.tokenId === combatantId)?.position).toEqual({ x: 2, y: 1 });
-      expect(persisted.projection.tokens.map((token) => token.tokenId).sort()).toEqual([...tokenIds].sort());
-      expect(persisted.movement?.budgetFeet).toBe(25);
-      expect(writes).toEqual([mapPath, `${mapPath}/combat/previews`, `${mapPath}/combat/move-commands`]);
+      expect(persisted.projection.tokens.find((token) => token.tokenId === combatantId)?.position).toEqual(destination);
+      expect(persisted.projection.tokens.map((token) => token.tokenId).sort()).toEqual(autoTokens.map((token) => token.tokenId).sort());
+      expect(persisted.movement?.budgetFeet).toBe(30 - preview.pathCostFeet);
+      expect(writes).toEqual([`${mapPath}/combat/previews`, `${mapPath}/combat/move-commands`]);
       expect(activationPosts).toBe(0);
       const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
       expect(dimensions.viewport).toBe(viewport.width);

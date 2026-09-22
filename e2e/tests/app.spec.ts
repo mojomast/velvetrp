@@ -1676,12 +1676,12 @@ test("M5.4 CampaignPlay shows one provider-committed travel receipt across reloa
   const travelStream=page.waitForRequest(browserRequest=>new URL(browserRequest.url()).pathname==="/api/rpg/v1/adventure-turns/stream");
   await page.getByLabel("What do you do?").fill("Travel to the public harbor.");await page.getByRole("button",{name:"Declare action"}).click();
   const submitted=await travelStream,submittedBody=submitted.postDataJSON() as {actorId:string;expectedRevision:number;idempotencyKey:string};expect(submittedBody).toMatchObject({actorId,expectedRevision:3});
-  const receiptRegion=page.getByRole("region",{name:"Committed mechanics"});await expect(receiptRegion.getByText("Travel completed")).toBeVisible({timeout:15_000});await expect(receiptRegion.getByText(destinationName)).toBeVisible();
-  expect(receiptMethods).toEqual(["GET"]);expect(await receiptRegion.getByText(destinationName).count()).toBe(1);
+  const receiptRegion=page.getByRole("region",{name:"Committed mechanics"}),receiptLine=receiptRegion.getByText(`Travel → ${destinationName}`);await expect(receiptLine).toBeVisible({timeout:15_000});await expect(receiptLine).toHaveCount(1);
+  expect(receiptMethods).toEqual(["GET"]);
   const assertSafe=async()=>{const state=`${await page.locator("body").innerText()}\n${await page.evaluate(()=>JSON.stringify(localStorage))}\n${await page.evaluate(()=>JSON.stringify(sessionStorage))}`;
     for(const secret of privateSentinels){expect(state).not.toContain(secret);expect(productionTraffic.join("\n")).not.toContain(secret);}};
-  await assertSafe();await page.reload();const reloadedReceipt=page.getByRole("region",{name:"Committed mechanics"});await expect(reloadedReceipt.getByText("Travel completed")).toBeVisible();await expect(reloadedReceipt.getByText(destinationName)).toBeVisible();
-  expect(receiptMethods).toEqual(["GET","GET"]);expect(await reloadedReceipt.getByText(destinationName).count()).toBe(1);await assertSafe();
+  await assertSafe();await page.reload();const reloadedReceipt=page.getByRole("region",{name:"Committed mechanics"}),reloadedReceiptLine=reloadedReceipt.getByText(`Travel → ${destinationName}`);await expect(reloadedReceiptLine).toBeVisible();await expect(reloadedReceiptLine).toHaveCount(1);
+  expect(receiptMethods).toEqual(["GET","GET"]);await assertSafe();
   const world=await json<{currentLocations:Array<{actorId:string;locationId:string}>}>(request,"GET",`/rpg/v1/campaigns/${campaignId}/world`);
   expect(world.currentLocations).toEqual([expect.objectContaining({actorId,locationId:prerequisite.destinationLocationId})]);
   const turn=await json<{result:{turn:{turnId:string}}}>(request,"GET",`/rpg/v1/adventure-turns/reconcile-initial?campaignId=${campaignId}&sessionId=${encodeURIComponent(room.id)}&actorId=${actorId}&idempotencyKey=${submittedBody.idempotencyKey}`);

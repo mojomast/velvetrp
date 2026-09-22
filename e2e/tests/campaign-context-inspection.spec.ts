@@ -166,7 +166,10 @@ test("GM inspects one exact persisted director dispatch without replaying provid
 
     await page.reload();
     await expect(page.getByRole("region", { name: "Campaign maps", exact: true })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Campaign narration and actions", exact: true })).toContainText("A quiet moment leaves room to consider the scene.");
+    // The persisted director scene is restored into the compact DM chronicle in the scene rail.
+    // The conversation region holds durable adventure-turn transcripts only, and this fixture
+    // produced director dispatches without an adventure turn.
+    await expect(page.getByRole("region", { name: "DM chronicle", exact: true })).toContainText("A quiet moment leaves room to consider the scene.");
     await expect(page.getByRole("textbox", { name: "What do you do?", exact: true })).toBeEnabled();
     expect(providerCapablePosts).toEqual([]);
     expect(providerCalls()).toBe(0);

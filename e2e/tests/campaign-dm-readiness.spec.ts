@@ -123,7 +123,10 @@ test("GM inspects provider-free readiness and repairs a story obstacle through H
     await expect(page.getByRole("heading", { name: "Activation readiness", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Inspection coverage: complete", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Manual review limitations", exact: true })).toBeVisible();
-    await expect(page.getByRole("region", { name: "DM chronicle" })).not.toContainText("SECRET_");
+    // This fixture has no director run, so the DM chronicle is correctly absent.
+    // The private-sentinel leak check therefore covers the whole play surface: the
+    // readiness diagnostics, the scene rail, and the conversation.
+    expect(await page.locator("body").innerText()).not.toContain("SECRET_");
 
     await page.setViewportSize({ width: 390, height: 844 });
     const mobile = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth,
@@ -143,6 +146,8 @@ test("GM inspects provider-free readiness and repairs a story obstacle through H
     const delayed = new Promise<void>(resolve => { delayedRequest = resolve; });
     await page.getByRole("button", { name: "Inspect preparation", exact: true }).click();
     await delayed;
+    // The open-drawer scrim covers the page behind it, so leave the Director tool before navigating.
+    await page.getByRole("button", { name: "Close Director", exact: true }).click();
     await page.getByRole("button", { name: "Back to campaign", exact: true }).click();
     await expect(page.getByTestId("campaign-rooms")).toBeVisible();
     releaseDelayedResponse!();
@@ -185,6 +190,7 @@ test("GM inspects provider-free readiness and repairs a story obstacle through H
     await expect(page.getByRole("heading", { name: "Preparation diagnostics", exact: true })).toBeVisible();
     expect(writes).toEqual(writesBeforeReload);
     expect(readinessGets).toEqual(["GET", "GET", "GET", "GET"]);
+    await page.getByRole("button", { name: "Close Director", exact: true }).click();
     await page.getByRole("button", { name: "Back to campaign", exact: true }).click();
     await expect(page.getByTestId("campaign-rooms")).toBeVisible();
     projectPlayerBootstrap = true;

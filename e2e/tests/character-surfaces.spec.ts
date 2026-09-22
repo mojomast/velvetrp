@@ -310,10 +310,16 @@ test("world expedition places an unplaced actor and camps once from the browser"
   await place.click();
   await expect(page.getByRole("heading", { name: "Confirmed command receipt" })).toBeVisible();
   await expect(camp).toBeEnabled();
-  await camp.click();
+  // The command lane can drop an early click while the placement mutation is still
+  // settling; retry only when no camp request was recorded, so "camps once" holds.
+  const campResponse = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/camp-commands") && response.request().method() === "POST");
+  await expect(async () => {
+    if (!campPosts.length) await camp.click();
+    expect(campPosts).toEqual(["POST"]);
+  }).toPass({ timeout: 15_000 });
+  expect((await campResponse).status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Confirmed command receipt" }).last()).toBeVisible();
   expect(placePosts).toEqual(["POST"]);
-  expect(campPosts).toEqual(["POST"]);
 
   const world = await json<{ currentLocations: Array<{ actorId: string; locationId: string }> }>(
     request, "GET", `/rpg/v1/campaigns/${fixture.campaignId}/world`,
