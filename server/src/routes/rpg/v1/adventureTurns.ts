@@ -40,6 +40,20 @@ type Repo = Pick<AdventureTurnRepository,
 export interface AdventureTurnsHttpOptions {
   adventureTurnRepositoryAccessor: () => Repo & Repository;
   agentDependencies?: AdventureAgentDependencies;
+  /**
+   * Optional post-narration seam for best-effort side lanes (scene images).
+   * Called only after an original turn durably settles narration in this
+   * request, synchronously, and never awaited: the hook must not throw and must
+   * not alter or delay the turn response.
+   */
+  onNarrationSettled?: (settled: {
+    campaignId: string;
+    sessionId: string;
+    actorId: string;
+    turnId: string;
+    declaration: string;
+    narration: string;
+  }) => void;
 }
 
 const enabled = () => { const flags = readRpgFeatureFlags(); return flags.campaign && flags.mechanics; };
@@ -528,7 +542,8 @@ function fail(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[
 }
 
 async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1], repo: Repo, initial: PrivateAdventureTurn,
-  streamKind: "initial" | "resume" | "variant", agentDependencies?:AdventureAgentDependencies): Promise<void> {
+  streamKind: "initial" | "resume" | "variant", agentDependencies?:AdventureAgentDependencies,
+  onNarrationSettled?: AdventureTurnsHttpOptions["onNarrationSettled"]): Promise<void> {
   let writer: SseWriter | null = null; let heartbeat: NodeJS.Timeout | null = null; let sequence = 0; let closed = false; let terminal = false;
   const abort = new AbortController();
   const send = (event: Omit<AdventureTurnStreamEvent, "sequence" | "timestamp">) => {
@@ -606,6 +621,9 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
     if(turn.toolCalls.length>0&&turn.toolCalls.every((call)=>["rejected","expired","cancelled"].includes(call.status))){finish(turn,"aborted");return;}
     if (turn.receiptLinks.length > 0) { send({ type: "mechanics_committed", payload: { receipts: receipts(turn) } }); await yieldToEventLoop(); }
     let narration = repo.getAdventureTurnNarration(OWNER, turn.turnId);
+    // True only when this request durably completed the narration; a resume or
+    // a lost settlement race never re-fires the post-narration side hook.
+    let narrationSettledHere = false;
     if (turn.narrationStatus !== "completed") {
       send({ type: "agent_status", payload: { status: "narrating" } });
       await yieldToEventLoop();
@@ -617,13 +635,23 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
        turn = narrated.turn; narration = narrated.text;
       if(turn.state!=="completed")try{turn = repo.updateAdventureTurnNarration(OWNER, { turnId: turn.turnId, expectedTurnRevision: turn.revision,
         expectedCampaignRevision: turn.campaignRevision, idempotencyKey: key("http-narrated", turn.turnId),
-         narrationStatus: "completed", terminalState: "completed", fallbackNarration: narration,narrationSource:narrated.source });}
+         narrationStatus: "completed", terminalState: "completed", fallbackNarration: narration,narrationSource:narrated.source });
+         narrationSettledHere = true;}
       catch(error){if(!(error instanceof AdventureTurnConflictError||error instanceof AdventureTurnStaleError))throw error;
         turn=requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId));if(turn.state!=="completed")throw error;
         narration=repo.getAdventureTurnNarration(OWNER,turn.turnId)??narration;}
       await yieldToEventLoop();
     }
     if (narration) { send({ type: "narration_delta", payload: { text: narration } }); await yieldToEventLoop(); }
+    // Best-effort post-narration seam for side lanes (automatic scene images).
+    // The hook is synchronous, wrapped, and never awaited: it cannot delay,
+    // fail, or alter this turn response.
+    if (narrationSettledHere && narration && turn.mode === "original" && onNarrationSettled) {
+      try {
+        onNarrationSettled({ campaignId: turn.campaignId, sessionId: turn.sessionId, actorId: turn.actorId,
+          turnId: turn.turnId, declaration: turn.declaration, narration });
+      } catch { /* side lanes are best-effort by contract */ }
+    }
     finish(requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId)), "done");
   } catch (error) {
     if (closed || abort.signal.aborted) return;
@@ -692,7 +720,7 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
       // openSse hijacks Fastify and writes directly to the Node response, so
       // bind this route-specific header on the raw response before writeHead.
       reply.raw.setHeader("X-Adventure-Turn-Id", turn.turnId);
-        await stream(request, reply, repo, turn, streamKind,options.agentDependencies);
+        await stream(request, reply, repo, turn, streamKind,options.agentDependencies,options.onNarrationSettled);
     } catch (error) { return fail(request, reply, error); }
   });
 

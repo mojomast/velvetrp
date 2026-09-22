@@ -20,7 +20,11 @@ import { roleplaySessionRoutes } from "./routes/roleplay/sessions.js";
 import { roleplaySystemRoutes } from "./routes/roleplay/system.js";
 import { roleplayUsageRoutes } from "./routes/roleplay/usage.js";
 import { rpgV1Routes } from "./routes/rpg/v1/features.js";
-import type { CampaignListRepository } from "./routes/rpg/v1/features.js";
+import type { CampaignListRepository, SceneImagesLaneOptions } from "./routes/rpg/v1/features.js";
+import type { SceneImageRouteService, SceneImageSceneResolver } from "./routes/rpg/v1/sceneImages.js";
+import { createSceneImageService } from "./image/service.js";
+import { createSupra2ImageClient, readSupra2ImageConfig } from "./provider/supra2ImageService.js";
+import { resolveDataDir } from "./repo/db.js";
 import { systemRuntime } from "./runtime.js";
 import type { RuntimeDependencies } from "./runtime.js";
 import type { AdventureAgentDependencies } from "./agent/adventureOrchestrator.js";
@@ -542,6 +546,12 @@ export function buildApp(options: {
   adventureAgentDependencies?: AdventureAgentDependencies;
   encounterGeneration?: GenerationDraftsHttpOptions["generateEncounter"];
   campaignContentGeneration?: import("./routes/rpg/v1/campaignContentGeneration.js").CampaignContentGenerationOptions["generateCampaignContent"];
+  /** Test seam: an already-configured scene-image sidecar (real or fake). */
+  sceneImageService?: SceneImageRouteService;
+  /** Optional authoritative scene source for scene-image revisions and prompts. */
+  sceneImageSceneResolver?: SceneImageSceneResolver;
+  /** Test seam for the installation opt-in; defaults to the exact env check. */
+  sceneImageInstallationEnabled?: () => boolean;
 } = {}) {
   const runtime = options.runtime ?? systemRuntime;
   const app = Fastify({
@@ -895,6 +905,27 @@ export function buildApp(options: {
   void app.register(roleplayProviderRoutes, { prefix: "/api" });
   void app.register(roleplaySystemOneRoutes, { prefix: "/api" });
   void app.register(roleplayUsageRoutes, { prefix: "/api" });
+  // Scene images: one sidecar per app, created lazily on first route use or at
+  // ready, never during route collection. An injected service is treated as
+  // already opted in; the default factory follows the exact env opt-in.
+  const injectedSceneImageService = options.sceneImageService;
+  const sceneImages: SceneImagesLaneOptions = {
+    createService: injectedSceneImageService
+      ? () => injectedSceneImageService
+      : () => createSceneImageService({
+          dataDir: resolveDataDir(),
+          client: createSupra2ImageClient({ config: readSupra2ImageConfig(process.env) }),
+          clock: runtime.clock,
+          ids: runtime.ids,
+        }),
+    injectedService: injectedSceneImageService !== undefined,
+    installationEnabled: options.sceneImageInstallationEnabled
+      ?? (injectedSceneImageService !== undefined
+        ? () => true
+        : () => readSupra2ImageConfig(process.env).enabled),
+    ...(options.sceneImageSceneResolver ? { resolveScene: options.sceneImageSceneResolver } : {}),
+  };
+
   void app.register(rpgV1Routes, {
     prefix: "/api/rpg/v1",
     campaignRepositoryFactory: options.campaignRepositoryFactory ?? (() => createRepository()),
@@ -902,6 +933,7 @@ export function buildApp(options: {
     ...(options.adventureAgentDependencies ? { adventureAgentDependencies: options.adventureAgentDependencies } : {}),
     ...(options.encounterGeneration ? { encounterGeneration: options.encounterGeneration } : {}),
     ...(options.campaignContentGeneration ? { campaignContentGeneration: options.campaignContentGeneration } : {}),
+    sceneImages,
   });
 
   return app;

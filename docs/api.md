@@ -33,9 +33,9 @@ The read-only `GET /provider/system-one/decisions` and `GET /provider/system-one
 
 `GET /rpg/v1/features` exposes the M0 RPG boundary as `{ campaign, mechanics, combat, studio, remoteAuthentication, systemOne }`. Every flag defaults to `false` and is enabled only by the exact value `true` in `FEATURE_RPG_CAMPAIGN`, `FEATURE_RPG_MECHANICS`, `FEATURE_RPG_COMBAT`, `FEATURE_RPG_STUDIO`, `FEATURE_REMOTE_AUTHENTICATION`, or `FEATURE_SYSTEM_ONE`. These are rollout controls, not authorization. The `systemOne` flag gates optional System One decision lanes only; every lane remains disabled by default and falls back to deterministic behavior, and no lane mutates campaign state.
 
-Development databases use one current schema and are disposable; schema changes require deleting and recreating `velvet.sqlite`, except for narrowly recognized exact predecessor upgrades. Each upgrade validates before commit and rolls back on failure; every other unknown or partially upgraded schema is rejected without repair. [Operations](operations.md#data-directory-and-current-schema) owns the exact persistence boundary. The trusted-local RPG surface has 154 counted explicit method/path operations. The inventory below includes all 155 explicit non-HEAD registrations and classifies `GET /api/rpg/v1/features` separately as discovery. The published count excludes that one discovery row and every Fastify-generated `HEAD` alias. A path registered for multiple methods counts once per method. Runtime Fastify registration is the executable authority; this table is the sole checked documentation inventory.
+Development databases use one current schema and are disposable; schema changes require deleting and recreating `velvet.sqlite`, except for narrowly recognized exact predecessor upgrades. Each upgrade validates before commit and rolls back on failure; every other unknown or partially upgraded schema is rejected without repair. [Operations](operations.md#data-directory-and-current-schema) owns the exact persistence boundary. The trusted-local RPG surface has 161 counted explicit method/path operations. The inventory below includes all 162 explicit non-HEAD registrations and classifies `GET /api/rpg/v1/features` separately as discovery. The published count excludes that one discovery row and every Fastify-generated `HEAD` alias. A path registered for multiple methods counts once per method. Runtime Fastify registration is the executable authority; this table is the sole checked documentation inventory.
 
-Campaign administration and transfer require the campaign feature. Mechanics, actor, world, NPC, faction, quest, story, campaign-play, adventure-turn, and most generation routes require campaign plus mechanics. Encounter, combat, reviewed campaign-content generation, and generated foundation/planning/material routes require campaign plus mechanics plus combat. Feature flags remain rollout controls, not permissions. There is no general live exact-candidate generation/selection HTTP or client selection surface. The manual actor travel route and the narrow internal provider-selected travel and quest bridges are separate; no other candidate bridge should be inferred.
+Campaign administration and transfer require the campaign feature. Mechanics, actor, world, NPC, faction, quest, story, campaign-play, adventure-turn, and most generation routes require campaign plus mechanics. Encounter, combat, reviewed campaign-content generation, and generated foundation/planning/material routes require campaign plus mechanics plus combat. Scene-image routes require the campaign feature and additionally refuse generation unless the installation-level `VELVET_SCENE_IMAGES_ENABLED` opt-in is the exact string `true`. Feature flags remain rollout controls, not permissions. There is no general live exact-candidate generation/selection HTTP or client selection surface. The manual actor travel route and the narrow internal provider-selected travel and quest bridges are separate; no other candidate bridge should be inferred.
 
 ## RPG operation inventory
 
@@ -93,6 +93,10 @@ Campaign administration and transfer require the campaign feature. Mechanics, ac
 | `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/play-bootstrap` | operation |
 | `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/present-cast` | operation |
 | `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/tactical-maps/:mode/actors/:actorId` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/scene-images/assets/:assetId` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/scene-images/gallery` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/scene-images/jobs/:jobId` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/scene-images/settings` | operation |
 | `GET` | `/api/rpg/v1/campaigns/:campaignId/shops/:shopId` | operation |
 | `GET` | `/api/rpg/v1/campaigns/:campaignId/story` | operation |
 | `GET` | `/api/rpg/v1/campaigns/:campaignId/timelines` | operation |
@@ -164,6 +168,8 @@ Campaign administration and transfer require the campaign feature. Mechanics, ac
 | `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/tactical-maps` | operation |
 | `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/tactical-maps/:mode/move-commands` | operation |
 | `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/tactical-maps/:mode/previews` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/scene-images/generate` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/scene-images/select` | operation |
 | `POST` | `/api/rpg/v1/campaigns/:campaignId/storylines` | operation |
 | `POST` | `/api/rpg/v1/campaigns/:campaignId/timeline-forks` | operation |
 | `POST` | `/api/rpg/v1/combats/:combatId/action-commands` | operation |
@@ -184,6 +190,7 @@ Campaign administration and transfer require the campaign feature. Mechanics, ac
 | `PUT` | `/api/rpg/v1/campaigns/:campaignId/content` | operation |
 | `PUT` | `/api/rpg/v1/campaigns/:campaignId/mechanics-starter-setup` | operation |
 | `PUT` | `/api/rpg/v1/campaigns/:campaignId/rooms` | operation |
+| `PUT` | `/api/rpg/v1/campaigns/:campaignId/scene-images/settings` | operation |
 | `PUT` | `/api/rpg/v1/campaigns/:campaignId/starter-setup` | operation |
 | `GET` | `/api/rpg/v1/campaigns/:campaignId/dm` | operation |
 | `POST` | `/api/rpg/v1/campaigns/:campaignId/dm/mode-commands` | operation |
@@ -198,6 +205,25 @@ Campaign administration and transfer require the campaign feature. Mechanics, ac
 | `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/decision-commands` | operation |
 | `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/resume-commands` | operation |
 <!-- rpg-operation-inventory:end -->
+
+### Scene images
+
+The seven scene-image operations under
+`/api/rpg/v1/campaigns/:campaignId/scene-images` require the campaign feature,
+use the fixed literal `local-owner`, and set `no-store` (`private, no-store`
+plus `x-content-type-options: nosniff` on the byte route). All writes require
+JSON, unexpected query parameters are rejected, and no implicit HEAD exists.
+The sidecar service owns campaign membership and owner/GM authorization; a
+player projection exposes only the illustration selected for that room.
+`GET .../gallery` requires exactly `sessionId`; `GET .../assets/:assetId`
+accepts an optional `sessionId` and then serves only an asset selected for that
+exact session. Generation is refused with `422 RPG_SCENE_IMAGE_DISABLED` while
+the installation-level `VELVET_SCENE_IMAGES_ENABLED` opt-in is not the exact
+string `true`; sidecar refusals map to `422 RPG_SCENE_IMAGE_DISABLED`,
+`409 RPG_SCENE_IMAGE_MANUAL`, `409 RPG_SCENE_IMAGE_SESSION_LIMIT`, and
+`409 RPG_SCENE_IMAGE_COOLDOWN`. Automatic-mode generation is a best-effort
+post-narration side lane: it is fire-and-forget, can never alter or delay an
+adventure turn, and obeys the campaign's automatic limit and cooldown.
 
 ### Campaign director
 
@@ -321,7 +347,7 @@ Slice 88 changes no schema or HTTP operation count. Its first-review remediation
 
 Setup has dual authority: fixed `local-owner` must be the sole canonical local application owner and the campaign pointer's sole canonical owner membership/principal. Inspection validates attributable campaign data before raw configuration identity, allowing exact configured starter namespace failures to become stable conflicts without hiding unrelated corruption. One preflight snapshot and both specialized immediate write transactions validate the full authority graph, campaign setup state, reserved exact profile, reserved pack across all versions, and complete/captured definition namespace before the first write. Exact manifest installation runs first, exact configuration second, then authoritative detail proof. This is convergent, not atomic: an install may remain after a valid first commit. Missing, extra, malformed, captured, wrong-version, unsealed, or incomplete reserved state conflicts without overwrite or repair. There is no hidden retry or automatic startup. The client exposes setup only to an exact owner, requires confirmation, binds success to owner/exact content, and uses GET—not an automatic PUT—to reconcile ambiguity. In-app back navigation is disabled while a mutation is in memory and reload receives a warning, but browsers cannot guarantee reload cancellation; a completed full reload remains ambiguous and must not be treated as permission to retry.
 
-All 154 counted current RPG operations, plus the separately classified feature-discovery GET, delegate with the fixed literal trusted-local principal `local-owner`; authorization and user identity headers are ignored. This is unauthenticated single-user local convenience, **not authentication or a remote-safe security boundary**. The server defaults to loopback `127.0.0.1`; these routes must remain on a trusted local loopback listener unless a separate real authentication boundary is added. Feature denial precedes query, path, media-type, and body validation. Routes share one lazy app-owned repository and cache either open success or failure for the plugin lifetime; a ready repository closes exactly once.
+All 161 counted current RPG operations, plus the separately classified feature-discovery GET, delegate with the fixed literal trusted-local principal `local-owner`; authorization and user identity headers are ignored. This is unauthenticated single-user local convenience, **not authentication or a remote-safe security boundary**. The server defaults to loopback `127.0.0.1`; these routes must remain on a trusted local loopback listener unless a separate real authentication boundary is added. Feature denial precedes query, path, media-type, and body validation. Routes share one lazy app-owned repository and cache either open success or failure for the plugin lifetime; a ready repository closes exactly once.
 
 Schema v15 and the public repository barrel provide campaign lifecycle/settings, audited membership and room administration, checkpoint/fork, recap, role-safe log/receipt reads, and bounded import/export operations. Transfer packages carry strict public gameplay events and portable actor mechanics while omitting private actor state, idempotency keys, credentials, local paths, and usage history. M2.1-M2.11 now expose the reviewed trusted-local HTTP surface for these and the later mechanics domains.
 

@@ -118,6 +118,12 @@ import { generationDraftsHttpRoutes } from "./generationDrafts.js";
 import type { GenerationDraftsHttpOptions } from "./generationDrafts.js";
 import { campaignContentGenerationHttpRoutes } from "./campaignContentGeneration.js";
 import type { CampaignContentGenerationOptions } from "./campaignContentGeneration.js";
+import {
+  createSceneImageNarrationHook,
+  sceneImagesHttpRoutes,
+  type SceneImageRouteService,
+  type SceneImageSceneResolver,
+} from "./sceneImages.js";
 import { actorResourcesHttpRoutes } from "./actorResources.js";
 import type { ActorResourceRepository } from "../../../repo/actorResourceRepo.js";
 import { actorInventoryHttpRoutes } from "./actorInventory.js";
@@ -158,6 +164,7 @@ import type { CampaignAdministrationIntegrationRepository } from "../../../repo/
 import { campaignAdministrationIntegrationsHttpRoutes } from "./campaignAdministrationIntegrations.js";
 import { campaignContextInspectionHttpRoutes } from "./campaignContextInspection.js";
 import type { CampaignContextInspectionReadRepository } from "../../../repo/campaign/campaignContextInspectionReadRepo.js";
+import { readSupra2ImageConfig } from "../../../provider/supra2ImageService.js";
 
 /** Shared lazy repository shape from which each RPG HTTP lane selects a narrow capability set. */
 export interface CampaignListRepository extends
@@ -277,12 +284,25 @@ export interface CampaignListRepository extends
   close(): void;
 }
 
+/** Optional app-owned scene-image lane wiring; omitted in route-collection tests. */
+export interface SceneImagesLaneOptions {
+  /** Lazily creates the once-per-app sidecar service. */
+  createService: () => SceneImageRouteService;
+  /** Injected services are already configured by the caller, including any fake. */
+  injectedService: boolean;
+  /** Installation-level opt-in; defaults to the exact `VELVET_SCENE_IMAGES_ENABLED` check. */
+  installationEnabled?: () => boolean;
+  /** Optional authoritative scene source; the default reads the campaign world. */
+  resolveScene?: SceneImageSceneResolver;
+}
+
 interface RpgV1RoutesOptions {
   campaignRepositoryFactory: () => CampaignListRepository;
   diceCommandIds: IdGenerator;
   adventureAgentDependencies?: AdventureAgentDependencies;
   encounterGeneration?: GenerationDraftsHttpOptions["generateEncounter"];
   campaignContentGeneration?: CampaignContentGenerationOptions["generateCampaignContent"];
+  sceneImages?: SceneImagesLaneOptions;
 }
 
 const LOCAL_CAMPAIGN_PRINCIPAL = "local-owner";
@@ -613,6 +633,75 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     return repositoryState.repository;
   }
 
+  // Scene images are a narrow side lane: one lazily created sidecar per app,
+  // its worker started only for the exact installation opt-in, and closed with
+  // the app. Nothing here touches the sidecar during route collection, and the
+  // lazy repository above is never opened just for registration.
+  let sceneImageService: SceneImageRouteService | null | undefined;
+  let sceneImageServiceOwned = false;
+  const getSceneImageService = (): SceneImageRouteService | null => {
+    if (sceneImageService !== undefined) return sceneImageService;
+    try {
+      sceneImageService = options.sceneImages?.createService() ?? null;
+      sceneImageServiceOwned = sceneImageService !== null && options.sceneImages?.injectedService !== true;
+    } catch {
+      sceneImageService = null;
+      sceneImageServiceOwned = false;
+    }
+    return sceneImageService;
+  };
+  const sceneImageInstallationEnabled = (): boolean => {
+    try {
+      if (!options.sceneImages) return false;
+      return options.sceneImages.installationEnabled?.()
+        ?? (options.sceneImages.injectedService ? true : readSupra2ImageConfig(process.env).enabled);
+    } catch {
+      return false;
+    }
+  };
+  /**
+   * Default active-scene resolution: the acting character's authoritative
+   * location row, or the room fallback. Failures fail closed to null so the
+   * route degrades to scene revision zero and a scene-key prompt instead of
+   * blocking generation.
+   */
+  const resolveSceneContext: SceneImageSceneResolver = options.sceneImages?.resolveScene ?? ((campaignId, sessionId, actorId) => {
+    try {
+      const repository = getCampaignRepository();
+      if (typeof repository.getCampaignWorld !== "function") return null;
+      const world = repository.getCampaignWorld(LOCAL_CAMPAIGN_PRINCIPAL, campaignId, sessionId);
+      if (!world || world.sessionId !== sessionId) return null;
+      if (actorId !== undefined) {
+        const actorLocation = world.currentLocations.find((entry) => entry.actorId === actorId);
+        if (actorLocation) {
+          const location = world.visibleLocations.find((entry) => entry.locationId === actorLocation.locationId);
+          return { sceneKey: `location:${actorLocation.locationId}`, sceneRevision: actorLocation.revision,
+            locationLabel: location?.name ?? null, locationDescription: location?.description ?? null };
+        }
+      }
+      return { sceneKey: `session:${sessionId}`, sceneRevision: world.revision, locationLabel: null, locationDescription: null };
+    } catch {
+      return null;
+    }
+  });
+  const onNarrationSettled = createSceneImageNarrationHook({
+    serviceAccessor: getSceneImageService,
+    installationEnabled: sceneImageInstallationEnabled,
+    resolveScene: resolveSceneContext,
+  });
+  app.addHook("onReady", async () => {
+    // Offline-safe: no worker is started unless the installation opted in via
+    // the exact VELVET_SCENE_IMAGES_ENABLED string plus a valid base URL.
+    if (!sceneImageInstallationEnabled()) return;
+    getSceneImageService()?.start?.();
+  });
+  app.addHook("onClose", async () => {
+    if (!sceneImageService) return;
+    sceneImageService.stop?.();
+    if (sceneImageServiceOwned) sceneImageService.close?.();
+    sceneImageService = null;
+  });
+
   app.get("/features", async () => readRpgFeatureFlags());
 
   // Child lanes share this exact lazy repository and its single onClose hook.
@@ -804,7 +893,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(npcPresenceHttpRoutes, { npcPresenceRepositoryAccessor });
   await app.register(companionAdministrationHttpRoutes, { companionRepositoryAccessor });
   await app.register(tacticalMapHttpRoutes, { tacticalMapRepositoryAccessor });
-  await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor,
+  await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor, onNarrationSettled,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
   await app.register(campaignDmHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository,
@@ -831,6 +920,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     ...(options.encounterGeneration ? { generateEncounter: options.encounterGeneration } : {}) });
   await app.register(campaignContentGenerationHttpRoutes, { generationDraftRepositoryAccessor,
     ...(options.campaignContentGeneration ? { generateCampaignContent: options.campaignContentGeneration } : {}) });
+  await app.register(sceneImagesHttpRoutes, {
+    serviceAccessor: getSceneImageService,
+    installationEnabled: sceneImageInstallationEnabled,
+    resolveScene: resolveSceneContext,
+  });
 
   app.get<{
     Params: { campaignId: string };
