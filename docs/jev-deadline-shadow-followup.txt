@@ -1,0 +1,47 @@
+Jev deadline and advisory execution follow-up
+
+Scope
+The production System One adapter now uses one requestTimeoutSeconds deadline for
+all attempts, response reads and retry backoff. Caller cancellation during backoff
+is classified separately from deadline expiration. The timer is cleared on exit.
+Adventure selection and rerank helpers accept the turn signal, skip already
+cancelled work, and discard a late result after cancellation.
+
+Background advisory execution
+Adventure-selection in shadow mode, memory reranking, campaign Director evaluation
+and narration verification use a shared in-process queue: four concurrent jobs,
+32 total running plus queued jobs. Overflow is dropped, not awaited. Queue stats
+expose running, queued, dropped and uncaught task failure counts to internal code;
+these are not a new public metrics endpoint. Helpers that swallow failures do not
+increment the queue failure count. Settings and input snapshots are captured before
+dispatch. Background adventure selection receives no gameplay repository, so it
+cannot commit actions. Active adventure selection remains awaited. Narration
+verification is submitted only after the candidate prose is generated.
+
+Operational limits
+This is best-effort telemetry, not a durable job system: shutdown can lose pending
+observations, saturation drops observations, and completed observations can appear
+after the turn response. This can bias evaluation samples under load. drain() is
+available for tests or explicit lifecycle integration; it is not wired into server
+shutdown in this change. Production callers are bounded by the adapter deadline;
+custom injected callers must also honor cancellation/deadlines or can occupy a
+queue slot indefinitely. Lane settings resolution remains awaited. Room routing
+and interaction guardrails/router scheduling are unchanged; no blanket claim that
+all Jev work is now background. Existing budget accounting is unchanged.
+
+Tests
+Adapter coverage includes expiry during retry backoff and caller cancellation with
+no subsequent request. Queue tests cover concurrency/capacity, overflow counters,
+synchronous/asynchronous exceptions and slot reuse. An orchestration regression
+holds rerank inference behind a gate, verifies the mechanics turn completes before
+that gate opens, then drains and checks the persisted advisory decision. Existing
+adventure tests explicitly drain before asserting eventually written audit rows.
+No paid provider calls or deployment are required for these tests.
+
+Coverage issue reproduced during validation
+The active-check fixture scripted Strength/Easy/normal from the full generated
+check set, but candidate-ID sorting followed by the existing 32-row cap sometimes
+excluded it. Captured requests showed the missing option and a correct fallback.
+The execution fixture now advertises just its intended generated check (repository
+execution validation remains real). Production shortlist policy is unchanged;
+recall measurement and candidate selection improvements remain follow-up work.

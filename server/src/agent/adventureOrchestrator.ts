@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { systemOneShadowQueue } from "./systemOneShadow.js";
 import {
   AGENT_TOOL_REGISTRY_VERSION, POST_V38_AGENT_TOOL_REGISTRY_VERSION, agentRequestObjectSchema, canonicalAgentJson, resourceIdSchema,
   projectExactCandidateForProvider,providerSafeExactCandidateListSchema,
@@ -215,9 +216,9 @@ export type AdventureShadowCommit = { turn: PrivateAdventureTurn; outcome: "mech
 
 export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
   candidates: readonly AdventureSelectionCandidate[], lane: SystemOneAdventureDependency,
-  repository?: Repository): Promise<AdventureShadowCommit | null> {
+  repository?: Repository, signal?: AbortSignal): Promise<AdventureShadowCommit | null> {
   try {
-    if (systemOneLaneMode(lane.settings, "adventure-selection") === "off") return null;
+    if (signal?.aborted || systemOneLaneMode(lane.settings, "adventure-selection") === "off") return null;
     if (candidates.length === 0) return null;
     const questions = buildAdventureSelectionQuestions(turn.declaration, candidates);
     // Keep the state structured (the vendor recommends it, and the harvest loop reads the same
@@ -225,7 +226,8 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
     // is needed here.
     const state = { declaration: turn.declaration, candidates } as never;
     const startedAt = performance.now();
-    const result = await lane.caller({ settings: lane.settings, state, questions });
+    const result = await lane.caller({ settings: lane.settings, state, questions, ...(signal ? { signal } : {}) });
+    if (signal?.aborted) return null;
     const composed = composeAdventureSelection(candidates, result.answers, lane.settings.confidencePolicy["adventure-selection"]);
     const decisionId = randomUUID();
     const record = (shadow: boolean): void => recordSystemOneDecision({
@@ -353,9 +355,9 @@ export function rerankShadowCandidates(hits: readonly CampaignRecallHit[]): Rera
  * failure is swallowed so shadow evaluation cannot affect the turn.
  */
 export async function recordRerankShadowDecision(turn: PrivateAdventureTurn, query: string,
-  candidates: readonly RerankCandidate[], lane: SystemOneRerankDependency): Promise<void> {
+  candidates: readonly RerankCandidate[], lane: SystemOneRerankDependency, signal?: AbortSignal): Promise<void> {
   try {
-    if (systemOneLaneMode(lane.settings, "memory-reranking") === "off") return;
+    if (signal?.aborted || systemOneLaneMode(lane.settings, "memory-reranking") === "off") return;
     if (candidates.length < 2) return;
     const input = { query, candidates };
     const questions = buildRerankQuestions(input);
@@ -363,7 +365,8 @@ export async function recordRerankShadowDecision(turn: PrivateAdventureTurn, que
     // shape back); the shortlist is the authorized recall projection, never a reorder.
     const state = { query, purpose: "adventure-planning", candidates } as never;
     const startedAt = performance.now();
-    const result = await lane.caller({ settings: lane.settings, state, questions });
+    const result = await lane.caller({ settings: lane.settings, state, questions, ...(signal ? { signal } : {}) });
+    if (signal?.aborted) return;
     const composed = composeRerankOrder(input, result.answers, lane.settings.confidencePolicy["memory-reranking"]);
     recordSystemOneDecision({
       decisionId: randomUUID(),
@@ -1000,8 +1003,16 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     try {
       const lane = await dependencies.getSystemOneAdventure();
       if (lane) {
-        const laneCommit = await recordAdventureShadowDecision(turn, shadowCandidates, lane, repository);
-        if (laneCommit) return { turn: laneCommit.turn, outcome: laneCommit.outcome, limitations: ADVENTURE_TOOL_LIMITATIONS };
+        if (systemOneLaneMode(lane.settings, "adventure-selection") === "shadow") {
+          const snapshot = structuredClone(turn);
+          const candidates = structuredClone(shadowCandidates);
+          const frozenLane = { ...lane, settings: structuredClone(lane.settings) };
+          // No repository is passed: background work cannot commit a gameplay action.
+          systemOneShadowQueue.submit(() => recordAdventureShadowDecision(snapshot, candidates, frozenLane, undefined, signal));
+        } else {
+          const laneCommit = await recordAdventureShadowDecision(turn, shadowCandidates, lane, repository, signal);
+          if (laneCommit) return { turn: laneCommit.turn, outcome: laneCommit.outcome, limitations: ADVENTURE_TOOL_LIMITATIONS };
+        }
       }
     } catch {
       // Shadow evaluation is advisory and must never affect the turn.
@@ -1015,7 +1026,13 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
       const rerankCandidates = rerankShadowCandidates(historicalRecall.hits);
       if (rerankCandidates.length >= 2) {
         const lane = await dependencies.getSystemOneRerank();
-        if (lane) await recordRerankShadowDecision(turn, historicalRecall.query, rerankCandidates, lane);
+        if (lane) {
+          const snapshot = structuredClone(turn);
+          const candidates = structuredClone(rerankCandidates);
+          const query = historicalRecall.query;
+          const frozenLane = { ...lane, settings: structuredClone(lane.settings) };
+          systemOneShadowQueue.submit(() => recordRerankShadowDecision(snapshot, query, candidates, frozenLane, signal));
+        }
       }
     } catch {
       // Shadow evaluation is advisory and must never affect the turn.

@@ -80,6 +80,24 @@ const goodAnswers = {
 };
 
 describe("System One completion adapter", () => {
+  it("includes retry backoff in the total deadline", async () => {
+    const { baseUrl, requests } = await startServer({ status: 429, body: {} });
+    await expect(completeWithSystemOne({ settings: settings(baseUrl, { requestTimeoutSeconds: 0.1 }), state: "x", questions }))
+      .rejects.toBeInstanceOf(SystemOneTimeoutError);
+    expect(requests).toHaveLength(1);
+  });
+
+  it("classifies caller cancellation during backoff and starts no retry", async () => {
+    const { baseUrl, requests } = await startServer({ status: 429, body: {} });
+    const controller = new AbortController();
+    await expect(completeWithSystemOne({ settings: settings(baseUrl), state: "x", questions, signal: controller.signal,
+      sleep: async (_ms, signal) => {
+        controller.abort();
+        signal!.throwIfAborted();
+      },
+    })).rejects.toBeInstanceOf(SystemOneCallerAbortError);
+    expect(requests).toHaveLength(1);
+  });
   it("sends the documented request and parses typed answers with provenance", async () => {
     const { baseUrl, requests } = await startServer({ body: { model: "jev-1.13.0", answers: goodAnswers, usage: { input_tokens: 300, output_tokens: 20 } }, headers: { "x-typesafe-request-id": "req_123" } });
     const result = await completeWithSystemOne({ settings: settings(baseUrl), state: { room: "mill" }, questions });

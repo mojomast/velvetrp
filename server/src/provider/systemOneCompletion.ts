@@ -429,16 +429,18 @@ export async function completeWithSystemOne(input: SystemOneCompletionInput): Pr
   const startedAt = performance.now();
   let lastError: SystemOneError | null = null;
 
+  const timeout = new AbortController();
+  const timer = setTimeout(() => timeout.abort(), timeoutMs);
+  const signal = AbortSignal.any(input.signal ? [input.signal, timeout.signal] : [timeout.signal]);
+  try {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     if (input.signal?.aborted) throw new SystemOneCallerAbortError("System One aborted by caller");
-    const timeout = new AbortController();
-    const timer = setTimeout(() => timeout.abort(), timeoutMs);
-    const signals = input.signal ? [input.signal, timeout.signal] : [timeout.signal];
+    if (timeout.signal.aborted) throw new SystemOneTimeoutError("System One timed out");
     try {
       const response = await fetch(`${baseUrl}/systemone`, {
         method: "POST",
         headers: buildSystemOneHeaders(baseUrl, input.settings.apiKey),
-        signal: AbortSignal.any(signals),
+        signal,
         redirect: "error",
         body,
       });
@@ -470,12 +472,12 @@ export async function completeWithSystemOne(input: SystemOneCompletionInput): Pr
         },
       };
     } catch (error) {
-      const classified = error instanceof SystemOneError
-        ? error
-        : input.signal?.aborted
+      const classified = input.signal?.aborted
         ? new SystemOneCallerAbortError("System One aborted by caller", { cause: error })
         : timeout.signal.aborted
         ? new SystemOneTimeoutError("System One timed out", { cause: error })
+        : error instanceof SystemOneError
+        ? error
         : isRedirectFailure(error)
         ? new SystemOneRedirectError("System One redirect refused")
         : new SystemOneTransportError("System One transport failed", { cause: error });
@@ -483,12 +485,19 @@ export async function completeWithSystemOne(input: SystemOneCompletionInput): Pr
       lastError = classified;
       if (attempt >= maxAttempts) throw classified;
       const backoff = Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * 2 ** (attempt - 1));
-      await sleep(backoff, input.signal);
-    } finally {
-      clearTimeout(timer);
+      try {
+        await sleep(backoff, signal);
+      } catch (error) {
+        if (input.signal?.aborted) throw new SystemOneCallerAbortError("System One aborted by caller", { cause: error });
+        if (timeout.signal.aborted) throw new SystemOneTimeoutError("System One timed out", { cause: error });
+        throw error;
+      }
     }
   }
   throw lastError ?? new SystemOneTransportError("System One transport failed");
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** The real adapter as a `SystemOneCaller`. */

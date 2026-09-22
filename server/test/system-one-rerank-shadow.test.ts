@@ -1,3 +1,4 @@
+import { systemOneShadowQueue } from "../src/agent/systemOneShadow.js";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   RERANK_SHADOW_CANDIDATE_CAP,
@@ -95,7 +96,7 @@ async function rerankTurn() {
  * Runs one fresh-planning turn that commits the exact quest objective candidate. The optional
  * lane factory is the only difference between the shadow and baseline runs.
  */
-async function runTurn(options: { lane?: (caller: SystemOneCaller) => SystemOneRerankDependency } = {}) {
+async function runTurn(options: { lane?: (caller: SystemOneCaller) => SystemOneRerankDependency; onTurnComplete?: () => void } = {}) {
   const { f, created, candidate, recall, candidates } = await rerankTurn();
   let providerCalls = 0;
   let laneResolutions = 0;
@@ -121,6 +122,8 @@ async function runTurn(options: { lane?: (caller: SystemOneCaller) => SystemOneR
     dependencies.getSystemOneRerank = async () => { laneResolutions += 1; return resolved; };
   }
   const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
+  options.onTurnComplete?.();
+  await systemOneShadowQueue.drain();
   const decisions = listSystemOneDecisionsByLane("memory-reranking", 10);
   f.repo.close();
   return { result, decisions, providerCalls, laneResolutions, advertisedTools, messageCount, caller, query: recall.query, candidates, candidate };
@@ -142,6 +145,23 @@ function turnProjection(result: AdventureAgentResult) {
 }
 
 describe("System One memory-reranking shadow lane", () => {
+  it("completes the turn while shadow inference is still blocked", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let finished = false;
+    let completedBeforeShadow = false;
+    // Safety cleanup only; the assertion fails if completion needed this timer.
+    const timer = setTimeout(release, 3000);
+    try {
+      const result = await runTurn({
+        lane: (caller) => lane(async (input) => { await gate; const result = await caller(input); finished = true; return result; }),
+        onTurnComplete: () => { completedBeforeShadow = !finished; release(); },
+      });
+      expect(completedBeforeShadow).toBe(true);
+      expect(result.result.outcome).toBe("mechanics-committed");
+      expect(result.decisions).toHaveLength(1);
+    } finally { clearTimeout(timer); release(); }
+  });
   it("records one advisory decision while the committed turn and provider calls stay identical", async () => {
     const shadow = await runTurn({ lane: (caller) => lane(caller) });
 

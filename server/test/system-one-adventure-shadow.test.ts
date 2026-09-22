@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { systemOneShadowQueue } from "../src/agent/systemOneShadow.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import {
@@ -110,6 +111,7 @@ async function runTurn(laneFactory?: () => SystemOneAdventureDependency) {
     ...(laneFactory ? { getSystemOneAdventure: async () => { laneResolutions += 1; return laneFactory(); } } : {}),
   };
   const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
+  await systemOneShadowQueue.drain();
   const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
   f.repo.close();
   return { result, decisions, providerCalls, laneResolutions, advertisedTools, messageCount, candidate };
@@ -124,6 +126,9 @@ async function runTurn(laneFactory?: () => SystemOneAdventureDependency) {
  */
 async function runCheckLaneTurn(options: { mode: "shadow" | "active"; pick: "check" | "objective"; staleCheckOnLaneCall?: boolean }) {
   const { f, created, check, objective } = await checkAdventureTurn();
+  // Test lane execution, not hash-dependent recall through the 32-row shortlist.
+  // Without this, the scripted Easy/normal check is sometimes never advertised.
+  vi.spyOn(f.repo, "generateAdventureCheckCandidates").mockReturnValue([check]);
   const picked = options.pick === "check" ? check : objective;
   let providerCalls = 0;
   const base = createFakeSystemOneCaller({
@@ -157,6 +162,7 @@ async function runCheckLaneTurn(options: { mode: "shadow" | "active"; pick: "che
     getSystemOneAdventure: async () => lane(caller, { laneModes: { ...defaultSystemOneLaneModes(), "adventure-selection": options.mode } }),
   };
   const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
+  await systemOneShadowQueue.drain();
   const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
   const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
   const execution = db.prepare("SELECT * FROM adventure_check_executions_v54 WHERE turn_id=?").get(created.turnId) as Record<string, unknown> | undefined;
@@ -237,6 +243,7 @@ async function runRestLaneTurn(options: { mode: "shadow" | "active"; pick: "rest
     getSystemOneAdventure: async () => lane(caller, { laneModes: { ...defaultSystemOneLaneModes(), "adventure-selection": options.mode } }),
   };
   const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
+  await systemOneShadowQueue.drain();
   const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
   const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
   const binding = db.prepare("SELECT * FROM adventure_exact_action_proposal_bindings_v56 WHERE turn_id=?")

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { systemOneShadowQueue } from "./systemOneShadow.js";
 import { campaignDmCompositionSchema, campaignDmSelectionSchema, canonicalAgentJson, type CampaignDmSelection } from "@velvet/contracts";
 import { callSystemOne, completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
   type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
@@ -193,7 +194,11 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
   if (deps.getSystemOneDirector) {
     try {
       const director = await deps.getSystemOneDirector();
-      if (director) await recordDirectorShadowDecision(work, director);
+      if (director) {
+        const snapshot = structuredClone(work);
+        const frozenDirector = { ...director, settings: structuredClone(director.settings) };
+        systemOneShadowQueue.submit(() => recordDirectorShadowDecision(snapshot, frozenDirector));
+      }
     } catch {
       // Shadow evaluation is advisory and must never affect planning.
     }
@@ -355,7 +360,11 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
       if(scene!==null&&deps.getSystemOneDirector){
         try{
           const director=await deps.getSystemOneDirector();
-          if(director)await recordNarrationShadowDecision(runId,scene,committedNarrationFacts(work.context),director);
+          if (director) {
+            const facts = committedNarrationFacts(work.context);
+            const frozenDirector = { ...director, settings: structuredClone(director.settings) };
+            systemOneShadowQueue.submit(() => recordNarrationShadowDecision(runId, scene, facts, frozenDirector));
+          }
         }catch{
           // Shadow evaluation is advisory and must never affect narration.
         }
