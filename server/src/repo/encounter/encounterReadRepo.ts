@@ -44,6 +44,13 @@ export type CombatLogPage = {
   nextAfterSequence: number | null;
 };
 
+/** One visible target a player attack declaration may name; the initiating actor is excluded. */
+export interface CombatInitiationCandidate {
+  readonly kind: "npc" | "actor";
+  readonly id: string;
+  readonly name: string;
+}
+
 /** Actor-authorized, non-mutating encounter operations. */
 export interface EncounterReadRepository {
   /** Returns lifecycle summaries for one visible campaign, or null when the campaign is concealed. */
@@ -64,6 +71,12 @@ export interface EncounterReadRepository {
   getCombatRewardClaimResult(principal:string,campaignId:string,combatId:string,rewardBundleId:string,claimIdentity:string):CombatRewardClaimResultResponse|null;
   /** Returns validated public combat-log entries when the principal may view the encounter. */
   listCombatLog(principal: string, campaignId: string, encounterId: string): unknown[];
+  /**
+   * Lists the campaign targets one initiating actor may reference by public name: every visible
+   * NPC public name plus every other campaign actor persona name. GM-only generated NPCs stay
+   * hidden from non-GM principals, and the initiating actor is always excluded.
+   */
+  listCombatInitiationCandidates(principal: string, campaignId: string, sessionId: string, actorId: string): CombatInitiationCandidate[];
   /** Repository-only legal actions; deliberately excluded from the live HTTP combat union. */
   getUseConsumableLegalActions(principal:string,combatId:string):UseConsumableLegalAction[];
   /** Reads one immutable repository-only consumable result by its internal command identity. */
@@ -360,6 +373,35 @@ export function createEncounterReadRepository(
         claim:row.reward_claim_id?{state:"claimed" as const,rewardClaimId:row.reward_claim_id,claimedAt:row.claimed_at}:{state:"unclaimed" as const}};
     });
   };
+  /**
+   * Bounded, non-mutating target list for declaration detection. Membership and an attached
+   * session are required; GM-only generated NPCs are withheld from non-GM principals.
+   */
+  const listCombatInitiationCandidates = (principal: string, campaignId: string, sessionId: string,
+    actorId: string): CombatInitiationCandidate[] => {
+    if (!member(principal, campaignId)) return [];
+    if (!db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?").get(campaignId, sessionId)) return [];
+    const seesHiddenNpcs = gm(principal, campaignId);
+    const npcs = db.prepare(`SELECT npc.npc_id id,npc.public_name name
+      FROM campaign_npcs_v28 npc
+      WHERE npc.campaign_id=?
+        AND (?=1 OR NOT EXISTS (SELECT 1 FROM campaign_generation_accepted_artifacts_v52 generated
+          WHERE generated.campaign_id=npc.campaign_id AND generated.server_resource_id=npc.npc_id
+            AND generated.artifact_kind='npc' AND generated.visibility='gm'))
+      ORDER BY npc.public_name COLLATE BINARY,npc.npc_id COLLATE BINARY`)
+      .all(campaignId, seesHiddenNpcs ? 1 : 0) as Array<{ id: string; name: string }>;
+    const actors = db.prepare(`SELECT actor.id id,persona.name name
+      FROM campaign_actors actor
+      JOIN campaign_characters character ON character.campaign_id=actor.campaign_id AND character.id=actor.campaign_character_id
+      JOIN characters persona ON persona.id=character.character_id
+      WHERE actor.campaign_id=? AND actor.id<>?
+      ORDER BY persona.name COLLATE BINARY,actor.id COLLATE BINARY`)
+      .all(campaignId, actorId) as Array<{ id: string; name: string }>;
+    return [
+      ...npcs.map((row) => ({ kind: "npc" as const, id: row.id, name: row.name })),
+      ...actors.map((row) => ({ kind: "actor" as const, id: row.id, name: row.name })),
+    ];
+  };
   const getCombatRewardClaimResult=(principal:string,campaignId:string,combatId:string,rewardBundleId:string,claimIdentity:string):CombatRewardClaimResultResponse|null=>{
     const rows=db.prepare(`SELECT bundle.recipient_actor_id,bundle.created_at bundle_created_at,claim.reward_claim_id,claim.claimed_at,
         command.idempotency_key,command.canonical_request_json,command.request_digest,command.expected_revision,command.resulting_revision,
@@ -399,7 +441,7 @@ export function createEncounterReadRepository(
         expectedRevision:request.expectedRevision,idempotencyKey:request.idempotencyKey},canonicalRequestDigest:row.request_digest},
       receipt:{idempotencyKey:row.idempotency_key,revisionBefore:row.expected_revision,revisionAfter:row.resulting_revision,occurredAt:row.occurred_at}});
   };
-  return { listEncounters, getEncounterSetupCandidates, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, getCombatCommandResult,
+  return { listEncounters, getEncounterSetupCandidates, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, listCombatInitiationCandidates, getCombatCommandResult,
     listCombatRewards,getCombatRewardClaimResult,
     getUseConsumableLegalActions:(principal,combatId)=>db.transaction(()=>buildUseConsumableLegalActions(db,principal,combatId)).deferred(),
     getUseConsumableCommandResult:(principal,commandId)=>db.transaction(()=>readUseConsumableCommandResult(db,principal,commandId)).deferred(),

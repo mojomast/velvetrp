@@ -14,6 +14,7 @@ import type { EncounterCombatSnapshot, EncounterLifecycleSnapshot } from "./enco
 import { EncounterUnavailableError } from "./encounterErrors.js";
 import { executeUseConsumable } from "./useConsumableRuntime.js";
 import { buildCombatPowerLegalActions, executeCombatPower, getCombatPowerResultByKey, type CombatPowerRequest, type CombatPowerResult } from "./combatPowerRuntime.js";
+import { initiateCombatFromTarget as executeInitiateCombatFromTarget, type InitiateCombatInput, type InitiateCombatResult } from "./initiateCombat.js";
 import { now, type EncounterResult, type EncounterRewardGrantSnapshot, type EncounterWriteDependencies } from "./actionExecution/shared.js";
 import { createCreateLifecycleEncounter, createStartLifecycleEncounter } from "./actionExecution/lifecycle.js";
 import { createResolveCombatAction } from "./actionExecution/attack.js";
@@ -37,6 +38,12 @@ export interface EncounterWriteRepository {
   useCombatPower(principal:string,input:CombatPowerRequest):CombatPowerResult;
   getCombatPowerLegalActions(principal:string,combatId:string):Array<ReturnType<typeof buildCombatPowerLegalActions>[number]&{revisions:{combat:number;sourceM15:number;sourceM16:number;targetM15:number|null;targetM16:number|null}}>;
   getCombatPowerResultByKey(principal:string,combatId:string,idempotencyKey:string):{request:CombatPowerRequest;result:CombatPowerResult}|null;
+  /**
+   * Materializes and starts one encounter when a player attacks a visible campaign target.
+   * `principal` is the initiating principal: the service authorizes it against the actor and
+   * routes start through the campaign GM authority, exactly like GM-created encounters.
+   */
+  initiateCombatFromTarget(principal:string,input:Omit<InitiateCombatInput,"principalId">):InitiateCombatResult;
   claimCombatReward(principal:string,combatId:string,rewardBundleId:string,input:{rewardClaimId:string;expectedRevision:number;idempotencyKey:string}):EncounterResult<{encounterId:string;status:string}>;
 }
 
@@ -61,6 +68,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
     executeEncounterCommand:execute,mutateEncounter:execute,
     useConsumable(principal,input){deps.assertFactoryMutation();return executeUseConsumable(db,deps,principal,input);},
     useCombatPower(principal,input){deps.assertFactoryMutation();return executeCombatPower(db,deps,principal,input);},
+    initiateCombatFromTarget(principal,input){return executeInitiateCombatFromTarget(db,deps,{...input,principalId:principal});},
     getCombatPowerLegalActions(principal,combatId){const actions=buildCombatPowerLegalActions(db,principal,combatId);const combat=(db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(combatId)as any)?.revision;if(combat===undefined)return[];const rev=(family:"m15"|"m16",campaignId:string,actorId:string)=>(db.prepare(`SELECT revision FROM rpg_${family}_mutation_revisions_v${family==="m15"?"25":"26"} WHERE campaign_id=? AND actor_id=?`).get(campaignId,actorId)as any)?.revision??0;return actions.map(action=>({...action,revisions:{combat,sourceM15:rev("m15",action.campaignId,action.sourceActorId),sourceM16:rev("m16",action.campaignId,action.sourceActorId),targetM15:action.targetActorId?rev("m15",action.campaignId,action.targetActorId):null,targetM16:action.targetActorId?rev("m16",action.campaignId,action.targetActorId):null}}));},
     getCombatPowerResultByKey(principal,combatId,idempotencyKey){return getCombatPowerResultByKey(db,principal,combatId,idempotencyKey);}};
 }

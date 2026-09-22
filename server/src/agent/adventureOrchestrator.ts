@@ -30,6 +30,10 @@ import { adventurePlanningMessages } from "./adventurePrompt.js";
 import { candidateLabels, labeled, type LabeledCandidate } from "./providerCandidateProjection.js";
 import { adventureTurnBudgets, type TurnBudgetPolicy } from "./turnBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "./directToolReasoning.js";
+import { detectAttackTarget } from "./attackIntent.js";
+// The pure detector is a sibling module, re-exported here so callers that already import the
+// adventure orchestrator can reach the same single vocabulary and matcher.
+export { ATTACK_VERBS, detectAttackTarget } from "./attackIntent.js";
 
 const OWNER = "local-owner";
 const digest = (...parts: string[]) => createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 48);
@@ -446,6 +450,33 @@ function privateTurn(repository: Repository, turnId: string): PrivateAdventureTu
   return value;
 }
 
+/**
+ * Materializes and starts combat for one original player declaration that attacks a visible
+ * target while no encounter is active. The encounter lifecycle service owns authorization,
+ * template pinning, initiative, turn economy, and the automatic tactical map; this helper only
+ * decides that the declaration is an attack and which visible target it names. The idempotency
+ * key is derived from the turn and target, so re-entering the same turn can never create a
+ * second encounter. Every failure (no match, unauthorized initiator, unknown target, active
+ * encounter, conflict) is swallowed so the turn falls through to the unchanged non-combat flow.
+ */
+function initiateCombatFromDeclaration(repository: Repository, turn: PrivateAdventureTurn): boolean {
+  try {
+    const candidates = repository.listCombatInitiationCandidates(turn.principalId, turn.campaignId, turn.sessionId, turn.actorId);
+    const target = detectAttackTarget(turn.declaration, candidates);
+    if (!target) return false;
+    repository.initiateCombatFromTarget(turn.principalId, {
+      campaignId: turn.campaignId,
+      sessionId: turn.sessionId,
+      actorId: turn.actorId,
+      target: target.kind === "npc" ? { kind: "npc", npcId: target.id } : { kind: "actor", actorId: target.id },
+      idempotencyKey: key("initiate-combat", turn.turnId, target.kind, target.id),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function selectAudience(repository: Repository, turn: PrivateAdventureTurn): { audience: CampaignAgentAudience; snapshot: CampaignAgentContextSnapshot } {
   const playerAudience: CampaignAgentAudience = { kind: "player", actorId: turn.actorId };
   const player = repository.getCampaignAgentContextSnapshot(OWNER, turn.campaignId, turn.sessionId, playerAudience);
@@ -807,8 +838,20 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     }else selectedContext = selectAudience(repository, turn);
   }
   catch { return { turn, outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS }; }
-  const { snapshot } = selectedContext;
+  let snapshot = selectedContext.snapshot;
   if(!snapshot.ruleset)return {turn,outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};
+  // Player-initiated combat runs before provider planning: an original player declaration that
+  // attacks a visible target while no encounter is active materializes and starts the encounter
+  // through the existing lifecycle service. On success the snapshot is re-read so the rest of
+  // this turn already sees the active encounter, its legal combat actions, and the automatic
+  // tactical map. A declaration that matches no target, an unauthorized initiator, or any typed
+  // initiation failure falls through to the unchanged non-combat flow.
+  if(snapshot.audience.kind==="player"&&snapshot.audience.actorId===turn.actorId
+      &&snapshot.authority.control!=="none"&&!snapshot.encounter&&initiateCombatFromDeclaration(repository,turn)){
+    try{selectedContext=selectAudience(repository,turn);snapshot=selectedContext.snapshot;}
+    catch{return {turn,outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};}
+    if(!snapshot.ruleset)return {turn,outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};
+  }
   let provider: ProviderSettings; let harness: HarnessSettings;
   try {
     [provider, harness] = await Promise.all([dependencies.getProvider(), dependencies.getHarness()]);
