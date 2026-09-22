@@ -39,6 +39,18 @@
 }
 .scene-illustration-figure figcaption { color: var(--muted); font-size: 12px; }
 
+/* Player-visible scene text: a few clamped lines under the illustration. */
+.scene-illustration-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .scene-image-dm { display: grid; gap: var(--panel-gap); }
 .scene-image-dm .admin-section-heading h2 { margin: 0; }
 .scene-image-group { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; }

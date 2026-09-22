@@ -54,6 +54,8 @@ export interface SceneIllustrationProps {
   sessionId: string;
   sceneKey: string;
   sceneLabel: string;
+  /** Player-visible location description shown as a small caption under the image. */
+  sceneDescription?: string;
   audience: "gm" | "player";
   /** Feature discovery: this component renders nothing while the images flag is off. */
   enabled: boolean;
@@ -66,7 +68,7 @@ export interface SceneIllustrationProps {
  * narration surface: an unloaded, missing, or broken image always degrades to
  * a text-only line, and local preferences can keep bytes off the wire.
  */
-export function SceneIllustration({ campaignId, sessionId, sceneKey, sceneLabel, audience, enabled, api, onOpenControls }: SceneIllustrationProps) {
+export function SceneIllustration({ campaignId, sessionId, sceneKey, sceneLabel, sceneDescription, audience, enabled, api, onOpenControls }: SceneIllustrationProps) {
   const [preferences, updatePreferences] = useSceneImagePreferences();
   const [gallery, setGallery] = useState<GalleryLoad>({ state: "loading" });
   const [display, setDisplay] = useState<"loading" | "ready" | "error">("loading");
@@ -115,6 +117,7 @@ export function SceneIllustration({ campaignId, sessionId, sceneKey, sceneLabel,
                   onLoad={() => setDisplay("ready")} onError={() => setDisplay("error")} />
                 {display === "loading" && <figcaption role="status">Loading illustration…</figcaption>}
               </figure>}
+    {sceneDescription ? <p className="scene-illustration-caption" title={sceneDescription}>{sceneDescription}</p> : null}
   </section>;
 }
 

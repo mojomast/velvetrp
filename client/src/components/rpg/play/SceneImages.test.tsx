@@ -124,6 +124,16 @@ describe("SceneIllustration", () => {
     expect(client.getGallery).toHaveBeenCalledWith("campaign", "room");
   });
 
+  it("shows the player-visible scene description as a small caption under the illustration", async () => {
+    const client = sceneApi({ getGallery: vi.fn().mockResolvedValue({ images: [readyImage()] }) });
+    render(<SceneIllustration campaignId="campaign" sessionId="room" sceneKey="location:gate" sceneLabel="Old North Gate"
+      sceneDescription="A cold gate above the harbor, its iron hinges furred with salt." audience="player" enabled api={client} />);
+    await screen.findByRole("img");
+    const caption = screen.getByText("A cold gate above the harbor, its iron hinges furred with salt.");
+    expect(caption.className).toContain("scene-illustration-caption");
+    expect(caption.getAttribute("title")).toContain("iron hinges");
+  });
+
   it("keeps player alt text free of prompt facts and falls back to text when the gallery fails", async () => {
     const client = sceneApi({ getGallery: vi.fn().mockResolvedValue({ images: [readyImage()] }) });
     const { unmount } = render(<SceneIllustration campaignId="campaign" sessionId="room" sceneKey="location:gate" sceneLabel="Old North Gate" audience="player" enabled api={client} />);

@@ -147,9 +147,9 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   useEffect(() => { if (!authorizationCanAct || (bootstrap && !["owner", "gm"].includes(bootstrap.principal.role))) setSessionLocked(false); }, [authorizationCanAct, bootstrap]);
   const [activeTool, setActiveTool] = useState<AtlasTool | null>(null);
   const [visitedTools, setVisitedTools] = useState<AtlasTool[]>([]);
-  const [activeScene, setActiveScene] = useState<{ sceneKey: string; label: string } | null>(null);
-  const resolveScene = useCallback((scene: { sceneKey: string; label: string } | null) => {
-    setActiveScene((current) => current?.sceneKey === scene?.sceneKey && current?.label === scene?.label ? current : scene);
+  const [activeScene, setActiveScene] = useState<{ sceneKey: string; label: string; description?: string } | null>(null);
+  const resolveScene = useCallback((scene: { sceneKey: string; label: string; description?: string } | null) => {
+    setActiveScene((current) => current?.sceneKey === scene?.sceneKey && current?.label === scene?.label && current?.description === scene?.description ? current : scene);
   }, []);
   const toolOriginRef = useRef<HTMLElement | null>(null);
   const [combatLocked, setCombatLocked] = useState(false);
@@ -559,7 +559,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       phase={sessionLocked || roomToolsLocked || phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"}
       declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => void submit(value)} composerRef={composerRef} />;
   const sceneImageNode = sceneImageAvailable && sceneImageApi
-    ? <SceneIllustration campaignId={campaignId} sessionId={sessionId} sceneKey={scene.sceneKey} sceneLabel={scene.label} audience={audience} enabled
+    ? <SceneIllustration campaignId={campaignId} sessionId={sessionId} sceneKey={scene.sceneKey} sceneLabel={scene.label} sceneDescription={scene.description} audience={audience} enabled
         api={sceneImageApi} onOpenControls={audience === "gm" ? () => openTool("images") : undefined} />
     : null;
   const centerNode = <>

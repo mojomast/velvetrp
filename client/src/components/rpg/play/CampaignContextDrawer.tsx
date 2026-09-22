@@ -45,7 +45,7 @@ export interface CampaignContextDrawerProps {
   readOnly?: boolean;
   commandsBlocked?: boolean;
   /** Emits the active scene identity (current location, or the room) for the play surface. */
-  onSceneResolved?: (scene: { sceneKey: string; label: string } | null) => void;
+  onSceneResolved?: (scene: { sceneKey: string; label: string; description?: string } | null) => void;
 }
 
 function status<T>(load: Load<T>, empty: boolean, label: string) {
@@ -179,13 +179,15 @@ function BoundCampaignContextDrawer({ campaignId, sessionId, selectedActorId, pl
   const exits = useMemo(() => actorLocation ? (worldValue?.visibleConnections.filter((entry) => entry.fromLocationId === actorLocation.locationId) ?? []) : [], [actorLocation, worldValue]);
   const sceneLocationId = actorLocation?.locationId ?? null;
   const sceneLocationName = location?.name ?? null;
+  const sceneLocationDescription = location?.description?.trim() || null;
   const sceneCallbackRef = useRef(onSceneResolved); sceneCallbackRef.current = onSceneResolved;
   useEffect(() => {
     // Ground the active scene in the acting character's location row; fall back
     // to the room only while no authoritative location is known.
-    if (sceneLocationId) sceneCallbackRef.current({ sceneKey: `location:${sceneLocationId}`, label: sceneLocationName?.trim() || "Current scene" });
+    if (sceneLocationId) sceneCallbackRef.current({ sceneKey: `location:${sceneLocationId}`, label: sceneLocationName?.trim() || "Current scene",
+      ...(sceneLocationDescription ? { description: sceneLocationDescription } : {}) });
     else sceneCallbackRef.current({ sceneKey: `session:${sessionId}`, label: "This room" });
-  }, [sceneLocationId, sceneLocationName, sessionId]);
+  }, [sceneLocationId, sceneLocationName, sceneLocationDescription, sessionId]);
   const rosterValue = roster.state === "ready" ? roster.value : roster.stale;
   const loadedCast = cast.state === "ready" ? cast.value : cast.stale;
   const castValue = loadedCast?.audience === audience ? loadedCast : undefined;
