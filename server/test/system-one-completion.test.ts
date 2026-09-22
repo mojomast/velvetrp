@@ -75,7 +75,7 @@ const questions: Record<string, SystemOneQuestion> = {
 
 const goodAnswers = {
   hold: { type: "noul", noul: 0.8 },
-  grounded: { type: "score", score: 1, confidence: 0.9, legend: { 0: "grounded", 1: "contradicts" }, probabilities: { 0: 0.9, 1: 0.1 } },
+  grounded: { type: "score", score: 0.1, confidence: 0.9, legend: { 0: "grounded", 1: "contradicts" }, probabilities: { 0: 0.9, 1: 0.1 } },
   pick: { type: "choice", choice: "attack", confidence: 0.9, probabilities: { attack: 0.9, none_of_these: 0.1 } },
 };
 
@@ -219,7 +219,7 @@ describe("System One completion adapter", () => {
     };
     const structuredAnswers = {
       route: { type: "choice", choice: "billing", confidence: 0.9, probabilities: { billing: 0.8, orders: 0.1, taxonomy: 0.1 } },
-      scope: { type: "score", score: 0, confidence: 0.9, legend: { 0: "One change", 1: "Several independent changes" }, probabilities: { 0: 0.9, 1: 0.1 } },
+      scope: { type: "score", score: 0.1, confidence: 0.9, legend: { 0: "One change", 1: "Several independent changes" }, probabilities: { 0: 0.9, 1: 0.1 } },
       credentials: { type: "noul", noul: 0.7 },
       absent: { type: "noul", noul: 0.5 },
     };

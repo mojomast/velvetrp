@@ -172,7 +172,7 @@ async function trySystemOneRoomRouting(input: {
   try {
     const result = await systemOne.caller({ settings: systemOne.settings, state, questions });
     const usage = result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null;
-    systemOneLaneBudgets.settle("speaker-routing", usage ?? { inputTokens: 0, outputTokens: 0 });
+    systemOneLaneBudgets.settle("speaker-routing", usage ?? { inputTokens: 0, outputTokens: 0 }, reservation.reservationId);
     const composed = composeRoomRoutingSelection(projection, result.answers, thresholds, maxSpeakers);
     // A lane changes behavior only when it is `active` and has a recorded, passing promotion.
     // Otherwise it still records the would-be decision.
@@ -213,7 +213,7 @@ async function trySystemOneRoomRouting(input: {
       },
     };
   } catch {
-    systemOneLaneBudgets.release("speaker-routing");
+    systemOneLaneBudgets.release("speaker-routing", reservation.reservationId);
     return null;
   }
 }

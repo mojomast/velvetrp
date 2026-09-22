@@ -138,7 +138,7 @@ function fakeSystemOneResponse(body: string): unknown {
     if (rest.length === 0) probabilities[winner] = 1;
     answers[id] = {
       type: "score",
-      score: Number(winner),
+      score: Object.entries(probabilities).reduce((sum, [level, probability]) => sum + Number(level) * probability, 0),
       confidence: 0.9,
       legend: Object.fromEntries(criteria.map((criterion, index) => [String(index), criterion])),
       probabilities,

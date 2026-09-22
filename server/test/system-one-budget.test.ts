@@ -22,7 +22,7 @@ function request(overrides: Partial<SystemOneBudgetReservationRequest> = {}): Sy
 describe("system one lane budget", () => {
   it("allows a reservation then settles against actual usage and cost", () => {
     const budgets = new SystemOneLaneBudgetManager();
-    expect(budgets.reserve("jev", policy, request())).toEqual({ allowed: true });
+    expect(budgets.reserve("jev", policy, request())).toEqual({ allowed: true, reservationId: expect.any(Number) });
     expect(budgets.snapshot("jev")).toMatchObject({
       reservedInputTokens: 100,
       reservedOutputTokens: 50,
@@ -50,7 +50,7 @@ describe("system one lane budget", () => {
   it("counts settled and reserved tokens when checking the token budget", () => {
     const budgets = new SystemOneLaneBudgetManager();
     const tight: SystemOneBudgetPolicy = { ...policy, maxTotalTokens: 200 };
-    expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 60, maxOutputTokens: 50 }))).toEqual({ allowed: true });
+    expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 60, maxOutputTokens: 50 }))).toEqual({ allowed: true, reservationId: expect.any(Number) });
     budgets.settle("jev", { inputTokens: 110, outputTokens: 50 });
     expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 30, maxOutputTokens: 20 })))
       .toEqual({ allowed: false, reason: "token-budget" });
@@ -66,10 +66,10 @@ describe("system one lane budget", () => {
 
   it("rate-limits within the window and allows again once the window passes", () => {
     const budgets = new SystemOneLaneBudgetManager();
-    expect(budgets.reserve("jev", policy, request({ nowMs: 0 }))).toEqual({ allowed: true });
-    expect(budgets.reserve("jev", policy, request({ nowMs: 100 }))).toEqual({ allowed: true });
+    expect(budgets.reserve("jev", policy, request({ nowMs: 0 }))).toEqual({ allowed: true, reservationId: expect.any(Number) });
+    expect(budgets.reserve("jev", policy, request({ nowMs: 100 }))).toEqual({ allowed: true, reservationId: expect.any(Number) });
     expect(budgets.reserve("jev", policy, request({ nowMs: 200 }))).toEqual({ allowed: false, reason: "rate-limit" });
-    expect(budgets.reserve("jev", policy, request({ nowMs: 1101 }))).toEqual({ allowed: true });
+    expect(budgets.reserve("jev", policy, request({ nowMs: 1101 }))).toEqual({ allowed: true, reservationId: expect.any(Number) });
   });
 
   it("release removes the reservation without settling", () => {

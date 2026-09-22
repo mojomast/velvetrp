@@ -31,12 +31,13 @@ function defaultAnswer(input: SystemOneCompletionInput, questionId: string): Sys
   }
   const levels = question.criteria.map((_, index) => String(index));
   const winner = levels[Math.floor(levels.length / 2)]!;
+  const probabilities = evenSpread(levels, winner, 0.8);
   return {
     type: "score",
-    score: Number(winner),
+    score: Object.entries(probabilities).reduce((sum, [level, probability]) => sum + Number(level) * probability, 0),
     confidence: 0.9,
     legend: Object.fromEntries(question.criteria.map((level, index) => [String(index), level])),
-    probabilities: evenSpread(levels, winner, 0.8),
+    probabilities,
   };
 }
 

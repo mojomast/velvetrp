@@ -388,6 +388,14 @@ export function validateSystemOneAnswers(
       if (!(answer.choice in probabilities)) throw new SystemOneProtocolError(`choice for question ${id} is not a declared option`);
     } else {
       const levelKeys = new Set(declared);
+      const maxScore = declared.length - 1;
+      const expectedScore = Object.entries(probabilities).reduce((total, [level, probability]) =>
+        total + Number(level) * probability, 0);
+      // Allow distribution rounding proportional to the scale, not arbitrary score drift.
+      if (!Number.isFinite(answer.score) || answer.score < 0 || answer.score > maxScore
+        || Math.abs(answer.score - expectedScore) > PROBABILITY_SUM_TOLERANCE * maxScore) {
+        throw new SystemOneProtocolError(`score for question ${id} is out of range or inconsistent with probabilities`);
+      }
       for (const key of Object.keys(answer.legend)) {
         if (!levelKeys.has(key)) throw new SystemOneProtocolError(`legend for question ${id} references an undeclared level`);
       }

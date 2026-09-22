@@ -19,7 +19,7 @@ export interface SystemOneBudgetReservationRequest {
 
 export type SystemOneBudgetDenialReason = "rate-limit" | "token-budget" | "dollar-budget";
 
-export type SystemOneBudgetDecision = { allowed: true } | { allowed: false; reason: SystemOneBudgetDenialReason };
+export type SystemOneBudgetDecision = { allowed: true; reservationId: number } | { allowed: false; reason: SystemOneBudgetDenialReason };
 
 export interface SystemOneBudgetSnapshot {
   reservedInputTokens: number;
@@ -43,7 +43,7 @@ interface SystemOneLaneState {
   settledOutputTokens: number;
   costUsd: number;
   requestStartsMs: number[];
-  reservation: SystemOneBudgetReservation | null;
+  reservations: Map<number, SystemOneBudgetReservation>;
 }
 
 function finiteNonNegative(value: number): boolean {
@@ -66,7 +66,7 @@ function createLaneState(): SystemOneLaneState {
     settledOutputTokens: 0,
     costUsd: 0,
     requestStartsMs: [],
-    reservation: null,
+    reservations: new Map(),
   };
 }
 
@@ -117,6 +117,7 @@ function projectCostUsd(inputTokens: number, outputTokens: number, pricing: Syst
 /** Process-local, lane-scoped budget accounting for the System One (Jev) lane. */
 export class SystemOneLaneBudgetManager {
   private readonly lanes = new Map<string, SystemOneLaneState>();
+  private nextReservationId = 1;
 
   reserve(lane: string, policy: SystemOneBudgetPolicy, request: SystemOneBudgetReservationRequest): SystemOneBudgetDecision {
     validatePolicy(policy);
@@ -139,44 +140,59 @@ export class SystemOneLaneBudgetManager {
     ) {
       return { allowed: false, reason: "token-budget" };
     }
-    if (policy.maxEstimatedCostUsd !== null && state.costUsd + projectedCostUsd > policy.maxEstimatedCostUsd) {
+    const reservedCostUsd = [...state.reservations.values()].reduce((sum, reservation) =>
+      sum + projectCostUsd(reservation.estimatedInputTokens, reservation.maxOutputTokens, reservation.pricing), 0);
+    if (policy.maxEstimatedCostUsd !== null && state.costUsd + reservedCostUsd + projectedCostUsd > policy.maxEstimatedCostUsd) {
       return { allowed: false, reason: "dollar-budget" };
     }
     state.reservedInputTokens += request.estimatedInputTokens;
     state.reservedOutputTokens += request.maxOutputTokens;
-    state.requestStartsMs.push(request.nowMs);
-    state.reservation = {
+    state.requestStartsMs = [...recentStarts, request.nowMs];
+    const reservationId = this.nextReservationId++;
+    state.reservations.set(reservationId, {
       estimatedInputTokens: request.estimatedInputTokens,
       maxOutputTokens: request.maxOutputTokens,
       pricing: { ...request.pricing },
-    };
+    });
     this.lanes.set(lane, state);
-    return { allowed: true };
+    return { allowed: true, reservationId };
   }
 
-  settle(lane: string, usage: { inputTokens: number; outputTokens: number }): void {
+  settle(lane: string, usage: { inputTokens: number; outputTokens: number }, reservationId?: number): void {
     if (!nonNegativeSafeInteger(usage.inputTokens) || !nonNegativeSafeInteger(usage.outputTokens)) {
       throw new RangeError("usage token counts must be non-negative safe integers");
     }
     const state = this.lanes.get(lane);
-    if (!state || !state.reservation) {
+    const id = this.resolveReservationId(state, reservationId);
+    const reservation = id === undefined ? undefined : state?.reservations.get(id);
+    if (!state || !reservation || id === undefined) {
       throw new Error(`no outstanding system one budget reservation for lane: ${lane}`);
     }
-    const reservation = state.reservation;
     state.reservedInputTokens -= reservation.estimatedInputTokens;
     state.reservedOutputTokens -= reservation.maxOutputTokens;
     state.settledInputTokens += usage.inputTokens;
     state.settledOutputTokens += usage.outputTokens;
     state.costUsd += projectCostUsd(usage.inputTokens, usage.outputTokens, reservation.pricing);
-    state.reservation = null;
+    state.reservations.delete(id);
   }
 
-  release(lane: string): void {
+  release(lane: string, reservationId?: number): void {
     const state = this.lanes.get(lane);
-    if (!state || !state.reservation) return;
-    state.reservedInputTokens -= state.reservation.estimatedInputTokens;
-    state.reservedOutputTokens -= state.reservation.maxOutputTokens;
-    state.reservation = null;
+    const id = this.resolveReservationId(state, reservationId);
+    const reservation = id === undefined ? undefined : state?.reservations.get(id);
+    if (!state || !reservation || id === undefined) return;
+    state.reservedInputTokens -= reservation.estimatedInputTokens;
+    state.reservedOutputTokens -= reservation.maxOutputTokens;
+    state.reservations.delete(id);
+  }
+
+  // Single-request callers remain supported; ambiguous settlement fails closed.
+  private resolveReservationId(state: SystemOneLaneState | undefined, id?: number): number | undefined {
+    if (id !== undefined) return id;
+    if (state && state.reservations.size > 1) {
+      throw new Error("reservationId is required for concurrent system one budget reservations");
+    }
+    return state?.reservations.keys().next().value;
   }
 
   reset(lane?: string): void {
