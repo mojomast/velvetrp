@@ -48,6 +48,10 @@ test("reviewed harbor human controls accept at Quay and travel once", async ({ p
     const composer = page.getByRole("textbox", { name: "What do you do?", exact: true });
     await composer.fill("I accept Restore the Harbor Light."); await page.getByRole("button", { name: "Declare action", exact: true }).click();
     await page.getByRole("button", { name: "Approve selected batch", exact: true }).click(); await expect(composer).toBeEnabled();
+    await expect(page.locator(".conversation-text.text-narration").first()).toBeVisible();
+    await expect(page.locator(".conversation-text.text-action").first()).toBeVisible();
+    const speakerColors = await page.locator(".conversation-speaker").evaluateAll(nodes => nodes.map(node => getComputedStyle(node).color));
+    expect(new Set(speakerColors).size).toBeGreaterThan(1);
     const map = await page.getByRole("region", { name: "Campaign maps", exact: true }).elementHandle();
     await composer.fill("Retained Harbor draft"); await page.getByRole("button", { name: "Director", exact: true }).click(); director = { action: "reveal-node", title: "Lens Recovered" };
     await page.getByRole("button", { name: "Open scene", exact: true }).click(); await page.getByRole("button", { name: "Approve exact proposal", exact: true }).click();

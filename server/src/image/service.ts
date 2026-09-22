@@ -195,6 +195,7 @@ export interface SceneImageGalleryQuery {
 }
 
 export interface SceneImageGalleryImage {
+  readonly selections?: readonly { sceneKey: string; revision: number }[];
   readonly assetId: string;
   readonly campaignId: string;
   readonly prompt: string;
@@ -1076,28 +1077,31 @@ export class SceneImageService {
       : requireInteger(query.limit, "limit", 1, SCENE_IMAGE_MAX_LIMIT);
     if (role === "owner" || role === "gm") {
       const assets = this.db
-        .prepare("SELECT * FROM scene_image_assets WHERE campaign_id=? ORDER BY created_at DESC, asset_id DESC LIMIT ?")
-        .all(campaignId, limit) as AssetRow[];
+        .prepare(`SELECT * FROM scene_image_assets WHERE campaign_id=? AND (
+          asset_id IN (SELECT asset_id FROM scene_image_assets WHERE campaign_id=? ORDER BY created_at DESC, asset_id DESC LIMIT ?)
+          OR asset_id IN (SELECT asset_id FROM scene_image_selections WHERE campaign_id=? AND (? IS NULL OR session_id=?)))
+          ORDER BY created_at DESC, asset_id DESC`)
+        .all(campaignId, campaignId, limit, campaignId, sessionId, sessionId) as AssetRow[];
       const selections = this.db
-        .prepare("SELECT asset_id, session_id FROM scene_image_selections WHERE campaign_id=?")
-        .all(campaignId) as Array<{ asset_id: string; session_id: string }>;
+        .prepare("SELECT asset_id, session_id, scene_key, revision FROM scene_image_selections WHERE campaign_id=?")
+        .all(campaignId) as Array<{ asset_id: string; session_id: string; scene_key: string; revision: number }>;
       const selected = new Set(
         selections.filter((row) => sessionId === null || row.session_id === sessionId).map((row) => row.asset_id),
       );
       const jobs = this.db
         .prepare("SELECT * FROM scene_image_jobs WHERE campaign_id=? ORDER BY created_at DESC, job_id DESC LIMIT ?")
         .all(campaignId, limit) as JobRow[];
-      return { images: assets.map((row) => mapGalleryImage(row, selected.has(row.asset_id))), jobs: jobs.map(mapJob) };
+      return { images: assets.map((row) => ({ ...mapGalleryImage(row, selected.has(row.asset_id)), selections: selections.filter((selection) => selection.asset_id === row.asset_id && selection.session_id === sessionId).map((selection) => ({ sceneKey: selection.scene_key, revision: selection.revision })) })), jobs: jobs.map(mapJob) };
     }
     if (role !== "player") throw new SceneImageError(403, "Scene image gallery is unavailable");
     if (sessionId === null) throw new SceneImageError(400, "Player scene image gallery requires a sessionId");
     const assets = this.db
-      .prepare(`SELECT asset.* FROM scene_image_selections selection
+      .prepare(`SELECT asset.*, selection.scene_key, selection.revision FROM scene_image_selections selection
         JOIN scene_image_assets asset ON asset.asset_id=selection.asset_id AND asset.campaign_id=selection.campaign_id
         WHERE selection.campaign_id=? AND selection.session_id=?
         ORDER BY selection.updated_at DESC, asset.asset_id DESC LIMIT ?`)
-      .all(campaignId, sessionId, limit) as AssetRow[];
-    return { images: assets.map((row) => mapGalleryImage(row, true)) };
+      .all(campaignId, sessionId, limit) as (AssetRow & { scene_key: string; revision: number })[];
+    return { images: assets.map((row) => ({ ...mapGalleryImage(row, true), selections: [{ sceneKey: row.scene_key, revision: row.revision }] })) };
   }
 
   selectImage(
@@ -1121,6 +1125,7 @@ export class SceneImageService {
     }
     const asset = this.assetRow(campaignId, assetId);
     if (!asset) throw new SceneImageError(404, "Scene image asset is unavailable");
+    return this.db.transaction(() => {
     const current = this.selectionRow(campaignId, sessionId, sceneKey);
     const revision = current?.revision ?? 0;
     if (revision !== expectedRevision) {
@@ -1135,24 +1140,25 @@ export class SceneImageService {
             asset_id=excluded.asset_id,
             revision=excluded.revision,
             updated_at=excluded.updated_at`)
-        .run(campaignId, sessionId, sceneKey, assetId, expectedRevision, updatedAt);
+        .run(campaignId, sessionId, sceneKey, assetId, expectedRevision + 1, updatedAt);
       this.touchAsset(assetId, updatedAt);
     })();
     const saved = this.selectionRow(campaignId, sessionId, sceneKey);
     const result: SceneImageSelectionResult = {
       selection: saved
         ? mapSelection(saved)
-        : { campaignId, sessionId, sceneKey, assetId, revision: expectedRevision, updatedAt },
+        : { campaignId, sessionId, sceneKey, assetId, revision: expectedRevision + 1, updatedAt },
       receipt: {
         idempotencyKey,
         revisionBefore: revision,
-        revisionAfter: expectedRevision,
+        revisionAfter: expectedRevision + 1,
         occurredAt: updatedAt,
         replayed: false,
       },
     };
     this.saveReceipt("select-image", principalId, campaignId, idempotencyKey, digest, result);
     return result;
+    })();
   }
 
   readAsset(principalId: string, campaignId: string, assetId: string): SceneImageAssetBytes {
@@ -1231,32 +1237,21 @@ export class SceneImageService {
   }
 
   /**
-   * Completes a job whose assets are already persisted. Binds the primary
-   * asset to the scene selection unless the active selection is newer than the
-   * job's scene revision, in which case the job is `stale` and the selection is
-   * left untouched.
+   * Completes persisted candidates without publishing. Only explicit DM selection
+   * can change player artwork; scene revisions never double as selection revisions.
    */
   private finishWithAssets(row: JobRow, assetIds: readonly string[]): void {
     const at = this.now();
-    const selection = this.selectionRow(row.campaign_id, row.session_id, row.scene_key);
     const primary = assetIds.length > 0 ? assetIds[0] ?? null : null;
-    const stale = selection !== undefined && selection.revision > row.scene_revision;
-    const status: SceneImageJobStatus = stale ? "stale" : "done";
+    // Completion creates candidates only. Publication always requires an explicit
+    // DM selection; scene content revisions and selection revisions are unrelated.
+    const status: SceneImageJobStatus = "done";
     this.db.transaction(() => {
       this.db
         .prepare("UPDATE scene_image_jobs SET status=?, asset_id=?, error_code=?, completed_at=?, updated_at=? WHERE job_id=?")
-        .run(status, primary, stale ? "stale-scene" : null, at, at, row.job_id);
+        .run(status, primary, null, at, at, row.job_id);
       if (primary) this.touchAsset(primary, at);
-      if (!stale && primary) {
-        this.db
-          .prepare(`INSERT INTO scene_image_selections(campaign_id,session_id,scene_key,asset_id,revision,updated_at)
-            VALUES(?,?,?,?,?,?)
-            ON CONFLICT(campaign_id,session_id,scene_key) DO UPDATE SET
-              asset_id=excluded.asset_id,
-              revision=excluded.revision,
-              updated_at=excluded.updated_at`)
-          .run(row.campaign_id, row.session_id, row.scene_key, primary, row.scene_revision, at);
-      }
+
     })();
   }
 

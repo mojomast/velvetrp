@@ -25,7 +25,7 @@ const STRONG_CASES: Array<[string, string, string]> = [
   ["I climb the garden wall.", "Strength", "Athletics"],
   ["I balance on the narrow beam.", "Dexterity", "Acrobatics"],
   ["I sneak past the sleeping guards.", "Dexterity", "Stealth"],
-  ["I try to pick the lock.", "Dexterity", "Sleight of Hand"],
+  ["I palm the coin.", "Dexterity", "Sleight of Hand"],
   ["I persuade the ferryman to take us across.", "Charisma", "Persuasion"],
   ["I try to intimidate the ferryman.", "Charisma", "Intimidation"],
   ["I lie to the gate guard.", "Charisma", "Deception"],
@@ -41,6 +41,11 @@ const STRONG_CASES: Array<[string, string, string]> = [
 ];
 
 const NULL_CASES = [
+  "I try to pick the lock.",
+  "I do not search the room",
+  "I look at my friend and say hello",
+  "I climb the ladder",
+  "If I search the room, what happens?",
   // Pure questions, greetings, and meta/table talk never resolve as checks.
   "Where is the ferryman?",
   "What do you think?",
@@ -68,6 +73,9 @@ describe("declaration-to-check mapping", () => {
     expect(mapDeclarationToCheck(declaration)).toBeNull();
   });
 
+  it("requires director adjudication for hazardous context", () => {
+    expect(mapDeclarationToCheck("I climb the sheer icy cliff")).toMatchObject({ skill: "Athletics", confidence: "weak" });
+  });
   it("returns unsupported leanings as weak, never strong", () => {
     expect(mapDeclarationToCheck("I check the door.")).toMatchObject({ ability: "Intelligence", skill: "Investigation", confidence: "weak" });
     expect(mapDeclarationToCheck("I scan the room.")).toMatchObject({ ability: "Wisdom", skill: "Perception", confidence: "weak" });

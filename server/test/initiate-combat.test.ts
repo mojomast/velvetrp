@@ -156,6 +156,20 @@ function tacticalMap(db: DatabaseDriver.Database, encounterId: string) {
 }
 
 describe("initiateCombatFromTarget", () => {
+  it.each([true, false])("includes nearby party actors only (colocated=%s)", async (colocated) => {
+    const f = await fixture();
+    try {
+      for (const location of ["party-a", "party-b"]) f.db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,visibility,created_at) VALUES(?,?,?,'public',?)").run(location, f.campaign.id, location, AT);
+      f.db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(f.campaign.id, f.hero.actorId, "party-a", f.session.id, AT);
+      f.db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(f.campaign.id, f.rival.actorId, colocated ? "party-a" : "party-b", f.session.id, AT);
+      const result = initiateCombatFromTarget(f.db, f.deps, input(f));
+      expect(result.combat.combatants.some((actor) => actor.kind === "actor" && actor.actorId === f.rival.actorId)).toBe(colocated);
+      f.db.prepare("DELETE FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?").run(f.campaign.id, f.rival.actorId);
+      const retry = initiateCombatFromTarget(f.db, f.deps, input(f));
+      expect(retry.combat.combatants.map((actor) => actor.combatantId)).toEqual(result.combat.combatants.map((actor) => actor.combatantId));
+      expect(initiateCombatFromTarget(f.db, f.deps, input(f)).encounterId).toBe(result.encounterId);
+    } finally { f.db.close(); }
+  });
   it("starts player-initiated combat against a commoner NPC with pinned template and automatic tactical map", async () => {
     const f = await fixture();
     const result = initiateCombatFromTarget(f.db, f.deps, input(f));

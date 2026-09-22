@@ -26,7 +26,7 @@ const settings: SceneImageSettings = {
 function readyImage(overrides: Partial<SceneImageGalleryItem> = {}): SceneImageGalleryItem {
   return {
     assetId: "asset-1", jobId: "job-1", prompt: "A moonlit gate above the harbor", seed: 7, steps: 20,
-    guidance: 3, status: "ready", seconds: 4.2, createdAt: at, selected: true, ...overrides,
+    guidance: 3, status: "ready", seconds: 4.2, createdAt: at, selected: true, sceneKey: "location:gate", ...overrides,
   };
 }
 
@@ -114,6 +114,18 @@ describe("scene image API bindings", () => {
 });
 
 describe("SceneIllustration", () => {
+  it("refreshes publication and scene changes without browser scene storage", async () => {
+    let selected = false;
+    const client = sceneApi({ getGallery: vi.fn(async () => ({ images: selected ? [readyImage({ selections: [{ sceneKey: "location:gate", revision: 1 }] })] : [] })) });
+    const first = render(<SceneIllustration campaignId="campaign" sessionId="room" sceneKey="location:gate" sceneLabel="Gate" audience="player" enabled api={client} />);
+    await screen.findByText(/No illustration has been selected/);
+    selected = true;
+    window.dispatchEvent(new Event("scene-image-selected"));
+    await screen.findByRole("img", { name: "Scene illustration for Gate" });
+    first.rerender(<SceneIllustration campaignId="campaign" sessionId="room" sceneKey="location:cave" sceneLabel="Cave" audience="player" enabled api={client} />);
+    await screen.findByText(/No illustration has been selected/);
+    expect(screen.queryByRole("img")).toBeNull();
+  });
   it("shows the selected image with a scene group label and GM prompt alt text", async () => {
     const client = sceneApi({ getGallery: vi.fn().mockResolvedValue({ images: [readyImage()] }) });
     render(<SceneIllustration campaignId="campaign" sessionId="room" sceneKey="location:gate" sceneLabel="Old North Gate" audience="gm" enabled api={client} />);
@@ -250,7 +262,7 @@ describe("SceneImageDmPanel", () => {
   it("wires selection, regeneration, settings reuse, scene grouping, and two-image comparison", async () => {
     rememberSceneImageJobs("campaign", "room", { sceneKey: "location:gate", label: "Old North Gate", jobIds: ["job-1"] });
     const first = readyImage({ assetId: "asset-1", jobId: "job-1", seed: 11, steps: 50, guidance: 3, selected: false, prompt: "Keeper prompt" });
-    const second = readyImage({ assetId: "asset-2", jobId: "job-2", seed: 22, steps: 20, guidance: 1, status: "failed", selected: false, createdAt: "2030-01-02T00:00:00.000Z", prompt: "Other prompt" });
+    const second = readyImage({ sceneKey: "", assetId: "asset-2", jobId: "job-2", seed: 22, steps: 20, guidance: 1, status: "failed", selected: false, createdAt: "2030-01-02T00:00:00.000Z", prompt: "Other prompt" });
     const third = readyImage({ assetId: "asset-3", jobId: "job-3", seed: 33, steps: 20, guidance: 3, status: "ready", selected: true, createdAt: "2030-01-03T00:00:00.000Z", prompt: "Selected prompt" });
     const select = vi.fn().mockResolvedValue({ selection: { sceneKey: "location:gate", assetId: "asset-1" }, receipt: { revisionAfter: 5 } });
     const generate = vi.fn().mockResolvedValue({ job: { jobId: "job-regenerated", status: "queued" }, deduped: true });

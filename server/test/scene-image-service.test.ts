@@ -524,8 +524,8 @@ describe("scene image queue and cache", () => {
     const gallery = harness.service.listGallery("owner", CAMPAIGN);
     expect(gallery.images).toHaveLength(2);
     expect(gallery.images.every((image) => image.width === 256 && image.height === 256)).toBe(true);
-    expect(gallery.images.filter((image) => image.selected)).toHaveLength(1);
-    expect(gallery.images.find((image) => image.assetId === done.assetId)?.selected).toBe(true);
+    expect(gallery.images.filter((image) => image.selected)).toHaveLength(0);
+    expect(gallery.images.find((image) => image.assetId === done.assetId)?.selected).toBe(false);
   });
 
   it("marks failed and cancelled service jobs without resubmitting", async () => {
@@ -588,19 +588,20 @@ describe("scene image queue and cache", () => {
     expect(harness.service.getJob("owner", CAMPAIGN, job.jobId).job.status).toBe("submitted");
   });
 
-  it("marks an outrun job stale and never overwrites the active selection", async () => {
+  it("keeps late completions as candidates and never overwrites the active selection", async () => {
     const harness = createHarness();
     enable(harness);
     const fresh = enqueueOk(harness, "current scene", { sceneRevision: 5, seed: 11 });
     const freshDone = await submitAndSettle(harness, fresh.jobId);
     expect(freshDone.status).toBe("done");
     const activeAsset = freshDone.assetId;
+    harness.service.selectImage("owner", CAMPAIGN, { sessionId: "session-1", sceneKey: "scene-1", assetId: activeAsset!, expectedRevision: 0, idempotencyKey: "publish-current" });
     expect(harness.service.listGallery("owner", CAMPAIGN).images.find((image) => image.assetId === activeAsset)?.selected).toBe(true);
 
     const stale = enqueueOk(harness, "old scene", { sceneRevision: 4, seed: 12 });
     const staleDone = await submitAndSettle(harness, stale.jobId);
-    expect(staleDone.status).toBe("stale");
-    expect(staleDone.errorCode).toBe("stale-scene");
+    expect(staleDone.status).toBe("done");
+    expect(staleDone.errorCode).toBeNull();
     expect(staleDone.assetId).not.toBeNull();
     const gallery = harness.service.listGallery("owner", CAMPAIGN);
     expect(gallery.images).toHaveLength(2);
@@ -620,6 +621,7 @@ describe("scene image retention and reads", () => {
     const third = enqueueOk(harness, "retention three", { seed: 3 });
     const thirdDone = await submitAndSettle(harness, third.jobId);
     expect(thirdDone.assetId).not.toBeNull();
+    harness.service.selectImage("owner", CAMPAIGN, { sessionId: "session-1", sceneKey: "scene-1", assetId: thirdDone.assetId!, expectedRevision: 0, idempotencyKey: "publish-retained" });
 
     const pruned = harness.service.prune();
     expect(pruned.assets).toBeGreaterThanOrEqual(1);
@@ -644,6 +646,14 @@ describe("scene image retention and reads", () => {
     const done = await submitAndSettle(harness, job.jobId);
     const assetId = done.assetId ?? "";
     expect(assetId).not.toBe("");
+    expect(harness.service.listGallery("player", CAMPAIGN, { sessionId: "session-1" }).images).toHaveLength(0);
+    expect(sceneError(() => harness.service.readAsset("player", CAMPAIGN, assetId)).statusCode).toBe(403);
+    const selectionInput = { sessionId: "session-1", sceneKey: "scene-1", assetId, expectedRevision: 0, idempotencyKey: "publish-authorized" };
+    const selected = harness.service.selectImage("owner", CAMPAIGN, selectionInput);
+    expect(selected.receipt.revisionAfter).toBe(1);
+    expect(harness.service.selectImage("owner", CAMPAIGN, selectionInput).receipt.replayed).toBe(true);
+    expect(sceneError(() => harness.service.selectImage("owner", CAMPAIGN, { ...selectionInput, idempotencyKey: "stale-writer" })).statusCode).toBe(409);
+    expect(harness.service.listGallery("player", CAMPAIGN, { sessionId: "session-1" }).images[0]?.selections).toEqual([{ sceneKey: "scene-1", revision: 1 }]);
 
     const dmGallery = harness.service.listGallery("owner", CAMPAIGN);
     expect(dmGallery.images).toHaveLength(1);
@@ -660,7 +670,7 @@ describe("scene image retention and reads", () => {
 
     const stale = enqueueOk(harness, "unpublished scene", { seed: 22, sceneRevision: 0 });
     const staleDone = await submitAndSettle(harness, stale.jobId);
-    expect(staleDone.status).toBe("stale");
+    expect(staleDone.status).toBe("done");
     expect(sceneError(() => harness.service.readAsset("player", CAMPAIGN, staleDone.assetId ?? "")).statusCode).toBe(403);
     expect(harness.service.readAsset("owner", CAMPAIGN, staleDone.assetId ?? "").bytes.byteLength).toBeGreaterThan(0);
 
