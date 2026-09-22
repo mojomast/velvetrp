@@ -49,8 +49,12 @@ paired run (540 calls, zero failures) is recorded in
 per-family tables: shared context acted at 100% acted accuracy in every family with acts, raising
 coverage from 0% to 17-100% across travel, rest, powers, consumables, and quests, at +23%
 measured input tokens and derived cost versus legacy. Still required before any production
-decision: production-path evaluation (curated benchmark candidates cannot authorize shortlisting)
+decision: production-path behavior of the current production payload is now characterized
+read-only across five worlds in
+[system-one-production-path-evaluation.md](system-one-production-path-evaluation.md); shared
+context is not wired, so no production-path comparison of the two payloads exists yet. Still
+required before any production decision: that comparison (after an authorized wiring evaluation)
 and an evaluated promotion binding once a payload is chosen. Do not change live shadow or active
-payloads until that evaluation is complete.
+payloads until then.
 
 Vendor guidance checked via WebXNG/SearXNG discovery and direct retrieval of https://docs.typesafe.ai/concepts/state.md: all questions evaluate the same shared state independently; content and supporting facts belong in state while questions describe judgments.
