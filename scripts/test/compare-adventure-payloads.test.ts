@@ -23,6 +23,8 @@ import {
 } from "../evaluate-system-one-adventure-lane.js";
 import {
   LIVE_CALL_CAP,
+  ACTION_FAMILY_ORDER,
+  ADVENTURE_PAYLOAD_VARIANTS,
   adventureCorpusDigest,
   adventurePayloadVersions,
   adventureRequestDigest,
@@ -34,18 +36,25 @@ import {
   compareAdventurePayloadsOffline,
   comparisonJson,
   emptyHarvestReport,
+  familyForAdventureKind,
   parseCompareArgs,
   renderComparisonReport,
+  resolveAdventureFamily,
   runLiveComparison,
   serializedRequestBytes,
   summarizeAttemptUsage,
+  summarizeFamilyAgreement,
+  summarizeFamilyGrading,
   summarizePayloadBytes,
   summarizeVariantAgreement,
   usageCostUsd,
   type AdventureAttemptRecord,
+  type AdventurePayloadVariant,
   type AgreementSample,
+  type FamilyGradingAttempt,
   type PayloadByteRow,
 } from "../compare-system-one-adventure-payloads.js";
+import { FAMILY_TOOL_KINDS, MECHANIC_FAMILIES } from "../synthetic-player-harness.js";
 import { beginAdventureEvidence } from "../system-one-evidence.js";
 
 const digestSeed = (seed: string): string => seed.repeat(Math.ceil(64 / seed.length)).slice(0, 64);
@@ -118,6 +127,28 @@ const attemptRecord = (overrides: Partial<AdventureAttemptRecord> = {}): Adventu
   readout: readoutFixture(),
   ...overrides,
 });
+
+/** One minimal graded call for the family roll-ups: no evidence, only the graded fields. */
+const gradedCall = (
+  variant: AdventurePayloadVariant,
+  caseId: string,
+  candidateId: string | null,
+  overrides: Partial<Pick<AdventureReadout, "deferred" | "correct" | "selectedCorrect">> = {},
+): FamilyGradingAttempt => ({
+  variant,
+  caseId,
+  readout: {
+    candidateId,
+    deferred: candidateId === null,
+    correct: true,
+    selectedCorrect: true,
+    ...overrides,
+  },
+});
+
+const closeTo = (actual: number, expected: number, label: string): void => {
+  assert.ok(Math.abs(actual - expected) < 1e-9, `${label}: expected ${expected}, got ${actual}`);
+};
 
 /**
  * A deterministic offline adapter double: it answers every question by shape, never touches the
@@ -532,6 +563,9 @@ test("offline comparison never sends a network call and reports structural statu
     assert.ok(result.markdown.includes("provider-free (offline; no network calls)"));
     assert.ok(result.markdown.includes("## Structural pairing"));
     assert.ok(result.markdown.includes("## Payload bytes"));
+    assert.ok(result.markdown.includes("## Grading metrics per action family"), "offline renders the family section too");
+    assert.equal(result.json.familyGrading.variants.legacy.families.length, ACTION_FAMILY_ORDER.length);
+    assert.equal(result.json.familyGrading.variants["shared-context"].families.length, ACTION_FAMILY_ORDER.length);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -561,4 +595,362 @@ test("the frozen corpus and the harvested fixture pair cleanly offline", async (
   assert.equal(ids.size, cases.length, "corpus identities are unique");
   const sharedBytes = rows.reduce((total, row) => total + (row.sharedBytes ?? 0), 0);
   assert.ok(sharedBytes < summary.legacyBytes, "across the full corpus the shared payload is smaller in bytes");
+});
+
+test("resolves every canonical family plus defer and unknown", () => {
+  assert.equal(MECHANIC_FAMILIES.length, 11);
+
+  for (const family of MECHANIC_FAMILIES) {
+    const kind = FAMILY_TOOL_KINDS[family];
+    assert.equal(familyForAdventureKind(kind), family, `${kind} maps to ${family}`);
+    const testCase = evalCase({
+      id: `family-${family}`,
+      candidates: [candidate("pick", "Pick", kind)],
+      expected: { preferred: "pick", acceptable: ["pick"] },
+    });
+    assert.deepEqual(resolveAdventureFamily(testCase, { candidateId: "pick" }), { family, kind }, `${family} resolves its exact candidate kind`);
+  }
+
+  // Family ids and production proposal tool names resolve too; unknown strings stay unmapped.
+  assert.equal(familyForAdventureKind("travel"), "travel");
+  assert.equal(familyForAdventureKind("combat_consumable_use"), "combat-consumable");
+  assert.equal(familyForAdventureKind("power_use"), "power");
+  assert.equal(familyForAdventureKind("rest_short"), "rest");
+  assert.equal(familyForAdventureKind("vendor_buy"), "commerce");
+  assert.equal(familyForAdventureKind("inventory_item_equip"), "inventory");
+  assert.equal(familyForAdventureKind("quest_reward_claim"), "quest-lifecycle");
+  assert.equal(familyForAdventureKind("character_progression_apply"), "progression");
+  assert.equal(familyForAdventureKind("exact_mystery.select"), null);
+  assert.equal(familyForAdventureKind(null), null);
+  assert.equal(familyForAdventureKind(""), null);
+
+  // The labeled (expected) kind wins; the named pick kind is the fallback for expected deferrals.
+  const mixed = evalCase({
+    id: "mixed",
+    candidates: [candidate("t", "Travel to the mill"), candidate("c", "Climb the wall", "exact_srd_check.select")],
+    expected: { preferred: "t", acceptable: ["t"] },
+  });
+  assert.deepEqual(resolveAdventureFamily(mixed, { candidateId: "c" }), {
+    family: "travel",
+    kind: "exact_actor_travel.select",
+  }, "the case label owns the family even when the call pick disagrees");
+
+  const deferExpected = evalCase({
+    id: "defer-expected",
+    candidates: [candidate("t", "Travel to the mill"), candidate("c", "Climb the wall", "exact_srd_check.select")],
+    expected: { preferred: null, acceptable: [null] },
+  });
+  assert.deepEqual(resolveAdventureFamily(deferExpected, { candidateId: null }), { family: "defer", kind: null });
+  assert.deepEqual(resolveAdventureFamily(deferExpected, { candidateId: "c" }), {
+    family: "srd-check",
+    kind: "exact_srd_check.select",
+  }, "an expected deferral falls back to the pick the call named");
+
+  // Unmapped kinds are reported, never dropped, whether they come from a call or a case label.
+  const unmappedPick = evalCase({
+    id: "unmapped-pick",
+    candidates: [candidate("u", "Mystery", "exact_mystery.select")],
+    expected: { preferred: null, acceptable: [null] },
+  });
+  assert.deepEqual(resolveAdventureFamily(unmappedPick, { candidateId: "u" }), { family: "unknown", kind: "exact_mystery.select" });
+  const unmappedLabel = evalCase({
+    id: "unmapped-label",
+    candidates: [candidate("u", "Mystery", "exact_mystery.select"), candidate("t", "Travel to the mill")],
+    expected: { preferred: "u", acceptable: ["u"] },
+  });
+  assert.deepEqual(resolveAdventureFamily(unmappedLabel, { candidateId: "t" }), {
+    family: "unknown",
+    kind: "exact_mystery.select",
+  }, "an unmapped label kind stays unknown even when the call picked a mapped kind");
+  assert.deepEqual(resolveAdventureFamily(unmappedPick, { candidateId: null }), { family: "defer", kind: null });
+});
+
+test("rolls up per-family grading math over synthetic readouts", () => {
+  const travelCase = evalCase({
+    id: "family-travel",
+    candidates: [candidate("t1", "Travel to the mill"), candidate("t2", "Travel to the harbor")],
+    expected: { preferred: "t1", acceptable: ["t1"] },
+  });
+  const checkCase = evalCase({
+    id: "family-check",
+    candidates: [candidate("c1", "Climb the wall", "exact_srd_check.select")],
+    expected: { preferred: "c1", acceptable: ["c1"] },
+  });
+  const deferCase = evalCase({
+    id: "family-defer",
+    candidates: [candidate("r1", "Take a rest", "exact_rest.select")],
+    expected: { preferred: null, acceptable: [null] },
+  });
+  const unmappedCase = evalCase({
+    id: "family-unmapped",
+    candidates: [candidate("u1", "Mystery", "exact_mystery.select")],
+    expected: { preferred: "u1", acceptable: ["u1"] },
+  });
+  const attempts: FamilyGradingAttempt[] = [
+    gradedCall("legacy", "family-travel", "t1"),
+    gradedCall("legacy", "family-travel", "t1", { deferred: true, correct: false, selectedCorrect: false }),
+    gradedCall("legacy", "family-check", "c1"),
+    gradedCall("legacy", "family-defer", null),
+    gradedCall("legacy", "family-unmapped", "u1"),
+    gradedCall("shared-context", "family-travel", "t2", { correct: false, selectedCorrect: false }),
+    gradedCall("shared-context", "family-check", null, { correct: false, selectedCorrect: false }),
+    gradedCall("shared-context", "family-defer", "r1", { deferred: true, correct: false, selectedCorrect: false }),
+    gradedCall("shared-context", "family-unmapped", "u1"),
+  ];
+
+  const report = summarizeFamilyGrading(attempts, [travelCase, checkCase, deferCase, unmappedCase]);
+  for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
+    assert.deepEqual(report.variants[variant].families.map((row) => row.family), ACTION_FAMILY_ORDER);
+    assert.equal(report.variants[variant].families.length, ACTION_FAMILY_ORDER.length);
+  }
+
+  assert.deepEqual(report.variants.legacy.families.find((row) => row.family === "travel"), {
+    family: "travel",
+    calls: 2,
+    cases: 1,
+    acted: 1,
+    coverage: 0.5,
+    actedCorrect: 1,
+    actedAccuracy: 1,
+    exact: 1,
+    correct: 1,
+    accuracy: 0.5,
+  });
+  assert.deepEqual(report.variants.legacy.families.find((row) => row.family === "srd-check"), {
+    family: "srd-check",
+    calls: 1,
+    cases: 1,
+    acted: 1,
+    coverage: 1,
+    actedCorrect: 1,
+    actedAccuracy: 1,
+    exact: 1,
+    correct: 1,
+    accuracy: 1,
+  });
+  assert.deepEqual(report.variants.legacy.families.find((row) => row.family === "defer"), {
+    family: "defer",
+    calls: 1,
+    cases: 1,
+    acted: 0,
+    coverage: 0,
+    actedCorrect: 0,
+    actedAccuracy: 0,
+    exact: 1,
+    correct: 1,
+    accuracy: 1,
+  });
+  assert.deepEqual(report.variants.legacy.families.find((row) => row.family === "unknown"), {
+    family: "unknown",
+    calls: 1,
+    cases: 1,
+    acted: 1,
+    coverage: 1,
+    actedCorrect: 1,
+    actedAccuracy: 1,
+    exact: 1,
+    correct: 1,
+    accuracy: 1,
+  });
+  assert.equal(report.variants.legacy.families.find((row) => row.family === "rest")?.calls, 0, "shared-only calls stay out of the legacy row");
+
+  assert.deepEqual(report.variants["shared-context"].families.find((row) => row.family === "travel"), {
+    family: "travel",
+    calls: 1,
+    cases: 1,
+    acted: 1,
+    coverage: 1,
+    actedCorrect: 0,
+    actedAccuracy: 0,
+    exact: 0,
+    correct: 0,
+    accuracy: 0,
+  });
+  assert.deepEqual(report.variants["shared-context"].families.find((row) => row.family === "rest"), {
+    family: "rest",
+    calls: 1,
+    cases: 1,
+    acted: 0,
+    coverage: 0,
+    actedCorrect: 0,
+    actedAccuracy: 0,
+    exact: 0,
+    correct: 0,
+    accuracy: 0,
+  });
+  assert.equal(report.variants["shared-context"].families.find((row) => row.family === "defer")?.calls, 0, "the shared deferral recovered a rest pick");
+  for (const family of ["inventory", "commerce", "power", "combat-consumable", "combat-power", "quest-lifecycle", "quest-objective", "progression"] as const) {
+    const row = report.variants.legacy.families.find((entry) => entry.family === family)!;
+    assert.deepEqual({ calls: row.calls, cases: row.cases, coverage: row.coverage, accuracy: row.accuracy }, { calls: 0, cases: 0, coverage: 0, accuracy: 0 });
+  }
+
+  assert.deepEqual(report.unmappedKinds, [{ kind: "exact_mystery.select", calls: 2, expectedCases: 1 }]);
+  assert.deepEqual(report.unresolvedCaseIds, []);
+
+  const offline = summarizeFamilyGrading([], [travelCase, checkCase, deferCase, unmappedCase]);
+  assert.ok(offline.variants.legacy.families.every((row) => row.calls === 0 && row.cases === 0));
+  assert.deepEqual(offline.unmappedKinds, [{ kind: "exact_mystery.select", calls: 0, expectedCases: 1 }], "a labeled unmapped kind is reported even without calls");
+
+  const orphaned = summarizeFamilyGrading([gradedCall("legacy", "missing-case", "t1")], [travelCase]);
+  assert.deepEqual(orphaned.unresolvedCaseIds, ["missing-case"]);
+  assert.equal(orphaned.variants.legacy.families.find((row) => row.family === "unknown")?.calls, 1, "a call without its case row is attributed to unknown, not dropped");
+});
+
+test("rolls up per-family agreement and conflicts", () => {
+  const travelCase = evalCase({
+    id: "agree-travel",
+    candidates: [candidate("a", "Travel to the mill"), candidate("b", "Travel to the harbor")],
+    expected: { preferred: "a", acceptable: ["a"] },
+  });
+  const checkCase = evalCase({
+    id: "agree-check",
+    candidates: [candidate("c", "Climb the wall", "exact_srd_check.select")],
+    expected: { preferred: "c", acceptable: ["c"] },
+  });
+  const splitCase = evalCase({
+    id: "agree-split",
+    candidates: [candidate("p", "Cast Mending Light", "exact_power_use.select")],
+    expected: { preferred: null, acceptable: [null] },
+  });
+  const agreement = summarizeFamilyAgreement([
+    gradedCall("legacy", "agree-travel", "a"),
+    gradedCall("legacy", "agree-travel", "a"),
+    gradedCall("shared-context", "agree-travel", "b"),
+    gradedCall("legacy", "agree-check", "c"),
+    gradedCall("shared-context", "agree-check", "c"),
+    gradedCall("legacy", "agree-split", null),
+    gradedCall("shared-context", "agree-split", "p"),
+  ], [travelCase, checkCase, splitCase]);
+
+  assert.deepEqual(agreement.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+  const travel = agreement.families.find((row) => row.family === "travel")!;
+  assert.equal(travel.calls, 3);
+  assert.equal(travel.cases, 1);
+  assert.equal(travel.legacyCalls, 2);
+  assert.equal(travel.sharedCalls, 1);
+  assert.equal(travel.pairedCases, 1);
+  closeTo(travel.meanAgreement, 2 / 3, "travel mean agreement");
+  assert.equal(travel.conflictCases, 1);
+  assert.equal(travel.crossVariantConflictCases, 1);
+  assert.equal(travel.meanCrossVariantAgreement, 0);
+
+  const check = agreement.families.find((row) => row.family === "srd-check")!;
+  assert.deepEqual(check, {
+    family: "srd-check",
+    calls: 2,
+    cases: 1,
+    legacyCalls: 1,
+    sharedCalls: 1,
+    pairedCases: 1,
+    meanAgreement: 1,
+    conflictCases: 0,
+    crossVariantConflictCases: 0,
+    meanCrossVariantAgreement: 1,
+  });
+
+  const defer = agreement.families.find((row) => row.family === "defer")!;
+  assert.deepEqual(defer, {
+    family: "defer",
+    calls: 1,
+    cases: 1,
+    legacyCalls: 1,
+    sharedCalls: 0,
+    pairedCases: 0,
+    meanAgreement: 1,
+    conflictCases: 0,
+    crossVariantConflictCases: 0,
+    meanCrossVariantAgreement: 0,
+  });
+  assert.equal(agreement.families.find((row) => row.family === "power")?.sharedCalls, 1, "the recovered pick lands in its own family");
+  assert.deepEqual(agreement.splitCases, ["agree-split"]);
+});
+
+test("renders the per-family section deterministically with a stable JSON shape", async () => {
+  const cases = [
+    evalCase({
+      id: "two",
+      candidates: [candidate("a", "Travel to the mill"), candidate("b", "Travel to the harbor", "exact_srd_check.select")],
+      expected: { preferred: "a", acceptable: ["a", "b"] },
+    }),
+    evalCase({ id: "one", candidates: [candidate("s", "Travel to the mill")], expected: { preferred: "s", acceptable: ["s"] } }),
+  ];
+  const live = await runLiveComparison({ cases, repeats: 1, maxCalls: 100, settings: defaultSystemOneSettings(), complete: fakeCompletion });
+  const view = buildComparisonView({
+    mode: "live",
+    generatedAt: "2026-09-22T00:00:00.000Z",
+    cases,
+    harvest: emptyHarvestReport(),
+    top: 10,
+    out: "docs/x.md",
+    jsonPath: "docs/x.json",
+    live,
+  });
+
+  const first = renderComparisonReport(view);
+  assert.equal(renderComparisonReport(view), first, "rendering is deterministic");
+  assert.ok(first.includes("## Grading metrics per action family"));
+  assert.ok(first.includes("### legacy"));
+  assert.ok(first.includes("### shared-context"));
+  assert.ok(first.includes("### Cross-variant agreement by family"));
+  assert.ok(first.includes("| travel | 2 | 2 | 100.0% | 100.0% | 2/2 | 100.0% | 2 |"));
+  assert.ok(first.includes("| defer | 0 | 0 | n/a | n/a | n/a | n/a | 0 |"));
+  assert.ok(first.includes("| unknown | 0 | 0 | n/a | n/a | n/a | n/a | 0 |"));
+  assert.ok(first.includes("No unmapped candidate kinds"));
+
+  const json = comparisonJson(view);
+  assert.deepEqual(Object.keys(json.familyGrading.variants), ["legacy", "shared-context"]);
+  for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
+    const grading = json.familyGrading.variants[variant];
+    assert.equal(grading.variant, variant);
+    assert.deepEqual(grading.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+    assert.equal(grading.families.length, 13);
+    const travel = grading.families.find((row) => row.family === "travel")!;
+    assert.deepEqual(travel, {
+      family: "travel",
+      calls: 2,
+      cases: 2,
+      acted: 2,
+      coverage: 1,
+      actedCorrect: 2,
+      actedAccuracy: 1,
+      exact: 2,
+      correct: 2,
+      accuracy: 1,
+    });
+  }
+  assert.deepEqual(json.familyGrading.agreement.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+  assert.ok(json.familyGrading.source.includes("MECHANIC_FAMILIES"));
+  assert.deepEqual(json.familyGrading.unmappedKinds, []);
+  assert.deepEqual(json.familyGrading.unresolvedCaseIds, []);
+});
+
+test("renders zeroed family grading offline and reports labeled unmapped kinds", () => {
+  const cases = [
+    evalCase({ id: "one", candidates: [candidate("a", "Travel to the mill")] }),
+    evalCase({ id: "weird", candidates: [candidate("u", "Mystery", "exact_mystery.select")], expected: { preferred: "u", acceptable: ["u"] } }),
+  ];
+  const result = compareAdventurePayloadsOffline({
+    cases,
+    harvest: emptyHarvestReport(),
+    generatedAt: "2026-09-22T00:00:00.000Z",
+    top: 10,
+    out: "docs/x.md",
+    jsonPath: "docs/x.json",
+  });
+
+  assert.ok(result.markdown.includes("## Grading metrics per action family"));
+  assert.ok(result.markdown.includes("Offline mode makes no model calls"));
+  assert.ok(result.markdown.includes("| unknown |"));
+  assert.ok(result.markdown.includes("`exact_mystery.select`"));
+  assert.equal(renderComparisonReport(result.view), result.markdown, "the offline markdown is deterministic");
+
+  for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
+    const grading = result.json.familyGrading.variants[variant];
+    assert.deepEqual(grading.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+    assert.ok(grading.families.every((row) => row.calls === 0 && row.cases === 0), "offline grades no calls");
+    assert.ok(grading.families.every((row) => row.coverage === 0 && row.accuracy === 0));
+  }
+  assert.deepEqual(result.json.familyGrading.unmappedKinds, [{ kind: "exact_mystery.select", calls: 0, expectedCases: 1 }]);
+  assert.deepEqual(result.json.familyGrading.agreement.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+  assert.ok(result.json.familyGrading.agreement.families.every((row) => row.calls === 0 && row.cases === 0));
 });

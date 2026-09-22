@@ -1,6 +1,6 @@
 # System One adventure payload comparison — legacy vs shared-context
 
-Generated 2026-09-22T13:47:09.931Z by `scripts/compare-system-one-adventure-payloads.ts` (live paired run).
+Generated 2026-09-22T13:58:34.925Z by `scripts/compare-system-one-adventure-payloads.ts` (live paired run).
 
 ## What this measures
 
@@ -32,8 +32,8 @@ failure below and in the JSON sidecar, never silently dropped.
 | Structural pairing | 135/135 case(s) clean |
 | Model | jev-1.13.0 |
 | Base URL | https://api.typesafe.ai/v1 |
-| Repeats | 1 per variant per case (interleaved per case) |
-| Budget | `--max-calls 300`; projected 270 call(s) |
+| Repeats | 2 per variant per case (interleaved per case) |
+| Budget | `--max-calls 600`; projected 540 call(s) |
 | Action threshold | act >= 0.75, confirm >= 0.5 |
 
 ## Payload bytes
@@ -91,29 +91,29 @@ Every case exposes the same ordered candidate identities and question batteries 
 
 ## Agreement
 
-Each case ran both variants 1 time(s), interleaved per case. `decision` is the candidate a call named
+Each case ran both variants 2 time(s), interleaved per case. `decision` is the candidate a call named
 (the composed pick, or the raw pick recovered from a deferral), else `defer`.
 
 | Metric | Value |
 | --- | ---: |
 | Cases with attempts from both variants | 135 of 135 |
-| Mean agreement across attempts | 96.3% |
-| Cases conflicted across attempts | 10 (7.4%) |
-| Cases with a cross-variant conflict | 10 of 135 |
-| Mean cross-variant agreement | 92.6% |
+| Mean agreement across attempts | 96.5% |
+| Cases conflicted across attempts | 11 (8.1%) |
+| Cases with a cross-variant conflict | 11 of 135 |
+| Mean cross-variant agreement | 93.0% |
 
 | Case | Attempts | Legacy decisions | Shared decisions | Agreement | Cross-variant |
 | --- | ---: | --- | --- | ---: | ---: |
-| harvested:2a99c91d232c | 2 | defer | check-candidate:cbe898133ae0f0985eea6e423db0a50b2c8e90316031ef72 | 50.0% | 0.0% |
-| harvested:30e85dce62a7 | 2 | defer | check-candidate:308a7266d8e98f164c89798999f2d90c2f6b422bf0c4631d | 50.0% | 0.0% |
-| harvested:332daeb09896 | 2 | defer | quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538 | 50.0% | 0.0% |
-| harvested:414b2795770d | 2 | defer | quest-accept-candidate:5ed06667552a5fe45c99a20aa4e0967a7069878d81b963de | 50.0% | 0.0% |
-| harvested:643d8f61c4c6 | 2 | defer | quest-abandon-candidate:ca3b200d6da4049840def29d775af69f4a6e5a0e47bd333a | 50.0% | 0.0% |
-| harvested:aa09b62078d5 | 2 | defer | check-candidate:12e71f3aa67293ec43c2e01419c73f11811a6d3244a99a89 | 50.0% | 0.0% |
-| harvested:adbcb3b5ee1a | 2 | quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a | defer | 50.0% | 0.0% |
-| harvested:b1446f731e6d | 2 | defer | power-candidate:d3f5f021b0a7af4271929b331a99224cc5eb01fb2821c321 | 50.0% | 0.0% |
-| harvested:c3e16ca55a84 | 2 | defer | quest-candidate:6783a700b2db923cdb69af8071596e9fd4b1557ddcb870a2 | 50.0% | 0.0% |
-| unsupported-hypothetical | 2 | defer | check:climb-41 | 50.0% | 0.0% |
+| harvested:2a99c91d232c | 4 | defer / defer | check-candidate:cbe898133ae0f0985eea6e423db0a50b2c8e90316031ef72 / check-candidate:cbe898133ae0f0985eea6e423db0a50b2c8e90316031ef72 | 50.0% | 0.0% |
+| harvested:30e85dce62a7 | 4 | defer / defer | check-candidate:308a7266d8e98f164c89798999f2d90c2f6b422bf0c4631d / check-candidate:308a7266d8e98f164c89798999f2d90c2f6b422bf0c4631d | 50.0% | 0.0% |
+| harvested:414b2795770d | 4 | defer / defer | quest-accept-candidate:5ed06667552a5fe45c99a20aa4e0967a7069878d81b963de / quest-accept-candidate:5ed06667552a5fe45c99a20aa4e0967a7069878d81b963de | 50.0% | 0.0% |
+| harvested:4ceb482981df | 4 | defer / defer | check-candidate:17b93880aa1be8e2bf91cddb2a27f999ef8ea45c56dcd18e / check-candidate:17b93880aa1be8e2bf91cddb2a27f999ef8ea45c56dcd18e | 50.0% | 0.0% |
+| harvested:643d8f61c4c6 | 4 | defer / defer | quest-abandon-candidate:ca3b200d6da4049840def29d775af69f4a6e5a0e47bd333a / quest-abandon-candidate:ca3b200d6da4049840def29d775af69f4a6e5a0e47bd333a | 50.0% | 0.0% |
+| harvested:adbcb3b5ee1a | 4 | quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a / quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a | defer / defer | 50.0% | 0.0% |
+| harvested:b1446f731e6d | 4 | defer / defer | power-candidate:d3f5f021b0a7af4271929b331a99224cc5eb01fb2821c321 / power-candidate:d3f5f021b0a7af4271929b331a99224cc5eb01fb2821c321 | 50.0% | 0.0% |
+| unsupported-hypothetical | 4 | defer / defer | check:climb-41 / check:climb-41 | 50.0% | 0.0% |
+| harvested:332daeb09896 | 4 | defer / quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538 | quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538 / quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538 | 75.0% | 50.0% |
+| harvested:c3e16ca55a84 | 4 | defer / defer | defer / quest-candidate:6783a700b2db923cdb69af8071596e9fd4b1557ddcb870a2 | 75.0% | 50.0% |
 
 ## Grading metrics per variant
 
@@ -125,19 +125,19 @@ so accuracy claims stay tied to the labeled scope (frozen plus human-confirmed h
 
 | Variant | Scope | Calls | Acted | Coverage | Acted accuracy | Exact preferred | Asserted-subset accuracy |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| legacy | All graded cases | 135 | 3 | 2.2% | 100.0% | 92/135 | 68.1% |
-| legacy | Labeled (frozen + human-confirmed) | 53 | 3 | 5.7% | 100.0% | 15/53 | 28.3% |
-| legacy | Agent-reviewed harvested (not gated) | 82 | 0 | 0.0% | n/a | 77/82 | 93.9% |
-| shared-context | All graded cases | 135 | 29 | 21.5% | 100.0% | 118/135 | 87.4% |
-| shared-context | Labeled (frozen + human-confirmed) | 53 | 28 | 52.8% | 100.0% | 40/53 | 75.5% |
-| shared-context | Agent-reviewed harvested (not gated) | 82 | 1 | 1.2% | 100.0% | 78/82 | 95.1% |
+| legacy | All graded cases | 270 | 6 | 2.2% | 100.0% | 184/270 | 68.1% |
+| legacy | Labeled (frozen + human-confirmed) | 106 | 6 | 5.7% | 100.0% | 30/106 | 28.3% |
+| legacy | Agent-reviewed harvested (not gated) | 164 | 0 | 0.0% | n/a | 154/164 | 93.9% |
+| shared-context | All graded cases | 270 | 58 | 21.5% | 100.0% | 236/270 | 87.4% |
+| shared-context | Labeled (frozen + human-confirmed) | 106 | 56 | 52.8% | 100.0% | 80/106 | 75.5% |
+| shared-context | Agent-reviewed harvested (not gated) | 164 | 2 | 1.2% | 100.0% | 156/164 | 95.1% |
 
 Per-variant repeat stability (using the evaluator's stability roll-up):
 
 | Variant | Mean agreement | Conflict cases | Mean signal std dev |
 | --- | ---: | ---: | ---: |
-| legacy | 100.0% | 0 of 135 | 0.0000 |
-| shared-context | 100.0% | 0 of 135 | 0.0000 |
+| legacy | 99.6% | 1 of 135 | 0.0089 |
+| shared-context | 99.3% | 2 of 135 | 0.0067 |
 
 ## Provider usage (measured separately)
 
@@ -147,12 +147,87 @@ figures are separate from the payload bytes above.
 
 | Variant | Attempts | Usage reported | Input tokens | Output tokens | Total tokens | Cost (USD) | Mean latency | Total latency | Failures |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| legacy | 135 | 135 | 1008741 | 392312 | 1401053 | 0.042367 | 141 ms | 19004 ms | 0 |
-| shared-context | 135 | 135 | 1244034 | 392641 | 1636675 | 0.052249 | 155 ms | 20874 ms | 0 |
+| legacy | 270 | 270 | 2017482 | 784673 | 2802155 | 0.084734 | 142 ms | 38398 ms | 0 |
+| shared-context | 270 | 270 | 2488068 | 785273 | 3273341 | 0.104499 | 161 ms | 43425 ms | 0 |
 
 ## Failures
 
 No adapter failures: every scheduled call returned a graded composition.
+
+## Grading metrics per action family
+
+Each graded call is attributed to exactly one canonical action family. The case's labeled family wins
+when the case names an expected candidate — that candidate's `kind`. A case that labels no expected
+candidate falls back to the kind of the pick the call named: the committed selection, or the raw pick
+the evaluator recovers from a deferral. A call that named no pick is `defer`; a resolved kind with no
+canonical mapping is `unknown`, listed below and never silently dropped. Families are ordered by the
+harness taxonomy (`MECHANIC_FAMILIES`), then `defer`, then `unknown` last. Small samples are shown as raw
+counts; no significance is claimed. All graded calls count here (frozen, human-confirmed, and
+agent-reviewed harvested); agent-reviewed rows are scored but are not promotion evidence.
+
+Mapping source: the case's expected candidate `kind` when the case labels one, falling back to the kind of the pick the call named (the committed selection, or the raw pick the evaluator recovers from a deferral), then `defer`; canonical families and exact candidate kinds from `MECHANIC_FAMILIES` / `KIND_TO_FAMILY` in `scripts/synthetic-player-harness.ts`, plus production proposal tool-name aliases.
+
+### legacy
+
+| Family | Calls | Acted | Coverage | Acted accuracy | Exact preferred | Asserted-subset accuracy | Cases (sample) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| travel | 10 | 0 | 0.0% | n/a | 0/10 | 0.0% | 5 |
+| srd-check | 22 | 0 | 0.0% | n/a | 0/22 | 0.0% | 11 |
+| inventory | 2 | 0 | 0.0% | n/a | 0/2 | 0.0% | 1 |
+| commerce | 6 | 4 | 66.7% | 100.0% | 4/6 | 66.7% | 3 |
+| power | 6 | 0 | 0.0% | n/a | 2/6 | 33.3% | 3 |
+| rest | 12 | 0 | 0.0% | n/a | 0/12 | 0.0% | 6 |
+| combat-consumable | 6 | 0 | 0.0% | n/a | 0/6 | 0.0% | 3 |
+| combat-power | 10 | 2 | 20.0% | 100.0% | 2/10 | 20.0% | 5 |
+| quest-lifecycle | 12 | 0 | 0.0% | n/a | 4/12 | 33.3% | 6 |
+| quest-objective | 10 | 0 | 0.0% | n/a | 0/10 | 0.0% | 5 |
+| progression | 2 | 0 | 0.0% | n/a | 0/2 | 0.0% | 1 |
+| defer | 172 | 0 | 0.0% | n/a | 172/172 | 100.0% | 86 |
+| unknown | 0 | 0 | n/a | n/a | n/a | n/a | 0 |
+
+### shared-context
+
+| Family | Calls | Acted | Coverage | Acted accuracy | Exact preferred | Asserted-subset accuracy | Cases (sample) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| travel | 10 | 6 | 60.0% | 100.0% | 6/10 | 60.0% | 5 |
+| srd-check | 30 | 5 | 16.7% | 100.0% | 13/30 | 43.3% | 15 |
+| inventory | 2 | 0 | 0.0% | n/a | 0/2 | 0.0% | 1 |
+| commerce | 6 | 6 | 100.0% | 100.0% | 6/6 | 100.0% | 3 |
+| power | 8 | 4 | 50.0% | 100.0% | 8/8 | 100.0% | 4 |
+| rest | 12 | 10 | 83.3% | 100.0% | 10/12 | 83.3% | 6 |
+| combat-consumable | 6 | 6 | 100.0% | 100.0% | 6/6 | 100.0% | 3 |
+| combat-power | 10 | 10 | 100.0% | 100.0% | 10/10 | 100.0% | 5 |
+| quest-lifecycle | 14 | 6 | 42.9% | 100.0% | 12/14 | 85.7% | 7 |
+| quest-objective | 12 | 3 | 25.0% | 100.0% | 5/12 | 41.7% | 7 |
+| progression | 2 | 2 | 100.0% | 100.0% | 2/2 | 100.0% | 1 |
+| defer | 158 | 0 | 0.0% | n/a | 158/158 | 100.0% | 80 |
+| unknown | 0 | 0 | n/a | n/a | n/a | n/a | 0 |
+
+### Cross-variant agreement by family
+
+Mean agreement is the mean per-case share of the most common decision; a conflict case has more than one
+decision across its attempts; a cross-variant conflict has at least one disagreeing legacy/shared pair.
+Counts are raw; no significance is claimed.
+
+| Family | Calls | Cases | Mean agreement | Conflict cases | Cross-variant conflicts | Mean cross-variant agreement |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| travel | 20 | 5 | 100.0% | 0/5 | 0/5 | 100.0% |
+| srd-check | 52 | 15 | 100.0% | 0/15 | 0/11 | 100.0% |
+| inventory | 4 | 1 | 100.0% | 0/1 | 0/1 | 100.0% |
+| commerce | 12 | 3 | 100.0% | 0/3 | 0/3 | 100.0% |
+| power | 14 | 4 | 100.0% | 0/4 | 0/3 | 100.0% |
+| rest | 24 | 6 | 100.0% | 0/6 | 0/6 | 100.0% |
+| combat-consumable | 12 | 3 | 100.0% | 0/3 | 0/3 | 100.0% |
+| combat-power | 20 | 5 | 100.0% | 0/5 | 0/5 | 100.0% |
+| quest-lifecycle | 26 | 8 | 100.0% | 0/8 | 0/5 | 100.0% |
+| quest-objective | 22 | 7 | 96.4% | 1/7 | 1/5 | 90.0% |
+| progression | 4 | 1 | 100.0% | 0/1 | 0/1 | 100.0% |
+| defer | 330 | 87 | 100.0% | 0/87 | 0/79 | 100.0% |
+| unknown | 0 | 0 | n/a | n/a | n/a | n/a |
+
+Cases whose calls resolved to more than one family (their pairs count inside each family): `unsupported-hypothetical`, `harvested:2a99c91d232c`, `harvested:30e85dce62a7`, `harvested:414b2795770d`, `harvested:4ceb482981df`, `harvested:643d8f61c4c6`, `harvested:adbcb3b5ee1a`, `harvested:b1446f731e6d`, `harvested:c3e16ca55a84`, `harvested:f5fc508589e4`.
+
+No unmapped candidate kinds appeared in graded calls or case labels.
 
 ## Honesty notes
 
@@ -169,7 +244,7 @@ No adapter failures: every scheduled call returned a graded composition.
 npx tsx scripts/compare-system-one-adventure-payloads.ts --out docs/system-one-adventure-payload-comparison.md
 # live paired run (owner-approved budget; both variants, interleaved per case):
 set -a; . /tmp/opencode/jev/jev.env; set +a   # TYPESAFE_API_KEY
-npx tsx scripts/compare-system-one-adventure-payloads.ts --live --max-calls 300 --repeat 1
+npx tsx scripts/compare-system-one-adventure-payloads.ts --live --max-calls 600 --repeat 2
 ```
 
 Raw per-case data: `docs/system-one-adventure-payload-comparison.json`.

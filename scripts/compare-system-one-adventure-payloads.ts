@@ -34,6 +34,15 @@
  * and harvested labels are live-derived; curated benchmark cases bypass production shortlisting.
  * The shared-context payload is evaluation-only and is not wired to the runtime lane.
  *
+ * Live mode also reports per-action-family grading for both variants: every graded call maps to
+ * exactly one canonical family (the case's expected candidate kind when it labels one, falling back
+ * to the kind of the pick the call named — the committed selection, or the raw pick the evaluator
+ * recovers from a deferral), with `defer` for a call that named nothing and `unknown` for a kind
+ * with no canonical mapping. Families use the harness taxonomy (`MECHANIC_FAMILIES` in
+ * `scripts/synthetic-player-harness.ts`); the JSON sidecar carries the same structures with every
+ * canonical family present in canonical order, `defer` next and `unknown` last, so the report shape
+ * is stable both offline and live.
+ *
  * Usage:
  *   npx tsx scripts/compare-system-one-adventure-payloads.ts [--out docs/system-one-adventure-payload-comparison.md] [--json <path>] [--top 10]
  *   TYPESAFE_API_KEY=... npx tsx scripts/compare-system-one-adventure-payloads.ts --live --max-calls 300 [--repeat 1]
@@ -85,6 +94,11 @@ import {
   type AdventureReadout,
   type AdventureSubsetSummary,
 } from "./evaluate-system-one-adventure-lane.js";
+import {
+  MECHANIC_FAMILIES,
+  resolveMechanicFamily,
+  type MechanicFamily,
+} from "./synthetic-player-harness.js";
 import { beginAdventureEvidence } from "./system-one-evidence.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -716,6 +730,335 @@ function crossVariantMean(values: readonly number[]): number {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Per-family grading (fed by the live attempts and the case labels)
+// ---------------------------------------------------------------------------------------------
+
+/** The family key for a call that named no pick at all. */
+export const ACTION_FAMILY_DEFER = "defer" as const;
+/** The family key for a resolved kind with no canonical mapping. */
+export const ACTION_FAMILY_UNKNOWN = "unknown" as const;
+/** Every row a family table can show: a canonical harness family, `defer`, or `unknown`. */
+export type ActionFamilyKey = MechanicFamily | typeof ACTION_FAMILY_DEFER | typeof ACTION_FAMILY_UNKNOWN;
+
+/** The canonical harness families, then `defer`, then `unknown` last: the stable row order. */
+export const ACTION_FAMILY_ORDER: readonly ActionFamilyKey[] = [
+  ...MECHANIC_FAMILIES,
+  ACTION_FAMILY_DEFER,
+  ACTION_FAMILY_UNKNOWN,
+];
+
+/**
+ * Production proposal tool names that carry a canonical family. Candidate kinds are the exact
+ * `exact_*.select` ids `KIND_TO_FAMILY` already maps; these aliases exist because the same action
+ * can surface as a proposal tool name in evidence (`combat_consumable_use`, `power_use`, ...).
+ */
+export const ACTION_FAMILY_TOOL_ALIASES: Readonly<Record<string, MechanicFamily>> = Object.freeze({
+  inventory_item_equip: "inventory",
+  inventory_item_unequip: "inventory",
+  inventory_item_drop: "inventory",
+  inventory_item_consume: "inventory",
+  inventory_item_gift: "inventory",
+  vendor_buy: "commerce",
+  vendor_sell: "commerce",
+  vendor_give: "commerce",
+  power_use: "power",
+  rest_short: "rest",
+  rest_long: "rest",
+  combat_consumable_use: "combat-consumable",
+  combat_power_use: "combat-power",
+  quest_accept: "quest-lifecycle",
+  quest_abandon: "quest-lifecycle",
+  quest_reward_claim: "quest-lifecycle",
+  character_progression_apply: "progression",
+});
+
+/** How the report describes the resolution below; shared by the markdown and the JSON sidecar. */
+export const ACTION_FAMILY_SOURCE =
+  "the case's expected candidate `kind` when the case labels one, falling back to the kind of the pick the call named"
+  + " (the committed selection, or the raw pick the evaluator recovers from a deferral), then `defer`;"
+  + " canonical families and exact candidate kinds from `MECHANIC_FAMILIES` / `KIND_TO_FAMILY`"
+  + " in `scripts/synthetic-player-harness.ts`, plus production proposal tool-name aliases";
+
+/** The canonical family for one candidate or tool kind, or null when the kind has no mapping. */
+export function familyForAdventureKind(kind: string | null | undefined): MechanicFamily | null {
+  if (typeof kind !== "string" || kind.trim() === "") return null;
+  return resolveMechanicFamily(kind) ?? ACTION_FAMILY_TOOL_ALIASES[kind] ?? null;
+}
+
+/** One call's family resolution: the row it counts in, plus the kind that produced it. */
+export interface AdventureFamilyResolution {
+  family: ActionFamilyKey;
+  /** The resolved kind, or null for a bare deferral; an unmapped kind still reports its text. */
+  kind: string | null;
+}
+
+/** The expected candidate of a case, or null when the case labels a deferral (or names no candidate). */
+function expectedCandidateOf(
+  testCase: Pick<AdventureEvalCase, "candidates" | "expected">,
+): AdventureEvalCase["candidates"][number] | null {
+  const expectedId = testCase.expected.preferred;
+  if (expectedId === null) return null;
+  return testCase.candidates.find((entry) => entry.candidateId === expectedId) ?? null;
+}
+
+/**
+ * Maps one graded call to exactly one canonical family.
+ *
+ * The case's labeled family wins when the case names an expected candidate: that candidate's `kind`,
+ * so a family row grades the calls that case labels. A case that labels no expected candidate (an
+ * expected deferral) falls back to the kind of the pick the call named — the committed selection, or
+ * the raw pick the evaluator recovers in `readout.candidateId` — so a deferral's recovered pick is
+ * attributed to the family it reached for. A call that named nothing is `defer`; a resolved kind
+ * with no canonical mapping is `unknown` and is reported, never silently dropped.
+ */
+export function resolveAdventureFamily(
+  testCase: Pick<AdventureEvalCase, "candidates" | "expected">,
+  readout: Pick<AdventureReadout, "candidateId">,
+): AdventureFamilyResolution {
+  const expected = expectedCandidateOf(testCase);
+  if (expected) {
+    const family = familyForAdventureKind(expected.kind);
+    return family === null
+      ? { family: ACTION_FAMILY_UNKNOWN, kind: expected.kind }
+      : { family, kind: expected.kind };
+  }
+  const named = readout.candidateId;
+  if (named !== null) {
+    const picked = testCase.candidates.find((entry) => entry.candidateId === named) ?? null;
+    if (!picked) return { family: ACTION_FAMILY_UNKNOWN, kind: null };
+    const family = familyForAdventureKind(picked.kind);
+    return family === null
+      ? { family: ACTION_FAMILY_UNKNOWN, kind: picked.kind }
+      : { family, kind: picked.kind };
+  }
+  return { family: ACTION_FAMILY_DEFER, kind: null };
+}
+
+/** One family's call outcomes for one variant. Ratios are 0 when their denominator is 0. */
+export interface FamilyGradingRow {
+  family: ActionFamilyKey;
+  /** Graded calls attributed to this family. */
+  calls: number;
+  /** Distinct case ids those calls came from: the raw sample behind the row. */
+  cases: number;
+  acted: number;
+  /** acted / calls. */
+  coverage: number;
+  actedCorrect: number;
+  /** actedCorrect / acted. */
+  actedAccuracy: number;
+  /** Calls matching the case's exact preferred outcome (including a preferred deferral). */
+  exact: number;
+  /** Calls in the case's acceptable set (the asserted-subset rubric). */
+  correct: number;
+  /** correct / calls: the asserted-subset accuracy. */
+  accuracy: number;
+}
+
+/** The graded attempts the family roll-up needs; `AdventureAttemptRecord` satisfies this. */
+export interface FamilyGradingAttempt {
+  variant: AdventurePayloadVariant;
+  caseId: string;
+  readout: Pick<AdventureReadout, "candidateId" | "deferred" | "correct" | "selectedCorrect">;
+}
+
+export interface VariantFamilyGrading {
+  variant: AdventurePayloadVariant;
+  /** One row per `ACTION_FAMILY_ORDER` entry, zeros included, in canonical order. */
+  families: FamilyGradingRow[];
+}
+
+/** A kind with no canonical mapping, counted wherever it appeared. */
+export interface UnmappedAdventureKind {
+  kind: string;
+  /** Graded calls attributed to `unknown` through this kind. */
+  calls: number;
+  /** Cases whose expected candidate carries this kind, even when no call was graded. */
+  expectedCases: number;
+}
+
+/** Per-family cross-variant agreement. Counts are raw; no significance is claimed. */
+export interface FamilyAgreementRow {
+  family: ActionFamilyKey;
+  calls: number;
+  cases: number;
+  legacyCalls: number;
+  sharedCalls: number;
+  /** Cases with attempts from both variants. */
+  pairedCases: number;
+  /** Mean over the family's cases of the most-common-decision share. */
+  meanAgreement: number;
+  /** Cases whose attempts named more than one decision. */
+  conflictCases: number;
+  /** Cases where any legacy x shared attempt pair disagreed. */
+  crossVariantConflictCases: number;
+  /** Mean over paired cases of the legacy x shared agreement share. */
+  meanCrossVariantAgreement: number;
+}
+
+export interface FamilyAgreementSummary {
+  /** One row per `ACTION_FAMILY_ORDER` entry, zeros included, in canonical order. */
+  families: FamilyAgreementRow[];
+  /** Cases whose calls resolved to more than one family; their pairs count inside each family. */
+  splitCases: string[];
+}
+
+export interface FamilyGradingReport {
+  /** The resolution rule, rendered into both the markdown and the JSON sidecar. */
+  source: string;
+  variants: Record<AdventurePayloadVariant, VariantFamilyGrading>;
+  agreement: FamilyAgreementSummary;
+  /** Kinds the resolution could not map, first-seen order; empty when every kind mapped. */
+  unmappedKinds: UnmappedAdventureKind[];
+  /** Attempts whose case row was unavailable; attributed to `unknown`, never dropped. */
+  unresolvedCaseIds: string[];
+}
+
+function emptyFamilyRow(family: ActionFamilyKey): FamilyGradingRow {
+  return {
+    family,
+    calls: 0,
+    cases: 0,
+    acted: 0,
+    coverage: 0,
+    actedCorrect: 0,
+    actedAccuracy: 0,
+    exact: 0,
+    correct: 0,
+    accuracy: 0,
+  };
+}
+
+/**
+ * Per-family agreement over the same resolved families. Each family's samples are summarized with
+ * the evaluator's `summarizeVariantAgreement`, so the per-family figures use the same per-case and
+ * cross-variant definitions as the aggregate section. Pure.
+ */
+export function summarizeFamilyAgreement(
+  attempts: readonly FamilyGradingAttempt[],
+  cases: readonly AdventureCaseRow[],
+): FamilyAgreementSummary {
+  const caseById = new Map(cases.map((testCase): [string, AdventureCaseRow] => [testCase.id, testCase]));
+  const samplesByFamily = new Map<ActionFamilyKey, AgreementSample[]>(
+    ACTION_FAMILY_ORDER.map((family): [ActionFamilyKey, AgreementSample[]] => [family, []]),
+  );
+  const familiesByCase = new Map<string, Set<ActionFamilyKey>>();
+  for (const attempt of attempts) {
+    const testCase = caseById.get(attempt.caseId);
+    const resolution: AdventureFamilyResolution = testCase
+      ? resolveAdventureFamily(testCase, attempt.readout)
+      : { family: ACTION_FAMILY_UNKNOWN, kind: null };
+    samplesByFamily.get(resolution.family)!.push({
+      caseId: attempt.caseId,
+      variant: attempt.variant,
+      decision: attempt.readout.candidateId ?? ACTION_FAMILY_DEFER,
+    });
+    let families = familiesByCase.get(attempt.caseId);
+    if (!families) {
+      families = new Set<ActionFamilyKey>();
+      familiesByCase.set(attempt.caseId, families);
+    }
+    families.add(resolution.family);
+  }
+  const families = ACTION_FAMILY_ORDER.map((family): FamilyAgreementRow => {
+    const samples = samplesByFamily.get(family)!;
+    const summary = summarizeVariantAgreement(samples);
+    const caseIds = new Set(samples.map((sample) => sample.caseId));
+    return {
+      family,
+      calls: samples.length,
+      cases: caseIds.size,
+      legacyCalls: samples.filter((sample) => sample.variant === "legacy").length,
+      sharedCalls: samples.filter((sample) => sample.variant === "shared-context").length,
+      pairedCases: summary.cases.filter((entry) => entry.crossVariantAgreement !== null).length,
+      meanAgreement: summary.meanAgreement,
+      conflictCases: summary.conflictCases,
+      crossVariantConflictCases: summary.crossVariantConflictCases,
+      meanCrossVariantAgreement: summary.meanCrossVariantAgreement,
+    };
+  });
+  const splitCases = [...familiesByCase.entries()]
+    .filter(([, familiesForCase]) => familiesForCase.size > 1)
+    .map(([caseId]) => caseId);
+  return { families, splitCases };
+}
+
+/**
+ * The full per-family report: one row set per variant plus the per-family agreement. Every
+ * `ACTION_FAMILY_ORDER` row is present whether or not it saw calls, so offline and live shapes
+ * match; kinds without a mapping are listed rather than dropped, and an attempt whose case row is
+ * missing is attributed to `unknown` and named in `unresolvedCaseIds`.
+ */
+export function summarizeFamilyGrading(
+  attempts: readonly FamilyGradingAttempt[],
+  cases: readonly AdventureCaseRow[],
+): FamilyGradingReport {
+  const caseById = new Map(cases.map((testCase): [string, AdventureCaseRow] => [testCase.id, testCase]));
+  const buckets = new Map<AdventurePayloadVariant, Map<ActionFamilyKey, { row: FamilyGradingRow; caseIds: Set<string> }>>();
+  for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
+    const byFamily = new Map<ActionFamilyKey, { row: FamilyGradingRow; caseIds: Set<string> }>();
+    for (const family of ACTION_FAMILY_ORDER) {
+      byFamily.set(family, { row: emptyFamilyRow(family), caseIds: new Set<string>() });
+    }
+    buckets.set(variant, byFamily);
+  }
+  const unmapped = new Map<string, UnmappedAdventureKind>();
+  const unresolvedCaseIds: string[] = [];
+  for (const attempt of attempts) {
+    const testCase = caseById.get(attempt.caseId);
+    let resolution: AdventureFamilyResolution;
+    if (testCase) {
+      resolution = resolveAdventureFamily(testCase, attempt.readout);
+    } else {
+      resolution = { family: ACTION_FAMILY_UNKNOWN, kind: null };
+      if (!unresolvedCaseIds.includes(attempt.caseId)) unresolvedCaseIds.push(attempt.caseId);
+    }
+    if (resolution.family === ACTION_FAMILY_UNKNOWN && resolution.kind !== null) {
+      const entry = unmapped.get(resolution.kind);
+      if (entry) entry.calls += 1;
+      else unmapped.set(resolution.kind, { kind: resolution.kind, calls: 1, expectedCases: 0 });
+    }
+    const bucket = buckets.get(attempt.variant)?.get(resolution.family);
+    if (!bucket) continue;
+    bucket.row.calls += 1;
+    bucket.caseIds.add(attempt.caseId);
+    if (!attempt.readout.deferred) {
+      bucket.row.acted += 1;
+      if (attempt.readout.correct) bucket.row.actedCorrect += 1;
+    }
+    if (attempt.readout.selectedCorrect) bucket.row.exact += 1;
+    if (attempt.readout.correct) bucket.row.correct += 1;
+  }
+  const variants = Object.fromEntries(ADVENTURE_PAYLOAD_VARIANTS.map((variant): [AdventurePayloadVariant, VariantFamilyGrading] => {
+    const byFamily = buckets.get(variant)!;
+    const families = ACTION_FAMILY_ORDER.map((family): FamilyGradingRow => {
+      const bucket = byFamily.get(family)!;
+      const row = bucket.row;
+      row.cases = bucket.caseIds.size;
+      row.coverage = row.calls === 0 ? 0 : row.acted / row.calls;
+      row.actedAccuracy = row.acted === 0 ? 0 : row.actedCorrect / row.acted;
+      row.accuracy = row.calls === 0 ? 0 : row.correct / row.calls;
+      return row;
+    });
+    return [variant, { variant, families }];
+  })) as Record<AdventurePayloadVariant, VariantFamilyGrading>;
+  for (const testCase of cases) {
+    const expected = expectedCandidateOf(testCase);
+    if (!expected || familyForAdventureKind(expected.kind) !== null) continue;
+    const entry = unmapped.get(expected.kind);
+    if (entry) entry.expectedCases += 1;
+    else unmapped.set(expected.kind, { kind: expected.kind, calls: 0, expectedCases: 1 });
+  }
+  return {
+    source: ACTION_FAMILY_SOURCE,
+    variants,
+    agreement: summarizeFamilyAgreement(attempts, cases),
+    unmappedKinds: [...unmapped.values()],
+    unresolvedCaseIds,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Live paired run
 // ---------------------------------------------------------------------------------------------
 
@@ -940,6 +1283,8 @@ export interface ComparisonView {
   rows: readonly PayloadByteRow[];
   structural: readonly StructuralPairResult[];
   summary: PayloadByteSummary;
+  /** Per-family grading and agreement; zero rows offline, filled from the live attempts. */
+  familyGrading: FamilyGradingReport;
   top: number;
   out: string;
   jsonPath: string;
@@ -974,6 +1319,7 @@ export function buildComparisonView(input: ComparisonViewInput): ComparisonView 
     rows,
     structural,
     summary: summarizePayloadBytes(rows),
+    familyGrading: summarizeFamilyGrading(input.live?.attempts ?? [], input.cases),
     top: input.top,
     out: input.out,
     jsonPath: input.jsonPath,
@@ -1033,6 +1379,21 @@ function subsetRow(variant: AdventurePayloadVariant, scope: string, summary: Adv
   return `| ${variant} | ${scope} | ${summary.calls} | ${summary.acted} | ${pctText(coverage)} | ${summary.acted === 0 ? "n/a" : pctText(summary.actedAccuracy)} | ${summary.calls === 0 ? "n/a" : `${summary.exact}/${summary.calls}`} | ${summary.calls === 0 ? "n/a" : pctText(summary.accuracy)} |`;
 }
 
+/** Ratio text for the family tables: `n/a` when the denominator is zero, never a fake zero share. */
+function ratioText(numerator: number, denominator: number): string {
+  return denominator === 0 ? "n/a" : pctText(numerator / denominator);
+}
+
+function familyGradingRow(row: FamilyGradingRow): string {
+  return `| ${row.family} | ${row.calls} | ${row.acted} | ${ratioText(row.acted, row.calls)} | ${ratioText(row.actedCorrect, row.acted)} | ${row.calls === 0 ? "n/a" : `${row.exact}/${row.calls}`} | ${ratioText(row.correct, row.calls)} | ${row.cases} |`;
+}
+
+function familyAgreementRow(row: FamilyAgreementRow): string {
+  const conflicts = row.cases === 0 ? "n/a" : `${row.conflictCases}/${row.cases}`;
+  const crossConflicts = row.pairedCases === 0 ? "n/a" : `${row.crossVariantConflictCases}/${row.pairedCases}`;
+  return `| ${row.family} | ${row.calls} | ${row.cases} | ${row.calls === 0 ? "n/a" : pctText(row.meanAgreement)} | ${conflicts} | ${crossConflicts} | ${row.pairedCases === 0 ? "n/a" : pctText(row.meanCrossVariantAgreement)} |`;
+}
+
 /** Shared honesty notes rendered into both the markdown report and the JSON sidecar. */
 export function comparisonNotes(view: ComparisonView): string[] {
   const notes = [
@@ -1050,7 +1411,7 @@ export function comparisonNotes(view: ComparisonView): string[] {
 
 /** Renders the markdown report. Pure. */
 export function renderComparisonReport(view: ComparisonView): string {
-  const { mode, generatedAt, cases, harvest, corpusDigest, rows, structural, summary, top, jsonPath, live } = view;
+  const { mode, generatedAt, cases, harvest, corpusDigest, rows, structural, summary, top, jsonPath, live, familyGrading } = view;
   const failed = structural.filter((result) => !result.ok);
   const frozen = cases.length - harvest.cases;
   const bounded = boundedDeltaRows(rows, top);
@@ -1234,6 +1595,60 @@ export function renderComparisonReport(view: ComparisonView): string {
     }
     lines.push("");
   }
+  lines.push("## Grading metrics per action family");
+  lines.push("");
+  lines.push("Each graded call is attributed to exactly one canonical action family. The case's labeled family wins");
+  lines.push("when the case names an expected candidate — that candidate's `kind`. A case that labels no expected");
+  lines.push("candidate falls back to the kind of the pick the call named: the committed selection, or the raw pick");
+  lines.push("the evaluator recovers from a deferral. A call that named no pick is `defer`; a resolved kind with no");
+  lines.push("canonical mapping is `unknown`, listed below and never silently dropped. Families are ordered by the");
+  lines.push("harness taxonomy (`MECHANIC_FAMILIES`), then `defer`, then `unknown` last. Small samples are shown as raw");
+  lines.push("counts; no significance is claimed. All graded calls count here (frozen, human-confirmed, and");
+  lines.push("agent-reviewed harvested); agent-reviewed rows are scored but are not promotion evidence.");
+  lines.push("");
+  lines.push(`Mapping source: ${familyGrading.source}.`);
+  lines.push("");
+  if (!live) {
+    lines.push("Offline mode makes no model calls: every call count is zero and no accuracy is measured. The section is");
+    lines.push("rendered in both modes so the report keeps a stable shape; live mode fills in the calls.");
+    lines.push("");
+  }
+  for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
+    lines.push(`### ${variant}`);
+    lines.push("");
+    lines.push("| Family | Calls | Acted | Coverage | Acted accuracy | Exact preferred | Asserted-subset accuracy | Cases (sample) |");
+    lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+    for (const row of familyGrading.variants[variant].families) lines.push(familyGradingRow(row));
+    lines.push("");
+  }
+  lines.push("### Cross-variant agreement by family");
+  lines.push("");
+  lines.push("Mean agreement is the mean per-case share of the most common decision; a conflict case has more than one");
+  lines.push("decision across its attempts; a cross-variant conflict has at least one disagreeing legacy/shared pair.");
+  lines.push("Counts are raw; no significance is claimed.");
+  lines.push("");
+  lines.push("| Family | Calls | Cases | Mean agreement | Conflict cases | Cross-variant conflicts | Mean cross-variant agreement |");
+  lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+  for (const row of familyGrading.agreement.families) lines.push(familyAgreementRow(row));
+  lines.push("");
+  if (familyGrading.agreement.splitCases.length > 0) {
+    lines.push(`Cases whose calls resolved to more than one family (their pairs count inside each family): ${familyGrading.agreement.splitCases.map((caseId) => `\`${cell(caseId)}\``).join(", ")}.`);
+    lines.push("");
+  }
+  if (familyGrading.unmappedKinds.length === 0) {
+    lines.push("No unmapped candidate kinds appeared in graded calls or case labels.");
+  } else {
+    lines.push("| Unmapped kind | Graded calls | Expected-case labels |");
+    lines.push("| --- | ---: | ---: |");
+    for (const entry of familyGrading.unmappedKinds) {
+      lines.push(`| \`${cell(entry.kind)}\` | ${entry.calls} | ${entry.expectedCases} |`);
+    }
+  }
+  lines.push("");
+  if (familyGrading.unresolvedCaseIds.length > 0) {
+    lines.push(`Attempts without a case row were attributed to \`unknown\`: ${familyGrading.unresolvedCaseIds.map((caseId) => `\`${cell(caseId)}\``).join(", ")}.`);
+    lines.push("");
+  }
   lines.push("## Honesty notes");
   lines.push("");
   for (const note of comparisonNotes(view)) lines.push(`- ${note}`);
@@ -1275,6 +1690,8 @@ export interface ComparisonReportJson {
   payloadBytes: PayloadByteSummary;
   cases: PayloadByteRow[];
   structural: { cases: number; paired: number; failures: StructuralPairResult[] };
+  /** Per-family grading plus per-family agreement; present in both modes with zero rows offline. */
+  familyGrading: FamilyGradingReport;
   notes: string[];
   live?: LiveComparison;
 }
@@ -1308,6 +1725,7 @@ export function comparisonJson(view: ComparisonView): ComparisonReportJson {
       paired: view.structural.length - failures.length,
       failures: failures.map((failure) => ({ ...failure })),
     },
+    familyGrading: view.familyGrading,
     notes: comparisonNotes(view),
     ...(view.live ? { live: view.live } : {}),
   };

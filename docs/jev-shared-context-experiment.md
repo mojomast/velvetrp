@@ -43,8 +43,14 @@ input tokens (1.24M vs 1.01M): payload bytes are not tokens. The adversarial/off
 (empty inputs, synonyms, negation, malicious-looking text, duplicate groups, large candidate sets)
 are covered by `scripts/test/adventure-payload-edge-cases.test.ts`.
 
-Still required before any production decision: repeated live runs over the runner's conflict
-breakdown, per-family and production-path metrics, and an evaluated promotion binding once the
-payload is chosen. Do not change live shadow or active payloads until that evaluation is complete.
+Per-family metrics and the conflict breakdown now ship in the runner's report; the repeat-2 live
+paired run (540 calls, zero failures) is recorded in
+[system-one-adventure-payload-comparison.md](system-one-adventure-payload-comparison.md) with
+per-family tables: shared context acted at 100% acted accuracy in every family with acts, raising
+coverage from 0% to 17-100% across travel, rest, powers, consumables, and quests, at +23%
+measured input tokens and derived cost versus legacy. Still required before any production
+decision: production-path evaluation (curated benchmark candidates cannot authorize shortlisting)
+and an evaluated promotion binding once a payload is chosen. Do not change live shadow or active
+payloads until that evaluation is complete.
 
 Vendor guidance checked via WebXNG/SearXNG discovery and direct retrieval of https://docs.typesafe.ai/concepts/state.md: all questions evaluate the same shared state independently; content and supporting facts belong in state while questions describe judgments.
