@@ -15,6 +15,17 @@
 .campaign-play-page .campaign-quick-tools > .campaign-quick-panel > header { position: static; }
 .campaign-play-page .campaign-quick-tools > .scene-illustration { margin-bottom: var(--panel-gap); }
 .campaign-play-page .campaign-quick-tools .scene-illustration-figure img { width: 100%; }
+/* Density: notices, toolbar, and transcript keep more content above the fold.
+   Text sizes stay at or above 11px so the tightened rhythm stays readable. */
+.campaign-play-page .room-top > :is(.atlas-notice, .atlas-reconcile) { margin: 0; }
+.campaign-play-page .room-top > .atlas-notice { padding: 8px 10px; }
+.campaign-play-page .room-toolbar .atlas-turn-tools { padding: 0; }
+.campaign-play-page .campaign-conversation > header { padding: 10px 12px; }
+.campaign-play-page .campaign-conversation-log { gap: 12px; padding: 12px; }
+.campaign-play-page .conversation-turn { gap: 6px; }
+.campaign-play-page .conversation-exchange { padding: 9px 11px; line-height: 1.5; }
+.campaign-play-page .conversation-exchange p { margin-top: 4px; }
+.campaign-play-page .conversation-exchange time { margin-top: 5px; }
 /* Tool drawers overlay the table from a fixed right-edge slot. */
 .campaign-drawers-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 .campaign-drawers-overlay .atlas-drawer-slot { pointer-events: auto; box-shadow: -16px 0 45px #0005; }

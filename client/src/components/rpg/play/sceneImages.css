@@ -4,9 +4,9 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -15,20 +15,21 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 6px 12px;
+  gap: 4px 8px;
 }
 
-.scene-illustration-scene { margin: 0; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.scene-illustration-scene { margin: 0; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .scene-illustration-scene span { color: var(--eyebrow); font: 700 10px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .1em; }
 .scene-illustration-scene strong { overflow-wrap: anywhere; }
 
-.scene-illustration-preferences { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--muted); font-size: 12px; }
-.scene-illustration-preferences label { display: inline-flex; align-items: center; gap: 5px; }
+.scene-illustration-preferences { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 8px; color: var(--muted); font-size: 11px; line-height: 1.3; }
+.scene-illustration-preferences label { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; }
+.scene-illustration-preferences .ghost { min-height: 24px; padding: 3px 8px; font-size: 11px; }
 
 .scene-illustration-fallback { margin: 0; color: var(--muted); }
 .scene-illustration-fallback p { margin: 0 0 6px; }
 
-.scene-illustration-figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
+.scene-illustration-figure { margin: 0; display: grid; gap: 4px; justify-items: start; }
 .scene-illustration-figure img {
   width: min(100%, 320px);
   aspect-ratio: 1 / 1;
@@ -37,16 +38,19 @@
   border: 1px solid var(--border);
   background: var(--surface-2);
 }
-.scene-illustration-figure figcaption { color: var(--muted); font-size: 12px; }
+.scene-illustration-figure figcaption { color: var(--muted); font-size: 11px; line-height: 1.3; }
 
-/* Player-visible scene text: a few clamped lines under the illustration. */
+/* Player-visible scene text: two clamped lines directly under the illustration.
+   This paragraph is only rendered when a description exists, so an absent
+   description costs no layout and never shifts the card. */
 .scene-illustration-caption {
   margin: 0;
   color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.3;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
