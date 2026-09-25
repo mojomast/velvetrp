@@ -230,6 +230,29 @@ describe("campaign-content section generation",()=>{
     const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"structured-log"),sections:["outline"]}}),logs=messages.join("\n");expect(response.statusCode).toBe(503);expect(response.json().code).toBe("RPG_GENERATION_UNAVAILABLE");expect(logs).toContain("invalid-structured-response");expect(logs).not.toContain("PRIVATE_PROVIDER_ECHO");expect(response.body).not.toContain("PRIVATE_PROVIDER_ECHO");await app.close();
   });
 
+  it("rejects a GM-only opening story node",async()=>{
+    enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Public opening"});const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async()=>({storyNodes:[{key:"secret-opening",title:"Secret",description:"Only the GM knows.",visibility:"gm" as const}]})});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"gm-opening"),sections:["story"]}});
+    expect(response.statusCode,response.body).toBe(503);await app.close();
+  });
+
+  it("rejects an encounter roster that names only concept or NPC keys",async()=>{
+    enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Concept roster"});const conceptOnly={npcs:[{key:"guard",name:"Guard",archetype:"Guard",description:"A wary guard.",visibility:"public" as const,factionKeys:[]}],monsterConcepts:[{key:"beast",name:"Beast",description:"A beast in the reeds.",visibility:"gm" as const,role:"guardian",tactics:[],mechanics:{state:"inert" as const,reason:"No compatible pinned enemy exists."}}],encounters:[{key:"ambush",title:"Ambush",description:"A planned fight.",visibility:"gm" as const,participantNpcKeys:["guard"],monsterConceptKeys:["beast"],objectives:[],terrain:[],escalation:[]}]};
+    const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async()=>conceptOnly});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"concept-roster"),sections:["npcs","monster-concepts","encounters"]}});
+    expect(response.statusCode,response.body).toBe(503);await app.close();
+  });
+
+  it("accepts a public opening story node and an exact pinned encounter roster",async()=>{
+    enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Ready opening"});repo.installMechanicsStarterCatalog("local-owner");repo.configureMechanicsStarterCatalog("local-owner",campaign.id,{expectedRevision:0,idempotencyKey:"opening-catalog"});const enemy=MECHANICS_STARTER_CATALOG.definitions.find((definition)=>definition.reference.kind==="enemy-template")!.reference;let providerPrompt:any;
+    const ready={storyNodes:[{key:"opening",title:"The Road",description:"Rain on the old road.",visibility:"public" as const},{key:"secret",title:"The Truth",description:"Only the GM knows.",visibility:"gm" as const}],storyRelationships:[{key:"opening-to-secret",fromStoryNodeKey:"opening",toStoryNodeKey:"secret",description:"The road leads on.",visibility:"gm" as const}],encounters:[{key:"road-ambush",title:"Road Ambush",description:"Bandits spring the trap.",visibility:"gm" as const,objectives:["Survive"],terrain:["Mud"],escalation:["Reinforcements"],enemyReferences:[enemy]}]};
+    const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async(prompt)=>{providerPrompt=prompt;return ready;}});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"ready-opening"),sections:["story","encounters"]}});
+    expect(response.statusCode,response.body).toBe(201);
+    expect(providerPrompt.outputRules).toMatch(/opening story node/);expect(providerPrompt.outputRules).toMatch(/exact supplied pinnedCatalog enemyReferences/);
+    await app.close();
+  });
+
   it("drops unresolvable references instead of failing the whole candidate",()=>{
     const dependencies=new Map<string,"public"|"gm">([["known-location","public"],["known-faction","public"],["gm-secret","gm"]]);
     const content=normalizeGeneratedCampaignContentProvider({
