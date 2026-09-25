@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { SRD_5_1_STARTER_CATALOG, createRepository } from "../src/repo/index.js";
 import {
+  EXACT_TOKEN_ONLY_KEYWORDS,
   NPC_TIER_KEYWORDS,
   NPC_TIER_MATCH_ORDER,
   NpcCombatProfileError,
@@ -122,6 +123,17 @@ describe("deriveNpcTier", () => {
     expect(deriveNpcTier("temple acolyte").tier).toBe("priest");
   });
 
+  it("does not promote an NPC from verb forms of ambiguous title keywords", () => {
+    expect(deriveNpcTier("Margery Fenn\nA wool factor who counts on her fingers and watches the road.").tier).toBe("commoner");
+    expect(deriveNpcTier("She watches the road.").tier).toBe("commoner");
+    expect(deriveNpcTier("He counts the takings.").tier).toBe("commoner");
+  });
+
+  it("still matches exact title tokens and guard nouns", () => {
+    expect(deriveNpcTier("Count Alaric").tier).toBe("leader");
+    expect(deriveNpcTier("The town watch").tier).toBe("guard");
+  });
+
   it("is deterministic", () => {
     expect(deriveNpcTier("The Ferryman's Widow")).toEqual(deriveNpcTier("The Ferryman's Widow"));
   });
@@ -144,6 +156,9 @@ describe("deriveNpcTier", () => {
     expect(NPC_TIER_KEYWORDS.priest).toContain("acolyte");
     expect(NPC_TIER_KEYWORDS.adventurer).toContain("veteran");
     expect(NPC_TIER_KEYWORDS.leader).toContain("captain");
+    for (const keyword of EXACT_TOKEN_ONLY_KEYWORDS) {
+      expect(seen.has(keyword), `exact-token keyword ${keyword} must exist in a tier`).toBe(true);
+    }
   });
 });
 

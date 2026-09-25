@@ -192,15 +192,26 @@ function tokenForms(token: string): readonly string[] {
 }
 
 /**
+ * Role keywords whose plural and gerund surfaces collide with common verbs far
+ * more often than they name a rank, so only an exact token may match them:
+ * "she counts on her fingers" is not the noble title "count", and "watches the
+ * road" is not a town watch. Profession words keep their inflected forms.
+ */
+export const EXACT_TOKEN_ONLY_KEYWORDS: ReadonlySet<string> = new Set(["count", "watch"]);
+
+/**
  * Pure, deterministic keyword/role heuristic over an NPC's public text. Case
  * insensitive and word-boundary safe; text without any role keyword falls back
  * to `commoner`.
  */
 export function deriveNpcTier(text: string): NpcTierDerivation {
-  const forms = new Set((text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).flatMap(tokenForms));
+  const tokens = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  const exactTokens = new Set(tokens);
+  const forms = new Set(tokens.flatMap(tokenForms));
   for (const tier of NPC_TIER_MATCH_ORDER) {
     for (const keyword of NPC_TIER_KEYWORDS[tier]) {
-      if (forms.has(keyword)) {
+      const present = EXACT_TOKEN_ONLY_KEYWORDS.has(keyword) ? exactTokens.has(keyword) : forms.has(keyword);
+      if (present) {
         return { tier, matchedKeyword: keyword, rationale: `matched role keyword "${keyword}" for tier ${tier}` };
       }
     }
