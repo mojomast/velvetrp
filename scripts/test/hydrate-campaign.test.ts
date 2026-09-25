@@ -16,6 +16,8 @@ class FakeApi {
   active = 0;
   peak = 0;
   staleApplies = 0;
+  attachedRooms: string[] = ["room-1"];
+  startupBlockers: string[] = ["opening-blocked"];
   generation: (body: any, api: FakeApi) => Promise<Response>;
 
   constructor(generation?: (body: any, api: FakeApi) => Promise<Response>) {
@@ -46,6 +48,12 @@ class FakeApi {
     if (method === "POST" && path.endsWith("/campaign-content-drafts")) { this.active++; this.peak = Math.max(this.peak, this.active); try { return await this.generation(body, this); } finally { this.active--; } }
     const apply = path.match(/\/campaign-content-drafts\/([^/]+)\/apply$/); if (apply) { const draft = this.drafts.get(apply[1]!); if (this.staleApplies > 0) { this.staleApplies--; return json(409, { code: "RPG_GENERATION_DRAFT_CONFLICT" }); } draft.draft.state = "applied"; return json(200, { draft: draft.draft, application: {}, receipts: [] }); }
     const read = path.match(/\/campaign-content-drafts\/([^/]+)$/); if (read) return this.drafts.has(read[1]!) ? json(200, this.drafts.get(read[1]!)) : json(404, { code: "NOT_FOUND" });
+    if (method === "POST" && path === "/api/rpg/v1/campaigns") return json(201, { campaign: { id: "campaign-created", name: body?.name ?? "campaign" } });
+    if (method === "PUT" && /\/campaigns\/[^/]+\/(?:mechanics-)?starter-setup$/.test(path)) return json(200, {});
+    if (method === "GET" && /\/campaigns\/[^/]+\/rooms$/.test(path)) return json(200, { attached: this.attachedRooms.map((sessionId) => ({ sessionId })), eligible: [] });
+    const startup = path.match(/\/campaigns\/([^/]+)\/rooms\/([^/]+)\/startup-commands$/);
+    if (method === "POST" && startup) return json(200, { campaignId: startup[1], sessionId: startup[2], dmMode: "ai", dmModeRevision: 1,
+      published: [], beat: { runId: null, state: "none" }, imagesEnqueued: [], blockers: this.startupBlockers });
     return json(404, { code: "NOT_FOUND" });
   };
 }
@@ -219,4 +227,41 @@ test("rejects a selector-only recipe change against an existing ledger", async (
   const path = await ledgerPath(), api = new FakeApi(); await run(recipe(1), api, path); const prior = api.calls.length;
   await assert.rejects(run(recipe(2), api, path), /recipe digest differs/);
   assert.equal(api.calls.length, prior);
+});
+
+function createdCampaignOptions(path: string, api: FakeApi, log?: (message: string) => void) {
+  return { recipe: baseRecipe(1), apiBase: "http://fake", createCampaign: "Ready to play", starter: "mechanics" as const,
+    ledgerPath: path, fetch: api.fetch, ...(log ? { log } : {}) };
+}
+
+test("runs the startup command for a created campaign's first attached room after starter setup", async () => {
+  const path = await ledgerPath(), api = new FakeApi(), messages: string[] = [];
+  const ledger = await hydrateCampaign(createdCampaignOptions(path, api, (message) => messages.push(message)));
+  const createCall = api.calls.find((call) => call.method === "POST" && call.path === "/api/rpg/v1/campaigns");
+  const starterCall = api.calls.find((call) => call.method === "PUT" && call.path.endsWith("/mechanics-starter-setup"));
+  const roomsCall = api.calls.find((call) => call.method === "GET" && call.path.endsWith("/rooms"));
+  const startupCall = api.calls.find((call) => call.path.endsWith("/startup-commands"));
+  assert.ok(createCall && starterCall && roomsCall && startupCall);
+  assert.equal(createCall.body.name, "Ready to play");
+  assert.equal(starterCall.path, "/api/rpg/v1/campaigns/campaign-created/mechanics-starter-setup");
+  assert.equal(roomsCall.path, "/api/rpg/v1/campaigns/campaign-created/rooms");
+  assert.equal(startupCall.method, "POST");
+  assert.equal(startupCall.path, "/api/rpg/v1/campaigns/campaign-created/rooms/room-1/startup-commands");
+  assert.deepEqual(startupCall.body, {});
+  assert.ok(api.calls.indexOf(startupCall) > api.calls.indexOf(starterCall), "startup must follow starter setup");
+  assert.ok(api.calls.findIndex((call) => call.path.endsWith("/apply")) < api.calls.indexOf(startupCall), "startup must follow content application");
+  assert.deepEqual(ledger.startup, { status: "complete", sessionId: "room-1" });
+  assert.ok(messages.some((message) => message.includes("Startup blockers") && message.includes("opening-blocked")));
+});
+
+test("resume skips a completed startup and does not re-query the room", async () => {
+  const path = await ledgerPath(), api = new FakeApi();
+  const first = await hydrateCampaign(createdCampaignOptions(path, api));
+  assert.equal(first.startup?.status, "complete");
+  const prior = api.calls.length;
+  const resumed = await hydrateCampaign(createdCampaignOptions(path, api));
+  assert.equal(api.calls.length, prior);
+  assert.equal(api.calls.filter((call) => call.path.endsWith("/startup-commands")).length, 1);
+  assert.equal(api.calls.filter((call) => call.method === "GET" && call.path.endsWith("/rooms")).length, 1);
+  assert.deepEqual(resumed.startup, { status: "complete", sessionId: "room-1" });
 });

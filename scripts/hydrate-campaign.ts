@@ -35,12 +35,13 @@ interface Ledger {
   schemaVersion: 1; recipeDigest: string; recipeName: string; apiBase: string; campaignId: string | null;
   createdCampaign: boolean; creationStatus: "not-requested" | "pending" | "dispatching" | "complete";
   createCampaignName?: string; starterSetup?: { starter: "original" | "mechanics" | "srd-5.1"; status: "dispatching" | "complete" };
+  startup?: { status: "dispatching" | "complete"; sessionId: string };
   works: Record<string, Work>; updatedAt: string;
 }
 export interface HydrateOptions {
   recipe: HydrationRecipe; apiBase: string; campaignId?: string; createCampaign?: string; starter?: "original" | "mechanics" | "srd-5.1";
   ledgerPath: string; concurrency?: number; dryRun?: boolean; requireProvider?: boolean; providerModel?: string;
-  allowStaleRegeneration?: boolean;
+  allowStaleRegeneration?: boolean; startup?: boolean;
   fetch?: Fetch; log?: (message: string) => void;
 }
 
@@ -153,6 +154,22 @@ async function request(fetcher: Fetch, base: string, path: string, method = "GET
   const response = await fetcher(`${base}${path}`, body === undefined ? { method } : { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   let parsed: Record<string, unknown> = {}; try { parsed = object(await response.json(), "API response"); } catch { if (response.ok) fail("API returned a malformed success response"); }
   if (!response.ok) throw new ApiError(response.status, parsed); return parsed;
+}
+/**
+ * Resolves the campaign's first attached room/session deterministically. Neither
+ * campaign creation nor starter setup returns a session id, so the rooms list is
+ * the authoritative source: the route orders attached rooms by `attachedAt`, then
+ * `sessionId`, and the startup command requires an attached room to succeed.
+ */
+async function firstAttachedRoom(fetcher: Fetch, base: string, campaignId: string): Promise<string | null> {
+  const rooms = await request(fetcher, base, `/api/rpg/v1/campaigns/${encodeURIComponent(campaignId)}/rooms`);
+  const attached = Array.isArray(rooms.attached) ? rooms.attached : [];
+  for (const room of attached) {
+    if (!room || typeof room !== "object" || Array.isArray(room)) continue;
+    const sessionId = (room as Record<string, unknown>).sessionId;
+    if (typeof sessionId === "string" && sessionId) return sessionId;
+  }
+  return null;
 }
 function generationBody(work: Work, campaignId: string, retry = false): Record<string, unknown> {
   const targets = Object.entries(work.desiredCounts).map(([field, count]) => `${count} ${field}`).join(", ");
@@ -303,6 +320,7 @@ export async function hydrateCampaign(options: HydrateOptions): Promise<Ledger> 
   let saveTail = Promise.resolve();
   const save = () => { saveTail = saveTail.then(() => writeLedger(options.ledgerPath, ledger!)); return saveTail; };
   if (ledger.starterSetup?.status === "dispatching") fail("starter setup outcome is uncertain; inspect campaign configuration before continuing");
+  if (ledger.startup?.status === "dispatching") fail("campaign startup outcome is uncertain; inspect campaign state before continuing");
   if (!ledger.campaignId) {
     if (ledger.creationStatus === "dispatching") fail("campaign creation outcome is uncertain; inspect campaigns and start with an explicit campaign ID and new ledger");
     ledger.creationStatus = "dispatching"; await save();
@@ -333,11 +351,28 @@ export async function hydrateCampaign(options: HydrateOptions): Promise<Ledger> 
     log(`Staging ${work.id}`); try { await stageWork(work, ledger!, save, fetcher); } catch (error) { void error; }
     if (work.status === "staged" || work.status === "applying") await applyWork(work, ledger, save, fetcher, options.allowStaleRegeneration === true);
   }
+  // Startup runs after every generation/apply pass so the opening beat can
+  // publish accepted public material and enqueue one image per applied public
+  // location. The command is idempotent and reports a blocked opening as a
+  // recoverable blocker rather than a hydration failure. It defaults on for the
+  // campaign-creation path and can be forced with `startup: true`/`--startup`.
+  if ((options.startup ?? (options.createCampaign !== undefined)) && ledger.startup?.status !== "complete") {
+    const sessionId = await firstAttachedRoom(fetcher, apiBase, ledger.campaignId);
+    if (!sessionId) {
+      log(`Startup skipped for campaign ${ledger.campaignId}: no attached room was found; attach a room and rerun to finish.`);
+    } else {
+      ledger.startup = { status: "dispatching", sessionId }; await save();
+      const summary = await request(fetcher, apiBase, `/api/rpg/v1/campaigns/${encodeURIComponent(ledger.campaignId)}/rooms/${encodeURIComponent(sessionId)}/startup-commands`, "POST", {});
+      const blockers = Array.isArray(summary.blockers) ? summary.blockers.filter((blocker): blocker is string => typeof blocker === "string") : [];
+      if (blockers.length) log(`Startup blockers for room ${sessionId}: ${blockers.join(", ")}; the room can be re-readied idempotently.`);
+      ledger.startup = { status: "complete", sessionId }; await save();
+    }
+  }
   const deficits = Object.values(ledger.works).filter((work) => work.status === "deficit");
   log(`Hydration complete for campaign ${ledger.campaignId}${deficits.length ? ` with ${deficits.length} unit-floor deficit(s)` : ""}.`); return ledger;
 }
 
-function usage(): never { fail("usage: npm run hydrate:campaign -- --recipe FILE --api-base URL (--campaign-id ID | --create-campaign NAME) [--ledger FILE] [--concurrency N] [--allow-stale-regeneration] [--starter original|mechanics|srd-5.1] [--require-provider] [--provider-model MODEL] [--dry-run]"); }
-function args(argv: string[]): Record<string, string | boolean> { const result: Record<string, string | boolean> = {}; for (let index = 0; index < argv.length; index++) { const arg = argv[index]!; if (!arg.startsWith("--")) usage(); const name = arg.slice(2); if (["dry-run", "require-provider", "allow-stale-regeneration"].includes(name)) result[name] = true; else { const value = argv[++index]; if (!value || value.startsWith("--")) usage(); result[name] = value; } } return result; }
-async function main(): Promise<void> { const input = args(process.argv.slice(2)), recipePath = typeof input.recipe === "string" ? resolve(input.recipe) : usage(); const recipe = parseRecipe(JSON.parse(await readFile(recipePath, "utf8"))), starter = input.starter; if (typeof starter === "string" && !(starter in STARTERS)) fail("starter must be original, mechanics, or srd-5.1"); await hydrateCampaign({ recipe, apiBase: typeof input["api-base"] === "string" ? input["api-base"] : "http://127.0.0.1:3000", ledgerPath: typeof input.ledger === "string" ? resolve(input.ledger) : resolve(`.hydration/${digest(recipe).slice(0, 16)}.json`), ...(typeof input["campaign-id"] === "string" ? { campaignId: input["campaign-id"] } : {}), ...(typeof input["create-campaign"] === "string" ? { createCampaign: input["create-campaign"] } : {}), ...(typeof starter === "string" ? { starter: starter as NonNullable<HydrateOptions["starter"]> } : {}), ...(typeof input.concurrency === "string" ? { concurrency: Number(input.concurrency) } : {}), ...(input["allow-stale-regeneration"] === true ? { allowStaleRegeneration: true } : {}), ...(input["dry-run"] === true ? { dryRun: true } : {}), ...(input["require-provider"] === true ? { requireProvider: true } : {}), ...(typeof input["provider-model"] === "string" ? { providerModel: input["provider-model"] } : {}) }); }
+function usage(): never { fail("usage: npm run hydrate:campaign -- --recipe FILE --api-base URL (--campaign-id ID | --create-campaign NAME) [--ledger FILE] [--concurrency N] [--allow-stale-regeneration] [--starter original|mechanics|srd-5.1] [--startup|--skip-startup] [--require-provider] [--provider-model MODEL] [--dry-run]"); }
+function args(argv: string[]): Record<string, string | boolean> { const result: Record<string, string | boolean> = {}; for (let index = 0; index < argv.length; index++) { const arg = argv[index]!; if (!arg.startsWith("--")) usage(); const name = arg.slice(2); if (["dry-run", "require-provider", "allow-stale-regeneration", "startup", "skip-startup"].includes(name)) result[name] = true; else { const value = argv[++index]; if (!value || value.startsWith("--")) usage(); result[name] = value; } } return result; }
+async function main(): Promise<void> { const input = args(process.argv.slice(2)), recipePath = typeof input.recipe === "string" ? resolve(input.recipe) : usage(); const recipe = parseRecipe(JSON.parse(await readFile(recipePath, "utf8"))), starter = input.starter; if (typeof starter === "string" && !(starter in STARTERS)) fail("starter must be original, mechanics, or srd-5.1"); await hydrateCampaign({ recipe, apiBase: typeof input["api-base"] === "string" ? input["api-base"] : "http://127.0.0.1:3000", ledgerPath: typeof input.ledger === "string" ? resolve(input.ledger) : resolve(`.hydration/${digest(recipe).slice(0, 16)}.json`), ...(typeof input["campaign-id"] === "string" ? { campaignId: input["campaign-id"] } : {}), ...(typeof input["create-campaign"] === "string" ? { createCampaign: input["create-campaign"] } : {}), ...(typeof starter === "string" ? { starter: starter as NonNullable<HydrateOptions["starter"]> } : {}), ...(typeof input.concurrency === "string" ? { concurrency: Number(input.concurrency) } : {}), ...(input["allow-stale-regeneration"] === true ? { allowStaleRegeneration: true } : {}), ...(input["dry-run"] === true ? { dryRun: true } : {}), ...(input.startup === true ? { startup: true } : {}), ...(input["skip-startup"] === true ? { startup: false } : {}), ...(input["require-provider"] === true ? { requireProvider: true } : {}), ...(typeof input["provider-model"] === "string" ? { providerModel: input["provider-model"] } : {}) }); }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((error) => { console.error(error instanceof Error ? error.message : "hydration failed"); process.exitCode = 1; });
