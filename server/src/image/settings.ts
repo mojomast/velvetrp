@@ -186,8 +186,8 @@ export interface SceneImageSettings {
 }
 
 export const DEFAULT_SCENE_IMAGE_SETTINGS: SceneImageSettings = Object.freeze({
-  enabled: false,
-  mode: "off",
+  enabled: true,
+  mode: "automatic",
   stylePresetId: "campaign-default",
   stylePhrase: "",
   promptOverrides: {},

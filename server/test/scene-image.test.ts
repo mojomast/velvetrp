@@ -170,8 +170,8 @@ describe("scene image settings", () => {
     expect(parseSceneImageSettings({})).toEqual(DEFAULT_SCENE_IMAGE_SETTINGS);
     expect(parseSceneImageSettings()).toEqual(DEFAULT_SCENE_IMAGE_SETTINGS);
     expect(DEFAULT_SCENE_IMAGE_SETTINGS).toMatchObject({
-      enabled: false,
-      mode: "off",
+      enabled: true,
+      mode: "automatic",
       steps: 20,
       guidance: 3,
       seedMode: "random",

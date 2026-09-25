@@ -298,7 +298,7 @@ describe("scene image settings", () => {
     const harness = createHarness();
     const initial = harness.service.getSettings("owner", CAMPAIGN);
     expect(initial.revision).toBe(0);
-    expect(initial.settings).toMatchObject({ enabled: false, mode: "off", steps: 20, guidance: 3 });
+    expect(initial.settings).toMatchObject({ enabled: true, mode: "automatic", steps: 20, guidance: 3 });
 
     const first = harness.service.updateSettings("owner", CAMPAIGN, {
       patch: { enabled: true, mode: "automatic", autoPerSessionLimit: 2 },
@@ -407,6 +407,11 @@ describe("scene image enqueue", () => {
 
   it("refuses automatic jobs under disabled, manual, session-limit, and cooldown policy", async () => {
     const harness = createHarness();
+    harness.service.updateSettings("owner", CAMPAIGN, {
+      patch: { enabled: false, mode: "off" },
+      expectedRevision: 0,
+      idempotencyKey: key("settings"),
+    });
     const disabled = harness.service.enqueue("owner", CAMPAIGN, sampleEnqueue({ auto: true }), key("enqueue"));
     expect(disabled.job).toBeNull();
     expect(disabled.refusal?.code).toBe("disabled");
@@ -418,7 +423,7 @@ describe("scene image enqueue", () => {
 
     harness.service.updateSettings("owner", CAMPAIGN, {
       patch: { mode: "automatic", autoPerSessionLimit: 1, cooldownSeconds: 120 },
-      expectedRevision: 1,
+      expectedRevision: 2,
       idempotencyKey: key("settings"),
     });
     const first = harness.service.enqueue("owner", CAMPAIGN, sampleEnqueue({ auto: true }), key("enqueue"));
@@ -431,7 +436,7 @@ describe("scene image enqueue", () => {
     harness.clock.advance(30_000);
     harness.service.updateSettings("owner", CAMPAIGN, {
       patch: { autoPerSessionLimit: 3 },
-      expectedRevision: 2,
+      expectedRevision: 3,
       idempotencyKey: key("settings"),
     });
     const cooling = harness.service.enqueue("owner", CAMPAIGN, sampleEnqueue({ auto: true }), key("enqueue"));
