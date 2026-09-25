@@ -85,6 +85,39 @@ describe("persistence and multi-character frontend", () => {
     expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-overview", campaignId: "campaign-one" });
   });
 
+  it("opens an explicit deep link over a different stored campaign workspace", async () => {
+    installFetch([], [], true);
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-play", campaignId: "campaign-two", sessionId: "session-two" }));
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+    );
+    window.history.replaceState({}, "", "/?deepLink=1#/campaign/campaign-one/overview");
+    render(<App />);
+    await screen.findByTestId("campaign-overview");
+    expect(window.location.hash).toBe("#/campaign/campaign-one/overview");
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-overview", campaignId: "campaign-one" });
+  });
+
+  it("follows a same-origin hash change while a workspace is open", async () => {
+    installFetch([aria], [], true, true);
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+    );
+    render(<App />);
+    await screen.findByRole("heading", { name: campaignAccess.name });
+    window.history.replaceState({}, "", "#/campaign/campaign-one/party");
+    act(() => { window.dispatchEvent(new Event("hashchange")); });
+    await screen.findByTestId("campaign-party");
+    expect(window.location.hash).toBe("#/campaign/campaign-one/party");
+  });
+
   it("restores the previous campaign destination when the browser goes back", async () => {
     installFetch([aria], [], true, true);
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));

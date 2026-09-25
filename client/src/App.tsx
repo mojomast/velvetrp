@@ -139,10 +139,16 @@ export default function App() {
   // A non-empty campaign route is a deliberate deep link. It wins only on a
   // fresh install or over the default home surface so an already-open workspace
   // is never silently replaced by a stale hash. Empty hashes keep local restore.
+  const forcedDeepLink = useRef((() => { try { return new URLSearchParams(window.location.search).has("deepLink"); } catch { return false; } })()).current;
+  // A non-empty campaign route is a deliberate deep link. It wins only on a
+  // fresh install, over the default home surface, or when the URL carries the
+  // explicit ?deepLink marker used by shared room links, so an already-open
+  // workspace is never silently replaced by a stale hash. Empty hashes keep
+  // local restore.
   const stored = useRef<StoredNavigation>((() => {
     const local = readNavigation();
     const fromHash = window.location.hash ? navigationFromRoute(window.location.hash) : null;
-    return fromHash && (freshNavigation || local.view === "home") ? fromHash : local;
+    return fromHash && (freshNavigation || local.view === "home" || forcedDeepLink) ? fromHash : local;
   })()).current;
   const campaignEntryRef = useRef(stored.campaignEntry === "overview");
   const [shellSelection, setShellSelection] = useState<{ destination: CampaignDestination; view: View; request: number } | null>(null);
@@ -470,14 +476,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onPopState = () => {
+    const onRouteChange = () => {
       const navigation = navigationFromRoute(window.location.hash);
       if (!navigation) return;
       routeSyncStartedRef.current = true;
       applyRoute(navigation);
     };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    window.addEventListener("popstate", onRouteChange);
+    window.addEventListener("hashchange", onRouteChange);
+    return () => {
+      window.removeEventListener("popstate", onRouteChange);
+      window.removeEventListener("hashchange", onRouteChange);
+    };
   }, [applyRoute]);
 
   function goHome() { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" }; setChatReturnCampaignId(""); setView("home"); setSession(null); setMessages([]); setError(null); }
