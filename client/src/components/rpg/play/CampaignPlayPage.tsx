@@ -31,6 +31,7 @@ import { AtlasAdvancement, type AtlasAdvancementApi } from "./AtlasAdvancement";
 import { CampaignDmPanel, CampaignDmChronicle, type CampaignDmApi } from "./CampaignDmPanel";
 import { CampaignReplay } from "./CampaignReplay";
 import { SituationActions } from "./SituationActions";
+import { CombatCommandBar } from "./CombatCommandBar";
 import { SceneIllustration, SceneImageDmPanel } from "./SceneImagePanel";
 import type { SceneImageApi } from "../../../api";
 import type { CampaignDmHistory } from "@velvet/contracts";
@@ -648,6 +649,12 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const legacyChronicleNode = hasChronicle ? <CampaignDmChronicle history={dmHistory} /> : null;
   const voiceNode = <VoiceControls campaignId={campaignId} contextKey={JSON.stringify([sessionId, authorizationGeneration, authorizationCanAct, phase,
       sessionLocked, roomToolsLocked, bootstrap.session.active, turn?.turn.turnId ?? "", turn?.turn.state ?? ""])} />;
+  const combatBarNode = actionable && combatAvailable && combatApi
+    ? <CombatCommandBar campaignId={campaignId} sessionId={sessionId} controlledActorId={selectedActorId || undefined}
+        canManage={authorizationCanAct && (bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm")}
+        api={combatApi} refreshKey={reconciliationRevision + liveRefreshRevision} disabled={!referenceReady}
+        onOpenCombat={() => openTool("combat")} onInsertDeclaration={prefill} onChanged={refreshAfterTool} />
+    : null;
   const situationNode = actionable && combatAvailable && combatApi
     ? <SituationActions campaignId={campaignId} sessionId={sessionId} controlledActorId={selectedActorId || undefined} api={combatApi} refreshKey={reconciliationRevision + liveRefreshRevision} disabled={!referenceReady} onInsert={prefill} />
     : null;
@@ -659,11 +666,11 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
         api={sceneImageApi} onOpenControls={audience === "gm" ? () => openTool("images") : undefined} />
     : null;
   const centerNode = <>
-    <div className="room-top">{noticesNode}{reconcileNode}</div>
+    <div className="room-top">{combatBarNode}{noticesNode}{reconcileNode}</div>
     <div className="room-main">{conversationNode}</div>
     <div className="room-bottom"><div className="room-toolbar">{dmNoticeNode}{replayToggleNode}{voiceNode}</div>{situationNode}{composerNode}</div>
   </>;
-  const activityNode = <>{dmNoticeNode}{replayToggleNode}{voiceNode}{situationNode}</>;
+  const activityNode = <>{combatBarNode}{dmNoticeNode}{replayToggleNode}{voiceNode}{situationNode}</>;
   const drawerSide = (tool: AtlasTool) => preferences.drawerSides?.[tool] ?? "right";
   // The four-way header control writes the same per-tool preference the Display dialog edits.
   // The legacy atlas keeps its default edge and hides the control.

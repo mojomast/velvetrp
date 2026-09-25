@@ -1,0 +1,7 @@
+.combat-command-bar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; padding: .55rem .7rem; border: 1px solid #73664a; border-radius: 6px; background: color-mix(in srgb, var(--surface-2) 88%, #3b2b52); }
+.combat-command-bar.is-terminal { border-color: var(--accent, #b58cff); box-shadow: inset 3px 0 var(--accent, #b58cff); }
+.combat-command-status { display: grid; gap: .15rem; min-width: 0; }
+.combat-command-status .eyebrow { margin: 0; }
+.combat-command-hint { margin: 0; font-size: .82rem; opacity: .8; }
+.combat-command-actions { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.combat-command-notice { flex-basis: 100%; margin: 0; font-size: .82rem; color: var(--muted); }

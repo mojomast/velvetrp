@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { CombatLegalAction, CombatReadResponse, EncounterPublic } from "@velvet/contracts";
+import { useActiveCombat } from "./useActiveCombat";
 import "./situationActions.css";
 
 /** Narrow reader needed to discover the active encounter and its legal actions. */
@@ -51,22 +52,8 @@ function declarationFor(kind: SupportedKind, target: string | null): string {
 
 /** Situation-aware mechanics for the controlled actor's turn, inserted as exact action context. */
 export function SituationActions({ campaignId, sessionId, controlledActorId, api, refreshKey = 0, disabled = false, onInsert }: SituationActionsProps) {
-  const [combat, setCombat] = useState<CombatReadResponse | null>(null);
+  const combat = useActiveCombat(campaignId, sessionId, api, refreshKey)?.combat ?? null;
   const [expanded, setExpanded] = useState(true);
-  useEffect(() => {
-    if (!api) { setCombat(null); return; }
-    let alive = true;
-    (async () => {
-      try {
-        const { encounters } = await api.listEncounters(campaignId);
-        const active = encounters.find((encounter) => encounter.sessionId === sessionId && encounter.status === "active" && encounter.combatId);
-        if (!active?.combatId) { if (alive) setCombat(null); return; }
-        const state = await api.getCombat(active.combatId);
-        if (alive) setCombat(state);
-      } catch { if (alive) setCombat(null); }
-    })();
-    return () => { alive = false; };
-  }, [api, campaignId, refreshKey, sessionId]);
 
   const labels = useMemo(() => new Map((combat?.combatants ?? []).map((combatant) => [combatant.combatantId,
     combatant.displayName ?? (combatant.kind === "actor" ? combatant.actorId : combatant.combatantId)])), [combat]);
