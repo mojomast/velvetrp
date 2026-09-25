@@ -108,6 +108,7 @@ import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActiv
 import { createCampaignRoomParticipantRepository } from "./campaignRoomParticipantRepo.js";
 import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
 import { createCampaignStartingLocationRepository } from "./campaignStartingLocationRepo.js";
+import { createCampaignStartupRepository } from "./campaignStartupRepo.js";
 import { createTacticalMapRepository } from "./tacticalMapRepo.js";
 import { createCampaignAdministrationIntegrationRepository } from "./campaignAdministrationIntegrationRepo.js";
 import {
@@ -859,6 +860,7 @@ function createRepositoryComposition<T>(
     ...createCampaignStartingLocationRepository(db, dependencies, () => {
       assertOpen(); if (transactionDepth > 0) throw new Error("starting-location operation cannot run inside a repository transaction");
     }),
+    ...createCampaignStartupRepository(db, dependencies, () => assertOpen()),
     ...createCampaignRoomActivationRepository(db, dependencies, () => {
       assertOpen(); if (transactionDepth > 0) throw new Error("room activation cannot run inside a repository transaction");
     }, (principalId, campaignId) => contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId)),

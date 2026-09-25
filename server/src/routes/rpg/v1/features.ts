@@ -112,6 +112,7 @@ import { campaignPlayHttpRoutes } from "./campaignPlay.js";
 import { campaignRoomActivationHttpRoutes } from "./campaignRoomActivation.js";
 import { campaignRoomParticipantHttpRoutes } from "./campaignRoomParticipant.js";
 import { campaignDmHttpRoutes } from "./campaignDm.js";
+import { campaignStartupHttpRoutes } from "./campaignStartup.js";
 import { campaignStartingLocationHttpRoutes } from "./campaignStartingLocation.js";
 import type { CampaignStartingLocationRepository } from "../../../repo/campaignStartingLocationRepo.js";
 import { generationDraftsHttpRoutes } from "./generationDrafts.js";
@@ -898,6 +899,14 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
   await app.register(campaignDmHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
+  // One server-owned startup command: same lazy repository, same scene-image
+  // accessors, and the same optional agent dependencies as the DM lane.
+  await app.register(campaignStartupHttpRoutes, {
+    repositoryAccessor: () => getCampaignRepository() as Repository,
+    sceneImageServiceAccessor: getSceneImageService,
+    sceneImageInstallationEnabled,
+    ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}),
+  });
   await app.register(campaignContextInspectionHttpRoutes, { repositoryAccessor: () => {
     const repository = getCampaignRepository();
     if (typeof repository.inspectCampaignContext !== "function"
