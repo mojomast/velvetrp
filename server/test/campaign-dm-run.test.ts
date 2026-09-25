@@ -1,6 +1,7 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { generatedCampaignContentProviderSchema } from "@velvet/contracts";
 import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.js";
 import { CampaignDmConflictError, CampaignDmUnavailableError } from "../src/repo/campaignDmRepo.js";
 import { buildApp } from "../src/app.js";
@@ -116,5 +117,37 @@ describe("durable DM director",()=>{
     expect(complete).toHaveBeenCalledTimes(2);
     expect((await app.inject({method:"GET",url:`${room}?private=true`})).statusCode).toBe(400);
     await app.close();
+  });
+
+  it("opens with a server-owned opening beat when only GM-private story exists at a starting location",async()=>{
+    const f=await dmFixture();const {repo,campaign,session}=f;
+    // A public starting location plus a GM-only story node: the private story cannot be
+    // rendered publicly, so the opening must come from the server-owned fallback instead.
+    const content=generatedCampaignContentProviderSchema.parse({
+      outlines:[{key:"opening",opening:"The road begins at the harbor.",premise:"Find what the drowned left behind.",startLocationKey:"harbor",visibility:"public"}],
+      locations:[{key:"harbor",name:"Rain Harbor",description:"A public harbor under grey rain.",visibility:"public"}],
+      storyNodes:[{key:"secret",title:"SECRET_TITLE",description:"SECRET_BODY",visibility:"gm"}],
+    });
+    const context=repo.getCampaignGenerationContext("local-owner",campaign.id,[])!;
+    const draft=repo.createGenerationDraft("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,kind:"content-pack",
+      stagedContent:{kind:"campaign-content",requestDigest:"c".repeat(64),baseContentRevision:context.revision,dependencyDigests:{},...content},
+      validation:{valid:true,issues:[],validatedAt:f.options.clock.now().toISOString()},
+      expectedCampaignRevision:repo.getCampaignAdministration("local-owner",campaign.id)!.revision,idempotencyKey:"gm-only-content"});
+    repo.recordCampaignGenerationCandidate(draft.draftId,content,[]);
+    repo.applyCampaignContentGenerationDraftAtomically("local-owner",{draftId:draft.draftId,expectedDraftRevision:0,
+      expectedCampaignRevision:draft.campaignRevision,idempotencyKey:"gm-only-accept",selectedArtifactKeys:["opening","harbor","secret"]});
+    expect(repo.getCampaignStartingLocation("local-owner",campaign.id)?.startingLocation?.name).toBe("Rain Harbor");
+    repo.setDmControl("local-owner",campaign.id,{mode:"ai",expectedRevision:0,idempotencyKey:"gm-only-ai"});
+    const run=repo.openDmBeat("local-owner",campaign.id,session.id,{intent:"open",expectedModeRevision:1,idempotencyKey:"gm-only-open"});
+    // The private rendering is advisory for this opening: it is not a run blocker, no public
+    // rendering is fabricated, and the opening still proceeds from the server-owned candidate.
+    expect(run.blockers).not.toContain("story-public-rendering-required");
+    expect(run.state).not.toBe("blocked");
+    await orchestrateCampaignDmBeat(repo,"local-owner",run.runId,dmDependencies());
+    const completed=repo.getDmRun("local-owner",campaign.id,session.id,run.runId);
+    expect(completed.state).toBe("completed");
+    expect(completed.receipts.map(({action})=>action)).toEqual(["ambient-beat"]);
+    expect(JSON.stringify(repo.getDmHistory("local-owner",campaign.id,session.id))).not.toContain("SECRET_");
+    const db=database();expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);db.close();repo.close();
   });
 });

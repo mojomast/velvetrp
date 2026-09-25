@@ -506,6 +506,17 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     const preparationContext = boundDirectorPreparation(planning);
     const locations = db.prepare("SELECT actor_id,location_id,state_revision FROM campaign_actor_locations_v28 WHERE campaign_id=? AND session_id=? ORDER BY actor_id").all(c, s);
     if (!open) {
+      const startingLocation = db.prepare(`SELECT start.location_id locationId,location.public_name name
+        FROM campaign_starting_locations_v51 start JOIN campaign_locations_v28 location
+          ON location.campaign_id=start.campaign_id AND location.location_id=start.location_id
+        WHERE start.campaign_id=? AND location.visibility='public'`).get(c) as
+        { locationId: string; name: string } | undefined;
+      // P0.2: an opening anchored to a public starting location is always available, so GM-private
+      // story rendering and concept-only encounter rosters are advisory for an open — they never
+      // hard-block the first beat. They stay preparation blockers for a continue, and without a
+      // starting location there is no opening candidate, so they still hard-block. The Director
+      // never fabricates a public rendering for GM-only content (docs/ai-dungeon-master.md:67).
+      const reportPreparation = (code: string) => { if (input.intent !== "open" || !startingLocation) blockers.push(code); };
       const setup = services.getEncounterSetupCandidates(g, c);
       for (const plan of planning?.encounters ?? []) {
         if (db.prepare("SELECT 1 FROM dm_encounter_bindings WHERE campaign_id=? AND artifact_key=?").get(c, plan.artifactKey)) continue;
@@ -526,16 +537,16 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
             const parsed = enemyTemplateCatalogDefinitionSchema.safeParse(JSON.parse(definition.definition_json));
             return !parsed.success || json(parsed.data.reference) !== json(ref);
           })) {
-          blockers.push("encounter-preparation-requires-exact-catalog-roster"); continue;
+          reportPreparation("encounter-preparation-requires-exact-catalog-roster"); continue;
         }
         const prepared = encounterCreateRequestSchema.safeParse({ sessionId: s, name: "Campaign encounter",
           combatants: [...actors.map(actorId => ({ kind: "actor", actorId, team: "allies" })),
             ...plan.enemyReferences.map(template => ({ kind: "enemy", template, team: "enemies" }))], idempotencyKey: "director-preview" });
         if (prepared.success) add("encounter-materialize", `Prepare and start accepted encounter: ${plan.title}`, plan.artifactKey, 0, prepared.data);
-        else blockers.push("encounter-preparation-requires-exact-catalog-roster");
+        else reportPreparation("encounter-preparation-requires-exact-catalog-roster");
       }
       for (const node of graph?.nodes ?? []) {
-        if(!publicSource(c,node.nodeId)){blockers.push('story-public-rendering-required');continue;}
+        if(!publicSource(c,node.nodeId)){reportPreparation('story-public-rendering-required');continue;}
         const incoming = graph!.edges.filter(edge => edge.toNodeId === node.nodeId);
         const unresolved = incoming.some(edge => edge.kind === "requires" && (!publicSource(c,edge.fromNodeId)||graph!.nodes.find(n => n.nodeId === edge.fromNodeId)?.status !== "resolved"));
         const resolved = incoming.filter(edge => publicSource(c,edge.fromNodeId)&&graph!.nodes.find(n => n.nodeId === edge.fromNodeId)?.status === "resolved").length;
@@ -553,12 +564,21 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         }
       }
       for (const clue of graph?.clues ?? []) {
-        if(!publicSource(c,clue.clueId)){blockers.push('story-public-rendering-required');continue;}
+        if(!publicSource(c,clue.clueId)){reportPreparation('story-public-rendering-required');continue;}
         const available = clue.sources.filter(source => source.kind === "node"
           ? publicSource(c,source.targetId)&&graph!.nodes.some(node => node.nodeId === source.targetId && node.status !== "hidden")
           : graph!.plotPoints.some(point => point.plotPointId === source.targetId && point.answered)).length;
         if (!clue.revealed && available >= clue.revealThreshold && (available > 0 || evidence))
           add("reveal-clue", `Reveal eligible clue: ${clue.title}`, clue.clueId, story!.revision, { storylineId: clue.storylineId });
+      }
+      // P0.2: An opening beat always has at least one server-owned candidate. When no public story,
+      // clue, or exact-roster encounter candidate is usable, the server anchors the opening to the
+      // campaign's designated public starting location. This is presentation only: it reveals no
+      // GM-private rendering and commits no world state.
+      if (input.intent === "open" && !bindings.length && startingLocation) {
+        const campaignName = (db.prepare("SELECT name FROM campaigns WHERE id=?").get(c) as { name: string } | undefined)?.name;
+        add("ambient-beat", `Open the campaign at ${startingLocation.name}${campaignName ? `: ${campaignName}` : ""}`, startingLocation.locationId, 0,
+          { opening: true, startingLocationId: startingLocation.locationId, startingLocationName: startingLocation.name, ...(campaignName ? { premise: campaignName } : {}) });
       }
       // Transition beats are a pacing fallback unless something needs GM attention or a public rendering.
       // Waiting on the table (player combat, scene adjudication) still lets the world pace.
