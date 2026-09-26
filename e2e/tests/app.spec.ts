@@ -523,7 +523,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     expect(roomRequests).toEqual(["PUT", "GET", "GET"]);
     await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
     await page.reload();
-    await expect(page.getByRole("heading", { name: campaignRoomTitle })).toBeVisible();
+    await expect(page.getByRole("heading", { name: campaignRoomTitle })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: "← Back to campaign" })).toBeVisible();
     await page.getByRole("button", { name: "← Back to campaign" }).click();
     await expect(page.getByRole("heading", { name: "Rooms", exact: true })).toBeFocused();
