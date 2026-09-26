@@ -107,8 +107,11 @@ import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js"
 import { createFreeformTravelRepository } from "./freeform/freeformTravelRepo.js";
 import { createFreeformNpcRepository } from "./freeform/freeformNpcRepo.js";
 import { createFreeformLoreRepository } from "./freeform/freeformLoreRepo.js";
+import { createFreeformQuestRepository } from "./freeform/freeformQuestRepo.js";
+import { createFreeformRumorRepository } from "./freeform/freeformRumorRepo.js";
 import { createFreeformShopRepository } from "./freeform/freeformShopRepo.js";
 import { createFreeformEncounterRepository } from "./freeform/freeformEncounterRepo.js";
+import { createFreeformFactionRepository } from "./freeform/freeformFactionRepo.js";
 import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
 import { createCampaignRoomParticipantRepository } from "./campaignRoomParticipantRepo.js";
 import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
@@ -851,6 +854,24 @@ function createRepositoryComposition<T>(
   },()=>{
     assertOpen();if(transactionDepth>0)throw new Error("freeform lore operation cannot run inside a repository transaction");
   });
+  const freeformQuestRepository=createFreeformQuestRepository(db,dependencies,{
+    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
+    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
+    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
+    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
+    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
+  },()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("freeform quest operation cannot run inside a repository transaction");
+  });
+  const freeformRumorRepository=createFreeformRumorRepository(db,dependencies,{
+    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
+    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
+    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
+    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
+    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
+  },()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("freeform rumor operation cannot run inside a repository transaction");
+  });
   const freeformShopRepository=createFreeformShopRepository(db,dependencies,{
     getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
     createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
@@ -865,6 +886,15 @@ function createRepositoryComposition<T>(
     startEncounter:(principalId,encounterId,input)=>encounterRepository.startEncounter(principalId,encounterId,input),
   },()=>{
     assertOpen();if(transactionDepth>0)throw new Error("freeform encounter operation cannot run inside a repository transaction");
+  });
+  const freeformFactionRepository=createFreeformFactionRepository(db,dependencies,{
+    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
+    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
+    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
+    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
+    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
+  },()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("freeform faction operation cannot run inside a repository transaction");
   });
   const campaignAdministrationIntegrationRepository = createCampaignAdministrationIntegrationRepository(db, dependencies, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("campaign administration integration cannot run inside a repository transaction");
@@ -906,6 +936,9 @@ function createRepositoryComposition<T>(
       ...freeformLoreRepository,
       ...freeformShopRepository,
       ...freeformEncounterRepository,
+      ...freeformQuestRepository,
+      ...freeformRumorRepository,
+      ...freeformFactionRepository,
       ...recallRepository,
       getCampaignAgentContextSnapshot: (principal, campaign, session, audience) =>
         createCampaignAgentContextReadRepository(db).getCampaignAgentContextSnapshot(principal, campaign, session, audience),
@@ -954,6 +987,9 @@ function createRepositoryComposition<T>(
     ...freeformLoreRepository,
     ...freeformShopRepository,
     ...freeformEncounterRepository,
+    ...freeformQuestRepository,
+    ...freeformRumorRepository,
+    ...freeformFactionRepository,
     ...campaignAdministrationIntegrationRepository,
     applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
       assertOpen();

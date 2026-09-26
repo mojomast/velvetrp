@@ -115,7 +115,10 @@ import { campaignDmHttpRoutes } from "./campaignDm.js";
 import { freeformTravelHttpRoutes } from "./freeformTravel.js";
 import { freeformNpcHttpRoutes } from "./freeformNpc.js";
 import { freeformLoreHttpRoutes } from "./freeformLore.js";
+import { freeformQuestHttpRoutes } from "./freeformQuest.js";
+import { freeformRumorHttpRoutes } from "./freeformRumor.js";
 import { freeformEncounterHttpRoutes } from "./freeformEncounter.js";
+import { freeformFactionHttpRoutes } from "./freeformFaction.js";
 import { freeformShopHttpRoutes } from "./freeformShop.js";
 import { campaignStartupHttpRoutes } from "./campaignStartup.js";
 import { campaignStartingLocationHttpRoutes } from "./campaignStartingLocation.js";
@@ -914,9 +917,18 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   // One bounded free-form lore command: the same lazy repository already
   // implements `classifyFreeformLoreIntent`/`materializeFreeformLore`.
   await app.register(freeformLoreHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
+  // One bounded free-form quest command: the same lazy repository already
+  // implements `classifyFreeformQuestIntent`/`materializeFreeformQuest`.
+  await app.register(freeformQuestHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
+  // One bounded free-form rumor command: the same lazy repository already
+  // implements `classifyFreeformRumorIntent`/`materializeFreeformRumor`.
+  await app.register(freeformRumorHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
   // One bounded free-form encounter command: the same lazy repository already
   // implements `classifyFreeformEncounterIntent`/`materializeFreeformEncounter`.
   await app.register(freeformEncounterHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
+  // One bounded free-form faction command: the same lazy repository already
+  // implements `classifyFreeformFactionIntent`/`materializeFreeformFaction`.
+  await app.register(freeformFactionHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
   // One bounded free-form shop command: the same lazy repository already
   // implements `classifyFreeformShopIntent`/`materializeFreeformShop`.
   await app.register(freeformShopHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
