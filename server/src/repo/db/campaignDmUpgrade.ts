@@ -21,7 +21,10 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
   const normalizeTransition = (objects: SchemaObject[]) => objects.map(object => transitionChanged.has(object.name)
     ? { ...object, sql: `<transition:${object.name}>` } : object);
   const upgradeTransition = JSON.stringify(normalizeTransition(actual))
-    === JSON.stringify(normalizeTransition(expected.filter(object => !worldTimeNames(object.name))));
+    === JSON.stringify(normalizeTransition(expected.filter(object => !worldTimeNames(object.name))))
+    // A later action added to the same receipt CHECKs/authority triggers: only those four objects
+    // differ, including a database that already carries the world-time receipt table.
+    || JSON.stringify(normalizeTransition(actual)) === JSON.stringify(normalizeTransition(expected));
   // P5.7 completion headroom: reasoning models need more than 256/768 completion tokens, so three tables' CHECKs changed.
   const completionChanged = new Set(["dm_provider_requests", "dm_planning_rounds", "dm_narration_dispatches"]);
   const normalizeCompletion = (objects: SchemaObject[]) => objects.map(object => completionChanged.has(object.name)

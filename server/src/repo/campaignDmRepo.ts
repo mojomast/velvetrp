@@ -15,6 +15,7 @@ import type { CampaignGenerationRepository } from "./campaignGenerationRepo.js";
 import type { AdventureTurnRepository } from "./adventureTurnRepo.js";
 import type { CampaignAdministrationIntegrationRepository } from "./campaignAdministrationIntegrationRepo.js";
 import type { AdventureCheckRepository } from "./adventureCheckRepo.js";
+import type { FreeformTravelRepository } from "./freeform/freeformTravelRepo.js";
 import { boundAdventureQuestReceipts } from "./quest/adventureQuestBinding.js";
 import { validDmScene, DM_SCENE_DESCRIPTION_PREFIX } from "../agent/dmNarration.js";
 import { publicStorySourceSql, publicStoryResourceSql } from "./storyDisclosure.js";
@@ -125,7 +126,8 @@ type Services = CampaignAgentContextReadRepository & CampaignRecallReadRepositor
   & StoryRepository & Pick<CampaignGenerationRepository, "getCampaignGeneratedPlanning">
   & Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnNarration" | "getAgentCombatReceipt">
   & Pick<AdventureCheckRepository, "getAdventureCheckPublicReceipt">
-  & Pick<CampaignAdministrationIntegrationRepository, "getSessionZeroSafetyPolicy">;
+  & Pick<CampaignAdministrationIntegrationRepository, "getSessionZeroSafetyPolicy">
+  & Pick<FreeformTravelRepository, "classifyFreeformTravelIntent" | "materializeFreeformTravel">;
 
 /** Private director aggregate. No player-turn proposal or transcript is used for GM state. */
 export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { clock: Clock; ids: IdGenerator; contextInspectionProvenance: ContextInspectionProvenanceMode }, services: Services,
@@ -459,7 +461,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       const digest = hash(command);
       bindings.push({ candidate: { candidateId: `dm-candidate:${digest.slice(0,40)}`, digest, action, label: label.slice(0,500) }, target, revision, ...(data === undefined ? {} : { data }) });
     };
-    let evidence: { turnId: string; intent: string; facts: unknown[]; receiptIds: string[]; sources:Array<{kind:string;targetId:string}> } | null = null;
+    let evidence: { turnId: string; actorId: string; intent: string; facts: unknown[]; receiptIds: string[]; sources:Array<{kind:string;targetId:string}> } | null = null;
     if (input.evidenceTurnId) {
       const turn = services.getAdventureTurn(g, input.evidenceTurnId);
       if (turn && turn.campaignId === c && turn.sessionId === s && turn.timelineId === context.timelineId
@@ -482,7 +484,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
           return [resolution];
         });
         const facts = [...checks, ...quests, ...victories];
-        if (facts.length) evidence = { turnId: turn.turnId, intent: "declaration" in turn ? turn.declaration : "", facts,
+        if (facts.length) evidence = { turnId: turn.turnId, actorId: turn.actorId, intent: "declaration" in turn ? turn.declaration : "", facts,
           receiptIds: turn.receiptLinks.map(link => link.commandId),sources:[
             ...(checks.length?[{kind:'check-turn',targetId:turn.turnId}]:[]),
             ...completedObjectives.map(receipt=>({kind:'quest-objective',targetId:receipt.objectiveId})),
@@ -571,6 +573,19 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         if (!clue.revealed && available >= clue.revealThreshold && (available > 0 || evidence))
           add("reveal-clue", `Reveal eligible clue: ${clue.title}`, clue.clueId, story!.revision, { storylineId: clue.storylineId });
       }
+      // Free-form travel: when the current beat's evidence is a declaration naming a place this
+      // campaign does not define, the server (never the model) authors exactly one bounded
+      // location+connection candidate. The deterministic classifier owns the closure and
+      // visibility; here we only advertise its exact candidate. An unmapped destination is never
+      // a blocker, and human mode keeps its existing manual flow unchanged.
+      if (control(c).mode === "ai" && evidence) {
+        const travel = services.classifyFreeformTravelIntent(g, c, s, evidence.actorId, evidence.intent);
+        if (travel.intent === "materialize-location" && travel.candidates[0]) {
+          const candidate = travel.candidates[0];
+          add("materialize-location", `Establish and travel to: ${candidate.name}`, candidate.candidateId, 0,
+            { actorId: evidence.actorId, text: evidence.intent, candidate });
+        }
+      }
       // P0.2: An opening beat always has at least one server-owned candidate. When no public story,
       // clue, or exact-roster encounter candidate is usable, the server anchors the opening to the
       // campaign's designated public starting location. This is presentation only: it reveals no
@@ -656,6 +671,20 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         .run(r.run_id, key, minutes, before, after, now());
       receipt = { kind: "world-time-advanced", minutes, elapsedBefore: before, elapsedAfter: after };
       summary = `Time passes: ${minutes} minutes elapse with no other change to the world.`;
+    } else if (action === "materialize-location") {
+      // The candidate is server-authored and bounded; the model only selected it. The free-form
+      // repo re-validates the exact candidate, applies the public location + connection through
+      // the content receipt path, and moves the actor with one world travel receipt. Replaying
+      // the same beat converges through its durable idempotency keys.
+      const data = binding.data as { actorId?: unknown; text?: unknown } | null | undefined;
+      const actorId = typeof data?.actorId === "string" ? data.actorId : null;
+      const text = typeof data?.text === "string" ? data.text : null;
+      if (!actorId || !text) throw new CampaignDmConflictError("location materialization candidate is unavailable");
+      const materialized = services.materializeFreeformTravel(r.gm_principal_id, r.campaign_id, r.session_id, actorId, text,
+        { candidateId: binding.target });
+      if (materialized.status !== "materialized") throw new CampaignDmConflictError("location materialization is unavailable");
+      receipt = materialized;
+      summary = `You travel to ${materialized.candidate.name}. The place is established and reachable from where you were.`.slice(0, 4000);
     } else {
       if(!publicSource(r.campaign_id,binding.target))throw new CampaignDmConflictError('story requires a reviewed public rendering');
       if(action==='resolve-node'&&r.mode==='ai'&&!binding.data.boundEvidence)throw new CampaignDmConflictError('scene evidence is not bound');

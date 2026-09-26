@@ -901,6 +901,7 @@ function createRepositoryComposition<T>(
     ...createCampaignDmRepository(db, dependencies, {
       ...encounterRepository, ...storyRepository, ...campaignGenerationRepository, ...adventureTurnRepository, ...adventureCheckRepository,
       ...campaignAdministrationIntegrationRepository,
+      ...freeformTravelRepository,
       ...recallRepository,
       getCampaignAgentContextSnapshot: (principal, campaign, session, audience) =>
         createCampaignAgentContextReadRepository(db).getCampaignAgentContextSnapshot(principal, campaign, session, audience),

@@ -36,6 +36,9 @@ export const campaignDmActionSchema = z.enum([
   "reveal-node", "resolve-node", "reveal-clue",
   // Transition beats: server-authored time advance (a receipt, never LLM-authored) and pure ambiance (no state change).
   "advance-time", "ambient-beat",
+  // Free-form travel: the server authors one bounded location+connection candidate from the
+  // player's declaration; the model may only select it and the apply carries a durable receipt.
+  "materialize-location",
 ]);
 export const campaignDmCandidateSchema = campaignDmSelectionSchema.extend({
   action: campaignDmActionSchema, label: z.string().min(1).max(500),

@@ -61,14 +61,14 @@ CREATE TABLE dm_decisions (
 );
 CREATE TABLE dm_receipts (
   run_id TEXT PRIMARY KEY REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
-  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue','advance-time','ambient-beat')),
+  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue','advance-time','ambient-beat','materialize-location')),
   domain_receipt_json TEXT NOT NULL CHECK(json_valid(domain_receipt_json)),
   public_json TEXT NOT NULL CHECK(json_valid(public_json) AND length(public_json)<=8000)
 );
 CREATE TABLE dm_composition_receipts (
   run_id TEXT NOT NULL REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
   ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 0 AND 2),
-  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue','advance-time','ambient-beat')),
+  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue','advance-time','ambient-beat','materialize-location')),
   domain_receipt_json TEXT NOT NULL CHECK(json_valid(domain_receipt_json)),
   public_json TEXT NOT NULL CHECK(json_valid(public_json) AND length(public_json)<=8000),
   PRIMARY KEY(run_id,ordinal)
@@ -152,6 +152,12 @@ CREATE TRIGGER dm_composition_receipts_authority BEFORE INSERT ON dm_composition
         AND command.idempotency_key=NEW.command_key AND command.command_type=NEW.action)
       OR (NEW.action='advance-time' AND EXISTS(SELECT 1 FROM dm_world_time_receipts world_time
         WHERE world_time.run_id=run.run_id AND world_time.command_key=NEW.command_key))
+      OR (NEW.action='materialize-location'
+        AND EXISTS(SELECT 1 FROM campaign_content_receipts_v42 content
+          WHERE content.campaign_id=run.campaign_id AND content.draft_id=json_extract(NEW.domain_receipt_json,'$.draftId'))
+        AND EXISTS(SELECT 1 FROM world_commands_v28 world
+          WHERE world.campaign_id=run.campaign_id AND world.session_id=run.session_id
+            AND world.command_id=json_extract(NEW.domain_receipt_json,'$.world.commandId') AND world.command_type='travel'))
       OR NEW.action='ambient-beat'))
 BEGIN SELECT RAISE(ABORT,'DM composition receipt requires approved domain command'); END;
 CREATE TRIGGER dm_public_history_replace BEFORE INSERT ON dm_public_history WHEN EXISTS(SELECT 1 FROM dm_public_history WHERE run_id=NEW.run_id)
@@ -187,6 +193,12 @@ CREATE TRIGGER dm_receipts_authority BEFORE INSERT ON dm_receipts WHEN NOT EXIST
         AND command.idempotency_key=NEW.command_key AND command.command_type=NEW.action)
       OR (NEW.action='advance-time' AND EXISTS(SELECT 1 FROM dm_world_time_receipts world_time
         WHERE world_time.run_id=run.run_id AND world_time.command_key=NEW.command_key))
+      OR (NEW.action='materialize-location'
+        AND EXISTS(SELECT 1 FROM campaign_content_receipts_v42 content
+          WHERE content.campaign_id=run.campaign_id AND content.draft_id=json_extract(NEW.domain_receipt_json,'$.draftId'))
+        AND EXISTS(SELECT 1 FROM world_commands_v28 world
+          WHERE world.campaign_id=run.campaign_id AND world.session_id=run.session_id
+            AND world.command_id=json_extract(NEW.domain_receipt_json,'$.world.commandId') AND world.command_type='travel'))
       OR NEW.action='ambient-beat'))
 BEGIN SELECT RAISE(ABORT,'DM receipt requires approved domain command'); END;
 CREATE TRIGGER dm_public_history_authority BEFORE INSERT ON dm_public_history WHEN NOT EXISTS(
