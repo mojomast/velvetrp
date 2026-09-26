@@ -31,6 +31,7 @@ import { AtlasAdvancement, type AtlasAdvancementApi } from "./AtlasAdvancement";
 import { CampaignDmPanel, CampaignDmChronicle, type CampaignDmApi } from "./CampaignDmPanel";
 import { CampaignStartupAction } from "./CampaignStartupAction";
 import { MaterializedWorldPanel, type MaterializedWorldPanelApi } from "./MaterializedWorldPanel";
+import { FreeformSeekPanel, type FreeformSeekApi } from "./FreeformSeekPanel";
 import { CampaignReplay } from "./CampaignReplay";
 import { SituationActions } from "./SituationActions";
 import { CombatCommandBar } from "./CombatCommandBar";
@@ -63,6 +64,13 @@ export interface CampaignPlayApi extends CampaignContextDrawerApi, MechanicRecei
   getActorGameplaySheet: (actorId: string) => Promise<ActorGameplaySheetResponse>;
   getCampaignDiceHistory?: (campaignId: string) => Promise<CampaignDiceHistoryResponse>;
   rollCampaignDice?: (campaignId: string, input: CampaignDiceRollRequest) => Promise<CampaignDiceRollResponse>;
+  /** Optional GM world-view mechanics reads. Present only when the host wires the transports. */
+  listCampaignFactions?: MaterializedWorldPanelApi["listFactions"];
+  getCampaignGeneratedPlanning?: MaterializedWorldPanelApi["getGeneratedPlanning"];
+  /** Optional free-form seek lanes. Present only when the host wires the transports. */
+  seekFreeformFaction?: FreeformSeekApi["seekFaction"];
+  seekFreeformQuest?: FreeformSeekApi["seekQuest"];
+  seekFreeformRumor?: FreeformSeekApi["seekRumor"];
 }
 
 /** Props for the authoritative campaign play layout. */
@@ -590,7 +598,12 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const scene = activeScene ?? { sceneKey: `session:${sessionId}`, label: "This room" };
   const tools: AtlasTool[] = ["director", "character", "dice", "travel", "context", "combat", ...(audience === "gm" && authorizationCanAct ? ["gm" as const, "security" as const, "create" as const, ...(sceneImageAvailable ? ["images" as const] : [])] : []), "help"];
   const worldViewApi: MaterializedWorldPanelApi | null = api.getCampaignPresentCast && api.getNpcShop && api.getShop
-    ? { getWorld: api.getCampaignWorld, getPresentCast: api.getCampaignPresentCast, getNpcShop: api.getNpcShop, getShop: api.getShop }
+    && api.listCampaignFactions && api.getCampaignGeneratedPlanning
+    ? { getWorld: api.getCampaignWorld, getPresentCast: api.getCampaignPresentCast, getNpcShop: api.getNpcShop, getShop: api.getShop,
+        listFactions: api.listCampaignFactions, listQuests: api.listCampaignQuests, getGeneratedPlanning: api.getCampaignGeneratedPlanning }
+    : null;
+  const freeformSeekApi: FreeformSeekApi | null = api.seekFreeformFaction && api.seekFreeformQuest && api.seekFreeformRumor
+    ? { seekFaction: api.seekFreeformFaction, seekQuest: api.seekFreeformQuest, seekRumor: api.seekFreeformRumor }
     : null;
   const campaignNav = onNavigate ? <label className="campaign-nav-select"><select aria-label="Open a campaign destination" value="" onChange={(event) => { const destination = event.target.value as CampaignDestination; if (destination) onNavigate(destination); }}><option value="">Campaign views…</option>{campaignDestinations(bootstrap.principal.role, Boolean(worldApi), combatAvailable).filter((item) => item.id !== "play").map((item) => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.label}</option>)}</select></label> : null;
   function applyPrefill(value: string, mode: "replace" | "append") {
@@ -729,7 +742,8 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     {audience === "gm" && authorizationCanAct && <AtlasDrawer tool="gm" open={activeTool === "gm"} onClose={closeTool} side={drawerSide("gm")} onSideChange={drawerSideChange("gm")}><section aria-label="DM scene controls"><SessionControls key={`session:${campaignId}:${sessionId}:${authorizationGeneration}`} bootstrap={bootstrap} api={api}
       blocked={roomToolsLocked || (phase !== "idle" && phase !== "terminal")} onLockChange={setSessionLocked}
       onRefresh={async () => { await refreshBootstrap(); await refreshTranscript(); setReconciliationRevision((value) => value + 1); }} onCombat={() => openTool("combat")} /></section>
-      {worldViewApi && <MaterializedWorldPanel key={`world-view:${campaignId}:${sessionId}:${authorizationGeneration}`} campaignId={campaignId} sessionId={sessionId} audience={audience} api={worldViewApi} />}</AtlasDrawer>}
+      {worldViewApi && <MaterializedWorldPanel key={`world-view:${campaignId}:${sessionId}:${authorizationGeneration}`} campaignId={campaignId} sessionId={sessionId} audience={audience} api={worldViewApi} />}
+      {freeformSeekApi && <FreeformSeekPanel campaignId={campaignId} sessionId={sessionId} actorId={selectedActorId || null} audience={audience} disabled={roomToolsLocked || (phase !== "idle" && phase !== "terminal")} api={freeformSeekApi} />}</AtlasDrawer>}
     {audience === "gm" && authorizationCanAct && <AtlasDrawer tool="security" open={activeTool === "security"} onClose={closeTool} side={drawerSide("security")} onSideChange={drawerSideChange("security")}>{visitedTools.includes("security") && <CampaignSecurityPanels campaignId={campaignId} onMutated={refreshAfterTool} />}</AtlasDrawer>}
     {audience === "gm" && authorizationCanAct && sceneImageAvailable && sceneImageApi && <AtlasDrawer tool="images" open={activeTool === "images"} onClose={closeTool} side={drawerSide("images")} onSideChange={drawerSideChange("images")}>{visitedTools.includes("images")
       && <SceneImageDmPanel campaignId={campaignId} sessionId={sessionId} sceneKey={scene.sceneKey} sceneLabel={scene.label} api={sceneImageApi} canManage enabled />}</AtlasDrawer>}

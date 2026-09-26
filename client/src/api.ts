@@ -1827,6 +1827,215 @@ export async function commandFreeformShop(campaignId: string, sessionId: string,
   return response;
 }
 
+const freeformBoundedText = (max: number) => z.string().min(1).max(max);
+
+/**
+ * Strict mirrors of the server's bounded free-form faction/quest/rumor command
+ * lanes (`server/src/routes/rpg/v1/freeform{Faction,Quest,Rumor}.ts`). The server
+ * owns the closed candidate set and all narrative text; this client only
+ * transports one bounded `text` phrase (and an optional classified
+ * `candidateId`) and validates the exact reply. Each wrapper issues exactly one
+ * POST and never retries.
+ */
+
+export const freeformFactionNoneReasonSchema = z.enum([
+  "no-faction-intent", "empty-name", "name-too-long", "not-a-faction", "known-faction",
+]);
+export type FreeformFactionNoneReason = z.infer<typeof freeformFactionNoneReasonSchema>;
+const freeformFactionCandidateSchema = z.object({
+  candidateId: freeformBoundedText(128),
+  factionKey: freeformBoundedText(128),
+  gmAgendaKey: freeformBoundedText(128),
+  name: freeformBoundedText(200),
+  archetype: freeformBoundedText(128),
+  description: freeformBoundedText(4_000),
+  gmAgenda: freeformBoundedText(4_000),
+  visibility: z.literal("public"),
+}).strict();
+const freeformFactionClassificationSchema = z.discriminatedUnion("intent", [
+  z.object({ intent: z.literal("none"), reason: freeformFactionNoneReasonSchema, factionName: freeformBoundedText(200).optional() }).strict(),
+  z.object({ intent: z.literal("materialize-faction"), factionName: freeformBoundedText(200),
+    candidates: z.array(freeformFactionCandidateSchema).min(1).max(4) }).strict(),
+]);
+const freeformFactionMaterializationSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("declined"), reason: freeformFactionNoneReasonSchema }).strict(),
+  z.object({
+    status: z.literal("materialized"),
+    candidate: z.object({ candidateId: freeformBoundedText(128), factionKey: freeformBoundedText(128),
+      gmAgendaKey: freeformBoundedText(128), name: freeformBoundedText(200), visibility: z.literal("public") }).strict(),
+    factionId: freeformBoundedText(128),
+    draftId: freeformBoundedText(128),
+    contentReceiptId: freeformBoundedText(128).nullable(),
+    gmAgendaArtifactKey: freeformBoundedText(128).nullable(),
+  }).strict(),
+]);
+export const freeformFactionHttpResponseSchema = z.object({
+  classification: freeformFactionClassificationSchema,
+  materialization: freeformFactionMaterializationSchema.optional(),
+}).strict();
+const freeformFactionHttpRequestSchema = z.object({
+  text: freeformBoundedText(2_000), candidateId: freeformBoundedText(128).optional(),
+}).strict();
+export type FreeformFactionHttpRequest = z.infer<typeof freeformFactionHttpRequestSchema>;
+export type FreeformFactionHttpResponse = z.infer<typeof freeformFactionHttpResponseSchema>;
+
+export const freeformQuestNoneReasonSchema = z.enum([
+  "no-quest-intent", "empty-lead", "lead-too-long", "known-quest", "no-current-location", "current-location-unmapped",
+]);
+export type FreeformQuestNoneReason = z.infer<typeof freeformQuestNoneReasonSchema>;
+const freeformQuestObjectiveSchema = z.object({
+  key: freeformBoundedText(128), description: freeformBoundedText(2_000),
+  targetProgress: z.number().int().min(1).max(1_000_000),
+  dependencyObjectiveKeys: z.array(freeformBoundedText(128)).max(4), visibility: z.literal("public"),
+}).strict();
+const freeformQuestRewardSchema = z.object({
+  key: freeformBoundedText(128), label: freeformBoundedText(200), kind: z.literal("custom"), amount: z.null(),
+  visibility: z.literal("public"),
+}).strict();
+const freeformQuestCandidateSchema = z.object({
+  candidateId: freeformBoundedText(128), questKey: freeformBoundedText(128), gmTwistKey: freeformBoundedText(128),
+  locationKey: freeformBoundedText(128), title: freeformBoundedText(200), description: freeformBoundedText(2_000),
+  objectives: z.array(freeformQuestObjectiveSchema).min(1).max(3), reward: freeformQuestRewardSchema,
+  gmTwist: freeformBoundedText(2_000), templateId: freeformBoundedText(128), visibility: z.literal("public"),
+}).strict();
+const freeformQuestClassificationSchema = z.discriminatedUnion("intent", [
+  z.object({ intent: z.literal("none"), reason: freeformQuestNoneReasonSchema, title: freeformBoundedText(200).optional() }).strict(),
+  z.object({ intent: z.literal("materialize-quest"), lead: freeformBoundedText(200),
+    candidates: z.array(freeformQuestCandidateSchema).min(1).max(4) }).strict(),
+]);
+const freeformQuestMaterializationSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("declined"), reason: freeformQuestNoneReasonSchema }).strict(),
+  z.object({
+    status: z.literal("materialized"),
+    candidate: z.object({ candidateId: freeformBoundedText(128), questKey: freeformBoundedText(128),
+      gmTwistKey: freeformBoundedText(128), title: freeformBoundedText(200), visibility: z.literal("public") }).strict(),
+    questId: freeformBoundedText(128),
+    draftId: freeformBoundedText(128),
+    contentReceiptId: freeformBoundedText(128).nullable(),
+    gmTwistArtifactKey: freeformBoundedText(128).nullable(),
+  }).strict(),
+]);
+export const freeformQuestHttpResponseSchema = z.object({
+  classification: freeformQuestClassificationSchema,
+  materialization: freeformQuestMaterializationSchema.optional(),
+}).strict();
+const freeformQuestHttpRequestSchema = z.object({
+  text: freeformBoundedText(2_000), candidateId: freeformBoundedText(128).optional(),
+}).strict();
+export type FreeformQuestHttpRequest = z.infer<typeof freeformQuestHttpRequestSchema>;
+export type FreeformQuestHttpResponse = z.infer<typeof freeformQuestHttpResponseSchema>;
+
+export const freeformRumorNoneReasonSchema = z.enum([
+  "no-rumor-intent", "empty-subject", "subject-too-long", "known-rumor", "no-current-location", "current-location-unmapped",
+]);
+export type FreeformRumorNoneReason = z.infer<typeof freeformRumorNoneReasonSchema>;
+const freeformRumorCandidateSchema = z.object({
+  candidateId: freeformBoundedText(128), hearsayKey: freeformBoundedText(128), truthKey: freeformBoundedText(128),
+  locationKey: freeformBoundedText(128), subject: freeformBoundedText(160), source: freeformBoundedText(2_000),
+  publicText: freeformBoundedText(2_000), gmTruth: freeformBoundedText(2_000), templateId: freeformBoundedText(128),
+  visibility: z.literal("public"),
+}).strict();
+const freeformRumorClassificationSchema = z.discriminatedUnion("intent", [
+  z.object({ intent: z.literal("none"), reason: freeformRumorNoneReasonSchema, title: freeformBoundedText(200).optional() }).strict(),
+  z.object({ intent: z.literal("materialize-rumor"), subject: freeformBoundedText(160),
+    candidates: z.array(freeformRumorCandidateSchema).min(1).max(4) }).strict(),
+]);
+const freeformRumorMaterializationSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("declined"), reason: freeformRumorNoneReasonSchema }).strict(),
+  z.object({
+    status: z.literal("materialized"),
+    candidate: z.object({ candidateId: freeformBoundedText(128), hearsayKey: freeformBoundedText(128),
+      truthKey: freeformBoundedText(128), subject: freeformBoundedText(160), source: freeformBoundedText(2_000),
+      publicText: freeformBoundedText(2_000), visibility: z.literal("public") }).strict(),
+    rumorId: freeformBoundedText(128),
+    draftId: freeformBoundedText(128),
+    contentReceiptId: freeformBoundedText(128).nullable(),
+    gmTruthArtifactKey: freeformBoundedText(128).nullable(),
+  }).strict(),
+]);
+export const freeformRumorHttpResponseSchema = z.object({
+  classification: freeformRumorClassificationSchema,
+  materialization: freeformRumorMaterializationSchema.optional(),
+}).strict();
+const freeformRumorHttpRequestSchema = z.object({
+  text: freeformBoundedText(2_000), candidateId: freeformBoundedText(128).optional(),
+}).strict();
+export type FreeformRumorHttpRequest = z.infer<typeof freeformRumorHttpRequestSchema>;
+export type FreeformRumorHttpResponse = z.infer<typeof freeformRumorHttpResponseSchema>;
+
+function freeformLanePath(campaignId: string, sessionId: string, actorId: string, lane: string): string {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const room = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
+  const actor = parseApiInput(() => resourceIdSchema.parse(actorId));
+  return `/rpg/v1/campaigns/${encodeOpaquePathSegment(campaign)}/rooms/${encodeOpaquePathSegment(room)}/actors/${encodeOpaquePathSegment(actor)}/freeform-${lane}-commands`;
+}
+
+/** Materializes one bounded free-form faction/order/guild; one POST, no retry. */
+export async function commandFreeformFaction(campaignId: string, sessionId: string, actorId: string,
+  input: FreeformFactionHttpRequest): Promise<FreeformFactionHttpResponse> {
+  const body = parseApiInput(() => freeformFactionHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "faction"),
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Freeform faction command");
+  const response = freeformFactionHttpResponseSchema.parse(success.body);
+  const materialization = response.materialization;
+  if (response.classification.intent === "materialize-faction") {
+    const candidates = response.classification.candidates;
+    if (body.candidateId !== undefined && !candidates.some((candidate) => candidate.candidateId === body.candidateId)) {
+      throw new Error("Freeform faction classification did not include the selected candidate");
+    }
+    if (materialization?.status === "materialized"
+      && !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)) {
+      throw new Error("Freeform faction materialization did not match the classified candidate");
+    }
+  }
+  return response;
+}
+
+/** Materializes one bounded free-form public quest; one POST, no retry. */
+export async function commandFreeformQuest(campaignId: string, sessionId: string, actorId: string,
+  input: FreeformQuestHttpRequest): Promise<FreeformQuestHttpResponse> {
+  const body = parseApiInput(() => freeformQuestHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "quest"),
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Freeform quest command");
+  const response = freeformQuestHttpResponseSchema.parse(success.body);
+  const materialization = response.materialization;
+  if (response.classification.intent === "materialize-quest") {
+    const candidates = response.classification.candidates;
+    if (body.candidateId !== undefined && !candidates.some((candidate) => candidate.candidateId === body.candidateId)) {
+      throw new Error("Freeform quest classification did not include the selected candidate");
+    }
+    if (materialization?.status === "materialized"
+      && !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)) {
+      throw new Error("Freeform quest materialization did not match the classified candidate");
+    }
+  }
+  return response;
+}
+
+/** Materializes one bounded free-form public rumor (hearsay); one POST, no retry. */
+export async function commandFreeformRumor(campaignId: string, sessionId: string, actorId: string,
+  input: FreeformRumorHttpRequest): Promise<FreeformRumorHttpResponse> {
+  const body = parseApiInput(() => freeformRumorHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "rumor"),
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Freeform rumor command");
+  const response = freeformRumorHttpResponseSchema.parse(success.body);
+  const materialization = response.materialization;
+  if (response.classification.intent === "materialize-rumor") {
+    const candidates = response.classification.candidates;
+    if (body.candidateId !== undefined && !candidates.some((candidate) => candidate.candidateId === body.candidateId)) {
+      throw new Error("Freeform rumor classification did not include the selected candidate");
+    }
+    if (materialization?.status === "materialized"
+      && !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)) {
+      throw new Error("Freeform rumor materialization did not match the classified candidate");
+    }
+  }
+  return response;
+}
+
 /** Submits one canonical economy command and binds its discriminated result. */
 export async function commandActorEconomy(campaignId: string, actorId: string, input: EconomyHttpCommandRequest): Promise<EconomyHttpCommandResponse> {
   const target = actorLanePath(campaignId, actorId);
