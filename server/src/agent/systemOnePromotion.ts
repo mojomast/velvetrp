@@ -92,6 +92,9 @@ export const DEFAULT_SYSTEM_ONE_LANE_GATES: Record<SystemOneLane, SystemOneLaneG
   "speaker-routing": { ...BASE_LANE_GATE },
   guardrails: { minSamples: 30, minAccuracy: 0.95, minAccuracyLowerBound: 0.85, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
   "cost-router": { minSamples: 30, minAccuracy: 0.95, minAccuracyLowerBound: 0.85, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
+  // Shadow-only lane: the default gate exists so a future evaluation has a bar to clear, but
+  // there is deliberately no promotion record or execution contract for this lane.
+  "freeform-materialization": { ...BASE_LANE_GATE },
 };
 
 /** The promotion decision for one lane, with every failed gate spelled out. */

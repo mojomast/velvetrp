@@ -67,10 +67,7 @@ describe("System One provider api", () => {
     expect(body.baseUrl).toBe("https://api.typesafe.ai/v1");
     expect(body.model).toBe("jev-latest");
     expect(body.pricing).toEqual({ promptPerMillion: 0.042, completionPerMillion: 0 });
-    expect(Object.keys(body.confidencePolicy)).toEqual([
-      "director-selection", "adventure-selection", "narration-verification", "memory-reranking",
-      "speaker-routing", "guardrails", "cost-router",
-    ]);
+    expect(Object.keys(body.confidencePolicy)).toEqual([...SYSTEM_ONE_LANES]);
     expect(Object.keys(body.confidenceCalibration)).toEqual(Object.keys(body.confidencePolicy));
     expect(body.confidenceCalibration["director-selection"]).toEqual({ a: 1, b: 0 });
     expect(body).not.toHaveProperty("apiKey");

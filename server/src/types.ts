@@ -375,6 +375,7 @@ export const SYSTEM_ONE_LANES = [
   "speaker-routing",
   "guardrails",
   "cost-router",
+  "freeform-materialization",
 ] as const;
 
 export type SystemOneLane = (typeof SYSTEM_ONE_LANES)[number];
