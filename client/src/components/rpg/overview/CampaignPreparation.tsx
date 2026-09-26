@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { campaignAdministrationHttpPatchRequestSchema, sessionZeroSafetyUpdateCommandSchema, type SessionZeroSafetyUpdateCommand } from "@velvet/contracts";
-import { ApiError, attachCampaignRoom, campaignStartup, getCampaignAdministration, getCampaignAdministrationIntegrations, getCampaignDetail, listCampaignCharacters, listCampaignRooms, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, startSession, updateCampaignAdministration, updateCampaignSessionZeroSafety } from "../../../api";
+import { ApiError, attachCampaignRoom, getCampaignAdministration, getCampaignAdministrationIntegrations, getCampaignDetail, listCampaignCharacters, listCampaignRooms, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, startSession, updateCampaignAdministration, updateCampaignSessionZeroSafety } from "../../../api";
 import { useCampaignShell } from "../shell/CampaignShell";
 import { createClientId } from "../../../utils/clientId";
 
@@ -64,7 +64,7 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
     finally { lock.current = false; if (alive.current) setBusy(false); }
   }
 
-  async function write(command: Command, operation?: () => Promise<unknown>, startupSessionId?: string) {
+  async function write(command: Command, operation?: () => Promise<unknown>) {
     if (lock.current || writing.has(campaignId) || storageError || !data) return;
     const role = data.detail.campaign.actorRole;
     const owner = role === "owner" && data.administration.campaign.actorRole === "owner";
@@ -75,29 +75,22 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
     catch { setStorageError(true); setNotice("Safe recovery storage is unavailable. Nothing was sent."); return; }
     const retry = saved !== null;
     lock.current = true; writing.add(campaignId); setBusy(true); setSaved(command); setReconciled(false); setConfirmed(false); setRoomConfirmed(false);
-    let startupNotice: string | null = null;
     try {
       if (command.kind === "safety") await updateCampaignSessionZeroSafety(campaignId, command.input);
       else if (command.kind === "publish" || command.kind === "complete") {
         const result = await updateCampaignAdministration(campaignId, command.input);
         if (command.kind === "complete" && alive.current) setNotice(`Campaign marked completed. Receipt confirmed at revision ${result.receipt.revisionAfter}.`);
       }
-      else if (operation) {
-        await operation();
-        // Room operations reach this line with both identifiers known after the
-        // write settles. This is the documented invocation point for the
-        // idempotent `campaignStartup` command (see api.ts): once the campaign's
-        // first room is attached, the freshly created campaign is ready for its
-        // one startup call. Attaching an additional room to a campaign that
-        // already has attached rooms never starts it, so a live campaign under
-        // playtest is never mutated.
-        if (command.kind === "attach" && startupSessionId && data.rooms.attached.length === 0) {
-          startupNotice = await firstRoomStartupNotice(startupSessionId);
-        }
-      }
+      else if (operation) await operation();
       else throw new Error("This operation cannot be retried");
+      // Room operations reach this line with both identifiers known after the
+      // write settles. This is the documented invocation point for the
+      // idempotent `campaignStartup` command (see api.ts): once the first room is
+      // attached, the freshly created campaign is ready for its one startup call.
+      // It is intentionally not invoked automatically here so preparation
+      // reads/writes never mutate a pre-existing or live campaign.
       localStorage.removeItem(key);
-      if (alive.current) { setSaved(null); setData(null); if (command.kind !== "complete") setNotice(startupNotice ?? "Server response confirmed. Read current preparation before the next step."); }
+      if (alive.current) { setSaved(null); setData(null); if (command.kind !== "complete") setNotice("Server response confirmed. Read current preparation before the next step."); }
     } catch (error) {
       // Only a first, definitive rejection can release an exact command.
       // Starter setup spans transactions and may leave catalog changes behind.
@@ -105,22 +98,6 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
       if (rejected) localStorage.removeItem(key);
       if (alive.current) { if (rejected) setSaved(null); setNotice(rejected ? "Command rejected. Read current preparation and review again; no retry was made." : "Write outcome uncertain. Read current preparation. Only revision-bound commands offer exact retry; creation, attachment and starter setup are never repeated automatically."); setData(null); }
     } finally { writing.delete(campaignId); lock.current = false; if (alive.current) setBusy(false); }
-  }
-
-  /**
-   * Runs the one idempotent first-room startup and never throws: the attach has
-   * already succeeded, so a blocked or failed startup must not be reported as an
-   * uncertain attach. Blockers and unexpected errors surface through the same
-   * status notice the rest of the component uses; no retry is issued here.
-   */
-  async function firstRoomStartupNotice(sessionId: string): Promise<string | null> {
-    try {
-      const summary = await campaignStartup(campaignId, sessionId);
-      return summary.blockers.length ? `Room attached, but campaign startup is blocked: ${summary.blockers.join("; ")}` : null;
-    } catch (error) {
-      if (!(error instanceof ApiError)) console.error("Campaign startup failed after the first room attach", error);
-      return "Room attached, but campaign startup did not complete. The campaign was not otherwise changed.";
-    }
   }
 
   const owner = data?.detail.campaign.actorRole === "owner" && data.administration.campaign.actorRole === "owner";
@@ -167,7 +144,7 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
         <button disabled={busy} onClick={() => { setStage(2); setConfirmed(false); }}>Next: review publication</button>
       </div>}
       {stage === 2 && <div><h3>Make the campaign available for play</h3><p>Campaign status: {status}. Publication changes campaign availability. It does not approve AI drafts, publish generated materials, clear a safety pause or start any room.</p>{status === "published" ? <><button onClick={() => { setStage(3); setConfirmed(false); }}>Next: connect a room</button>{owner && <fieldset disabled={locked}><legend>Complete this campaign</legend><p>Completion ends normal campaign play. This cannot be undone here.</p><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> I confirm that this published campaign is complete.</label><button disabled={!confirmed} onClick={() => void write({ kind: "complete", input: { expectedRevision: data.administration.campaign.revision, idempotencyKey: createClientId(), status: "completed" } })}>Mark campaign complete</button></fieldset>}</> : <fieldset disabled={locked || !owner || !configured || !["draft", "paused"].includes(status ?? "")}><legend>Explicit publication</legend>{!owner && <p>Only the campaign owner can publish or resume the campaign.</p>}<label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> I reviewed the rules and safety agreement and confirm making this campaign available for play.</label><button disabled={!confirmed} onClick={() => void write({ kind: "publish", input: { expectedRevision: data.administration.campaign.revision, idempotencyKey: createClientId(), status: "published" } })}>{status === "paused" ? "Resume campaign publication" : "Publish campaign"}</button></fieldset>}</div>}
-      {stage === 3 && <div><h3>Connect your session</h3><p>Create a room from campaign personas, then attach it explicitly from the available list. Neither action activates gameplay.</p><h4>Attached rooms</h4>{data.rooms.attached.length ? <ul>{data.rooms.attached.map(room => <li key={room.sessionId}>{room.title ?? "Untitled room"} / {room.participantNames.join(", ")}</li>)}</ul> : <p>No rooms attached.</p>}<h4>Available rooms</h4>{!data.rooms.eligible.length && <p>No eligible rooms found.</p>}<fieldset disabled={locked || !privileged || !editable}><legend>Attach an existing room</legend><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> I confirm the selected room operation.</label>{data.rooms.eligible.map(room => <article key={room.sessionId}><p>{room.title ?? "Untitled room"} / {room.participantNames.join(", ")}</p><button disabled={!confirmed} onClick={() => void write({ kind: "attach" }, () => attachCampaignRoom(campaignId, { sessionId: room.sessionId }), room.sessionId)}>Attach {room.title ?? "untitled room"}</button></article>)}</fieldset>
+      {stage === 3 && <div><h3>Connect your session</h3><p>Create a room from campaign personas, then attach it explicitly from the available list. Neither action activates gameplay.</p><h4>Attached rooms</h4>{data.rooms.attached.length ? <ul>{data.rooms.attached.map(room => <li key={room.sessionId}>{room.title ?? "Untitled room"} / {room.participantNames.join(", ")}</li>)}</ul> : <p>No rooms attached.</p>}<h4>Available rooms</h4>{!data.rooms.eligible.length && <p>No eligible rooms found.</p>}<fieldset disabled={locked || !privileged || !editable}><legend>Attach an existing room</legend><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> I confirm the selected room operation.</label>{data.rooms.eligible.map(room => <article key={room.sessionId}><p>{room.title ?? "Untitled room"} / {room.participantNames.join(", ")}</p><button disabled={!confirmed} onClick={() => void write({ kind: "attach" }, () => attachCampaignRoom(campaignId, { sessionId: room.sessionId }))}>Attach {room.title ?? "untitled room"}</button></article>)}</fieldset>
       <details>
         <summary>Create a new room</summary>
         <p>Creation has no idempotency/retry contract. If its response is lost, inspect available and attached rooms; do not automatically create a duplicate.</p>

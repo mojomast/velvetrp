@@ -6,7 +6,7 @@ import { CampaignPreparation } from "./CampaignPreparation";
 vi.mock("../../../api", async importOriginal => ({ ...await importOriginal<typeof api>(),
   getCampaignDetail: vi.fn(), getCampaignAdministration: vi.fn(), getCampaignAdministrationIntegrations: vi.fn(),
   listCampaignRooms: vi.fn(), listCampaignCharacters: vi.fn(), setupSrd51Starter: vi.fn(), setupOriginalStarter: vi.fn(), setupMechanicsStarter: vi.fn(),
-  updateCampaignAdministration: vi.fn(), updateCampaignSessionZeroSafety: vi.fn(), startSession: vi.fn(), attachCampaignRoom: vi.fn(), campaignStartup: vi.fn(),
+  updateCampaignAdministration: vi.fn(), updateCampaignSessionZeroSafety: vi.fn(), startSession: vi.fn(), attachCampaignRoom: vi.fn(),
 }));
 const stamp = "2030-01-01T00:00:00.000Z";
 const props = { campaignId: "campaign-one", mechanics: true, initialStage: 0, onRead: vi.fn(), onBuilder: vi.fn() };
@@ -24,7 +24,6 @@ beforeEach(() => {
   vi.resetAllMocks(); localStorage.clear(); authority();
   vi.mocked(api.listCampaignRooms).mockResolvedValue({ attached: [], eligible: [room] });
   vi.mocked(api.listCampaignCharacters).mockResolvedValue({ characters: [{ id: "actor-one", characterId: "persona-one", name: "Rowan" }] });
-  vi.mocked(api.campaignStartup).mockResolvedValue({ campaignId: props.campaignId, sessionId: room.sessionId, dmMode: "ai", dmModeRevision: 1, published: [], beat: { runId: null, state: "completed" }, imagesEnqueued: [], blockers: [] });
 });
 afterEach(cleanup);
 async function open(stage = 0) {
@@ -153,42 +152,6 @@ describe("progressive campaign preparation", () => {
     await screen.findByText(/Server response confirmed/);
     expect(api.attachCampaignRoom).toHaveBeenCalledExactlyOnceWith("campaign-one", { sessionId: "opaque-room" });
     expect(api.startSession).not.toHaveBeenCalled();
-  });
-  it("starts the new campaign exactly once when its first room is attached", async () => {
-    await open(3);
-    fireEvent.click(screen.getAllByLabelText("I confirm the selected room operation.")[0]!);
-    fireEvent.click(screen.getByRole("button", { name: "Attach Crossing" }));
-    await screen.findByText(/Server response confirmed/);
-    expect(api.campaignStartup).toHaveBeenCalledExactlyOnceWith("campaign-one", "opaque-room");
-  });
-  it("does not start a campaign that already has an attached room", async () => {
-    vi.mocked(api.listCampaignRooms).mockResolvedValue({ attached: [{ ...room, sessionId: "existing-room", title: "Existing", attachedAt: stamp }], eligible: [room] });
-    await open(3);
-    fireEvent.click(screen.getAllByLabelText("I confirm the selected room operation.")[0]!);
-    fireEvent.click(screen.getByRole("button", { name: "Attach Crossing" }));
-    await screen.findByText(/Server response confirmed/);
-    expect(api.attachCampaignRoom).toHaveBeenCalledExactlyOnceWith("campaign-one", { sessionId: "opaque-room" });
-    expect(api.campaignStartup).not.toHaveBeenCalled();
-  });
-  it("surfaces startup blockers without breaking the attach flow", async () => {
-    vi.mocked(api.campaignStartup).mockResolvedValue({ campaignId: props.campaignId, sessionId: room.sessionId, dmMode: "human", dmModeRevision: 1, published: [], beat: { runId: null, state: "blocked" }, imagesEnqueued: [], blockers: ["No AI provider configured"] });
-    await open(3);
-    fireEvent.click(screen.getAllByLabelText("I confirm the selected room operation.")[0]!);
-    fireEvent.click(screen.getByRole("button", { name: "Attach Crossing" }));
-    await screen.findByText(/Room attached, but campaign startup is blocked: No AI provider configured/);
-    expect(api.attachCampaignRoom).toHaveBeenCalledExactlyOnceWith("campaign-one", { sessionId: "opaque-room" });
-    expect(api.campaignStartup).toHaveBeenCalledOnce();
-    expect(screen.queryByText(/Write outcome uncertain/)).toBeNull();
-  });
-  it("does not break the attach flow when startup is rejected", async () => {
-    vi.mocked(api.campaignStartup).mockRejectedValue(new api.ApiError(500, "startup failed"));
-    await open(3);
-    fireEvent.click(screen.getAllByLabelText("I confirm the selected room operation.")[0]!);
-    fireEvent.click(screen.getByRole("button", { name: "Attach Crossing" }));
-    await screen.findByText(/Room attached, but campaign startup did not complete/);
-    expect(api.attachCampaignRoom).toHaveBeenCalledExactlyOnceWith("campaign-one", { sessionId: "opaque-room" });
-    expect(api.campaignStartup).toHaveBeenCalledOnce();
-    expect(screen.queryByText(/Write outcome uncertain/)).toBeNull();
   });
   it("never retries uncertain creation or auto-attaches a title match", async () => {
     vi.mocked(api.startSession).mockRejectedValue(new TypeError("lost"));
