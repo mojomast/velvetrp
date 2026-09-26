@@ -29,6 +29,7 @@ import { RpgCharacterSheetPage, type RpgCharacterSheetApi } from "../actor/RpgCh
 import type { StudioAuthorization } from "../StudioAuthorization";
 import { AtlasAdvancement, type AtlasAdvancementApi } from "./AtlasAdvancement";
 import { CampaignDmPanel, CampaignDmChronicle, type CampaignDmApi } from "./CampaignDmPanel";
+import { CampaignStartupAction } from "./CampaignStartupAction";
 import { CampaignReplay } from "./CampaignReplay";
 import { SituationActions } from "./SituationActions";
 import { CombatCommandBar } from "./CombatCommandBar";
@@ -534,6 +535,9 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const referenceReady = actionable && !sessionLocked && !roomToolsLocked && (phase === "idle" || phase === "terminal") && Boolean(selectedActorId);
   const toolBlocked = dmLocked || sessionLocked || !actionable || !["idle", "terminal"].includes(phase);
   const audience = bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm" ? "gm" : "player";
+  // A completed opening run is the durable "already started" signal. Until the
+  // Director history loads the action stays disabled rather than guessing.
+  const startupUnstarted = dmHistory !== null && !dmHistory.runs.some((run) => run.intent === "open" && run.state === "completed");
   const actorNames = new Map(bootstrap.playableActors.map((actor) => [actor.actorId, actor.name]));
   const { canView: canViewDice, canRoll: canRollDice } = bootstrap.capabilities.campaignDice;
   const playBlocker = !authorizationCanAct || bootstrap.principal.role === "observer" ? "Observer access is read-only."
@@ -624,7 +628,11 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     {pendingInitial && phase === "ambiguous" && actionable && <div className="atlas-reconcile"><p>A submitted declaration has no confirmed turn identity.</p><button type="button" onClick={() => void reconcilePendingInitial()}>Reconcile submitted declaration</button></div>}
     {pendingTurnReconciliation && phase === "ambiguous" && actionable && <div className="atlas-reconcile"><p>A known turn needs authoritative reconciliation.</p><button type="button" onClick={() => void reconcileKnownTurn(pendingTurnReconciliation)}>Reconcile known turn</button></div>}
   </>;
-  const dmNoticeNode = <p className="atlas-notice">Table DM: {(dmHistory?.control.mode ?? bootstrap.dm?.mode) === "human" ? "Human DM" : (dmHistory?.control.mode ?? bootstrap.dm?.mode) === "ai" ? "AI DM / no human DM" : "Status unavailable"}. <button type="button" onClick={() => openTool("director")}>Manage director</button></p>;
+  const dmNoticeNode = <>
+    <p className="atlas-notice">Table DM: {(dmHistory?.control.mode ?? bootstrap.dm?.mode) === "human" ? "Human DM" : (dmHistory?.control.mode ?? bootstrap.dm?.mode) === "ai" ? "AI DM / no human DM" : "Status unavailable"}. <button type="button" onClick={() => openTool("director")}>Manage director</button></p>
+    <CampaignStartupAction campaignId={campaignId} sessionId={sessionId} role={bootstrap.principal.role}
+      canAct={authorizationCanAct} unstarted={startupUnstarted} onStarted={refreshAfterTool} />
+  </>;
   const replayToggleNode = <div className="atlas-turn-tools" aria-label="Session replay">
       <button type="button" className="ghost" aria-pressed={replayOpen} onClick={() => setReplayOpen((open) => !open)}>{replayOpen ? "Close replay" : "Replay this session"}</button>
     </div>;
