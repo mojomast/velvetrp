@@ -112,6 +112,7 @@ import { campaignPlayHttpRoutes } from "./campaignPlay.js";
 import { campaignRoomActivationHttpRoutes } from "./campaignRoomActivation.js";
 import { campaignRoomParticipantHttpRoutes } from "./campaignRoomParticipant.js";
 import { campaignDmHttpRoutes } from "./campaignDm.js";
+import { freeformTravelHttpRoutes } from "./freeformTravel.js";
 import { campaignStartupHttpRoutes } from "./campaignStartup.js";
 import { campaignStartingLocationHttpRoutes } from "./campaignStartingLocation.js";
 import type { CampaignStartingLocationRepository } from "../../../repo/campaignStartingLocationRepo.js";
@@ -899,6 +900,9 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
   await app.register(campaignDmHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
+  // One bounded free-form travel command: the same lazy repository already
+  // implements `classifyFreeformTravelIntent`/`materializeFreeformTravel`.
+  await app.register(freeformTravelHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
   // One server-owned startup command: same lazy repository, same scene-image
   // accessors, and the same optional agent dependencies as the DM lane.
   await app.register(campaignStartupHttpRoutes, {
