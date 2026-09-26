@@ -154,7 +154,7 @@ export function MerchantVisitPanel({ campaignId, sessionId, actorId, merchants, 
     <label className="field">Merchant to visit
       <select aria-label="Merchant to visit" value={selected} onChange={(event) => { setSelected(event.target.value); setNotice(null); }}>
         <option value="">Choose a merchant</option>
-        {merchants.map((npc) => <option key={npc.npcId} value={npc.npcId}>{npc.name}</option>)}
+        {merchants.map((npc) => <option key={npc.npcId} value={npc.npcId}>Visit {npc.name}</option>)}
       </select>
     </label>
     <button type="button" className="primary" disabled={blocked || !hasMerchants || !selected} onClick={() => void visit()}>
