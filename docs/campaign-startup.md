@@ -146,14 +146,12 @@ automatically re-attempt on resume — re-invoke the command (or attach a room
 first) to finish. A persisted `startup.status: "dispatching"` at load means the
 outcome is uncertain and stops the run for explicit inspection (`:323`).
 
-### Client first-room attach
+### Client
 
-`client/src/components/rpg/overview/CampaignPreparation.tsx` calls
-`campaignStartup(campaignId, sessionId)` (`:116-124`, `client/src/api.ts:1468`)
-immediately after a successful first-room attach. It fires only when the campaign
-had **no** attached rooms before the attach
-(`command.kind === "attach" && startupSessionId && data.rooms.attached.length === 0`,
-`:92-96`), so attaching another room to a campaign already under play never
-starts it again. The helper never throws: a blocked or failed startup surfaces
-through the normal status notice and must not turn the already-succeeded attach
-into an uncertain write; no retry is issued (`:110-124`).
+`client/src/api.ts` exposes `campaignStartup(campaignId, sessionId)`, which POSTs
+the empty-body startup command and strict-parses the summary. The preparation
+wizard's room attach does **not** auto-invoke it: connecting a room stays
+preparation-only so it cannot change the Director mode, mutate a live campaign,
+or dispatch provider work during setup. Callers that create and start a campaign
+in one flow (the hydration CLI) invoke the command explicitly once the first room
+exists.

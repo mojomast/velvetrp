@@ -23,15 +23,14 @@ retained as secondary advanced setup for operations not yet migrated.
 - Rooms checks authoritative activation readiness and starts prepared sessions
   through the provider-free activation API. An uncertain command retains its exact
   idempotency key; entering play requires confirmed activation and a current read.
-- Attaching a campaign's first room issues the idempotent campaign startup
-  command (`client/src/components/rpg/overview/CampaignPreparation.tsx:94-96`,
-  `:116-124`): it delegates the Director to AI, publishes eligible public
-  materials, opens the beat, and enqueues one image per public location. It fires
-  only when the campaign had no attached rooms before the attach
-  (`:92-94`), so attaching another room to a live campaign never mutates it. A
-  blocked or failed startup is reported through the status notice and never turns
-  the successful attach into an uncertain write; no retry is issued
-  (`:110-124`). See [campaign startup](campaign-startup.md).
+- Connecting rooms is preparation-only: attaching a room does not change the
+  Director mode, publish materials, dispatch a beat, or enqueue images. The
+  idempotent campaign startup command is exposed to the client as
+  `campaignStartup(campaignId, sessionId)` (`client/src/api.ts`) and is invoked
+  by the hydration CLI on the create-and-start path; the preparation attach
+  intentionally does not auto-invoke it, so the wizard never mutates a live
+  campaign or dispatches provider work during setup. See
+  [campaign startup](campaign-startup.md).
 - Create offers a questionnaire or scripted interview, explicit brief review,
   generation, candidate inspection, and explicit application. Opening the page does
   not generate content or probe the provider. Publication remains separate.
