@@ -149,6 +149,25 @@ export {
   type FreeformNpcRepository,
 } from "./freeform/freeformNpcRepo.js";
 export {
+  MAX_FREEFORM_LORE_SUBJECT_LENGTH,
+  FREEFORM_LORE_TEMPLATES,
+  FreeformLoreAuthorizationError,
+  FreeformLoreConflictError,
+  FreeformLoreUnavailableError,
+  classifyFreeformLore,
+  createFreeformLoreRepository,
+  parseFreeformLoreSubject,
+  selectFreeformLoreTemplate,
+  type FreeformLoreCandidate,
+  type FreeformLoreClassification,
+  type FreeformLoreLocationContext,
+  type FreeformLoreMaterialization,
+  type FreeformLoreMaterializedCandidate,
+  type FreeformLoreNoneReason,
+  type FreeformLoreRepository,
+  type FreeformLoreTemplate,
+} from "./freeform/freeformLoreRepo.js";
+export {
   MAX_FREEFORM_SHOP_ITEMS,
   MIN_FREEFORM_SHOP_QUANTITY,
   MAX_FREEFORM_SHOP_QUANTITY,

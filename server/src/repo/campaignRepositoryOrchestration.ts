@@ -106,6 +106,7 @@ import { createAgentObservationReadRepository } from "./observations/agentObserv
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
 import { createFreeformTravelRepository } from "./freeform/freeformTravelRepo.js";
 import { createFreeformNpcRepository } from "./freeform/freeformNpcRepo.js";
+import { createFreeformLoreRepository } from "./freeform/freeformLoreRepo.js";
 import { createFreeformShopRepository } from "./freeform/freeformShopRepo.js";
 import { createFreeformEncounterRepository } from "./freeform/freeformEncounterRepo.js";
 import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
@@ -841,6 +842,15 @@ function createRepositoryComposition<T>(
   },()=>{
     assertOpen();if(transactionDepth>0)throw new Error("freeform npc operation cannot run inside a repository transaction");
   });
+  const freeformLoreRepository=createFreeformLoreRepository(db,dependencies,{
+    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
+    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
+    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
+    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
+    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
+  },()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("freeform lore operation cannot run inside a repository transaction");
+  });
   const freeformShopRepository=createFreeformShopRepository(db,dependencies,{
     getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
     createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
@@ -936,6 +946,7 @@ function createRepositoryComposition<T>(
     ...campaignGenerationRepository,
     ...freeformTravelRepository,
     ...freeformNpcRepository,
+    ...freeformLoreRepository,
     ...freeformShopRepository,
     ...freeformEncounterRepository,
     ...campaignAdministrationIntegrationRepository,
