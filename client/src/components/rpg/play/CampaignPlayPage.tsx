@@ -537,7 +537,8 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const audience = bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm" ? "gm" : "player";
   // A completed opening run is the durable "already started" signal. Until the
   // Director history loads the action stays disabled rather than guessing.
-  const startupUnstarted = dmHistory !== null && !dmHistory.runs.some((run) => run.intent === "open" && run.state === "completed");
+  const startupLoaded = dmHistory !== null;
+  const startupUnstarted = startupLoaded && !dmHistory.runs.some((run) => run.intent === "open" && run.state === "completed");
   const actorNames = new Map(bootstrap.playableActors.map((actor) => [actor.actorId, actor.name]));
   const { canView: canViewDice, canRoll: canRollDice } = bootstrap.capabilities.campaignDice;
   const playBlocker = !authorizationCanAct || bootstrap.principal.role === "observer" ? "Observer access is read-only."
@@ -631,7 +632,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const dmNoticeNode = <>
     <p className="atlas-notice">Table DM: {(dmHistory?.control.mode ?? bootstrap.dm?.mode) === "human" ? "Human DM" : (dmHistory?.control.mode ?? bootstrap.dm?.mode) === "ai" ? "AI DM / no human DM" : "Status unavailable"}. <button type="button" onClick={() => openTool("director")}>Manage director</button></p>
     <CampaignStartupAction campaignId={campaignId} sessionId={sessionId} role={bootstrap.principal.role}
-      canAct={authorizationCanAct} unstarted={startupUnstarted} onStarted={refreshAfterTool} />
+      canAct={authorizationCanAct} unstarted={startupUnstarted} loaded={startupLoaded} onStarted={refreshAfterTool} />
   </>;
   const replayToggleNode = <div className="atlas-turn-tools" aria-label="Session replay">
       <button type="button" className="ghost" aria-pressed={replayOpen} onClick={() => setReplayOpen((open) => !open)}>{replayOpen ? "Close replay" : "Replay this session"}</button>

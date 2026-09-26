@@ -11,8 +11,8 @@ const summary: Awaited<ReturnType<typeof api.campaignStartup>> = {
   beat: { runId: "run-one", state: "completed" }, imagesEnqueued: [], blockers: [],
 };
 
-function renderAction(role: "owner" | "gm" | "player" | "observer" = "owner", unstarted = true, canAct = true) {
-  return render(<CampaignStartupAction campaignId="campaign-one" sessionId="room-one" role={role} canAct={canAct} unstarted={unstarted} />);
+function renderAction(role: "owner" | "gm" | "player" | "observer" = "owner", unstarted = true, canAct = true, loaded = true) {
+  return render(<CampaignStartupAction campaignId="campaign-one" sessionId="room-one" role={role} canAct={canAct} unstarted={unstarted} loaded={loaded} />);
 }
 
 beforeEach(() => { vi.mocked(api.campaignStartup).mockResolvedValue(summary); });
@@ -38,6 +38,13 @@ describe("CampaignStartupAction", () => {
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(api.campaignStartup).not.toHaveBeenCalled();
+  });
+
+  it("does not claim the campaign already started while director history is loading", () => {
+    renderAction("owner", false, true, false);
+    expect(screen.getByRole("button", { name: "Start campaign" })).toHaveProperty("disabled", true);
+    expect(screen.queryByText(/already has a completed opening scene/)).toBeNull();
+    expect(screen.getByText(/Reading director history/)).toBeTruthy();
   });
 
   it("starts the campaign exactly once with both identifiers on an explicit click", async () => {

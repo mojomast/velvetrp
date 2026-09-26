@@ -14,8 +14,8 @@ type CampaignRole = CampaignPlayBootstrap["principal"]["role"];
  * The command reports a blocked opening in `blockers` rather than throwing, so
  * callers must show that summary without treating it as a hard failure.
  */
-export function CampaignStartupAction({ campaignId, sessionId, role, canAct, unstarted, onStarted }: {
-  campaignId: string; sessionId: string; role: CampaignRole; canAct: boolean; unstarted: boolean;
+export function CampaignStartupAction({ campaignId, sessionId, role, canAct, unstarted, loaded, onStarted }: {
+  campaignId: string; sessionId: string; role: CampaignRole; canAct: boolean; unstarted: boolean; loaded: boolean;
   onStarted?: (result: CampaignStartupResponse) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -40,7 +40,8 @@ export function CampaignStartupAction({ campaignId, sessionId, role, canAct, uns
   }
   return <div className="campaign-startup-action" role="group" aria-label="Start campaign">
     <button type="button" disabled={busy || !unstarted} onClick={() => void start()}>{busy ? "Starting campaign…" : "Start campaign"}</button>
-    {!unstarted && <p className="atlas-notice" role="status">This campaign already has a completed opening scene.</p>}
+    {loaded && !unstarted && <p className="atlas-notice" role="status">This campaign already has a completed opening scene.</p>}
+    {!loaded && <p className="atlas-notice" role="status">Reading director history…</p>}
     {notice && <p className="atlas-notice" role="status">{notice}</p>}
     {blockers.length > 0 && <ul className="atlas-notice" aria-label="Campaign startup blockers">{blockers.map((blocker, index) => <li key={`${blocker}:${index}`}>{blocker}</li>)}</ul>}
   </div>;
