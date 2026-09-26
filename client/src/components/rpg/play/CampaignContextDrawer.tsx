@@ -4,6 +4,7 @@ import { ApiError, ApiInputError, commandNpcPresence as defaultCommandNpcPresenc
 import { beginNpcPresenceMutation, clearNpcPresenceMutation, markNpcPresenceAmbiguous, markNpcPresenceReconciliation, reconcileNpcPresenceMutation, releaseNpcPresenceMutation, useNpcPresenceMutation } from "../narrativeMutationRegistry";
 import type { CampaignContextWidget } from "./campaignWorkbenchPreferences";
 import { CampaignRouteMap } from "./CampaignRouteMap";
+import { MerchantVisitPanel, type MerchantVisitApi } from "./MerchantVisitPanel";
 import { TacticalMapPanel, type TacticalMapPanelApi } from "../map/TacticalMapPanel";
 import { createClientId } from "../../../utils/clientId";
 
@@ -25,6 +26,11 @@ export interface CampaignContextDrawerApi extends Partial<TacticalMapPanelApi> {
   getCampaignPresentCast?: (campaignId: string, sessionId: string, audience: Audience) => Promise<NpcCastHttp>;
   commandNpcPresence?: (campaignId: string, sessionId: string, npcId: string, input: NpcPresenceMutationHttpRequest) => Promise<NpcPresenceMutationHttpResponse>;
   getCampaignPublishedMaterials?: (campaignId:string)=>Promise<CampaignPublishedMaterials>;
+  /** Optional free-form merchant-shop lane. Present only when the host wires the shop transports. */
+  visitMerchant?: MerchantVisitApi["visitMerchant"];
+  getShop?: MerchantVisitApi["getShop"];
+  getWallet?: MerchantVisitApi["getWallet"];
+  economyCommand?: MerchantVisitApi["economyCommand"];
 }
 
 export interface CampaignContextDrawerProps {
@@ -198,6 +204,11 @@ function BoundCampaignContextDrawer({ campaignId, sessionId, selectedActorId, pl
   const materialValue=materials.state==="ready"?materials.value:materials.stale;
   const availableNpcs = rosterValue?.filter((npc) => !castValue?.members.some((member) => member.id === npc.id)) ?? [];
   const canManage = !readOnly && !commandsBlocked && cast.state === "ready" && world.state === "ready" && audience === "gm" && castValue?.state === "running";
+  const merchantVisitApi: MerchantVisitApi | null = api.visitMerchant && api.getShop && api.getWallet && api.economyCommand
+    ? { visitMerchant: api.visitMerchant, getShop: api.getShop, getWallet: api.getWallet, economyCommand: api.economyCommand } : null;
+  // GM/owner audiences, or a player controlling the selected actor, may visit a present merchant.
+  const canVisitMerchant = Boolean(merchantVisitApi) && !readOnly && !commandsBlocked && castValue?.state === "running"
+    && (audience === "gm" || actorEligible) && selectedActorId !== null;
   const tacticalApi = useMemo(() => api.getTacticalMap && api.generateTacticalMap && api.previewTacticalMapMove && api.moveTacticalMapToken
     ? { getTacticalMap: api.getTacticalMap, generateTacticalMap: api.generateTacticalMap, previewTacticalMapMove: api.previewTacticalMapMove, moveTacticalMapToken: api.moveTacticalMapToken, readCombatRoster: api.readCombatRoster } : null,
   [api.generateTacticalMap, api.getTacticalMap, api.moveTacticalMapToken, api.previewTacticalMapMove, api.readCombatRoster]);
@@ -255,6 +266,8 @@ function BoundCampaignContextDrawer({ campaignId, sessionId, selectedActorId, pl
   const widgetContent: Record<CampaignContextWidget, ReactNode> = {
     location: <section><h2>Current location</h2>{status(world, !location, "visible location")}{location && <><p><strong>{location.name}</strong></p><p>{location.description}</p><h3>Visible exits from this location</h3>{exits.length ? <ul>{exits.map((exit) => <li key={exit.connectionId}>{worldValue?.visibleLocations.find((entry) => entry.locationId === exit.toLocationId)?.name ?? "Visible destination"}</li>)}</ul> : <p>No server-visible exits from this origin.</p>}</>}</section>,
     cast: <section className="campaign-cast-management"><h2>{castValue?.state === "stopped" ? "Present at stop/history" : castValue?.state === "running" ? "NPCs present now" : "NPC presence"}</h2>{cast.state === "loading" && !cast.stale && <p role="status">Loading present cast...</p>}{cast.state === "error" && !cast.stale && <p role="alert">Present cast could not be loaded.</p>}{castValue?.state === "running" && castValue.members.length === 0 && <p>No NPCs marked present.</p>}{castValue?.state === "stopped" && castValue.members.length === 0 && <p>No NPCs were present at stop/history.</p>}{castValue?.members.length ? <ul>{castValue.members.map((npc) => <li key={npc.id}><span>{npc.name}{npc.locationLabel ? ` - ${npc.locationLabel}` : ""}</span>{canManage && <span className="campaign-cast-actions"><label>Move {npc.name}<select aria-label={presenceControlLabel("Move", npc, " location")} value={moveLocations[npc.id] ?? npc.locationId ?? ""} onChange={(event) => setMoveLocations((values) => ({ ...values, [npc.id]: event.target.value }))}><option value="">Unknown or undisclosed location</option>{worldValue?.visibleLocations.map((place) => <option key={place.locationId} value={place.locationId}>{place.name}</option>)}</select></label><button type="button" className="ghost" aria-label={presenceControlLabel("Move", npc)} disabled={Boolean(lock)} onClick={() => void mutate(npc.id, { kind: "move", locationId: Object.prototype.hasOwnProperty.call(moveLocations, npc.id) ? moveLocations[npc.id] || null : npc.locationId })}>Move {npc.name}</button><button type="button" className="ghost" aria-label={presenceControlLabel("Remove", npc)} disabled={Boolean(lock)} onClick={(event) => { removeOriginRef.current = event.currentTarget; setRemoveNpcId(npc.id); }}>Remove {npc.name}</button></span>}</li>)}</ul> : null}
+      {canVisitMerchant && merchantVisitApi && <MerchantVisitPanel campaignId={campaignId} sessionId={sessionId} actorId={selectedActorId}
+        merchants={castValue?.members.map((member) => ({ npcId: member.id, name: member.name })) ?? []} api={merchantVisitApi} />}
       {canManage && availableNpcs.length > 0 && <fieldset className="campaign-cast-place"><legend>Place an NPC</legend><label>NPC<select value={placeNpcId} onChange={(event) => setPlaceNpcId(event.target.value)}><option value="">Choose NPC</option>{availableNpcs.map((npc) => <option key={npc.id} value={npc.id}>{npc.name}</option>)}</select></label><label>Place location<select value={placeLocationId} onChange={(event) => setPlaceLocationId(event.target.value)}><option value="">Unknown or undisclosed location</option>{worldValue?.visibleLocations.map((place) => <option key={place.locationId} value={place.locationId}>{place.name}</option>)}</select></label><button type="button" className="primary" disabled={!placeNpcId || Boolean(lock)} onClick={() => void mutate(placeNpcId, { kind: "place", locationId: placeLocationId || null })}>Place NPC</button></fieldset>}
       {removeNpcId && canManage && <div className="campaign-removal-confirmation" role="group" aria-label="Confirm NPC removal"><p>Remove {castValue.members.find((npc) => npc.id === removeNpcId)?.name} from the present cast?</p><button ref={confirmRemoveRef} type="button" className="primary" disabled={Boolean(lock)} onClick={() => void mutate(removeNpcId, { kind: "remove" }).finally(closeRemoval)}>Confirm remove</button><button type="button" className="ghost" onClick={closeRemoval}>Cancel</button></div>}
     </section>,

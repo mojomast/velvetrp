@@ -1722,6 +1722,88 @@ export async function getCampaignShop(campaignId: string, shopId: string): Promi
   return economyHttpShopGetResponseSchema.parse(success.body);
 }
 
+/**
+ * Strict mirror of the server's bounded free-form shop command
+ * (`server/src/routes/rpg/v1/freeformShop.ts`). The server owns the candidate
+ * set, stock, quantities, and prices; this client only transports the selected
+ * `merchantNpcId` (and an optional classified `candidateId`) and validates the
+ * exact reply. It never invents an item, a quantity, a price, or a currency.
+ */
+export const freeformShopNoneReasonSchema = z.enum(["no-merchant", "merchant-not-public", "shop-already-exists", "no-compatible-item"]);
+export type FreeformShopNoneReason = z.infer<typeof freeformShopNoneReasonSchema>;
+const freeformShopItemReferenceSchema = z.object({
+  kind: z.literal("item"),
+  packId: z.string().min(1).max(128),
+  packVersion: z.string().min(1).max(64),
+  definitionId: z.string().min(1).max(256),
+}).strict();
+const freeformShopStockLineSchema = z.object({
+  stockId: z.string().min(1).max(128),
+  item: freeformShopItemReferenceSchema,
+  quantity: z.number().int().min(1).max(20),
+  unitPriceMinor: z.number().int().min(0),
+  currencyCode: z.string().min(1).max(64),
+}).strict();
+const freeformShopCandidateSchema = z.object({
+  candidateId: z.string().min(1).max(128),
+  shopId: z.string().min(1).max(128),
+  shopName: z.string().min(1).max(200),
+  npcId: z.string().min(1).max(128),
+  items: z.array(freeformShopStockLineSchema).min(1).max(8),
+}).strict();
+const freeformShopClassificationSchema = z.discriminatedUnion("intent", [
+  z.object({ intent: z.literal("none"), reason: freeformShopNoneReasonSchema }).strict(),
+  z.object({ intent: z.literal("materialize-shop"), merchantName: z.string().min(1).max(200),
+    candidates: z.array(freeformShopCandidateSchema).min(1).max(1) }).strict(),
+]);
+const freeformShopMaterializationSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("declined"), reason: freeformShopNoneReasonSchema }).strict(),
+  z.object({
+    status: z.literal("materialized"),
+    candidate: freeformShopCandidateSchema,
+    shopId: z.string().min(1).max(128),
+    npcId: z.string().min(1).max(128),
+    draftId: z.string().min(1).max(128),
+    contentReceiptId: z.string().min(1).max(128).nullable(),
+    bindingCreated: z.boolean(),
+    stock: z.array(freeformShopStockLineSchema).min(1).max(8),
+  }).strict(),
+]);
+export const freeformShopHttpResponseSchema = z.object({
+  classification: freeformShopClassificationSchema,
+  materialization: freeformShopMaterializationSchema.optional(),
+}).strict();
+const freeformShopHttpRequestSchema = z.object({
+  merchantNpcId: z.string().min(1).max(128),
+  candidateId: z.string().min(1).max(128).optional(),
+}).strict();
+
+export type FreeformShopHttpRequest = z.infer<typeof freeformShopHttpRequestSchema>;
+export type FreeformShopHttpResponse = z.infer<typeof freeformShopHttpResponseSchema>;
+
+/**
+ * Builds or binds one closed, catalog-bound merchant shop. This function issues
+ * exactly one POST and never retries: a replay is the server's idempotent
+ * concern, and an ambiguous outcome must be reconciled explicitly by the caller.
+ */
+export async function commandFreeformShop(campaignId: string, sessionId: string, actorId: string,
+  input: FreeformShopHttpRequest): Promise<FreeformShopHttpResponse> {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const room = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
+  const actor = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const body = parseApiInput(() => freeformShopHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeOpaquePathSegment(campaign)}/rooms/${encodeOpaquePathSegment(room)}/actors/${encodeOpaquePathSegment(actor)}/freeform-shop-commands`,
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Freeform shop command");
+  const response = freeformShopHttpResponseSchema.parse(success.body);
+  if (response.materialization?.status === "materialized"
+    && response.materialization.candidate.npcId !== body.merchantNpcId) {
+    throw new Error("Freeform shop materialization did not match the selected merchant");
+  }
+  return response;
+}
+
 /** Submits one canonical economy command and binds its discriminated result. */
 export async function commandActorEconomy(campaignId: string, actorId: string, input: EconomyHttpCommandRequest): Promise<EconomyHttpCommandResponse> {
   const target = actorLanePath(campaignId, actorId);
