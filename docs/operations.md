@@ -144,6 +144,14 @@ The current trusted-local RPG boundary has 172 counted explicit operations plus 
 
 If `VELVET_DATA_DIR` is unset or blank, the fallback is `data` under the process's current working directory. Consequently, root `npm run dev` defaults to `<repository>/data`, while a command started with `server` as its working directory defaults to `<repository>/server/data`. Do not rely on this fallback in persistent operation.
 
+**Compound predecessor drift is rejected.** Each upgrade recognizer above admits
+exactly one predecessor inventory. A database that is missing **more than one**
+generation of changes (for example, both an older receipt-action gate and a later
+status widening) matches no single recognizer, so the current-schema gate fails:
+the repository open throws and RPG routes answer 500 until the store is
+recreated. Keep long-lived development stores current, or recreate
+`velvet.sqlite` per the disposable-database rule.
+
 ## Build and start
 
 Build all workspaces from the root:
