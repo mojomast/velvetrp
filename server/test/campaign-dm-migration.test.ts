@@ -17,6 +17,21 @@ const FREEFORM_RECEIPT_CLAUSE = `      OR (NEW.action='materialize-location'
           WHERE world.campaign_id=run.campaign_id AND world.session_id=run.session_id
             AND world.command_id=json_extract(NEW.domain_receipt_json,'$.world.commandId') AND world.command_type='travel'))
 `;
+/**
+ * The later free-form materializer authority clauses (person/clue/shop via the accepted
+ * content draft, encounter via the real started encounter and its start combat command),
+ * exactly as published in the current DM schema.
+ */
+const FREEFORM_MATERIALIZER_CLAUSES = `      OR (NEW.action IN ('materialize-npc','materialize-lore','materialize-shop')
+        AND EXISTS(SELECT 1 FROM campaign_content_receipts_v42 content
+          WHERE content.campaign_id=run.campaign_id AND content.draft_id=json_extract(NEW.domain_receipt_json,'$.draftId')))
+      OR (NEW.action='materialize-encounter'
+        AND EXISTS(SELECT 1 FROM combat_commands_v27 command JOIN encounter ON encounter.encounter_id=command.encounter_id
+          WHERE encounter.campaign_id=run.campaign_id AND encounter.session_id=run.session_id
+            AND encounter.encounter_id=json_extract(NEW.domain_receipt_json,'$.encounterId')
+            AND command.command_id=json_extract(NEW.domain_receipt_json,'$.startReceipt.commandId')
+            AND command.command_type='start'))
+`;
 function predecessor(db:DatabaseDriver.Database,oldMap=false){
   db.pragma("foreign_keys=OFF");const expected=objects(db);
   for(const object of expected.filter(o=>o.name.startsWith("dm_")&&o.type!=="table"))db.exec(`DROP ${object.type} ${object.name}`);
@@ -117,6 +132,30 @@ describe("exact DM schema upgrade",()=>{
     expect(objects(db)).toEqual(before);
     ensureCurrentSchema(db,filename);expect(db.prepare('SELECT * FROM dm_control').all()).toEqual(control);
     expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_receipts'").get()).toMatchObject({sql:expect.stringContaining("'materialize-location'")});
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);db.close();
+  });
+  it('widens the receipt action gate to freeform npc/lore/shop/encounter on the exact current predecessor',()=>{
+    const repo=createRepository(),campaign=repo.createCampaign('local-owner',{name:'Existing freeform materializers'});repo.close();
+    const filename=path.join(process.env.VELVET_DATA_DIR!,'velvet.sqlite'),db=new DatabaseDriver(filename);
+    const expected=objects(db);db.pragma('foreign_keys=OFF');
+    // The current predecessor differs only by the later free-form actions in the two receipt
+    // CHECKs and their authority triggers; the upgrade rebuilds both tables and their triggers.
+    for(const table of ['dm_receipts','dm_composition_receipts']){
+      const definition=expected.find(o=>o.type==='table'&&o.name===table)!;
+      db.exec(`CREATE TEMP TABLE saved AS SELECT * FROM ${table}`);
+      db.exec(`DROP TABLE ${table}`);
+      db.exec(definition.sql.replace(",'materialize-npc','materialize-lore','materialize-shop','materialize-encounter'",""));
+      db.exec(`INSERT INTO ${table} SELECT * FROM saved`);db.exec('DROP TABLE saved');
+      for(const object of expected.filter(o=>o.tbl_name===table&&o.type!=='table')){
+        db.exec(object.sql.includes("'materialize-encounter'")?object.sql.replace(FREEFORM_MATERIALIZER_CLAUSES,''):object.sql);
+      }
+    }
+    db.pragma('foreign_keys=ON');const before=objects(db),control=db.prepare('SELECT * FROM dm_control').all();
+    expect(()=>upgradeCampaignDmSchema(db,before,expected,()=>{throw new Error('rollback');})).toThrow('rollback');
+    expect(objects(db)).toEqual(before);
+    ensureCurrentSchema(db,filename);expect(db.prepare('SELECT * FROM dm_control').all()).toEqual(control);
+    expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_receipts'").get()).toMatchObject({sql:expect.stringContaining("'materialize-encounter'")});
+    expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_receipts_authority'").get()).toMatchObject({sql:expect.stringContaining("'materialize-encounter'")});
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);db.close();
   });
   it('raises director completion headroom on the exact prior-cap predecessor',()=>{

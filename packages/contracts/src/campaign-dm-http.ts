@@ -39,6 +39,11 @@ export const campaignDmActionSchema = z.enum([
   // Free-form travel: the server authors one bounded location+connection candidate from the
   // player's declaration; the model may only select it and the apply carries a durable receipt.
   "materialize-location",
+  // Free-form materialization: the server authors one bounded candidate from the player's
+  // declaration (a person, a clue, an encounter) or from an explicit merchant context; the model
+  // may only select it and the apply carries a durable receipt. Shop candidates are admitted by
+  // the gate but not currently advertised from a declaration (see campaignDmRepo).
+  "materialize-npc", "materialize-lore", "materialize-shop", "materialize-encounter",
 ]);
 export const campaignDmCandidateSchema = campaignDmSelectionSchema.extend({
   action: campaignDmActionSchema, label: z.string().min(1).max(500),

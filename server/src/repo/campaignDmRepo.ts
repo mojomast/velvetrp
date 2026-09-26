@@ -16,6 +16,10 @@ import type { AdventureTurnRepository } from "./adventureTurnRepo.js";
 import type { CampaignAdministrationIntegrationRepository } from "./campaignAdministrationIntegrationRepo.js";
 import type { AdventureCheckRepository } from "./adventureCheckRepo.js";
 import type { FreeformTravelRepository } from "./freeform/freeformTravelRepo.js";
+import type { FreeformNpcRepository } from "./freeform/freeformNpcRepo.js";
+import type { FreeformLoreRepository } from "./freeform/freeformLoreRepo.js";
+import type { FreeformShopRepository } from "./freeform/freeformShopRepo.js";
+import type { FreeformEncounterRepository } from "./freeform/freeformEncounterRepo.js";
 import { boundAdventureQuestReceipts } from "./quest/adventureQuestBinding.js";
 import { validDmScene, DM_SCENE_DESCRIPTION_PREFIX } from "../agent/dmNarration.js";
 import { publicStorySourceSql, publicStoryResourceSql } from "./storyDisclosure.js";
@@ -127,7 +131,11 @@ type Services = CampaignAgentContextReadRepository & CampaignRecallReadRepositor
   & Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnNarration" | "getAgentCombatReceipt">
   & Pick<AdventureCheckRepository, "getAdventureCheckPublicReceipt">
   & Pick<CampaignAdministrationIntegrationRepository, "getSessionZeroSafetyPolicy">
-  & Pick<FreeformTravelRepository, "classifyFreeformTravelIntent" | "materializeFreeformTravel">;
+  & Pick<FreeformTravelRepository, "classifyFreeformTravelIntent" | "materializeFreeformTravel">
+  & Pick<FreeformNpcRepository, "classifyFreeformNpcIntent" | "materializeFreeformNpc">
+  & Pick<FreeformLoreRepository, "classifyFreeformLoreIntent" | "materializeFreeformLore">
+  & Pick<FreeformShopRepository, "classifyFreeformShopIntent" | "materializeFreeformShop">
+  & Pick<FreeformEncounterRepository, "classifyFreeformEncounterIntent" | "materializeFreeformEncounter">;
 
 /** Private director aggregate. No player-turn proposal or transcript is used for GM state. */
 export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { clock: Clock; ids: IdGenerator; contextInspectionProvenance: ContextInspectionProvenanceMode }, services: Services,
@@ -585,6 +593,29 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
           add("materialize-location", `Establish and travel to: ${candidate.name}`, candidate.candidateId, 0,
             { actorId: evidence.actorId, text: evidence.intent, candidate });
         }
+        // Free-form person, clue and hostile materialization follow the same closed pattern: the
+        // server-authored classifier reads the declaration text and supplies at most one exact
+        // candidate; the model may only select it. An unmapped declaration is never a blocker.
+        // `classifyFreeformShopIntent` is deliberately not offered here: its closed candidate is
+        // keyed by an explicit `merchantNpcId`, which a free-form declaration does not carry.
+        const npc = services.classifyFreeformNpcIntent(g, c, s, evidence.actorId, evidence.intent);
+        if (npc.intent === "materialize-npc" && npc.candidates[0]) {
+          const candidate = npc.candidates[0];
+          add("materialize-npc", `Introduce a new face: ${candidate.name}`, candidate.candidateId, 0,
+            { actorId: evidence.actorId, text: evidence.intent, candidate });
+        }
+        const lore = services.classifyFreeformLoreIntent(g, c, s, evidence.actorId, evidence.intent);
+        if (lore.intent === "materialize-lore" && lore.candidates[0]) {
+          const candidate = lore.candidates[0];
+          add("materialize-lore", `Establish a new clue: ${candidate.title}`, candidate.candidateId, 0,
+            { actorId: evidence.actorId, text: evidence.intent, candidate });
+        }
+        const encounter = services.classifyFreeformEncounterIntent(g, c, s, evidence.actorId, evidence.intent);
+        if (encounter.intent === "materialize-encounter" && encounter.candidates[0]) {
+          const candidate = encounter.candidates[0];
+          add("materialize-encounter", `Resolve a hostile encounter: ${candidate.encounterName}`, candidate.candidateId, 0,
+            { actorId: evidence.actorId, text: evidence.intent, candidate });
+        }
       }
       // P0.2: An opening beat always has at least one server-owned candidate. When no public story,
       // clue, or exact-roster encounter candidate is usable, the server anchors the opening to the
@@ -685,6 +716,55 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if (materialized.status !== "materialized") throw new CampaignDmConflictError("location materialization is unavailable");
       receipt = materialized;
       summary = `You travel to ${materialized.candidate.name}. The place is established and reachable from where you were.`.slice(0, 4000);
+    } else if (action === "materialize-npc") {
+      // The candidate is server-authored and bounded; the model only selected it. The free-form
+      // repo re-validates the exact candidate and applies the public persona through the content
+      // receipt path. Replaying the same beat converges through its durable draft keys.
+      const data = binding.data as { actorId?: unknown; text?: unknown } | null | undefined;
+      const actorId = typeof data?.actorId === "string" ? data.actorId : null;
+      const text = typeof data?.text === "string" ? data.text : null;
+      if (!actorId || !text) throw new CampaignDmConflictError("npc materialization candidate is unavailable");
+      const materialized = services.materializeFreeformNpc(r.gm_principal_id, r.campaign_id, r.session_id, actorId, text,
+        { candidateId: binding.target });
+      if (materialized.status !== "materialized") throw new CampaignDmConflictError("npc materialization is unavailable");
+      receipt = materialized;
+      summary = `A new face appears: ${materialized.candidate.name}.`.slice(0, 4000);
+    } else if (action === "materialize-lore") {
+      const data = binding.data as { actorId?: unknown; text?: unknown } | null | undefined;
+      const actorId = typeof data?.actorId === "string" ? data.actorId : null;
+      const text = typeof data?.text === "string" ? data.text : null;
+      if (!actorId || !text) throw new CampaignDmConflictError("lore materialization candidate is unavailable");
+      const materialized = services.materializeFreeformLore(r.gm_principal_id, r.campaign_id, r.session_id, actorId, text,
+        { candidateId: binding.target });
+      if (materialized.status !== "materialized") throw new CampaignDmConflictError("lore materialization is unavailable");
+      receipt = materialized;
+      summary = `A new clue surfaces: ${materialized.candidate.title}.`.slice(0, 4000);
+    } else if (action === "materialize-encounter") {
+      // The exact pinned roster is server-authored; the model only selected it. The free-form
+      // repo re-validates the candidate and creates+starts the encounter through the encounter
+      // lifecycle in the same transaction this receipt records.
+      const data = binding.data as { actorId?: unknown; text?: unknown } | null | undefined;
+      const actorId = typeof data?.actorId === "string" ? data.actorId : null;
+      const text = typeof data?.text === "string" ? data.text : null;
+      if (!actorId || !text) throw new CampaignDmConflictError("encounter materialization candidate is unavailable");
+      const materialized = services.materializeFreeformEncounter(r.gm_principal_id, r.campaign_id, r.session_id, actorId, text,
+        { candidateId: binding.target });
+      if (materialized.status !== "materialized") throw new CampaignDmConflictError("encounter materialization is unavailable");
+      receipt = materialized;
+      summary = `${materialized.candidate.encounterName}. Initiative is established; consult the combat tracker for the current turn.`.slice(0, 4000);
+    } else if (action === "materialize-shop") {
+      // Not currently advertised from a free-form declaration: the shop classifier is keyed by an
+      // explicit merchant NPC id that the declaration does not carry. The apply stays fail-closed
+      // for a future explicit merchant context: a server-authored merchant id is required.
+      const data = binding.data as { actorId?: unknown; merchantNpcId?: unknown } | null | undefined;
+      const actorId = typeof data?.actorId === "string" ? data.actorId : null;
+      const merchantNpcId = typeof data?.merchantNpcId === "string" ? data.merchantNpcId : null;
+      if (!actorId || !merchantNpcId) throw new CampaignDmConflictError("shop materialization candidate is unavailable");
+      const materialized = services.materializeFreeformShop(r.gm_principal_id, r.campaign_id, r.session_id, actorId, merchantNpcId,
+        { candidateId: binding.target });
+      if (materialized.status !== "materialized") throw new CampaignDmConflictError("shop materialization is unavailable");
+      receipt = materialized;
+      summary = `A public stall opens: ${materialized.candidate.shopName}.`.slice(0, 4000);
     } else {
       if(!publicSource(r.campaign_id,binding.target))throw new CampaignDmConflictError('story requires a reviewed public rendering');
       if(action==='resolve-node'&&r.mode==='ai'&&!binding.data.boundEvidence)throw new CampaignDmConflictError('scene evidence is not bound');

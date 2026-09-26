@@ -1,7 +1,7 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { generatedCampaignContentProviderSchema, type PrivateAdventureTurn } from "@velvet/contracts";
+import { generatedCampaignContentProviderSchema, type CampaignDmCandidate, type PrivateAdventureTurn } from "@velvet/contracts";
 import { orchestrateAdventureTurn } from "../src/agent/adventureOrchestrator.js";
 import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.js";
 import { dmDependencies, dmFixture } from "./fixtures/dmCampaign.js";
@@ -17,7 +17,7 @@ const countOf = (db: DatabaseDriver.Database, sql: string, ...params: unknown[])
 /**
  * Seeds one generated public location ("harbor") through the ordinary accept path
  * and places the actor there, so the free-form classifier has a generated public
- * source location to attach a connection to.
+ * source location to attach content to.
  */
 function seedHarbor(f: Fixture): string {
   const content = generatedCampaignContentProviderSchema.parse({
@@ -59,23 +59,23 @@ function finishTurn(f: Fixture, turn: PrivateAdventureTurn): string {
 }
 
 /**
- * Produces one completed, evidenced adventure turn whose declaration names the
- * unmapped glassblower's district. The declared travel is carried as the turn's
- * declaration (`evidence.intent`), while a committed public quest objective is
- * the evidence fact that makes the turn usable by the director.
+ * Produces one completed, evidenced adventure turn whose declaration is the free-form
+ * attempt under test. The declaration is carried as the turn's declaration
+ * (`evidence.intent`), while a committed public quest objective is the evidence fact
+ * that makes the turn usable by the director.
  */
-async function travelEvidence(f: Fixture): Promise<string> {
+async function evidencedTurn(f: Fixture, declaration: string): Promise<string> {
   f.repo.createCampaignQuest(OWNER, f.campaign.id, { quest: {
-    questId: "glass-quest", storylineId: "story", title: "Glass errand", description: null, visibility: "public", journalText: "Offered",
-    objectives: [{ objectiveId: "glass-objective", description: "Reach the glassblower's district", targetProgress: 1, dependencyObjectiveIds: [], visibility: "public" }],
+    questId: "freeform-quest", storylineId: "story", title: "Free-form errand", description: null, visibility: "public", journalText: "Offered",
+    objectives: [{ objectiveId: "freeform-objective", description: "Carry out the declaration", targetProgress: 1, dependencyObjectiveIds: [], visibility: "public" }],
     rewards: [],
-  }, expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "create-glass-quest" });
-  f.repo.executeQuestCommand(OWNER, "glass-quest", { kind: "accept",
-    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "accept-glass-quest" });
+  }, expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "create-freeform-quest" });
+  f.repo.executeQuestCommand(OWNER, "freeform-quest", { kind: "accept",
+    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "accept-freeform-quest" });
   const created = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
-    sessionId: f.session.id, actorId: f.actorId, declaration: "I go to the glassblower's district",
-    expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: "travel-turn" });
-  const objective = f.repo.listAdventureQuestObjectiveCandidates(OWNER, created.turnId).find((value) => value.objectiveId === "glass-objective")!;
+    sessionId: f.session.id, actorId: f.actorId, declaration: declaration,
+    expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: "freeform-turn" });
+  const objective = f.repo.listAdventureQuestObjectiveCandidates(OWNER, created.turnId).find((value) => value.objectiveId === "freeform-objective")!;
   expect(objective).toBeDefined();
   const completed = await orchestrateAdventureTurn(f.repo, created.turnId, { ...dmDependencies(async () => ({ message: { role: "assistant", content: null,
     toolCalls: [{ id: "objective", name: "exact_quest_objective.select", arguments: JSON.stringify({ candidateId: objective.candidateId, digest: objective.digest }) }] },
@@ -83,12 +83,37 @@ async function travelEvidence(f: Fixture): Promise<string> {
   return finishTurn(f, completed.turn);
 }
 
+/**
+ * Offers exactly one candidate for `action`, executes it, and replays the same beat.
+ * Returns the run so callers can assert the action-specific durable effects.
+ */
+async function offerExecuteAndReplay(f: Fixture, evidence: string, action: CampaignDmCandidate["action"]) {
+  const request = { intent: "continue" as const, expectedModeRevision: 1, idempotencyKey: "freeform-beat", evidenceTurnId: evidence };
+  const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, request);
+  const work = f.repo.claimDmPlanning(OWNER, run.runId, "fake", "fake")!;
+  const candidates = work.candidates.filter((value) => value.action === action);
+  expect(candidates).toHaveLength(1);
+  const candidate = candidates[0]!;
+  f.repo.settleDmPlanning(OWNER, run.runId, work.claimId, { candidateId: candidate.candidateId, digest: candidate.digest }, null);
+  await orchestrateCampaignDmBeat(f.repo, OWNER, run.runId, dmDependencies());
+
+  const executed = f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId);
+  expect(executed.state).toBe("completed");
+  expect(executed.receipts.map(({ action: value }) => value)).toEqual([action]);
+
+  // Replaying the same beat (same idempotency key) converges on the same run and does not re-execute.
+  const replay = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, request);
+  expect(replay.runId).toBe(run.runId);
+  await orchestrateCampaignDmBeat(f.repo, OWNER, replay.runId, dmDependencies(async () => { throw new Error("replay must not dispatch a provider"); }));
+  return run;
+}
+
 describe("freeform location director integration", () => {
   it("offers, executes and exactly once replays a server-authored materialize-location candidate", async () => {
     const f = await dmFixture(); f.graph();
     const harborId = seedHarbor(f);
     f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "freeform-ai" });
-    const evidence = await travelEvidence(f);
+    const evidence = await evidencedTurn(f, "I go to the glassblower's district");
 
     const request = { intent: "continue" as const, expectedModeRevision: 1, idempotencyKey: "freeform-beat", evidenceTurnId: evidence };
     const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, request);
@@ -126,6 +151,89 @@ describe("freeform location director integration", () => {
     expect(countOf(db, "SELECT count(*) n FROM campaign_locations_v28 WHERE campaign_id=?", f.campaign.id)).toBe(2);
     expect(countOf(db, "SELECT count(*) n FROM world_commands_v28 WHERE campaign_id=? AND session_id=? AND command_type='travel'",
       f.campaign.id, f.session.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+});
+
+describe("freeform npc director integration", () => {
+  it("offers, executes and exactly once replays a server-authored materialize-npc candidate", async () => {
+    const f = await dmFixture();
+    f.graph();
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "freeform-ai" });
+    const evidence = await evidencedTurn(f, "I ask the glassblower about the road");
+    const run = await offerExecuteAndReplay(f, evidence, "materialize-npc");
+
+    const db = openDb();
+    const npc = db.prepare("SELECT npc_id,public_name FROM campaign_npcs_v28 WHERE campaign_id=?").all(f.campaign.id) as
+      Array<{ npc_id: string; public_name: string }>;
+    expect(npc).toHaveLength(1);
+    expect(npc[0]!.public_name.toLowerCase()).toContain("glassblower");
+    // The receipt names a real accepted content draft through the shared campaign-content receipt.
+    const receipt = db.prepare("SELECT domain_receipt_json FROM dm_receipts WHERE run_id=?").get(run.runId) as { domain_receipt_json: string };
+    const draftId = (JSON.parse(receipt.domain_receipt_json) as { draftId: string }).draftId;
+    expect(db.prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?").get(f.campaign.id, draftId)).toBeTruthy();
+
+    // Replay converged: still exactly one persona and one draft.
+    expect(countOf(db, "SELECT count(*) n FROM campaign_npcs_v28 WHERE campaign_id=?", f.campaign.id)).toBe(1);
+    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-npc-draft-%'", f.campaign.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+});
+
+describe("freeform lore director integration", () => {
+  it("offers, executes and exactly once replays a server-authored materialize-lore candidate", async () => {
+    const f = await dmFixture();
+    f.graph();
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "freeform-ai" });
+    const evidence = await evidencedTurn(f, "I recall the legend of the pale tide");
+    const run = await offerExecuteAndReplay(f, evidence, "materialize-lore");
+
+    const db = openDb();
+    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='clue'", f.campaign.id)).toBe(1);
+    const receipt = db.prepare("SELECT domain_receipt_json FROM dm_receipts WHERE run_id=?").get(run.runId) as { domain_receipt_json: string };
+    const value = JSON.parse(receipt.domain_receipt_json) as { draftId: string; clueId: string };
+    expect(db.prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?").get(f.campaign.id, value.draftId)).toBeTruthy();
+    expect(countOf(db, "SELECT count(*) n FROM story_clues_v34 WHERE campaign_id=? AND clue_id=?", f.campaign.id, value.clueId)).toBe(1);
+
+    // Replay converged: one clue, one source node, one GM-only truth.
+    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='story-node'", f.campaign.id)).toBe(1);
+    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore'", f.campaign.id)).toBe(1);
+    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-lore-draft-%'", f.campaign.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+});
+
+describe("freeform encounter director integration", () => {
+  it("offers, executes and exactly once replays a server-authored materialize-encounter candidate", async () => {
+    const f = await dmFixture();
+    f.graph();
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "freeform-ai" });
+    const evidence = await evidencedTurn(f, "I attack the nearest foe!");
+    const run = await offerExecuteAndReplay(f, evidence, "materialize-encounter");
+
+    const db = openDb();
+    const encounter = db.prepare("SELECT encounter_id,status,session_id FROM encounter WHERE campaign_id=?")
+      .get(f.campaign.id) as { encounter_id: string; status: string; session_id: string };
+    expect(encounter).toMatchObject({ status: "active", session_id: f.session.id });
+
+    // The receipt names the real started encounter and its start combat command; the gate mirrors
+    // the existing encounter authority clause.
+    const receipt = db.prepare("SELECT domain_receipt_json FROM dm_receipts WHERE run_id=?").get(run.runId) as { domain_receipt_json: string };
+    const value = JSON.parse(receipt.domain_receipt_json) as {
+      encounterId: string; startReceipt: { commandId: string };
+    };
+    expect(value.encounterId).toBe(encounter.encounter_id);
+    expect(db.prepare("SELECT 1 FROM combat_commands_v27 WHERE encounter_id=? AND command_id=? AND command_type='start'")
+      .get(encounter.encounter_id, value.startReceipt.commandId)).toBeTruthy();
+
+    // Replay converged: one encounter and its single start path.
+    expect(countOf(db, "SELECT count(*) n FROM encounter WHERE campaign_id=?", f.campaign.id)).toBe(1);
+    expect(countOf(db, "SELECT count(*) n FROM encounter_lifecycle_v31 WHERE campaign_id=?", f.campaign.id)).toBe(1);
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     db.close(); f.repo.close();
   });
