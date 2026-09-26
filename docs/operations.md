@@ -132,9 +132,9 @@ Otherwise startup tries `server/src/repo/db/campaignDmUpgrade.ts`, then the map-
 - **Director review-authority predecessor:** the current inventory without `dm_review_` objects, with the older campaign-membership foreign keys on `dm_control`, `dm_mode_commands`, and `dm_runs`. This exact shape is recognized with or without `dm_narration_` objects. The upgrade rebuilds those three tables with principal foreign keys, restores historical rows before recreating present-authority insert triggers, and adds missing director objects. Runs in `planning` or `awaiting-approval` become `cancelled`, their revision increments, and their blocker becomes `director-security-upgrade-requires-new-beat`. Other historical rows are retained; this does not replay mechanics or paid work.
 - **Director narration predecessor:** the current inventory with only `dm_narration_` objects absent. It adds the missing narration objects without resetting existing control or cancelling runs.
 
-Recognition compares the complete schema-object inventory, not a version label or merely the presence of selected tables. These cases do not authorize arbitrary combinations of missing objects or historical migration chains.
+Recognition compares the complete schema-object inventory, not a version label or merely the presence of selected tables. Startup also chains recognized predecessors: after a successful upgrade it re-evaluates the store and applies another recognized predecessor, so a store missing more than one generation advances one exactly recognized generation per pass, up to a small fixed bound. Only an inventory that exactly matches a recognized predecessor at each step may advance; arbitrary combinations of missing objects are still not authorized, and unrecognized, modified, or partially upgraded schemas are still rejected.
 
-The upgrade uses one independent immediate transaction for each recognized path. Director/map rebuilds temporarily disable foreign-key enforcement and restore it afterward; the recall-only additive path does not disable it. For every path, an explicit foreign-key check plus complete current-schema, SQLite quick-check, local-ownership, and effect-vocabulary validation must succeed before commit. Any failure rolls back schema and data changes. Every other unknown, modified, or partially upgraded schema is rejected without repair. Apart from the explicit director initialization and pending-run cancellation above, startup does not backfill domain state, rewind history, clean historical artifacts, or import `db.json`. A schema mismatch fails with the database path and directs the developer to delete/recreate it.
+The upgrade uses one independent immediate transaction for each recognized path. Director/map rebuilds temporarily disable foreign-key enforcement and restore it afterward; the recall-only additive path does not disable it. A single recognized predecessor validates before commit: an explicit foreign-key check plus complete current-schema, SQLite quick-check, local-ownership, and effect-vocabulary validation must succeed before commit. A multi-generation chain first plans the complete sequence against the store without mutating anything, then commits each generation in its own immediate transaction after its own explicit foreign-key and quick check; the same complete validation runs on the final generation (or after the late-schema step). Any failure rolls back schema and data changes. Every other unknown, modified, or partially upgraded schema is rejected without repair. Apart from the explicit director initialization and pending-run cancellation above, startup does not backfill domain state, rewind history, clean historical artifacts, or import `db.json`. A schema mismatch fails with the database path and directs the developer to delete/recreate it.
 
 NPC presence starts empty because roster membership, NPC metadata, actor locations, room participants, messages, and narrative context do not prove presence. Companion authorization derives from current owner/GM relationships while durable history remains evidence rather than current authority. Exact-candidate execution binds provider selection to deterministic world travel and reconstructs replay from persisted evidence. Existing manual world travel remains separate.
 
@@ -144,13 +144,18 @@ The current trusted-local RPG boundary has 172 counted explicit operations plus 
 
 If `VELVET_DATA_DIR` is unset or blank, the fallback is `data` under the process's current working directory. Consequently, root `npm run dev` defaults to `<repository>/data`, while a command started with `server` as its working directory defaults to `<repository>/server/data`. Do not rely on this fallback in persistent operation.
 
-**Compound predecessor drift is rejected.** Each upgrade recognizer above admits
-exactly one predecessor inventory. A database that is missing **more than one**
-generation of changes (for example, both an older receipt-action gate and a later
-status widening) matches no single recognizer, so the current-schema gate fails:
-the repository open throws and RPG routes answer 500 until the store is
-recreated. Keep long-lived development stores current, or recreate
-`velvet.sqlite` per the disposable-database rule.
+**Compound predecessor drift is chained, then still fail-closed.** Each upgrade
+recognizer still admits exactly one predecessor inventory, but startup now chains
+them: if a store matches no single recognizer, it is compared against inventories
+that leave several recognized generations at their predecessors. Only objects an
+exact recognizer actually rebuilds are advanced, one recognized generation per
+pass, and the whole sequence is planned without mutating the store first. A
+database missing **more than one** generation (for example, both an older
+receipt-action gate and a later status widening) therefore upgrades in bounded
+passes instead of failing the current-schema gate. A genuinely unknown, modified,
+or partially upgraded inventory still matches no plan and is rejected with no
+partial upgrade, so long-lived development stores remain disposable per the rule
+above.
 
 ## Build and start
 

@@ -533,6 +533,156 @@ export function upgradeEncounterCancelledStatusSchema(
   }
 }
 
+/** Maximum number of recognized predecessor generations one startup may chain. */
+export const MAX_SCHEMA_UPGRADE_PASSES = 4;
+
+type SchemaRecognizer = (
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+) => boolean;
+
+/** Every exact-predecessor recognizer, in the order the single-generation chain has always used. */
+const schemaRecognizers: SchemaRecognizer[] = [
+  upgradeStartingGrantsSchema,
+  upgradeCampaignDmSchema,
+  upgradeTacticalMapSchema,
+  upgradeCombatMarkerSchema,
+  upgradeCombatantLabelSchema,
+  upgradeCombatConditionsSchema,
+  upgradeAdvancementCatalogSchema,
+  upgradeCatalogAttestationLimitSchema,
+  upgradeAdventureCheckExecutionOriginSchema,
+  upgradeAdventureExactActionOriginSchema,
+  upgradeEncounterCancelledStatusSchema,
+];
+
+function schemaObjectsEqual(a: SchemaObject[], b: SchemaObject[]): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function schemaObjectDiffers(a: SchemaObject | undefined, b: SchemaObject | undefined): boolean {
+  return !a || !b || a.type !== b.type || a.tbl_name !== b.tbl_name || a.sql !== b.sql;
+}
+
+/** Object names whose persisted definition differs between the two complete inventories. */
+function schemaDiffNames(actual: SchemaObject[], expected: SchemaObject[]): Set<string> {
+  const actualByName = new Map(actual.map((object) => [object.name, object]));
+  const expectedByName = new Map(expected.map((object) => [object.name, object]));
+  const names = new Set<string>();
+  for (const object of actual) if (schemaObjectDiffers(object, expectedByName.get(object.name))) names.add(object.name);
+  for (const object of expected) if (schemaObjectDiffers(actualByName.get(object.name), object)) names.add(object.name);
+  return names;
+}
+
+/**
+ * Rebuilds the current inventory with every named object masked to its persisted shape. Masking an
+ * object absent from the store removes it, because that is exactly what a predecessor generation
+ * looked like in the store. Order is preserved from the ordered current inventory.
+ */
+function expectedWithMaskedObjects(expected: SchemaObject[], actual: SchemaObject[], masked: ReadonlySet<string>): SchemaObject[] {
+  const actualByName = new Map(actual.map((object) => [object.name, object]));
+  const result: SchemaObject[] = [];
+  for (const object of expected) {
+    if (!masked.has(object.name)) {
+      result.push(object);
+      continue;
+    }
+    const persisted = actualByName.get(object.name);
+    if (persisted) result.push(persisted);
+  }
+  return result;
+}
+
+/**
+ * Probes a recognizer's exact-predecessor comparison without mutating anything. Every recognizer
+ * refuses to run inside a transaction, so on a transaction-guarded probe database it throws the
+ * moment its comparison succeeds and returns false when the inventory is not a recognized
+ * predecessor. Only that exact guard is treated as recognition; any other failure propagates.
+ */
+function recognizesPredecessor(
+  db: DatabaseDriver.Database,
+  recognizer: SchemaRecognizer,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+): boolean {
+  try {
+    recognizer(db, actual, expected, () => {});
+    return false;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("requires an independent transaction")) return true;
+    throw error;
+  }
+}
+
+/**
+ * Finds one recognized generation that can advance `actual` toward `expected` while other
+ * generations are still at their predecessors. Only objects that the recognizer's comparison
+ * ignores are resolved; every other differing object stays masked to the persisted shape, and the
+ * step is accepted only when the recognizer's exact-predecessor comparison passes. A store that no
+ * recognized generation can advance exactly is refused rather than loosened.
+ */
+function findCompoundUpgradeStep(
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  probe: DatabaseDriver.Database,
+): { recognizer: SchemaRecognizer; expected: SchemaObject[] } | null {
+  const expectedNames = new Set(expected.map((object) => object.name));
+  // No generation removes an object no recognizer knows about, so an unexpected object can never resolve.
+  if (actual.some((object) => !expectedNames.has(object.name))) return null;
+  const names = [...schemaDiffNames(actual, expected)];
+  if (names.length === 0) return null;
+  const maskedFor = (resolved: ReadonlySet<string>) => {
+    const masked = new Set(names);
+    for (const name of resolved) masked.delete(name);
+    return expectedWithMaskedObjects(expected, actual, masked);
+  };
+  for (const recognizer of schemaRecognizers) {
+    for (const seed of names) {
+      const resolved = new Set<string>([seed]);
+      for (const candidate of names) {
+        if (resolved.has(candidate)) continue;
+        const trial = new Set(resolved);
+        trial.add(candidate);
+        if (recognizesPredecessor(probe, recognizer, actual, maskedFor(trial))) resolved.add(candidate);
+      }
+      const candidateExpected = maskedFor(resolved);
+      if (schemaObjectsEqual(candidateExpected, actual)) continue;
+      if (!recognizesPredecessor(probe, recognizer, actual, candidateExpected)) continue;
+      return { recognizer, expected: candidateExpected };
+    }
+  }
+  return null;
+}
+
+/** Plans a bounded sequence of exactly recognized generations from `actual` onto `expected`, or null. */
+function planCompoundUpgrade(
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  probe: DatabaseDriver.Database,
+  maxSteps: number,
+): Array<{ recognizer: SchemaRecognizer; expected: SchemaObject[] }> | null {
+  const steps: Array<{ recognizer: SchemaRecognizer; expected: SchemaObject[] }> = [];
+  let state = actual;
+  for (let step = 0; step < maxSteps; step += 1) {
+    if (schemaObjectsEqual(state, expected)) return steps;
+    const found = findCompoundUpgradeStep(state, expected, probe);
+    if (!found) return null;
+    state = found.expected;
+    steps.push(found);
+  }
+  return schemaObjectsEqual(state, expected) ? steps : null;
+}
+
+/** Integrity checks that must hold after every generation, before the final complete-schema gate. */
+function assertIntermediateDatabase(db: DatabaseDriver.Database): void {
+  const quickCheck = db.prepare("PRAGMA quick_check").all() as Array<Record<string, unknown>>;
+  if (quickCheck.length !== 1 || Object.values(quickCheck[0] ?? {})[0] !== "ok") throw new Error("SQLite quick_check failed");
+  const foreignKeyIssue = db.prepare("PRAGMA foreign_key_check").get() as { table: string } | undefined;
+  if (foreignKeyIssue) throw new Error(`foreign-key violation in ${foreignKeyIssue.table}`);
+}
+
 export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
@@ -568,56 +718,103 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     const readyActionSql = readFileSync(new URL("./combatReadyActionSchema.sql", import.meta.url), "utf8");
     const systemOneSql = readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8");
     const combatantLabelSql = readFileSync(new URL("./combatantLabelSchema.sql", import.meta.url), "utf8");
-    const actual = schemaObjects(db);
-    const missingRecall = !actual.some(object => object.name === "adventure_narration_contexts");
-    const missingInspection = !actual.some(object => object.name === "campaign_context_inspection_headers_v61");
-    const missingKnowledge = !actual.some(object => object.name.startsWith("agent_observations"));
-    const missingMarkers = !actual.some(object => object.name.startsWith("combat_markers_"));
-    const missingAttunements = !actual.some(object => object.name.startsWith("actor_item_attunements_"));
-    const missingReadyActions = !actual.some(object => object.name.startsWith("combat_ready_actions_"));
-    const missingSystemOne = !actual.some(object => object.name.startsWith("system_one_"));
-    const missingCombatantLabels = !actual.some(object => object.name.startsWith("encounter_combatant_label_"));
-    const missingLateSchema = missingRecall || missingInspection || missingKnowledge || missingMarkers || missingAttunements || missingReadyActions || missingSystemOne || missingCombatantLabels;
-    const expected = expectedObjects().filter(object =>
-      !(missingRecall && object.name.startsWith("adventure_narration_contexts"))
-      && !(missingInspection && object.name.startsWith("campaign_context_inspection_"))
-      && !(missingKnowledge && object.name.startsWith("agent_observations"))
-      && !(missingMarkers && object.name.startsWith("combat_markers_"))
-      && !(missingAttunements && object.name.startsWith("actor_item_attunements_"))
-      && !(missingReadyActions && object.name.startsWith("combat_ready_actions_"))
-      && !(missingSystemOne && (object.name.startsWith("system_one_") || object.tbl_name === "system_one_decisions_v1"))
-      && !(missingCombatantLabels && object.name.startsWith("encounter_combatant_label_")));
-    if (mismatchReason(actual, expected) === null) {
-      if (!missingLateSchema) {
-        assertCurrentDatabase(db, databasePath);
-        return;
+    // A transaction-guarded in-memory database lets the recognizers' exact-predecessor comparisons
+    // run as pure predicates: every recognizer throws "requires an independent transaction" before
+    // mutating, so no schema changes leak out of the probe.
+    let probe: DatabaseDriver.Database | undefined;
+    let upgradesRemaining = MAX_SCHEMA_UPGRADE_PASSES;
+    try {
+      for (let pass = 0; pass <= MAX_SCHEMA_UPGRADE_PASSES; pass += 1) {
+        const actual = schemaObjects(db);
+        const missingRecall = !actual.some(object => object.name === "adventure_narration_contexts");
+        const missingInspection = !actual.some(object => object.name === "campaign_context_inspection_headers_v61");
+        const missingKnowledge = !actual.some(object => object.name.startsWith("agent_observations"));
+        const missingMarkers = !actual.some(object => object.name.startsWith("combat_markers_"));
+        const missingAttunements = !actual.some(object => object.name.startsWith("actor_item_attunements_"));
+        const missingReadyActions = !actual.some(object => object.name.startsWith("combat_ready_actions_"));
+        const missingSystemOne = !actual.some(object => object.name.startsWith("system_one_"));
+        const missingCombatantLabels = !actual.some(object => object.name.startsWith("encounter_combatant_label_"));
+        const missingLateSchema = missingRecall || missingInspection || missingKnowledge || missingMarkers || missingAttunements || missingReadyActions || missingSystemOne || missingCombatantLabels;
+        const expected = expectedObjects().filter(object =>
+          !(missingRecall && object.name.startsWith("adventure_narration_contexts"))
+          && !(missingInspection && object.name.startsWith("campaign_context_inspection_"))
+          && !(missingKnowledge && object.name.startsWith("agent_observations"))
+          && !(missingMarkers && object.name.startsWith("combat_markers_"))
+          && !(missingAttunements && object.name.startsWith("actor_item_attunements_"))
+          && !(missingReadyActions && object.name.startsWith("combat_ready_actions_"))
+          && !(missingSystemOne && (object.name.startsWith("system_one_") || object.tbl_name === "system_one_decisions_v1"))
+          && !(missingCombatantLabels && object.name.startsWith("encounter_combatant_label_")));
+        const installMissingLateSchema = () => {
+          if (missingRecall) db.exec(recallSql);
+          if (missingInspection) db.exec(inspectionSql);
+          if (missingKnowledge) db.exec(knowledgeSql);
+          if (missingMarkers) db.exec(markerSql);
+          if (missingAttunements) db.exec(attunementSql);
+          if (missingReadyActions) db.exec(readyActionSql);
+          if (missingSystemOne) db.exec(systemOneSql);
+          if (missingCombatantLabels) db.exec(combatantLabelSql);
+        };
+        if (mismatchReason(actual, expected) === null) {
+          if (!missingLateSchema) {
+            assertCurrentDatabase(db, databasePath);
+            return;
+          }
+          db.transaction(() => {
+            installMissingLateSchema();
+            assertCurrentDatabase(db, databasePath);
+          }).immediate();
+          return;
+        }
+        // A store that exactly matches one recognized predecessor upgrades in a single immediate
+        // transaction, exactly as before, and is then re-evaluated. A missing pre-recall sidecar is
+        // installed inside that same transaction and validated before commit.
+        const validate = missingLateSchema
+          ? () => {
+            installMissingLateSchema();
+            assertCurrentDatabase(db, databasePath);
+          }
+          : () => assertCurrentDatabase(db, databasePath);
+        let progressed = false;
+        for (const recognizer of schemaRecognizers) {
+          if (recognizer(db, schemaObjects(db), expected, validate)) {
+            progressed = true;
+            break;
+          }
+        }
+        if (progressed) {
+          upgradesRemaining -= 1;
+          if (upgradesRemaining < 0) break;
+          continue;
+        }
+        // Compound predecessor drift: no single recognizer matches the store, but a bounded sequence
+        // of recognized generations may. Plan the whole chain without mutating anything, then apply
+        // it. The plan only exists when every object resolves exactly onto the current inventory, so
+        // unknown or modified schemas still fail closed with no repair.
+        if (!probe) {
+          probe = new DatabaseDriver(":memory:");
+          probe.exec("BEGIN");
+        }
+        const plan = planCompoundUpgrade(actual, expected, probe, upgradesRemaining);
+        if (!plan) break;
+        for (let index = 0; index < plan.length; index += 1) {
+          const step = plan[index]!;
+          const isFinalStep = index === plan.length - 1;
+          // Intermediate generations commit independently once their own integrity checks pass; the
+          // final generation also installs any missing late schema and runs the complete gate.
+          const stepValidate = isFinalStep ? validate : () => assertIntermediateDatabase(db);
+          if (!step.recognizer(db, schemaObjects(db), step.expected, stepValidate)) {
+            throw new Error("planned schema upgrade did not recognize its predecessor");
+          }
+        }
+        upgradesRemaining -= plan.length;
+        if (upgradesRemaining < 0) break;
       }
-      db.transaction(() => {
-        if (missingRecall) db.exec(recallSql);
-        if (missingInspection) db.exec(inspectionSql);
-        if (missingKnowledge) db.exec(knowledgeSql);
-        if (missingMarkers) db.exec(markerSql);
-        if (missingAttunements) db.exec(attunementSql);
-        if (missingReadyActions) db.exec(readyActionSql);
-        if (missingSystemOne) db.exec(systemOneSql);
-        if (missingCombatantLabels) db.exec(combatantLabelSql);
-        assertCurrentDatabase(db, databasePath);
-      }).immediate();
-      return;
-    }
-    const validate = () => assertCurrentDatabase(db, databasePath);
-    if (!upgradeStartingGrantsSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeCombatMarkerSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeCombatantLabelSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeCombatConditionsSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeAdvancementCatalogSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeCatalogAttestationLimitSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeAdventureCheckExecutionOriginSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeAdventureExactActionOriginSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeEncounterCancelledStatusSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
+    } finally {
+      if (probe) {
+        probe.exec("ROLLBACK");
+        probe.close();
+      }
     }
   } catch (error) {
     if (error instanceof CurrentSchemaError) throw error;
