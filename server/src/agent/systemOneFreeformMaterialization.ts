@@ -17,7 +17,9 @@ import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./syst
  * classifies ("does this attempt need new durable content?"), gates legality, and selects among
  * candidates the server already produced — or fails closed to no action.
  *
- * The lane is SHADOW-ONLY: it has no call site, no execution contract, and no promotion record.
+ * The lane is SHADOW-ONLY: it has no call site and no promotion record. Its execution contract
+ * (`SYSTEM_ONE_EXECUTION_CONTRACTS`) and promotion gate exist so a future passing evaluation can
+ * bind, but `isLanePromoted("freeform-materialization")` stays false without a production record.
  * Every dispatch is recorded with `shadow: true`; a lane mode of `active` changes nothing because
  * nothing consumes the composition. The deterministic free-form classifier that will own the
  * actual materialization is not implemented yet (Phase 1 of the research plan).
@@ -40,6 +42,16 @@ export const FREEFORM_MATERIALIZATION_NONE = "none_of_these";
 export const FREEFORM_NEEDS_CONTENT_KEY = "needs_content";
 export const FREEFORM_LEGAL_KEY = "legal";
 export const FREEFORM_CANDIDATE_KEY = "candidate";
+
+/**
+ * The single action family the lane may ever authorize: selecting one server-authored
+ * materialization candidate. A future active path must record its evaluation binding under this
+ * family (`systemOneEvaluationBinding("freeform-materialization", settings, responseModel,
+ * FREEFORM_MATERIALIZATION_ACTION_FAMILY)`), and the composition can only ever return a candidate
+ * id/kind from the closed authored set or a fallback. The lane never authorizes prose, stats,
+ * items, prices, stock, or a state mutation.
+ */
+export const FREEFORM_MATERIALIZATION_ACTION_FAMILY = "freeform.materialize-candidate";
 
 /** Bound on the advertised candidate set; mirrors the other lanes' closed-set caps. */
 export const FREEFORM_MATERIALIZATION_CANDIDATE_CAP = 32;

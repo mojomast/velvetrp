@@ -76,13 +76,20 @@ describe("recordFreeformMaterializationShadowDecision", () => {
     createRepository();
   });
 
-  it("is shadow-only and carries no execution contract or promotion record", () => {
+  it("is shadow-only: it declares an execution contract but carries no promotion record", () => {
     expect(SYSTEM_ONE_LANES).toContain("freeform-materialization");
     // Record-only default; System One overall is disabled by default.
     expect(defaultSystemOneLaneModes()["freeform-materialization"]).toBe("shadow");
     expect(systemOneLaneMode(defaultSystemOneSettings(), "freeform-materialization")).toBe("shadow");
     expect(defaultSystemOneSettings().enabled).toBe(false);
-    expect(Object.keys(SYSTEM_ONE_EXECUTION_CONTRACTS)).not.toContain("freeform-materialization");
+    // The execution contract declares what a future passing evaluation would bind; it grants no
+    // authority on its own, and there is deliberately no production promotion record.
+    expect(SYSTEM_ONE_EXECUTION_CONTRACTS["freeform-materialization"]).toEqual({
+      questionVersion: "freeform-materialization-v1",
+      compositionVersion: "freeform-materialization-v1",
+      candidateStrategy: "server-authored-freeform-candidates-v1",
+      stateVersion: "freeform-materialization-state-v1",
+    });
     expect(promotionRecord("freeform-materialization")).toBeUndefined();
     expect(isLanePromoted("freeform-materialization")).toBe(false);
   });

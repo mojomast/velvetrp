@@ -124,3 +124,43 @@ receipt for the whole action; the research document's proposed
 `freeform_materializations_v61` sidecar does not exist and remains a recommended
 follow-up (`freeformShopRepo.ts:44-51`). See
 [free-form generation research](freeform-generation-research.md).
+
+## System One (Jev) freeform-materialization lane
+
+The advisory `freeform-materialization` lane
+(`server/src/agent/systemOneFreeformMaterialization.ts`) is registered, has a
+shadow battery, a promotion gate (`DEFAULT_SYSTEM_ONE_LANE_GATES`), and — as of
+this promotion-path slice — an execution contract (`SYSTEM_ONE_EXECUTION_CONTRACTS`
+in `server/src/agent/systemOneBinding.ts`). It remains **shadow-only and
+unpromoted**: `isLanePromoted("freeform-materialization")` is false in production
+because there is deliberately **no production promotion record**, and no call
+site consumes its composition. System One is disabled by default
+(`SystemOneSettings.enabled: false`) and the lane's default mode is `shadow`, so
+even shadow recording does not run unless an operator opts in.
+
+The execution contract is bounded: the lane's `choice` may only select a
+candidate the server already authored (`materialize-location`, `materialize-npc`,
+`hostile-encounter`, `shop-stock`, `new-clue`) or fail closed to
+`none_of_these`; the composition never returns prose, stats, prices, stock, or a
+state mutation, and a future active path must bind under the single action family
+`FREEFORM_MATERIALIZATION_ACTION_FAMILY` (`freeform.materialize-candidate`).
+
+### Remaining evidence required to activate in production
+
+A future activation needs all of the following; none exists yet:
+
+- A frozen, provider-free **holdout with negative examples**: attempts that must
+  hold, duplicate or illegal materializations, and attempts where a wrong
+  candidate would be chosen. A no-error positive corpus is a promotion candidate,
+  not proof.
+- A passing `evaluatePromotionGate("freeform-materialization", metrics)` on that
+  holdout: at least 30 acted samples, accuracy >= 0.9, Wilson lower bound >= 0.8,
+  Brier and ECE <= 0.1.
+- A fitted monotonic Platt map recorded in `confidenceCalibration` for the lane,
+  and an `evaluatedBindings` record that exactly matches the runtime
+  `systemOneEvaluationBinding("freeform-materialization", settings,
+  responseModel, FREEFORM_MATERIALIZATION_ACTION_FAMILY)`.
+- An active call site that consumes the composed candidate and goes through the
+  existing receipted repository path (never a direct table write), gated by an
+  `active` lane mode **and** `isLanePromoted`. Until then the deterministic
+  classifier owns materialization.

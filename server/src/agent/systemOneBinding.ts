@@ -13,6 +13,16 @@ export const SYSTEM_ONE_EXECUTION_CONTRACTS = {
     questionVersion: "adventure-grouped-v1", compositionVersion: "adventure-grouped-v1",
     candidateStrategy: "family-round-robin-32-legacy-v1", stateVersion: "adventure-declaration-candidates-v1",
   },
+  // The only action this lane may ever authorize is selecting one candidate the server already
+  // authored (a location/NPC/encounter/shop/clue materialization). It can never authorize prose,
+  // stats, prices, stock, or a state mutation: `composeFreeformMaterializationDecision` returns a
+  // candidate id/kind from the closed authored set or a fallback. This contract declares what a
+  // future passing evaluation would bind and grants no authority without a matching promotion
+  // record; there is deliberately no production record (see docs/freeform-materialization.md).
+  "freeform-materialization": {
+    questionVersion: "freeform-materialization-v1", compositionVersion: "freeform-materialization-v1",
+    candidateStrategy: "server-authored-freeform-candidates-v1", stateVersion: "freeform-materialization-state-v1",
+  },
 } as const;
 
 export interface SystemOneEvaluationBinding {
