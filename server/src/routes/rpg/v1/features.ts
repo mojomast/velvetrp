@@ -114,6 +114,8 @@ import { campaignRoomParticipantHttpRoutes } from "./campaignRoomParticipant.js"
 import { campaignDmHttpRoutes } from "./campaignDm.js";
 import { freeformTravelHttpRoutes } from "./freeformTravel.js";
 import { freeformNpcHttpRoutes } from "./freeformNpc.js";
+import { freeformLoreHttpRoutes } from "./freeformLore.js";
+import { freeformEncounterHttpRoutes } from "./freeformEncounter.js";
 import { freeformShopHttpRoutes } from "./freeformShop.js";
 import { campaignStartupHttpRoutes } from "./campaignStartup.js";
 import { campaignStartingLocationHttpRoutes } from "./campaignStartingLocation.js";
@@ -908,6 +910,12 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   // One bounded free-form NPC command: the same lazy repository already
   // implements `classifyFreeformNpcIntent`/`materializeFreeformNpc`.
   await app.register(freeformNpcHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
+  // One bounded free-form lore command: the same lazy repository already
+  // implements `classifyFreeformLoreIntent`/`materializeFreeformLore`.
+  await app.register(freeformLoreHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
+  // One bounded free-form encounter command: the same lazy repository already
+  // implements `classifyFreeformEncounterIntent`/`materializeFreeformEncounter`.
+  await app.register(freeformEncounterHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
   // One bounded free-form shop command: the same lazy repository already
   // implements `classifyFreeformShopIntent`/`materializeFreeformShop`.
   await app.register(freeformShopHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });

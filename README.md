@@ -153,7 +153,7 @@ The following inventory is intentionally more concrete than the product overview
 
 The registered `dnd-5e@1.0.0` rules module is a tested development subset adapted from the 2014 SRD 5.1, not full D&D support or full SRD conformance. It provides pure deterministic helpers for the mechanics listed in the [coverage matrix](docs/srd-5.1-coverage.md); many rules and feature interactions remain partial or unsupported. This work includes material from Wizards of the Coast LLC's [official SRD source page](https://www.dndbeyond.com/srd) and the exact [System Reference Document 5.1 CC PDF](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode). VelvetRP adapts and modifies that material into deterministic software mechanics; Wizards of the Coast LLC has not endorsed these modifications.
 
-The full operation contract is in the [API reference](docs/api.md): 165 counted explicit trusted-local RPG operations plus feature discovery, excluding implicit HEAD aliases. The implementation intentionally does not duplicate the route and schema tree here.
+The full operation contract is in the [API reference](docs/api.md): 167 counted explicit trusted-local RPG operations plus feature discovery, excluding implicit HEAD aliases. The implementation intentionally does not duplicate the route and schema tree here.
 
 ## Requirements
 
