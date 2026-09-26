@@ -172,6 +172,27 @@ export {
   type FreeformShopRepository,
   type FreeformShopStockLine,
 } from "./freeform/freeformShopRepo.js";
+export {
+  MAX_FREEFORM_ENCOUNTER_ENEMIES,
+  MIN_FREEFORM_ENCOUNTER_ENEMIES,
+  FreeformEncounterAuthorizationError,
+  FreeformEncounterConflictError,
+  FreeformEncounterUnavailableError,
+  classifyFreeformEncounter,
+  createFreeformEncounterRepository,
+  deriveFreeformEncounterIntensity,
+  isFreeformEncounterProvocation,
+  type FreeformEncounterCandidate,
+  type FreeformEncounterClassification,
+  type FreeformEncounterEnemyReference,
+  type FreeformEncounterEnemyTemplate,
+  type FreeformEncounterIntensity,
+  type FreeformEncounterMaterialization,
+  type FreeformEncounterMaterializedCandidate,
+  type FreeformEncounterNoneReason,
+  type FreeformEncounterPorts,
+  type FreeformEncounterRepository,
+} from "./freeform/freeformEncounterRepo.js";
 export { createEncounterPlanningService, type EncounterPlanningService, type EncounterPlanningDependencies,
   type EncounterCatalogDefinition, type EncounterCandidate, type EncounterPlanningDifficulty,
   type CampaignEncounterRequest, type CampaignEncounterPlan } from "./dm/encounterPlanning.js";

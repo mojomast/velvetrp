@@ -107,6 +107,7 @@ import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js"
 import { createFreeformTravelRepository } from "./freeform/freeformTravelRepo.js";
 import { createFreeformNpcRepository } from "./freeform/freeformNpcRepo.js";
 import { createFreeformShopRepository } from "./freeform/freeformShopRepo.js";
+import { createFreeformEncounterRepository } from "./freeform/freeformEncounterRepo.js";
 import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
 import { createCampaignRoomParticipantRepository } from "./campaignRoomParticipantRepo.js";
 import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
@@ -849,6 +850,12 @@ function createRepositoryComposition<T>(
   },()=>{
     assertOpen();if(transactionDepth>0)throw new Error("freeform shop operation cannot run inside a repository transaction");
   });
+  const freeformEncounterRepository=createFreeformEncounterRepository(db,dependencies,{
+    createEncounter:(principalId,campaignId,input)=>encounterRepository.createEncounter(principalId,campaignId,input),
+    startEncounter:(principalId,encounterId,input)=>encounterRepository.startEncounter(principalId,encounterId,input),
+  },()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("freeform encounter operation cannot run inside a repository transaction");
+  });
   const campaignAdministrationIntegrationRepository = createCampaignAdministrationIntegrationRepository(db, dependencies, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("campaign administration integration cannot run inside a repository transaction");
   });
@@ -930,6 +937,7 @@ function createRepositoryComposition<T>(
     ...freeformTravelRepository,
     ...freeformNpcRepository,
     ...freeformShopRepository,
+    ...freeformEncounterRepository,
     ...campaignAdministrationIntegrationRepository,
     applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
       assertOpen();
