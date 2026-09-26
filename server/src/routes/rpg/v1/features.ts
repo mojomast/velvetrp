@@ -114,6 +114,7 @@ import { campaignRoomParticipantHttpRoutes } from "./campaignRoomParticipant.js"
 import { campaignDmHttpRoutes } from "./campaignDm.js";
 import { freeformTravelHttpRoutes } from "./freeformTravel.js";
 import { freeformNpcHttpRoutes } from "./freeformNpc.js";
+import { freeformShopHttpRoutes } from "./freeformShop.js";
 import { campaignStartupHttpRoutes } from "./campaignStartup.js";
 import { campaignStartingLocationHttpRoutes } from "./campaignStartingLocation.js";
 import type { CampaignStartingLocationRepository } from "../../../repo/campaignStartingLocationRepo.js";
@@ -907,6 +908,9 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   // One bounded free-form NPC command: the same lazy repository already
   // implements `classifyFreeformNpcIntent`/`materializeFreeformNpc`.
   await app.register(freeformNpcHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
+  // One bounded free-form shop command: the same lazy repository already
+  // implements `classifyFreeformShopIntent`/`materializeFreeformShop`.
+  await app.register(freeformShopHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
   // One server-owned startup command: same lazy repository, same scene-image
   // accessors, and the same optional agent dependencies as the DM lane.
   await app.register(campaignStartupHttpRoutes, {
