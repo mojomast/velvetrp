@@ -131,6 +131,23 @@ export {
   type FreeformTravelMaterialization,
   type FreeformTravelRepository,
 } from "./freeform/freeformTravelRepo.js";
+export {
+  MAX_FREEFORM_NPC_NAME_LENGTH,
+  FREEFORM_NPC_ARCHETYPES,
+  FreeformNpcAuthorizationError,
+  FreeformNpcConflictError,
+  FreeformNpcUnavailableError,
+  classifyFreeformNpc,
+  createFreeformNpcRepository,
+  parseFreeformNpcAddress,
+  selectFreeformNpcArchetype,
+  type FreeformNpcArchetypeTemplate,
+  type FreeformNpcCandidate,
+  type FreeformNpcClassification,
+  type FreeformNpcLocationContext,
+  type FreeformNpcMaterialization,
+  type FreeformNpcRepository,
+} from "./freeform/freeformNpcRepo.js";
 export { createEncounterPlanningService, type EncounterPlanningService, type EncounterPlanningDependencies,
   type EncounterCatalogDefinition, type EncounterCandidate, type EncounterPlanningDifficulty,
   type CampaignEncounterRequest, type CampaignEncounterPlan } from "./dm/encounterPlanning.js";

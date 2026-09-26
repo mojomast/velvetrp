@@ -105,6 +105,7 @@ import { AgentObservationUnavailableError, createAgentObservationRepository } fr
 import { createAgentObservationReadRepository } from "./observations/agentObservationReadRepo.js";
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
 import { createFreeformTravelRepository } from "./freeform/freeformTravelRepo.js";
+import { createFreeformNpcRepository } from "./freeform/freeformNpcRepo.js";
 import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
 import { createCampaignRoomParticipantRepository } from "./campaignRoomParticipantRepo.js";
 import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
@@ -829,6 +830,15 @@ function createRepositoryComposition<T>(
   },()=>{
     assertOpen();if(transactionDepth>0)throw new Error("freeform travel operation cannot run inside a repository transaction");
   });
+  const freeformNpcRepository=createFreeformNpcRepository(db,dependencies,{
+    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
+    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
+    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
+    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
+    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
+  },()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("freeform npc operation cannot run inside a repository transaction");
+  });
   const campaignAdministrationIntegrationRepository = createCampaignAdministrationIntegrationRepository(db, dependencies, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("campaign administration integration cannot run inside a repository transaction");
   });
@@ -908,6 +918,7 @@ function createRepositoryComposition<T>(
     ...exactCandidateProviderBridge,
     ...campaignGenerationRepository,
     ...freeformTravelRepository,
+    ...freeformNpcRepository,
     ...campaignAdministrationIntegrationRepository,
     applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
       assertOpen();
