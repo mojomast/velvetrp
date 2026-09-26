@@ -84,7 +84,12 @@ export const DM_NARRATION_COMPLETION_MAX_TOKENS = 1536;
 export const DM_AGGREGATE_TOKEN_CAP = 64_000;
 /** Blockers that mean the table is deciding; the world may still pace and breathe rather than hard-block. */
 const PACING_BLOCKERS = new Set(["waiting-for-player-combat-action", "scene-resolution-requires-gm-binding-or-human-adjudication"]);
-type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any };
+/**
+ * Non-state beats that pace the world. A declared materialization may be scheduled directly by
+ * the server when these are the only candidates that keep it company (see `claimDmPlanning`).
+ */
+const PACING_ACTIONS = new Set<CampaignDmCandidate["action"]>(["ambient-beat", "advance-time"]);
+type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any; preferred?: boolean };
 type RunRow = {
   run_id: string; campaign_id: string; session_id: string; timeline_id: string;
   principal_id: string; gm_principal_id: string; mode: "human" | "ai"; mode_revision: number;
@@ -467,7 +472,9 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       const command = { campaignId: c, sessionId: s, timelineId: context.timelineId, modeRevision: control(c).revision,
         action, target, revision, data: data ?? null };
       const digest = hash(command);
-      bindings.push({ candidate: { candidateId: `dm-candidate:${digest.slice(0,40)}`, digest, action, label: label.slice(0,500) }, target, revision, ...(data === undefined ? {} : { data }) });
+      const binding: Binding = { candidate: { candidateId: `dm-candidate:${digest.slice(0,40)}`, digest, action, label: label.slice(0,500) }, target, revision, ...(data === undefined ? {} : { data }) };
+      bindings.push(binding);
+      return binding;
     };
     let evidence: { turnId: string; actorId: string; intent: string; facts: unknown[]; receiptIds: string[]; sources:Array<{kind:string;targetId:string}> } | null = null;
     // A completed original turn's own declaration is usable context even when it has no
@@ -596,12 +603,16 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       // fact; a declaration-only turn never satisfies story evidence (see above). The deterministic
       // classifier owns the closure and visibility; here we only advertise its exact candidate. An
       // unmapped destination is never a blocker, and human mode keeps its existing manual flow.
+      // The first materialization the declaration yields is `preferred`: it is the direct answer
+      // to the player's stated action, so it leads the advertised list and the server may commit
+      // it without Director discretion when nothing else actionable competes (see claimDmPlanning).
+      let preferred: Binding | null = null;
       const freeform = evidence ?? declaration;
       if (control(c).mode === "ai" && freeform) {
         const travel = services.classifyFreeformTravelIntent(g, c, s, freeform.actorId, freeform.intent);
         if (travel.intent === "materialize-location" && travel.candidates[0]) {
           const candidate = travel.candidates[0];
-          add("materialize-location", `Establish and travel to: ${candidate.name}`, candidate.candidateId, 0,
+          preferred = add("materialize-location", `Establish and travel to: ${candidate.name}`, candidate.candidateId, 0,
             { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
         // Free-form person, clue and hostile materialization follow the same closed pattern: the
@@ -612,19 +623,19 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         const npc = services.classifyFreeformNpcIntent(g, c, s, freeform.actorId, freeform.intent);
         if (npc.intent === "materialize-npc" && npc.candidates[0]) {
           const candidate = npc.candidates[0];
-          add("materialize-npc", `Introduce a new face: ${candidate.name}`, candidate.candidateId, 0,
+          preferred ??= add("materialize-npc", `Introduce a new face: ${candidate.name}`, candidate.candidateId, 0,
             { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
         const lore = services.classifyFreeformLoreIntent(g, c, s, freeform.actorId, freeform.intent);
         if (lore.intent === "materialize-lore" && lore.candidates[0]) {
           const candidate = lore.candidates[0];
-          add("materialize-lore", `Establish a new clue: ${candidate.title}`, candidate.candidateId, 0,
+          preferred ??= add("materialize-lore", `Establish a new clue: ${candidate.title}`, candidate.candidateId, 0,
             { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
         const encounter = services.classifyFreeformEncounterIntent(g, c, s, freeform.actorId, freeform.intent);
         if (encounter.intent === "materialize-encounter" && encounter.candidates[0]) {
           const candidate = encounter.candidates[0];
-          add("materialize-encounter", `Resolve a hostile encounter: ${candidate.encounterName}`, candidate.candidateId, 0,
+          preferred ??= add("materialize-encounter", `Resolve a hostile encounter: ${candidate.encounterName}`, candidate.candidateId, 0,
             { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
       }
@@ -647,6 +658,14 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         add("advance-time", `Let ${DM_WORLD_TIME_STEP_MINUTES} minutes of world time pass`, s, elapsed,
           { minutes: DM_WORLD_TIME_STEP_MINUTES, elapsedBefore: elapsed });
         add("ambient-beat", "Hold on an ambient moment with no state change", s, 0, {});
+      }
+      // An explicit declaration must not be buried behind unrelated story beats: lead with its
+      // server-authored materialization while leaving every other candidate available to the
+      // Director. The marker itself is server-internal (never part of the public candidate).
+      if (preferred) {
+        preferred.preferred = true;
+        const index = bindings.indexOf(preferred);
+        if (index > 0) { bindings.splice(index, 1); bindings.unshift(preferred); }
       }
     }
     const bounded = bindings.slice(0, 24);
@@ -916,6 +935,21 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         }
         queueNarration(r,holdNarration(r));
         db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(id);return null;
+      }
+      // Server-owned world-filling: an explicit declaration that maps to exactly one server-authored
+      // materialization is committed without waiting on Director discretion when nothing else
+      // actionable competes (no story/combat candidate and no open encounter). The candidate is
+      // still server-authored and goes through the ordinary atomic, receipted, idempotent execute
+      // path. Richer candidate sets still dispatch, so the Director keeps the choice when content
+      // competes. Human mode never carries the `preferred` marker (the free-form block is ai-only),
+      // and the mode check here is defensive.
+      const preferred=bindings.filter(binding=>binding.preferred===true);
+      if(r.mode==="ai"&&preferred.length===1
+        &&bindings.every(binding=>binding===preferred[0]||PACING_ACTIONS.has(binding.candidate.action))
+        &&!db.prepare("SELECT 1 FROM encounter WHERE campaign_id=? AND session_id=? AND status IN ('preparing','active')").get(r.campaign_id,r.session_id)){
+        db.prepare("UPDATE dm_runs SET state='awaiting-approval',proposal_json=?,revision=revision+1 WHERE run_id=?")
+          .run(json([{candidateId:preferred[0]!.candidate.candidateId,digest:preferred[0]!.candidate.digest}]),id);
+        return null;
       }
       const claimId=deps.ids.nextId(),context=JSON.parse(r.context_json),candidates=bindings.map(b=>b.candidate);
        db.prepare(`INSERT INTO dm_dispatches VALUES(?,?,?,?,?,?,'claimed',NULL,${DM_PLANNING_PROMPT_MAX_TOKENS},${DM_PLANNING_COMPLETION_MAX_TOKENS})`).run(id,claimId,

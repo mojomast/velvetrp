@@ -1,10 +1,10 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { generatedCampaignContentProviderSchema, type CampaignDmCandidate, type PrivateAdventureTurn } from "@velvet/contracts";
 import { orchestrateAdventureTurn } from "../src/agent/adventureOrchestrator.js";
 import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.js";
-import { dmDependencies, dmFixture } from "./fixtures/dmCampaign.js";
+import { dmCompletion, dmDependencies, dmFixture } from "./fixtures/dmCampaign.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -314,5 +314,103 @@ describe("freeform declaration-only director integration", () => {
     expect(work.candidates.some((value) => value.action === "resolve-node")).toBe(false);
     expect(work.candidates.some((value) => value.action === "reveal-node")).toBe(false);
     f.repo.close();
+  });
+});
+
+describe("freeform declaration auto-materialization", () => {
+  it("materializes a declaration-only location without a director selection", async () => {
+    const f = await dmFixture(true);
+    // No story graph: the only actionable candidate is the declaration's materialization, so the
+    // server schedules it directly rather than leaving it to the Director's discretion.
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "auto-ai" });
+    const evidence = await failedCheckTurn(f, "I go to the glassblower's district");
+    const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id,
+      { intent: "continue", expectedModeRevision: 1, idempotencyKey: "auto-beat", evidenceTurnId: evidence });
+
+    // The planning lane must never dispatch; the narration lane still runs.
+    const complete = vi.fn(async (input) => {
+      expect(input.promptVersion).toBe("campaign-dm-narration-v1");
+      return dmCompletion(input);
+    });
+    await orchestrateCampaignDmBeat(f.repo, OWNER, run.runId, dmDependencies(complete));
+
+    const executed = f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId);
+    expect(executed.state).toBe("completed");
+    expect(executed.receipts.map(({ action }) => action)).toEqual(["materialize-location"]);
+    expect(complete).toHaveBeenCalledTimes(1);
+
+    const db = openDb();
+    expect(countOf(db, "SELECT count(*) n FROM campaign_locations_v28 WHERE campaign_id=?", f.campaign.id)).toBe(2);
+    expect(countOf(db, "SELECT count(*) n FROM world_commands_v28 WHERE campaign_id=? AND session_id=? AND command_type='travel'",
+      f.campaign.id, f.session.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+
+  it("keeps the materialization preferred but dispatches when a story candidate competes", async () => {
+    const f = await dmFixture();
+    f.graph();
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "competing-ai" });
+    const evidence = await evidencedTurn(f, "I go to the glassblower's district");
+    const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id,
+      { intent: "continue", expectedModeRevision: 1, idempotencyKey: "competing-beat", evidenceTurnId: evidence });
+
+    const work = f.repo.claimDmPlanning(OWNER, run.runId, "fake", "fake")!;
+    // The declaration's materialization leads the advertised list, but a competing story beat
+    // still forces a Director decision instead of an automatic commit.
+    expect(work.candidates[0]!.action).toBe("materialize-location");
+    expect(work.candidates.filter((candidate) => candidate.action === "materialize-location")).toHaveLength(1);
+    expect(work.candidates.some((candidate) => candidate.action === "reveal-node")).toBe(true);
+    expect(work.candidates[0]).not.toHaveProperty("preferred");
+    expect(f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId).state).toBe("planning");
+    f.repo.close();
+  });
+
+  it("exactly once replays an auto-scheduled materialization", async () => {
+    const f = await dmFixture(true);
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "auto-replay-ai" });
+    const evidence = await failedCheckTurn(f, "I go to the glassblower's district");
+    const request = { intent: "continue" as const, expectedModeRevision: 1, idempotencyKey: "auto-replay-beat", evidenceTurnId: evidence };
+    const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, request);
+    await orchestrateCampaignDmBeat(f.repo, OWNER, run.runId, dmDependencies());
+
+    const replay = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, request);
+    expect(replay.runId).toBe(run.runId);
+    await orchestrateCampaignDmBeat(f.repo, OWNER, replay.runId,
+      dmDependencies(async () => { throw new Error("replay must not dispatch a provider"); }));
+
+    const db = openDb();
+    expect(countOf(db, "SELECT count(*) n FROM campaign_locations_v28 WHERE campaign_id=?", f.campaign.id)).toBe(2);
+    expect(countOf(db, "SELECT count(*) n FROM world_commands_v28 WHERE campaign_id=? AND session_id=? AND command_type='travel'",
+      f.campaign.id, f.session.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+
+  it("does not auto-materialize or advertise a free-form candidate in human mode", async () => {
+    const f = await dmFixture(true);
+    f.graph();
+    seedHarbor(f);
+    // Human mode is the default; no setDmControl call.
+    const evidence = await failedCheckTurn(f, "I go to the glassblower's district");
+    const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id,
+      { intent: "continue", expectedModeRevision: 0, idempotencyKey: "human-freeform-beat", evidenceTurnId: evidence });
+    const work = f.repo.claimDmPlanning(OWNER, run.runId, "fake", "fake");
+    // The server did not silently schedule anything; the run still awaits a Director proposal.
+    expect(work).not.toBeNull();
+    expect(work!.candidates.some((candidate) => candidate.action === "materialize-location")).toBe(false);
+    expect(f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId).state).toBe("planning");
+
+    const reveal = work!.candidates.find((candidate) => candidate.action === "reveal-node")!;
+    f.repo.settleDmPlanning(OWNER, run.runId, work!.claimId, { candidateId: reveal.candidateId, digest: reveal.digest }, null);
+    await orchestrateCampaignDmBeat(f.repo, OWNER, run.runId, dmDependencies());
+    // Without a human approval the proposal is not executed and no world state changes.
+    expect(f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId).state).toBe("awaiting-approval");
+    const db = openDb();
+    expect(countOf(db, "SELECT count(*) n FROM campaign_locations_v28 WHERE campaign_id=?", f.campaign.id)).toBe(1);
+    db.close(); f.repo.close();
   });
 });
