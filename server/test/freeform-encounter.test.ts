@@ -135,6 +135,27 @@ describe("freeform encounter materialization", () => {
     f.repo.close();
   });
 
+  it("reports a bounded conflict when the session already has an open encounter", async () => {
+    const f = await dmFixture();
+    const first = f.repo.materializeFreeformEncounter(OWNER, f.campaign.id, f.session.id, f.actorId, HOSTILE);
+    expect(first.status).toBe("materialized");
+    if (first.status !== "materialized") throw new Error("expected a materialized encounter");
+    const firstRoster = JSON.stringify(first.candidate.enemies);
+    // The create idempotency key is derived from the exact roster, so only a
+    // different roster is a genuinely new encounter: the already-open one makes
+    // the engine refuse, and that refusal must surface as the bounded conflict.
+    const alternate = ["I attack the swarm of rats!", "I attack the elite champion!", "I attack the goblins!",
+      "I attack the shapes in the fog!", "I draw my sword and attack the foe!"].find((text) => {
+      const classification = f.repo.classifyFreeformEncounterIntent(OWNER, f.campaign.id, f.session.id, f.actorId, text);
+      return classification.intent === "materialize-encounter"
+        && JSON.stringify(classification.candidates[0]?.enemies) !== firstRoster;
+    });
+    expect(alternate).toBeDefined();
+    expect(() => f.repo.materializeFreeformEncounter(OWNER, f.campaign.id, f.session.id, f.actorId, alternate!))
+      .toThrow(FreeformEncounterConflictError);
+    f.repo.close();
+  });
+
   it("converges exactly once on replay", async () => {
     const f = await dmFixture();
     const first = f.repo.materializeFreeformEncounter(OWNER, f.campaign.id, f.session.id, f.actorId, HOSTILE);

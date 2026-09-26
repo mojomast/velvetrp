@@ -58,6 +58,7 @@ import type {
   EncounterReceipt,
   EncounterResult,
 } from "../encounter/index.js";
+import { EncounterConflictError, EncounterStaleError } from "../encounter/encounterErrors.js";
 
 /** Upper bound on combatants in one free-form hostile encounter. */
 export const MAX_FREEFORM_ENCOUNTER_ENEMIES = 4;
@@ -375,11 +376,22 @@ export function createFreeformEncounterRepository(
           idempotencyKey: createKey,
         });
         // The encounter lifecycle requires GM authority; the player intent was authorized above.
-        const created = ports.createEncounter(authority, campaignId, createRequest);
-        const started = ports.startEncounter(authority, created.encounter.encounterId, encounterStartCommandRequestSchema.parse({
-          expectedRevision: created.encounter.revision,
-          idempotencyKey: startKey,
-        }));
+        // A session that already has an open encounter (or a stale create) is a bounded conflict,
+        // never an unexpected 500: translate the engine's own conflict/stale errors.
+        let created: ReturnType<FreeformEncounterPorts["createEncounter"]>;
+        let started: ReturnType<FreeformEncounterPorts["startEncounter"]>;
+        try {
+          created = ports.createEncounter(authority, campaignId, createRequest);
+          started = ports.startEncounter(authority, created.encounter.encounterId, encounterStartCommandRequestSchema.parse({
+            expectedRevision: created.encounter.revision,
+            idempotencyKey: startKey,
+          }));
+        } catch (error) {
+          if (error instanceof EncounterConflictError || error instanceof EncounterStaleError) {
+            throw new FreeformEncounterConflictError("the session already has an open encounter or cannot start another right now");
+          }
+          throw error;
+        }
 
         return {
           status: "materialized" as const,
