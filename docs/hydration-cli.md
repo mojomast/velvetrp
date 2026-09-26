@@ -74,3 +74,25 @@ The reusable `scripts/recipes/harness-wars.json` recipe demonstrates a serial de
 - A changed recipe, including changed `expandFrom` selectors, API base, or campaign is rejected for an existing ledger. Select a new ledger path for a deliberately different run.
 
 Campaign creation and starter setup are intentionally not auto-retried if their response is lost. Inspect authoritative campaign state before starting again with explicit flags and an appropriate ledger.
+
+## Campaign startup
+
+After every generation/apply pass, the CLI runs the server-owned, idempotent
+campaign startup command so a freshly created campaign is immediately playable.
+Startup is **on by default for `--create-campaign`**; force it with `--startup`
+or opt out with `--skip-startup`
+(`(options.startup ?? (options.createCampaign !== undefined))`,
+`scripts/hydrate-campaign.ts:359`). When creating with `--campaign-id` instead,
+pass `--startup` explicitly.
+
+The CLI resolves the campaign's first attached room deterministically from the
+rooms list (`firstAttachedRoom`, `scripts/hydrate-campaign.ts:158-173`). If no
+room is attached it logs a skip and leaves `ledger.startup` unrecorded so a later
+run can retry (`:360-363`). Otherwise it POSTs the startup command with an empty
+body (`:364-368`). Reported blockers are logged, and the ledger records
+`startup.status: "complete"` even when blockers exist, so the CLI does not
+automatically re-attempt on resume; re-invoke the command (or attach a room
+first) to finish. A persisted `startup.status: "dispatching"` at load means the
+outcome is uncertain and stops the run for explicit inspection (`:323`). See
+[campaign startup](campaign-startup.md) for the command's order, idempotency
+keys, and public-only scope.
