@@ -164,3 +164,36 @@ A future activation needs all of the following; none exists yet:
   existing receipted repository path (never a direct table write), gated by an
   `active` lane mode **and** `isLanePromoted`. Until then the deterministic
   classifier owns materialization.
+
+## Known limitations and prerequisites
+
+These are operational prerequisites, not bugs. They were found by running the
+commands against a seeded world with a live server.
+
+- **DM-beat free-form candidates need a `dnd-5e` (srd-5.1) campaign.** The
+  director offers `materialize-location`/`-npc`/`-lore`/`-encounter` only when a
+  beat carries evidence, and evidence is built from a completed adventure turn's
+  receipt links (check/quest/victory receipts). Adventure check candidates are
+  generated only when `sheetSnapshot` resolves the campaign ruleset to the
+  `dnd-5e` v1.0.0 descriptor (`server/src/repo/adventureCheckRepo.ts`). A campaign
+  on the legacy `velvet:rules:starter-v1` profile never produces SRD checks, so
+  it never produces check evidence, so the evidence-gated candidates never
+  appear. To exercise them, start from the `srd-5.1` starter. The direct
+  `freeform-*-commands` routes do not depend on the ruleset.
+- **The text classifiers need an artifact-backed current location.** Travel, NPC,
+  and lore materialization require the acting actor's current location to have an
+  accepted PUBLIC location artifact
+  (`campaign_generation_accepted_artifacts_v52`, `artifact_kind='location'`).
+  A world with no generated+applied content (or only manually created locations)
+  declines with `current-location-unmapped` rather than writing a connection it
+  cannot reference.
+- **An open encounter bounds encounter creation.** While a session has an open
+  (`preparing`/`active`) encounter, the encounter lifecycle refuses a new create.
+  Both the `freeform-encounter-commands` route and the DM `materialize-encounter`
+  candidate surface this as a bounded conflict (`FreeformEncounterConflictError`
+  → 409, or `CampaignDmConflictError`), never an unexpected 500.
+- **Scene-image hydration requires a reachable image backend.** Startup enqueues
+  one job per public location, but jobs fail with `submission-failed` when the
+  configured `VELVET_SCENE_IMAGES_BASE_URL` is unreachable or erroring (observed
+  502 in the test environment). The queue is correct; only the backend was down.
+
