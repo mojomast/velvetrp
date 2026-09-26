@@ -1,6 +1,7 @@
 import {
   economyHttpCommandRequestSchema,
   economyHttpCommandResponseSchema,
+  economyHttpNpcShopAssociationGetResponseSchema,
   economyHttpShopGetResponseSchema,
   economyHttpWalletGetResponseSchema,
   resourceIdSchema,
@@ -30,7 +31,7 @@ const APPLICATION_JSON = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+
 export interface ActorEconomyHttpOptions {
   economyRepositoryAccessor: () => Pick<EconomyRepository,
     "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">
-    & Pick<AdventureCommerceRepository, "requestVendorSaleQuote">;
+    & Pick<AdventureCommerceRepository, "requestVendorSaleQuote" | "getNpcShop">;
 }
 
 function invalidQuery(request: FastifyRequest): boolean {
@@ -130,6 +131,27 @@ export const actorEconomyHttpRoutes: FastifyPluginAsync<ActorEconomyHttpOptions>
       } catch (error) {
         request.log.error({ operation: "shop-read", method: request.method, route: request.routeOptions.url }, "RPG shop operation failed");
         return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Shop could not be loaded");
+      }
+    },
+  );
+
+  // Reads the one existing merchant binding for an NPC so a client can reopen a
+  // previously materialized shop instead of reissuing the materialization command.
+  app.get<{ Params: { campaignId: string; npcId: string }; Querystring: Record<string, unknown> }>(
+    "/campaigns/:campaignId/npcs/:npcId/shop", { exposeHeadRoute: false }, async (request, reply) => {
+      if (!(await shopGuard(request, reply))) return;
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      const npcId = resourceIdSchema.safeParse(request.params.npcId);
+      if (!campaignId.success || !npcId.success) return shopNotFound(request, reply);
+      try {
+        const association = options.economyRepositoryAccessor().getNpcShop(LOCAL_OWNER, campaignId.data, npcId.data);
+        if (association === null || association.campaignId !== campaignId.data || association.npcId !== npcId.data) return shopNotFound(request, reply);
+        return reply.code(200).send(economyHttpNpcShopAssociationGetResponseSchema.parse({
+          association: { npcId: association.npcId, vendorLabel: association.vendorLabel, shopId: association.shopId, shopLabel: association.shopLabel },
+        }));
+      } catch (error) {
+        request.log.error({ operation: "npc-shop-association-read", method: request.method, route: request.routeOptions.url }, "RPG NPC shop association operation failed");
+        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Shop association could not be loaded");
       }
     },
   );

@@ -287,6 +287,7 @@ import {
   actorResourcesHttpGetResponseSchema,
   economyHttpCommandRequestSchema,
   economyHttpCommandResponseSchema,
+  economyHttpNpcShopAssociationGetResponseSchema,
   economyHttpShopGetResponseSchema,
   economyHttpWalletGetResponseSchema,
   vendorSaleQuoteRequestSchema,
@@ -311,6 +312,7 @@ import type {
   ActorResourcesHttpGetResponse,
   EconomyHttpCommandRequest,
   EconomyHttpCommandResponse,
+  EconomyHttpNpcShopAssociationGetResponse,
   EconomyHttpShopGetResponse,
   EconomyHttpWalletGetResponse,
   VendorSaleQuoteRequest,
@@ -1720,6 +1722,27 @@ export async function getCampaignShop(campaignId: string, shopId: string): Promi
   const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/shops/${encodeURIComponent(validShopId)}`, { cache: "no-store" });
   requireStatus(success, 200, "Campaign shop read");
   return economyHttpShopGetResponseSchema.parse(success.body);
+}
+
+/**
+ * Reads the existing NPC-to-shop association for one merchant. A missing
+ * association and missing authorization are the same non-disclosing 404, which
+ * this transport maps to `null`; every other failure still throws so callers can
+ * never mistake an outage for "no shop yet".
+ */
+export async function getCampaignNpcShop(campaignId: string, npcId: string): Promise<EconomyHttpNpcShopAssociationGetResponse["association"] | null> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const validNpcId = parseApiInput(() => resourceIdSchema.parse(npcId));
+  try {
+    const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/npcs/${encodeURIComponent(validNpcId)}/shop`, { cache: "no-store" });
+    requireStatus(success, 200, "Campaign NPC shop association read");
+    const response = economyHttpNpcShopAssociationGetResponseSchema.parse(success.body);
+    if (response.association.npcId !== validNpcId) throw new Error("Campaign NPC shop association did not match the request");
+    return response.association;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 /**

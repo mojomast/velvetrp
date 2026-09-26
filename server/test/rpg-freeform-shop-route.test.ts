@@ -98,6 +98,28 @@ describe("freeform shop HTTP command", () => {
     await app.close();
   });
 
+  it("exposes the existing NPC-to-shop association after materialization and masks its absence", async () => {
+    enableRpg();
+    const f = await dmFixture();
+    const merchantId = seedMerchant(f);
+    const app = appFor(f);
+    const associationUrl = `/api/rpg/v1/campaigns/${f.campaign.id}/npcs/${merchantId}/shop`;
+
+    // Before any materialization the association is a non-disclosing 404.
+    const missing = await app.inject({ method: "GET", url: associationUrl });
+    expect(missing.statusCode, missing.body).toBe(404);
+    expect(missing.json()).toMatchObject({ code: "RPG_SHOP_NOT_FOUND" });
+
+    const materialized = await app.inject(post(shopUrl(f.campaign.id, f.session.id, f.actorId), { merchantNpcId: merchantId }));
+    expect(materialized.statusCode, materialized.body).toBe(200);
+    const shopId = materialized.json().materialization.shopId as string;
+
+    const found = await app.inject({ method: "GET", url: associationUrl });
+    expect(found.statusCode, found.body).toBe(200);
+    expect(found.json()).toMatchObject({ association: { npcId: merchantId, vendorLabel: "Mara", shopId } });
+    await app.close();
+  });
+
   it("returns only the classification when there is no candidate", async () => {
     enableRpg();
     const f = await dmFixture();

@@ -28,6 +28,7 @@ export interface CampaignContextDrawerApi extends Partial<TacticalMapPanelApi> {
   getCampaignPublishedMaterials?: (campaignId:string)=>Promise<CampaignPublishedMaterials>;
   /** Optional free-form merchant-shop lane. Present only when the host wires the shop transports. */
   visitMerchant?: MerchantVisitApi["visitMerchant"];
+  getNpcShop?: MerchantVisitApi["getNpcShop"];
   getShop?: MerchantVisitApi["getShop"];
   getWallet?: MerchantVisitApi["getWallet"];
   economyCommand?: MerchantVisitApi["economyCommand"];
@@ -204,8 +205,8 @@ function BoundCampaignContextDrawer({ campaignId, sessionId, selectedActorId, pl
   const materialValue=materials.state==="ready"?materials.value:materials.stale;
   const availableNpcs = rosterValue?.filter((npc) => !castValue?.members.some((member) => member.id === npc.id)) ?? [];
   const canManage = !readOnly && !commandsBlocked && cast.state === "ready" && world.state === "ready" && audience === "gm" && castValue?.state === "running";
-  const merchantVisitApi: MerchantVisitApi | null = api.visitMerchant && api.getShop && api.getWallet && api.economyCommand
-    ? { visitMerchant: api.visitMerchant, getShop: api.getShop, getWallet: api.getWallet, economyCommand: api.economyCommand } : null;
+  const merchantVisitApi: MerchantVisitApi | null = api.visitMerchant && api.getNpcShop && api.getShop && api.getWallet && api.economyCommand
+    ? { visitMerchant: api.visitMerchant, getNpcShop: api.getNpcShop, getShop: api.getShop, getWallet: api.getWallet, economyCommand: api.economyCommand } : null;
   // GM/owner audiences, or a player controlling the selected actor, may visit a present merchant.
   const canVisitMerchant = Boolean(merchantVisitApi) && !readOnly && !commandsBlocked && castValue?.state === "running"
     && (audience === "gm" || actorEligible) && selectedActorId !== null;

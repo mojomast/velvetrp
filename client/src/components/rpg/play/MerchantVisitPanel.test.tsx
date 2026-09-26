@@ -29,7 +29,7 @@ const purchaseResponse: EconomyHttpCommandResponse = { type: "purchase_from_shop
   receipt: { type: "purchase_from_shop", idempotencyKey: "purchase-key", revisionBefore: 5, revisionAfter: 6, occurredAt: at } };
 
 function apiMock(overrides: Partial<MerchantVisitApi> = {}): MerchantVisitApi {
-  return { visitMerchant: vi.fn(), getShop: vi.fn(), getWallet: vi.fn(), economyCommand: vi.fn(), ...overrides };
+  return { visitMerchant: vi.fn(), getNpcShop: vi.fn().mockResolvedValue(null), getShop: vi.fn(), getWallet: vi.fn(), economyCommand: vi.fn(), ...overrides };
 }
 
 const merchants = [{ npcId: "npc-mara", name: "Mara" }];
@@ -43,7 +43,7 @@ describe("MerchantVisitPanel", () => {
     const api = apiMock({ visitMerchant: vi.fn().mockResolvedValue(materialized), getWallet: vi.fn().mockResolvedValue(wallet), getShop: vi.fn().mockResolvedValue(shop) });
     renderPanel(api);
     expect(api.visitMerchant).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("Present NPC to visit"), { target: { value: "npc-mara" } });
+    fireEvent.change(screen.getByLabelText("Merchant to visit"), { target: { value: "npc-mara" } });
     fireEvent.click(screen.getByRole("button", { name: "Visit merchant" }));
     await screen.findByText("Mara's wares");
     expect(api.visitMerchant).toHaveBeenCalledTimes(1);
@@ -55,12 +55,27 @@ describe("MerchantVisitPanel", () => {
     expect(screen.getByText(/105 minor units \(gold\) each/)).toBeTruthy();
   });
 
+  it("reopens the existing association's shop without reissuing the materialize command", async () => {
+    const association = { npcId: "npc-mara", vendorLabel: "Mara", shopId: "ff-shop-existing", shopLabel: "Mara's wares" };
+    const api = apiMock({ getNpcShop: vi.fn().mockResolvedValue(association), getWallet: vi.fn().mockResolvedValue(wallet), getShop: vi.fn().mockResolvedValue(shop) });
+    renderPanel(api);
+    fireEvent.change(screen.getByLabelText("Merchant to visit"), { target: { value: "npc-mara" } });
+    fireEvent.click(screen.getByRole("button", { name: "Visit merchant" }));
+    await screen.findByText("Mara's wares");
+    // The association read replaces the materialize command entirely.
+    expect(api.getNpcShop).toHaveBeenCalledWith("campaign", "npc-mara");
+    expect(api.visitMerchant).not.toHaveBeenCalled();
+    expect(api.getShop).toHaveBeenCalledWith("campaign", "ff-shop-existing");
+    expect(screen.getByText(/already stocked for Mara/)).toBeTruthy();
+    expect(screen.getByText("potion")).toBeTruthy();
+  });
+
   it("purchases the exact selected stock line through the commerce command", async () => {
     const api = apiMock({ visitMerchant: vi.fn().mockResolvedValue(materialized), getWallet: vi.fn().mockResolvedValue(wallet),
       getShop: vi.fn().mockResolvedValue(shop),
       economyCommand: vi.fn().mockResolvedValueOnce(quoteResponse).mockResolvedValueOnce(purchaseResponse) });
     renderPanel(api);
-    fireEvent.change(screen.getByLabelText("Present NPC to visit"), { target: { value: "npc-mara" } });
+    fireEvent.change(screen.getByLabelText("Merchant to visit"), { target: { value: "npc-mara" } });
     fireEvent.click(screen.getByRole("button", { name: "Visit merchant" }));
     await screen.findByText("Mara's wares");
     fireEvent.click(screen.getByRole("button", { name: "Request server quote" }));
@@ -77,7 +92,7 @@ describe("MerchantVisitPanel", () => {
   it("surfaces a declined classification and a transport error without breaking the view", async () => {
     const api = apiMock({ visitMerchant: vi.fn().mockResolvedValue(declined) });
     renderPanel(api);
-    fireEvent.change(screen.getByLabelText("Present NPC to visit"), { target: { value: "npc-mara" } });
+    fireEvent.change(screen.getByLabelText("Merchant to visit"), { target: { value: "npc-mara" } });
     fireEvent.click(screen.getByRole("button", { name: "Visit merchant" }));
     await screen.findByText(/no public identity/);
     expect(api.visitMerchant).toHaveBeenCalledTimes(1);
@@ -87,7 +102,7 @@ describe("MerchantVisitPanel", () => {
     const failing = apiMock({ visitMerchant: vi.fn().mockRejectedValue(new ApiError(409, "conflict")) });
     cleanup();
     renderPanel(failing);
-    fireEvent.change(screen.getByLabelText("Present NPC to visit"), { target: { value: "npc-mara" } });
+    fireEvent.change(screen.getByLabelText("Merchant to visit"), { target: { value: "npc-mara" } });
     fireEvent.click(screen.getByRole("button", { name: "Visit merchant" }));
     await screen.findByText(/conflicts with current campaign state/);
     expect(failing.visitMerchant).toHaveBeenCalledTimes(1);

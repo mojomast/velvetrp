@@ -49,6 +49,20 @@ export const economyHttpShopGetResponseSchema = z.object({
   });
 });
 
+/**
+ * One merchant's existing NPC-to-shop association. Campaign and NPC identity
+ * come from the route; a missing association or missing membership is a
+ * non-disclosing 404 rather than an empty list.
+ */
+export const economyHttpNpcShopAssociationGetResponseSchema = z.object({
+  association: z.object({
+    npcId: resourceIdSchema,
+    vendorLabel: z.string().trim().min(1).max(200),
+    shopId: shopIdSchema,
+    shopLabel: z.string().trim().min(1).max(200),
+  }).strict(),
+}).strict();
+
 const commandBase = {
   expectedRevision: expectedRevisionSchema,
   idempotencyKey: idempotencyKeySchema,
@@ -213,6 +227,7 @@ export type VendorSaleQuoteResponse = z.infer<typeof vendorSaleQuoteResponseSche
 
 export type EconomyHttpWalletGetResponse = z.infer<typeof economyHttpWalletGetResponseSchema>;
 export type EconomyHttpShopGetResponse = z.infer<typeof economyHttpShopGetResponseSchema>;
+export type EconomyHttpNpcShopAssociationGetResponse = z.infer<typeof economyHttpNpcShopAssociationGetResponseSchema>;
 export type EconomyHttpCommandRequest = z.infer<typeof economyHttpCommandRequestSchema>;
 export type EconomyHttpCommandReceipt = z.infer<typeof economyHttpCommandReceiptSchema>;
 export type EconomyHttpCommandResponse = z.infer<typeof economyHttpCommandResponseSchema>;
