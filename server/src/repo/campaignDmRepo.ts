@@ -470,8 +470,17 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       bindings.push({ candidate: { candidateId: `dm-candidate:${digest.slice(0,40)}`, digest, action, label: label.slice(0,500) }, target, revision, ...(data === undefined ? {} : { data }) });
     };
     let evidence: { turnId: string; actorId: string; intent: string; facts: unknown[]; receiptIds: string[]; sources:Array<{kind:string;targetId:string}> } | null = null;
+    // A completed original turn's own declaration is usable context even when it has no
+    // successful-check fact: the free-form classifiers need only the actor and the declared
+    // intent, while story grounding still requires real `evidence`.
+    let declaration: { turnId: string; actorId: string; intent: string } | null = null;
     if (input.evidenceTurnId) {
       const turn = services.getAdventureTurn(g, input.evidenceTurnId);
+      if (turn && turn.campaignId === c && turn.sessionId === s && turn.timelineId === context.timelineId
+        && turn.mode === "original" && turn.state === "completed" && "declaration" in turn
+        && typeof turn.declaration === "string" && turn.declaration.trim().length > 0) {
+        declaration = { turnId: turn.turnId, actorId: turn.actorId, intent: turn.declaration };
+      }
       if (turn && turn.campaignId === c && turn.sessionId === s && turn.timelineId === context.timelineId
         && turn.mode === "original" && turn.state === "completed" && turn.receiptLinks.length
         && !db.prepare("SELECT 1 FROM dm_story_evidence WHERE campaign_id=? AND turn_id=?").get(c, turn.turnId)) {
@@ -581,40 +590,42 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         if (!clue.revealed && available >= clue.revealThreshold && (available > 0 || evidence))
           add("reveal-clue", `Reveal eligible clue: ${clue.title}`, clue.clueId, story!.revision, { storylineId: clue.storylineId });
       }
-      // Free-form travel: when the current beat's evidence is a declaration naming a place this
-      // campaign does not define, the server (never the model) authors exactly one bounded
-      // location+connection candidate. The deterministic classifier owns the closure and
-      // visibility; here we only advertise its exact candidate. An unmapped destination is never
-      // a blocker, and human mode keeps its existing manual flow unchanged.
-      if (control(c).mode === "ai" && evidence) {
-        const travel = services.classifyFreeformTravelIntent(g, c, s, evidence.actorId, evidence.intent);
+      // Free-form travel: when the current beat's declaration names a place this campaign does
+      // not define, the server (never the model) authors exactly one bounded location+connection
+      // candidate. A completed turn's own declaration qualifies even without a successful-check
+      // fact; a declaration-only turn never satisfies story evidence (see above). The deterministic
+      // classifier owns the closure and visibility; here we only advertise its exact candidate. An
+      // unmapped destination is never a blocker, and human mode keeps its existing manual flow.
+      const freeform = evidence ?? declaration;
+      if (control(c).mode === "ai" && freeform) {
+        const travel = services.classifyFreeformTravelIntent(g, c, s, freeform.actorId, freeform.intent);
         if (travel.intent === "materialize-location" && travel.candidates[0]) {
           const candidate = travel.candidates[0];
           add("materialize-location", `Establish and travel to: ${candidate.name}`, candidate.candidateId, 0,
-            { actorId: evidence.actorId, text: evidence.intent, candidate });
+            { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
         // Free-form person, clue and hostile materialization follow the same closed pattern: the
         // server-authored classifier reads the declaration text and supplies at most one exact
         // candidate; the model may only select it. An unmapped declaration is never a blocker.
         // `classifyFreeformShopIntent` is deliberately not offered here: its closed candidate is
         // keyed by an explicit `merchantNpcId`, which a free-form declaration does not carry.
-        const npc = services.classifyFreeformNpcIntent(g, c, s, evidence.actorId, evidence.intent);
+        const npc = services.classifyFreeformNpcIntent(g, c, s, freeform.actorId, freeform.intent);
         if (npc.intent === "materialize-npc" && npc.candidates[0]) {
           const candidate = npc.candidates[0];
           add("materialize-npc", `Introduce a new face: ${candidate.name}`, candidate.candidateId, 0,
-            { actorId: evidence.actorId, text: evidence.intent, candidate });
+            { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
-        const lore = services.classifyFreeformLoreIntent(g, c, s, evidence.actorId, evidence.intent);
+        const lore = services.classifyFreeformLoreIntent(g, c, s, freeform.actorId, freeform.intent);
         if (lore.intent === "materialize-lore" && lore.candidates[0]) {
           const candidate = lore.candidates[0];
           add("materialize-lore", `Establish a new clue: ${candidate.title}`, candidate.candidateId, 0,
-            { actorId: evidence.actorId, text: evidence.intent, candidate });
+            { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
-        const encounter = services.classifyFreeformEncounterIntent(g, c, s, evidence.actorId, evidence.intent);
+        const encounter = services.classifyFreeformEncounterIntent(g, c, s, freeform.actorId, freeform.intent);
         if (encounter.intent === "materialize-encounter" && encounter.candidates[0]) {
           const candidate = encounter.candidates[0];
           add("materialize-encounter", `Resolve a hostile encounter: ${candidate.encounterName}`, candidate.candidateId, 0,
-            { actorId: evidence.actorId, text: evidence.intent, candidate });
+            { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
       }
       // P0.2: An opening beat always has at least one server-owned candidate. When no public story,
@@ -640,12 +651,12 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     }
     const bounded = bindings.slice(0, 24);
     const historicalRecall = services.getCampaignRecall(g, { campaignId: c, sessionId: s, audience: { kind: "dm" }, purpose: "dm-planning",
-      query: evidence?.intent || graph?.nodes.filter(node => node.status === "revealed").map(node => node.title).join(" ") || context.visibleWorld.join(" ") });
+      query: (evidence ?? declaration)?.intent || graph?.nodes.filter(node => node.status === "revealed").map(node => node.title).join(" ") || context.visibleWorld.join(" ") });
     if (!historicalRecall) throw new CampaignDmConflictError("director recall authority unavailable");
-    const privateContext = { context, story: graph, preparation: preparationContext, evidence, safety, historicalRecall };
+    const privateContext = { context, story: graph, preparation: preparationContext, evidence, declaration, safety, historicalRecall };
     // A changing domain snapshot invalidates approvals, including actor health and catalog changes.
     const health = db.prepare("SELECT actor_id,name,current,max FROM rpg_actor_resources WHERE campaign_id=? ORDER BY actor_id,name").all(c);
-    const freshness = hash({ context, story, planning, locations, health, combat, candidates: bounded, evidence, safety, historicalRecall });
+    const freshness = hash({ context, story, planning, locations, health, combat, candidates: bounded, evidence, declaration, safety, historicalRecall });
     if (json(privateContext).length + json(bounded).length > 60000) throw new CampaignDmConflictError("director context exceeds bounded preparation");
     return { context: privateContext, bindings: bounded, blockers: [...new Set(blockers)].slice(0,16), freshness, timelineId: context.timelineId };
   }

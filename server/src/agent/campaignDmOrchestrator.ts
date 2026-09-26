@@ -306,7 +306,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
 }
 
 /** Two calls maximum per beat plus bounded read grounding; each round has one durable claim, no ambiguous paid retries. */
-export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository, principal: string, runId: string,
+async function runCampaignDmBeat(repository: CampaignDmRepository, principal: string, runId: string,
   deps: AdventureAgentDependencies = dependencies): Promise<void> {
   if(!repository.hasDmNarrationJob(principal,runId))await planCampaignDmBeat(repository,principal,runId,deps);
   const work=repository.getDmNarrationWork(principal,runId);
@@ -375,4 +375,28 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
     repository.settleDmNarration(principal,runId,claimId,null,claimId?"unknown-or-invalid-provider-outcome":"narration-settings-unavailable");
   } finally {if(timer)clearTimeout(timer);}
   repository.getDmNarrationWork(principal,runId);
+}
+
+/**
+ * Runs one Director beat behind a last-resort fence: an unexpected orchestration
+ * failure must never leave a run stuck in `planning` (which would make every later
+ * beat conflict with "room already has an outstanding beat"). A queued narration
+ * job means the beat is recoverable by resume, so it is left untouched; otherwise
+ * the run is settled `blocked` with a stable blocker so the next beat can proceed.
+ * The original failure is always rethrown.
+ */
+export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository, principal: string, runId: string,
+  deps: AdventureAgentDependencies = dependencies): Promise<void> {
+  try {
+    await runCampaignDmBeat(repository, principal, runId, deps);
+  } catch (error) {
+    try {
+      if (!repository.hasDmNarrationJob(principal, runId)) {
+        repository.blockDmBeat(principal, runId, "director-orchestration-failed-request-new-beat");
+      }
+    } catch {
+      // Never mask the original failure with a settlement error.
+    }
+    throw error;
+  }
 }

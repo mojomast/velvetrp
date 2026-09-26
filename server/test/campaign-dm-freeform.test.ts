@@ -84,6 +84,28 @@ async function evidencedTurn(f: Fixture, declaration: string): Promise<string> {
 }
 
 /**
+ * Produces one completed adventure turn whose only receipt is a FAILED SRD check and whose
+ * declaration is the free-form attempt under test. This is the declaration-only case: the
+ * turn is usable free-form context but is not successful-check story evidence.
+ */
+async function failedCheckTurn(f: Fixture, declaration: string): Promise<string> {
+  const created = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
+    sessionId: f.session.id, actorId: f.actorId, declaration,
+    expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: `failed-check-turn:${declaration.replace(/[^A-Za-z0-9._:-]+/g, "-")}` });
+  const candidate = f.repo.generateAdventureCheckCandidates(OWNER, created.turnId)
+    .find((value) => value.label.includes("Nearly Impossible") && value.label.endsWith("normal"))!;
+  expect(candidate).toBeDefined();
+  const completed = await orchestrateAdventureTurn(f.repo, created.turnId, { ...dmDependencies(async () => ({
+    message: { role: "assistant", content: null,
+      toolCalls: [{ id: "check", name: "exact_srd_check.select", arguments: JSON.stringify({ candidateId: candidate.candidateId, digest: candidate.digest }) }] },
+    usage: null, model: { requestedModel: "fake", responseModel: "fake" } })), now: f.options.clock.now });
+  expect(completed.turn.receiptLinks).toHaveLength(1);
+  const receipt = f.repo.getAdventureCheckPublicReceipt(OWNER, f.campaign.id, completed.turn.receiptLinks[0]!.commandId);
+  expect(receipt?.outcome).toBe("failure");
+  return finishTurn(f, completed.turn);
+}
+
+/**
  * Offers exactly one candidate for `action`, executes it, and replays the same beat.
  * Returns the run so callers can assert the action-specific durable effects.
  */
@@ -236,5 +258,61 @@ describe("freeform encounter director integration", () => {
     expect(countOf(db, "SELECT count(*) n FROM encounter_lifecycle_v31 WHERE campaign_id=?", f.campaign.id)).toBe(1);
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     db.close(); f.repo.close();
+  });
+});
+
+describe("freeform declaration-only director integration", () => {
+  it("offers and materializes a location from a failed-check declaration", async () => {
+    const f = await dmFixture(true);
+    f.graph();
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "failed-check-ai" });
+    const evidence = await failedCheckTurn(f, "I go to the glassblower's district");
+
+    const request = { intent: "continue" as const, expectedModeRevision: 1, idempotencyKey: "failed-check-beat", evidenceTurnId: evidence };
+    const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, request);
+    // Story grounding is unchanged: with no successful fact the evidence blocker remains.
+    expect(run.blockers).toContain("evidence-needs-successful-check-objective-or-defeat");
+    const work = f.repo.claimDmPlanning(OWNER, run.runId, "fake", "fake")!;
+    const context = work.context as { evidence: unknown; declaration: { actorId: string; intent: string } | null };
+    expect(context.evidence).toBeNull();
+    expect(context.declaration).toMatchObject({ actorId: f.actorId, intent: "I go to the glassblower's district" });
+    // The declaration alone still offers the closed free-form candidate.
+    const candidate = work.candidates.find((value) => value.action === "materialize-location")!;
+    expect(candidate).toBeDefined();
+    f.repo.settleDmPlanning(OWNER, run.runId, work.claimId, { candidateId: candidate.candidateId, digest: candidate.digest }, null);
+    await orchestrateCampaignDmBeat(f.repo, OWNER, run.runId, dmDependencies());
+
+    const executed = f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId);
+    expect(executed.state).toBe("completed");
+    expect(executed.receipts.map(({ action }) => action)).toEqual(["materialize-location"]);
+
+    const db = openDb();
+    expect(countOf(db, "SELECT count(*) n FROM campaign_locations_v28 WHERE campaign_id=?", f.campaign.id)).toBe(2);
+    expect(countOf(db, "SELECT count(*) n FROM world_commands_v28 WHERE campaign_id=? AND session_id=? AND command_type='travel'",
+      f.campaign.id, f.session.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+
+  it("does not treat a declaration-only turn as story evidence for reveal or resolve", async () => {
+    const f = await dmFixture(true);
+    f.graph();
+    // A revealed public scene exists that would resolve if committed evidence were supplied.
+    f.repo.executeStorylineCommand(OWNER, "story", { kind: "reveal-node", targetId: "gate", data: {},
+      expectedRevision: f.repo.getCampaignStory(OWNER, f.campaign.id)!.revision, idempotencyKey: "reveal-gate-before-declaration" });
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "declaration-only-ai" });
+    const evidence = await failedCheckTurn(f, "I study the gate's old markings");
+
+    const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id,
+      { intent: "continue", expectedModeRevision: 1, idempotencyKey: "declaration-only-beat", evidenceTurnId: evidence });
+    expect(run.blockers).toContain("evidence-needs-successful-check-objective-or-defeat");
+    const work = f.repo.claimDmPlanning(OWNER, run.runId, "fake", "fake")!;
+    const context = work.context as { evidence: unknown; declaration: unknown };
+    expect(context.evidence).toBeNull();
+    expect(context.declaration).not.toBeNull();
+    expect(work.candidates.some((value) => value.action === "resolve-node")).toBe(false);
+    expect(work.candidates.some((value) => value.action === "reveal-node")).toBe(false);
+    f.repo.close();
   });
 });

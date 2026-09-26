@@ -150,4 +150,24 @@ describe("durable DM director",()=>{
     expect(JSON.stringify(repo.getDmHistory("local-owner",campaign.id,session.id))).not.toContain("SECRET_");
     const db=database();expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);db.close();repo.close();
   });
+
+  it("settles an unexpected orchestration failure without wedging the next beat",async()=>{
+    const f=await dmFixture();f.graph();
+    f.repo.setDmControl("local-owner",f.campaign.id,{mode:"ai",expectedRevision:0,idempotencyKey:"wedge-ai"});
+    const run=f.repo.openDmBeat("local-owner",f.campaign.id,f.session.id,
+      {intent:"continue",expectedModeRevision:1,idempotencyKey:"wedge-first"});
+    // Force an unexpected failure after the run is durable but before any narration job exists.
+    const failing={...f.repo,claimDmPlanning:()=>{throw new Error("unexpected orchestration failure");}};
+    await expect(orchestrateCampaignDmBeat(failing,"local-owner",run.runId,dmDependencies()))
+      .rejects.toThrow("unexpected orchestration failure");
+    const settled=f.repo.getDmRun("local-owner",f.campaign.id,f.session.id,run.runId);
+    expect(settled.state).toBe("blocked");
+    expect(settled.blockers).toContain("director-orchestration-failed-request-new-beat");
+    // The failed run is terminal, so the next beat is not blocked by "room already has an outstanding beat".
+    const next=f.repo.openDmBeat("local-owner",f.campaign.id,f.session.id,
+      {intent:"continue",expectedModeRevision:1,idempotencyKey:"wedge-next"});
+    expect(next.runId).not.toBe(run.runId);
+    expect(next.state).toBe("planning");
+    f.repo.close();
+  });
 });
