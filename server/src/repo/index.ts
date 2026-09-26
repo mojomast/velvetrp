@@ -117,6 +117,20 @@ export { TacticalMapAuthorizationError, TacticalMapUnavailableError, TacticalMap
 export { ensureCombatTacticalMap, inferCombatMapKind, combatMapSeed, type EnsureCombatTacticalMapDependencies,
   type EnsureCombatTacticalMapContext, type EnsureCombatTacticalMapInput, type EnsureCombatTacticalMapResult } from "./combatTacticalMap.js";
 export { WorldAuthorizationError, WorldStaleError, WorldConflictError, WorldUnavailableError, type WorldRepository } from "./worldRepo.js";
+export {
+  MAX_FREEFORM_DESTINATION_LENGTH,
+  FreeformTravelAuthorizationError,
+  FreeformTravelConflictError,
+  FreeformTravelUnavailableError,
+  classifyFreeformTravel,
+  createFreeformTravelRepository,
+  parseFreeformTravelDestination,
+  type FreeformTravelCandidate,
+  type FreeformTravelClassification,
+  type FreeformTravelLocationContext,
+  type FreeformTravelMaterialization,
+  type FreeformTravelRepository,
+} from "./freeform/freeformTravelRepo.js";
 export { createEncounterPlanningService, type EncounterPlanningService, type EncounterPlanningDependencies,
   type EncounterCatalogDefinition, type EncounterCandidate, type EncounterPlanningDifficulty,
   type CampaignEncounterRequest, type CampaignEncounterPlan } from "./dm/encounterPlanning.js";
