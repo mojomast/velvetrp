@@ -83,6 +83,12 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
       }
       else if (operation) await operation();
       else throw new Error("This operation cannot be retried");
+      // Room operations reach this line with both identifiers known after the
+      // write settles. This is the documented invocation point for the
+      // idempotent `campaignStartup` command (see api.ts): once the first room is
+      // attached, the freshly created campaign is ready for its one startup call.
+      // It is intentionally not invoked automatically here so preparation
+      // reads/writes never mutate a pre-existing or live campaign.
       localStorage.removeItem(key);
       if (alive.current) { setSaved(null); setData(null); if (command.kind !== "complete") setNotice("Server response confirmed. Read current preparation before the next step."); }
     } catch (error) {

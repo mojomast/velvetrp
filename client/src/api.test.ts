@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, archiveCampaignAdministration, attachCampaignRoom, branchMessage, cancelGeneration, commandActorCheck, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, detachCampaignRoom, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministration, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
+import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, archiveCampaignAdministration, attachCampaignRoom, branchMessage, cancelGeneration, campaignStartup, commandActorCheck, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, detachCampaignRoom, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministration, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
 import { claimCombatReward,commandActorPower,commandCombatConsumable,endCombat,getActorPowers,getCombatCommandResult,getCombatConsumableActions,getCombatConsumableResult,getCombatLog,getCombatRewardClaimResult,getCombatState,getEncounterSetupCandidates,listCombatRewards,resolveCombatAction,resolveCombatEnemyTurn,startEncounter } from "./api";
 import { commandQuest, commandStoryline, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
 import { getCampaignCommandReceipt } from "./api";
@@ -1072,6 +1072,40 @@ describe("HTTP runtime contracts", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await expect(createCampaign({ name: " " })).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("runs the idempotent campaign startup command and binds its strict summary", async () => {
+    const summary = {
+      campaignId: "campaign-one",
+      sessionId: "session-one",
+      dmMode: "ai",
+      dmModeRevision: 1,
+      published: ["welcome"],
+      beat: { runId: "run-one", state: "completed" },
+      imagesEnqueued: [{ locationId: "harbor", jobId: "job-one", deduped: false, skipped: null }],
+      blockers: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(summary), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(campaignStartup("campaign-one", "session-one")).resolves.toEqual(summary);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rpg/v1/campaigns/campaign-one/rooms/session-one/startup-commands",
+      expect.objectContaining({ method: "POST", cache: "no-store", body: "{}" }),
+    );
+    // The strict summary rejects unknown fields and any cross-room mismatch.
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ...summary, extra: true }), { status: 200 }));
+    await expect(campaignStartup("campaign-one", "session-one")).rejects.toThrow();
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ...summary, sessionId: "session-other" }), { status: 200 }));
+    await expect(campaignStartup("campaign-one", "session-one")).rejects.toThrow(/did not match/);
+  });
+
+  it("rejects invalid campaign startup identifiers before network I/O", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    for (const [campaignId, sessionId] of [[" campaign-one", "session-one"], ["campaign-one", ""]]) {
+      await expect(campaignStartup(campaignId!, sessionId!)).rejects.toThrow();
+    }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

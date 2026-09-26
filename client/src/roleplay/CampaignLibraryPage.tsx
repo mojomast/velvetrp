@@ -72,6 +72,10 @@ export function CampaignLibraryPage({ onBack, onOpen, onContentPacks, focusConte
     setAnnouncement("");
     try {
       const { campaign } = await createCampaign({ name });
+      // Campaign creation completes here with no room/session, so the idempotent
+      // `campaignStartup` command cannot run yet (the server requires an attached
+      // room). The documented invocation point is the first room attach in
+      // CampaignPreparation.
       if (!mountedRef.current) return;
       // A successful POST is authoritative for clearing the draft. The list is
       // still re-read rather than optimistically appending that response.

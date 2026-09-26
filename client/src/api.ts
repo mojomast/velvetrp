@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { actorGameplaySheetResponseSchema } from "@velvet/contracts";
 import { campaignDmSceneBindingRequestSchema, type CampaignDmSceneBindingRequest } from "@velvet/contracts";
 import { campaignDmControlSchema, campaignDmModeRequestSchema, campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmRunSchema, campaignDmPrivateRunSchema, campaignDmHistorySchema, campaignDmReadinessResponseSchema, type CampaignDmModeRequest, type CampaignDmBeatRequest, type CampaignDmDecisionRequest, type CampaignDmReadinessResponse } from "@velvet/contracts";
@@ -1432,6 +1433,65 @@ export async function detachCampaignRoom(
     || Object.keys(event.data).join(",") !== "sessionId"
     || event.data.sessionId !== validSessionId) {
     throw new Error("Campaign room detachment receipt did not match the request");
+  }
+  return response;
+}
+
+/** Beat terminal states reported by the bounded campaign startup summary. */
+const campaignStartupBeatStateSchema = z.enum([
+  "completed", "blocked", "planning", "awaiting-approval", "cancelled", "unknown", "none",
+]);
+
+/**
+ * Strict client mirror of the server's campaign startup summary. It intentionally
+ * carries no caller-selected command data: the request body is always `{}` and
+ * every idempotency key is derived server-side from durable identities.
+ */
+export const campaignStartupResponseSchema = z.object({
+  campaignId: resourceIdSchema,
+  sessionId: resourceIdSchema,
+  dmMode: z.enum(["human", "ai"]),
+  dmModeRevision: z.number().int().min(0),
+  published: z.array(z.string().min(1).max(200)).max(64),
+  beat: z.object({ runId: resourceIdSchema.nullable(), state: campaignStartupBeatStateSchema }).strict(),
+  imagesEnqueued: z.array(z.object({
+    locationId: resourceIdSchema,
+    jobId: resourceIdSchema.nullable(),
+    deduped: z.boolean(),
+    skipped: z.string().max(64).nullable(),
+  }).strict()).max(64),
+  blockers: z.array(z.string().max(200)).max(16),
+}).strict();
+
+export type CampaignStartupResponse = z.infer<typeof campaignStartupResponseSchema>;
+
+/**
+ * Runs the one idempotent campaign startup command for a room already attached to
+ * the campaign: it delegates the Director to AI, publishes eligible public
+ * materials, opens the beat, and enqueues one scene image per public location.
+ *
+ * The room must already be attached to the campaign (see `attachCampaignRoom`).
+ * The server returns a summary rather than throwing on a blocked opening, so
+ * callers must surface `blockers` without treating them as a hard failure. The
+ * command is safe to retry; this wrapper never retries on its own.
+ *
+ * Documented invocation point: callers that own both identifiers should invoke
+ * this exactly once after the first room is attached. The campaign creation flow
+ * in this client (`CampaignLibraryPage` / `WorldbuildingAgentPanel`) creates a
+ * campaign without a room, so the earliest point with both IDs is the room
+ * attach in `CampaignPreparation`.
+ */
+export async function campaignStartup(campaignId: string, sessionId: string): Promise<CampaignStartupResponse> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const validSessionId = parseApiInput(() => resourceIdSchema.parse(sessionId));
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/rooms/${encodeURIComponent(validSessionId)}/startup-commands`,
+    { method: "POST", cache: "no-store", body: "{}" },
+  );
+  requireStatus(success, 200, "Campaign startup");
+  const response = campaignStartupResponseSchema.parse(success.body);
+  if (response.campaignId !== validCampaignId || response.sessionId !== validSessionId) {
+    throw new Error("Campaign startup response did not match the request");
   }
   return response;
 }
