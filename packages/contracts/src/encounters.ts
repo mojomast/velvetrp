@@ -24,7 +24,7 @@ export const opportunityAttackReactionSchema = z.object({
 export const combatTeamSchema = z.enum(["allies", "enemies"]);
 /** Both variants are explicit so the server can preserve their distinct provenance. */
 export const encounterKindSchema = z.enum(["prepared", "improvised"]);
-export const encounterStatusSchema = z.enum(["preparing", "active", "completed", "escaped"]);
+export const encounterStatusSchema = z.enum(["preparing", "active", "completed", "escaped", "cancelled"]);
 export const combatActionKindSchema = z.enum(["attack", "grapple", "escape-grapple", "dash", "disengage", "help", "hide", "power", "item", "defend", "flee", "end-turn"]);
 
 /**

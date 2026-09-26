@@ -2567,7 +2567,7 @@ CREATE TABLE encounter (
       -- These values are the public EncounterStatus contract.  Creation may
       -- immediately activate an encounter, but it must not invent a private
       -- terminal vocabulary that clients cannot represent.
-      status TEXT NOT NULL CHECK(status IN ('preparing','active','completed','escaped')),
+      status TEXT NOT NULL CHECK(status IN ('preparing','active','completed','escaped','cancelled')),
       round_number INTEGER NOT NULL DEFAULT 0 CHECK(typeof(round_number)='integer' AND round_number BETWEEN 0 AND 1000000),
       current_turn_combatant_id TEXT, state_revision INTEGER NOT NULL DEFAULT 0 CHECK(typeof(state_revision)='integer' AND state_revision BETWEEN 0 AND 9007199254740991),
       created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),

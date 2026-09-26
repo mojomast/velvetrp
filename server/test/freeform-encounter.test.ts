@@ -2,6 +2,8 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  EncounterAuthorizationError,
+  EncounterConflictError,
   FreeformEncounterConflictError,
   classifyFreeformEncounter,
   type FreeformEncounterEnemyTemplate,
@@ -212,6 +214,59 @@ describe("freeform encounter materialization", () => {
     expect(countOf(db, "SELECT count(*) n FROM combat_receipts_v27")).toBe(0);
     expect(countOf(db, "SELECT count(*) n FROM tactical_maps_v58 WHERE campaign_id=?", f.campaign.id)).toBe(0);
     db.close();
+    f.repo.close();
+  });
+});
+
+describe("freeform encounter cancellation", () => {
+  it("cancels a preparing encounter with a durable receipt, then frees the session", async () => {
+    const f = await dmFixture();
+    const prepared = f.prepare();
+
+    // A preparing encounter blocks a new free-form encounter as a bounded conflict.
+    expect(() => f.repo.materializeFreeformEncounter(OWNER, f.campaign.id, f.session.id, f.actorId, HOSTILE))
+      .toThrow(FreeformEncounterConflictError);
+
+    const cancelled = f.repo.cancelPreparingEncounter(OWNER, prepared.encounterId,
+      { expectedRevision: prepared.revision, idempotencyKey: "cancel-prepare" });
+    expect(cancelled.encounter).toMatchObject({ encounterId: prepared.encounterId, status: "cancelled", combatId: null });
+    expect(cancelled.receipt).toMatchObject({ idempotencyKey: "cancel-prepare", revisionBefore: prepared.revision,
+      revisionAfter: prepared.revision + 1 });
+
+    const db = openDb();
+    expect(db.prepare("SELECT status FROM encounter WHERE encounter_id=?").get(prepared.encounterId)).toEqual({ status: "cancelled" });
+    expect(db.prepare("SELECT command_type FROM combat_commands_v27 WHERE encounter_id=? ORDER BY command_type")
+      .all(prepared.encounterId)).toEqual([{ command_type: "close" }, { command_type: "start" }]);
+    expect(db.prepare("SELECT canonical_request_json FROM combat_commands_v27 WHERE encounter_id=? AND command_type='close'")
+      .get(prepared.encounterId)).toBeTruthy();
+    expect(countOf(db, "SELECT count(*) n FROM combat_receipts_v27 WHERE encounter_id=?", prepared.encounterId)).toBe(2);
+    db.close();
+
+    // Exact replay converges on the same immutable result without a second command.
+    expect(f.repo.cancelPreparingEncounter(OWNER, prepared.encounterId,
+      { expectedRevision: prepared.revision, idempotencyKey: "cancel-prepare" })).toEqual(cancelled);
+
+    // The cancelled preparation no longer blocks the free-form encounter route's repository path.
+    const materialized = f.repo.materializeFreeformEncounter(OWNER, f.campaign.id, f.session.id, f.actorId, HOSTILE);
+    expect(materialized.status).toBe("materialized");
+    f.repo.close();
+  });
+
+  it("requires GM authority and only cancels a preparing encounter", async () => {
+    const f = await dmFixture();
+    const prepared = f.prepare();
+    f.advance();
+    const db = openDb();
+    db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('outsider','Outsider',0)").run();
+    db.close();
+    f.repo.addCampaignMembership(OWNER, f.campaign.id, { principalId: "outsider", role: "player" });
+    expect(() => f.repo.cancelPreparingEncounter("outsider", prepared.encounterId,
+      { expectedRevision: prepared.revision, idempotencyKey: "cancel-unauthorized" })).toThrow(EncounterAuthorizationError);
+
+    const started = f.repo.startEncounter(OWNER, prepared.encounterId,
+      { expectedRevision: prepared.revision, idempotencyKey: "start-before-cancel" });
+    expect(() => f.repo.cancelPreparingEncounter(OWNER, prepared.encounterId,
+      { expectedRevision: started.receipt.revisionAfter, idempotencyKey: "cancel-active" })).toThrow(EncounterConflictError);
     f.repo.close();
   });
 });

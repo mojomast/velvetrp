@@ -83,7 +83,7 @@ export const encounterPublicSchema = z.object({
       || ids.some((id, index) => index > 0 && id <= ids[index - 1]!)) {
     context.addIssue({ code: "custom", message: "combatants must be unique and stably ordered", path: ["combatants"] });
   }
-  const expectsCombat = encounter.status !== "preparing";
+  const expectsCombat = encounter.status !== "preparing" && encounter.status !== "cancelled";
   if (expectsCombat !== (encounter.combatId !== null)) {
     context.addIssue({ code: "custom", message: "combat identity must match encounter status", path: ["combatId"] });
   }
@@ -272,6 +272,28 @@ export const encounterStartCommandResponseSchema = z.object({
   combat: combatStateSchema,
   receipt: encounterCommandReceiptPublicSchema,
 }).strict();
+
+/**
+ * Abandons one never-started preparing encounter. Cancel grants no rewards and
+ * creates no combat identity; it exists so a stuck preparation cannot wedge the
+ * session's encounter slot forever.
+ */
+export const encounterCancelCommandRequestSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
+
+export const encounterCancelCommandResponseSchema = z.object({
+  encounter: encounterPublicSchema,
+  receipt: encounterCommandReceiptPublicSchema,
+}).strict().superRefine((response, context) => {
+  if (response.encounter.status !== "cancelled") {
+    context.addIssue({ code: "custom", message: "cancelled encounter must be cancelled", path: ["encounter", "status"] });
+  }
+  if (response.encounter.revision !== response.receipt.revisionAfter) {
+    context.addIssue({ code: "custom", message: "encounter revision must match the command receipt", path: ["encounter", "revision"] });
+  }
+});
 
 /** Combat identity is route-owned on reads and remains explicit in start responses. */
 export const combatReadResponseSchema = z.object({
@@ -1019,6 +1041,8 @@ export type CombatLegalAction = z.infer<typeof combatLegalActionSchema>;
 export type CombatState = z.infer<typeof combatStateSchema>;
 export type CombatTurnEconomy = z.infer<typeof combatTurnEconomySchema>;
 export type EncounterStartCommandRequest = z.infer<typeof encounterStartCommandRequestSchema>;
+export type EncounterCancelCommandRequest = z.infer<typeof encounterCancelCommandRequestSchema>;
+export type EncounterCancelCommandResponse = z.infer<typeof encounterCancelCommandResponseSchema>;
 export type CombatReadResponse = z.infer<typeof combatReadResponseSchema>;
 export type CombatLogQuery = z.infer<typeof combatLogQuerySchema>;
 export type CombatLogEntryPublic = z.infer<typeof combatLogEntryPublicSchema>;

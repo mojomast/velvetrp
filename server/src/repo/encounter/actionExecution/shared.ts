@@ -24,7 +24,7 @@ export const now=(d:EncounterDependencies)=>utcIsoTimestampSchema.parse(d.clock.
 export const member=(db:DatabaseDriver.Database,p:string,c:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(c,p));
 export const gm=(db:DatabaseDriver.Database,p:string,c:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')").get(c,p));
 export const controls=(db:DatabaseDriver.Database,p:string,c:string,a:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?").get(c,a,p));
-export const commandType=(t:string)=>t==="create_encounter"||t==="start_encounter"||t==="resolve_initiative"||t==="join_combatant"?"start":t==="advance_turn"||t==="advance_round"?"advance_turn":t==="flee"?"flee":t==="claim_reward_bundle"||t==="end_combat"?"grant_rewards":"resolve_action";
+export const commandType=(t:string)=>t==="create_encounter"||t==="start_encounter"||t==="resolve_initiative"||t==="join_combatant"?"start":t==="advance_turn"||t==="advance_round"?"advance_turn":t==="flee"?"flee":t==="cancel_encounter"?"close":t==="claim_reward_bundle"||t==="end_combat"?"grant_rewards":"resolve_action";
 export const actionTypes=new Set(["attack","power","item","defend","flee","end-turn","dash","disengage","help","hide","grapple","escape-grapple","shove","stand-up"]);
 export const dndCommandTypes=new Set(["attack","dash","disengage","help","hide","grapple","escape-grapple","shove","stand-up","flee","end-turn"]);
 

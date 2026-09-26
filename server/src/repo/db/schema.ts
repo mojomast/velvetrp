@@ -43,6 +43,16 @@ export const CATALOG_ATTESTATION_LIMIT_CHECK =
 export const CATALOG_ATTESTATION_LIMIT_PREDECESSOR_CHECK =
   "CHECK (typeof(definition_count)='integer' AND definition_count BETWEEN 1 AND 1024)";
 
+/**
+ * The current `encounter.status` CHECK widened with the explicit `cancelled`
+ * state, and its exact predecessor that predates abandonable prepared
+ * encounters.
+ */
+export const ENCOUNTER_STATUS_CHECK =
+  "CHECK(status IN ('preparing','active','completed','escaped','cancelled'))";
+export const ENCOUNTER_STATUS_PREDECESSOR_CHECK =
+  "CHECK(status IN ('preparing','active','completed','escaped'))";
+
 /** Objects added by the durable character known-option table. */
 export const CHARACTER_KNOWN_OPTIONS_OBJECT_NAMES: ReadonlySet<string> = new Set([
   "character_known_options_v25",
@@ -484,6 +494,45 @@ export function upgradeAdventureExactActionOriginSchema(
   return true;
 }
 
+/**
+ * Upgrades only the complete schema whose `encounter.status` CHECK predates the
+ * explicit `cancelled` state. The encounter table is rebuilt in place to widen
+ * the CHECK and its indexes/triggers are recreated, so historical preparing,
+ * active, completed, and escaped encounters upgrade without data loss.
+ */
+export function upgradeEncounterCancelledStatusSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const table = "encounter";
+  const predecessor = expected.map((object) => object.name === table && object.type === "table"
+    ? { ...object, sql: object.sql.replace(ENCOUNTER_STATUS_CHECK, ENCOUNTER_STATUS_PREDECESSOR_CHECK) }
+    : object);
+  if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
+  if (db.inTransaction) throw new Error("encounter status upgrade requires an independent transaction");
+  const definition = expected.find((object) => object.type === "table" && object.name === table)!;
+  const tableObjects = expected.filter((object) => object.type !== "table" && object.tbl_name === table);
+  const foreignKeys = db.pragma("foreign_keys", { simple: true }) as number;
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.transaction(() => {
+      db.exec(`CREATE TEMP TABLE ${table}_upgrade AS SELECT * FROM ${table}`);
+      db.exec(`DROP TABLE ${table}`);
+      db.exec(definition.sql);
+      db.exec(`INSERT INTO ${table} SELECT * FROM ${table}_upgrade`);
+      db.exec(`DROP TABLE ${table}_upgrade`);
+      for (const object of tableObjects) db.exec(object.sql);
+      if (db.prepare("PRAGMA foreign_key_check").get()) throw new Error("encounter status upgrade violates foreign keys");
+      validate();
+    }).immediate();
+    return true;
+  } finally {
+    db.pragma(`foreign_keys = ${foreignKeys ? "ON" : "OFF"}`);
+  }
+}
+
 export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
@@ -566,7 +615,8 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       && !upgradeAdvancementCatalogSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCatalogAttestationLimitSchema(db, schemaObjects(db), expected, validate)
       && !upgradeAdventureCheckExecutionOriginSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeAdventureExactActionOriginSchema(db, schemaObjects(db), expected, validate)) {
+      && !upgradeAdventureExactActionOriginSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeEncounterCancelledStatusSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
     }
   } catch (error) {

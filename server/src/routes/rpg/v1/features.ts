@@ -196,7 +196,7 @@ export interface CampaignListRepository extends
   Partial<Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">>,
   Partial<Pick<SpellcastingRepository, "castSpell">>,
   Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
-  Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">>,
+  Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter" | "cancelPreparingEncounter">>,
   Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">>,
   Partial<Pick<EncounterRepository, "resolveCombatAction" | "executeCombatEnemyTurn" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "getCombatRewardClaimResult">>,
   Partial<Pick<EncounterRepository, "getUseConsumableLegalActions" | "useConsumable" | "getUseConsumableCommandResultByKey">>,
@@ -375,7 +375,7 @@ type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
 type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">;
 type SpellcastingLaneRepository = Pick<SpellcastingRepository, "castSpell">;
 type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">;
-type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "getEncounterSetupCandidates" | "createEncounter" | "startEncounter">;
+type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "getEncounterSetupCandidates" | "createEncounter" | "startEncounter" | "cancelPreparingEncounter">;
 type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">;
 type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "executeCombatEnemyTurn" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "listCombatRewards" | "getCombatRewardClaimResult">;
 type CombatPowerLaneRepository=Pick<EncounterRepository,"getCombatPowerLegalActions"|"useCombatPower"|"getCombatPowerResultByKey">;
@@ -543,7 +543,7 @@ function assertEffectRepository(repository: CampaignListRepository): asserts rep
 }
 function assertEncounterLifecycleRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & EncounterLifecycleLaneRepository {
   if (typeof repository.listEncounters !== "function" || typeof repository.createEncounter !== "function"
-      || typeof repository.startEncounter !== "function") throw new UnsupportedCampaignRepositoryError();
+      || typeof repository.startEncounter !== "function" || typeof repository.cancelPreparingEncounter !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 function assertCombatReadRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CombatReadLaneRepository {
   if (typeof repository.getCombatState !== "function" || typeof repository.listCombatLogPage !== "function" || typeof repository.listCombatRewards !== "function") {

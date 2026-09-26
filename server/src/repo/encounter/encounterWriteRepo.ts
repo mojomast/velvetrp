@@ -4,6 +4,7 @@ import {
   type CombatActionResolution,
   type CombatEndCommandRequest,
   type CombatEnemyTurnCommandRequest,
+  type EncounterCancelCommandRequest,
   type EncounterCommand,
   type EncounterCreateRequest,
   type EncounterStartCommandRequest,
@@ -16,7 +17,7 @@ import { executeUseConsumable } from "./useConsumableRuntime.js";
 import { buildCombatPowerLegalActions, executeCombatPower, getCombatPowerResultByKey, type CombatPowerRequest, type CombatPowerResult } from "./combatPowerRuntime.js";
 import { initiateCombatFromTarget as executeInitiateCombatFromTarget, type InitiateCombatInput, type InitiateCombatResult } from "./initiateCombat.js";
 import { now, type EncounterResult, type EncounterRewardGrantSnapshot, type EncounterWriteDependencies } from "./actionExecution/shared.js";
-import { createCreateLifecycleEncounter, createStartLifecycleEncounter } from "./actionExecution/lifecycle.js";
+import { createCreateLifecycleEncounter, createStartLifecycleEncounter, createCancelPreparingEncounter } from "./actionExecution/lifecycle.js";
 import { createResolveCombatAction } from "./actionExecution/attack.js";
 import { createExecuteCombatEnemyTurn } from "./actionExecution/enemyTurn.js";
 import { createEndCombat } from "./actionExecution/rewards.js";
@@ -29,6 +30,7 @@ export { contestScore } from "./actionExecution/survival.js";
 export interface EncounterWriteRepository {
   createEncounter(principal:string,campaignId:string,input:EncounterCreateRequest):EncounterResult<{campaignId:string;encounter:EncounterLifecycleSnapshot}>;
   startEncounter(principal:string,encounterId:string,input:EncounterStartCommandRequest):EncounterResult<{campaignId:string;encounterId:string;combat:EncounterCombatSnapshot}>;
+  cancelPreparingEncounter(principal:string,encounterId:string,input:EncounterCancelCommandRequest):EncounterResult<{campaignId:string;encounterId:string;encounter:EncounterLifecycleSnapshot}>;
   resolveCombatAction(principal:string,combatId:string,input:CombatActionCommandRequest):EncounterResult<{campaignId:string;encounterId:string;resolution:CombatActionResolution;combat:EncounterCombatSnapshot}>;
   executeCombatEnemyTurn(principal:string,combatId:string,input:CombatEnemyTurnCommandRequest):EncounterResult<{campaignId:string;encounterId:string;resolution:CombatActionResolution;combat:EncounterCombatSnapshot}>;
   endCombat(principal:string,combatId:string,input:CombatEndCommandRequest):EncounterResult<{campaignId:string;encounterId:string;encounter:EncounterLifecycleSnapshot;rewards:EncounterRewardGrantSnapshot[]}>;
@@ -51,11 +53,12 @@ export interface EncounterWriteRepository {
 export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:EncounterWriteDependencies):EncounterWriteRepository {
   const createEncounter=createCreateLifecycleEncounter(db,deps);
   const startEncounter=createStartLifecycleEncounter(db,deps);
+  const cancelPreparingEncounter=createCancelPreparingEncounter(db,deps);
   const resolveCombatAction=createResolveCombatAction(db,deps);
   const executeCombatEnemyTurn=createExecuteCombatEnemyTurn(db,deps);
   const endCombat=createEndCombat(db,deps);
   const execute=createExecute(db,deps,resolveCombatAction);
-  return {createEncounter,startEncounter,resolveCombatAction,executeCombatEnemyTurn,endCombat,
+  return {createEncounter,startEncounter,cancelPreparingEncounter,resolveCombatAction,executeCombatEnemyTurn,endCombat,
     claimCombatReward(principal,combatId,rewardBundleId,input){
       const bundle=db.prepare(`SELECT campaign_id,reward_bundle_id,recipient_actor_id FROM reward_bundle
         WHERE encounter_id=? AND reward_bundle_id=? AND recipient_actor_id IN(SELECT actor_id FROM campaign_actor_private_state WHERE controller_principal_id=?)`)

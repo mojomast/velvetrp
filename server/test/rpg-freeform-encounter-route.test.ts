@@ -19,6 +19,7 @@ const countOf = (db: DatabaseDriver.Database, sql: string, ...params: unknown[])
 afterEach(() => {
   delete process.env.FEATURE_RPG_CAMPAIGN;
   delete process.env.FEATURE_RPG_MECHANICS;
+  delete process.env.FEATURE_RPG_COMBAT;
 });
 const enableRpg = (): void => {
   process.env.FEATURE_RPG_CAMPAIGN = "true";
@@ -189,6 +190,39 @@ describe("freeform encounter HTTP command", () => {
     expect(countOf(db, "SELECT count(*) n FROM encounter_lifecycle_v31 WHERE campaign_id=?", f.campaign.id)).toBe(1);
     expect(countOf(db, "SELECT count(*) n FROM tactical_maps_v58 WHERE campaign_id=? AND encounter_id=?", f.campaign.id, firstBody.materialization.encounterId)).toBe(1);
     expect(countOf(db, "SELECT count(*) n FROM combat_receipts_v27 WHERE encounter_id=?", firstBody.materialization.encounterId)).toBe(2);
+    db.close();
+    await app.close();
+  });
+
+  it("cancels the blocking preparing encounter so the freeform route no longer conflicts", async () => {
+    enableRpg();
+    process.env.FEATURE_RPG_COMBAT = "true";
+    const f = await dmFixture();
+    const app = appFor(f);
+    const freeform = post(encounterUrl(f.campaign.id, f.session.id, f.actorId), { text: HOSTILE });
+
+    // The prepared encounter occupies the session's only slot.
+    const prepared = f.prepare();
+    const blocked = await app.inject(freeform);
+    expect(blocked.statusCode, blocked.body).toBe(409);
+    expect(blocked.json()).toMatchObject({ code: "RPG_FREEFORM_ENCOUNTER_CONFLICT" });
+
+    // Cancel it through the encounter lifecycle route.
+    const cancelled = await app.inject(post(`/api/rpg/v1/encounters/${prepared.encounterId}/cancel-commands`,
+      { expectedRevision: prepared.revision, idempotencyKey: "cancel-blocking-prepare" }));
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
+    expect(cancelled.json()).toMatchObject({ encounter: { encounterId: prepared.encounterId, status: "cancelled", combatId: null },
+      receipt: { idempotencyKey: "cancel-blocking-prepare", revisionBefore: prepared.revision, revisionAfter: prepared.revision + 1 } });
+
+    // The freeform route now materializes instead of conflicting.
+    const materialized = await app.inject(freeform);
+    expect(materialized.statusCode, materialized.body).toBe(200);
+    expect(materialized.json().classification).toMatchObject({ intent: "materialize-encounter" });
+    expect(materialized.json().materialization.status).toBe("materialized");
+
+    const db = openDb();
+    expect(countOf(db, "SELECT count(*) n FROM encounter WHERE campaign_id=? AND status='active'", f.campaign.id)).toBe(1);
+    expect(db.prepare("SELECT status FROM encounter WHERE encounter_id=?").get(prepared.encounterId)).toEqual({ status: "cancelled" });
     db.close();
     await app.close();
   });

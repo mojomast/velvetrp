@@ -1,5 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
-import { resourceIdSchema, encounterCreateRequestSchema, encounterStartCommandRequestSchema, type EncounterCreateRequest, type EncounterStartCommandRequest } from "@velvet/contracts";
+import { resourceIdSchema, encounterCreateRequestSchema, encounterStartCommandRequestSchema, encounterCancelCommandRequestSchema, type EncounterCreateRequest, type EncounterStartCommandRequest, type EncounterCancelCommandRequest } from "@velvet/contracts";
 import { ensureCombatTacticalMap } from "../../combatTacticalMap.js";
 import { EncounterAuthorizationError, EncounterConflictError, EncounterStaleError, EncounterUnavailableError } from "../encounterErrors.js";
 import type { EncounterCombatSnapshot, EncounterLifecycleSnapshot } from "../encounterReadRepo.js";
@@ -75,6 +75,42 @@ export function createCreateLifecycleEncounter(db:DatabaseDriver.Database,deps:E
       if(!encounter)throw new Error("created encounter projection is unavailable");
       const result={campaignId:parsedCampaignId,encounter,receipt:{commandId,idempotencyKey:command.idempotencyKey,revisionBefore:0,revisionAfter:1,occurredAt:at}};
       sealReceipt(db,encounterId,commandId,1,at,result);
+      return result;
+    }).immediate();
+  };
+}
+
+export function createCancelPreparingEncounter(db:DatabaseDriver.Database,deps:EncounterWriteDependencies){
+  return (p:string,encounterIdInput:string,input:EncounterCancelCommandRequest):EncounterResult<{campaignId:string;encounterId:string;encounter:EncounterLifecycleSnapshot}>=>{
+    deps.assertFactoryMutation();
+    const encounterId=resourceIdSchema.parse(encounterIdInput),command=encounterCancelCommandRequestSchema.parse(input),request=canonical(command);
+    return db.transaction(()=>{
+      const encounter=db.prepare("SELECT * FROM encounter WHERE encounter_id=?").get(encounterId) as any;
+      if(!encounter)throw new EncounterUnavailableError("encounter unavailable");
+      if(!gm(db,p,encounter.campaign_id))throw new EncounterAuthorizationError("encounter cancellation requires GM authority");
+      const replay=db.prepare(`SELECT command.canonical_request_json,receipt.canonical_result_json
+        FROM combat_commands_v27 command JOIN combat_receipts_v27 receipt
+          ON receipt.encounter_id=command.encounter_id AND receipt.command_id=command.command_id
+        WHERE command.encounter_id=? AND command.idempotency_key=?`).get(encounterId,command.idempotencyKey) as any;
+      if(replay){
+        if(replay.canonical_request_json!==request)throw new EncounterConflictError("idempotency key was reused");
+        return JSON.parse(replay.canonical_result_json);
+      }
+      const root=db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(encounterId) as any;
+      if(!root||root.revision!==command.expectedRevision)throw new EncounterStaleError("encounter revision is stale");
+      if(encounter.status!=="preparing")throw new EncounterConflictError("only a preparing encounter can be cancelled");
+      const before=root.revision,after=before+1,at=now(deps),commandId=id(deps);
+      const internal={type:"cancel_encounter",encounterId,idempotencyKey:command.idempotencyKey};
+      beginProtocol(db,deps,internal,request,commandId,null,before,after,at,"encounter_state_changed",
+        {kind:"encounter_completed"},"encounter_state",0);
+      db.prepare(`UPDATE encounter SET status='cancelled',current_turn_combatant_id=NULL,
+        state_revision=state_revision+1,updated_at=? WHERE encounter_id=?`).run(at,encounterId);
+      advanceRevision(db,encounterId,after,at);
+      const encounterProjection=deps.reads.listEncounters(p,encounter.campaign_id)?.find((value)=>value.encounterId===encounterId);
+      if(!encounterProjection)throw new Error("cancelled encounter projection is unavailable");
+      const receipt={commandId,idempotencyKey:command.idempotencyKey,revisionBefore:before,revisionAfter:after,occurredAt:at};
+      const result={campaignId:encounterProjection.campaignId,encounterId,encounter:encounterProjection,receipt};
+      sealReceipt(db,encounterId,commandId,after,at,result);
       return result;
     }).immediate();
   };

@@ -176,7 +176,7 @@ export function createEncounterReadRepository(
         sessionId: row.session_id,
         name: row.name,
         status: row.status,
-        combatId: row.status === "preparing" ? null : row.encounter_id,
+        combatId: row.status === "preparing" || row.status === "cancelled" ? null : row.encounter_id,
         combatants: combatantRows(row.encounter_id).map(publicCombatant),
         revision: row.revision,
         createdAt: row.created_at,
@@ -230,7 +230,7 @@ export function createEncounterReadRepository(
   const getCombatState = (principal: string, combatId: string): EncounterCombatSnapshot | null => {
     const encounter = db.prepare(`SELECT e.*,root.revision FROM encounter e
       JOIN combat_mutation_revisions_v27 root ON root.encounter_id=e.encounter_id
-      WHERE e.encounter_id=? AND e.status<>'preparing'`).get(combatId) as any;
+      WHERE e.encounter_id=? AND e.status NOT IN ('preparing','cancelled')`).get(combatId) as any;
     if (!encounter || !member(principal, encounter.campaign_id)) return null;
     const rows = combatantRows(combatId);
     const active = rows.filter((row) => row.status === "active" || row.status === "unconscious");
@@ -279,7 +279,7 @@ export function createEncounterReadRepository(
     return { campaignId: encounter.campaign_id, encounterId: encounter.encounter_id, ...combat };
   };
   const listCombatLogPage = (principal: string, combatId: string, afterSequence: number, limit: number): CombatLogPage | null => {
-    const encounter = db.prepare("SELECT campaign_id FROM encounter WHERE encounter_id=? AND status<>'preparing'").get(combatId) as any;
+    const encounter = db.prepare("SELECT campaign_id FROM encounter WHERE encounter_id=? AND status NOT IN ('preparing','cancelled')").get(combatId) as any;
     if (!encounter || !member(principal, encounter.campaign_id)) return null;
     const rows = db.prepare(`SELECT log_id,log_json,occurred_at FROM combat_log WHERE encounter_id=?
       ORDER BY occurred_at,log_ordinal,log_id`).all(combatId) as CombatLogRow[];

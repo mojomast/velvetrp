@@ -171,14 +171,18 @@ These are operational prerequisites, not bugs. They were found by running the
 commands against a seeded world with a live server.
 
 - **DM-beat free-form candidates need a `dnd-5e` (srd-5.1) campaign.** The
-  director offers `materialize-location`/`-npc`/`-lore`/`-encounter` only when a
-  beat carries evidence, and evidence is built from a completed adventure turn's
-  receipt links (check/quest/victory receipts). Adventure check candidates are
+  director offers `materialize-location`/`-npc`/`-lore`/`-encounter` when a
+  completed `original` turn supplies a declaration: a successful-check/objective/
+  victory turn is story evidence, and a declaration-only turn (for example one
+  whose only receipt is a failed check) still supplies the actor and declared
+  intent for the free-form classifiers. Story grounding such as `resolve-node`
+  still requires successful-check evidence. Adventure check candidates are
   generated only when `sheetSnapshot` resolves the campaign ruleset to the
   `dnd-5e` v1.0.0 descriptor (`server/src/repo/adventureCheckRepo.ts`). A campaign
-  on the legacy `velvet:rules:starter-v1` profile never produces SRD checks, so
-  it never produces check evidence, so the evidence-gated candidates never
-  appear. To exercise them, start from the `srd-5.1` starter. The direct
+  on the legacy `velvet:rules:starter-v1` profile never produces SRD checks, so it
+  never produces successful-check story evidence; a declaration-only turn can still
+  offer free-form candidates when the location prerequisite below holds. To exercise
+  SRD-check evidence, start from the `srd-5.1` starter. The direct
   `freeform-*-commands` routes do not depend on the ruleset.
 - **The text classifiers need an artifact-backed current location.** Travel, NPC,
   and lore materialization require the acting actor's current location to have an
@@ -191,7 +195,12 @@ commands against a seeded world with a live server.
   (`preparing`/`active`) encounter, the encounter lifecycle refuses a new create.
   Both the `freeform-encounter-commands` route and the DM `materialize-encounter`
   candidate surface this as a bounded conflict (`FreeformEncounterConflictError`
-  → 409, or `CampaignDmConflictError`), never an unexpected 500.
+  → 409, or `CampaignDmConflictError`), never an unexpected 500. A `preparing`
+  encounter that should not run can be abandoned with
+  `POST /api/rpg/v1/encounters/:encounterId/cancel-commands`
+  (`{ expectedRevision, idempotencyKey }`), which is owner/GM-only, receipted, and
+  idempotent; after it the session slot is free again. Only a `preparing`
+  encounter can be cancelled; an `active` one must be completed.
 - **Scene-image hydration requires a reachable image backend.** Startup enqueues
   one job per public location, but jobs fail with `submission-failed` when the
   configured `VELVET_SCENE_IMAGES_BASE_URL` is unreachable or erroring (observed

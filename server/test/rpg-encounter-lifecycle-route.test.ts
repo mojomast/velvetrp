@@ -21,6 +21,9 @@ function repository(overrides:Record<string,unknown>={}){
     receipt:{commandId:"private",idempotencyKey:"prepare",revisionBefore:0,revisionAfter:1,occurredAt:at}}),
   startEncounter:()=>({campaignId:"campaign",encounterId:"encounter",combat,
     receipt:{commandId:"private",idempotencyKey:"start",revisionBefore:1,revisionAfter:2,occurredAt:at}}),
+  cancelPreparingEncounter:()=>({campaignId:"campaign",encounterId:"encounter",
+    encounter:{...encounter,status:"cancelled" as const,revision:2},
+    receipt:{commandId:"private",idempotencyKey:"cancel",revisionBefore:1,revisionAfter:2,occurredAt:at}}),
   close(){},listCampaigns:()=>[],...overrides} as unknown as CampaignListRepository;
 }
 
@@ -75,5 +78,23 @@ describe("M2.9 encounter lifecycle routes",()=>{
       instance:"/api/rpg/v1/encounters/:encounterId/start-commands"});
     expect((await app.inject({method:"HEAD",url:"/api/rpg/v1/campaigns/campaign/encounters"})).statusCode).toBe(404);
     expect(calls).toBe(0);await app.close();
+  });
+
+  it("cancels a preparing encounter for the fixed local owner with a no-store receipt",async()=>{
+    enable();const calls:any[]=[];
+    const app=buildApp({campaignRepositoryFactory:()=>repository({
+      cancelPreparingEncounter:(...args:any[])=>{calls.push(["cancel",...args]);return {campaignId:"campaign",encounterId:"encounter",
+        encounter:{...encounter,status:"cancelled" as const,revision:2},
+        receipt:{commandId:"private",idempotencyKey:"cancel",revisionBefore:1,revisionAfter:2,occurredAt:at}};},
+    })});
+    const hostile={authorization:"Bearer attacker","x-principal-id":"attacker"};
+    const cancelled=await app.inject({method:"POST",url:"/api/rpg/v1/encounters/encounter/cancel-commands",
+      headers:{...hostile,"content-type":"application/json"},payload:{expectedRevision:1,idempotencyKey:"cancel"}});
+    expect(cancelled.statusCode,cancelled.body).toBe(200);expect(cancelled.headers["cache-control"]).toBe("no-store");
+    expect(cancelled.json()).toEqual({
+      encounter:Object.fromEntries(Object.entries({...encounter,status:"cancelled",revision:2}).filter(([key])=>key!=="campaignId")),
+      receipt:{idempotencyKey:"cancel",revisionBefore:1,revisionAfter:2,occurredAt:at}});
+    expect(calls).toEqual([["cancel","local-owner","encounter",{expectedRevision:1,idempotencyKey:"cancel"}]]);
+    await app.close();
   });
 });
