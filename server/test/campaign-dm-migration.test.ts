@@ -32,6 +32,14 @@ const FREEFORM_MATERIALIZER_CLAUSES = `      OR (NEW.action IN ('materialize-npc
             AND command.command_id=json_extract(NEW.domain_receipt_json,'$.startReceipt.commandId')
             AND command.command_type='start'))
 `;
+/**
+ * The faction/quest/rumor authority clause added with the later free-form materializers, exactly
+ * as published in the current DM schema.
+ */
+const FREEFORM_FACTION_QUEST_RUMOR_CLAUSE = `      OR (NEW.action IN ('materialize-faction','materialize-quest','materialize-rumor')
+        AND EXISTS(SELECT 1 FROM campaign_content_receipts_v42 content
+          WHERE content.campaign_id=run.campaign_id AND content.draft_id=json_extract(NEW.domain_receipt_json,'$.draftId')))
+`;
 function predecessor(db:DatabaseDriver.Database,oldMap=false){
   db.pragma("foreign_keys=OFF");const expected=objects(db);
   for(const object of expected.filter(o=>o.name.startsWith("dm_")&&o.type!=="table"))db.exec(`DROP ${object.type} ${object.name}`);
@@ -156,6 +164,31 @@ describe("exact DM schema upgrade",()=>{
     ensureCurrentSchema(db,filename);expect(db.prepare('SELECT * FROM dm_control').all()).toEqual(control);
     expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_receipts'").get()).toMatchObject({sql:expect.stringContaining("'materialize-encounter'")});
     expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_receipts_authority'").get()).toMatchObject({sql:expect.stringContaining("'materialize-encounter'")});
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);db.close();
+  });
+  it('widens the receipt action gate to freeform faction/quest/rumor on the exact current predecessor',()=>{
+    const repo=createRepository(),campaign=repo.createCampaign('local-owner',{name:'Existing freeform faction quest rumor'});repo.close();
+    const filename=path.join(process.env.VELVET_DATA_DIR!,'velvet.sqlite'),db=new DatabaseDriver(filename);
+    const expected=objects(db);db.pragma('foreign_keys=OFF');
+    // The current predecessor differs only by the faction/quest/rumor actions in the two receipt
+    // CHECKs and their authority triggers; the upgrade rebuilds both tables and their triggers.
+    for(const table of ['dm_receipts','dm_composition_receipts']){
+      const definition=expected.find(o=>o.type==='table'&&o.name===table)!;
+      db.exec(`CREATE TEMP TABLE saved AS SELECT * FROM ${table}`);
+      db.exec(`DROP TABLE ${table}`);
+      db.exec(definition.sql.replace(",'materialize-faction','materialize-quest','materialize-rumor'",""));
+      db.exec(`INSERT INTO ${table} SELECT * FROM saved`);db.exec('DROP TABLE saved');
+      for(const object of expected.filter(o=>o.tbl_name===table&&o.type!=='table')){
+        db.exec(object.sql.includes("'materialize-rumor'")?object.sql.replace(FREEFORM_FACTION_QUEST_RUMOR_CLAUSE,''):object.sql);
+      }
+    }
+    db.pragma('foreign_keys=ON');const before=objects(db),control=db.prepare('SELECT * FROM dm_control').all();
+    expect(()=>upgradeCampaignDmSchema(db,before,expected,()=>{throw new Error('rollback');})).toThrow('rollback');
+    expect(objects(db)).toEqual(before);
+    ensureCurrentSchema(db,filename);expect(db.prepare('SELECT * FROM dm_control').all()).toEqual(control);
+    expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_receipts'").get()).toMatchObject({sql:expect.stringContaining("'materialize-rumor'")});
+    expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_receipts_authority'").get()).toMatchObject({sql:expect.stringContaining("'materialize-rumor'")});
+    expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_composition_receipts_authority'").get()).toMatchObject({sql:expect.stringContaining("'materialize-faction'")});
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);db.close();
   });
   it('raises director completion headroom on the exact prior-cap predecessor',()=>{

@@ -20,6 +20,9 @@ import type { FreeformNpcRepository } from "./freeform/freeformNpcRepo.js";
 import type { FreeformLoreRepository } from "./freeform/freeformLoreRepo.js";
 import type { FreeformShopRepository } from "./freeform/freeformShopRepo.js";
 import type { FreeformEncounterRepository } from "./freeform/freeformEncounterRepo.js";
+import type { FreeformFactionRepository } from "./freeform/freeformFactionRepo.js";
+import type { FreeformQuestRepository } from "./freeform/freeformQuestRepo.js";
+import type { FreeformRumorRepository } from "./freeform/freeformRumorRepo.js";
 import { boundAdventureQuestReceipts } from "./quest/adventureQuestBinding.js";
 import { validDmScene, DM_SCENE_DESCRIPTION_PREFIX } from "../agent/dmNarration.js";
 import { publicStorySourceSql, publicStoryResourceSql } from "./storyDisclosure.js";
@@ -140,7 +143,10 @@ type Services = CampaignAgentContextReadRepository & CampaignRecallReadRepositor
   & Pick<FreeformNpcRepository, "classifyFreeformNpcIntent" | "materializeFreeformNpc">
   & Pick<FreeformLoreRepository, "classifyFreeformLoreIntent" | "materializeFreeformLore">
   & Pick<FreeformShopRepository, "classifyFreeformShopIntent" | "materializeFreeformShop">
-  & Pick<FreeformEncounterRepository, "classifyFreeformEncounterIntent" | "materializeFreeformEncounter">;
+  & Pick<FreeformEncounterRepository, "classifyFreeformEncounterIntent" | "materializeFreeformEncounter">
+  & Pick<FreeformFactionRepository, "classifyFreeformFactionIntent" | "materializeFreeformFaction">
+  & Pick<FreeformQuestRepository, "classifyFreeformQuestIntent" | "materializeFreeformQuest">
+  & Pick<FreeformRumorRepository, "classifyFreeformRumorIntent" | "materializeFreeformRumor">;
 
 /** Private director aggregate. No player-turn proposal or transcript is used for GM state. */
 export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { clock: Clock; ids: IdGenerator; contextInspectionProvenance: ContextInspectionProvenanceMode }, services: Services,
@@ -638,6 +644,28 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
           preferred ??= add("materialize-encounter", `Resolve a hostile encounter: ${candidate.encounterName}`, candidate.candidateId, 0,
             { actorId: freeform.actorId, text: freeform.intent, candidate });
         }
+        // A declaration that names a faction/order/guild, asks for work, or listens for
+        // gossip/admits likewise yields at most one exact server-authored candidate. As above,
+        // only the model may select it, the apply carries a durable content receipt, and an
+        // unmapped declaration is never a blocker.
+        const faction = services.classifyFreeformFactionIntent(g, c, s, freeform.actorId, freeform.intent);
+        if (faction.intent === "materialize-faction" && faction.candidates[0]) {
+          const candidate = faction.candidates[0];
+          preferred ??= add("materialize-faction", `Introduce a new faction: ${candidate.name}`, candidate.candidateId, 0,
+            { actorId: freeform.actorId, text: freeform.intent, candidate });
+        }
+        const quest = services.classifyFreeformQuestIntent(g, c, s, freeform.actorId, freeform.intent);
+        if (quest.intent === "materialize-quest" && quest.candidates[0]) {
+          const candidate = quest.candidates[0];
+          preferred ??= add("materialize-quest", `A new job surfaces: ${candidate.title}`, candidate.candidateId, 0,
+            { actorId: freeform.actorId, text: freeform.intent, candidate });
+        }
+        const rumor = services.classifyFreeformRumorIntent(g, c, s, freeform.actorId, freeform.intent);
+        if (rumor.intent === "materialize-rumor" && rumor.candidates[0]) {
+          const candidate = rumor.candidates[0];
+          preferred ??= add("materialize-rumor", `Hear a new rumor about: ${candidate.subject}`, candidate.candidateId, 0,
+            { actorId: freeform.actorId, text: freeform.intent, candidate });
+        }
       }
       // P0.2: An opening beat always has at least one server-owned candidate. When no public story,
       // clue, or exact-roster encounter candidate is usable, the server anchors the opening to the
@@ -782,6 +810,45 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if (materialized.status !== "materialized") throw new CampaignDmConflictError("encounter materialization is unavailable");
       receipt = materialized;
       summary = `${materialized.candidate.encounterName}. Initiative is established; consult the combat tracker for the current turn.`.slice(0, 4000);
+    } else if (action === "materialize-faction") {
+      // The candidate is server-authored and bounded; the model only selected it. The free-form
+      // repo re-validates the exact candidate and applies the public faction plus its separate
+      // GM-only agenda through the content receipt path. Replaying converges on durable draft keys.
+      const data = binding.data as { actorId?: unknown; text?: unknown } | null | undefined;
+      const actorId = typeof data?.actorId === "string" ? data.actorId : null;
+      const text = typeof data?.text === "string" ? data.text : null;
+      if (!actorId || !text) throw new CampaignDmConflictError("faction materialization candidate is unavailable");
+      const materialized = services.materializeFreeformFaction(r.gm_principal_id, r.campaign_id, r.session_id, actorId, text,
+        { candidateId: binding.target });
+      if (materialized.status !== "materialized") throw new CampaignDmConflictError("faction materialization is unavailable");
+      receipt = materialized;
+      summary = `A new faction emerges: ${materialized.candidate.name}.`.slice(0, 4000);
+    } else if (action === "materialize-quest") {
+      // The candidate is server-authored and bounded; the model only selected it. The free-form
+      // repo re-validates the exact candidate and applies the public quest with its separate
+      // GM-only twist through the content receipt path. Replaying converges on durable draft keys.
+      const data = binding.data as { actorId?: unknown; text?: unknown } | null | undefined;
+      const actorId = typeof data?.actorId === "string" ? data.actorId : null;
+      const text = typeof data?.text === "string" ? data.text : null;
+      if (!actorId || !text) throw new CampaignDmConflictError("quest materialization candidate is unavailable");
+      const materialized = services.materializeFreeformQuest(r.gm_principal_id, r.campaign_id, r.session_id, actorId, text,
+        { candidateId: binding.target });
+      if (materialized.status !== "materialized") throw new CampaignDmConflictError("quest materialization is unavailable");
+      receipt = materialized;
+      summary = `A new job is offered: ${materialized.candidate.title}.`.slice(0, 4000);
+    } else if (action === "materialize-rumor") {
+      // The candidate is server-authored and bounded; the model only selected it. The free-form
+      // repo re-validates the exact candidate and applies the public hearsay plus its separate
+      // GM-only truth through the content receipt path. Replaying converges on durable draft keys.
+      const data = binding.data as { actorId?: unknown; text?: unknown } | null | undefined;
+      const actorId = typeof data?.actorId === "string" ? data.actorId : null;
+      const text = typeof data?.text === "string" ? data.text : null;
+      if (!actorId || !text) throw new CampaignDmConflictError("rumor materialization candidate is unavailable");
+      const materialized = services.materializeFreeformRumor(r.gm_principal_id, r.campaign_id, r.session_id, actorId, text,
+        { candidateId: binding.target });
+      if (materialized.status !== "materialized") throw new CampaignDmConflictError("rumor materialization is unavailable");
+      receipt = materialized;
+      summary = `A rumor spreads: ${materialized.candidate.subject}.`.slice(0, 4000);
     } else if (action === "materialize-shop") {
       // Not currently advertised from a free-form declaration: the shop classifier is keyed by an
       // explicit merchant NPC id that the declaration does not carry. The apply stays fail-closed

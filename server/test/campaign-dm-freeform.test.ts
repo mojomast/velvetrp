@@ -261,6 +261,84 @@ describe("freeform encounter director integration", () => {
   });
 });
 
+describe("freeform faction director integration", () => {
+  it("offers, executes and exactly once replays a server-authored materialize-faction candidate", async () => {
+    const f = await dmFixture();
+    f.graph();
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "freeform-ai" });
+    const evidence = await evidencedTurn(f, "I look for the local thieves' guild");
+    const run = await offerExecuteAndReplay(f, evidence, "materialize-faction");
+
+    const db = openDb();
+    const receipt = db.prepare("SELECT domain_receipt_json FROM dm_receipts WHERE run_id=?").get(run.runId) as { domain_receipt_json: string };
+    const value = JSON.parse(receipt.domain_receipt_json) as { draftId: string; factionId: string; gmAgendaArtifactKey: string | null };
+    // The receipt names a real accepted content draft and the materialized public faction.
+    expect(db.prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?").get(f.campaign.id, value.draftId)).toBeTruthy();
+    expect(db.prepare("SELECT public_name FROM campaign_factions_v28 WHERE campaign_id=? AND faction_id=?")
+      .get(f.campaign.id, value.factionId)).toBeTruthy();
+    expect(value.gmAgendaArtifactKey).toBeTruthy();
+
+    // Replay converged: exactly one faction and one draft.
+    expect(countOf(db, "SELECT count(*) n FROM campaign_factions_v28 WHERE campaign_id=?", f.campaign.id)).toBe(1);
+    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-faction-draft-%'", f.campaign.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+});
+
+describe("freeform quest director integration", () => {
+  it("offers, executes and exactly once replays a server-authored materialize-quest candidate", async () => {
+    const f = await dmFixture();
+    f.graph();
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "freeform-ai" });
+    const evidence = await evidencedTurn(f, "I look for work");
+    const run = await offerExecuteAndReplay(f, evidence, "materialize-quest");
+
+    const db = openDb();
+    const receipt = db.prepare("SELECT domain_receipt_json FROM dm_receipts WHERE run_id=?").get(run.runId) as { domain_receipt_json: string };
+    const value = JSON.parse(receipt.domain_receipt_json) as { draftId: string; questId: string; gmTwistArtifactKey: string | null };
+    // The receipt names a real accepted content draft and the materialized public quest.
+    expect(db.prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?").get(f.campaign.id, value.draftId)).toBeTruthy();
+    expect(db.prepare("SELECT title,status FROM quests WHERE campaign_id=? AND id=?").get(f.campaign.id, value.questId))
+      .toMatchObject({ status: "open" });
+    expect(value.gmTwistArtifactKey).toBeTruthy();
+
+    // Replay converged: one materialized draft (the fixture quest is authored directly, not by a draft).
+    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-quest-draft-%'", f.campaign.id)).toBe(1);
+    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='quest' AND visibility='public'", f.campaign.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+});
+
+describe("freeform rumor director integration", () => {
+  it("offers, executes and exactly once replays a server-authored materialize-rumor candidate", async () => {
+    const f = await dmFixture();
+    f.graph();
+    seedHarbor(f);
+    f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "freeform-ai" });
+    const evidence = await evidencedTurn(f, "what are people saying about the salt witch");
+    const run = await offerExecuteAndReplay(f, evidence, "materialize-rumor");
+
+    const db = openDb();
+    const receipt = db.prepare("SELECT domain_receipt_json FROM dm_receipts WHERE run_id=?").get(run.runId) as { domain_receipt_json: string };
+    const value = JSON.parse(receipt.domain_receipt_json) as { draftId: string; rumorId: string; gmTruthArtifactKey: string | null };
+    // The receipt names a real accepted content draft and the materialized public hearsay.
+    expect(db.prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?").get(f.campaign.id, value.draftId)).toBeTruthy();
+    expect(db.prepare("SELECT visibility FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND server_resource_id=? AND artifact_kind='lore'")
+      .get(f.campaign.id, value.rumorId)).toMatchObject({ visibility: "public" });
+    expect(value.gmTruthArtifactKey).toBeTruthy();
+
+    // Replay converged: one public hearsay artifact and one draft.
+    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'", f.campaign.id)).toBe(1);
+    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-rumor-draft-%'", f.campaign.id)).toBe(1);
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    db.close(); f.repo.close();
+  });
+});
+
 describe("freeform declaration-only director integration", () => {
   it("offers and materializes a location from a failed-check declaration", async () => {
     const f = await dmFixture(true);

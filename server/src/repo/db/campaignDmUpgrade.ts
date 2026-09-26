@@ -22,9 +22,10 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
     ? { ...object, sql: `<transition:${object.name}>` } : object);
   const upgradeTransition = JSON.stringify(normalizeTransition(actual))
     === JSON.stringify(normalizeTransition(expected.filter(object => !worldTimeNames(object.name))))
-    // Later actions (materialize-location, then materialize-npc/lore/shop/encounter) added to the
-    // same receipt CHECKs/authority triggers: only those four objects differ, including a database
-    // that already carries the world-time receipt table and/or the earlier free-form action.
+    // Later actions (materialize-location, then materialize-npc/lore/shop/encounter, then
+    // materialize-faction/quest/rumor) added to the same receipt CHECKs/authority triggers: only
+    // those four objects differ, including a database that already carries the world-time receipt
+    // table and/or the earlier free-form actions.
     || JSON.stringify(normalizeTransition(actual)) === JSON.stringify(normalizeTransition(expected));
   // P5.7 completion headroom: reasoning models need more than 256/768 completion tokens, so three tables' CHECKs changed.
   const completionChanged = new Set(["dm_provider_requests", "dm_planning_rounds", "dm_narration_dispatches"]);
