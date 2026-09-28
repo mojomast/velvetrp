@@ -302,6 +302,66 @@ function mentionsFact(text:string,value:string|number):boolean{
   const words=narrationWords(text);
   return tokens.every(token=>words.some(word=>tokenPrefixMatch(token,word)));
 }
+/** One shared significant token is enough to call a rejected draft a near-miss rather than a placeholder. */
+function mentionsFactPartially(text:string,label:string):boolean{
+  const tokens=narrationMatchTokens(label);
+  if(tokens.length===0)return false;
+  const words=narrationWords(text);
+  return tokens.some(token=>words.some(word=>tokenPrefixMatch(token,word)));
+}
+/**
+ * Human-readable committed labels and values a single receipt exposes. Only receipt-specific
+ * strings and numbers are returned, never the generic prose frame, so a placeholder such as
+ * "The authoritative result is clear." cannot masquerade as a grounded near-miss.
+ */
+function receiptNarrationFacts(value:NarrationReceipt):{labels:string[];numbers:number[]}{
+  const present=(...entries:Array<string|null|undefined>):string[]=>entries.filter((entry):entry is string=>typeof entry==="string"&&entry.length>0);
+  switch(value.kind){
+    case "travel":return{labels:present(value.destination),numbers:[]};
+    case "inventory":return{labels:present(value.itemLabel,value.slot,value.recipient),numbers:[value.quantity]};
+    case "commerce":return{labels:present(value.itemLabel,value.vendorLabel,value.shopLabel,value.currencyLabel),numbers:[value.quantity,value.balanceBefore,value.balanceAfter]};
+    case "quest":return{labels:present(value.questTitle,value.objectiveDescription),numbers:[value.progressBefore,value.progressAfter,value.targetProgress]};
+    case "quest-lifecycle":return{labels:present(value.questTitle),numbers:value.reward?.amount===null||value.reward?.amount===undefined?[]:[value.reward.amount]};
+    case "progression":return{labels:present(value.className,...value.features),numbers:[value.levelBefore,value.levelAfter,...value.resources.flatMap((resource)=>[resource.before,resource.after])]};
+    case "check":return{labels:present(value.skill??value.ability,value.outcome),numbers:[value.total,value.dc,...value.rolls.map((roll)=>roll.value)]};
+    case "power":return{labels:present(value.powerName,...value.targets,...value.stateDeltas.flatMap((delta)=>[delta.actor,delta.change])),numbers:value.costs.flatMap((cost)=>[cost.before,cost.after])};
+    case "rest":return{labels:present(value.restName,...value.recovery.map((recovery)=>recovery.label)),numbers:value.recovery.flatMap((recovery)=>[recovery.before,recovery.after])};
+    case "combat-consumable":return{labels:present(value.itemName,value.target,...value.outcomes.flatMap((outcome)=>outcome.kind==="resource"?[outcome.resource]:[])),
+      numbers:value.outcomes.flatMap((outcome)=>outcome.kind==="resource"?[outcome.before,outcome.after].filter((entry):entry is number=>entry!==null):[outcome.before,outcome.after])};
+    case "combat-power":return{labels:present(value.powerName,value.target,...value.outcomes.flatMap((outcome)=>outcome.kind==="effect"?[outcome.effect]:[])),
+      numbers:value.outcomes.flatMap((outcome)=>outcome.kind==="effect"?[]:[outcome.before,outcome.after])};
+    case "combat":{
+      const labels=present(value.action,value.outcome.kind==="damage"?value.outcome.damageType:null);
+      const numbers=value.outcome.kind==="damage"?[value.outcome.applied,value.outcome.hitPointsBefore,value.outcome.hitPointsAfter]
+        :value.outcome.kind==="contest"?[value.outcome.attackerRoll,value.outcome.defenderRoll]
+        :value.outcome.kind==="survival"?[value.outcome.successes,value.outcome.failures]
+        :value.outcome.kind==="stand-up"?[value.outcome.movementCostFeet]:[];
+      return{labels,numbers};
+    }
+    case "mechanic":{
+      if(value.event.type==="actor_dice_rolled"){const data=value.event.data as {total:number;modifier:number};return{labels:[],numbers:[data.total,data.modifier]};}
+      if(value.event.type==="actor_attribute_set"){const data=value.event.data as {valueBefore:number;valueAfter:number};return{labels:[],numbers:[data.valueBefore,data.valueAfter]};}
+      const data=value.event.data as {current:number;max:number};return{labels:[],numbers:[data.current,data.max]};
+    }
+  }
+}
+/**
+ * The bounded grounding repair is only worth a provider call when the rejected draft already
+ * references at least one committed fact — a receipt label/value or the current location — so it
+ * looks correctable. A generic, empty, or fact-free placeholder goes straight to the deterministic
+ * receipt-bound fallback, preserving the exact dispatch counts that acceptance tests pin.
+ */
+export function narrationRepairIsWorthwhile(rejected:string,values:readonly NarrationReceipt[],
+  currentLocation:string|null,conversation:boolean):boolean{
+  if(!rejected.trim())return false;
+  if(currentLocation&&mentionsFactPartially(rejected,currentLocation))return true;
+  if(conversation)return narrationWords(rejected).length>=8;
+  return values.some((value)=>{
+    const facts=receiptNarrationFacts(value);
+    return facts.labels.some((label)=>mentionsFactPartially(rejected,label))
+      ||facts.numbers.some((number)=>includesNumber(rejected,number));
+  });
+}
 
 // A mechanical outcome is only grounded by a matching committed receipt, so provider prose may not
 // assert one that no receipt carries (the zero-receipt case, or a turn whose receipts lack that
@@ -570,6 +630,12 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       // gets a second provider attempt carrying the exact committed facts; transport, protocol, and
       // malformed-argument failures never retry. The strict local gate still decides the final text.
       if (!gateAgainst(providerText)) {
+        // One bounded repair only, and only for a correctable near-miss that already names a
+        // committed fact. A generic or fact-free draft skips straight to the receipt-bound fallback
+        // so acceptance contracts that pin provider dispatch counts stay exact.
+        if (!narrationRepairIsWorthwhile(providerText, safeReceipts, publicContext.currentLocation, conversation)) {
+          throw new Error("narration references no committed fact; deterministic fallback");
+        }
         const repairInput: ProviderCompletionInput = { ...completionInput,
           messages: [...completionInput.messages, narrationRepairMessage({ values: safeReceipts, currentLocation: publicContext.currentLocation,
             conversation, rejected: providerText })] };

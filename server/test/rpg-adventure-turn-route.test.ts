@@ -51,6 +51,15 @@ function seed(ruleset: "velvet"|"dnd" = "velvet") {
   return campaign;
 }
 
+/** Places the seeded actor at a discovered public location so narration has a current-location anchor. */
+function locateActor(campaignId: string, locationName: string) {
+  const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+  db.prepare("INSERT INTO campaign_locations_v28 VALUES('quay',?,NULL,?,'A fog-damp landing.','public',?)").run(campaignId, locationName, at);
+  db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,'quay','session',0,?)").run(campaignId, "actor", at);
+  db.prepare("INSERT INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(campaignId, "actor", "quay", at);
+  db.close();
+}
+
 function events(body: string) {
   return body.split("\n\n").filter((frame) => frame.startsWith("event: ")).map((frame) => {
     const data = frame.split("\n").find((line) => line.startsWith("data: "))!.slice(6);
@@ -353,43 +362,62 @@ describe("M2.11 adventure turn routes", () => {
     await app.close();
   });
 
-  it("retries a gate-rejected narration exactly once with the exact facts",async()=>{
-    enable();const campaign=seed();let narrationCalls=0;const repairMessages:string[]=[];
-    const rejected="You gain a legendary sword from the GM's stash.";
+  it("retries a gate-rejected near-miss exactly once with the exact facts",async()=>{
+    enable();const campaign=seed();locateActor(campaign.id,"Lantern Quay");let narrationCalls=0;const repairMessages:string[]=[];
+    const rejected="At Lantern Quay, you take 7 damage.";
     const dependencies:AdventureAgentDependencies={complete:async(input)=>{
       if(!input.tools?.some((tool)=>tool.name==="submit_adventure_narration"))
         return{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
       narrationCalls+=1;
       if(narrationCalls===1)return narrationResult(rejected);
       repairMessages.push(String(input.messages.at(-1)?.content));
-      return narrationResult("The moment holds; nothing is established.");
+      return narrationResult("At Lantern Quay, the moment holds; nothing is established.");
     },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
     const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
     const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
-      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I wait.",expectedRevision:0,idempotencyKey:"grounding-repair"}});
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I wait beside the quay.",expectedRevision:0,idempotencyKey:"grounding-repair"}});
     expect(narrationCalls).toBe(2);
     expect(repairMessages[0]).toContain("GROUNDING CORRECTION");
     expect(repairMessages[0]).toContain("Rejected draft");
     expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{
-      text:"The moment holds; nothing is established.",source:"provider-assisted"}}});
+      text:"At Lantern Quay, the moment holds; nothing is established.",source:"provider-assisted"}}});
     expect(response.body).not.toContain(rejected);
     await app.close();
   });
 
+  it("skips the grounding repair for a generic fact-free draft and goes straight to the receipt-bound fallback",async()=>{
+    enable();const campaign=seed();locateActor(campaign.id,"Lantern Quay");let narrationCalls=0;
+    const dependencies:AdventureAgentDependencies={complete:async(input)=>{
+      if(!input.tools?.some((tool)=>tool.name==="submit_adventure_narration"))
+        return{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
+      narrationCalls+=1;return narrationResult("The authoritative result is clear.");
+    },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
+    const declaration="I wait beside the quay.";
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration,expectedRevision:0,idempotencyKey:"grounding-repair-skip"}});
+    // The placeholder names no committed fact, so it never earns a repair dispatch.
+    expect(narrationCalls).toBe(1);
+    expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{
+      source:"deterministic-fallback",text:narrationFallback(declaration,[],{currentLocation:"Lantern Quay"})}}});
+    await app.close();
+  });
+
   it("falls back after one failed repair without a third provider attempt",async()=>{
-    enable();const campaign=seed();let narrationCalls=0;
-    const rejected="You gain a legendary sword from the GM's stash.";
+    enable();const campaign=seed();locateActor(campaign.id,"Lantern Quay");let narrationCalls=0;
+    const rejected="At Lantern Quay, you take 7 damage.";
     const dependencies:AdventureAgentDependencies={complete:async(input)=>{
       if(!input.tools?.some((tool)=>tool.name==="submit_adventure_narration"))
         return{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
       narrationCalls+=1;return narrationResult(rejected);
     },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
     const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
+    const declaration="I wait beside the quay.";
     const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
-      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I wait.",expectedRevision:0,idempotencyKey:"grounding-repair-bounded"}});
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration,expectedRevision:0,idempotencyKey:"grounding-repair-bounded"}});
     expect(narrationCalls).toBe(2);
     expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{
-      source:"deterministic-fallback",text:narrationFallback("I wait.",[])}}});
+      source:"deterministic-fallback",text:narrationFallback(declaration,[],{currentLocation:"Lantern Quay"})}}});
     await app.close();
   });
 

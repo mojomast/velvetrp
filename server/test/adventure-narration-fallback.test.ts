@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { narrationFallback, providerNarrationMatchesReceipts } from "../src/routes/rpg/v1/adventureTurns.js";
+import { narrationFallback, narrationRepairIsWorthwhile, providerNarrationMatchesReceipts } from "../src/routes/rpg/v1/adventureTurns.js";
 
 const combat = (action: string, outcome: unknown, roundBefore = 1, roundAfter = 1) => ({ kind: "combat", action, outcome, roundBefore, roundAfter });
 const fallback = (values: unknown[]) => narrationFallback("I act.", values as never);
@@ -107,5 +107,26 @@ describe("context-aware deterministic fallbacks", () => {
     expect(narrationFallback("I attack the goblin with my blade.", [])).toBe(narrationFallback("I attack the goblin with my blade.", []));
     expect(narrationFallback("I walk back to the Market.", [], { currentLocation: "Market" }))
       .toBe(narrationFallback("I walk back to the Market.", [], { currentLocation: "Market" }));
+  });
+});
+
+describe("bounded grounding repair near-miss gate", () => {
+  const quest = { kind: "quest", questTitle: "Guard the s11 market", objectiveDescription: "Keep the stalls safe",
+    progressBefore: 0, progressAfter: 2, targetProgress: 3, objectiveCompleted: false, questCompleted: false };
+  const check = { kind: "check", checkKind: "skill", ability: "Intelligence", skill: "Investigation", mode: "normal",
+    difficulty: "Medium", rolls: [{ value: 15, kept: true }], abilityModifier: 3, proficiencyBonus: 2, modifier: 5,
+    total: 20, dc: 15, outcome: "success" };
+
+  it("skips a generic placeholder that names no committed fact", () => {
+    expect(narrationRepairIsWorthwhile("The authoritative result is clear.", [quest] as never, null, false)).toBe(false);
+    expect(narrationRepairIsWorthwhile("The authoritative result is clear.", [check] as never, null, false)).toBe(false);
+    expect(narrationRepairIsWorthwhile("", [quest] as never, null, false)).toBe(false);
+    expect(narrationRepairIsWorthwhile("Some unrelated atmospheric prose.", [check] as never, null, false)).toBe(false);
+  });
+
+  it("repairs a near-miss that already names a committed label or value", () => {
+    expect(narrationRepairIsWorthwhile("The guard advances to 2 of 3.", [quest] as never, null, false)).toBe(true);
+    expect(narrationRepairIsWorthwhile("Your Investigation check comes to 25.", [check] as never, null, false)).toBe(true);
+    expect(narrationRepairIsWorthwhile("At Lantern Quay, you take 7 damage.", [] as never, "Lantern Quay", false)).toBe(true);
   });
 });
