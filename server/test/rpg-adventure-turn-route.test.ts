@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { adventureTurnStreamEventSchema, canonicalAgentJson } from "@velvet/contracts";
 import type { AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import type { ProviderCompletionResult, ProviderCompletionUsage } from "../src/provider/index.js";
+import { ProviderHttpError } from "../src/provider/index.js";
 import { buildApp } from "../src/app.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { createRepository } from "../src/repo/index.js";
@@ -283,7 +284,7 @@ describe("M2.11 adventure turn routes", () => {
     const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
     const payload={campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration,expectedRevision:0,idempotencyKey:`unsafe-${_kind.replaceAll(" ","-")}`};
     const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload});
-    const terminal=events(response.body).at(-1);const safe="The scene holds. Your intended action remains pending; no movement or other campaign change is established.";
+    const terminal=events(response.body).at(-1);const safe=narrationFallback(declaration,[]);
     expect(terminal).toMatchObject({type:"terminal",payload:{narrationStatus:{status:"completed",text:safe,source:"deterministic-fallback"},receipts:[]}});
     if (providerContent !== "{") expect(response.body).not.toContain(providerContent);
     const replay=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload});
@@ -329,7 +330,81 @@ describe("M2.11 adventure turn routes", () => {
     const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
       campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I leave now",expectedRevision:0,idempotencyKey:"narration-provider-failure"}});
     expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{outcome:"done",narrationStatus:{source:"deterministic-fallback",
-      text:"The scene holds. Your intended action remains pending; no movement or other campaign change is established."}}});
+      text:narrationFallback("I leave now",[])}}});
+    await app.close();
+  });
+
+  it("adapts a thinking-mode tool_choice rejection to auto and keeps strict local validation",async()=>{
+    enable();const campaign=seed();const toolChoices:string[]=[];let narrationCalls=0;
+    const dependencies:AdventureAgentDependencies={complete:async(input)=>{
+      if(!input.tools?.some((tool)=>tool.name==="submit_adventure_narration"))
+        return{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
+      narrationCalls+=1;toolChoices.push(typeof input.toolChoice==="object"?"named":String(input.toolChoice));
+      // The live deepseek-flash endpoint rejects a forced named tool choice while thinking.
+      if(narrationCalls===1)throw new ProviderHttpError(400,"Thinking mode does not support this tool_choice");
+      return narrationResult("At the quay, the fog rolls in and the moment holds.");
+    },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I wait beside the arch.",expectedRevision:0,idempotencyKey:"thinking-tool-choice-adapt"}});
+    expect(narrationCalls).toBe(2);expect(toolChoices).toEqual(["named","auto"]);
+    expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{
+      status:"completed",text:"At the quay, the fog rolls in and the moment holds.",source:"provider-assisted"}}});
+    await app.close();
+  });
+
+  it("retries a gate-rejected narration exactly once with the exact facts",async()=>{
+    enable();const campaign=seed();let narrationCalls=0;const repairMessages:string[]=[];
+    const rejected="You gain a legendary sword from the GM's stash.";
+    const dependencies:AdventureAgentDependencies={complete:async(input)=>{
+      if(!input.tools?.some((tool)=>tool.name==="submit_adventure_narration"))
+        return{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
+      narrationCalls+=1;
+      if(narrationCalls===1)return narrationResult(rejected);
+      repairMessages.push(String(input.messages.at(-1)?.content));
+      return narrationResult("The moment holds; nothing is established.");
+    },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I wait.",expectedRevision:0,idempotencyKey:"grounding-repair"}});
+    expect(narrationCalls).toBe(2);
+    expect(repairMessages[0]).toContain("GROUNDING CORRECTION");
+    expect(repairMessages[0]).toContain("Rejected draft");
+    expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{
+      text:"The moment holds; nothing is established.",source:"provider-assisted"}}});
+    expect(response.body).not.toContain(rejected);
+    await app.close();
+  });
+
+  it("falls back after one failed repair without a third provider attempt",async()=>{
+    enable();const campaign=seed();let narrationCalls=0;
+    const rejected="You gain a legendary sword from the GM's stash.";
+    const dependencies:AdventureAgentDependencies={complete:async(input)=>{
+      if(!input.tools?.some((tool)=>tool.name==="submit_adventure_narration"))
+        return{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
+      narrationCalls+=1;return narrationResult(rejected);
+    },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I wait.",expectedRevision:0,idempotencyKey:"grounding-repair-bounded"}});
+    expect(narrationCalls).toBe(2);
+    expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{
+      source:"deterministic-fallback",text:narrationFallback("I wait.",[])}}});
+    await app.close();
+  });
+
+  it("does not retry an ambiguous provider failure",async()=>{
+    enable();const campaign=seed();let narrationCalls=0;
+    const dependencies:AdventureAgentDependencies={complete:async(input)=>{
+      if(!input.tools?.some((tool)=>tool.name==="submit_adventure_narration"))
+        return{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
+      narrationCalls+=1;throw new ProviderHttpError(503,"upstream unavailable");
+    },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I wait.",expectedRevision:0,idempotencyKey:"ambiguous-5xx"}});
+    expect(narrationCalls).toBe(1);
+    expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{source:"deterministic-fallback"}}});
     await app.close();
   });
 

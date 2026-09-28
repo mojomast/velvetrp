@@ -62,3 +62,50 @@ describe("unsupported travel narration without a receipt", () => {
     expect(providerNarrationMatchesReceipts("The Bell asks of you: walk the hill track before the fair.", [])).toBe(true);
   });
 });
+
+describe("semantic gate tolerance for internal labels and ordinary inflection", () => {
+  const quest = { kind: "quest", questTitle: "Guard the s11 market", objectiveDescription: "Keep the stalls safe",
+    progressBefore: 0, progressAfter: 1, targetProgress: 1, objectiveCompleted: true, questCompleted: false };
+  const check = { kind: "check", checkKind: "skill", ability: "Intelligence", skill: "Investigation", mode: "normal",
+    difficulty: "Medium", rolls: [{ value: 15, kept: true }], abilityModifier: 3, proficiencyBonus: 2, modifier: 5,
+    total: 20, dc: 15, outcome: "success" };
+
+  it("grounds a quest receipt whose readable title drops the internal identifier marker", () => {
+    expect(providerNarrationMatchesReceipts(
+      "The watch closes ranks as Guard the market advances to 1 of 1; the objective is complete.", [quest] as never)).toBe(true);
+    // The core label must still be present; a bare mechanic word is not enough.
+    expect(providerNarrationMatchesReceipts("The watch closes ranks as a quest advances to 1 of 1.", [quest] as never)).toBe(false);
+  });
+
+  it("matches a stopworded destination and an inflected check outcome", () => {
+    expect(providerNarrationMatchesReceipts("You arrive at Black Berth.", [{ kind: "travel", destination: "the Black Berth" }] as never)).toBe(true);
+    expect(providerNarrationMatchesReceipts("Your Investigation check comes to 20 against DC 15: it succeeded.", [check] as never)).toBe(true);
+    expect(providerNarrationMatchesReceipts("Your Investigation check comes to 20 against DC 15: it failed.", [check] as never)).toBe(false);
+  });
+
+  it("still rejects an arrival at a different place than the committed destination", () => {
+    expect(providerNarrationMatchesReceipts("You arrive at Pointe-Saint-Gilles.", [{ kind: "travel", destination: "Black Berth" }] as never)).toBe(false);
+  });
+});
+
+describe("context-aware deterministic fallbacks", () => {
+  it("composes distinct, stable prose for distinct receipt-free contexts", () => {
+    const samples: Array<[string, string]> = [
+      ["hold", narrationFallback("I wait.", [])],
+      ["conversation", narrationFallback("I greet the keeper and ask about the fog.", [])],
+      ["illegal", narrationFallback("/help what commands exist here?", [])],
+      ["rest", narrationFallback("I take a short rest by the fire.", [])],
+      ["combat", narrationFallback("I attack the goblin with my blade.", [])],
+      ["travel-to-current-place", narrationFallback("I walk back to the Market.", [], { currentLocation: "Market" })],
+    ];
+    for (const [kind, text] of samples) {
+      expect(text, kind).toContain("movement or other campaign change is established");
+    }
+    expect(samples.find(([kind]) => kind === "hold")![1]).not.toBe(samples.find(([kind]) => kind === "conversation")![1]);
+    expect(new Set(samples.map(([, text]) => text)).size).toBe(6);
+    // Determinism: the same declaration and context always composes the same line.
+    expect(narrationFallback("I attack the goblin with my blade.", [])).toBe(narrationFallback("I attack the goblin with my blade.", []));
+    expect(narrationFallback("I walk back to the Market.", [], { currentLocation: "Market" }))
+      .toBe(narrationFallback("I walk back to the Market.", [], { currentLocation: "Market" }));
+  });
+});

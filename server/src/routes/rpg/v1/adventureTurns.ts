@@ -19,12 +19,12 @@ import { openSse, type SseWriter } from "../../roleplay/generationService.js";
 import { adventureProviderPromptEstimate, createAdventureTurnBudgetPolicy, effectiveAdventureTurnMaxTokens, initializeAdventureTurnBudget,
   orchestrateAdventureTurn, type AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
 import type { Repository } from "../../../repo/index.js";
-import { completeWithProvider } from "../../../provider/index.js";
+import { completeWithProvider, ProviderHttpError } from "../../../provider/index.js";
 import { getPromptPreset } from "../../../presets.js";
 import { adventureNarrationMessages, conversationNarrationMessages } from "../../../agent/adventurePrompt.js";
 import { adventureTurnBudgets } from "../../../agent/turnBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "../../../agent/directToolReasoning.js";
-import type { CompletionFunctionTool, ProviderCompletionInput } from "../../../provider/index.js";
+import type { CompletionFunctionTool, CompletionMessage, ProviderCompletionInput, ProviderCompletionResult } from "../../../provider/index.js";
 
 const OWNER = "local-owner";
 const JSON_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
@@ -169,14 +169,46 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
   }
   return values;
 }
-export function narrationFallback(declaration: string, values: readonly NarrationReceipt[]): string {
-  void declaration;
-  return composeNarration(values);
+const NARRATION_HOLD_TEXT = "The scene holds. Your intended action remains pending; no movement or other campaign change is established.";
+const NARRATION_CONVERSATION_FALLBACK = "The exchange holds. Words are offered but nothing is resolved; no movement or other campaign change is established.";
+const NARRATION_ILLEGAL_FALLBACK = "That action cannot be established from the current state. It remains unresolved; no movement or other campaign change is established.";
+const NARRATION_REST_FALLBACK = "The rest is not yet committed. No recovery, time skip, or movement or other campaign change is established.";
+const NARRATION_COMBAT_FALLBACK = "The fight holds where it stands. Your next move is not resolved; no damage, turn change, or movement or other campaign change is established.";
+const NARRATION_TRAVEL_CURRENT_FALLBACK = "You are already there. No journey, arrival, or movement or other campaign change is established.";
+// Deterministic per-turn context classification for receipt-free fallbacks. Distinct contexts get
+// distinct, stable prose instead of one byte-identical hold line, so replaying a turn still reads
+// the same while a dialogue, rest, combat, or illegal declaration no longer collapses together.
+const NARRATION_REST_SIGNAL = /\b(?:rest|rests|rested|resting|sleep|sleeps|slept|camp|camps|camped|recover|recovers|recovered|recovery|meditate|meditates|meditated|trance|breather|breath)\b/;
+const NARRATION_COMBAT_SIGNAL = /\b(?:attack|attacks|attacked|strike|strikes|struck|swing|swings|swung|stab|stabs|stabbed|shoot|shoots|shot|slash|slashes|slashed|cast|casts|spell|spells|fight|fights|fought|kill|kills|killed|flee|flees|fled|retreat|retreats|retreated|grapple|grapples|grappled|shove|shoves|shoved|dash|dashes|dashed|disengage|disengages|disengaged|stabilize|stabilizes|stabilized|parry|parries|block|blocks|blocked|dodge|dodges|dodged|charge|charges|charged)\b/;
+const NARRATION_CONVERSATION_SIGNAL = /\b(?:ask|asks|asked|answer|answers|answered|say|says|said|tell|tells|told|talk|talks|talked|speak|speaks|spoke|greet|greets|greeted|call|calls|called|shout|shouts|shouted|whisper|whispers|whispered|mutter|mutters|muttered|reply|replies|replied|question|questions|questioned|listen|listens|listened|address|addresses|addressed|hail|hails|hailed|introduce|introduces|introduced|chat|chats|chatted|converse|converses|conversed|nod|nods|nodded|persuade|persuades|persuaded|intimidate|intimidates|intimidated|deceive|deceives|deceived)\b/;
+const NARRATION_META_SIGNAL = /\b(?:help|command|commands|rule|rules|system|sheet|inventory|stat|stats|status|respec|meta|ooc|gm|stash|developer|console|teleport|summon|cheat|hack)\b/;
+const NARRATION_TRAVEL_SIGNAL = /\b(?:travel|travels|traveled|journey|journeys|journeyed|walk|walks|walked|ride|rides|rode|march|marches|marched|return|returns|returned|leave|leaves|left|depart|departs|departed|move|moves|moved|enter|enters|entered|arrive|arrives|arrived|reach|reaches|reached|head|heads|headed|go|goes|went|path|road|route)\b/;
+export interface NarrationFallbackContext { currentLocation?: string | null; }
+function zeroReceiptFallback(declaration: string, currentLocation: string | null): string {
+  const text = normalizedNarration(declaration);
+  if (!text) return NARRATION_HOLD_TEXT;
+  if (NARRATION_REST_SIGNAL.test(text)) return NARRATION_REST_FALLBACK;
+  if (NARRATION_COMBAT_SIGNAL.test(text)) return NARRATION_COMBAT_FALLBACK;
+  if (NARRATION_META_SIGNAL.test(text)) return NARRATION_ILLEGAL_FALLBACK;
+  if (NARRATION_CONVERSATION_SIGNAL.test(text)) return NARRATION_CONVERSATION_FALLBACK;
+  if (NARRATION_TRAVEL_SIGNAL.test(text) || /\bset (?:out|off)\b|\bmake for\b/.test(text)) {
+    return currentLocation && mentionsFact(declaration, currentLocation) ? NARRATION_TRAVEL_CURRENT_FALLBACK : NARRATION_ILLEGAL_FALLBACK;
+  }
+  return NARRATION_HOLD_TEXT;
+}
+/**
+ * Receipt-bound fallback prose. With committed receipts the composition is already fact-specific;
+ * with none, classify the declaration so distinct contexts produce distinct (but deterministic)
+ * prose instead of one byte-identical hold line.
+ */
+export function narrationFallback(declaration: string, values: readonly NarrationReceipt[], context?: NarrationFallbackContext): string {
+  if (values.length > 0) return composeNarration(values);
+  return zeroReceiptFallback(declaration, context?.currentLocation ?? null);
 }
 
 /** Receipt-only prose retained for every provider and settings failure lane. */
 function composeNarration(values: readonly NarrationReceipt[]): string {
-  if (values.length === 0) return "The scene holds. Your intended action remains pending; no movement or other campaign change is established.";
+  if (values.length === 0) return NARRATION_HOLD_TEXT;
   const facts = values.map((value) => {
     if (value.kind === "travel") return `You arrive at ${value.destination}.`;
     if(value.kind==="inventory"){
@@ -234,10 +266,42 @@ function composeNarration(values: readonly NarrationReceipt[]): string {
 }
 
 const normalizedNarration = (value:string) => value.toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g," ").trim();
-const includesFact = (text:string,value:string|number) => normalizedNarration(text).includes(normalizedNarration(String(value)));
 const includesAny = (text:string,values:readonly string[]) => values.some(value=>normalizedNarration(text).includes(value));
 const includesNumber = (text:string,value:number) => new RegExp(`(^|\\D)${String(value).replace("-","\\-")}(?=\\D|$)`).test(text);
 const regexEscape=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+
+// Internal server labels (for example a seeded quest title such as "Guard the s11 market") are not
+// player-visible prose. Strip bracketed markers and short identifier tokens before matching so a
+// narration that names the readable label still grounds the receipt.
+const stripInternalLabels = (value:string) => value.replace(/\[[^\]]*\]/g," ").replace(/\bs\d+\b/gi," ");
+const NARRATION_MATCH_STOPWORDS = new Set(["the","a","an","of","to","in","on","at","and","or","for","from","with","into","your","you","their","its","his","her","this","that","by","as","is","are","was","were","be"]);
+const narrationMatchTokens = (value:string):string[] => [...new Set(normalizedNarration(stripInternalLabels(value)).split(" ").filter(token=>token.length>=2&&!NARRATION_MATCH_STOPWORDS.has(token)))];
+const narrationWords = (text:string):string[] => normalizedNarration(text).split(" ").filter(Boolean);
+// Light stemming by shared prefix keeps "success"/"succeeded" and "guard"/"guarding" together
+// without letting short words collide.
+function tokenPrefixMatch(left:string,right:string):boolean{
+  if(left===right)return true;
+  const length=Math.min(left.length,right.length);
+  if(length<4)return false;
+  let index=0;while(index<length&&left[index]===right[index])index+=1;
+  return index>=4;
+}
+/**
+ * Fuzzy receipt grounding: an exact normalized substring first, then every significant label token
+ * (ignoring internal identifiers and stopwords) present in the prose with a light prefix stem. This
+ * tolerates internal labels and ordinary inflection; it never accepts a label whose core words are
+ * absent, so a narration still has to name the committed fact.
+ */
+function mentionsFact(text:string,value:string|number):boolean{
+  const label=String(value);
+  const normalizedLabel=normalizedNarration(stripInternalLabels(label));
+  if(!normalizedLabel)return true;
+  if(normalizedNarration(text).includes(normalizedLabel))return true;
+  const tokens=narrationMatchTokens(label);
+  if(tokens.length===0)return true;
+  const words=narrationWords(text);
+  return tokens.every(token=>words.some(word=>tokenPrefixMatch(token,word)));
+}
 
 // A mechanical outcome is only grounded by a matching committed receipt, so provider prose may not
 // assert one that no receipt carries (the zero-receipt case, or a turn whose receipts lack that
@@ -261,6 +325,9 @@ const hyphenatedItemPattern=/\b[a-z]+-[a-z]+(?=\s+(?:off|from|onto|into|out|down
 // to a space in normalizedNarration, so a directive such as "what it asks of you: walk the hill
 // track" would otherwise read as "you walk" and reject grounded narration.
 const travelClaimPattern=/\b(?:you|the party|the group)\s+(?:arrive|arrives|arrived|reach|reaches|reached|enter|enters|entered|travel|travels|traveled|journey|journeys|journeyed|leave|leaves|left|walk|walks|walked|head|heads|headed|ride|rides|rode|march|marches|marched|set out|sets out|set off|sets off|make for|makes for|made for)\b/;
+// Any explicit arrival target in provider prose must still be the committed destination. Broadened
+// to include idiomatic arrival framings while keeping the destination as the captured tail.
+const ARRIVAL_TARGET_PATTERN=/\b(?:arriv(?:e|es|ed|ing|al)|reach(?:es|ed)?|enter(?:s|ed)?|step(?:s|ped)?\s+(?:onto|into|through|inside)|come(?:s)?\s+(?:to|into)|came\s+(?:to|into)|return(?:s|ed)?\s+to|back\s+(?:at|in)|lead(?:s)?\s+(?:you|the party)\s+(?:to|into)|bring(?:s)?\s+(?:you|the party)\s+(?:to|into))\s+(?:the\s+|a\s+|an\s+)?([^.!?;\n]{1,200})/gi;
 function assertsTransactionOrAcquisition(normalized:string):boolean{
   for(const verb of normalized.matchAll(transactionVerbPattern)){
     const window=normalized.slice(verb.index??0,(verb.index??0)+64).replace(negatedCurrencyPattern,"");
@@ -309,20 +376,22 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
   if(contradiction)return false;
   return values.every(value=>{
     if(value.kind==="travel"){
-      const arrivalClaims=[...text.matchAll(/\b(?:arriv(?:e|es|ed|ing)|arrival)\s+(?:at|in)\s+([^.!?;\n]{1,200})/gi)].map(match=>match[1]!);
-      return includesFact(text,value.destination)&&arrivalClaims.every(claim=>includesFact(claim,value.destination))
-        &&includesAny(text,["arrive","arrives","arrived","reach","reaches","reached","travel","travels","traveled","move","moves","moved","enter","enters","entered",
-          "walk","walks","walked","head","heads","headed","ride","rides","rode","march","marches","marched","set out","sets out","set off","sets off","make for","makes for","made for"]);
+      // Tolerance: the label is matched fuzzily (internal markers and inflection folded), and naming
+      // the destination is enough. Safety: any explicit arrival target in the prose must still be the
+      // committed destination, so a different arrival is rejected.
+      if(!mentionsFact(text,value.destination))return false;
+      const arrivalTargets=[...text.matchAll(ARRIVAL_TARGET_PATTERN)].map(match=>match[1]!);
+      return arrivalTargets.every(target=>mentionsFact(target,value.destination));
     }
-    if(value.kind==="inventory")return includesFact(text,value.itemLabel)&&includesNumber(text,value.quantity)&&includesAny(text,value.action==="equip"?["equip"]:value.action==="unequip"?["unequip"]:value.action==="drop"?["drop","discard"]:value.action==="gift"?["give","gives","gave","gift"]:["consume","consumes","consumed","remove","removes","removed"]);
-    if(value.kind==="commerce")return includesFact(text,value.itemLabel)&&includesFact(text,value.vendorLabel)&&includesNumber(text,value.quantity)&&includesNumber(text,value.balanceAfter)&&includesAny(text,value.action==="buy"?["buy","buys","bought","purchase"]:value.action==="sell"?["sell","sells","sold","sale"]:["give","gives","gave","transfer"]);
-    if(value.kind==="quest")return includesFact(text,value.questTitle)&&includesNumber(text,value.progressAfter)&&includesAny(text,["advance","advances","advanced","progress","complete","completes","completed"]);
-    if(value.kind==="quest-lifecycle")return includesFact(text,value.questTitle)&&includesAny(text,value.action==="accept"?["accept","accepted"]:value.action==="abandon"?["abandon","abandoned"]:["claim","claimed"]);
-    if(value.kind==="progression")return includesFact(text,value.className)&&includesNumber(text,value.levelAfter)&&includesAny(text,["advance","advances","advanced","level"]);
-    if(value.kind==="check")return includesFact(text,value.skill??value.ability)&&includesNumber(text,value.total)&&includesNumber(text,value.dc)&&includesFact(text,value.outcome);
-    if(value.kind==="power")return includesFact(text,value.powerName)&&value.targets.every(target=>includesFact(text,target))&&value.costs.every(cost=>includesNumber(text,cost.after))&&value.stateDeltas.every(delta=>includesFact(text,delta.actor)&&includesFact(text,delta.change));
-    if(value.kind==="rest")return includesFact(text,value.restName)&&value.recovery.every(delta=>includesFact(text,delta.label)&&includesNumber(text,delta.after));
-    if(value.kind==="combat-consumable"||value.kind==="combat-power")return includesFact(text,value.kind==="combat-consumable"?value.itemName:value.powerName)&&includesFact(text,value.target)&&value.outcomes.every(outcome=>outcome.kind==="effect"?includesFact(text,outcome.effect):outcome.kind==="temporary-hit-points"?includesNumber(text,outcome.granted):includesNumber(text,outcome.applied)&&(outcome.after===null?outcome.kind==="resource"&&includesFact(text,outcome.resource):includesNumber(text,outcome.after)));
+    if(value.kind==="inventory")return mentionsFact(text,value.itemLabel)&&includesNumber(text,value.quantity)&&includesAny(text,value.action==="equip"?["equip"]:value.action==="unequip"?["unequip"]:value.action==="drop"?["drop","discard"]:value.action==="gift"?["give","gives","gave","gift"]:["consume","consumes","consumed","remove","removes","removed"]);
+    if(value.kind==="commerce")return mentionsFact(text,value.itemLabel)&&mentionsFact(text,value.vendorLabel)&&includesNumber(text,value.quantity)&&includesNumber(text,value.balanceAfter)&&includesAny(text,value.action==="buy"?["buy","buys","bought","purchase"]:value.action==="sell"?["sell","sells","sold","sale"]:["give","gives","gave","transfer"]);
+    if(value.kind==="quest")return mentionsFact(text,value.questTitle)&&includesNumber(text,value.progressAfter)&&includesAny(text,["advance","advances","advanced","progress","complete","completes","completed"]);
+    if(value.kind==="quest-lifecycle")return mentionsFact(text,value.questTitle)&&includesAny(text,value.action==="accept"?["accept","accepted"]:value.action==="abandon"?["abandon","abandoned"]:["claim","claimed"]);
+    if(value.kind==="progression")return mentionsFact(text,value.className)&&includesNumber(text,value.levelAfter)&&includesAny(text,["advance","advances","advanced","level"]);
+    if(value.kind==="check")return mentionsFact(text,value.skill??value.ability)&&includesNumber(text,value.total)&&includesNumber(text,value.dc)&&mentionsFact(text,value.outcome);
+    if(value.kind==="power")return mentionsFact(text,value.powerName)&&value.targets.every(target=>mentionsFact(text,target))&&value.costs.every(cost=>includesNumber(text,cost.after))&&value.stateDeltas.every(delta=>mentionsFact(text,delta.actor)&&mentionsFact(text,delta.change));
+    if(value.kind==="rest")return mentionsFact(text,value.restName)&&value.recovery.every(delta=>mentionsFact(text,delta.label)&&includesNumber(text,delta.after));
+    if(value.kind==="combat-consumable"||value.kind==="combat-power")return mentionsFact(text,value.kind==="combat-consumable"?value.itemName:value.powerName)&&mentionsFact(text,value.target)&&value.outcomes.every(outcome=>outcome.kind==="effect"?mentionsFact(text,outcome.effect):outcome.kind==="temporary-hit-points"?includesNumber(text,outcome.granted):includesNumber(text,outcome.applied)&&(outcome.after===null?outcome.kind==="resource"&&mentionsFact(text,outcome.resource):includesNumber(text,outcome.after)));
     // Combat damage must state the exact damage dealt and the resulting hit points. The applied
     // damage and HP already fix the outcome, so prose need not echo a literal action or status
     // word (a longsword "bites home" and an enemy "falls" as naturally as they are "attacked" and
@@ -335,10 +404,80 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
     const data=value.event.data as {current:number;max:number};return includesNumber(text,data.current)&&includesNumber(text,data.max)&&includesAny(text,["resource","current","maximum"]);
   });
 }
+type NarrationUsage = { promptTokens: number; completionTokens: number; totalTokens: number };
+function narrationUsageTotal(results: readonly ProviderCompletionResult[]): NarrationUsage | null {
+  if (results.length === 0) return null;
+  let promptTokens = 0, completionTokens = 0, totalTokens = 0;
+  for (const result of results) {
+    const usage = result.usage;
+    if (!usage || ![usage.promptTokens, usage.completionTokens, usage.totalTokens].every((value) => Number.isSafeInteger(value) && value >= 0)
+      || usage.totalTokens < usage.promptTokens + usage.completionTokens) return null;
+    promptTokens += usage.promptTokens; completionTokens += usage.completionTokens; totalTokens += usage.totalTokens;
+  }
+  return { promptTokens, completionTokens, totalTokens };
+}
+const narrationCompletionText = (results: readonly ProviderCompletionResult[]): string =>
+  results.map((result) => result.message.toolCalls?.map((call) => call.arguments).join("\n") ?? "").join("\n");
+/** Settles the one reservation against every billed completion, measured when available. */
+function narrationBudgetSettlement(results: readonly ProviderCompletionResult[], promptText: string): { usage: NarrationUsage } | { promptText: string; completionText: string } {
+  const usage = narrationUsageTotal(results);
+  return usage ? { usage } : { promptText, completionText: narrationCompletionText(results) };
+}
+/** A total pre-completion failure charges the reserved worst case, as before. */
+function narrationFailureSettlement(results: readonly ProviderCompletionResult[], promptText: string): { usage: NarrationUsage } | { promptText: string; completionText: string } | Record<string, never> {
+  return results.length === 0 ? {} : narrationBudgetSettlement(results, promptText);
+}
+/** A thinking-mode upstream rejects a forced named tool choice with HTTP 400; `auto` is accepted. */
+function isThinkingModeToolChoiceRejection(error: unknown): boolean {
+  return error instanceof ProviderHttpError && (error.status === 400 || error.status === 422)
+    && /tool[_\s-]?choice|thinking mode/i.test(error.message);
+}
+/**
+ * One bounded adaptation for thinking endpoints: retry the identical request with `auto` only when
+ * the provider deterministically rejected the forced tool choice. The caller still requires exactly
+ * one `submit_adventure_narration` call, so the strict local schema stays authoritative.
+ */
+async function completeNarrationDispatch(dispatch: (input: ProviderCompletionInput) => Promise<ProviderCompletionResult>,
+  input: ProviderCompletionInput, consumed: ProviderCompletionResult[]): Promise<ProviderCompletionResult> {
+  try { const result = await dispatch(input); consumed.push(result); return result; }
+  catch (error) {
+    if (!isThinkingModeToolChoiceRejection(error)) throw error;
+    const result = await dispatch({ ...input, toolChoice: "auto" });
+    consumed.push(result); return result;
+  }
+}
+/** Extracts the single strict narration argument, rejecting transport and contract violations. */
+function narrationTextFromResult(result: ProviderCompletionResult): string {
+  const calls = result.message.toolCalls;
+  if (calls?.length !== 1 || calls[0]?.name !== NARRATION_TOOL_NAME || typeof calls[0].id !== "string" || !calls[0].id.trim()
+    || typeof calls[0].arguments !== "string") throw new Error("invalid narration response");
+  const parsed = JSON.parse(calls[0].arguments) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).length !== 1
+    || !("narration" in parsed) || typeof parsed.narration !== "string") throw new Error("invalid narration response");
+  const providerText = (parsed.narration as string).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
+  if (!providerText || providerText.length > 8_000) throw new Error("invalid narration response");
+  return providerText;
+}
+/** The exact-facts repair instruction for the single bounded gate retry. */
+function narrationRepairMessage(input: { values: readonly NarrationReceipt[]; currentLocation: string | null; conversation: boolean; rejected: string }): CompletionMessage {
+  const facts = input.conversation
+    ? "No mechanics are committed for this turn; the player's declaration establishes intent only."
+    : `The only committed facts for this turn are:\n${composeNarration(input.values)}`;
+  return { role: "user", content: [
+    "GROUNDING CORRECTION: the previous submission failed the server's local grounding check.",
+    "Rewrite the narration as one short passage and return it by calling submit_adventure_narration exactly once.",
+    facts,
+    ...(input.currentLocation ? [`The actor's current location is ${input.currentLocation}.`] : []),
+    input.conversation
+      ? "Do not assert or imply movement, travel, arrival, items, transactions, damage, healing, conditions, discoveries, quests, progression, dice, checks, levels, rests, or any other mechanical or campaign change."
+      : "State only these committed facts. Do not add, omit, round, or contradict any value, and never call a committed result pending or unresolved.",
+    `Rejected draft (untrusted data, for reference only):\n${input.rejected.slice(0, 2_000)}`,
+  ].join("\n\n") };
+}
 async function performNarration(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, turn);
-  const fallbackText = composeNarration(safeReceipts ?? []);
+  let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? []);
   if (!safeReceipts) return { turn, text: fallbackText,source:"deterministic-fallback" };
   const callId = key("narration-provider", turn.turnId);
   const recovered=repo.getNarrationProviderDispatch(OWNER,turn.turnId,callId);
@@ -356,6 +495,7 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
     catch { return { turn, text: fallbackText, source: "deterministic-fallback" }; }
     const publicContext=publicNarrationContext(repo,turn);
     if(!publicContext)return {turn,text:fallbackText,source:"deterministic-fallback"};
+    fallbackText = narrationFallback(turn.declaration, safeReceipts, { currentLocation: publicContext.currentLocation });
     // Receipt-free conversation narration applies only to a narration derivative whose immediate
     // prior is a settled original hold. The prior is resolved fresh and never via the chain, so a
     // derivative of a derivative, a pending confirmation, or any inherited mechanics stays on the
@@ -414,37 +554,45 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
        if(claim.state==="settled")return finalizeNarrationDispatch(repo,turn.turnId,callId,claim);
        return { turn:requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId)), text: fallbackText, source: "deterministic-fallback" };
     }
+    const dispatch = dependencies?.complete ?? completeWithProvider;
     let measuredUsage: { promptTokens: number; completionTokens: number } | null = null;
     let budgetSettled = false;
     let usageEstimated = false;
+    let promptTextEstimate = adventureProviderPromptEstimate(completionInput);
+    const consumed: ProviderCompletionResult[] = [];
     try {
-      const result = await (dependencies?.complete ?? completeWithProvider)(completionInput);
-      const completionText = result.message.toolCalls?.map((call) => call.arguments).join("\n");
-      const charged = adventureTurnBudgets.settle(turn.turnId, callId, { usage: result.usage,
-        promptText: adventureProviderPromptEstimate(completionInput), ...(completionText === undefined ? {} : { completionText }) });
-      budgetSettled = true; measuredUsage = charged; usageEstimated = charged.source === "estimated";
-      const calls = result.message.toolCalls;
-      if (calls?.length !== 1 || calls[0]?.name !== NARRATION_TOOL_NAME || typeof calls[0].id !== "string" || !calls[0].id.trim()
-        || typeof calls[0].arguments !== "string") throw new Error("invalid narration response");
-      const parsed = JSON.parse(calls[0].arguments) as unknown;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).length !== 1
-        || !("narration" in parsed) || typeof parsed.narration !== "string") {
-        throw new Error("invalid narration response");
+      const gateAgainst = (text: string): boolean => conversation
+        ? conversationNarrationMatches(text, publicContext.currentLocation)
+        : providerNarrationMatchesReceipts(text, safeReceipts, publicContext.currentLocation);
+      let result = await completeNarrationDispatch(dispatch, completionInput, consumed);
+      let providerText = narrationTextFromResult(result);
+      // One bounded repair only. A syntactically valid narration that fails the local grounding gate
+      // gets a second provider attempt carrying the exact committed facts; transport, protocol, and
+      // malformed-argument failures never retry. The strict local gate still decides the final text.
+      if (!gateAgainst(providerText)) {
+        const repairInput: ProviderCompletionInput = { ...completionInput,
+          messages: [...completionInput.messages, narrationRepairMessage({ values: safeReceipts, currentLocation: publicContext.currentLocation,
+            conversation, rejected: providerText })] };
+        promptTextEstimate = adventureProviderPromptEstimate(repairInput);
+        result = await completeNarrationDispatch(dispatch, repairInput, consumed);
+        providerText = narrationTextFromResult(result);
+        if (!gateAgainst(providerText)) throw new Error("narration contradicts or omits verified current facts after one repair");
       }
-      const providerText = parsed.narration.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
-      if (!providerText || providerText.length > 8_000) throw new Error("invalid narration response");
       const currentSnapshot=repo.getCampaignAgentContextSnapshot(OWNER,turn.campaignId,turn.sessionId,{kind:"player",actorId:turn.actorId});
       if (JSON.stringify(publicNarrationContext(repo, turn)) !== JSON.stringify(publicContext)) throw new Error("narration public context is stale");
       if(!currentSnapshot?.ruleset||currentSnapshot.ruleset.id!==publicContext.ruleset.id||currentSnapshot.ruleset.version!==publicContext.ruleset.version
         ||JSON.stringify(currentSnapshot.ruleset.descriptor)!==JSON.stringify(publicContext.ruleset.descriptor))throw new Error("narration ruleset context is stale");
-      if(!(conversation ? conversationNarrationMatches(providerText,publicContext.currentLocation)
-        : providerNarrationMatchesReceipts(providerText,safeReceipts,publicContext.currentLocation)))throw new Error("narration contradicts or omits verified current facts");
+      const charged = adventureTurnBudgets.settle(turn.turnId, callId, narrationBudgetSettlement(consumed, promptTextEstimate));
+      budgetSettled = true; measuredUsage = charged; usageEstimated = charged.source === "estimated";
        claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"provider-assisted",narration:providerText,
          outcomeCode:usageEstimated?"ok-estimated":"ok",promptTokens:measuredUsage.promptTokens,completionTokens:measuredUsage.completionTokens});
     } catch (error) {
       if (process.env.VELVET_NARRATION_DEBUG === "1") console.warn("[narration-failed]",
         error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : "unknown");
-      if (!budgetSettled) { measuredUsage = adventureTurnBudgets.settle(turn.turnId, callId, {}); usageEstimated = true; }
+      if (!budgetSettled) {
+        const charged = adventureTurnBudgets.settle(turn.turnId, callId, narrationFailureSettlement(consumed, promptTextEstimate));
+        measuredUsage = charged; usageEstimated = charged.source === "estimated";
+      }
        claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"deterministic-fallback",narration:fallbackText,
          outcomeCode:usageEstimated?"narration-failed-estimated":"narration-failed",promptTokens:measuredUsage?.promptTokens??null,
          completionTokens:measuredUsage?.completionTokens??null});
@@ -458,7 +606,7 @@ function finalizeNarrationDispatch(repo:Repo&Repository,turnId:string,callId:str
    const currentTurn=requirePrivate(repo.getAdventureTurn(OWNER,turnId));
    const frozen=repo.getNarrationProviderContext(OWNER,turnId,callId);
    if(frozen && JSON.stringify(frozen)!==JSON.stringify(publicNarrationContext(repo,currentTurn))) {
-     return {turn:currentTurn,text:composeNarration(narrationReceipts(repo,currentTurn)??[]),source:"deterministic-fallback"};
+     return {turn:currentTurn,text:narrationFallback(currentTurn.declaration,narrationReceipts(repo,currentTurn)??[]),source:"deterministic-fallback"};
    }
   let turn=requirePrivate(repo.getAdventureTurn(OWNER,turnId));const started=turn.providerCalls.find(call=>call.callId===callId&&call.phase==="started");
   if(started&&!turn.providerCalls.some(call=>call.callId===callId&&call.phase!=="started"))try{turn=repo.recordProviderCallOutcome(OWNER,{turnId,callId,
