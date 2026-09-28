@@ -43,3 +43,38 @@ Pricing is USD per million prompt/completion tokens. A dollar cap requires prici
 ## Provenance
 
 The adapter captures provider request ID, requested/response model, system fingerprint, normalized finish reason, monotonic latency, prompt version, and schema/tool-registry version in its in-process result. The current durable adventure schema stores only requested model, attempt, safe outcome code, and token counts; the additional fields are intentionally not persisted without a schema change. Prompts, schemas, arguments, response text, headers, API keys, and exception messages never enter provenance metadata.
+
+## Thinking-mode gateways and DM narration
+
+Some OpenAI-compatible gateways route one model id to a mix of thinking and non-thinking upstreams
+(for example `deepseek-v4-flash` behind the agentrouter `/v1` endpoint). A thinking upstream:
+
+- **rejects any forced tool choice** — named `{ type: "function", function: { name } }` and the string
+  `"required"` both fail with `400 invalid_request_error: Thinking mode does not support this tool_choice`,
+  intermittently, depending on which upstream the gateway selected; and
+- **burns the whole completion budget on hidden `reasoning_content`**, returning an empty `content`
+  with `finish_reason: "length"` when reasoning is not disabled.
+
+This is why the campaign Director's planning rounds succeed (`tool_choice: "auto"`) while a forced
+`submit_dm_scene` narration can settle `unknown-or-invalid-provider-outcome`. Two rules keep the DM
+lanes working:
+
+1. Disable reasoning in the request (`reasoning_effort: "none"`, sent through
+   `DIRECT_TOOL_BODY_OVERRIDES`) so no budget is spent on hidden deliberation.
+2. Prefer `tool_choice: "auto"` with **exactly one advertised tool** over a forced named tool choice.
+   The owning orchestrator still requires the one expected call and rejects anything else, so schema
+   authority is unchanged; `auto` is accepted by every upstream the gateway routes to.
+
+Required environment for a live thinking-mode gateway:
+
+```
+OPENROUTER_BASE_URL=http://100.72.41.9:8787/v1
+OPENROUTER_API_KEY=<gateway key>
+OPENROUTER_MODEL=deepseek-v4-flash
+```
+
+`requesty-deepseek-v4.1-flash` and the `openrouter:*` routes are exposed by the same gateway but were
+not usable in validation (402 low balance / upstream provider error), so they are not a fallback. The
+narration lane performs at most one extra dispatch **only** for a pre-dispatch rejection
+(`ProviderTransportError`, or HTTP 400/404/422) where no completion could have been generated;
+timeouts, 429, and all 5xx stay on the no-ambiguous-paid-retry path.

@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { systemOneShadowQueue } from "./systemOneShadow.js";
 import { campaignDmCompositionSchema, campaignDmSelectionSchema, canonicalAgentJson, type CampaignDmSelection } from "@velvet/contracts";
-import { callSystemOne, completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
-  type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
+import { callSystemOne, completeWithProvider, ProviderHttpError, ProviderTransportError, type CompletionFunctionTool,
+  type CompletionMessage, type CompletionToolCall, type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
 import { canUseSystemOne } from "../provider/providerTransport.js";
 import { getHarnessSettings, getProviderSettings, getSystemOneSettings, recordSystemOneDecision } from "../repo/index.js";
 import { readRpgFeatureFlags } from "../features.js";
@@ -143,6 +143,23 @@ function usageRecord(usage:ProviderCompletionResult['usage'],prompt:number,compl
       (promptTokens*price.promptPerMillion+completionTokens*price.completionPerMillion)/1_000_000};
 }
 
+/**
+ * A failure that was rejected before the provider could generate any completion, so one bounded retry
+ * cannot double-charge a paid outcome. A transport failure never reached the provider; a 400/404/422 is
+ * a deterministic request rejection. Deliberately excluded: timeouts, 429, and every 5xx, because those
+ * can leave a paid outcome unknown and the DM lane must never retry an ambiguous paid call.
+ */
+function isUnbilledProviderFailure(error: unknown): boolean {
+  return error instanceof ProviderTransportError
+    || (error instanceof ProviderHttpError && [400, 404, 422].includes(error.status));
+}
+
+/** One bounded pre-dispatch retry; the second failure propagates to the lane's deterministic settlement. */
+async function dispatchWithUnbilledRetry<T>(dispatch: () => Promise<T>): Promise<T> {
+  try { return await dispatch(); }
+  catch (first) { if (!isUnbilledProviderFailure(first)) throw first; return await dispatch(); }
+}
+
 export function selectDmBeatTool(selectionPairs: Array<{ candidateId: string; digest: string }>): CompletionFunctionTool {
   return { name: "select_dm_beat", description: "Select an ordered composition of zero to three exact authorized campaign beats, or hold with an empty list for a player choice.",
     parameters: { type: "object", additionalProperties: false, required: ["composition"], properties: { composition: {
@@ -261,7 +278,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
     let accounting: DmProviderUsage | null = null;
     try {
       const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("DM deadline")); }, DM_PROVIDER_DEADLINE_MS); });
-      const result = await Promise.race([deps.complete({ ...input, signal: controller.signal }), timeout]);
+      const result = await dispatchWithUnbilledRetry(()=>Promise.race([deps.complete({ ...input, signal: controller.signal }), timeout]));
       accounting = usageRecord(result.usage, promptBound, completionLimit, price);
       if (round === 0) repository.recordDmProviderUsage(principal, runId, 'planning', accounting);
       if (result.usage && (![result.usage.promptTokens, result.usage.completionTokens, result.usage.totalTokens].every(value => Number.isSafeInteger(value) && value >= 0)
@@ -322,7 +339,11 @@ async function runCampaignDmBeat(repository: CampaignDmRepository, principal: st
     const completionLimit=Math.min(DM_NARRATION_COMPLETION_MAX_TOKENS,provider.samplers.maxTokens??DM_NARRATION_COMPLETION_MAX_TOKENS);
     const input:ProviderCompletionInput={provider:{...provider,samplers:{...provider.samplers,maxTokens:completionLimit}},
       harness,preset:getPromptPreset("default"),promptVersion:"campaign-dm-narration-v1",schemaVersion:"campaign-dm-narration-v1",
-      messages:dmNarrationMessages(work.context,work.fallback),parallelToolCalls:false,toolChoice:{name:"submit_dm_scene"},
+      // Exactly one tool is advertised, and a thinking-mode upstream rejects a forced named tool choice
+      // with HTTP 400 ("Thinking mode does not support this tool_choice") even when reasoning is
+      // disabled. `auto` is accepted everywhere and still yields the one tool call; the orchestrator
+      // rejects anything other than a single submit_dm_scene call, so the schema stays authoritative.
+      messages:dmNarrationMessages(work.context,work.fallback),parallelToolCalls:false,toolChoice:"auto",
       tools:[dmNarrationTool(work.context)],bodyOverrides:DIRECTOR_BODY_OVERRIDES};
     const promptBytes=1024+Buffer.byteLength(JSON.stringify(input.messages)+JSON.stringify(input.tools)+JSON.stringify(harness));
     const promptBound=estimatePromptTokens(promptBytes);
@@ -344,7 +365,9 @@ async function runCampaignDmBeat(repository: CampaignDmRepository, principal: st
       if(!claimId)return;
       const controller=new AbortController();
       const timeout=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(new Error("narration deadline"));},DM_PROVIDER_DEADLINE_MS);});
-      const result=await Promise.race([deps.complete({...input,signal:controller.signal}),timeout]);
+      // One bounded pre-dispatch retry only (see isUnbilledProviderFailure); a timeout, 429, or 5xx is
+      // never retried because it can leave an ambiguous paid outcome.
+      const result=await dispatchWithUnbilledRetry(()=>Promise.race([deps.complete({...input,signal:controller.signal}),timeout]));
       accounting=usageRecord(result.usage,promptBound,completionLimit,price);
       repository.recordDmProviderUsage(principal,runId,'narration',accounting);
       if(result.usage&&(![result.usage.promptTokens,result.usage.completionTokens,result.usage.totalTokens].every(value=>Number.isSafeInteger(value)&&value>=0)
