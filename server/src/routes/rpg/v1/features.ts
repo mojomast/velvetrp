@@ -127,6 +127,7 @@ import { generationDraftsHttpRoutes } from "./generationDrafts.js";
 import type { GenerationDraftsHttpOptions } from "./generationDrafts.js";
 import { campaignContentGenerationHttpRoutes } from "./campaignContentGeneration.js";
 import type { CampaignContentGenerationOptions } from "./campaignContentGeneration.js";
+import { campaignRegionPackHttpRoutes } from "./campaignRegionPack.js";
 import {
   createSceneImageNarrationHook,
   sceneImagesHttpRoutes,
@@ -399,6 +400,8 @@ type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGeneratio
   & Pick<Repository, "stageCampaignGenerationAtomically" | "beginCampaignGenerationCall" | "getCampaignGenerationCall" | "finishCampaignGenerationCall"
     | "getCampaignGenerationContext" | "recordCampaignGenerationCandidate" | "getCampaignGeneratedFoundation"
     | "getCampaignGeneratedPlanning" | "getCampaignPublishedMaterials" | "publishCampaignMaterial" | "getSessionZeroSafetyPolicy">;
+type RegionPackLaneRepository = GenerationDraftLaneRepository
+  & { getCampaignStartingLocation: CampaignStartingLocationLaneRepository["getCampaignStartingLocation"] };
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -613,6 +616,10 @@ function assertGenerationDraftRepository(repository: CampaignListRepository): as
     "getCampaignGenerationContext", "recordCampaignGenerationCandidate", "getCampaignGeneratedFoundation",
     "getCampaignGeneratedPlanning", "getCampaignPublishedMaterials", "publishCampaignMaterial", "getSessionZeroSafetyPolicy"];
   if (methods.some((method) => typeof (repository as Partial<GenerationDraftLaneRepository>)[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+}
+function assertRegionPackRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & RegionPackLaneRepository {
+  assertGenerationDraftRepository(repository);
+  if (typeof repository.getCampaignStartingLocation !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 
 /** Registers trusted-local RPG v1 routes over one lazily owned repository. */
@@ -853,6 +860,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     const repository = getCampaignRepository(); assertCampaignStartingLocationRepository(repository); return repository;
   };
   const generationDraftRepositoryAccessor = (): GenerationDraftLaneRepository => { const repository = getCampaignRepository(); assertGenerationDraftRepository(repository); return repository; };
+  const regionPackRepositoryAccessor = (): RegionPackLaneRepository => { const repository = getCampaignRepository(); assertRegionPackRepository(repository); return repository; };
   const administrationIntegrationsRepositoryAccessor = (): CampaignAdministrationIntegrationRepository => {
     const repository = getCampaignRepository();
     if (typeof repository.getCampaignAdministrationIntegrations !== "function" || typeof repository.associateCampaignVendor !== "function"
@@ -961,6 +969,8 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor,
     ...(options.encounterGeneration ? { generateEncounter: options.encounterGeneration } : {}) });
   await app.register(campaignContentGenerationHttpRoutes, { generationDraftRepositoryAccessor,
+    ...(options.campaignContentGeneration ? { generateCampaignContent: options.campaignContentGeneration } : {}) });
+  await app.register(campaignRegionPackHttpRoutes, { generationDraftRepositoryAccessor: regionPackRepositoryAccessor,
     ...(options.campaignContentGeneration ? { generateCampaignContent: options.campaignContentGeneration } : {}) });
   await app.register(sceneImagesHttpRoutes, {
     serviceAccessor: getSceneImageService,

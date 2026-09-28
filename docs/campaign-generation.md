@@ -37,6 +37,30 @@ Campaign text, accepted canon, tone, exclusions, and revision feedback are frame
 
 Candidate GET/POST responses omit faction GM notes and NPC private goals. They do not expose provider prompts, credentials, principals, hidden goals, or provider-call records.
 
+## Region packs
+
+`POST /api/rpg/v1/campaigns/:campaignId/region-packs` replaces 11-32 separate generation requests for an opening or quest area with one coherent region pack: exactly one provider dispatch and exactly one atomic apply. The body is strict and bounded:
+
+- `idempotencyKey`;
+- `brief` (<=2000), optional `tone` (<=200), optional `exclusions` (<=16);
+- optional `anchorLocationKey`, an already-accepted public location artifact key;
+- `locationCount` (4..16); and
+- optional `linked` hints (`npcs`, `quests`, `clues`, `storyNodes`, `factions`, `encounters`).
+
+The internal sections are fixed to `outline`, `locations`, `factions`, `npcs`, `quests`, `clues`, and `story`. `linked.encounters === true` additionally requests the `encounters` section; the other hints are advisory coverage prose, and every section is still requested in the same single call.
+
+The server composes the region brief, then runs the same parse -> sanitize -> validateContent pipeline as campaign-content generation and calls `validateRegionPack` fail-closed before staging. The region validator additionally requires:
+
+- at least four and at most sixteen new public locations, at most twenty-four connections, at most 128 applied keys, and at least `locations - 1` connections;
+- exactly one outline whose `startLocationKey` is one of the new pack locations (self-anchoring), unless the campaign already designates an immutable starting location, in which case `anchorLocationKey` is required and at least one connection must reach it;
+- every connection endpoint in-pack or equal to the supplied accepted anchor, with no self-connections and no duplicate directed `(from, to)` pairs;
+- a connected undirected graph that includes every new location and the anchor; and
+- every `npc.locationKey`, `quest.locationKeys`, and `clue.locationKey` resolving in-pack or to accepted canon.
+
+Locations and connections in the pack must be public; GM-only opening-area geography is rejected. When anchoring to existing canon the server passes the accepted `anchorLocationKey` through `expandArtifactKeys`, so the provider sees that one public artifact and nothing else private. A validation or provider failure writes no draft, no accepted artifact, and no starting location; there is no automatic second paid request.
+
+On success the 201 response carries the applied draft projection, the applied artifact keys, the content receipt, and the designated `startLocation` (`artifactKey`, `locationId`, `name`). If the campaign already designated a start, it is never re-anchored: the existing immutable designation is reported unchanged. An exact replay on the same `idempotencyKey` converges on the existing draft and apply receipt without a second provider call. Because the requested `locationCount` is a hard upper bound, a caller that asks for many locations in one call trades provider reliability for breadth; a smaller `locationCount` (for example six to eight) is the conservative operating range.
+
 ## Review and application
 
 `POST /api/rpg/v1/campaign-content-drafts/:draftId/apply` requires:

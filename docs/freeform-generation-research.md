@@ -650,3 +650,33 @@ must ship with a rollback story (fail closed, no auto-retry).
   (`docs/campaign-generation.md:96-98`).
 - Do not expose a free-form command that skips authorization, revision checks, idempotency, or
   receipts.
+
+## 7. Region packs as a request-budget answer
+
+The recurring cost problem behind several free-form lanes is the number of paid provider
+dispatches needed to fill one playable area. `POST /campaigns/:campaignId/region-packs`
+(`server/src/routes/rpg/v1/campaignRegionPack.ts`) collapses an opening or quest area into
+exactly one dispatch and one atomic apply. It reuses the reviewed campaign-content pipeline
+(`beginCampaignGenerationCall` -> provider -> parse -> sanitize -> `validateContent` -> stage ->
+apply) rather than adding a parallel provider contract, and it adds one pure fail-closed gate,
+`validateRegionPack` (`server/src/startup/regionPack.ts`).
+
+The design keeps the lane's existing invariants:
+
+- the provider still emits only bounded, typed, additive artifacts; no new artifact kind or
+  schema is introduced;
+- one `idempotencyKey` owns one durable job, and an exact replay converges on the existing
+  draft and apply receipt without a second provider call;
+- a provider or validation failure writes nothing and is never silently retried; the caller
+  must explicitly acknowledge a failed attempt, exactly as the content-generation lane
+  requires; and
+- the accepted anchor location is the only existing canon expanded into the prompt, so no
+  private or GM-only material crosses the boundary.
+
+The graph and anchoring guarantees are the one genuinely new piece. The server requires a
+connected public graph of new locations, self-anchoring when no start is designated, or an
+explicit accepted anchor once an immutable starting location exists. Because those guarantees
+are a hard request property, a large `locationCount` trades reliability for breadth; the
+conservative operating range is a small pack (about six to eight locations) rather than the
+schema maximum.
+

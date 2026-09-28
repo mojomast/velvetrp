@@ -81,6 +81,7 @@ export * from "./generation-drafts.js";
 export * from "./adventure-turns-http.js";
 export * from "./generation-drafts-http.js";
 export * from "./campaign-content-generation-http.js";
+export * from "./campaign-region-pack-http.js";
 export * from "./tactical-map.js";
 // Provider-agnostic text-to-image transport contracts (disabled by default).
 export * from "./image-generation.js";
