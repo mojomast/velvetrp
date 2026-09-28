@@ -42,7 +42,7 @@ test("the frozen corpus is broad, labelled, and digest-pinned", () => {
   assert.ok(corpus.some((entry) => entry.holdout), "a holdout split is required");
   assert.ok(corpus.some((entry) => !entry.holdout), "a development split is required");
   const categories = new Set(corpus.map((entry) => entry.category));
-  for (const category of ["materialize-location", "materialize-npc", "hostile-encounter", "shop-stock", "new-clue", "hold", "illegal", "duplicate"]) {
+  for (const category of ["materialize-location", "materialize-npc", "hostile-encounter", "shop-stock", "new-clue", "materialize-faction", "materialize-quest", "materialize-rumor", "hold", "illegal", "duplicate"]) {
     assert.ok(categories.has(category as never), `missing corpus category ${category}`);
   }
   assert.ok(corpus.some((entry) => entry.expected.band === "act"), "positive cases are required");
@@ -55,9 +55,9 @@ test("the frozen corpus is broad, labelled, and digest-pinned", () => {
     assert.ok(entry.candidates.length >= 2, `${entry.id} should carry a distractor candidate`);
   }
   // The corpus and both splits are frozen: any drift changes the digest.
-  assert.equal(FREEFORM_MATERIALIZATION_CORPUS_DIGEST, "a323ce6a1da8e41812341cd70a295c848fecded252531ed033019939d77dfa4c");
-  assert.equal(FREEFORM_MATERIALIZATION_DEV_DIGEST, "c44e0023ecf4b13ea3a90fd27f95e5b2f048b4411993021946d271897d7b523f");
-  assert.equal(FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST, "0e2fb2a89393ba6df9f83ecaae7c5c51b91cfb50a583408f9bf28a2d0aeed8a3");
+  assert.equal(FREEFORM_MATERIALIZATION_CORPUS_DIGEST, "791e1f03c93dbdfd7707bbc1cb3f41851a33d990e26e16b93a264e0fa33d76b2");
+  assert.equal(FREEFORM_MATERIALIZATION_DEV_DIGEST, "196637d02fd99d5ecf07b625c3e084e78c293ceca42ccabfea937a1bc579e8c9");
+  assert.equal(FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST, "879a1c7e989e117cf6a8e604b53a64f809e4b98904cb9fba30aa613710f7cca6");
   // The grid is fixed and ascending.
   assert.deepEqual([...FREEFORM_MATERIALIZATION_THRESHOLD_GRID], [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75]);
 });

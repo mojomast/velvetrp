@@ -85,10 +85,10 @@ describe("recordFreeformMaterializationShadowDecision", () => {
     // The execution contract declares what a future passing evaluation would bind; it grants no
     // authority on its own, and there is deliberately no production promotion record.
     expect(SYSTEM_ONE_EXECUTION_CONTRACTS["freeform-materialization"]).toEqual({
-      questionVersion: "freeform-materialization-v1",
-      compositionVersion: "freeform-materialization-v1",
+      questionVersion: "freeform-materialization-v2",
+      compositionVersion: "freeform-materialization-v2",
       candidateStrategy: "server-authored-freeform-candidates-v1",
-      stateVersion: "freeform-materialization-state-v1",
+      stateVersion: "freeform-materialization-state-v2",
     });
     expect(promotionRecord("freeform-materialization")).toBeUndefined();
     expect(isLanePromoted("freeform-materialization")).toBe(false);

@@ -6,8 +6,11 @@ import { systemOneLaneMode } from "../defaults.js";
 import {
   recordSystemOneDecision,
   type FreeformEncounterMaterialization,
+  type FreeformFactionMaterialization,
   type FreeformLoreMaterialization,
   type FreeformNpcMaterialization,
+  type FreeformQuestMaterialization,
+  type FreeformRumorMaterialization,
   type FreeformShopMaterialization,
   type FreeformTravelMaterialization,
 } from "../repo/index.js";
@@ -37,10 +40,12 @@ import { isLanePromoted } from "./systemOnePromotion.js";
 /**
  * Materialization families the server may author as candidates.
  *
- * Follow-up (deliberately out of scope for this slice): the newer faction, quest, and rumor
- * free-form repositories are NOT kinds here. Adding one is a separate change that needs its own
- * execution-contract revision, corpus cases, and promotion evidence; this lane's gate and
- * activation path cover only the five families below.
+ * The closed set covers all eight free-form materializers the server owns, including the newer
+ * faction, quest, and rumor repositories. Adding or removing a kind is a contract change: it
+ * revises the lane's question/composition/state versions (see `SYSTEM_ONE_EXECUTION_CONTRACTS`
+ * in `systemOneBinding.ts`) and needs fresh corpus cases and promotion evidence. The lane's gate
+ * and activation path only ever cover the families listed here, and the lane stays shadow-only
+ * and unpromoted (no production promotion record).
  */
 export const FREEFORM_MATERIALIZATION_KINDS = [
   "materialize-location",
@@ -48,6 +53,9 @@ export const FREEFORM_MATERIALIZATION_KINDS = [
   "hostile-encounter",
   "shop-stock",
   "new-clue",
+  "materialize-faction",
+  "materialize-quest",
+  "materialize-rumor",
 ] as const;
 export type FreeformMaterializationKind = (typeof FREEFORM_MATERIALIZATION_KINDS)[number];
 
@@ -147,7 +155,7 @@ export function buildFreeformMaterializationQuestions(state: FreeformMaterializa
   return {
     [FREEFORM_NEEDS_CONTENT_KEY]: {
       type: "noul",
-      instructions: `Does this player attempt require new durable campaign content that a later apply would have to commit (a location, NPC, encounter, shop stock, or clue), rather than being fully covered by narration or a hold?\nAttempt: ${attempt}`,
+      instructions: `Does this player attempt require new durable campaign content that a later apply would have to commit (a location, NPC, encounter, shop stock, clue, faction, quest, or rumor), rather than being fully covered by narration or a hold?\nAttempt: ${attempt}`,
       criteria: {
         true: "It needs new durable content the prepared campaign does not contain; a materialization would have to be committed",
         false: "Narration or an explicit hold fully covers it; no new durable content is required",
@@ -319,7 +327,7 @@ export async function recordFreeformMaterializationShadowDecision(
 }
 
 /**
- * The narrow repository surface the active path may call. It is exactly the five receipted
+ * The narrow repository surface the active path may call. It is exactly the eight receipted
  * free-form materialization methods already exposed by `Repository`, so the real repository
  * satisfies it structurally; a test double can too. The lane never writes a table directly.
  */
@@ -334,6 +342,12 @@ export interface FreeformMaterializationExecutionPort {
     merchantNpcId: string, options?: { candidateId?: string }): FreeformShopMaterialization;
   materializeFreeformLore(principalId: string, campaignId: string, sessionId: string, actorId: string,
     text: string, options?: { candidateId?: string }): FreeformLoreMaterialization;
+  materializeFreeformFaction(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    text: string, options?: { candidateId?: string }): FreeformFactionMaterialization;
+  materializeFreeformQuest(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    text: string, options?: { candidateId?: string }): FreeformQuestMaterialization;
+  materializeFreeformRumor(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    text: string, options?: { candidateId?: string }): FreeformRumorMaterialization;
 }
 
 /**
@@ -346,7 +360,10 @@ export type FreeformMaterializationExecution =
   | { kind: "materialize-npc"; result: FreeformNpcMaterialization }
   | { kind: "hostile-encounter"; result: FreeformEncounterMaterialization }
   | { kind: "shop-stock"; result: FreeformShopMaterialization }
-  | { kind: "new-clue"; result: FreeformLoreMaterialization };
+  | { kind: "new-clue"; result: FreeformLoreMaterialization }
+  | { kind: "materialize-faction"; result: FreeformFactionMaterialization }
+  | { kind: "materialize-quest"; result: FreeformQuestMaterialization }
+  | { kind: "materialize-rumor"; result: FreeformRumorMaterialization };
 
 /** The bounded input to one activation attempt. */
 export interface FreeformMaterializationActivationInput {
@@ -408,6 +425,12 @@ function executeFreeformMaterializationCandidate(
     }
     case "new-clue":
       return { kind: "new-clue", result: port.materializeFreeformLore(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+    case "materialize-faction":
+      return { kind: "materialize-faction", result: port.materializeFreeformFaction(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+    case "materialize-quest":
+      return { kind: "materialize-quest", result: port.materializeFreeformQuest(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+    case "materialize-rumor":
+      return { kind: "materialize-rumor", result: port.materializeFreeformRumor(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
     default:
       // A null kind is already rejected before this point; fail closed if one ever reaches here.
       throw new Error("lane selection has no materialization kind");

@@ -40,6 +40,21 @@ const KIND_CANDIDATE: Record<FreeformMaterializationCandidate["kind"], FreeformM
   "hostile-encounter": { candidateId: "ffe-cccccccccccccccccccccccccccccccccccccccc", kind: "hostile-encounter", label: "Goblin raiders" },
   "shop-stock": { candidateId: "ffsc-dddddddddddddddddddddddddddddddddddddddd", kind: "shop-stock", label: "The merchant's wares" },
   "new-clue": { candidateId: "ffl-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", kind: "new-clue", label: "The drowned courier" },
+  "materialize-faction": { candidateId: "fff-ffffffffffffffffffffffffffffffffffffffff", kind: "materialize-faction", label: "The thieves' guild" },
+  "materialize-quest": { candidateId: "ffq-1111111111111111111111111111111111111111", kind: "materialize-quest", label: "A bounty on the road bandits" },
+  "materialize-rumor": { candidateId: "ffr-2222222222222222222222222222222222222222", kind: "materialize-rumor", label: "The pale tide" },
+};
+
+/** The single receipted repository method each advertised kind may route to. */
+const KIND_METHOD: Record<FreeformMaterializationCandidate["kind"], keyof FreeformMaterializationExecutionPort> = {
+  "materialize-location": "materializeFreeformTravel",
+  "materialize-npc": "materializeFreeformNpc",
+  "hostile-encounter": "materializeFreeformEncounter",
+  "shop-stock": "materializeFreeformShop",
+  "new-clue": "materializeFreeformLore",
+  "materialize-faction": "materializeFreeformFaction",
+  "materialize-quest": "materializeFreeformQuest",
+  "materialize-rumor": "materializeFreeformRumor",
 };
 
 interface PortCall {
@@ -94,6 +109,18 @@ function fakePort(failWith?: Error): FreeformMaterializationExecutionPort & { ca
     materializeFreeformLore(...args) {
       record("materializeFreeformLore", args);
       return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformLore"]>;
+    },
+    materializeFreeformFaction(...args) {
+      record("materializeFreeformFaction", args);
+      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformFaction"]>;
+    },
+    materializeFreeformQuest(...args) {
+      record("materializeFreeformQuest", args);
+      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformQuest"]>;
+    },
+    materializeFreeformRumor(...args) {
+      record("materializeFreeformRumor", args);
+      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformRumor"]>;
     },
   };
 }
@@ -227,6 +254,7 @@ describe("executeFreeformMaterializationLane", () => {
       if (result.source !== "lane") throw new Error("expected a lane selection");
       expect(result.execution.kind).toBe(kind);
       expect(port.calls).toHaveLength(1);
+      expect(port.calls[0]!.method).toBe(KIND_METHOD[kind]);
       expect(port.calls[0]!.args.at(-1)).toEqual({ candidateId: candidate.candidateId });
     }
   });

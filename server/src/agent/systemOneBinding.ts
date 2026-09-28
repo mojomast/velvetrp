@@ -14,14 +14,22 @@ export const SYSTEM_ONE_EXECUTION_CONTRACTS = {
     candidateStrategy: "family-round-robin-32-legacy-v1", stateVersion: "adventure-declaration-candidates-v1",
   },
   // The only action this lane may ever authorize is selecting one candidate the server already
-  // authored (a location/NPC/encounter/shop/clue materialization). It can never authorize prose,
-  // stats, prices, stock, or a state mutation: `composeFreeformMaterializationDecision` returns a
-  // candidate id/kind from the closed authored set or a fallback. This contract declares what a
-  // future passing evaluation would bind and grants no authority without a matching promotion
-  // record; there is deliberately no production record (see docs/freeform-materialization.md).
+  // authored (a location/NPC/encounter/shop/clue/faction/quest/rumor materialization). It can
+  // never authorize prose, stats, prices, stock, or a state mutation:
+  // `composeFreeformMaterializationDecision` returns a candidate id/kind from the closed authored
+  // set or a fallback. This contract declares what a future passing evaluation would bind and
+  // grants no authority without a matching promotion record; there is deliberately no production
+  // record (see docs/freeform-materialization.md).
+  //
+  // Version revision: the closed candidate set grew from five to eight families (adding
+  // `materialize-faction`, `materialize-quest`, `materialize-rumor`). That changes the `choice`
+  // criteria and the accepted `kind` enum in the battery and the persisted state, and it changes
+  // the composition's closed-set handling, so the question, composition, and state versions move
+  // to `-v2`. The candidate strategy is unchanged (still a server-authored closed set), so it
+  // keeps `-v1`. Any evaluation binding recorded before this revision no longer matches.
   "freeform-materialization": {
-    questionVersion: "freeform-materialization-v1", compositionVersion: "freeform-materialization-v1",
-    candidateStrategy: "server-authored-freeform-candidates-v1", stateVersion: "freeform-materialization-state-v1",
+    questionVersion: "freeform-materialization-v2", compositionVersion: "freeform-materialization-v2",
+    candidateStrategy: "server-authored-freeform-candidates-v1", stateVersion: "freeform-materialization-state-v2",
   },
 } as const;
 

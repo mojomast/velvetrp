@@ -140,10 +140,15 @@ even shadow recording does not run unless an operator opts in.
 
 The execution contract is bounded: the lane's `choice` may only select a
 candidate the server already authored (`materialize-location`, `materialize-npc`,
-`hostile-encounter`, `shop-stock`, `new-clue`) or fail closed to
-`none_of_these`; the composition never returns prose, stats, prices, stock, or a
-state mutation, and a future active path must bind under the single action family
+`hostile-encounter`, `shop-stock`, `new-clue`, `materialize-faction`,
+`materialize-quest`, `materialize-rumor`) or fail closed to `none_of_these`; the
+composition never returns prose, stats, prices, stock, or a state mutation, and a
+future active path must bind under the single action family
 `FREEFORM_MATERIALIZATION_ACTION_FAMILY` (`freeform.materialize-candidate`).
+Because the closed candidate set now covers all eight free-form materializers, the
+lane's `questionVersion`, `compositionVersion`, and `stateVersion` are `-v2` (the
+candidate strategy string is unchanged); an evaluation binding recorded against the
+earlier five-kind `-v1` set no longer matches.
 
 ### Remaining evidence required to activate in production
 

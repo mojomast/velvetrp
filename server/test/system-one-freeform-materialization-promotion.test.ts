@@ -84,10 +84,10 @@ afterEach(() => {
 describe("freeform-materialization promotion path", () => {
   it("declares an execution contract bounded to server-authored candidates", () => {
     expect(SYSTEM_ONE_EXECUTION_CONTRACTS["freeform-materialization"]).toEqual({
-      questionVersion: "freeform-materialization-v1",
-      compositionVersion: "freeform-materialization-v1",
+      questionVersion: "freeform-materialization-v2",
+      compositionVersion: "freeform-materialization-v2",
       candidateStrategy: "server-authored-freeform-candidates-v1",
-      stateVersion: "freeform-materialization-state-v1",
+      stateVersion: "freeform-materialization-state-v2",
     });
     expect(FREEFORM_MATERIALIZATION_ACTION_FAMILY).toBe("freeform.materialize-candidate");
   });
@@ -113,7 +113,7 @@ describe("freeform-materialization promotion path", () => {
     expect(isLanePromoted(LANE,
       systemOneEvaluationBinding(LANE, settings, settings.model, "freeform.other"))).toBe(false);
     // A stale question version is not covered either.
-    expect(isLanePromoted(LANE, { ...binding, questionVersion: "freeform-materialization-v2" })).toBe(false);
+    expect(isLanePromoted(LANE, { ...binding, questionVersion: "freeform-materialization-v3" })).toBe(false);
   });
 
   it("maps a promoted selection only to a server-authored candidate", () => {

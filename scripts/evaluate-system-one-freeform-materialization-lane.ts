@@ -62,13 +62,16 @@ const EVIDENCE = "docs/system-one-freeform-materialization-benchmark.md";
 const CAMPAIGN_ID = "campaign-freeform-corpus";
 const SESSION_ID = "session-freeform-corpus";
 
-/** The corpus categories. Positives are one per materialization kind; negatives are the hard cases. */
+/** The corpus categories. Positives are one or more per materialization kind; negatives are the hard cases. */
 export type FreeformCaseCategory =
   | "materialize-location"
   | "materialize-npc"
   | "hostile-encounter"
   | "shop-stock"
   | "new-clue"
+  | "materialize-faction"
+  | "materialize-quest"
+  | "materialize-rumor"
   | "hold"
   | "illegal"
   | "duplicate";
@@ -99,7 +102,7 @@ const c = (
 ): FreeformMaterializationCandidate => ({ candidateId, kind, label });
 
 /**
- * The frozen holdout. Positive cases carry at least one distractor candidate (and two cases embed a
+ * The frozen holdout. Positive cases carry at least one distractor candidate (and several embed a
  * deliberate wrong-candidate trap: two same-kind candidates where the attempt disambiguates one).
  * Negative cases are `hold` (narration is sufficient), `illegal` (adding content now violates canon
  * or readiness), and `duplicate` (the attempt names content the campaign already has, so no new
@@ -263,7 +266,64 @@ export const FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS: readonly FreeformMateria
     candidates: [c("new-clue", "The poisoned well", "ffl-poisoned-well"), c("materialize-npc", "The water carrier", "ffn-water-carrier")],
     expected: { band: "act", candidateId: "ffl-poisoned-well", kind: "new-clue" } },
 
-  // ---------------------------- hold (4): narration is sufficient ----------------------------
+  // ---------------------------- materialize-faction (4) ----------------------------
+  { id: "faction-1", category: "materialize-faction", holdout: false,
+    attempt: "I look for the local thieves' guild.",
+    candidates: [c("materialize-faction", "The thieves' guild", "fff-thieves-guild"), c("materialize-npc", "The guildmaster", "ffn-guildmaster")],
+    expected: { band: "act", candidateId: "fff-thieves-guild", kind: "materialize-faction" } },
+  { id: "faction-2", category: "materialize-faction", holdout: true,
+    attempt: "I ask around for the mages guild.",
+    candidates: [c("materialize-faction", "The mages guild", "fff-mages-guild"), c("materialize-location", "The guildhall", "ffc-guildhall")],
+    expected: { band: "act", candidateId: "fff-mages-guild", kind: "materialize-faction" } },
+  { id: "faction-3", category: "materialize-faction", holdout: false,
+    // Wrong-candidate trap: two factions are offered; the attempt names the smiths guild only.
+    attempt: "I want to find the smiths guild.",
+    candidates: [c("materialize-faction", "The merchants guild", "fff-merchants-guild"), c("materialize-faction", "The smiths guild", "fff-smiths-guild")],
+    expected: { band: "act", candidateId: "fff-smiths-guild", kind: "materialize-faction" } },
+  { id: "faction-4", category: "materialize-faction", holdout: true,
+    attempt: "I seek out the order of the silver flame.",
+    candidates: [c("materialize-faction", "The order of the silver flame", "fff-silver-flame"), c("new-clue", "Tales of the silver flame", "ffl-silver-flame-tales")],
+    expected: { band: "act", candidateId: "fff-silver-flame", kind: "materialize-faction" } },
+
+  // ---------------------------- materialize-quest (4) ----------------------------
+  { id: "quest-1", category: "materialize-quest", holdout: false,
+    attempt: "I want steady work.",
+    candidates: [c("materialize-quest", "A bounty on the road bandits", "ffq-road-bandits"), c("materialize-npc", "The quest giver", "ffn-quest-giver")],
+    expected: { band: "act", candidateId: "ffq-road-bandits", kind: "materialize-quest" } },
+  { id: "quest-2", category: "materialize-quest", holdout: true,
+    attempt: "Do you have any jobs for me?",
+    candidates: [c("materialize-quest", "Escort the merchant caravan", "ffq-escort-caravan"), c("shop-stock", "The caravan's wares", "ffsc-caravan-wares")],
+    expected: { band: "act", candidateId: "ffq-escort-caravan", kind: "materialize-quest" } },
+  { id: "quest-3", category: "materialize-quest", holdout: false,
+    // Wrong-candidate trap: two quests are offered; the attempt names the bandit hunt only.
+    attempt: "I offer to hunt the road bandits.",
+    candidates: [c("materialize-quest", "Clear the ruined mill", "ffq-clear-mill"), c("materialize-quest", "Hunt the road bandits", "ffq-hunt-bandits")],
+    expected: { band: "act", candidateId: "ffq-hunt-bandits", kind: "materialize-quest" } },
+  { id: "quest-4", category: "materialize-quest", holdout: true,
+    attempt: "I look for a contract to guard the eastern road.",
+    candidates: [c("materialize-quest", "Guard the eastern road", "ffq-guard-road"), c("materialize-location", "The eastern road", "ffc-eastern-road")],
+    expected: { band: "act", candidateId: "ffq-guard-road", kind: "materialize-quest" } },
+
+  // ---------------------------- materialize-rumor (4) ----------------------------
+  { id: "rumor-1", category: "materialize-rumor", holdout: false,
+    attempt: "I listen for gossip about the pale tide.",
+    candidates: [c("materialize-rumor", "The pale tide", "ffr-pale-tide"), c("new-clue", "Signs of the pale tide", "ffl-pale-tide-signs")],
+    expected: { band: "act", candidateId: "ffr-pale-tide", kind: "materialize-rumor" } },
+  { id: "rumor-2", category: "materialize-rumor", holdout: true,
+    attempt: "I ask around about rumors of the drowned courier.",
+    candidates: [c("materialize-rumor", "The drowned courier", "ffr-drowned-courier"), c("materialize-npc", "A dockworker", "ffn-rumor-dockworker")],
+    expected: { band: "act", candidateId: "ffr-drowned-courier", kind: "materialize-rumor" } },
+  { id: "rumor-3", category: "materialize-rumor", holdout: false,
+    // Wrong-candidate trap: two rumors are offered; the attempt names the hollow king only.
+    attempt: "I ask for the rumor about the hollow king.",
+    candidates: [c("materialize-rumor", "The pale tide", "ffr-pale-tide-2"), c("materialize-rumor", "The hollow king", "ffr-hollow-king")],
+    expected: { band: "act", candidateId: "ffr-hollow-king", kind: "materialize-rumor" } },
+  { id: "rumor-4", category: "materialize-rumor", holdout: true,
+    attempt: "I want to hear the gossip on the missing shipment.",
+    candidates: [c("materialize-rumor", "The missing shipment", "ffr-missing-shipment"), c("shop-stock", "A fence's wares", "ffsc-rumor-fence-wares")],
+    expected: { band: "act", candidateId: "ffr-missing-shipment", kind: "materialize-rumor" } },
+
+  // ---------------------------- hold (6): narration is sufficient ----------------------------
   { id: "hold-1", category: "hold", holdout: false,
     attempt: "I describe my character sharpening her sword by the fire while we talk.",
     candidates: [c("materialize-location", "The campsite", "ffc-campsite")],
@@ -280,8 +340,16 @@ export const FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS: readonly FreeformMateria
     attempt: "I recount what happened at the gate yesterday.",
     candidates: [c("new-clue", "The gate incident", "ffl-gate-incident")],
     expected: { band: "fallback", candidateId: null, kind: null } },
+  { id: "hold-5", category: "hold", holdout: false,
+    attempt: "I retell the legend of the order of the silver flame to my companions.",
+    candidates: [c("materialize-faction", "The order of the silver flame", "fff-hold-silver-flame")],
+    expected: { band: "fallback", candidateId: null, kind: null } },
+  { id: "hold-6", category: "hold", holdout: true,
+    attempt: "I mention the jobs I have already done, to pass the time.",
+    candidates: [c("materialize-quest", "An old job", "ffq-hold-old-job")],
+    expected: { band: "fallback", candidateId: null, kind: null } },
 
-  // ---------------------------- illegal (4): adding content now is not legal ----------------------------
+  // ---------------------------- illegal (6): adding content now is not legal ----------------------------
   { id: "illegal-1", category: "illegal", holdout: false,
     attempt: "I declare that the king is secretly my brother and summon his royal guard.",
     candidates: [c("materialize-npc", "The royal guard", "ffn-royal-guard")],
@@ -298,8 +366,16 @@ export const FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS: readonly FreeformMateria
     attempt: "I declare the war over and the enemy army gone.",
     candidates: [c("hostile-encounter", "The vanished army", "ffe-vanished-army")],
     expected: { band: "fallback", candidateId: null, kind: null } },
+  { id: "illegal-5", category: "illegal", holdout: false,
+    attempt: "I declare the guild's grandmaster is secretly my father and they owe me fealty.",
+    candidates: [c("materialize-faction", "The thieves' guild", "fff-illegal-thieves-guild")],
+    expected: { band: "fallback", candidateId: null, kind: null } },
+  { id: "illegal-6", category: "illegal", holdout: true,
+    attempt: "I invent a rumor that the king is dead and spread it as established truth.",
+    candidates: [c("materialize-rumor", "The king's death", "ffr-illegal-king-death")],
+    expected: { band: "fallback", candidateId: null, kind: null } },
 
-  // ---------------------------- duplicate (4): the content already exists ----------------------------
+  // ---------------------------- duplicate (7): the content already exists ----------------------------
   { id: "duplicate-1", category: "duplicate", holdout: false,
     attempt: "We already mapped the Glassblower's District; I walk back there.",
     candidates: [c("materialize-location", "Glassblower's District", "ffc-dup-glassblower")],
@@ -315,6 +391,18 @@ export const FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS: readonly FreeformMateria
   { id: "duplicate-4", category: "duplicate", holdout: false,
     attempt: "I speak again with Captain Vale, who already gave us orders.",
     candidates: [c("materialize-npc", "Captain Vale", "ffn-dup-vale")],
+    expected: { band: "fallback", candidateId: null, kind: null } },
+  { id: "duplicate-5", category: "duplicate", holdout: false,
+    attempt: "I already found the thieves' guild; I ask about it again.",
+    candidates: [c("materialize-faction", "The thieves' guild", "fff-dup-thieves-guild")],
+    expected: { band: "fallback", candidateId: null, kind: null } },
+  { id: "duplicate-6", category: "duplicate", holdout: true,
+    attempt: "I ask for the same road bandit bounty we already accepted.",
+    candidates: [c("materialize-quest", "The road bandit bounty", "ffq-dup-road-bandits")],
+    expected: { band: "fallback", candidateId: null, kind: null } },
+  { id: "duplicate-7", category: "duplicate", holdout: false,
+    attempt: "I already heard the rumor about the pale tide.",
+    candidates: [c("materialize-rumor", "The pale tide", "ffr-dup-pale-tide")],
     expected: { band: "fallback", candidateId: null, kind: null } },
 ];
 
@@ -857,9 +945,9 @@ export function renderFreeformBenchmark(input: {
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
-  lines.push("The `freeform-materialization` lane is advisory and bounded: the server owns a closed candidate set (a location, NPC, encounter, shop, or clue the deterministic classifier would author), and the lane may only select one authored candidate id/kind or fail closed to no action. It never authors prose, stats, prices, stock, or a state mutation. The battery is two `noul` gates (`needs_content`, `legal`) plus one aggregate `choice` over the exact authored ids and an explicit `none_of_these`; `composeFreeformMaterializationDecision` requires every signal at the action threshold to act.");
+  lines.push("The `freeform-materialization` lane is advisory and bounded: the server owns a closed candidate set (a location, NPC, encounter, shop, clue, faction, quest, or rumor the deterministic classifier would author), and the lane may only select one authored candidate id/kind or fail closed to no action. It never authors prose, stats, prices, stock, or a state mutation. The battery is two `noul` gates (`needs_content`, `legal`) plus one aggregate `choice` over the exact authored ids and an explicit `none_of_these`; `composeFreeformMaterializationDecision` requires every signal at the action threshold to act.");
   lines.push("");
-  lines.push("The corpus is **frozen and provider-free**: the attempts, candidate sets, and labels are hand-authored fixtures, and no case carries provider output. The evaluation runs the real adapter once per case. Positives exercise all five kinds, including wrong-candidate traps where two same-kind candidates are offered and the attempt names only one. Negatives are hard holds: narration is sufficient, adding content now is illegal under canon/readiness, or the named content already exists (duplicate). A `fallback` label is correct only when the lane does not act; acting there is a false act and an acted error. Only `act` samples score the gate, so a deferral is coverage, not an acted error.");
+  lines.push("The corpus is **frozen and provider-free**: the attempts, candidate sets, and labels are hand-authored fixtures, and no case carries provider output. The evaluation runs the real adapter once per case. Positives exercise all eight kinds, including wrong-candidate traps where two same-kind candidates are offered and the attempt names only one. Negatives are hard holds: narration is sufficient, adding content now is illegal under canon/readiness, or the named content already exists (duplicate). A `fallback` label is correct only when the lane does not act; acting there is a false act and an acted error. Only `act` samples score the gate, so a deferral is coverage, not an acted error.");
   lines.push("");
   lines.push("| Setting | Value |");
   lines.push("| --- | --- |");
