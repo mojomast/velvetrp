@@ -42,15 +42,17 @@ import {
 } from "../server/src/agent/systemOneFreeformMaterialization.js";
 import type { SystemOneBand } from "../server/src/agent/systemOnePolicy.js";
 import { systemOneEvaluationBinding } from "../server/src/agent/systemOneBinding.js";
+import { wilsonLowerBound } from "../server/src/agent/systemOneGateStatistics.js";
 import {
+  DEFAULT_SYSTEM_ONE_LANE_GATES,
   evaluatePromotionGate,
   type CalibrationMetrics as PromotionCalibrationMetrics,
   type SystemOnePromotionRecord,
   type SystemOnePromotionResult,
 } from "../server/src/agent/systemOnePromotion.js";
 import { defaultSystemOneSettings } from "../server/src/defaults.js";
-import { completeWithSystemOne } from "../server/src/provider/systemOneCompletion.js";
-import type { SystemOneSettings } from "../server/src/types.js";
+import { completeWithSystemOne, type SystemOneAnswer } from "../server/src/provider/systemOneCompletion.js";
+import type { SystemOneConfidenceThresholds, SystemOneSettings } from "../server/src/types.js";
 import { gradeCalibration } from "../server/test/evals/dmGraders.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -329,12 +331,30 @@ function canonical(value: unknown): unknown {
   return value;
 }
 
-function corpusDigest(): string {
-  return createHash("sha256").update(JSON.stringify(canonical(FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS))).digest("hex");
+function digestOf(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
 }
 
 /** Pinned digest of the frozen corpus; a test fails when the corpus drifts from this value. */
-export const FREEFORM_MATERIALIZATION_CORPUS_DIGEST = corpusDigest();
+export const FREEFORM_MATERIALIZATION_CORPUS_DIGEST = digestOf(FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS);
+
+/** Pinned development-split digest (the only split the threshold and calibration are selected on). */
+export const FREEFORM_MATERIALIZATION_DEV_DIGEST = digestOf(
+  FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.filter((entry) => !entry.holdout),
+);
+
+/** Pinned holdout-split digest (frozen, never used for selection). */
+export const FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST = digestOf(
+  FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.filter((entry) => entry.holdout),
+);
+
+/** The fixed action-threshold grid, low to high. Selection uses the development split only. */
+export const FREEFORM_MATERIALIZATION_THRESHOLD_GRID = [
+  0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75,
+] as const;
+
+/** The shipped review threshold; selection never changes it (freeform composition uses only action). */
+export const FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD = 0.5;
 
 /**
  * One graded observation: the composed decision for a case, plus its label comparison.
@@ -491,6 +511,215 @@ export function evaluateFreeformBenchmark(
       calibrated: allCalibrated,
     },
     gate,
+  };
+}
+
+/** One retained live call: the raw model answers, keyed back to its corpus case. */
+export interface FreeformRawObservation {
+  caseId: string;
+  repeat: number;
+  answers: Record<string, SystemOneAnswer>;
+  latencyMs: number;
+}
+
+/** Recomposes one retained observation at a candidate threshold. Composition semantics are unchanged. */
+export function sampleAtThreshold(
+  benchmarkCase: FreeformMaterializationBenchmarkCase,
+  answers: Record<string, SystemOneAnswer>,
+  threshold: number,
+  reviewThreshold = FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD,
+): FreeformBenchmarkSample {
+  const state = {
+    campaignId: CAMPAIGN_ID,
+    sessionId: SESSION_ID,
+    attempt: benchmarkCase.attempt,
+    candidates: benchmarkCase.candidates,
+  };
+  const thresholds: SystemOneConfidenceThresholds = { actionThreshold: threshold, reviewThreshold };
+  return toFreeformSample(benchmarkCase, composeFreeformMaterializationDecision(state, answers, thresholds));
+}
+
+export interface FreeformSplitReport {
+  /** Repeated acted samples at this threshold. */
+  samples: number;
+  /** Distinct corpus cases that acted (repeats collapsed). */
+  distinctActed: number;
+  actedErrors: number;
+  accuracy: number;
+  accuracyLowerBound: number;
+  raw: FreeformCalibrationMetrics;
+  calibrated: FreeformCalibrationMetrics;
+  gate: SystemOnePromotionResult;
+}
+
+export interface FreeformThresholdPoint {
+  threshold: number;
+  calibration: PlattCalibration;
+  dev: FreeformSplitReport;
+  holdout: FreeformSplitReport;
+}
+
+export interface FreeformDevSelection {
+  grid: FreeformThresholdPoint[];
+  selected: FreeformThresholdPoint | null;
+  selectedBy: "dev-gate" | "dev-best" | "none";
+  /** True only when at least one development threshold passed its own gate. */
+  devGateQualified: boolean;
+  reasons: string[];
+}
+
+function splitReport(samples: readonly FreeformBenchmarkSample[], fitted: PlattCalibration): FreeformSplitReport {
+  const acted = samples.filter(isActedSample);
+  const accuracy = rate(acted.filter((sample) => sample.correct).length, acted.length);
+  const calibrated = metricsFor(acted, fitted, true);
+  const raw = metricsFor(acted, fitted, false);
+  const metrics: PromotionCalibrationMetrics = {
+    samples: acted.length,
+    accuracy,
+    brier: calibrated.brier,
+    expectedCalibrationError: calibrated.expectedCalibrationError,
+  };
+  return {
+    samples: acted.length,
+    distinctActed: new Set(acted.map((sample) => sample.caseId)).size,
+    actedErrors: acted.filter((sample) => !sample.correct).length,
+    accuracy,
+    accuracyLowerBound: acted.length === 0 ? 0 : wilsonLowerBound(Math.round(accuracy * acted.length), acted.length),
+    raw,
+    calibrated,
+    gate: evaluatePromotionGate(PROMOTION_LANE, metrics),
+  };
+}
+
+const better = (
+  left: FreeformThresholdPoint,
+  right: FreeformThresholdPoint,
+  keys: ReadonlyArray<(point: FreeformThresholdPoint) => number>,
+): FreeformThresholdPoint => {
+  for (const key of keys) {
+    const difference = key(left) - key(right);
+    if (Math.abs(difference) > 1e-12) return difference > 0 ? left : right;
+  }
+  // Prefer the lower threshold on a tie (more coverage).
+  return left.threshold <= right.threshold ? left : right;
+};
+
+/**
+ * Selects the action threshold and fits the Platt map on the **development split only**. The stored
+ * raw answers let every grid point be recomposed at a swept threshold without re-asking the model;
+ * `composeFreeformMaterializationDecision` itself is untouched. The holdout columns are recorded
+ * for reporting but are never consulted for selection.
+ *
+ * Selection: among development thresholds whose own gate passes, choose the one with the most
+ * distinct acted cases, then the highest calibrated accuracy and Wilson lower bound. If no
+ * development threshold passes, select the best descriptive point and mark the selection
+ * unqualified (a holdout pass at an unqualified point never promotes).
+ */
+export function evaluateFreeformDevSelection(
+  observations: readonly FreeformRawObservation[],
+  grid: readonly number[] = FREEFORM_MATERIALIZATION_THRESHOLD_GRID,
+  reviewThreshold = FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD,
+): FreeformDevSelection {
+  const corpusById = new Map(FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.map((entry) => [entry.id, entry]));
+  const gate = DEFAULT_SYSTEM_ONE_LANE_GATES[PROMOTION_LANE];
+  const points: FreeformThresholdPoint[] = [];
+  for (const threshold of grid) {
+    const samples = observations
+      .map((observation) => {
+        const entry = corpusById.get(observation.caseId);
+        return entry ? sampleAtThreshold(entry, observation.answers, threshold, reviewThreshold) : null;
+      })
+      .filter((sample): sample is FreeformBenchmarkSample => sample !== null);
+    const devActed = samples.filter((sample) => !sample.holdout).filter(isActedSample);
+    const fitted = fitPlattCalibration(toPoints(devActed, { a: 1, b: 0 }, false));
+    points.push({
+      threshold,
+      calibration: fitted,
+      dev: splitReport(samples.filter((sample) => !sample.holdout), fitted),
+      holdout: splitReport(samples.filter((sample) => sample.holdout), fitted),
+    });
+  }
+
+  const gated = points.filter((point) => point.dev.gate.promoted);
+  const coverageFloor = points.filter((point) => point.dev.samples >= gate.minSamples);
+  const descriptive = coverageFloor.length > 0 ? coverageFloor : points.filter((point) => point.dev.samples > 0);
+  const reasons: string[] = [];
+  let selected: FreeformThresholdPoint | null = null;
+  let selectedBy: FreeformDevSelection["selectedBy"] = "none";
+  if (gated.length > 0) {
+    selectedBy = "dev-gate";
+    selected = gated.reduce((current, point) => better(current, point, [
+      (value) => value.dev.distinctActed,
+      (value) => value.dev.accuracy,
+      (value) => value.dev.accuracyLowerBound,
+    ]));
+  } else if (descriptive.length > 0) {
+    selectedBy = "dev-best";
+    selected = descriptive.reduce((current, point) => better(current, point, [
+      (value) => value.dev.accuracy,
+      (value) => value.dev.accuracyLowerBound,
+      (value) => value.dev.distinctActed,
+    ]));
+    reasons.push(
+      "no development threshold passed the development gate; the selected point is descriptive only and cannot promote",
+    );
+  } else {
+    reasons.push("no threshold produced an acted development sample");
+  }
+  return { grid: points, selected, selectedBy, devGateQualified: gated.length > 0, reasons };
+}
+
+const roundedCalibration = (calibration: PlattCalibration): PlattCalibration => ({
+  a: round4(calibration.a),
+  b: round4(calibration.b),
+});
+
+/**
+ * The production promotion record a dev-selected run would justify, or null. It requires a
+ * development-gate-qualified selection (never a descriptive best point) and a passing holdout gate,
+ * plus a real response model for the binding. The binding names the selected action threshold, the
+ * shipped review threshold, and the fitted calibration, so it matches the runtime settings the
+ * promotion would ship with.
+ */
+export function proposeSelectionPromotionRecord(
+  selection: FreeformDevSelection,
+  settings: SystemOneSettings,
+  responseModel: string | null | undefined,
+  promotedAt: string,
+  evidence = EVIDENCE,
+): SystemOnePromotionRecord | null {
+  if (!selection.devGateQualified || selection.selected === null) return null;
+  const point = selection.selected;
+  if (!point.holdout.gate.promoted) return null;
+  if (!responseModel || responseModel.trim().length === 0) return null;
+  const reviewThreshold = Math.min(FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD, point.threshold);
+  const calibratedSettings: SystemOneSettings = {
+    ...settings,
+    confidenceCalibration: {
+      ...settings.confidenceCalibration,
+      [PROMOTION_LANE]: roundedCalibration(point.calibration),
+    },
+    confidencePolicy: {
+      ...settings.confidencePolicy,
+      [PROMOTION_LANE]: { actionThreshold: point.threshold, reviewThreshold },
+    },
+  };
+  return {
+    evaluatedBindings: [systemOneEvaluationBinding(
+      PROMOTION_LANE,
+      calibratedSettings,
+      responseModel,
+      FREEFORM_MATERIALIZATION_ACTION_FAMILY,
+    )],
+    metrics: {
+      samples: point.holdout.samples,
+      accuracy: round4(point.holdout.accuracy),
+      brier: round4(point.holdout.calibrated.brier),
+      expectedCalibrationError: round4(point.holdout.calibrated.expectedCalibrationError),
+    },
+    calibration: roundedCalibration(point.calibration),
+    promotedAt,
+    evidence,
   };
 }
 
@@ -714,6 +943,201 @@ export function renderFreeformBenchmark(input: {
   return lines.join("\n");
 }
 
+interface GateRow {
+  criterion: string;
+  observed: string;
+  required: string;
+  pass: boolean;
+}
+
+/** Every base gate as observed-vs-required, whether it passed or not. */
+export function promotionGateRows(metrics: PromotionCalibrationMetrics, result: SystemOnePromotionResult): GateRow[] {
+  const gates = result.gates;
+  const lowerBound = metrics.samples === 0
+    ? 0
+    : wilsonLowerBound(Math.round(metrics.accuracy * metrics.samples), metrics.samples);
+  const rows: GateRow[] = [
+    { criterion: "samples", observed: `${metrics.samples}`, required: `>= ${gates.minSamples}`, pass: metrics.samples >= gates.minSamples },
+    { criterion: "accuracy", observed: metrics.accuracy.toFixed(4), required: `>= ${gates.minAccuracy.toFixed(4)}`, pass: metrics.accuracy >= gates.minAccuracy },
+  ];
+  if (gates.minAccuracyLowerBound !== undefined) {
+    rows.push({ criterion: "Wilson lower bound", observed: lowerBound.toFixed(4), required: `>= ${gates.minAccuracyLowerBound.toFixed(4)}`, pass: lowerBound >= gates.minAccuracyLowerBound });
+  }
+  rows.push({ criterion: "Brier", observed: metrics.brier.toFixed(4), required: `<= ${gates.maxBrier.toFixed(4)}`, pass: metrics.brier <= gates.maxBrier });
+  rows.push({ criterion: "ECE", observed: metrics.expectedCalibrationError.toFixed(4), required: `<= ${gates.maxExpectedCalibrationError.toFixed(4)}`, pass: metrics.expectedCalibrationError <= gates.maxExpectedCalibrationError });
+  return rows;
+}
+
+function gateTable(lines: string[], metrics: PromotionCalibrationMetrics, result: SystemOnePromotionResult): void {
+  lines.push("| Criterion | Observed | Required | Result |");
+  lines.push("| --- | ---: | ---: | :---: |");
+  for (const row of promotionGateRows(metrics, result)) {
+    lines.push(`| ${row.criterion} | ${row.observed} | ${row.required} | ${row.pass ? "pass" : "**fail**"} |`);
+  }
+}
+
+function metricsOfSplit(report: FreeformSplitReport): PromotionCalibrationMetrics {
+  return {
+    samples: report.samples,
+    accuracy: report.accuracy,
+    brier: report.calibrated.brier,
+    expectedCalibrationError: report.calibrated.expectedCalibrationError,
+  };
+}
+
+/**
+ * Renders the dev-selection benchmark: the development sweep used for selection, the selected
+ * threshold and calibration, the frozen-holdout gate, per-case outcomes, and a clearly labelled
+ * post-hoc holdout diagnostic scan.
+ */
+export function renderFreeformSelectionBenchmark(input: {
+  generatedAt: string;
+  model: string;
+  responseModel: string | null;
+  baseUrl: string;
+  repeats: number;
+  shippedThresholds: SystemOneConfidenceThresholds;
+  selection: FreeformDevSelection;
+  observations: readonly FreeformRawObservation[];
+  calls: readonly RawCall[];
+  proposedRecord: SystemOnePromotionRecord | null;
+}): string {
+  const { generatedAt, model, responseModel, baseUrl, repeats, shippedThresholds, selection, observations, calls, proposedRecord } = input;
+  const okCalls = calls.filter((call) => call.ok).length;
+  const lines: string[] = [];
+  const selected = selection.selected;
+  const reviewThreshold = selected ? Math.min(FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD, selected.threshold) : FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD;
+  lines.push("# System One (Jev) freeform-materialization benchmark — development selection");
+  lines.push("");
+  lines.push(`Generated ${generatedAt} by \`scripts/evaluate-system-one-freeform-materialization-lane.ts --dev-select\`.`);
+  lines.push("");
+  lines.push("## What this measures");
+  lines.push("");
+  lines.push("The bounded `freeform-materialization` battery is two `noul` gates (`needs_content`, `legal`) plus one aggregate `choice` over the exact server-authored candidate ids and an explicit `none_of_these`. The lane may only select an authored candidate or fail closed; it never authors prose, stats, prices, stock, or a state mutation. The raw answers from one live run are retained, so every threshold on the fixed grid is recomposed with `composeFreeformMaterializationDecision` unchanged — no model is re-asked. The action threshold and the monotonic Platt map are selected on the **development split only**; the frozen **holdout** is scored once at the selected threshold. A holdout pass at a descriptive (non-development-gate-qualified) point never promotes.");
+  lines.push("");
+  lines.push("| Setting | Value |");
+  lines.push("| --- | --- |");
+  lines.push(`| Requested model | \`${model}\` |`);
+  lines.push(`| Response model | \`${responseModel ?? "unknown"}\` |`);
+  lines.push(`| Base URL | \`${baseUrl}\` |`);
+  lines.push(`| Repeats per case | ${repeats} |`);
+  lines.push(`| Shipped thresholds (action / review) | ${shippedThresholds.actionThreshold} / ${shippedThresholds.reviewThreshold} |`);
+  lines.push(`| Threshold grid | ${FREEFORM_MATERIALIZATION_THRESHOLD_GRID.map((value) => value.toFixed(2)).join(", ")} |`);
+  lines.push(`| Corpus digest | \`${FREEFORM_MATERIALIZATION_CORPUS_DIGEST}\` |`);
+  lines.push(`| Development-split digest | \`${FREEFORM_MATERIALIZATION_DEV_DIGEST}\` |`);
+  lines.push(`| Holdout-split digest | \`${FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST}\` |`);
+  lines.push(`| Calls | ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases x ${repeats} = ${calls.length} (${okCalls} succeeded) |`);
+  lines.push("");
+  lines.push("## Development threshold sweep (selection input)");
+  lines.push("");
+  lines.push("Calibration and the gate are computed per development threshold; the selected row is marked. Holdout columns are not shown here so selection cannot see them.");
+  lines.push("");
+  lines.push("| Threshold | Dev acted (repeats) | Dev distinct acted | Dev accuracy | Dev Wilson LB | Dev Brier (cal) | Dev ECE (cal) | Dev gate |");
+  lines.push("| ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: |");
+  for (const point of selection.grid) {
+    const marker = selected && point.threshold === selected.threshold ? " **←**" : "";
+    lines.push(`| ${point.threshold.toFixed(2)}${marker} | ${point.dev.samples} | ${point.dev.distinctActed} | ${pct(point.dev.accuracy)} | ${point.dev.accuracyLowerBound.toFixed(4)} | ${point.dev.calibrated.brier.toFixed(4)} | ${point.dev.calibrated.expectedCalibrationError.toFixed(4)} | ${point.dev.gate.promoted ? "pass" : "fail"} |`);
+  }
+  lines.push("");
+  const gated = selection.grid.filter((point) => point.dev.gate.promoted).map((point) => point.threshold.toFixed(2));
+  lines.push(gated.length > 0
+    ? `Development thresholds whose own gate passes: ${gated.join(", ")}.`
+    : "No development threshold passes its own gate.");
+  for (const reason of selection.reasons) lines.push(`- ${reason}`);
+  lines.push("");
+  lines.push("## Selected threshold");
+  lines.push("");
+  if (selected) {
+    lines.push(`Selected action threshold **${selected.threshold.toFixed(2)}** (review ${reviewThreshold}), by \`${selection.selectedBy}\`, fit on the development split: Platt \`sigmoid(a * logit(p) + b)\` with a = ${selected.calibration.a.toFixed(4)}, b = ${selected.calibration.b.toFixed(4)}. Development-gate qualified: **${selection.devGateQualified ? "yes" : "no"}**.`);
+  } else {
+    lines.push("No threshold produced an acted development sample; nothing is selectable.");
+  }
+  lines.push("");
+  if (selected) {
+    lines.push("## Frozen-holdout gate at the selected threshold");
+    lines.push("");
+    lines.push(`Holdout acted **${selected.holdout.samples}** repeated samples across **${selected.holdout.distinctActed}** distinct cases (${selected.holdout.actedErrors} acted error(s)); accuracy ${pct(selected.holdout.accuracy)}.`);
+    lines.push("");
+    lines.push("| Holdout signal | Brier | ECE |");
+    lines.push("| --- | ---: | ---: |");
+    lines.push(`| raw | ${selected.holdout.raw.brier.toFixed(4)} | ${selected.holdout.raw.expectedCalibrationError.toFixed(4)} |`);
+    lines.push(`| calibrated (development map) | ${selected.holdout.calibrated.brier.toFixed(4)} | ${selected.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`);
+    lines.push("");
+    gateTable(lines, metricsOfSplit(selected.holdout), selected.holdout.gate);
+    lines.push("");
+    lines.push(`**${selected.holdout.gate.promoted ? "HOLDOUT PROMOTE" : "HOLDOUT NOT READY"}**`);
+    lines.push("");
+    if (selected.holdout.gate.reasons.length === 0) lines.push("Every holdout gate passed.");
+    else for (const reason of selected.holdout.gate.reasons) lines.push(`- ${reason}`);
+    lines.push("");
+  }
+  lines.push("## Per-case outcomes at the selected threshold");
+  lines.push("");
+  if (selected) {
+    lines.push("| Case | Category | Split | Expected | Acted (repeats) | Distinct | Correct repeats | Band |");
+    lines.push("| --- | --- | :---: | --- | ---: | :---: | ---: | --- |");
+    const corpusById = new Map(FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.map((entry) => [entry.id, entry]));
+    const byCase = new Map<string, FreeformBenchmarkSample[]>();
+    for (const observation of observations) {
+      const entry = corpusById.get(observation.caseId);
+      if (!entry) continue;
+      const sample = sampleAtThreshold(entry, observation.answers, selected.threshold, reviewThreshold);
+      const bucket = byCase.get(observation.caseId);
+      if (bucket) bucket.push(sample);
+      else byCase.set(observation.caseId, [sample]);
+    }
+    for (const entry of FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS) {
+      const rows = byCase.get(entry.id) ?? [];
+      const acted = rows.filter((row) => row.acted);
+      const correct = rows.filter((row) => row.correct);
+      const bands = new Set(rows.map((row) => row.band));
+      const expectedText = entry.expected.band === "act" ? `act → ${entry.expected.candidateId}` : "fallback";
+      lines.push(`| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${expectedText} | ${acted.length}/${rows.length} | ${acted.length > 0 ? "yes" : "no"} | ${correct.length}/${rows.length} | ${[...bands].join("/")} |`);
+    }
+    lines.push("");
+  } else {
+    lines.push("No selected threshold.");
+  }
+  lines.push("");
+  lines.push("## Post-hoc holdout diagnostic scan (NOT used for selection)");
+  lines.push("");
+  lines.push("Holdout metrics at every grid threshold, shown only to characterize the frozen split after selection. Selection used the development columns above.");
+  lines.push("");
+  lines.push("| Threshold | Holdout acted (repeats) | Distinct | Accuracy | Wilson LB | Brier (cal) | ECE (cal) | Holdout gate |");
+  lines.push("| ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: |");
+  for (const point of selection.grid) {
+    lines.push(`| ${point.threshold.toFixed(2)} | ${point.holdout.samples} | ${point.holdout.distinctActed} | ${pct(point.holdout.accuracy)} | ${point.holdout.accuracyLowerBound.toFixed(4)} | ${point.holdout.calibrated.brier.toFixed(4)} | ${point.holdout.calibrated.expectedCalibrationError.toFixed(4)} | ${point.holdout.gate.promoted ? "pass" : "fail"} |`);
+  }
+  lines.push("");
+  if (proposedRecord) {
+    lines.push("## Proposed promotion record");
+    lines.push("");
+    lines.push("```json");
+    lines.push(JSON.stringify(proposedRecord, null, 2));
+    lines.push("```");
+  } else {
+    lines.push("## No promotion record");
+    lines.push("");
+    lines.push("The holdout gate did not pass at a development-gate-qualified threshold, or no real response model was captured, so the lane keeps its record-only shadow behavior and no calibration or threshold is shipped.");
+  }
+  lines.push("");
+  lines.push("## Honesty");
+  lines.push("");
+  lines.push("- Selection used the development split only; the holdout was scored once at the selected threshold and drives the gate.");
+  lines.push("- The gate counts repeated acted samples; the distinct acted-case count is reported alongside because repeats from one case are not independent evidence.");
+  lines.push("- A frozen, provider-free corpus with no acted error is a promotion candidate, not proof; it cannot test the calibration's error tail.");
+  lines.push("- The lane has no default active path; an opt-in call site requires `enabled`, an `active` lane mode, and a matching promotion binding.");
+  lines.push("");
+  lines.push("## Reproduce");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("set -a; . /tmp/opencode/jev/jev.env; set +a   # TYPESAFE_API_KEY");
+  lines.push("npx tsx scripts/evaluate-system-one-freeform-materialization-lane.ts --dev-select --repeat 5");
+  lines.push("```");
+  lines.push("");
+  return lines.join("\n");
+}
+
 function argumentValue(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
   return index >= 0 ? process.argv[index + 1] : undefined;
@@ -726,7 +1150,8 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const repeatRaw = Number(argumentValue("--repeat") ?? "1");
+  const devSelect = process.argv.includes("--dev-select");
+  const repeatRaw = Number(argumentValue("--repeat") ?? (devSelect ? "5" : "1"));
   const repeats = Math.max(1, Math.min(25, Number.isFinite(repeatRaw) ? Math.floor(repeatRaw) : 1));
   const outPath = path.resolve(ROOT, argumentValue("--out") ?? DEFAULT_OUT);
   const settings: SystemOneSettings = { ...defaultSystemOneSettings(), apiKey: key };
@@ -734,6 +1159,7 @@ async function main(): Promise<void> {
   const promotedAt = new Date().toISOString().slice(0, 10);
 
   const samples: FreeformBenchmarkSample[] = [];
+  const observations: FreeformRawObservation[] = [];
   const calls: RawCall[] = [];
   let model = settings.model;
   let responseModel: string | null = null;
@@ -755,6 +1181,12 @@ async function main(): Promise<void> {
         const composed = composeFreeformMaterializationDecision(state, result.answers, thresholds);
         const sample = toFreeformSample(benchmarkCase, composed);
         samples.push(sample);
+        observations.push({
+          caseId: benchmarkCase.id,
+          repeat,
+          answers: result.answers,
+          latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        });
         calls.push({
           caseId: benchmarkCase.id, category: benchmarkCase.category, repeat, ok: true,
           latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
@@ -775,6 +1207,48 @@ async function main(): Promise<void> {
   }
   process.stdout.write("\n");
   if (samples.length === 0) throw new Error("no freeform-materialization calls succeeded; nothing to evaluate");
+
+  if (devSelect) {
+    const selection = evaluateFreeformDevSelection(observations, FREEFORM_MATERIALIZATION_THRESHOLD_GRID, FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD);
+    const proposedRecord = proposeSelectionPromotionRecord(selection, settings, responseModel, promotedAt);
+    const selected = selection.selected;
+    const markdown = renderFreeformSelectionBenchmark({
+      generatedAt: new Date().toISOString(),
+      model,
+      responseModel,
+      baseUrl: settings.baseUrl,
+      repeats,
+      shippedThresholds: thresholds,
+      selection,
+      observations,
+      calls,
+      proposedRecord,
+    });
+    await writeFile(outPath, markdown, "utf8");
+    await writeFile(
+      outPath.replace(/\.md$/, ".json"),
+      `${JSON.stringify({
+        mode: "dev-select", model, responseModel, repeats, shippedThresholds: thresholds, reviewThreshold: FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD,
+        corpusDigest: FREEFORM_MATERIALIZATION_CORPUS_DIGEST,
+        devDigest: FREEFORM_MATERIALIZATION_DEV_DIGEST,
+        holdoutDigest: FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST,
+        grid: FREEFORM_MATERIALIZATION_THRESHOLD_GRID,
+        corpus: FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS, observations, calls, selection, proposedRecord,
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    console.log(`corpus ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases, repeats ${repeats}, dev digest ${FREEFORM_MATERIALIZATION_DEV_DIGEST}, holdout digest ${FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST}`);
+    if (selected) {
+      console.log(`selected t=${selected.threshold.toFixed(2)} by ${selection.selectedBy} (dev-gate-qualified=${selection.devGateQualified}); dev acted ${selected.dev.samples}/${selected.dev.distinctActed} distinct acc ${(selected.dev.accuracy * 100).toFixed(1)}%`);
+      console.log(`holdout acted ${selected.holdout.samples} repeats / ${selected.holdout.distinctActed} distinct, acc ${(selected.holdout.accuracy * 100).toFixed(1)}%, cal brier=${selected.holdout.calibrated.brier.toFixed(4)} ece=${selected.holdout.calibrated.expectedCalibrationError.toFixed(4)}`);
+      console.log(`holdout gate: promoted=${selected.holdout.gate.promoted}${selected.holdout.gate.reasons.length ? ` reasons=${selected.holdout.gate.reasons.join("; ")}` : ""}`);
+    } else {
+      console.log("no selectable threshold; holdout gate not scored");
+    }
+    console.log(`proposed record: ${proposedRecord ? "yes" : "none"}`);
+    console.log(`wrote ${path.relative(ROOT, outPath)}`);
+    return;
+  }
 
   const evaluation = evaluateFreeformBenchmark(samples);
   const proposedRecord = proposePromotionRecord(evaluation, settings, responseModel, promotedAt);

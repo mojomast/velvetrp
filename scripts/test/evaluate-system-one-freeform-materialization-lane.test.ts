@@ -16,12 +16,20 @@ import type { SystemOneAnswer } from "../../server/src/provider/systemOneComplet
 import {
   FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS,
   FREEFORM_MATERIALIZATION_CORPUS_DIGEST,
+  FREEFORM_MATERIALIZATION_DEV_DIGEST,
+  FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST,
+  FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD,
+  FREEFORM_MATERIALIZATION_THRESHOLD_GRID,
   evaluateFreeformBenchmark,
+  evaluateFreeformDevSelection,
   gradeFreeformDecision,
   proposePromotionRecord,
+  proposeSelectionPromotionRecord,
+  sampleAtThreshold,
   summarizeFreeformCases,
   toFreeformSample,
   type FreeformBenchmarkSample,
+  type FreeformRawObservation,
 } from "../evaluate-system-one-freeform-materialization-lane.js";
 
 const LANE = "freeform-materialization" as const;
@@ -46,8 +54,12 @@ test("the frozen corpus is broad, labelled, and digest-pinned", () => {
       `${entry.id} does not advertise its expected candidate`);
     assert.ok(entry.candidates.length >= 2, `${entry.id} should carry a distractor candidate`);
   }
-  // The corpus is frozen: any drift changes the digest.
+  // The corpus and both splits are frozen: any drift changes the digest.
   assert.equal(FREEFORM_MATERIALIZATION_CORPUS_DIGEST, "a323ce6a1da8e41812341cd70a295c848fecded252531ed033019939d77dfa4c");
+  assert.equal(FREEFORM_MATERIALIZATION_DEV_DIGEST, "c44e0023ecf4b13ea3a90fd27f95e5b2f048b4411993021946d271897d7b523f");
+  assert.equal(FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST, "0e2fb2a89393ba6df9f83ecaae7c5c51b91cfb50a583408f9bf28a2d0aeed8a3");
+  // The grid is fixed and ascending.
+  assert.deepEqual([...FREEFORM_MATERIALIZATION_THRESHOLD_GRID], [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75]);
 });
 
 const answers = (options: {
@@ -214,4 +226,90 @@ test("carries no unbounded fields: a selected decision exposes only populated ro
   assert.ok(candidate);
   assert.equal(composed.kind, "new-clue");
   assert.deepEqual(Object.keys(composed).sort(), ["band", "candidateId", "kind", "legal", "needsContent", "reason", "signals", "topSignal"]);
+});
+
+/** Builds retained observations with a per-case signal and repeat count, for selection tests. */
+function observationSet(
+  signalFor: (entry: (typeof FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS)[number]) => number,
+  repeats: number,
+  omit: ReadonlySet<string> = new Set(),
+): FreeformRawObservation[] {
+  const out: FreeformRawObservation[] = [];
+  for (const entry of FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS) {
+    if (omit.has(entry.id)) continue;
+    const signal = signalFor(entry);
+    const choice = entry.expected.candidateId ?? entry.candidates[0]!.candidateId;
+    for (let repeat = 1; repeat <= repeats; repeat += 1) {
+      out.push({ caseId: entry.id, repeat, answers: answers({ choice, choiceProbability: signal, needsContent: signal, legal: signal }), latencyMs: 1 });
+    }
+  }
+  return out;
+}
+
+test("selects on development and promotes only when the frozen holdout gate passes", () => {
+  const observations = observationSet((entry) => (entry.expected.band === "act" ? 0.9 : 0.1), 5);
+  const selection = evaluateFreeformDevSelection(observations);
+  assert.equal(selection.devGateQualified, true);
+  assert.equal(selection.selectedBy, "dev-gate");
+  assert.ok(selection.selected);
+  // Every threshold acts identically here; the lowest wins coverage.
+  assert.equal(selection.selected!.threshold, 0.3);
+  assert.ok(selection.selected!.holdout.gate.promoted);
+  assert.equal(selection.selected!.holdout.accuracy, 1);
+  assert.ok(selection.selected!.holdout.distinctActed >= 10);
+
+  const record = proposeSelectionPromotionRecord(selection, defaultSystemOneSettings(), "jev-1.13.0", "2026-09-28");
+  assert.ok(record);
+  assert.equal(record.evidence, "docs/system-one-freeform-materialization-benchmark.md");
+  assert.equal(record.metrics.accuracy, 1);
+  const settings = defaultSystemOneSettings();
+  const expectedSettings = {
+    ...settings,
+    confidenceCalibration: { ...settings.confidenceCalibration, [LANE]: record.calibration! },
+    confidencePolicy: { ...settings.confidencePolicy, [LANE]: { actionThreshold: 0.3, reviewThreshold: Math.min(FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD, 0.3) } },
+  };
+  assert.deepEqual(record.evaluatedBindings, [
+    systemOneEvaluationBinding(LANE, expectedSettings, "jev-1.13.0", FREEFORM_MATERIALIZATION_ACTION_FAMILY),
+  ]);
+  // A missing response model can never satisfy the binding.
+  assert.equal(proposeSelectionPromotionRecord(selection, settings, null, "2026-09-28"), null);
+});
+
+test("does not promote when the frozen holdout fails even though development passes", () => {
+  // Development negatives stay low, so development passes; holdout negatives are high, so they act.
+  const observations = observationSet((entry) => {
+    if (entry.expected.band === "act") return 0.9;
+    return entry.holdout ? 0.9 : 0.1;
+  }, 5);
+  const selection = evaluateFreeformDevSelection(observations);
+  assert.equal(selection.devGateQualified, true);
+  assert.ok(selection.selected);
+  assert.equal(selection.selected!.holdout.gate.promoted, false);
+  assert.ok(selection.selected!.holdout.accuracy < 0.9);
+  assert.equal(proposeSelectionPromotionRecord(selection, defaultSystemOneSettings(), "jev-1.13.0", "2026-09-28"), null);
+});
+
+test("never promotes a descriptive selection that no development threshold qualified", () => {
+  // Few development positives act, so every development gate fails the sample floor.
+  const omit = new Set(FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS
+    .filter((entry) => !entry.holdout && entry.expected.band === "act")
+    .slice(2)
+    .map((entry) => entry.id));
+  const observations = observationSet((entry) => (entry.expected.band === "act" ? 0.9 : 0.1), 5, omit);
+  const selection = evaluateFreeformDevSelection(observations);
+  assert.equal(selection.devGateQualified, false);
+  assert.equal(selection.selectedBy, "dev-best");
+  assert.ok(selection.reasons.some((reason) => reason.includes("no development threshold passed")));
+  assert.equal(proposeSelectionPromotionRecord(selection, defaultSystemOneSettings(), "jev-1.13.0", "2026-09-28"), null);
+});
+
+test("recomposes a retained answer at a lower threshold without changing composition semantics", () => {
+  const entry = FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.find((candidate) => candidate.id === "loc-1")!;
+  const raw = answers({ choice: entry.expected.candidateId!, choiceProbability: 0.6, needsContent: 0.6, legal: 0.6 });
+  const shipped = sampleAtThreshold(entry, raw, 0.75);
+  assert.equal(shipped.acted, false);
+  const swept = sampleAtThreshold(entry, raw, 0.5);
+  assert.equal(swept.acted, true);
+  assert.equal(swept.correct, true);
+  assert.equal(swept.topSignal, 0.6);
 });
