@@ -843,18 +843,30 @@ export function prioritizeCandidateOptions<T extends { toolName: string }>(optio
 }
 
 /** Whole-word (with a light shared-prefix stem) mention of one location name. */
+function mentionsLocationWord(intentWords: readonly string[], word: string): boolean {
+  return intentWords.some((candidate) => {
+    const length = Math.min(word.length, candidate.length);
+    if (length < 4) return word === candidate;
+    for (let index = 0; index < length; index += 1) if (word[index] !== candidate[index]) return index >= 4;
+    return true;
+  });
+}
+/**
+ * Whole-phrase or distinctive multi-word mention of one location name. A single-word place such as
+ * "Docks" matches on its stem ("dock"), but a multi-word place needs every significant word (at
+ * least two) present, so a person or object sharing one word — "Keeper Maren" versus the
+ * destination "Keeper House" — never counts as naming the place.
+ */
 function mentionsLocation(declaration: string, name: string): boolean {
   const value = normalized(name);
   if (!value) return false;
   const intent = normalized(declaration);
   if (intent.includes(value)) return true;
   const intentWords = intent.split(" ").filter(Boolean);
-  return normalizedWords(name).some((word) => word.length >= 4 && intentWords.some((candidate) => {
-    const length = Math.min(word.length, candidate.length);
-    if (length < 4) return word === candidate;
-    for (let index = 0; index < length; index += 1) if (word[index] !== candidate[index]) return index >= 4;
-    return true;
-  }));
+  const words = [...new Set(normalizedWords(name))];
+  if (words.length === 0) return false;
+  const matched = words.filter((word) => mentionsLocationWord(intentWords, word)).length;
+  return matched >= Math.min(2, words.length);
 }
 
 /** How a declaration references the actor's current place and the advertised destinations. */

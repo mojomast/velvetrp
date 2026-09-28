@@ -119,6 +119,19 @@ describe("location gating", () => {
     expect(locationBoundCandidatesAllowed(here)).toBe(true);
   });
 
+  it("does not treat a person or object sharing one word with a destination as naming that place", () => {
+    // "Keeper Maren" must not match the destination "Keeper House"; a same-location conversation
+    // check therefore stays allowed.
+    const conversation = declarationLocationReference("I ask Keeper Maren for an insight check.", "Lantern Quay", ["Keeper House", "Breakwater Cave"]);
+    expect(conversation.namedDestinations).toEqual([]);
+    expect(conversation.mismatchedDestination).toBeNull();
+    expect(locationBoundCandidatesAllowed(conversation)).toBe(true);
+    // A genuine multi-word destination still matches when every significant word is present.
+    const genuine = declarationLocationReference("I set out for Keeper House with the lens.", "Lantern Quay", ["Keeper House", "Breakwater Cave"]);
+    expect(genuine.mismatchedDestination).toBe("Keeper House");
+    expect(locationBoundCandidatesAllowed(genuine)).toBe(false);
+  });
+
   it("stages travel for a compound declaration's first step", () => {
     const intent = declarationIntent("I set out for the Docks and then buy a longsword from Mara.");
     expect(intent.steps.length).toBe(2);
