@@ -92,6 +92,12 @@ const PACING_BLOCKERS = new Set(["waiting-for-player-combat-action", "scene-reso
  * the server when these are the only candidates that keep it company (see `claimDmPlanning`).
  */
 const PACING_ACTIONS = new Set<CampaignDmCandidate["action"]>(["ambient-beat", "advance-time"]);
+/** The stable blocker for a deterministic unbilled rejection; a fresh beat may retry it. */
+export const DM_PROVIDER_REJECTION_RETRY_BLOCKER = "director-provider-request-rejected-retry";
+/** The stable blocker for an ambiguous paid outcome that must never be retried automatically. */
+export const DM_PROVIDER_UNKNOWN_BLOCKER = "provider-outcome-unknown-no-automatic-retry";
+/** Recorded on a rejected dispatch so the provider attempt stays durably reconcilable. */
+const UNBILLED_PROVIDER_REJECTION = { failed: "unbilled-provider-rejection" } as const;
 type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any; preferred?: boolean };
 type RunRow = {
   run_id: string; campaign_id: string; session_id: string; timeline_id: string;
@@ -101,6 +107,12 @@ type RunRow = {
   blockers_json: string; created_at: string; expires_at: string;
 };
 export type DmPlanningWork = { runId: string; claimId: string; context: unknown; candidates: CampaignDmCandidate[] };
+/**
+ * How a failed planning dispatch settles the run. `retriable` is reserved for a deterministic unbilled
+ * provider rejection (HTTP 400/404/422): the beat is `blocked` with a stable code so a fresh beat can
+ * retry it. `unknown` (the default) means the paid outcome cannot be proven and must never be retried.
+ */
+export type DmPlanningDisposition = "unknown" | "retriable";
 export type DmNarrationWork = { context: unknown; fallback: string;
   planning: { tokens: number; costUsd: number | null; maxTotalTokens: number; maxCostUsd: number | null } };
 export type DmProviderUsage = {source:'provider'|'reserved';promptTokens:number;completionTokens:number;totalTokens:number;costUsd:number|null};
@@ -118,12 +130,12 @@ export interface CampaignDmRepository {
   bindDmProviderRequest(principal: string, runId: string, claimId: string, request: unknown, promptTokens: number, completionTokens: number): boolean;
   settleDmPlanning(principal: string, runId: string, claimId: string,
     selection: CampaignDmSelection | CampaignDmSelection[] | null,
-    usage: { promptTokens: number; completionTokens: number } | null, failed?: boolean): void;
+    usage: { promptTokens: number; completionTokens: number } | null, failed?: boolean, disposition?: DmPlanningDisposition): void;
   readDmPlanningGrounding(principal: string, runId: string, request: DmReadToolRequest): { tool: string; summary: string; data: unknown };
   claimDmPlanningRound(principal: string, runId: string, round: 1 | 2, provider: string, model: string, request: unknown,
     promptTokens: number, completionTokens: number): { claimId: string } | null;
   settleDmPlanningRound(principal: string, runId: string, claimId: string, response: unknown,
-    usage: { promptTokens: number; completionTokens: number } | null, failed?: boolean): void;
+    usage: { promptTokens: number; completionTokens: number } | null, failed?: boolean, disposition?: DmPlanningDisposition): void;
   executeDmBeat(principal: string, runId: string): CampaignDmRun;
   decideDmBeat(principal: string, campaignId: string, sessionId: string, runId: string, input: CampaignDmDecisionRequest): CampaignDmRun;
   blockDmBeat(principal: string, runId: string, code: string): void;
@@ -487,6 +499,18 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     // successful-check fact: the free-form classifiers need only the actor and the declared
     // intent, while story grounding still requires real `evidence`.
     let declaration: { turnId: string; actorId: string; intent: string } | null = null;
+    // A `continue` beat whose caller did not name an evidence turn still inherits the declaration of the
+    // latest completed turn that has not yet been consumed by a completed beat. This is recorded player
+    // action, not invented state, and it lets the closed free-form classifiers offer their exact
+    // candidates. It never becomes `evidence`: resolving a scene still requires a GM-bound successful
+    // fact. Consumption keys on `completed` runs only, so the selection is stable across the freshness
+    // recomputations that happen while the same beat is still planning, approving, or being retried.
+    const autoDeclarationTurnId = input.evidenceTurnId || input.intent !== "continue" ? undefined
+      : (db.prepare(`SELECT turn.id id FROM adventure_turns turn
+          WHERE turn.campaign_id=? AND turn.session_id=? AND turn.timeline_id=? AND turn.mode='original' AND turn.state='completed'
+            AND NOT EXISTS(SELECT 1 FROM dm_runs run WHERE run.campaign_id=turn.campaign_id AND run.session_id=turn.session_id
+              AND run.state='completed' AND run.created_at>=turn.created_at)
+          ORDER BY turn.created_at DESC,turn.id DESC LIMIT 1`).get(c, s, context.timelineId) as { id: string } | undefined)?.id;
     if (input.evidenceTurnId) {
       const turn = services.getAdventureTurn(g, input.evidenceTurnId);
       if (turn && turn.campaignId === c && turn.sessionId === s && turn.timelineId === context.timelineId
@@ -522,6 +546,13 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
           ] };
         else blockers.push("evidence-needs-successful-check-objective-or-defeat");
       } else blockers.push("evidence-unavailable-or-already-used");
+    } else if (autoDeclarationTurnId) {
+      const turn = services.getAdventureTurn(g, autoDeclarationTurnId);
+      if (turn && turn.campaignId === c && turn.sessionId === s && turn.timelineId === context.timelineId
+        && turn.mode === "original" && turn.state === "completed" && "declaration" in turn
+        && typeof turn.declaration === "string" && turn.declaration.trim().length > 0) {
+        declaration = { turnId: turn.turnId, actorId: turn.actorId, intent: turn.declaration };
+      }
     }
     let combat = null;
     if (open?.status === "preparing") add("encounter-start", `Start prepared encounter: ${open.name}`, open.encounterId, open.revision);
@@ -600,6 +631,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         const available = clue.sources.filter(source => source.kind === "node"
           ? publicSource(c,source.targetId)&&graph!.nodes.some(node => node.nodeId === source.targetId && node.status !== "hidden")
           : graph!.plotPoints.some(point => point.plotPointId === source.targetId && point.answered)).length;
+        // A clue is offered once its reveal threshold is met by revealed sources or real evidence.
         if (!clue.revealed && available >= clue.revealThreshold && (available > 0 || evidence))
           add("reveal-clue", `Reveal eligible clue: ${clue.title}`, clue.clueId, story!.revision, { storylineId: clue.storylineId });
       }
@@ -1033,7 +1065,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if(old){if(old.request_json!==requestJson||old.reserved_prompt_tokens!==promptTokens||old.reserved_completion_tokens!==completionTokens)throw new CampaignDmConflictError("provider request changed");return true;}
       db.prepare("INSERT INTO dm_provider_requests VALUES(?,?,?,?)").run(id,requestJson,promptTokens,completionTokens);return true;
     }).immediate();},
-    settleDmPlanning(p,id,claimId,selection,usage,failed=false){guard();db.transaction(()=>{
+    settleDmPlanning(p,id,claimId,selection,usage,failed=false,disposition){guard();db.transaction(()=>{
       const r=row(id);triggerAuthority(p,r);const dispatch=db.prepare("SELECT * FROM dm_dispatches WHERE run_id=? AND claim_id=?").get(id,claimId) as any;
       if(!dispatch)throw new CampaignDmConflictError("dispatch unavailable");
       const normalized=selection===null?null:campaignDmCompositionSchema.parse(Array.isArray(selection)?selection:[selection]);
@@ -1049,7 +1081,9 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
           || dispatch.completion_tokens!==(usage?.completionTokens??null)))throw new CampaignDmConflictError("settlement replay changed");
         return;
       }
-      if(failed||now()>=dispatch.deadline_at){db.prepare("UPDATE dm_dispatches SET status='unknown',prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(usage?.promptTokens??null,usage?.completionTokens??null,id);stop(r,"unknown","provider-outcome-unknown-no-automatic-retry");return;}
+      if(failed||now()>=dispatch.deadline_at){const retriable=failed&&disposition==="retriable";
+        db.prepare("UPDATE dm_dispatches SET status='unknown',response_json=?,prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(retriable?json(UNBILLED_PROVIDER_REJECTION):null,usage?.promptTokens??null,usage?.completionTokens??null,id);
+        stop(r,retriable?"blocked":"unknown",retriable?DM_PROVIDER_REJECTION_RETRY_BLOCKER:DM_PROVIDER_UNKNOWN_BLOCKER);return;}
       if(normalized){const bindings=JSON.parse(r.candidates_json) as Binding[];
         if(!normalized.every(selection=>bindings.some(b=>b.candidate.candidateId===selection.candidateId&&b.candidate.digest===selection.digest)))throw new CampaignDmConflictError("unadvertised candidate");}
       db.prepare("UPDATE dm_dispatches SET status='settled',response_json=?,prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(json({selection:normalized}),usage?.promptTokens??null,usage?.completionTokens??null,id);
@@ -1121,7 +1155,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:r.campaign_id,sessionId:r.session_id,lane:"director-planning",recordedPhase:"planned",createdAt:now()},deps.contextInspectionProvenance);
       return {claimId};
     }).immediate();},
-    settleDmPlanningRound(p,id,claimId,response,usage,failed=false){guard();db.transaction(()=>{
+    settleDmPlanningRound(p,id,claimId,response,usage,failed=false,disposition){guard();db.transaction(()=>{
       const r=row(id);triggerAuthority(p,r);
       const responseJson=json(response);
       if(responseJson.length>64000)throw new CampaignDmConflictError("planning round response exceeds bound");
@@ -1139,10 +1173,10 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         const aggregate=planningAggregate(id,claimId);
         if(usage&&aggregate.tokens+usage.promptTokens+usage.completionTokens>Math.min(DM_AGGREGATE_TOKEN_CAP,budget?.maxTotalTokens??DM_AGGREGATE_TOKEN_CAP))failed=true;
         if(usage&&budget?.maxCostUsd!=null&&(cost==null||aggregate.cost==null||aggregate.cost+cost>budget.maxCostUsd))failed=true;
-        if(failed||now()>=roundRow.deadline_at){
-          db.prepare("UPDATE dm_planning_rounds SET status='unknown',prompt_tokens=?,completion_tokens=?,cost_usd=? WHERE run_id=? AND claim_id=?")
-            .run(usage?.promptTokens??null,usage?.completionTokens??null,cost,id,claimId);
-          stop(r,"unknown","provider-outcome-unknown-no-automatic-retry");return;
+        if(failed||now()>=roundRow.deadline_at){const retriable=failed&&disposition==="retriable";
+          db.prepare("UPDATE dm_planning_rounds SET status='unknown',response_json=?,prompt_tokens=?,completion_tokens=?,cost_usd=? WHERE run_id=? AND claim_id=?")
+            .run(retriable?json(UNBILLED_PROVIDER_REJECTION):null,usage?.promptTokens??null,usage?.completionTokens??null,cost,id,claimId);
+          stop(r,retriable?"blocked":"unknown",retriable?DM_PROVIDER_REJECTION_RETRY_BLOCKER:DM_PROVIDER_UNKNOWN_BLOCKER);return;
         }
         db.prepare("UPDATE dm_planning_rounds SET status='settled',response_json=?,prompt_tokens=?,completion_tokens=?,cost_usd=? WHERE run_id=? AND claim_id=?")
           .run(responseJson,usage?.promptTokens??null,usage?.completionTokens??null,cost,id,claimId);
@@ -1154,7 +1188,9 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if(!dispatch)throw new CampaignDmConflictError("planning round unavailable");
       if(dispatch.status!=="claimed")return;
       if(usage&&!recordedUsageAllowed(id,'planning'))failed=true;
-      if(failed||now()>=dispatch.deadline_at){db.prepare("UPDATE dm_dispatches SET status='unknown',prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(usage?.promptTokens??null,usage?.completionTokens??null,id);stop(r,"unknown","provider-outcome-unknown-no-automatic-retry");return;}
+      if(failed||now()>=dispatch.deadline_at){const retriable=failed&&disposition==="retriable";
+        db.prepare("UPDATE dm_dispatches SET status='unknown',response_json=?,prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(retriable?json(UNBILLED_PROVIDER_REJECTION):null,usage?.promptTokens??null,usage?.completionTokens??null,id);
+        stop(r,retriable?"blocked":"unknown",retriable?DM_PROVIDER_REJECTION_RETRY_BLOCKER:DM_PROVIDER_UNKNOWN_BLOCKER);return;}
       db.prepare("UPDATE dm_dispatches SET status='settled',response_json=?,prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(responseJson,usage?.promptTokens??null,usage?.completionTokens??null,id);
     }).immediate();},
     executeDmBeat(p,id){guard();const r=row(id);triggerAuthority(p,r);

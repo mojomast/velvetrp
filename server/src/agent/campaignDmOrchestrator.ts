@@ -154,11 +154,31 @@ function isUnbilledProviderFailure(error: unknown): boolean {
     || (error instanceof ProviderHttpError && [400, 404, 422].includes(error.status));
 }
 
-/** One bounded pre-dispatch retry; the second failure propagates to the lane's deterministic settlement. */
-async function dispatchWithUnbilledRetry<T>(dispatch: () => Promise<T>): Promise<T> {
-  try { return await dispatch(); }
-  catch (first) { if (!isUnbilledProviderFailure(first)) throw first; return await dispatch(); }
+/**
+ * The narrow subset of {@link isUnbilledProviderFailure} that is unambiguously unbilled: a provider
+ * that returned 400/404/422 refused the exact request before generating a completion. A transport
+ * failure is deliberately excluded here because the connection may have dropped after the provider
+ * produced (and billed) a completion, so it must settle unknown rather than be advertised as retriable.
+ */
+function isDeterministicProviderRejection(error: unknown): boolean {
+  return error instanceof ProviderHttpError && [400, 404, 422].includes(error.status);
 }
+
+/** One bounded pre-dispatch retry; the second failure propagates to the lane's deterministic settlement. */
+async function dispatchWithUnbilledRetry<T>(dispatch: () => Promise<T>, attempts = 2): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try { return await dispatch(); }
+    catch (error) { if (attempt >= attempts || !isUnbilledProviderFailure(error)) throw error; }
+  }
+}
+
+/**
+ * Planning retries deterministic unbilled rejections more than once. A routing gateway can intermittently
+ * send the same request to an incompatible thinking upstream; every 400 is unbilled, so a bounded retry
+ * cannot double-charge and usually lands on a compatible upstream. Ambiguous outcomes (timeout/429/5xx)
+ * are never retried and fall straight through to the unknown settlement.
+ */
+const DM_PLANNING_DISPATCH_ATTEMPTS = 4;
 
 export function selectDmBeatTool(selectionPairs: Array<{ candidateId: string; digest: string }>): CompletionFunctionTool {
   return { name: "select_dm_beat", description: "Select an ordered composition of zero to three exact authorized campaign beats, or hold with an empty list for a player choice.",
@@ -278,7 +298,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
     let accounting: DmProviderUsage | null = null;
     try {
       const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("DM deadline")); }, DM_PROVIDER_DEADLINE_MS); });
-      const result = await dispatchWithUnbilledRetry(()=>Promise.race([deps.complete({ ...input, signal: controller.signal }), timeout]));
+      const result = await dispatchWithUnbilledRetry(()=>Promise.race([deps.complete({ ...input, signal: controller.signal }), timeout]), DM_PLANNING_DISPATCH_ATTEMPTS);
       accounting = usageRecord(result.usage, promptBound, completionLimit, price);
       if (round === 0) repository.recordDmProviderUsage(principal, runId, 'planning', accounting);
       if (result.usage && (![result.usage.promptTokens, result.usage.completionTokens, result.usage.totalTokens].every(value => Number.isSafeInteger(value) && value >= 0)
@@ -307,15 +327,20 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
       for (let index = 0; index < calls.length; index += 1) {
         messages.push({ role: "tool", toolCallId: calls[index]!.id, content: groundingObservation(requests[index]!, observations[index]!) });
       }
-    } catch {
+    } catch (error) {
       if (!accounting) {
         accounting = usageRecord(null, promptBound, completionLimit, price);
         if (round === 0) repository.recordDmProviderUsage(principal, runId, 'planning', accounting);
         runningTokens += accounting.totalTokens;
         runningCost += accounting.costUsd ?? 0;
       }
-      if (round === 0) repository.settleDmPlanning(principal, runId, round0ClaimId, null, { promptTokens: accounting.promptTokens, completionTokens: accounting.completionTokens }, true);
-      else repository.settleDmPlanningRound(principal, runId, claimId, null, { promptTokens: accounting.promptTokens, completionTokens: accounting.completionTokens }, true);
+      // A deterministic 4xx rejection is unbilled: settle the beat `blocked` with a stable retriable
+      // code so it can be retried through a fresh beat instead of a terminal, ambiguous `unknown`.
+      // Everything else (timeout, transport, 429, 5xx, forged selection, over-budget usage) is unknown:
+      // the paid outcome cannot be proven, so it must never be automatically retried.
+      const disposition = isDeterministicProviderRejection(error) ? "retriable" as const : "unknown" as const;
+      if (round === 0) repository.settleDmPlanning(principal, runId, round0ClaimId, null, { promptTokens: accounting.promptTokens, completionTokens: accounting.completionTokens }, true, disposition);
+      else repository.settleDmPlanningRound(principal, runId, claimId, null, { promptTokens: accounting.promptTokens, completionTokens: accounting.completionTokens }, true, disposition);
       return;
     } finally { if (timer) clearTimeout(timer); }
   }

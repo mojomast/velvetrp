@@ -78,3 +78,20 @@ not usable in validation (402 low balance / upstream provider error), so they ar
 narration lane performs at most one extra dispatch **only** for a pre-dispatch rejection
 (`ProviderTransportError`, or HTTP 400/404/422) where no completion could have been generated;
 timeouts, 429, and all 5xx stay on the no-ambiguous-paid-retry path.
+
+The same gateway also intermittently rejects a **tool-result follow-up** on the Director planning lane
+with `400 The content[].thinking in the thinking mode must be passed back to the API`, even though the
+request already disables reasoning and even when the prior assistant `reasoning_content` is replayed
+verbatim on the next round. This was reproduced directly against the gateway: replaying the exact
+`reasoning_content` did not change the intermittent failure rate (`4/8 with` vs `3/8 without` in one
+sampled window; `30/30` for both when the gateway happened to route to a compatible upstream). The
+gateway translates between a `reasoning_content` response field and an Anthropic-style `content[].thinking`
+input block, so no OpenAI-format client field can satisfy the incompatible upstream; capture-and-replay
+is therefore **not** a reliable fix and is not forced. Instead the planning lane retries a deterministic
+unbilled 4xx a small bounded number of times (each attempt is unbilled and usually lands on a compatible
+upstream) and, if every attempt is rejected, settles the beat `blocked` with
+`director-provider-request-rejected-retry` — a clean, durably recorded, retriable outcome — rather than a
+terminal `unknown`. Only a deterministic 4xx is treated this way: timeouts, transport failures, 429, 5xx,
+forged selections, and over-budget usage still settle `unknown` because their paid outcome cannot be
+proven and must never be automatically retried.
+
