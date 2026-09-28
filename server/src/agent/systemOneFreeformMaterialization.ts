@@ -3,9 +3,18 @@ import { z } from "zod";
 import type { SystemOneAnswer, SystemOneCaller, SystemOneQuestions } from "../provider/systemOneCompletion.js";
 import type { SystemOneConfidenceThresholds, SystemOneSettings } from "../types.js";
 import { systemOneLaneMode } from "../defaults.js";
-import { recordSystemOneDecision } from "../repo/index.js";
+import {
+  recordSystemOneDecision,
+  type FreeformEncounterMaterialization,
+  type FreeformLoreMaterialization,
+  type FreeformNpcMaterialization,
+  type FreeformShopMaterialization,
+  type FreeformTravelMaterialization,
+} from "../repo/index.js";
+import { systemOneEvaluationBinding } from "./systemOneBinding.js";
 import { calibrateTopSignal } from "./systemOneCalibration.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./systemOnePolicy.js";
+import { isLanePromoted } from "./systemOnePromotion.js";
 
 /**
  * `freeform-materialization` — advisory, shadow-only System One lane for free-form attempts.
@@ -25,7 +34,14 @@ import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./syst
  * actual materialization is not implemented yet (Phase 1 of the research plan).
  */
 
-/** Materialization families the server may author as candidates. */
+/**
+ * Materialization families the server may author as candidates.
+ *
+ * Follow-up (deliberately out of scope for this slice): the newer faction, quest, and rumor
+ * free-form repositories are NOT kinds here. Adding one is a separate change that needs its own
+ * execution-contract revision, corpus cases, and promotion evidence; this lane's gate and
+ * activation path cover only the five families below.
+ */
 export const FREEFORM_MATERIALIZATION_KINDS = [
   "materialize-location",
   "materialize-npc",
@@ -299,5 +315,185 @@ export async function recordFreeformMaterializationShadowDecision(
     });
   } catch {
     // Advisory shadow recording: never affects gameplay, generation, fallbacks, or the response.
+  }
+}
+
+/**
+ * The narrow repository surface the active path may call. It is exactly the five receipted
+ * free-form materialization methods already exposed by `Repository`, so the real repository
+ * satisfies it structurally; a test double can too. The lane never writes a table directly.
+ */
+export interface FreeformMaterializationExecutionPort {
+  materializeFreeformTravel(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    text: string, options?: { candidateId?: string }): FreeformTravelMaterialization;
+  materializeFreeformNpc(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    text: string, options?: { candidateId?: string }): FreeformNpcMaterialization;
+  materializeFreeformEncounter(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    text: string, options?: { candidateId?: string }): FreeformEncounterMaterialization;
+  materializeFreeformShop(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    merchantNpcId: string, options?: { candidateId?: string }): FreeformShopMaterialization;
+  materializeFreeformLore(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    text: string, options?: { candidateId?: string }): FreeformLoreMaterialization;
+}
+
+/**
+ * The matching receipted materialization a promoted lane selected, tagged with the lane kind that
+ * produced it. Each arm is the existing repository result; the lane never returns prose, stats,
+ * prices, stock, or a state mutation of its own.
+ */
+export type FreeformMaterializationExecution =
+  | { kind: "materialize-location"; result: FreeformTravelMaterialization }
+  | { kind: "materialize-npc"; result: FreeformNpcMaterialization }
+  | { kind: "hostile-encounter"; result: FreeformEncounterMaterialization }
+  | { kind: "shop-stock"; result: FreeformShopMaterialization }
+  | { kind: "new-clue"; result: FreeformLoreMaterialization };
+
+/** The bounded input to one activation attempt. */
+export interface FreeformMaterializationActivationInput {
+  campaignId: string;
+  sessionId: string;
+  actorId: string;
+  /** The raw player declaration or GM action that triggered the attempt. */
+  attempt: string;
+  /** The closed, server-authored candidate set. */
+  candidates: readonly FreeformMaterializationCandidate[];
+  /** Required to execute a `shop-stock` selection; ignored by every other kind. */
+  merchantNpcId?: string;
+}
+
+/** The dependencies the activation path executes against. */
+export interface FreeformMaterializationActivationDependencies<TFallback> {
+  /** The receipted repository surface (a real `Repository` satisfies it structurally). */
+  port: FreeformMaterializationExecutionPort;
+  /**
+   * The deterministic classifier/hold the lane falls back to whenever it does not act. The
+   * caller supplies it, so the lane can never change the deterministic outcome by failing.
+   */
+  deterministicFallback: () => TFallback;
+}
+
+export interface FreeformMaterializationLaneSelection {
+  source: "lane";
+  decision: FreeformMaterializationDecision;
+  execution: FreeformMaterializationExecution;
+}
+
+export interface FreeformMaterializationDeterministicOutcome<TFallback> {
+  source: "deterministic";
+  /** The composed advisory decision, or null when the lane never ran. */
+  decision: FreeformMaterializationDecision | null;
+  fallback: TFallback;
+}
+
+function executeFreeformMaterializationCandidate(
+  port: FreeformMaterializationExecutionPort,
+  principalId: string,
+  input: FreeformMaterializationActivationInput,
+  decision: FreeformMaterializationDecision,
+): FreeformMaterializationExecution {
+  const candidateId = decision.candidateId;
+  if (candidateId === null) throw new Error("lane selection has no candidate");
+  const options = { candidateId };
+  switch (decision.kind) {
+    case "materialize-location":
+      return { kind: "materialize-location", result: port.materializeFreeformTravel(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+    case "materialize-npc":
+      return { kind: "materialize-npc", result: port.materializeFreeformNpc(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+    case "hostile-encounter":
+      return { kind: "hostile-encounter", result: port.materializeFreeformEncounter(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+    case "shop-stock": {
+      const merchantNpcId = input.merchantNpcId?.trim();
+      if (!merchantNpcId) throw new Error("a shop-stock selection requires the authored merchant");
+      return { kind: "shop-stock", result: port.materializeFreeformShop(principalId, input.campaignId, input.sessionId, input.actorId, merchantNpcId, options) };
+    }
+    case "new-clue":
+      return { kind: "new-clue", result: port.materializeFreeformLore(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+    default:
+      // A null kind is already rejected before this point; fail closed if one ever reaches here.
+      throw new Error("lane selection has no materialization kind");
+  }
+}
+
+/**
+ * The freeform-materialization activation path.
+ *
+ * Authority is deliberately narrow and fail-closed: it runs the lane only when System One is
+ * enabled and the lane mode is `active`, and it executes a materialization only when the composed
+ * band is `act`, the selected candidate is the server-authored candidate the lane advertised, and
+ * `isLanePromoted` matches the binding built from the real response model. Every other outcome —
+ * disabled, off/shadow mode, malformed state, no/missing/unusable answer, a non-`act` band, an
+ * unpromoted lane, a kind mismatch, missing shop merchant, or any repository failure — invokes the
+ * caller's deterministic classifier/hold and returns its result unchanged.
+ *
+ * The lane can only ever hand one of its advertised candidate ids to an existing receipted
+ * repository method. It never authors content, never writes a table directly, and never returns
+ * prose, stats, prices, stock, or a state mutation of its own.
+ */
+export async function executeFreeformMaterializationLane<TFallback>(
+  principalId: string,
+  settings: SystemOneSettings,
+  caller: SystemOneCaller,
+  dependencies: FreeformMaterializationActivationDependencies<TFallback>,
+  input: FreeformMaterializationActivationInput,
+): Promise<FreeformMaterializationLaneSelection | FreeformMaterializationDeterministicOutcome<TFallback>> {
+  const fallback = (
+    decision: FreeformMaterializationDecision | null,
+  ): FreeformMaterializationDeterministicOutcome<TFallback> => ({
+    source: "deterministic",
+    decision,
+    fallback: dependencies.deterministicFallback(),
+  });
+
+  if (!settings.enabled) return fallback(null);
+  if (systemOneLaneMode(settings, "freeform-materialization") !== "active") return fallback(null);
+
+  const parsed = freeformMaterializationStateSchema.safeParse({
+    campaignId: input.campaignId,
+    sessionId: input.sessionId,
+    attempt: input.attempt,
+    candidates: input.candidates,
+  });
+  if (!parsed.success) return fallback(null);
+  const state = parsed.data;
+
+  let decision: FreeformMaterializationDecision;
+  let responseModel: string | null | undefined;
+  try {
+    const questions = buildFreeformMaterializationQuestions(state);
+    const result = await caller({ settings, state: state as never, questions });
+    responseModel = result.model.responseModel;
+    decision = composeFreeformMaterializationDecision(
+      state,
+      result.answers,
+      settings.confidencePolicy["freeform-materialization"],
+    );
+  } catch {
+    // A transport, protocol, or composition failure never falls through to an act.
+    return fallback(null);
+  }
+
+  if (decision.band !== "act" || decision.candidateId === null || decision.kind === null) {
+    return fallback(decision);
+  }
+  const candidate = state.candidates.find((entry) => entry.candidateId === decision.candidateId);
+  if (!candidate || candidate.kind !== decision.kind) return fallback(decision);
+
+  const binding = systemOneEvaluationBinding(
+    "freeform-materialization",
+    settings,
+    responseModel,
+    FREEFORM_MATERIALIZATION_ACTION_FAMILY,
+  );
+  if (!isLanePromoted("freeform-materialization", binding)) return fallback(decision);
+
+  try {
+    const execution = executeFreeformMaterializationCandidate(dependencies.port, principalId, input, decision);
+    // A decline means the receipted path wrote nothing; the deterministic classifier still owns
+    // the outcome, so the lane reports no execution either.
+    if (execution.result.status !== "materialized") return fallback(decision);
+    return { source: "lane", decision, execution };
+  } catch {
+    // The receipted repository rejected the candidate or failed: fail closed to the classifier.
+    return fallback(decision);
   }
 }
