@@ -2,6 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { upgradeTacticalMapSchema } from "../../map/schemaUpgrade.js";
 import { upgradeCampaignDmSchema } from "./campaignDmUpgrade.js";
+import { upgradeFactionRelationsSchema } from "./factionRelationUpgrade.js";
 
 /**
  * The exact turn-economy update guard published before Dash could extend the
@@ -556,6 +557,7 @@ const schemaRecognizers: SchemaRecognizer[] = [
   upgradeAdventureCheckExecutionOriginSchema,
   upgradeAdventureExactActionOriginSchema,
   upgradeEncounterCancelledStatusSchema,
+  upgradeFactionRelationsSchema,
 ];
 
 function schemaObjectsEqual(a: SchemaObject[], b: SchemaObject[]): boolean {

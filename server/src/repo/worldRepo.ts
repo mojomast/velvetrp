@@ -27,6 +27,9 @@ export {
   type CreateFactionResult,
   type FactionReputationResult,
   type FactionReactionResult,
+  type SetFactionRelationResult,
+  type ActorFactionMembershipResult,
+  type NpcFactionMembershipResult,
 } from "./world/index.js";
 
 /** Public world facade combining commands with principal-filtered projections. */

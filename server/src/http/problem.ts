@@ -59,6 +59,18 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/api\/rpg\/v1\/factions\/[^/]+\/reputation-commands$/.test(path)) {
     return "/api/rpg/v1/factions/:factionId/reputation-commands";
   }
+  if (/^\/api\/rpg\/v1\/factions\/[^/]+\/reaction-commands$/.test(path)) {
+    return "/api/rpg/v1/factions/:factionId/reaction-commands";
+  }
+  if (/^\/api\/rpg\/v1\/factions\/[^/]+\/relation-commands$/.test(path)) {
+    return "/api/rpg/v1/factions/:factionId/relation-commands";
+  }
+  if (/^\/api\/rpg\/v1\/factions\/[^/]+\/actor-membership-commands$/.test(path)) {
+    return "/api/rpg/v1/factions/:factionId/actor-membership-commands";
+  }
+  if (/^\/api\/rpg\/v1\/factions\/[^/]+\/npc-membership-commands$/.test(path)) {
+    return "/api/rpg/v1/factions/:factionId/npc-membership-commands";
+  }
   if (/^\/api\/rpg\/v1\/quests\/[^/]+\/commands$/.test(path)) {
     return "/api/rpg/v1/quests/:questId/commands";
   }

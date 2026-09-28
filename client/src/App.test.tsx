@@ -242,7 +242,7 @@ describe("persistence and multi-character frontend", () => {
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"x-world-revision":"0"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify({npcs:[],relationships:[]}),{status:200,headers:{"x-world-revision":"0"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"x-world-revision":"0"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[],memberships:[],relations:[]}),{status:200,headers:{"x-world-revision":"0"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/,handler:()=>new Response(JSON.stringify({quests:[],objectives:[],journal:[]}),{status:200,headers:{"x-quest-revision":"0"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/story$/,handler:()=>new Response(JSON.stringify({storylines:[],nodes:[],edges:[],plotPoints:[],clues:[]}),{status:200,headers:{"x-story-revision":"0"}})},
     );render(<App/>);await screen.findByRole("heading",{name:campaignAccess.name});
@@ -254,7 +254,7 @@ describe("persistence and multi-character frontend", () => {
     routes.push(
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json({campaign:{...configuredCampaignDetail.campaign,actorRole:++detailReads===1?"gm":nextRole}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify(detailReads===1?{npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"SECRET GOAL",gmNotes:"SECRET NOTE",merchantState:null},createdAt:campaignAccess.createdAt}],relationships:[]}:{npcs:[],relationships:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[],memberships:[],relations:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
     );
     render(<App/>);await screen.findByText("SECRET GOAL");if(nextRole==="observer")fireEvent.focus(window);else fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await screen.findByText("No visible NPCs.");expect(document.body.textContent).not.toContain("SECRET");expect(localStorage.getItem("velvet.narrative-mutation.v3:campaign-one:npc")).not.toContain("REGISTRY SECRET");expect(screen.queryByRole("heading",{name:"Create NPC definition"})).toBeNull();
   });
@@ -264,7 +264,7 @@ describe("persistence and multi-character frontend", () => {
     routes.push(
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>++detailReads===1?json(configuredCampaignDetail):json({type:"x",title:"Missing",status:404,detail:"missing",code:"RPG_CAMPAIGN_NOT_FOUND",requestId:"r",error:"missing"},404)},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify({npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"SECRET",gmNotes:"SECRET",merchantState:null},createdAt:campaignAccess.createdAt}],relationships:[]}),{status:200,headers:{"x-world-revision":"1"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"x-world-revision":"1"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[],memberships:[],relations:[]}),{status:200,headers:{"x-world-revision":"1"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns$/,handler:()=>json({campaigns:[]})},
     );
     render(<App/>);await screen.findAllByText("SECRET");fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await waitFor(()=>expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}").view).toBe("campaigns"));expect(document.body.textContent).not.toContain("SECRET");

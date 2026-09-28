@@ -19,7 +19,7 @@ const world: CampaignWorldHttpResponse = {
   visibleConnections: [{ connectionId: "road", fromLocationId: "harbor", toLocationId: "hill" }],
 };
 const npcs: GmCampaignNpcsHttpResponse = { npcs: [{ npcId: "npc", personaId: "persona", publicState: { name: "Mira" }, privateState: { goals: "SECRET GOAL", gmNotes: "SECRET NOTE", merchantState: null }, createdAt: at }], relationships: [] };
-const factions = { factions: [{ factionId: "faction", name: "Harbor Guild", publicState: { description: "Dock workers" }, privateState: { gmNotes: "SECRET FACTION", visibility: "public" as const }, createdAt: at }], standings: [] };
+const factions = { factions: [{ factionId: "faction", name: "Harbor Guild", publicState: { description: "Dock workers" }, privateState: { gmNotes: "SECRET FACTION", visibility: "public" as const }, createdAt: at }], standings: [], memberships: [], relations: [] };
 const quests = { quests: [{ questId: "quest", storylineId: "story", campaignId: "campaign", title: "Recover the lantern", description: null, status: "offered" as const, rewards: [], createdAt: at, updatedAt: at }], objectives: [], journal: [] };
 const story = { storylines: [{ storylineId: "story", campaignId: "campaign", title: "Harbor mystery", summary: null, status: "active" as const, createdAt: at, updatedAt: at }], nodes: [], edges: [], plotPoints: [], clues: [] };
 const base = { visibility: "gm" as const, sourceDraftId: "draft" };
@@ -35,7 +35,7 @@ function authorization(role: StudioAuthorization["role"] = "gm", generation = 1)
   return auth;
 }
 function castApi(): CastStudioApi {
-  return { listNpcs: vi.fn().mockResolvedValue({ data: npcs, revision: 2 }), listFactions: vi.fn().mockResolvedValue({ data: factions, revision: 2 }), createNpc: vi.fn(), createFaction: vi.fn(), relationship: vi.fn(), reputation: vi.fn(), previewNpcs: shared.projectNpcsForPlayers, previewFactions: shared.projectFactionsForPlayers, getCompanion: vi.fn(), commandCompanion: vi.fn(), listMemberships: vi.fn(), listRooms: vi.fn() };
+  return { listNpcs: vi.fn().mockResolvedValue({ data: npcs, revision: 2 }), listFactions: vi.fn().mockResolvedValue({ data: factions, revision: 2 }), createNpc: vi.fn(), createFaction: vi.fn(), relationship: vi.fn(), reputation: vi.fn(), relation: vi.fn(), actorMembership: vi.fn(), npcMembership: vi.fn(), reaction: vi.fn(), previewNpcs: shared.projectNpcsForPlayers, previewFactions: shared.projectFactionsForPlayers, getCompanion: vi.fn(), commandCompanion: vi.fn(), listMemberships: vi.fn(), listRooms: vi.fn() };
 }
 function worldApi(): WorldExplorerApi { return { getWorld: vi.fn().mockResolvedValue({ data: world, revision: 2 }), travel: vi.fn(), place: vi.fn(), camp: vi.fn() }; }
 

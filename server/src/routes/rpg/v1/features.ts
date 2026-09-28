@@ -206,7 +206,7 @@ export interface CampaignListRepository extends
   Partial<Pick<EncounterRepository, "getCombatPowerLegalActions" | "useCombatPower" | "getCombatPowerResultByKey">>,
   Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor" | "placeActor">>,
   Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
-  Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">>,
+  Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation"|"resolveFactionReaction"|"setFactionRelation"|"changeActorFactionMembership"|"changeNpcFactionMembership">>,
   Partial<Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">>,
   Partial<Pick<CompanionRepository,
     "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">>,
@@ -384,8 +384,7 @@ type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatActio
 type CombatPowerLaneRepository=Pick<EncounterRepository,"getCombatPowerLegalActions"|"useCombatPower"|"getCombatPowerResultByKey">;
 type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"establishCamp"|"placeActor">;
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
-type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
-type NpcPresenceHttpLaneRepository = Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">;
+type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation"|"resolveFactionReaction"|"setFactionRelation"|"changeActorFactionMembership"|"changeNpcFactionMembership">;type NpcPresenceHttpLaneRepository = Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">;
 type CompanionAdministrationHttpLaneRepository = Pick<CompanionRepository,
   "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">;
 type TacticalMapLaneRepository = TacticalMapRepository;
@@ -572,7 +571,8 @@ function assertNpcHttpRepository(repository:CampaignListRepository):asserts repo
   if(typeof repository.listCampaignNpcs!=="function"||typeof repository.createCampaignNpc!=="function"||typeof repository.changeNpcRelationship!=="function")throw new UnsupportedCampaignRepositoryError();
 }
 function assertFactionHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&FactionHttpLaneRepository{
-  if(typeof repository.listCampaignFactions!=="function"||typeof repository.createCampaignFaction!=="function"||typeof repository.changeFactionReputation!=="function")throw new UnsupportedCampaignRepositoryError();
+  const methods:Array<keyof FactionHttpLaneRepository>=["listCampaignFactions","createCampaignFaction","changeFactionReputation","resolveFactionReaction","setFactionRelation","changeActorFactionMembership","changeNpcFactionMembership"];
+  if(methods.some((method)=>typeof repository[method]!=="function"))throw new UnsupportedCampaignRepositoryError();
 }
 function assertNpcPresenceHttpRepository(
   repository: CampaignListRepository,

@@ -43,6 +43,8 @@ const factions: CampaignFactionsHttpResponse = {
       privateState: { gmNotes: "secret", visibility: "gm" }, createdAt: at },
   ],
   standings: [],
+  memberships: [],
+  relations: [],
 };
 const quests: GmCampaignQuestsHttpResponse = {
   quests: [{ questId: "ff-quest-1", campaignId: "campaign", storylineId: "story-1", title: "Dockside Work",

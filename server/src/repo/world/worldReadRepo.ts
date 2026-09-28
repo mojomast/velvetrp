@@ -1,7 +1,9 @@
 import type DatabaseDriver from "better-sqlite3";
 import { gmCampaignFactionsHttpResponseSchema,gmCampaignNpcsHttpResponseSchema,playerCampaignFactionsHttpResponseSchema,playerCampaignNpcsHttpResponseSchema,campaignWorldHttpResponseSchema, worldProjectionSchema,
-  type CampaignWorldHttpResponse,type FactionStandingHttp,type GmCampaignFactionHttp,type GmCampaignNpcHttp,type NpcRelationshipHttp,type PlayerCampaignFactionHttp,type PlayerCampaignNpcHttp,type WorldProjection } from "@velvet/contracts";
+  type CampaignWorldHttpResponse,type FactionMembershipViewHttp,type FactionRelationHttp,type FactionStandingHttp,type GmCampaignFactionHttp,type GmCampaignNpcHttp,type NpcRelationshipHttp,type PlayerCampaignFactionHttp,type PlayerCampaignNpcHttp,type WorldProjection } from "@velvet/contracts";
 import { WorldConflictError } from "./worldErrors.js";
+/** The stored membership vocabulary is `ally`; the contract exposes it as `associate`. */
+const httpMembershipRole = (role: string): "leader" | "member" | "associate" | "enemy" => role === "ally" ? "associate" : role as "leader" | "member" | "associate" | "enemy";
 
 /** Context required to run a world projection. */
 export interface WorldReadContext {
@@ -20,7 +22,7 @@ export interface WorldReadRepository {
 }
 export type WorldCampaignHttpSnapshot=CampaignWorldHttpResponse&{campaignId:string;sessionId:string;revision:number};
 export type CampaignNpcsSnapshot={campaignId:string;revision:number;audience:"gm";npcs:GmCampaignNpcHttp[];relationships:NpcRelationshipHttp[]}|{campaignId:string;revision:number;audience:"player";npcs:PlayerCampaignNpcHttp[];relationships:NpcRelationshipHttp[]};
-export type CampaignFactionsSnapshot={campaignId:string;revision:number;audience:"gm";factions:GmCampaignFactionHttp[];standings:FactionStandingHttp[]}|{campaignId:string;revision:number;audience:"player";factions:PlayerCampaignFactionHttp[];standings:FactionStandingHttp[]};
+export type CampaignFactionsSnapshot={campaignId:string;revision:number;audience:"gm";factions:GmCampaignFactionHttp[];standings:FactionStandingHttp[];memberships:FactionMembershipViewHttp[];relations:FactionRelationHttp[]}|{campaignId:string;revision:number;audience:"player";factions:PlayerCampaignFactionHttp[];standings:FactionStandingHttp[];memberships:FactionMembershipViewHttp[];relations:FactionRelationHttp[]};
 
 /** Creates database-backed world projections with their required lifecycle guard. */
 export function createWorldReadRepository(
@@ -159,8 +161,22 @@ export function createWorldReadRepository(
       WHERE campaign_id=? AND controller_principal_id=?`).all(campaignId,principalId) as any[]).map((row)=>row.actor_id));
     const standings=ledger.filter((row)=>visibleIds.has(row.faction_id)&&(isGm||controlled!.has(row.actor_id))).map((row)=>({
       factionId:row.faction_id,subjectActorId:row.actor_id,reputation:row.reputation,updatedAt:row.updated_at}));
-    if(isGm){const response=gmCampaignFactionsHttpResponseSchema.parse({factions,standings});return {campaignId,revision,audience:"gm",...response};}
-    const response=playerCampaignFactionsHttpResponseSchema.parse({factions,standings});return {campaignId,revision,audience:"player",...response};
+    const relationRows=db.prepare(`SELECT from_faction_id,to_faction_id,relation,updated_at FROM campaign_faction_relations_v32
+      WHERE campaign_id=? ORDER BY from_faction_id,to_faction_id`).all(campaignId) as any[];
+    const relations=relationRows.filter((row)=>isGm||(visibleIds.has(row.from_faction_id)&&visibleIds.has(row.to_faction_id)))
+      .map((row)=>({fromFactionId:row.from_faction_id,toFactionId:row.to_faction_id,disposition:row.relation,updatedAt:row.updated_at}));
+    const actorMemberships=db.prepare(`SELECT faction_id,actor_id,membership_role,joined_at FROM campaign_actor_faction_memberships_v28
+      WHERE campaign_id=? ORDER BY faction_id,actor_id`).all(campaignId) as any[];
+    const npcMemberships=db.prepare(`SELECT faction_id,npc_id,membership_role,joined_at FROM campaign_npc_faction_memberships_v28
+      WHERE campaign_id=? ORDER BY faction_id,npc_id`).all(campaignId) as any[];
+    const memberships:FactionMembershipViewHttp[]=[
+      ...actorMemberships.filter((row)=>visibleIds.has(row.faction_id)&&(isGm||controlled!.has(row.actor_id)))
+        .map((row)=>({campaignId,factionId:row.faction_id,actorId:row.actor_id,role:httpMembershipRole(row.membership_role),joinedAt:row.joined_at})),
+      ...npcMemberships.filter((row)=>visibleIds.has(row.faction_id))
+        .map((row)=>({campaignId,factionId:row.faction_id,npcId:row.npc_id,role:httpMembershipRole(row.membership_role),joinedAt:row.joined_at})),
+    ];
+    if(isGm){const response=gmCampaignFactionsHttpResponseSchema.parse({factions,standings,memberships,relations});return {campaignId,revision,audience:"gm",...response};}
+    const response=playerCampaignFactionsHttpResponseSchema.parse({factions,standings,memberships,relations});return {campaignId,revision,audience:"player",...response};
   };
 
   return { getWorldProjection,getCampaignWorld,listCampaignNpcs,listCampaignFactions };

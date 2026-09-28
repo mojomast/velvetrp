@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
-import { actorIdSchema } from "./rpg-characters.js";
-import { locationConnectionIdSchema, locationIdSchema, MAX_TRAVEL_PARTY_SIZE } from "./world.js";
+import { actorIdSchema, campaignIdSchema } from "./rpg-characters.js";
+import { factionIdSchema, factionMembershipRoleSchema, locationConnectionIdSchema, locationIdSchema, MAX_TRAVEL_PARTY_SIZE, npcIdSchema } from "./world.js";
 
 export const worldCurrentLocationHttpSchema=z.object({
   actorId:actorIdSchema,locationId:locationIdSchema,revision:revisionSchema,updatedAt:utcIsoTimestampSchema,
@@ -130,8 +130,20 @@ export const gmCampaignFactionHttpSchema=playerCampaignFactionHttpSchema.extend(
 export const campaignFactionHttpSchema=z.union([gmCampaignFactionHttpSchema,playerCampaignFactionHttpSchema]);
 export const factionStandingHttpSchema=z.object({factionId:resourceIdSchema,subjectActorId:actorIdSchema,
   reputation:z.number().int().safe(),updatedAt:utcIsoTimestampSchema}).strict();
-export const gmCampaignFactionsHttpResponseSchema=z.object({factions:z.array(gmCampaignFactionHttpSchema).max(1_000),standings:z.array(factionStandingHttpSchema).max(10_000)}).strict();
-export const playerCampaignFactionsHttpResponseSchema=z.object({factions:z.array(playerCampaignFactionHttpSchema).max(1_000),standings:z.array(factionStandingHttpSchema).max(10_000)}).strict();
+/** Authoritative inter-faction disposition. The closed vocabulary matches the stored relation CHECK. */
+export const factionRelationDispositionSchema=z.enum(["allied","neutral","hostile"]);
+export const factionRelationHttpSchema=z.object({fromFactionId:factionIdSchema,toFactionId:factionIdSchema,
+  disposition:factionRelationDispositionSchema,updatedAt:utcIsoTimestampSchema}).strict()
+  .refine((relation)=>relation.fromFactionId!==relation.toFactionId,{message:"a faction relation cannot target itself",path:["toFactionId"]});
+export const actorFactionMembershipHttpSchema=z.object({campaignId:campaignIdSchema,factionId:factionIdSchema,
+  actorId:actorIdSchema,role:factionMembershipRoleSchema,joinedAt:utcIsoTimestampSchema}).strict();
+export const npcFactionMembershipHttpSchema=z.object({campaignId:campaignIdSchema,factionId:factionIdSchema,
+  npcId:npcIdSchema,role:factionMembershipRoleSchema,joinedAt:utcIsoTimestampSchema}).strict();
+export const factionMembershipViewHttpSchema=z.union([actorFactionMembershipHttpSchema,npcFactionMembershipHttpSchema]);
+export const gmCampaignFactionsHttpResponseSchema=z.object({factions:z.array(gmCampaignFactionHttpSchema).max(1_000),standings:z.array(factionStandingHttpSchema).max(10_000),
+  memberships:z.array(factionMembershipViewHttpSchema).max(10_000),relations:z.array(factionRelationHttpSchema).max(10_000)}).strict();
+export const playerCampaignFactionsHttpResponseSchema=z.object({factions:z.array(playerCampaignFactionHttpSchema).max(1_000),standings:z.array(factionStandingHttpSchema).max(10_000),
+  memberships:z.array(factionMembershipViewHttpSchema).max(10_000),relations:z.array(factionRelationHttpSchema).max(10_000)}).strict();
 export const campaignFactionsHttpResponseSchema=z.union([gmCampaignFactionsHttpResponseSchema,playerCampaignFactionsHttpResponseSchema]);
 export const createCampaignFactionHttpRequestSchema=z.object({name:z.string().trim().min(1).max(200),
   publicState:factionPublicStateHttpSchema,privateState:factionPrivateStateHttpSchema,
@@ -151,6 +163,18 @@ export const factionReactionCommandHttpRequestSchema=z.object({subjectActorId:ac
   .refine((request)=>request.delta!==0,"reputation delta must not be zero");
 export const factionReactionCommandHttpResponseSchema=z.object({standing:factionStandingHttpSchema,
   receipt:worldCommandReceiptHttpSchema,sourceObservationId:z.string().min(1).max(256)}).strict();
+export const factionRelationCommandHttpRequestSchema=z.object({toFactionId:factionIdSchema,
+  disposition:factionRelationDispositionSchema,expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema}).strict();
+export const factionRelationCommandHttpResponseSchema=z.object({relation:factionRelationHttpSchema,
+  receipt:worldCommandReceiptHttpSchema}).strict();
+export const actorFactionMembershipCommandHttpRequestSchema=z.object({actorId:actorIdSchema,
+  role:factionMembershipRoleSchema,expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema}).strict();
+export const actorFactionMembershipCommandHttpResponseSchema=z.object({membership:actorFactionMembershipHttpSchema,
+  receipt:worldCommandReceiptHttpSchema}).strict();
+export const npcFactionMembershipCommandHttpRequestSchema=z.object({npcId:npcIdSchema,
+  role:factionMembershipRoleSchema,expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema}).strict();
+export const npcFactionMembershipCommandHttpResponseSchema=z.object({membership:npcFactionMembershipHttpSchema,
+  receipt:worldCommandReceiptHttpSchema}).strict();
 export type CampaignFactionHttp=z.infer<typeof campaignFactionHttpSchema>;
 export type GmCampaignFactionHttp=z.infer<typeof gmCampaignFactionHttpSchema>;
 export type PlayerCampaignFactionHttp=z.infer<typeof playerCampaignFactionHttpSchema>;
@@ -161,3 +185,14 @@ export type CreateCampaignFactionHttpRequest=z.infer<typeof createCampaignFactio
 export type FactionReputationCommandHttpRequest=z.infer<typeof factionReputationCommandHttpRequestSchema>;
 export type FactionReactionCommandHttpRequest=z.infer<typeof factionReactionCommandHttpRequestSchema>;
 export type FactionReactionCommandHttpResponse=z.infer<typeof factionReactionCommandHttpResponseSchema>;
+export type FactionRelationDisposition=z.infer<typeof factionRelationDispositionSchema>;
+export type FactionRelationHttp=z.infer<typeof factionRelationHttpSchema>;
+export type FactionRelationCommandHttpRequest=z.infer<typeof factionRelationCommandHttpRequestSchema>;
+export type FactionRelationCommandHttpResponse=z.infer<typeof factionRelationCommandHttpResponseSchema>;
+export type ActorFactionMembershipHttp=z.infer<typeof actorFactionMembershipHttpSchema>;
+export type NpcFactionMembershipHttp=z.infer<typeof npcFactionMembershipHttpSchema>;
+export type FactionMembershipViewHttp=z.infer<typeof factionMembershipViewHttpSchema>;
+export type ActorFactionMembershipCommandHttpRequest=z.infer<typeof actorFactionMembershipCommandHttpRequestSchema>;
+export type ActorFactionMembershipCommandHttpResponse=z.infer<typeof actorFactionMembershipCommandHttpResponseSchema>;
+export type NpcFactionMembershipCommandHttpRequest=z.infer<typeof npcFactionMembershipCommandHttpRequestSchema>;
+export type NpcFactionMembershipCommandHttpResponse=z.infer<typeof npcFactionMembershipCommandHttpResponseSchema>;

@@ -142,6 +142,22 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
     return {instance:"/api/rpg/v1/factions/:factionId/reputation-commands",hasQuery,
       queryDetail:method==="POST"?"Faction reputation command does not accept query parameters":null,mechanics:true,noStore:true};
   }
+  if (/^\/api\/rpg\/v1\/factions\/[^/]+\/reaction-commands$/.test(instance)) {
+    return {instance:"/api/rpg/v1/factions/:factionId/reaction-commands",hasQuery,
+      queryDetail:method==="POST"?"Faction reaction command does not accept query parameters":null,mechanics:true,noStore:true};
+  }
+  if (/^\/api\/rpg\/v1\/factions\/[^/]+\/relation-commands$/.test(instance)) {
+    return {instance:"/api/rpg/v1/factions/:factionId/relation-commands",hasQuery,
+      queryDetail:method==="POST"?"Faction relation command does not accept query parameters":null,mechanics:true,noStore:true};
+  }
+  if (/^\/api\/rpg\/v1\/factions\/[^/]+\/actor-membership-commands$/.test(instance)) {
+    return {instance:"/api/rpg/v1/factions/:factionId/actor-membership-commands",hasQuery,
+      queryDetail:method==="POST"?"Faction actor membership command does not accept query parameters":null,mechanics:true,noStore:true};
+  }
+  if (/^\/api\/rpg\/v1\/factions\/[^/]+\/npc-membership-commands$/.test(instance)) {
+    return {instance:"/api/rpg/v1/factions/:factionId/npc-membership-commands",hasQuery,
+      queryDetail:method==="POST"?"Faction NPC membership command does not accept query parameters":null,mechanics:true,noStore:true};
+  }
   if (/^\/api\/rpg\/v1\/quests\/[^/]+\/commands$/.test(instance)) {
     return { instance: "/api/rpg/v1/quests/:questId/commands", hasQuery,
       queryDetail: method === "POST" ? "Quest commands do not accept query parameters" : null,
@@ -876,6 +892,22 @@ export function buildApp(options: {
     if (/^\/api\/rpg\/v1\/factions\/[^/]+\/reputation-commands$/.test(instance)) {
       reply.header("cache-control","no-store");return sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found",{
         instance:"/api/rpg/v1/factions/:factionId/reputation-commands"});
+    }
+    if (/^\/api\/rpg\/v1\/factions\/[^/]+\/reaction-commands$/.test(instance)) {
+      reply.header("cache-control","no-store");return sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found",{
+        instance:"/api/rpg/v1/factions/:factionId/reaction-commands"});
+    }
+    if (/^\/api\/rpg\/v1\/factions\/[^/]+\/relation-commands$/.test(instance)) {
+      reply.header("cache-control","no-store");return sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found",{
+        instance:"/api/rpg/v1/factions/:factionId/relation-commands"});
+    }
+    if (/^\/api\/rpg\/v1\/factions\/[^/]+\/actor-membership-commands$/.test(instance)) {
+      reply.header("cache-control","no-store");return sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found",{
+        instance:"/api/rpg/v1/factions/:factionId/actor-membership-commands"});
+    }
+    if (/^\/api\/rpg\/v1\/factions\/[^/]+\/npc-membership-commands$/.test(instance)) {
+      reply.header("cache-control","no-store");return sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found",{
+        instance:"/api/rpg/v1/factions/:factionId/npc-membership-commands"});
     }
     if (/^\/api\/rpg\/v1\/combats\/[^/]+(?:\/(?:log|action-commands|end-commands))?$/.test(instance)) {
       reply.header("cache-control", "no-store");

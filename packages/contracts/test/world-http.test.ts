@@ -3,7 +3,10 @@ import {actorTravelCommandRequestSchema,actorTravelCommandResponseSchema,campaig
   campaignWorldHttpResponseSchema,createCampaignNpcHttpRequestSchema,createCampaignNpcHttpResponseSchema,
   npcRelationshipCommandHttpRequestSchema,npcRelationshipCommandHttpResponseSchema,campaignFactionsHttpResponseSchema,
   createCampaignFactionHttpRequestSchema,factionReputationCommandHttpRequestSchema,
-  factionReactionCommandHttpRequestSchema,factionReactionCommandHttpResponseSchema} from "../src/index.js";
+  factionReactionCommandHttpRequestSchema,factionReactionCommandHttpResponseSchema,
+  factionRelationCommandHttpRequestSchema,factionRelationCommandHttpResponseSchema,
+  factionRelationHttpSchema,actorFactionMembershipCommandHttpRequestSchema,actorFactionMembershipCommandHttpResponseSchema,
+  npcFactionMembershipCommandHttpRequestSchema,npcFactionMembershipCommandHttpResponseSchema} from "../src/index.js";
 import {gmCampaignNpcsHttpResponseSchema,playerCampaignNpcsHttpResponseSchema,gmCampaignFactionsHttpResponseSchema,playerCampaignFactionsHttpResponseSchema} from "../src/index.js";
 
 const at="2035-01-01T00:00:00.000Z";
@@ -56,10 +59,26 @@ describe("world HTTP contracts",()=>{
   it("keeps faction projections and reputation commands strict",()=>{
     const faction={factionId:"guild",name:"Guild",publicState:{description:"Traders"},createdAt:at};
     const gmFaction={...faction,privateState:{gmNotes:"Secret",visibility:"public" as const}};
-    expect(playerCampaignFactionsHttpResponseSchema.parse({factions:[faction],standings:[]})).toBeTruthy();
-    expect(gmCampaignFactionsHttpResponseSchema.parse({factions:[gmFaction],standings:[]})).toBeTruthy();
-    expect(campaignFactionsHttpResponseSchema.safeParse({factions:[faction,gmFaction],standings:[]}).success).toBe(false);
-    expect(campaignFactionsHttpResponseSchema.safeParse({factions:[{...faction,gmNotes:"leak"}],standings:[]}).success).toBe(false);
+    expect(playerCampaignFactionsHttpResponseSchema.parse({factions:[faction],standings:[],memberships:[],relations:[]})).toBeTruthy();
+    expect(gmCampaignFactionsHttpResponseSchema.parse({factions:[gmFaction],standings:[],memberships:[],relations:[]})).toBeTruthy();
+    expect(campaignFactionsHttpResponseSchema.safeParse({factions:[faction,gmFaction],standings:[],memberships:[],relations:[]}).success).toBe(false);
+    expect(campaignFactionsHttpResponseSchema.safeParse({factions:[{...faction,gmNotes:"leak"}],standings:[],memberships:[],relations:[]}).success).toBe(false);
+    const relation={fromFactionId:"guild",toFactionId:"rivals",disposition:"hostile" as const,updatedAt:at};
+    const membership={campaignId:"campaign",factionId:"guild",actorId:"actor",role:"associate" as const,joinedAt:at};
+    expect(playerCampaignFactionsHttpResponseSchema.parse({factions:[faction],standings:[],memberships:[membership],relations:[relation]})).toBeTruthy();
+    expect(factionRelationHttpSchema.safeParse({...relation,toFactionId:"guild"}).success).toBe(false);
+    expect(factionRelationHttpSchema.safeParse({...relation,disposition:"friendly"}).success).toBe(false);
+    const relationCommand={toFactionId:"rivals",disposition:"hostile" as const,expectedRevision:1,idempotencyKey:"relation"};
+    expect(factionRelationCommandHttpRequestSchema.parse(relationCommand)).toEqual(relationCommand);
+    expect(factionRelationCommandHttpResponseSchema.parse({relation,receipt:{idempotencyKey:"relation",revisionBefore:1,revisionAfter:2,occurredAt:at}})).toBeTruthy();
+    const actorMembershipCommand={actorId:"actor",role:"leader" as const,expectedRevision:1,idempotencyKey:"actor-membership"};
+    expect(actorFactionMembershipCommandHttpRequestSchema.parse(actorMembershipCommand)).toEqual(actorMembershipCommand);
+    expect(actorFactionMembershipCommandHttpResponseSchema.parse({membership,receipt:{idempotencyKey:"actor-membership",revisionBefore:1,revisionAfter:2,occurredAt:at}})).toBeTruthy();
+    const npcMembershipCommand={npcId:"npc-1",role:"member" as const,expectedRevision:1,idempotencyKey:"npc-membership"};
+    expect(npcFactionMembershipCommandHttpRequestSchema.parse(npcMembershipCommand)).toEqual(npcMembershipCommand);
+    expect(npcFactionMembershipCommandHttpResponseSchema.parse({membership:{campaignId:"campaign",factionId:"guild",npcId:"npc-1",role:"member",joinedAt:at},
+      receipt:{idempotencyKey:"npc-membership",revisionBefore:1,revisionAfter:2,occurredAt:at}})).toBeTruthy();
+    expect(actorFactionMembershipCommandHttpRequestSchema.safeParse({...actorMembershipCommand,role:"ruler"}).success).toBe(false);
     const create={name:"Guild",publicState:{description:"Traders"},privateState:{gmNotes:"Secret",visibility:"public" as const},expectedRevision:0,idempotencyKey:"guild"};
     expect(createCampaignFactionHttpRequestSchema.parse(create)).toEqual(create);
     expect(createCampaignFactionHttpRequestSchema.safeParse({...create,privateState:{...create.privateState,visibility:"discovered"}}).success).toBe(false);

@@ -3016,7 +3016,7 @@ CREATE TABLE world_narrative_revisions_v32 (
 CREATE TABLE world_narrative_commands_v32 (
       campaign_id TEXT NOT NULL, command_id TEXT NOT NULL,
       resource_id TEXT NOT NULL CHECK(length(resource_id) BETWEEN 1 AND 128 AND resource_id NOT GLOB '*[^A-Za-z0-9._:-]*'),
-      command_type TEXT NOT NULL CHECK(command_type IN ('create_npc','change_npc_relationship','create_faction','change_faction_reputation')),
+      command_type TEXT NOT NULL CHECK(command_type IN ('create_npc','change_npc_relationship','create_faction','change_faction_reputation','set_faction_relation','set_actor_faction_membership','set_npc_faction_membership')),
       idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
       canonical_request_json TEXT NOT NULL CHECK(json_valid(canonical_request_json) AND json_type(canonical_request_json)='object'),
       request_digest TEXT NOT NULL CHECK(length(request_digest)=64 AND request_digest NOT GLOB '*[^0-9a-f]*'),
@@ -3038,7 +3038,7 @@ CREATE TABLE world_narrative_receipts_v32 (
     );
 CREATE TABLE world_narrative_events_v32 (
       event_id TEXT PRIMARY KEY,campaign_id TEXT NOT NULL,command_id TEXT NOT NULL,resulting_revision INTEGER NOT NULL,
-      event_type TEXT NOT NULL CHECK(event_type IN ('npc_created','npc_relationship_changed','faction_created','faction_reputation_changed')),
+      event_type TEXT NOT NULL CHECK(event_type IN ('npc_created','npc_relationship_changed','faction_created','faction_reputation_changed','faction_relation_changed','actor_faction_membership_changed','npc_faction_membership_changed')),
       event_json TEXT NOT NULL CHECK(json_valid(event_json) AND json_type(event_json)='object'),
       occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'),
       UNIQUE(campaign_id,command_id),
@@ -3078,6 +3078,16 @@ CREATE TABLE campaign_faction_reputation_v32 (
       FOREIGN KEY(campaign_id,faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
       FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
       FOREIGN KEY(campaign_id,command_id) REFERENCES world_narrative_commands_v32(campaign_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+CREATE TABLE campaign_faction_relations_v32 (
+      campaign_id TEXT NOT NULL,from_faction_id TEXT NOT NULL,to_faction_id TEXT NOT NULL,
+      relation TEXT NOT NULL CHECK(relation IN ('allied','neutral','hostile')),
+      command_id TEXT NOT NULL,updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,from_faction_id,to_faction_id),
+      FOREIGN KEY(campaign_id,from_faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,to_faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,command_id) REFERENCES world_narrative_commands_v32(campaign_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      CHECK(from_faction_id<>to_faction_id)
     );
 CREATE TRIGGER world_narrative_commands_v32_immutable_update BEFORE UPDATE ON world_narrative_commands_v32 BEGIN SELECT RAISE(ABORT,'world narrative commands are immutable'); END;
 CREATE TRIGGER world_narrative_commands_v32_immutable_delete BEFORE DELETE ON world_narrative_commands_v32 BEGIN SELECT RAISE(ABORT,'world narrative commands are immutable'); END;
