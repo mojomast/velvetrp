@@ -419,6 +419,33 @@ describe("bounded adventure orchestrator", () => {
       .toThrow("exact-candidate provider binding is malformed");
     mismatched.close();
   });
+  it("gates a mismatched-location declaration to navigation and refuses to commit its check",async()=>{
+    const campaign=seed("dnd"),repository=createRepository({clock:{now:()=>new Date(at)}});
+    const created=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",
+      declaration:"I search the crates along the Silver Harbor for anything hidden.",expectedCampaignRevision:0,idempotencyKey:"hold-location-mismatch"});
+    const deps=dependencies([completion()]);deps.now=()=>new Date(at);
+    const result=await orchestrateAdventureTurn(repository,created.turnId,deps);
+    expect(result.outcome).toBe("completed");
+    expect(result.turn.receiptLinks).toEqual([]);
+    expect(result.turn.toolCalls).toEqual([]);
+    expect(result.hold).toMatchObject({reason:"location-mismatch",suggestedNextStep:expect.stringContaining("Silver Harbor")});
+    expect(result.hold?.suggestedCandidateId).toBeTruthy();
+    repository.close();
+  });
+  it("describes an already-there travel hold and suggests a real advertised destination",async()=>{
+    const campaign=seed();
+    const discovery=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    discovery.prepare("INSERT OR IGNORE INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(campaign.id,"actor","origin",at);discovery.close();
+    const repository=createRepository({clock:{now:()=>new Date(at)}});
+    const created=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",
+      declaration:"I head back to the Old Gate before it gets dark.",expectedCampaignRevision:0,idempotencyKey:"hold-already-there"});
+    const deps=dependencies([completion()]);deps.now=()=>new Date(at);
+    const result=await orchestrateAdventureTurn(repository,created.turnId,deps);
+    expect(result.outcome).toBe("completed");
+    expect(result.turn.receiptLinks).toEqual([]);
+    expect(result.hold).toMatchObject({reason:"already-at-location",suggestedNextStep:"Travel to Silver Harbor"});
+    repository.close();
+  });
   it("scopes receipt integrity verification to the selected v48 binding",async()=>{
     const campaign=seed(),repository=createRepository({clock:{now:()=>new Date(at)}});
     const execute=async(idempotencyKey:string,choiceId:string)=>{const turn=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,
