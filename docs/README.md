@@ -43,6 +43,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Supra2 service deployment](supra2-service-deployment.md) - Inference-host runbook for the private Supra2-IMG service: Strix Halo and ROCm prerequisites, pinned checkpoint verification, the current `/health`, `/api/status`, `/api/generate`, `/api/batch`, `/api/cancel`, and `/images/...` contract, tailnet authorization, persistence, historical timings, and upgrade/license policy.
 - [Interactive gameplay agent instructions](interactive-gameplay-agent-instructions.md) - Trusted-local operator workflow, discovery, character/campaign setup, play, and no-retry reconciliation.
 - [Playtest world](playtest-world.md) - Provider-free Hollowford Reach seed world and launcher for unlimited live roleplay/evaluation passes.
+- [Free-form fun evaluator](freeform-fun-eval.md) - Scripted free-form session harness measuring narration provider share, fallback distinctness, materialization rate, DM-beat success, latency, and location-coherence violations, with baseline comparison.
 - [Planning board](planning-board.md) - Internal contributor workflow for the repository-specific planning board.
 
 ## Planning and historical records
