@@ -52,6 +52,7 @@ import {
   type EncounterStartCommandRequest,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { pickVariation, type VariationPool } from "./freeformVariation.js";
 import type {
   EncounterCombatSnapshot,
   EncounterLifecycleSnapshot,
@@ -160,12 +161,28 @@ function normalizeProvocation(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function encounterName(actorName: string, locationName: string | null): string {
+function encounterName(framing: string, actorName: string, locationName: string | null): string {
   const subject = actorName.trim() ? actorName.trim() : "the party";
   const place = locationName && locationName.trim() ? ` at ${locationName.trim()}` : "";
-  const name = `Hostile encounter for ${subject}${place}`.trim();
+  const name = `${framing} for ${subject}${place}`.trim();
   return (name || "Hostile encounter").slice(0, 200);
 }
+
+/**
+ * Public flavor pools for an encounter's display name. Narrative only: the enemy
+ * roster and every stat stay exact pinned catalog references and are never
+ * derived from this text.
+ */
+export const FREEFORM_ENCOUNTER_FRAMINGS: VariationPool<string> = Object.freeze([
+  "A sudden clash",
+  "An ambush",
+  "A standoff turned violent",
+  "A skirmish",
+  "An opening melee",
+  "A costly stand",
+  "A brief and ugly fight",
+  "A cornered confrontation",
+]);
 
 /** The public projection of an enemy definition omits GM-only `private` fields. */
 const publicEnemyTemplateSchema = enemyTemplateCatalogDefinitionSchema.omit({ private: true });
@@ -214,7 +231,7 @@ export function classifyFreeformEncounter(input: {
   const count = MIN_FREEFORM_ENCOUNTER_ENEMIES + (Number.parseInt(digest.slice(0, 8), 16) % span);
   const candidate: FreeformEncounterCandidate = {
     candidateId: `ffe-${digest.slice(0, 40)}`,
-    encounterName: encounterName(input.actorName, input.locationName),
+    encounterName: encounterName(pickVariation(`${digest}:encounter-framing`, FREEFORM_ENCOUNTER_FRAMINGS), input.actorName, input.locationName),
     actorId: input.actorId,
     enemies: Array.from({ length: count }, () => chosen.reference),
     visibility: "public",

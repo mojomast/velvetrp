@@ -119,21 +119,29 @@ export { ensureCombatTacticalMap, inferCombatMapKind, combatMapSeed, type Ensure
 export { WorldAuthorizationError, WorldStaleError, WorldConflictError, WorldUnavailableError, type WorldRepository } from "./worldRepo.js";
 export {
   MAX_FREEFORM_DESTINATION_LENGTH,
+  FREEFORM_LOCATION_FEATURES,
+  FREEFORM_LOCATION_MOODS,
+  FREEFORM_TRAVEL_SEEDS,
   FreeformTravelAuthorizationError,
   FreeformTravelConflictError,
   FreeformTravelUnavailableError,
   classifyFreeformTravel,
   createFreeformTravelRepository,
   parseFreeformTravelDestination,
+  selectFreeformTravelSeed,
   type FreeformTravelCandidate,
   type FreeformTravelClassification,
   type FreeformTravelLocationContext,
   type FreeformTravelMaterialization,
   type FreeformTravelRepository,
+  type FreeformTravelSeedTemplate,
 } from "./freeform/freeformTravelRepo.js";
 export {
   MAX_FREEFORM_NPC_NAME_LENGTH,
   FREEFORM_NPC_ARCHETYPES,
+  FREEFORM_NPC_DETAILS,
+  FREEFORM_NPC_MOODS,
+  FREEFORM_NPC_PRIVATE_ANGLES,
   FreeformNpcAuthorizationError,
   FreeformNpcConflictError,
   FreeformNpcUnavailableError,
@@ -150,7 +158,9 @@ export {
 } from "./freeform/freeformNpcRepo.js";
 export {
   MAX_FREEFORM_LORE_SUBJECT_LENGTH,
+  FREEFORM_LORE_SECRETS,
   FREEFORM_LORE_TEMPLATES,
+  FREEFORM_LORE_TEXTURES,
   FreeformLoreAuthorizationError,
   FreeformLoreConflictError,
   FreeformLoreUnavailableError,
@@ -170,7 +180,10 @@ export {
 export {
   MAX_FREEFORM_QUEST_LEAD_LENGTH,
   MAX_FREEFORM_QUEST_OBJECTIVES,
+  FREEFORM_QUEST_COMPLICATIONS,
+  FREEFORM_QUEST_REWARD_LABELS,
   FREEFORM_QUEST_TEMPLATES,
+  FREEFORM_QUEST_TEXTURES,
   FreeformQuestAuthorizationError,
   FreeformQuestConflictError,
   FreeformQuestUnavailableError,
@@ -192,6 +205,8 @@ export {
 export {
   MAX_FREEFORM_RUMOR_SUBJECT_LENGTH,
   FREEFORM_RUMOR_TEMPLATES,
+  FREEFORM_RUMOR_TEXTURES,
+  FREEFORM_RUMOR_TRUTHS,
   FreeformRumorAuthorizationError,
   FreeformRumorConflictError,
   FreeformRumorUnavailableError,
@@ -214,6 +229,7 @@ export {
   MAX_FREEFORM_SHOP_ITEMS,
   MIN_FREEFORM_SHOP_QUANTITY,
   MAX_FREEFORM_SHOP_QUANTITY,
+  FREEFORM_SHOP_ATMOSPHERES,
   FreeformShopAuthorizationError,
   FreeformShopConflictError,
   FreeformShopUnavailableError,
@@ -221,6 +237,7 @@ export {
   createFreeformShopRepository,
   freeformShopId,
   freeformShopName,
+  freeformShopNotice,
   freeformShopQuantity,
   freeformShopStockId,
   type FreeformShopCandidate,
@@ -237,6 +254,7 @@ export {
 export {
   MAX_FREEFORM_ENCOUNTER_ENEMIES,
   MIN_FREEFORM_ENCOUNTER_ENEMIES,
+  FREEFORM_ENCOUNTER_FRAMINGS,
   FreeformEncounterAuthorizationError,
   FreeformEncounterConflictError,
   FreeformEncounterUnavailableError,
@@ -258,6 +276,8 @@ export {
 export {
   MAX_FREEFORM_FACTION_NAME_LENGTH,
   FREEFORM_FACTION_ARCHETYPES,
+  FREEFORM_FACTION_DETAILS,
+  FREEFORM_FACTION_PRIVATE_ANGLES,
   FreeformFactionAuthorizationError,
   FreeformFactionConflictError,
   FreeformFactionUnavailableError,
@@ -275,6 +295,13 @@ export {
   type FreeformFactionRepository,
   type FreeformFactionTemplate,
 } from "./freeform/freeformFactionRepo.js";
+export {
+  appendSentences,
+  isFlavorOnly,
+  pickVariation,
+  variationIndex,
+  type VariationPool,
+} from "./freeform/freeformVariation.js";
 export { createEncounterPlanningService, type EncounterPlanningService, type EncounterPlanningDependencies,
   type EncounterCatalogDefinition, type EncounterCandidate, type EncounterPlanningDifficulty,
   type CampaignEncounterRequest, type CampaignEncounterPlan } from "./dm/encounterPlanning.js";

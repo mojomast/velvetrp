@@ -68,6 +68,7 @@ import {
   type PrivateGenerationDraft,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { appendSentences, pickVariation, type VariationPool } from "./freeformVariation.js";
 
 /** Upper bound on distinct catalog items a free-form shop may stock. */
 export const MAX_FREEFORM_SHOP_ITEMS = 8;
@@ -192,6 +193,34 @@ export function freeformShopQuantity(shopId: string, reference: FreeformShopItem
 export function freeformShopName(merchantName: string): string {
   const bounded = merchantName.trim().slice(0, 180) || "Merchant";
   return `${bounded}'s wares`;
+}
+
+/**
+ * Public flavor pools for the shop notice. Narrative only: item names and prices
+ * stay catalog-bound and are never derived here.
+ */
+export const FREEFORM_SHOP_ATMOSPHERES: VariationPool<string> = Object.freeze([
+  "The stall is laid out with a care that suggests the keeper counts everything twice.",
+  "Half the goods are set back from the lane, as if the best stock is saved for known faces.",
+  "A hand-lettered board lists what is offered, and a second smaller board edges the prices upward.",
+  "The keeper greets browsers and sellers with exactly the same measured nod.",
+  "Dust and daylight fall over the wares in equal measure.",
+  "A stool by the counter has been worn into the shape of long waiting.",
+  "The stock is tidy in front and crowded at the back, the way a careful shopkeeper works.",
+  "A bell over the lane warns the keeper before a stranger reaches the counter.",
+]);
+
+/**
+ * Deterministic public shop notice text for a merchant identity. The summary is
+ * flavor; the catalog-bound item names, quantities and prices live in the notice
+ * details and the shop stock rows, never here.
+ */
+export function freeformShopNotice(shopName: string, identity: string): string {
+  const keeper = shopName.replace(/'s wares$/, "");
+  return appendSentences(
+    `A public stall of ${keeper}, offering catalog-priced wares.`,
+    pickVariation(`${identity}:shop-atmosphere`, FREEFORM_SHOP_ATMOSPHERES),
+  );
 }
 
 const compareReferences = (left: FreeformShopItemReference, right: FreeformShopItemReference): number =>
@@ -487,7 +516,7 @@ export function createFreeformShopRepository(
         const content = generatedCampaignContentProviderSchema.parse({
           lore: [{
             key: noticeKey, title: candidate.shopName,
-            summary: `A public stall of ${candidate.shopName.replace(/'s wares$/, "")}, offering catalog-priced wares.`.slice(0, 4000),
+            summary: freeformShopNotice(candidate.shopName, identity).slice(0, 4000),
             details: noticeDetails, visibility: "public", locationKeys: [], factionKeys: [], storyNodeKeys: [],
           }],
         });

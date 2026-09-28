@@ -50,6 +50,7 @@ import {
   type PrivateGenerationDraft,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { appendSentences, pickVariation, type VariationPool } from "./freeformVariation.js";
 
 /** Maximum length of the player-supplied faction/order/guild phrase. */
 export const MAX_FREEFORM_FACTION_NAME_LENGTH = 200;
@@ -138,11 +139,72 @@ export const FREEFORM_FACTION_ARCHETYPES: readonly FreeformFactionTemplate[] = O
     gmAgenda: "Advance the faction's cause quietly; reveal no inner plan and judge whether the party can be enlisted.",
   }),
   Object.freeze({
+    id: "court", label: "Court",
+    keywords: ["court", "retinue", "household", "chancery", "ministry", "senate", "nobility", "regency", "chamberlain", "heraldry"],
+    description: "A public court of {location}, where precedence is spoken and intent is not.",
+    gmAgenda: "Balance the court's rivals; grant the party only the favour that costs nothing and note whom they flatter.",
+  }),
+  Object.freeze({
+    id: "free-company", label: "Free company",
+    keywords: ["company", "warband", "mercenaries", "sellswords", "freebooters", "bravos", "lances", "banner"],
+    description: "A public free company of {location}, selling discipline and keeping its own counsel about the rest.",
+    gmAgenda: "Price the company's next contract; test the party's mettle and never let a patron choose the battlefield twice.",
+  }),
+  Object.freeze({
+    id: "sea-company", label: "Sea company",
+    keywords: ["fleet", "sailors", "mariners", "privateers", "corsairs", "captains", "admiralty", "shipping"],
+    description: "A public sea company of {location}, answerable to weather, cargo and a short list of names.",
+    gmAgenda: "Protect the routes and the manifest; sound out the party for landward eyes and say nothing of the shallow passages.",
+  }),
+  Object.freeze({
+    id: "circle", label: "Circle",
+    keywords: ["circle", "coterie", "mystics", "seers", "oracle", "diviners", "augurs", "readers"],
+    description: "A public circle of {location}, speaking of signs in a way that never quite commits to a claim.",
+    gmAgenda: "Keep the circle's reading ambiguous and its true question hidden; draw the party toward the answer the circle needs them to find.",
+  }),
+  Object.freeze({
+    id: "trading-house", label: "Trading house",
+    keywords: ["trading", "counting-house", "bank", "moneylenders", "exchange", "financiers", "bursary", "ledger"],
+    description: "A public trading house of {location}, counting friendship in the same column as debt.",
+    gmAgenda: "Call in the campaign's older debts; offer credit only against leverage and learn what the party cannot afford to lose.",
+  }),
+  Object.freeze({
+    id: "rangers", label: "Rangers",
+    keywords: ["rangers", "ranger", "woodsmen", "hunters", "druids", "grove", "wildwalkers", "pathfinders"],
+    description: "A public band of rangers around {location}, keeping the wild's borders in a language the town only half hears.",
+    gmAgenda: "Decide whether the party is part of the balance or a disturbance; guide them only as far as their respect for the land allows.",
+  }),
+  Object.freeze({
     id: "unlisted", label: "Unlisted",
     keywords: [],
     description: "A public association of {location}, keeping its business to itself.",
     gmAgenda: "Observe the party from a distance; share nothing and commit to nothing until the association's interest is clear.",
   }),
+]);
+
+/**
+ * Public flavor pools appended to a faction description. Narrative only: no
+ * stats, prices, stock, catalog references or GM-only text.
+ */
+export const FREEFORM_FACTION_DETAILS: VariationPool<string> = Object.freeze([
+  "Its meetings end without a written record.",
+  "Members wear the same small pin, worn differently by rank.",
+  "It keeps a rented room that is never the one it names.",
+  "Its oldest members still use a greeting no outsider recognizes.",
+  "It pays its dues in favours tallied on a private slate.",
+  "It keeps a public face and a second door for the rest.",
+  "Its business is done over food, never over paper.",
+  "It remembers a slight longer than it remembers a payment.",
+]);
+
+/** GM-only private angles appended to the faction agenda artifact; never public. */
+export const FREEFORM_FACTION_PRIVATE_ANGLES: VariationPool<string> = Object.freeze([
+  "Privately, the faction is eager to use the party without being seen to recruit them.",
+  "Privately, the faction is testing whether the party can be blamed for a coming failure.",
+  "Privately, the faction has already chosen a side the party has not been told about.",
+  "Privately, the faction is split, and the party's answer will decide the stronger half.",
+  "Privately, the faction owes a debt to an outside power it means to repay with the party's help.",
+  "Privately, the faction wants the party to find something before its rivals do.",
 ]);
 
 const FACTION_KEYWORDS: ReadonlySet<string> = new Set(
@@ -276,8 +338,11 @@ export function classifyFreeformFaction(input: {
     gmAgendaKey: generatedArtifactKeySchema.parse(`ff-faction-agenda-${digest.slice(0, 40)}`),
     name,
     archetype: template.label,
-    description: template.description.replaceAll("{location}", location),
-    gmAgenda: template.gmAgenda,
+    description: appendSentences(
+      template.description.replaceAll("{location}", location),
+      pickVariation(`${digest}:faction-detail`, FREEFORM_FACTION_DETAILS),
+    ),
+    gmAgenda: appendSentences(template.gmAgenda, pickVariation(`${digest}:faction-angle`, FREEFORM_FACTION_PRIVATE_ANGLES)),
     visibility: "public",
   };
   return { intent: "materialize-faction", factionName: name, candidates: [candidate] };

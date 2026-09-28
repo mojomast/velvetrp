@@ -56,6 +56,7 @@ import {
   type PrivateGenerationDraft,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { appendSentences, pickVariation, type VariationPool } from "./freeformVariation.js";
 
 /** Maximum length of the player-supplied work/lead phrase. */
 export const MAX_FREEFORM_QUEST_LEAD_LENGTH = 200;
@@ -155,6 +156,71 @@ export const FREEFORM_QUEST_TEMPLATES: readonly FreeformQuestTemplate[] = Object
     gmTwist: "The lead is real but incomplete; the person who spread it in {location} is steering the search away from themselves.",
   }),
   Object.freeze({
+    id: "bounty", label: "Bounty work",
+    keywords: ["bounty", "bounties", "capture", "wanted", "outlaw", "beast", "cull", "predator", "monster", "hunt"],
+    title: "A bounty posted in {location}",
+    description: "A public bounty in {location} names a quarry and a reward, and leaves the method to whoever takes it.",
+    objectives: [
+      "Read the bounty and learn the quarry's last known ground.",
+      "Track the quarry and end the trouble it causes.",
+      "Return proof to whoever posted the bounty in {location}.",
+    ],
+    rewardLabel: "The posted bounty",
+    gmTwist: "The quarry named in {location} is not the real danger; the poster wants it silenced before it can speak.",
+  }),
+  Object.freeze({
+    id: "gather", label: "Gathering work",
+    keywords: ["gather", "gathering", "forage", "foraging", "collect", "collection", "harvest", "herbs", "ingredients", "reagents", "supplies", "procure"],
+    title: "A gathering errand out of {location}",
+    description: "A request in {location} needs someone to bring back what the town cannot gather for itself.",
+    objectives: [
+      "Learn from {location} what must be gathered and where it grows.",
+      "Gather the needful things and carry them back safely.",
+      "Deliver the haul to the one who asked in {location}.",
+    ],
+    rewardLabel: "A gatherer's payment",
+    gmTwist: "The request is a pretext to watch where the party ranges; someone in {location} is mapping the same ground for another purpose.",
+  }),
+  Object.freeze({
+    id: "rescue", label: "Rescue work",
+    keywords: ["rescue", "save", "ransom", "abduct", "abducted", "kidnapped", "captive", "prisoner", "liberate"],
+    title: "A rescue asked in {location}",
+    description: "Someone in {location} is missing, and the person asking will pay to have them brought home.",
+    objectives: [
+      "Find who is missing and who last saw them in {location}.",
+      "Follow the trail and reach the place they are held.",
+      "Bring them back to {location}, alive and free.",
+    ],
+    rewardLabel: "A rescuer's reward",
+    gmTwist: "The missing person left {location} willingly; the rescue is really a recovery of something they carried away.",
+  }),
+  Object.freeze({
+    id: "craft", label: "Craft work",
+    keywords: ["craft", "commission", "forge", "repair", "apprentice", "smithing", "build", "construct", "workshop"],
+    title: "A commission from {location}",
+    description: "A craft-folk of {location} needs materials or hands to finish work that cannot wait.",
+    objectives: [
+      "Take the commission and learn what the work requires.",
+      "Bring the materials or do the work asked of you.",
+      "Return to {location} and see the commission accepted.",
+    ],
+    rewardLabel: "A commission's fee",
+    gmTwist: "The work is a cover for replacing something the maker should not have repaired, and the original is still in {location}.",
+  }),
+  Object.freeze({
+    id: "trial", label: "Trial work",
+    keywords: ["trial", "contest", "tournament", "race", "challenge", "competition", "duel", "prove"],
+    title: "A trial offered in {location}",
+    description: "A public trial in {location} promises a prize to whoever passes a test of nerve or skill.",
+    objectives: [
+      "Enter the trial and learn its terms in {location}.",
+      "Meet the test set before you and see it through.",
+      "Claim the prize from whoever set the trial.",
+    ],
+    rewardLabel: "The trial's prize",
+    gmTwist: "The trial in {location} exists to find one specific person, and the crowd is the only reason it has not become a trap.",
+  }),
+  Object.freeze({
     id: "general", label: "Open request",
     keywords: [],
     title: "A request for help in {location}",
@@ -166,6 +232,45 @@ export const FREEFORM_QUEST_TEMPLATES: readonly FreeformQuestTemplate[] = Object
     rewardLabel: "An agreed reward",
     gmTwist: "The request is a small hook into a larger local problem; whoever asked has more at stake than they admit.",
   }),
+]);
+
+/**
+ * Public flavor pools appended to a quest. Narrative only: no stats, items,
+ * prices, enemies or catalog references, and nothing GM-only.
+ */
+export const FREEFORM_QUEST_TEXTURES: VariationPool<string> = Object.freeze([
+  "The offer has been copied onto three different notices, in three different hands.",
+  "Whoever posted it chose a spot where the watch rarely stops.",
+  "The wording is careful, as if a lawyer had trimmed it.",
+  "The paper is fresh, but the address is an old one.",
+  "A small mark in the corner suggests the poster wants to be recognized.",
+  "The notice is signed with a nickname rather than a name.",
+  "It names no one, yet everyone asked already seems to know who posted it.",
+  "The posting has been rained on and re-posted, as if the offer matters that much.",
+]);
+
+/** Inert public reward labels; they carry no executable mechanic. */
+export const FREEFORM_QUEST_REWARD_LABELS: VariationPool<string> = Object.freeze([
+  "A promised day's wage",
+  "Payment on delivery",
+  "A favour owed in return",
+  "An agreed reward",
+  "A share of whatever is recovered",
+  "A modest fee, paid promptly",
+  "A promise of future work",
+  "A quiet settlement, in private",
+]);
+
+/** GM-only complications appended to the quest twist artifact; never public. */
+export const FREEFORM_QUEST_COMPLICATIONS: VariationPool<string> = Object.freeze([
+  "The real difficulty is not the task but who benefits if it fails.",
+  "A second party has already taken the same job and means to finish it first.",
+  "The person who posted the work is not the person the party will meet.",
+  "The task is a test, and the result matters more to the poster than the work itself.",
+  "The obvious lead is a decoy; the true one lies in what the poster did not write.",
+  "Someone close to the poster is quietly working against the offer.",
+  "The reward is real, but its source would embarrass whoever pays it.",
+  "The job connects to an older obligation the party has not yet noticed.",
 ]);
 
 /** Fail-closed reasons a declaration does not produce a materialization candidate. */
@@ -339,16 +444,22 @@ export function classifyFreeformQuest(input: {
     gmTwistKey: generatedArtifactKeySchema.parse(`ff-quest-twist-${digest.slice(0, 40)}`),
     locationKey: artifact.data,
     title,
-    description: fill(template.description, input.currentLocation.name),
+    description: appendSentences(
+      fill(template.description, input.currentLocation.name),
+      pickVariation(`${digest}:quest-texture`, FREEFORM_QUEST_TEXTURES),
+    ),
     objectives,
     reward: {
       key: generatedArtifactKeySchema.parse(`ffq-${digest.slice(0, 40)}-reward`),
-      label: template.rewardLabel,
+      label: pickVariation(`${digest}:quest-reward`, FREEFORM_QUEST_REWARD_LABELS),
       kind: "custom",
       amount: null,
       visibility: "public",
     },
-    gmTwist: fill(template.gmTwist, input.currentLocation.name),
+    gmTwist: appendSentences(
+      fill(template.gmTwist, input.currentLocation.name),
+      pickVariation(`${digest}:quest-complication`, FREEFORM_QUEST_COMPLICATIONS),
+    ),
     templateId: template.id,
     visibility: "public",
   };

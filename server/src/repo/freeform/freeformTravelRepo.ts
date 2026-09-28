@@ -50,6 +50,7 @@ import {
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
 import type { ActorTravelResult } from "../world/worldWriteRepo.js";
+import { appendSentences, pickVariation, type VariationPool } from "./freeformVariation.js";
 
 /** Maximum length of the player-supplied destination phrase. */
 export const MAX_FREEFORM_DESTINATION_LENGTH = 200;
@@ -154,6 +155,100 @@ function normalizeLocationName(value: string): string {
 }
 
 /**
+ * The closed, server-authored place-seed set. Each seed is a deterministic
+ * atmosphere template that selects on destination keywords; `{name}` is the
+ * bounded player phrase and `{from}` is the public source location name. No
+ * stats, prices, stock or catalog references appear here, and all text is public.
+ * The final entry is the keyword-less fallback.
+ */
+export interface FreeformTravelSeedTemplate {
+  readonly id: string;
+  /** Lowercase tokens that select this seed from the declared destination. */
+  readonly keywords: readonly string[];
+  /** Deterministic public description; `{name}` and `{from}` are filled from bounded input. */
+  readonly description: string;
+}
+
+export const FREEFORM_TRAVEL_SEEDS: readonly FreeformTravelSeedTemplate[] = Object.freeze([
+  Object.freeze({
+    id: "waterside", keywords: ["dock", "docks", "quay", "quays", "harbor", "harbour", "pier", "wharf", "waterfront", "river", "canal", "port", "shipyard"],
+    description: "The waterside of {name}, reached from {from}, where gulls wheel over wet stone and the air tastes of brine.",
+  }),
+  Object.freeze({
+    id: "market", keywords: ["market", "marketplace", "bazaar", "fair", "exchange", "shops", "trade"],
+    description: "The market of {name}, reached from {from}, loud with hawkers, hand-carts and the press of a bargaining crowd.",
+  }),
+  Object.freeze({
+    id: "sacred", keywords: ["temple", "church", "shrine", "chapel", "abbey", "monastery", "cathedral", "sanctuary"],
+    description: "A sacred place called {name}, reached from {from}, where voices drop without being asked and the stone holds the cold.",
+  }),
+  Object.freeze({
+    id: "gate", keywords: ["gate", "gates", "wall", "walls", "rampart", "barracks", "watchtower", "bastion", "checkpoint"],
+    description: "The gate-ground of {name}, reached from {from}, all trampled earth and banners that have seen better weather.",
+  }),
+  Object.freeze({
+    id: "garden", keywords: ["garden", "gardens", "grove", "park", "orchard", "meadow", "green", "arbor"],
+    description: "A green and growing place called {name}, reached from {from}, where the town's noise thins among the leaves.",
+  }),
+  Object.freeze({
+    id: "alley", keywords: ["alley", "alleys", "lane", "lanes", "warren", "warrens", "gutter", "backstreet", "slum", "rookery"],
+    description: "The narrow ways of {name}, reached from {from}, where washing lines cross overhead and every turn looks like the last.",
+  }),
+  Object.freeze({
+    id: "fortified", keywords: ["keep", "citadel", "castle", "tower", "fort", "fortress", "palace", "manor", "hall"],
+    description: "The fortified seat of {name}, reached from {from}, its walls speaking of a time when they were needed.",
+  }),
+  Object.freeze({
+    id: "underground", keywords: ["mine", "mines", "quarry", "cave", "caves", "cavern", "tunnel", "crypt", "cellar", "undercity"],
+    description: "The deep places of {name}, reached from {from}, where the light falls away and the air turns cool and still.",
+  }),
+  Object.freeze({
+    id: "roadside", keywords: ["road", "roads", "trail", "path", "highway", "bridge", "crossing", "waystation"],
+    description: "The road-place of {name}, reached from {from}, a stop for those arriving rather than a place to stay.",
+  }),
+  Object.freeze({
+    id: "district", keywords: [],
+    description: "A part of the settlement called {name}, reached from {from}, taking shape around you as you arrive.",
+  }),
+]);
+
+/**
+ * Public flavor pools appended to a new location description. Narrative only:
+ * no stats, prices, stock, catalog references or GM-only text.
+ */
+export const FREEFORM_LOCATION_MOODS: VariationPool<string> = Object.freeze([
+  "The mood is busy and indifferent to strangers.",
+  "The mood is quiet, as though the place is holding its breath.",
+  "The mood is watchful and slow to warm.",
+  "The mood is worn but stubbornly lived-in.",
+  "The mood is prosperous and quietly proud of it.",
+  "The mood is uneasy, the way a room is after an argument.",
+  "The mood is open and unhurried.",
+  "The mood is cramped and careful of its own business.",
+]);
+
+/** Public feature pools appended to a new location description. */
+export const FREEFORM_LOCATION_FEATURES: VariationPool<string> = Object.freeze([
+  "A painted sign over the way in has been repainted more than once.",
+  "Someone has chalked a mark on the corner post that no one hurries to wipe away.",
+  "The nearest door stands half open, as if the place expects visitors.",
+  "A bench beside the path has been worn smooth by long waiting.",
+  "The light falls in a way that makes the far end hard to read.",
+  "A small shrine or token sits where passersby can leave an offering.",
+  "The ground is swept clean in one place and left untended everywhere else.",
+  "A bell or whistle somewhere ahead marks time for the district.",
+]);
+
+/** Selects the first server-authored seed whose keyword matches a destination token; falls back to `district`. */
+export function selectFreeformTravelSeed(name: string): FreeformTravelSeedTemplate {
+  const tokens = new Set(normalizeLocationName(name).split(/[^a-z0-9]+/).filter(Boolean));
+  for (const template of FREEFORM_TRAVEL_SEEDS) {
+    if (template.keywords.some((keyword) => tokens.has(keyword))) return template;
+  }
+  return FREEFORM_TRAVEL_SEEDS[FREEFORM_TRAVEL_SEEDS.length - 1]!;
+}
+
+/**
  * Deterministic, server-owned classification. It never invents content: a
  * materialization candidate is only produced when the request names a place that
  * is not already known and the actor's current location is a generated public
@@ -182,6 +277,7 @@ export function classifyFreeformTravel(input: {
   if (!artifact?.success) return { intent: "none", reason: "current-location-unmapped" };
 
   const digest = sha256(`${input.identity}:${normalized}`);
+  const seedTemplate = selectFreeformTravelSeed(name);
   const candidate: FreeformTravelCandidate = {
     candidateId: `ffc-${digest.slice(0, 40)}`,
     locationKey: generatedArtifactKeySchema.parse(`ff-loc-${digest.slice(0, 40)}`),
@@ -190,7 +286,11 @@ export function classifyFreeformTravel(input: {
     fromLocationId: input.currentLocation.locationId,
     fromLocationName: input.currentLocation.name,
     name,
-    description: `A place first reached from ${input.currentLocation.name}.`,
+    description: appendSentences(
+      seedTemplate.description.replaceAll("{name}", name).replaceAll("{from}", input.currentLocation.name),
+      pickVariation(`${digest}:location-mood`, FREEFORM_LOCATION_MOODS),
+      pickVariation(`${digest}:location-feature`, FREEFORM_LOCATION_FEATURES),
+    ),
     visibility: "public",
   };
   return { intent: "materialize-location", destinationName: name, candidates: [candidate] };

@@ -62,6 +62,45 @@ Both routed commands in `server/src/repo/freeform/` follow the same shape:
   the trusted-local `local-owner` principal, require the `campaign` and
   `mechanics` flags, reject query parameters, and require `application/json`.
 
+## Deterministic variety
+
+Free-form materialization is deliberately repetitive at the identity level (the
+same declaration must always commit the same canon) but should not read as the
+same copy-pasted persona or place for every identity. The oracles therefore pair
+richer base text with a small deterministic variation layer
+(`server/src/repo/freeform/freeformVariation.ts`):
+
+- **Server-authored archetype/keyword tables.** Travel gains a closed place-seed
+  table (`FREEFORM_TRAVEL_SEEDS`), and the NPC, faction, quest, rumor and lore
+  tables gain additional archetypes/templates and keywords. Selection is still
+  first-match over declared tokens with a keyword-less fallback, so the closed
+  candidate set and its ordering stay server-owned.
+- **Seed-keyed variation.** `pickVariation(seed, pool)` maps a seed string onto a
+  non-empty pool using the first 32 bits of `sha256(seed)`. Callers seed it from
+  the existing durable identity digest
+  (`sha256(`${campaignId}:${sessionId}:${actorId}:${normalizedPhrase}`)`) plus a
+  per-slot salt (`:npc-detail`, `:faction-angle`, `:location-mood`, ...). It never
+  reads a clock, a random source or any mutable state.
+- **Replay safety.** The variation is baked into candidate fields that already flow
+  through the generation draft, so the content request digest stays a deterministic
+  function of the durable identity and phrase. A replay reads the committed
+  draft/artifact back (`replayMaterialization`) instead of re-running the picker,
+  so stored content is returned byte-identically and no second artifact is created.
+- **Invariant preservation.** Public and GM-only variation use separate pools:
+  public descriptions never receive a GM-only angle, secret or truth, and the apply
+  path still rejects a public artifact that depends on a GM-only artifact.
+  Variation text is narrative flavor only — `isFlavorOnly` asserts no digits and no
+  mechanics/price vocabulary — so it cannot smuggle in stats, items, prices or
+  stock. Shop prices remain the catalog's exact amounts, and the NPC baseline stats
+  remain the fixed `10,10,10,'generated-deterministic-baseline'`.
+
+The enriched oracles are: location place-seeds plus mood/feature pools; NPC
+archetypes, details, moods and GM angles; faction archetypes, public tells and GM
+angles; quest templates, public textures, inert reward labels and GM
+complications; rumor templates, hearsay textures and GM truths; lore templates,
+public textures and GM secrets; the shop notice atmosphere; and the encounter
+framing name.
+
 ## Travel to an unmapped location
 
 `POST /api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/actors/:actorId/freeform-travel-commands`

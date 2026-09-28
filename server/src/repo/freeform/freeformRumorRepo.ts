@@ -65,6 +65,7 @@ import {
   type PrivateGenerationDraft,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { appendSentences, pickVariation, type VariationPool } from "./freeformVariation.js";
 
 /** Maximum length of the player-supplied rumor subject phrase. */
 export const MAX_FREEFORM_RUMOR_SUBJECT_LENGTH = 160;
@@ -151,11 +152,60 @@ export const FREEFORM_RUMOR_TEMPLATES: readonly FreeformRumorTemplate[] = Object
     gmTruth: "The danger behind {subject} is real; {faction} holds the only reliable account and keeps it close.",
   }),
   Object.freeze({
+    id: "noble-talk", label: "Court talk",
+    keywords: ["noble", "court", "lord", "lady", "heir", "marriage", "inheritance", "succession", "scandal", "betrothal"],
+    publicText: "Among the better houses of {location} it is said that {subject}, and {source} is named as the source.",
+    gmTruth: "What is really true of {subject} is a matter of succession that {faction} is quietly arranging.",
+  }),
+  Object.freeze({
+    id: "temple-talk", label: "Temple talk",
+    keywords: ["temple", "priest", "shrine", "blessing", "omen", "relic", "pilgrimage", "prayer", "altar", "saint"],
+    publicText: "The devout of {location} repeat that {subject}, a sign they trace back to {source}.",
+    gmTruth: "The sign surrounding {subject} has a plain explanation that {faction} has chosen not to publish.",
+  }),
+  Object.freeze({
+    id: "road-talk", label: "Road talk",
+    keywords: ["road", "traveller", "traveler", "bridge", "toll", "pilgrim", "ferry", "waystone", "milestone", "highway"],
+    publicText: "Those on the road through {location} say that {subject}, and they heard it from {source}.",
+    gmTruth: "The road account of {subject} omits a detour; {faction} knows why that part is left out.",
+  }),
+  Object.freeze({
+    id: "underworld", label: "Underworld talk",
+    keywords: ["thieves", "undercity", "sewer", "fence", "blackmail", "cutpurse", "hideout", "broker", "racket"],
+    publicText: "In the lower talk of {location} the claim runs that {subject}, passed along by {source}.",
+    gmTruth: "The lower account of {subject} is close to true, which is why {faction} wants it traced to the wrong quarter.",
+  }),
+  Object.freeze({
     id: "local", label: "Local hearsay",
     keywords: [],
     publicText: "A claim going around {location} holds that {subject}, and people credit {source} for starting it.",
     gmTruth: "The truth of {subject} is known to {faction}, which prefers the version people are repeating.",
   }),
+]);
+
+/**
+ * Public flavor pools appended to a rumor's hearsay text. Narrative only: no
+ * stats, items, prices or catalog references, and nothing GM-only.
+ */
+export const FREEFORM_RUMOR_TEXTURES: VariationPool<string> = Object.freeze([
+  "The retelling has been polished smooth by repetition.",
+  "No two tellings agree on the middle of the story.",
+  "The speaker keeps glancing toward the nearest door.",
+  "It is the kind of claim that gets a table to lean in.",
+  "The story changes whenever a stranger joins the group.",
+  "It is told with the confidence of someone who heard it secondhand.",
+  "A few listeners nod as if they had already decided to believe it.",
+  "The telling is short, as though the speaker is being paid by the word not to linger.",
+]);
+
+/** GM-only truths appended to the rumor truth artifact; never public. */
+export const FREEFORM_RUMOR_TRUTHS: VariationPool<string> = Object.freeze([
+  "In fact the claim was started to hide a smaller, more embarrassing mistake.",
+  "In fact the account is a decoy, and the real event happened somewhere the story never mentions.",
+  "In fact only one witness survived, and that witness has been paid to stay quiet.",
+  "In fact the truth is duller than the rumor, which is exactly why the rumor is being encouraged.",
+  "In fact the story names the wrong culprit on purpose.",
+  "In fact the event was neither accident nor crime, but something the local powers arranged.",
 ]);
 
 /** Fail-closed reasons a declaration does not produce a materialization candidate. */
@@ -344,8 +394,14 @@ export function classifyFreeformRumor(input: {
     locationKey: artifact.data,
     subject,
     source,
-    publicText: fill(template.publicText, values),
-    gmTruth: fill(template.gmTruth, values),
+    publicText: appendSentences(
+      fill(template.publicText, values),
+      pickVariation(`${digest}:rumor-texture`, FREEFORM_RUMOR_TEXTURES),
+    ),
+    gmTruth: appendSentences(
+      fill(template.gmTruth, values),
+      pickVariation(`${digest}:rumor-truth`, FREEFORM_RUMOR_TRUTHS),
+    ),
     templateId: template.id,
     visibility: "public",
   };

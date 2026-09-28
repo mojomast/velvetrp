@@ -56,6 +56,7 @@ import {
   type PrivateGenerationDraft,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { appendSentences, pickVariation, type VariationPool } from "./freeformVariation.js";
 
 /** Maximum length of the player-supplied person/role phrase. */
 export const MAX_FREEFORM_NPC_NAME_LENGTH = 200;
@@ -133,9 +134,57 @@ export const FREEFORM_NPC_ARCHETYPES: readonly FreeformNpcArchetypeTemplate[] = 
   }),
   Object.freeze({
     id: "laborer", label: "Laborer",
-    keywords: ["laborer", "labourer", "porter", "dockhand", "ferryman", "stablehand", "servant", "cook", "fisher", "farmer", "groom", "miner"],
-    description: "A public laborer of {location}, getting through the day's work with a wary eye on strangers.",
+    keywords: ["laborer", "labourer", "porter", "dockhand", "ferryman", "stablehand", "servant", "cook", "fisher", "farmer", "groom", "miner", "longshoreman", "stevedore", "handyman"],
+    description: "A public laborer of {location}, getting through the day's work with a wary eye on strangers and a long memory for who pays on time.",
     gmGoals: "Trade gossip about the immediate district only for a small kindness or an honest answer.",
+  }),
+  Object.freeze({
+    id: "sailor", label: "Sailor",
+    keywords: ["sailor", "sailors", "mariner", "mariners", "deckhand", "boatman", "captain", "navigator", "dockmaster", "whaler", "rigger", "bosun"],
+    description: "A public sailor of {location}, reading the weather and the company with the same practised squint.",
+    gmGoals: "Talk freely of tides and cargo, but keep the crew's business close; test whether the party understands how the water works.",
+  }),
+  Object.freeze({
+    id: "hunter", label: "Hunter",
+    keywords: ["hunter", "hunters", "trapper", "tracker", "ranger", "falconer", "guide", "scout", "woodsman", "beastmaster"],
+    description: "A public hunter of {location}, patient with animals and considerably less so with people.",
+    gmGoals: "Weigh whether the party respects the land; share a trail or a warning only after they prove they will not waste it.",
+  }),
+  Object.freeze({
+    id: "performer", label: "Performer",
+    keywords: ["performer", "bard", "minstrel", "actor", "dancer", "acrobat", "juggler", "musician", "singer", "storyteller", "player", "tumbler"],
+    description: "A public performer of {location}, always half a step from the next laugh or the next exit.",
+    gmGoals: "Collect the room's secrets as readily as its applause; trade a flattering public story for a private truth.",
+  }),
+  Object.freeze({
+    id: "noble", label: "Noble",
+    keywords: ["noble", "nobles", "lord", "lady", "aristocrat", "magistrate", "envoy", "diplomat", "baron", "baroness", "count", "countess", "duke", "duchess", "heir", "steward"],
+    description: "A public noble of {location}, courteous in exactly the measure required and not a degree more.",
+    gmGoals: "Measure the party's usefulness and breeding; promise nothing in writing and remember every slight, real or imagined.",
+  }),
+  Object.freeze({
+    id: "beggar", label: "Beggar",
+    keywords: ["beggar", "beggars", "vagrant", "drifter", "urchin", "panhandler", "outcast", "leper", "mendicant", "tramp"],
+    description: "A public beggar of {location}, seeing far more of the street than anyone gives them credit for.",
+    gmGoals: "Trade street truth for a little food or a moment of respect; keep track of who is kind and who pretends not to look.",
+  }),
+  Object.freeze({
+    id: "outlaw", label: "Outlaw",
+    keywords: ["outlaw", "bandit", "cutpurse", "rogue", "smuggler", "brigand", "poacher", "raider", "highwayman", "fence"],
+    description: "A public outlaw of {location}, moving like someone who has learned which alleys have exits.",
+    gmGoals: "Probe whether the party can be bought, used or avoided; never name a partner or a route without a reason.",
+  }),
+  Object.freeze({
+    id: "courier", label: "Courier",
+    keywords: ["courier", "messenger", "herald", "runner", "postman", "crier", "dispatch"],
+    description: "A public courier of {location}, carrying more than letters and saying less than either.",
+    gmGoals: "Guard the contents and the route; decide whether the party is a safer hand than the last one.",
+  }),
+  Object.freeze({
+    id: "mercenary", label: "Mercenary",
+    keywords: ["mercenary", "mercenaries", "sellsword", "sellswords", "adventurer", "adventurers", "bravo", "freebooter", "blade", "fighter"],
+    description: "A public mercenary of {location}, weighing every stranger as a contract or a complication.",
+    gmGoals: "Price the party's courage and discipline; commit only for coin or a cause worth the risk, and keep a line of retreat.",
   }),
   Object.freeze({
     id: "bystander", label: "Bystander",
@@ -143,6 +192,47 @@ export const FREEFORM_NPC_ARCHETYPES: readonly FreeformNpcArchetypeTemplate[] = 
     description: "A public bystander of {location}, caught between curiosity and the wish to stay out of trouble.",
     gmGoals: "Avoid trouble; answer only what is asked and remember who was polite.",
   }),
+]);
+
+/**
+ * Public flavor pools appended to an NPC description. They are narrative only:
+ * no stats, items, prices or catalog references, and no GM-only text.
+ */
+export const FREEFORM_NPC_DETAILS: VariationPool<string> = Object.freeze([
+  "They keep a fixed habit of watching the door.",
+  "A faded token of some old allegiance hangs at their collar.",
+  "They speak in short, measured sentences and let the silences do the rest.",
+  "Their sleeves are rolled with the ease of someone used to work.",
+  "A small old scar catches the light when they turn their head.",
+  "They keep their tools close and their opinions closer.",
+  "There is a story they clearly will not tell, and they watch to see if you ask.",
+  "They read the room before they answer even a simple question.",
+  "Their voice is soft, but they repeat a point until it is understood.",
+  "They wear the local fashion a shade too carefully, as if it were borrowed.",
+]);
+
+/** Public mood pools appended to an NPC description. */
+export const FREEFORM_NPC_MOODS: VariationPool<string> = Object.freeze([
+  "Their manner is brisk and businesslike.",
+  "Their manner is slow to trust but not unfriendly.",
+  "Their manner is dryly amused at the world's expense.",
+  "Their manner is guardedly polite.",
+  "Their manner is openly curious about strangers.",
+  "Their manner is weary but watchful.",
+  "Their manner is blunt to the point of rudeness.",
+  "Their manner is unhurried and deliberate.",
+]);
+
+/** GM-only private angles appended to the NPC goal artifact; never public. */
+export const FREEFORM_NPC_PRIVATE_ANGLES: VariationPool<string> = Object.freeze([
+  "Privately, they are deciding whether the party is useful or merely trouble.",
+  "Privately, they carry an obligation to someone the party has not met.",
+  "Privately, they are waiting for a signal that has not yet come.",
+  "Privately, they blame themselves for something the party might uncover.",
+  "Privately, they are weighing whether to pass the party's names along.",
+  "Privately, they want the party to leave before a certain question is asked.",
+  "Privately, they are protecting a secret that is not theirs to keep.",
+  "Privately, they see an opportunity in the party's arrival.",
 ]);
 
 /** Fail-closed reasons a declaration does not produce a materialization candidate. */
@@ -281,8 +371,12 @@ export function classifyFreeformNpc(input: {
     factionKeys: [...(input.currentLocation.factionKeys ?? [])],
     name,
     archetype: template.label,
-    description: template.description.replaceAll("{location}", input.currentLocation.name),
-    gmGoals: template.gmGoals,
+    description: appendSentences(
+      template.description.replaceAll("{location}", input.currentLocation.name),
+      pickVariation(`${digest}:npc-detail`, FREEFORM_NPC_DETAILS),
+      pickVariation(`${digest}:npc-mood`, FREEFORM_NPC_MOODS),
+    ),
+    gmGoals: appendSentences(template.gmGoals, pickVariation(`${digest}:npc-angle`, FREEFORM_NPC_PRIVATE_ANGLES)),
     visibility: "public",
   };
   return { intent: "materialize-npc", npcName: name, candidates: [candidate] };

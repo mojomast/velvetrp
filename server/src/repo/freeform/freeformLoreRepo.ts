@@ -66,6 +66,7 @@ import {
   type PrivateGenerationDraft,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { appendSentences, pickVariation, type VariationPool } from "./freeformVariation.js";
 
 /** Maximum length of the player-supplied lore/clue subject phrase. */
 export const MAX_FREEFORM_LORE_SUBJECT_LENGTH = 160;
@@ -137,11 +138,60 @@ export const FREEFORM_LORE_TEMPLATES: readonly FreeformLoreTemplate[] = Object.f
     gmSecret: "The custom tied to {subject} exists because of an unrecorded agreement between {faction} and an outside party.",
   }),
   Object.freeze({
+    id: "war", label: "War",
+    keywords: ["war", "battle", "siege", "army", "invasion", "retreat", "conquest", "campaign", "rebellion", "uprising"],
+    publicText: "The people of {location} keep a careful account of {subject}, mostly in the passive voice.",
+    gmSecret: "The account of {subject} omits a surrender that {faction} has spent years denying ever happened.",
+  }),
+  Object.freeze({
+    id: "blessing", label: "Blessing",
+    keywords: ["blessing", "miracle", "relic", "saint", "shrine", "consecration", "votive", "revelation"],
+    publicText: "A local devotion in {location} ties {subject} to a blessing no one can quite date.",
+    gmSecret: "The blessing around {subject} was declared retroactively; {faction} needed the story to be older than it is.",
+  }),
+  Object.freeze({
+    id: "bargain", label: "Bargain",
+    keywords: ["bargain", "pact", "oath", "wager", "debt", "covenant", "accord", "compact"],
+    publicText: "An old bargain in {location} still shapes what people do about {subject}, though no one recites its terms.",
+    gmSecret: "The bargain over {subject} was broken once already, and {faction} is the side that has not admitted it.",
+  }),
+  Object.freeze({
+    id: "discovery", label: "Discovery",
+    keywords: ["map", "chart", "route", "passage", "cache", "vault", "archive", "ledger", "survey"],
+    publicText: "A discovery linked to {location} concerns {subject}, and the finder's account is the only one people trust.",
+    gmSecret: "The discovery of {subject} was not the first; {faction} removed an earlier account to keep the claim clean.",
+  }),
+  Object.freeze({
     id: "local", label: "Local rumor",
     keywords: [],
     publicText: "A half-remembered local rumor of {location} concerns {subject}.",
     gmSecret: "The rumor about {subject} is partly true; {faction} holds the rest of the account.",
   }),
+]);
+
+/**
+ * Public flavor pools appended to a lore/clue's public text. Narrative only: no
+ * stats, items, prices, enemies or catalog references, and nothing GM-only.
+ */
+export const FREEFORM_LORE_TEXTURES: VariationPool<string> = Object.freeze([
+  "The version told in {location} is shorter than the one written down elsewhere.",
+  "Every telling adds a small detail the last one lacked.",
+  "The account is repeated with the same hesitation in the same place.",
+  "It is the sort of story that gets told after the second drink, not the first.",
+  "The telling is careful until it reaches the part no one can agree on.",
+  "A local version and an outside version disagree on the ending.",
+  "The story is usually told to warn, not to inform.",
+  "It survives mainly because no one has a better explanation.",
+]);
+
+/** GM-only truths appended to the lore truth artifact; never public. */
+export const FREEFORM_LORE_SECRETS: VariationPool<string> = Object.freeze([
+  "The part left out is the part {faction} arranged personally.",
+  "The true record was deliberately split so that no single keeper holds it whole.",
+  "What actually happened is duller, and more damning, than the story.",
+  "The story is accurate except for the name at its center.",
+  "The missing detail points at a place the story never names.",
+  "The account was rewritten once already, and the rewrite is the version people repeat.",
 ]);
 
 /** Fail-closed reasons a declaration does not produce a materialization candidate. */
@@ -282,6 +332,7 @@ export function classifyFreeformLore(input: {
   const template = selectFreeformLoreTemplate(subject);
   const faction = input.currentLocation.factionNames?.find((value) => value.trim().length > 0) ?? "the local powers";
   const digest = sha256(`${input.identity}:${normalized}`);
+  const fillValues = { subject, location: input.currentLocation.name, faction };
   const candidate: FreeformLoreCandidate = {
     candidateId: `ffl-${digest.slice(0, 40)}`,
     sourceNodeKey: generatedArtifactKeySchema.parse(`ff-lore-source-${digest.slice(0, 40)}`),
@@ -289,8 +340,14 @@ export function classifyFreeformLore(input: {
     gmSecretKey: generatedArtifactKeySchema.parse(`ff-lore-truth-${digest.slice(0, 40)}`),
     locationKey: artifact.data,
     title: subject,
-    publicText: fill(template.publicText, { subject, location: input.currentLocation.name, faction }),
-    gmSecret: fill(template.gmSecret, { subject, location: input.currentLocation.name, faction }),
+    publicText: appendSentences(
+      fill(template.publicText, fillValues),
+      fill(pickVariation(`${digest}:lore-texture`, FREEFORM_LORE_TEXTURES), fillValues),
+    ),
+    gmSecret: appendSentences(
+      fill(template.gmSecret, fillValues),
+      fill(pickVariation(`${digest}:lore-secret`, FREEFORM_LORE_SECRETS), fillValues),
+    ),
     templateId: template.id,
     visibility: "public",
   };
