@@ -558,7 +558,7 @@ function narrationEventsOf(phases: Array<{ phase: "initial" | "resume"; narratio
 // ---------------------------------------------------------------------------------------------
 
 export interface EvalOptions {
-  dataDir?: string;
+  dataDir?: string | undefined;
   turns: number;
   seed: number;
   port: number;
@@ -936,9 +936,9 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
 
 export interface BaseUrlOptions {
   baseUrl: string;
-  campaignId?: string;
-  sessionId?: string;
-  actorId?: string;
+  campaignId?: string | undefined;
+  sessionId?: string | undefined;
+  actorId?: string | undefined;
   turns: number;
   out: string;
   baseline: BaselineMetrics | null;
