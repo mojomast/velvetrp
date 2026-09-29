@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { adaptCompletionBodyForKnownEndpoint, completeWithProvider } from "../src/provider/openAiCompatibleCompletion.js";
+import { adaptCompletionBodyForKnownEndpoint, completeWithProvider, rejectsToolResultReplay } from "../src/provider/openAiCompatibleCompletion.js";
 import { isAuthorizedHttpProviderBaseUrl } from "../src/provider/providerTransport.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { getPromptPreset } from "../src/presets.js";
@@ -49,6 +49,20 @@ describe("authorized live-validation endpoint detection", () => {
     expect(isAuthorizedHttpProviderBaseUrl("https://100.72.41.9:8787/v1")).toBe(false);
     expect(isAuthorizedHttpProviderBaseUrl(LOOPBACK)).toBe(false);
     expect(isAuthorizedHttpProviderBaseUrl("not-a-url")).toBe(false);
+  });
+});
+
+describe("known thinking-endpoint tool-result replay", () => {
+  it("marks only the authorized router's deepseek-v4 family as refusing a tool-result transcript", () => {
+    expect(rejectsToolResultReplay(ROUTER, "deepseek-v4-flash")).toBe(true);
+    expect(rejectsToolResultReplay(`${ROUTER}/`, "deepseek-v4-pro")).toBe(true);
+    // Any other model on the same router keeps a standard OpenAI tool-result transcript.
+    expect(rejectsToolResultReplay(ROUTER, "gpt-6-astra")).toBe(false);
+    // The known model on any other endpoint is not assumed to reject tool results.
+    for (const baseUrl of [LOOPBACK, "https://api.openai.com/v1", "https://openrouter.ai/api/v1"]) {
+      expect(rejectsToolResultReplay(baseUrl, "deepseek-v4-flash")).toBe(false);
+    }
+    expect(rejectsToolResultReplay("not-a-url", "deepseek-v4-flash")).toBe(false);
   });
 });
 

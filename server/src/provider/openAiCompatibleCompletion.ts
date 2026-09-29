@@ -348,6 +348,19 @@ export function adaptCompletionBodyForKnownEndpoint(
   return "auto";
 }
 
+/**
+ * Whether this endpoint/model pair refuses a standard OpenAI tool-result transcript. The
+ * thinking-mode `deepseek-v4-*` upstream reachable through the authorized live-validation router
+ * requires its private `content[].thinking` block on every assistant tool-call turn, which an
+ * OpenAI-compatible transcript cannot reconstruct, so a caller that would replay tool results must
+ * instead fold the read-only observations into a non-tool turn. False everywhere else: ordinary
+ * OpenAI-compatible providers accept a standard function/tool transcript, and the canonical
+ * tool-result messages must be preserved there.
+ */
+export function rejectsToolResultReplay(baseUrl: string, model: string): boolean {
+  return isAuthorizedHttpProviderBaseUrl(baseUrl) && THINKING_ROUTER_REASONING_MODEL.test(model.trim());
+}
+
 interface ResponseToolPolicy {
   advertisedNames: ReadonlySet<string>;
   decodeName: (name: string) => string;

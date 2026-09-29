@@ -7,6 +7,7 @@ import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.j
 import { dmReadToolSchemas, parseDmReadCall } from "../src/agent/dmReadTools.js";
 import type { ProviderCompletionInput, ProviderCompletionResult } from "../src/provider/index.js";
 import { dmCompletion, dmDependencies, dmFixture } from "./fixtures/dmCampaign.js";
+import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -145,6 +146,35 @@ describe("grounded director planning loop", () => {
     const db = database();
     const rounds = db.prepare("SELECT round,status FROM dm_planning_rounds WHERE run_id=? ORDER BY round").all(run.runId) as { round: number; status: string }[];
     expect(rounds).toEqual([{ round: 1, status: "settled" }, { round: 2, status: "settled" }]);
+    db.close(); f.repo.close();
+  });
+
+  it("folds grounding observations into a user turn instead of replaying tool results on the known thinking endpoint", async () => {
+    const f = await dmFixture(); f.graph();
+    f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "thinking-ai" });
+    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, { intent: "open", expectedModeRevision: 1, idempotencyKey: "thinking-fold" });
+    const planning: ProviderCompletionInput[] = [];
+    const complete = vi.fn(async (input: ProviderCompletionInput): Promise<ProviderCompletionResult> => {
+      if (input.promptVersion === "campaign-dm-narration-v1") return dmCompletion(input);
+      planning.push(input);
+      if (planning.length === 1) return readResult("read_public_world", {}, "read-1");
+      // The thinking upstream never receives a tool-result transcript, so it can never demand a
+      // private thinking block that an OpenAI-compatible transcript cannot replay.
+      expect(input.messages.some((message) => message.role === "tool")).toBe(false);
+      expect(input.messages.some((message) => message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0)).toBe(false);
+      const folded = input.messages.filter((message) => message.role === "user").map((message) => message.content).join("\n");
+      expect(folded).toContain("Read-only grounding tool results already collected");
+      expect(folded).toContain("read_public_world");
+      return dmCompletion(input, "reveal-node");
+    });
+    const provider = { ...defaultProviderSettings(), baseUrl: "http://100.72.41.9:8787/v1", model: "deepseek-v4-flash" };
+    const deps = { complete, getProvider: async () => provider, getHarness: async () => defaultHarnessSettings(), now: () => new Date() };
+    await orchestrateCampaignDmBeat(f.repo, "local-owner", run.runId, deps);
+    expect(planning).toHaveLength(2);
+    expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, run.runId).state).toBe("completed");
+    const db = database();
+    const rounds = db.prepare("SELECT round,status FROM dm_planning_rounds WHERE run_id=? ORDER BY round").all(run.runId) as { round: number; status: string }[];
+    expect(rounds).toEqual([{ round: 1, status: "settled" }]);
     db.close(); f.repo.close();
   });
 });
