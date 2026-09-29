@@ -672,6 +672,69 @@ function initiateCombatFromDeclaration(repository: Repository, turn: PrivateAdve
   }
 }
 
+/**
+ * True when a declaration only addresses a person and names no other observable action family.
+ * This is the narrow shape where an unknown person must be materialized or held: the declaration
+ * has no advertised action to commit, so a provider-chosen social check would be a fabricated
+ * target. A compound declaration that also names a real action keeps the unchanged flow.
+ */
+function isPurePersonContactDeclaration(declaration: string): boolean {
+  const intent = declarationIntent(declaration);
+  return !(intent.commerce || intent.give || intent.rest || intent.check || intent.combat
+    || intent.travel || intent.quest || intent.progression);
+}
+
+/**
+ * Bounded deterministic resolution for a pure person-contact declaration that addresses someone the
+ * prepared campaign never defined ("I approach a hooded stranger..."). The server-owned freeform
+ * classifier (the same closed grammar the materialization lane uses) decides whether the declaration
+ * names an unknown person; this helper only consumes that verdict.
+ *
+ * When the classifier authorizes a candidate, the receipted, idempotent freeform lane materializes
+ * exactly that server-authored public archetype, keeping any GM-only goals in a separate `gm`
+ * artifact. When it does not (the person has no generated public place, or the materialization is
+ * refused), the turn holds. Either way the turn never advertises or commits a check against a
+ * nonexistent persona, never invents stats, and never lets the provider pick the target.
+ *
+ * Returns an orchestrator result when the declaration is an unknown-person declaration, else null
+ * so the unchanged flow continues. The classifier never throws for a player-controlled actor; an
+ * authorization or availability failure falls through to the same unchanged flow.
+ */
+function resolveUnknownPersonDeclaration(repository: Repository, turn: PrivateAdventureTurn): AdventureAgentResult | null {
+  let classification: ReturnType<Repository["classifyFreeformNpcIntent"]>;
+  try {
+    classification = repository.classifyFreeformNpcIntent(OWNER, turn.campaignId, turn.sessionId, turn.actorId, turn.declaration);
+  } catch {
+    return null;
+  }
+  const namesUnknownPerson = classification.intent === "materialize-npc"
+    || (classification.intent === "none"
+      && (classification.reason === "current-location-unmapped" || classification.reason === "no-current-location"));
+  // A pure declaration that now names a known person is left to the unchanged flow, except that a
+  // prior attempt of this same declaration may already have materialized that person (a crash
+  // between the content commit and the turn response). Materialization is idempotent, so it either
+  // replays the same durable draft or declines for a pre-existing campaign person.
+  const mayReplayMaterialization = classification.intent === "none" && classification.reason === "known-npc";
+  if (!namesUnknownPerson && !mayReplayMaterialization) return null;
+  let materializedName: string | null = null;
+  if (classification.intent === "materialize-npc" || mayReplayMaterialization) {
+    try {
+      const materialized = repository.materializeFreeformNpc(OWNER, turn.campaignId, turn.sessionId, turn.actorId,
+        turn.declaration, classification.intent === "materialize-npc" ? { candidateId: classification.candidates[0]!.candidateId } : {});
+      if (materialized.status === "materialized") materializedName = materialized.candidate.name;
+    } catch {
+      // A refused or unavailable materialization keeps the honest hold below; nothing is committed.
+    }
+  }
+  if (!namesUnknownPerson && materializedName === null) return null;
+  const subject = materializedName ?? (classification.intent === "materialize-npc" ? classification.npcName : "the person");
+  const message = materializedName
+    ? `A new face appears: ${subject}. The declaration addresses someone the campaign had not defined, so the server introduced that person instead of rolling a check against a stranger.`
+    : `The declaration addresses ${subject}, who is not part of the campaign yet and cannot be introduced from the current state. No check can be rolled against a person the campaign has not defined.`;
+  return { turn: privateTurn(repository, turn.turnId), outcome: "completed", limitations: ADVENTURE_TOOL_LIMITATIONS,
+    hold: { reason: "unknown-person", message, suggestedNextStep: null, suggestedCandidateId: null } };
+}
+
 function selectAudience(repository: Repository, turn: PrivateAdventureTurn): { audience: CampaignAgentAudience; snapshot: CampaignAgentContextSnapshot } {
   const playerAudience: CampaignAgentAudience = { kind: "player", actorId: turn.actorId };
   const player = repository.getCampaignAgentContextSnapshot(OWNER, turn.campaignId, turn.sessionId, playerAudience);
@@ -1031,7 +1094,7 @@ export function locationBoundCandidatesAllowed(reference: DeclarationLocationRef
 
 /** The bounded machine description of a deliberate provider hold. */
 export interface AdventureHold {
-  reason: "location-mismatch" | "already-at-location" | "pending-compound-step" | "no-advertised-match";
+  reason: "location-mismatch" | "already-at-location" | "pending-compound-step" | "no-advertised-match" | "unknown-person";
   message: string;
   suggestedNextStep: string | null;
   suggestedCandidateId: string | null;
@@ -1460,6 +1523,15 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     try{selectedContext=selectAudience(repository,turn);snapshot=selectedContext.snapshot;}
     catch{return {turn,outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};}
     if(!snapshot.ruleset)return {turn,outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};
+  }
+  // A pure person-contact declaration that names someone the prepared campaign never defined must
+  // not resolve as a skill check against a nonexistent persona. The server either materializes the
+  // person through the existing receipted freeform lane or holds with a clear reason; the provider
+  // never gets to advertise or commit a social check against a target that does not exist.
+  if(snapshot.audience.kind==="player"&&snapshot.audience.actorId===turn.actorId
+      &&snapshot.authority.control!=="none"&&!snapshot.encounter&&isPurePersonContactDeclaration(turn.declaration)){
+    const unknownPerson=resolveUnknownPersonDeclaration(repository,turn);
+    if(unknownPerson)return unknownPerson;
   }
   let provider: ProviderSettings; let harness: HarnessSettings;
   try {
