@@ -49,11 +49,20 @@ and applied atomically, then its starting location is auto-designated from the o
   materialized.
 - **Vendor:** a deterministic server-authored shop (`materializeFreeformShop`) bound to
   Bran Ironhand with 8 stock lines drawn from the pinned SRD 5.1 item catalog.
+- **Commerce:** every party actor holds a funded wallet (`rpg_wallets_v25`) in the vendor
+  shop's priced currency — at least the most expensive stocked line (floor 5000 minor
+  units) — and the bound shop carries a positive buy policy (`rpg_shop_buy_policies_v57`)
+  on its stock. Without a wallet the commerce lane emits no buy candidate; without a policy the
+  vendor cannot buy from the party. A declared purchase therefore flows through the normal
+  confirmation → commerce path with no silent spend.
 - **Encounter anchor:** a public encounter at The Cinder Camp with an exact pinned
   `srd-5.1:enemy-template:goblin` reference. A second GM-only wood encounter pins
   `srd-5.1:enemy-template:wolf`.
 - **Party:** 3 finalized SRD 5.1 level-one characters (Tamsin Rook, Halvard Grim, Ysolde
-  Fen), each with a durable campaign sheet, all placed at the starting location.
+  Fen), each with a durable campaign sheet, all placed at and having discovered the starting
+  location (so the agent context has an authoritative current location). The read-back
+  summary reports each actor's `name` from the authoritative persona row keyed by
+  `personaId`, never from actor iteration order.
 - **Room/campaign:** one active attached room, campaign `published`, DM mode `ai`.
 
 ## Build and launch
@@ -109,8 +118,10 @@ The test asserts: campaign published, DM mode `ai`, one active room, 2-4 finaliz
 sheets, a public accepted artifact and public `campaign_locations_v28` row for every required
 location, reciprocal open public connections for every intended pair, a designated starting
 location matching the outline, public factions/NPCs-with-locations/quests-with-objectives/
-rumors, an encounter anchor with a pinned hostile, a stocked vendor bound to the smith, party
-placement on a public-artifact-backed location, and presence/relationship coverage.
+rumors, an encounter anchor with a pinned hostile, a stocked vendor bound to the smith, a
+funded positive wallet for every party actor in the vendor's currency, a vendor buy policy,
+reported actor names that match their `personaId` persona row, party placement on a
+public-artifact-backed location, and presence/relationship coverage.
 
 ## Optional live additions
 

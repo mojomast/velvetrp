@@ -23,6 +23,13 @@ export const PLAYTEST_WORLD_CAMPAIGN_NAME = "The Hollowford Reach [playtest:holl
 export const PLAYTEST_WORLD_ROOM_TITLE = "Hollowford Reach - Live Table";
 export const PLAYTEST_WORLD_SEED_VERSION = "hollowford-v1";
 export const PLAYTEST_WORLD_DM_MODE = "ai" as const;
+/**
+ * Floor for every party wallet, in the vendor shop's priced currency. The builder
+ * funds each wallet with at least the most expensive stocked line, so this floor is
+ * raised whenever the materialized shop stocks a pricier item. It guarantees the
+ * commerce lane emits affordable buy candidates rather than no candidates at all.
+ */
+export const PLAYTEST_WORLD_PARTY_WALLET_MINOR = 5_000;
 
 /** Party personas; finalized into durable campaign characters with level-one sheets. */
 export const PLAYTEST_WORLD_PARTY = [
@@ -64,6 +71,9 @@ export interface PlaytestWorldResult {
     publicEncounterArtifacts: number;
     connections: number;
     shopStock: number;
+    partyWallets: number;
+    shopBuyPolicies: number;
+    locationDiscoveries: number;
     presenceEvents: number;
     npcRelationships: number;
   };
@@ -263,6 +273,25 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
         { server_resource_id: string | null } | undefined)?.server_resource_id;
       if (!vendorNpcId) throw new Error("playtest vendor NPC is unavailable");
       const shop = repository.materializeFreeformShop(OWNER, campaign.id, session.id, actors[0]!.actorId, vendorNpcId);
+      if (shop.status !== "materialized") throw new Error(`playtest vendor shop could not be materialized: ${shop.reason}`);
+
+      // Commerce: fund every party wallet in the shop's priced currency and grant the
+      // vendor a positive buy policy on its stock. Without a wallet the commerce lane
+      // emits no buy candidate (and the party cannot pay); without a buy policy the
+      // vendor cannot buy back from the party. The wallet insert mirrors the in-process
+      // deterministic economy fixture (`materializeEconomyGraph`).
+      const walletCurrency = shop.stock.find((line) => line.unitPriceMinor > 0)?.currencyCode ?? shop.stock[0]?.currencyCode;
+      if (!walletCurrency) throw new Error("playtest vendor shop has no priced stock to fund wallets");
+      const walletMinor = Math.max(PLAYTEST_WORLD_PARTY_WALLET_MINOR, ...shop.stock.map((line) => line.unitPriceMinor));
+      const fundedAt = new Date().toISOString();
+      const fundWallet = db.prepare(`INSERT INTO rpg_wallets_v25(campaign_id,actor_id,currency_code,balance_minor,updated_at)
+        VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,currency_code) DO UPDATE
+        SET balance_minor=excluded.balance_minor,updated_at=excluded.updated_at`);
+      for (const actor of actors) fundWallet.run(campaign.id, actor.actorId, walletCurrency, walletMinor, fundedAt);
+      for (const line of shop.stock) {
+        const payout = line.unitPriceMinor > 0 ? Math.max(1, Math.floor(line.unitPriceMinor / 2)) : 0;
+        repository.setShopBuyPolicy(OWNER, campaign.id, shop.shopId, line.stockId, payout);
+      }
 
       // NPC presence and a few relationships.
       let cast = repository.getNpcCast(OWNER, campaign.id, session.id);
@@ -315,20 +344,31 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
         idempotencyKey: "playtest.hollowford.relationship.edda",
       });
 
-      // Place the whole party at the designated starting location.
+      // Place the whole party at the designated starting location and record that
+      // each actor has discovered it. The discovery row mirrors
+      // `placeFinalizedActorAtCampaignStartV51`; without it the agent context has no
+      // authoritative current location and any place-naming declaration is held.
+      const worldRevision = (): number => (db.prepare("SELECT revision FROM world_mutation_revisions_v28 WHERE campaign_id=? AND session_id=?")
+        .get(campaign.id, session.id) as { revision: number } | undefined)?.revision ?? 0;
       for (const [index, actor] of actors.entries()) {
         const existingPlacement = db.prepare("SELECT 1 FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?")
           .get(campaign.id, actor.actorId);
         if (existingPlacement) continue;
-        const expectedRevision = (db.prepare("SELECT revision FROM world_mutation_revisions_v28 WHERE campaign_id=? AND session_id=?")
-          .get(campaign.id, session.id) as { revision: number } | undefined)?.revision ?? 0;
         repository.setActorLocation(OWNER, session.id, {
           type: "set_actor_location",
           campaignId: campaign.id,
           actorId: actor.actorId,
           locationId: locationIds[PLAYTEST_WORLD_START_LOCATION_KEY]!,
-          expectedRevision,
+          expectedRevision: worldRevision(),
           idempotencyKey: `playtest.hollowford.place.${index}`,
+        });
+        repository.executeWorldCommand(OWNER, session.id, {
+          type: "discover_location",
+          campaignId: campaign.id,
+          actorId: actor.actorId,
+          locationId: locationIds[PLAYTEST_WORLD_START_LOCATION_KEY]!,
+          expectedRevision: worldRevision(),
+          idempotencyKey: `playtest.hollowford.discover.${index}`,
         });
       }
 
@@ -369,15 +409,22 @@ export function summarizePlaytestWorld(dataDir: string, campaignId: string): Pla
     const session = db.prepare(`SELECT attached.session_id FROM campaign_sessions attached
       WHERE attached.campaign_id=? ORDER BY attached.attached_at,session_id LIMIT 1`).get(campaignId) as { session_id: string } | undefined;
     if (!session) throw new Error("playtest room is unavailable");
-    const actors = (db.prepare(`SELECT actor.id actor_id,actor.campaign_character_id,campaign_character.character_id persona_id
-      FROM campaign_actors actor JOIN campaign_characters campaign_character
+    // The persona name is read from the authoritative `characters` row the campaign
+    // character points at, never from creation order. Actor ids are generated, so a
+    // positional lookup mislabels actors (the reported `name` must track `personaId`).
+    const actors = (db.prepare(`SELECT actor.id actor_id,actor.campaign_character_id,campaign_character.character_id persona_id,
+        persona.name persona_name
+      FROM campaign_actors actor
+      JOIN campaign_characters campaign_character
         ON campaign_character.id=actor.campaign_character_id AND campaign_character.campaign_id=actor.campaign_id
-      WHERE actor.campaign_id=? ORDER BY actor.id`).all(campaignId) as Array<{ actor_id: string; campaign_character_id: string; persona_id: string }>)
-      .map((row, index) => ({
+      JOIN characters persona ON persona.id=campaign_character.character_id
+      WHERE actor.campaign_id=? ORDER BY persona.name,actor.id`).all(campaignId) as Array<
+        { actor_id: string; campaign_character_id: string; persona_id: string; persona_name: string }>)
+      .map((row) => ({
         actorId: row.actor_id,
         campaignCharacterId: row.campaign_character_id,
         personaId: row.persona_id,
-        name: PLAYTEST_WORLD_PARTY[index]?.name ?? `actor-${index + 1}`,
+        name: row.persona_name,
       }));
     if (actors.length === 0) throw new Error("playtest party is unavailable");
 
@@ -416,6 +463,11 @@ export function summarizePlaytestWorld(dataDir: string, campaignId: string): Pla
         WHERE campaign_id=? AND artifact_kind='encounter' AND visibility='public'`, campaignId),
       connections: count("SELECT count(*) count FROM campaign_location_connections_v28 WHERE campaign_id=?", campaignId),
       shopStock: count("SELECT count(*) count FROM rpg_shop_stock_v25 WHERE campaign_id=? AND shop_id=?", campaignId, vendorRow.shop_id),
+      partyWallets: count(`SELECT count(*) count FROM rpg_wallets_v25 wallet
+        JOIN campaign_actors actor ON actor.campaign_id=wallet.campaign_id AND actor.id=wallet.actor_id
+        WHERE wallet.campaign_id=? AND wallet.balance_minor>0`, campaignId),
+      shopBuyPolicies: count("SELECT count(*) count FROM rpg_shop_buy_policies_v57 WHERE campaign_id=? AND shop_id=?", campaignId, vendorRow.shop_id),
+      locationDiscoveries: count("SELECT count(*) count FROM campaign_location_discoveries_v28 WHERE campaign_id=?", campaignId),
       presenceEvents: count("SELECT count(*) count FROM npc_presence_events_v43 WHERE campaign_id=?", campaignId),
       npcRelationships: count(`SELECT count(*) count FROM world_narrative_events_v32
         WHERE campaign_id=? AND event_type='npc_relationship_changed'`, campaignId),

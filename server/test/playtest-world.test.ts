@@ -14,6 +14,7 @@ import {
 import {
   PLAYTEST_WORLD_CAMPAIGN_NAME,
   PLAYTEST_WORLD_DM_MODE,
+  PLAYTEST_WORLD_PARTY,
   buildPlaytestWorld,
   summarizePlaytestWorld,
 } from "./fixtures/playtestWorld.js";
@@ -163,11 +164,45 @@ describe("playtest world fixture", () => {
         .get(created.campaignId, created.vendor.npcId) as { shop_id: string } | undefined;
       expect(binding?.shop_id).toBe(created.vendor.shopId);
 
-      // Party is standing on a public accepted-artifact-backed location.
+      // Commerce is provisioned: every party actor holds a positive wallet in the
+      // vendor's priced currency and the bound vendor has a buy policy on stock.
+      const vendorCurrency = (db.prepare(`SELECT currency_code FROM rpg_shop_stock_v25
+        WHERE campaign_id=? AND shop_id=? AND unit_price_minor>0 ORDER BY stock_id LIMIT 1`)
+        .get(created.campaignId, created.vendor.shopId) as { currency_code: string } | undefined)?.currency_code;
+      expect(vendorCurrency).toBeTruthy();
+      expect(created.counts.partyWallets).toBeGreaterThanOrEqual(created.actors.length);
+      expect(created.counts.shopBuyPolicies).toBeGreaterThanOrEqual(1);
+      const policy = db.prepare(`SELECT currency_code,payout_unit_minor FROM rpg_shop_buy_policies_v57
+        WHERE campaign_id=? AND shop_id=? ORDER BY stock_id LIMIT 1`)
+        .get(created.campaignId, created.vendor.shopId) as { currency_code: string; payout_unit_minor: number } | undefined;
+      expect(policy?.currency_code).toBe(vendorCurrency);
+      for (const actor of created.actors) {
+        const wallet = db.prepare(`SELECT balance_minor FROM rpg_wallets_v25
+          WHERE campaign_id=? AND actor_id=? AND currency_code=?`)
+          .get(created.campaignId, actor.actorId, vendorCurrency!) as { balance_minor: number } | undefined;
+        expect(wallet?.balance_minor, `wallet for ${actor.name}`).toBeGreaterThan(0);
+        // The reported name must track the authoritative persona row, not actor order.
+        const persona = db.prepare(`SELECT persona.name name FROM campaign_actors actor
+          JOIN campaign_characters cc ON cc.id=actor.campaign_character_id AND cc.campaign_id=actor.campaign_id
+          JOIN characters persona ON persona.id=cc.character_id
+          WHERE actor.campaign_id=? AND actor.id=?`)
+          .get(created.campaignId, actor.actorId) as { name: string } | undefined;
+        expect(actor.personaId, `persona id for ${actor.name}`).toBeTruthy();
+        expect(actor.name, `reported name for actor ${actor.actorId}`).toBe(persona?.name);
+      }
+      expect(created.actors.map((actor) => actor.name).sort()).toEqual(
+        PLAYTEST_WORLD_PARTY.map((persona) => persona.name).sort());
+
+      // Party is standing on a public accepted-artifact-backed location, and each
+      // actor has discovered it so the agent context has a current location.
+      expect(created.counts.locationDiscoveries).toBeGreaterThanOrEqual(created.actors.length);
       for (const actor of created.actors) {
         const placement = db.prepare("SELECT location_id FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?")
           .get(created.campaignId, actor.actorId) as { location_id: string } | undefined;
         expect(placement?.location_id, actor.name).toBe(created.locationIds[PLAYTEST_WORLD_START_LOCATION_KEY]);
+        const discovery = db.prepare("SELECT 1 FROM campaign_location_discoveries_v28 WHERE campaign_id=? AND actor_id=? AND location_id=?")
+          .get(created.campaignId, actor.actorId, created.locationIds[PLAYTEST_WORLD_START_LOCATION_KEY]);
+        expect(discovery, `discovery for ${actor.name}`).toBeTruthy();
         const backing = db.prepare(`SELECT 1 FROM campaign_generation_accepted_artifacts_v52
           WHERE campaign_id=? AND server_resource_id=? AND artifact_kind='location' AND visibility='public'`)
           .get(created.campaignId, placement!.location_id);
