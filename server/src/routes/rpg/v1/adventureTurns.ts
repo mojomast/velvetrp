@@ -221,17 +221,43 @@ export function holdNarration(hold: AdventureHold): string {
 }
 
 /**
- * True when a deliberate hold should replace provider narration with the deterministic hold line.
- * Only a declaration that names a concrete action family (or an advertised check it strongly maps
- * to) gets a server-stated reason and next step; a pure conversation, question, or meta hold keeps
- * its provider-backed prose. The classifier is the orchestrator's single deterministic vocabulary,
- * so the route never invents its own intent.
+ * True when a declaration names a concrete action family (as opposed to pure conversation,
+ * question, or meta). It is the orchestrator's single deterministic vocabulary, so the route never
+ * invents its own intent.
  */
-export function holdNarrationIsWarranted(hold: AdventureHold, declaration: string): boolean {
-  if (!hold.suggestedNextStep) return false;
+function declarationNamesConcreteAction(declaration: string): boolean {
   const intent = declarationIntent(declaration);
   return intent.commerce || intent.give || intent.rest || intent.check || intent.combat
     || intent.travel || intent.quest || intent.progression;
+}
+
+/**
+ * True when a deliberate hold should replace provider narration with the deterministic hold line.
+ * Only a declaration that names a concrete action family (or an advertised check it strongly maps
+ * to) gets a server-stated reason and next step; a pure conversation, question, or meta hold keeps
+ * its provider-backed prose.
+ */
+export function holdNarrationIsWarranted(hold: AdventureHold, declaration: string): boolean {
+  return Boolean(hold.suggestedNextStep) && declarationNamesConcreteAction(declaration);
+}
+
+/**
+ * The deterministic narration a turn owns, computed before any provider dispatch.
+ *
+ * A warranted deliberate hold is that turn's own story: the orchestrator bounded why the
+ * declaration did not resolve and advertised a safe next step. A held declaration never resolves
+ * its own mechanics, so when the turn carries receipts they are side effects of the wider scene
+ * (for example a deterministic enemy-fallback combat receipt), not the declaration's committed
+ * outcome. Composing those receipts would replay an unrelated line as if the declaration produced
+ * it, so an actionable held declaration composes its own zero-receipt fallback instead.
+ *
+ * Returns null when no hold applies, leaving the caller on the existing receipt-bound path.
+ */
+export function deliberateHoldNarration(hold: AdventureHold | undefined, declaration: string,
+  values: readonly NarrationReceipt[]): string | null {
+  if (!hold || !declarationNamesConcreteAction(declaration)) return null;
+  if (holdNarrationIsWarranted(hold, declaration)) return holdNarration(hold);
+  return values.length > 0 ? narrationFallback(declaration, []) : null;
 }
 
 /** Receipt-only prose retained for every provider and settings failure lane. */
@@ -565,13 +591,14 @@ function narrationRepairMessage(input: { values: readonly NarrationReceipt[]; cu
 async function performNarration(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal, hold?: AdventureHold): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, turn);
-  // A deliberate hold with a safe advertised next step is narrated deterministically from the
-  // orchestrator's bounded reason, so the player always sees why the action did not resolve and
-  // what to try next. A held turn carries no receipts. A hold with no advertised step (for
-  // example pure conversation) keeps the existing provider-backed narration unchanged.
-  if (hold?.suggestedNextStep && turn.receiptLinks.length === 0 && holdNarrationIsWarranted(hold, turn.declaration)) {
-    return { turn, text: holdNarration(hold), source: "deterministic-fallback" };
-  }
+  // A deliberate hold is the turn's own deterministic narration. It is computed from the
+  // orchestrator's bounded reason (never from provider output), so no provider dispatch happens
+  // for a held declaration. A held declaration does not resolve its own mechanics, so any receipt
+  // linked to the turn is a scene side effect (for example a deterministic enemy-fallback combat
+  // receipt) and must not overwrite the declaration with an unrelated line. A pure conversation,
+  // question, or meta hold is not a concrete action and keeps the provider-backed path unchanged.
+  const heldText = deliberateHoldNarration(hold, turn.declaration, safeReceipts ?? []);
+  if (heldText) return { turn, text: heldText, source: "deterministic-fallback" };
   let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? []);
   if (!safeReceipts) return { turn, text: fallbackText,source:"deterministic-fallback" };
   const callId = key("narration-provider", turn.turnId);
