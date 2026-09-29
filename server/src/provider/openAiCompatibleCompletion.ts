@@ -1,7 +1,7 @@
 import type { PromptPreset } from "../presets.js";
 import type { HarnessSettings, ProviderSettings } from "../types.js";
 import { buildRequestBody } from "../llm.js";
-import { buildProviderHeaders, canUseProvider, validateProviderBaseUrl } from "./providerTransport.js";
+import { buildProviderHeaders, canUseProvider, isAuthorizedHttpProviderBaseUrl, validateProviderBaseUrl } from "./providerTransport.js";
 
 const HTTP_ERROR_DETAIL_LIMIT = 1_000;
 const HTTP_ERROR_READ_LIMIT = 4_096;
@@ -314,6 +314,40 @@ function applyBodyOverrides(body: Record<string, unknown>, overrides: ProviderCo
   Object.assign(body, overrides);
 }
 
+/** The AgentRouter thinking-mode model family reachable through the authorized live-validation router. */
+const THINKING_ROUTER_REASONING_MODEL = /^deepseek-v4-/;
+
+/**
+ * Adapts a request body to the exact authorized live-validation router's known capabilities and
+ * returns the effective tool choice the response must be validated against.
+ *
+ * The router's thinking-mode `deepseek-v4-*` upstream rejects a forced named or `required`
+ * `tool_choice` outright (`Thinking mode does not support this tool_choice`) and also rejects the
+ * next tool-result round because a provider's private thinking cannot be replayed from an
+ * OpenAI-compatible transcript. Measured on the live endpoint, `auto` is accepted and yields the
+ * exact tool call far more often than a forced choice. A caller that asks for reasoning off
+ * (`reasoning_effort: "none"`, the RPG tool-call signal) already relies on local argument validation,
+ * so the provider sends `auto` on its behalf and reports the response faithfully instead of paying a
+ * rejected round-trip. Only this endpoint and model family are adapted; every other provider keeps
+ * standard forced tool-choice semantics, and the capability preflight (which does not request
+ * reasoning off) is untouched.
+ *
+ * Exported for focused unit coverage; it is applied automatically inside {@link completeWithProvider}.
+ */
+export function adaptCompletionBodyForKnownEndpoint(
+  body: Record<string, unknown>,
+  baseUrl: string,
+): CompletionToolChoice | undefined {
+  if (!isAuthorizedHttpProviderBaseUrl(baseUrl)) return undefined;
+  if (typeof body.model !== "string" || !THINKING_ROUTER_REASONING_MODEL.test(body.model.trim())) return undefined;
+  if (body.reasoning_effort !== "none") return undefined;
+  const choice = body.tool_choice;
+  const forced = choice === "required" || (typeof choice === "object" && choice !== null);
+  if (!forced) return undefined;
+  body.tool_choice = "auto";
+  return "auto";
+}
+
 interface ResponseToolPolicy {
   advertisedNames: ReadonlySet<string>;
   decodeName: (name: string) => string;
@@ -520,6 +554,7 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
   const advertisedNames = applyTools(body, input, codec);
   applyJsonSchema(body, input.jsonSchema);
   applyBodyOverrides(body, input.bodyOverrides);
+  const effectiveToolChoice = adaptCompletionBodyForKnownEndpoint(body, baseUrl) ?? input.toolChoice;
   const requestedModel = String(body.model);
 
   const timeout = new AbortController();
@@ -542,7 +577,7 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
     return parseResponse(payload, requestedModel, {
       advertisedNames,
       decodeName: codec.decode,
-      toolChoice: input.toolChoice,
+      toolChoice: effectiveToolChoice,
       priorCallIds: transcript.priorCallIds,
     }, input.provider.apiKey, response, Math.max(0, Math.round(performance.now() - startedAt)),
       input.promptVersion ?? "unversioned", input.schemaVersion ?? "unversioned");

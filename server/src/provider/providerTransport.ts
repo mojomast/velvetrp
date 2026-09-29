@@ -29,6 +29,15 @@ function isAuthorizedHttpProvider(url: URL): boolean {
     && !url.password;
 }
 
+/** Whether a base URL is the exact authorized live-validation HTTP provider endpoint. */
+export function isAuthorizedHttpProviderBaseUrl(baseUrl: string): boolean {
+  try {
+    return isAuthorizedHttpProvider(new URL(baseUrl.trim()));
+  } catch {
+    return false;
+  }
+}
+
 /** Returns whether a hostname identifies a loopback-only destination. */
 export function isLoopbackHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
