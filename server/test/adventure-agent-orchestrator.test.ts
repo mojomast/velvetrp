@@ -770,7 +770,7 @@ describe("bounded adventure orchestrator", () => {
       return adventureTurnStreamEventSchema.parse(JSON.parse(line.slice(6)));
     });
     expect(events.map((event) => event.type)).toEqual(["turn_started", "agent_status", "tool_proposed",
-      "mechanics_committed", "agent_status", "narration_delta", "terminal"]);
+      "mechanics_committed", "agent_status", "narration_delta", "choice", "terminal"]);
     for(const event of events)expect(JSON.stringify(event)).not.toMatch(/private-call|promptTokens|providerCalls|argumentsJson|executionBinding|local-owner/);
     expect(events.some((event)=>JSON.stringify(event).includes('"expression":"1d20"'))).toBe(false);
     expect((wire as any).parallel_tool_calls).toBe(false);

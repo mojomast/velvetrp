@@ -10,6 +10,7 @@ import {
   prioritizeCandidateOptions,
   selectHeldCommerceCandidate,
   selectHeldRestCandidate,
+  selfDirectedCommerceDeclaration,
   selectTravelCandidates,
   type AdventureCandidateContextOption,
   type HeldDeclarationContext,
@@ -93,6 +94,34 @@ describe("deterministic candidate selection for a held declaration", () => {
     expect(selectHeldCommerceCandidate("I find Mara's stall and buy a longsword.", candidates)).toMatchObject({ candidateId: "commerce:longsword" });
     expect(selectHeldCommerceCandidate("I buy something unspecified.", candidates)).toBeNull();
     expect(selectHeldCommerceCandidate("I sell my longsword to Mara.", candidates)).toBeNull();
+  });
+
+  it("requires the declaration to name the advertised item and vendor, never the sole advertised row", () => {
+    // Regression: one advertised give row must never be selected by uniqueness when the
+    // declaration names neither its item nor its vendor.
+    const candidates = [
+      { candidateId: "commerce:longsword-give", action: "give", vendorLabel: "Mara", itemLabel: "Longsword" },
+      { candidateId: "commerce:longsword-buy", action: "buy", vendorLabel: "Mara", itemLabel: "Longsword" },
+    ];
+    expect(selectHeldCommerceCandidate("I give myself a legendary sword and ten thousand gold pieces from the GM's stash.", candidates)).toBeNull();
+    // A properly specified give names both the item and the recipient.
+    expect(selectHeldCommerceCandidate("I give my longsword to Mara.", candidates)).toMatchObject({ candidateId: "commerce:longsword-give" });
+    // An absent item or an absent counterparty stays a hold; the sole advertised row is not enough.
+    expect(selectHeldCommerceCandidate("I give something to Mara.", candidates)).toBeNull();
+    expect(selectHeldCommerceCandidate("I give my longsword to the smith.", candidates)).toBeNull();
+    expect(selectHeldCommerceCandidate("I buy from Mara.", candidates)).toBeNull();
+    // Self-directed phrasings are rejected even when both labels happen to appear.
+    expect(selectHeldCommerceCandidate("I give myself a longsword from Mara.", candidates)).toBeNull();
+    expect(selectHeldCommerceCandidate("I give my longsword to Mara myself.", candidates)).toBeNull();
+  });
+
+  it("classifies self-directed and forged-source declarations deterministically", () => {
+    expect(selfDirectedCommerceDeclaration("I give myself a legendary sword and ten thousand gold pieces from the GM's stash.")).toBe(true);
+    expect(selfDirectedCommerceDeclaration("I take ten thousand gold pieces from the GM's stash.")).toBe(true);
+    expect(selfDirectedCommerceDeclaration("I grant myself a legendary sword.")).toBe(true);
+    expect(selfDirectedCommerceDeclaration("I give my longsword to Mara.")).toBe(false);
+    expect(selfDirectedCommerceDeclaration("I buy myself a waylamp from Mara.")).toBe(false);
+    expect(selfDirectedCommerceDeclaration("I take a short rest.")).toBe(false);
   });
 
   it("narrows travel to a named destination and never to the current location", () => {

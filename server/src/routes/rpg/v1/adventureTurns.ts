@@ -7,6 +7,7 @@ import {
   adventureTurnTranscriptResponseSchema, resourceIdSchema,
   combatActionResolutionSchema,
   type AdventureTurnStreamEvent, type PrivateAdventureTurn, type AdventureTurnHttpProposal,type AdventureCombatConsumablePublicReceipt,type AdventureCombatPowerPublicReceipt,
+  type AdventureAffordance,
 } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
@@ -848,6 +849,10 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
   onNarrationSettled?: AdventureTurnsHttpOptions["onNarrationSettled"]): Promise<void> {
   let writer: SseWriter | null = null; let heartbeat: NodeJS.Timeout | null = null; let sequence = 0; let closed = false; let terminal = false;
   let hold: AdventureHold | undefined;
+  // Bounded, role-safe advertised candidates for this turn, captured from the orchestrator's own
+  // advertised exact-candidate set. Never provider output, never an invented option.
+  let affordances: AdventureAffordance[] = [];
+  const captureAffordances = (value: AdventureAffordance[]) => { if (value.length > 0) affordances = value; };
   const abort = new AbortController();
   const send = (event: Omit<AdventureTurnStreamEvent, "sequence" | "timestamp">) => {
     if (!writer || closed) return;
@@ -886,7 +891,7 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
     if (closed) return;
     if ((streamKind === "initial" || streamKind === "resume") && (["declared","proposed"].includes(turn.state)
       ||turn.toolCalls.some((call)=>call.status==="approved"))) {
-      let agent=await orchestrateAdventureTurn(repo as Repo & Repository,turn.turnId,agentDependencies,abort.signal);turn=agent.turn;
+      let agent=await orchestrateAdventureTurn(repo as Repo & Repository,turn.turnId,agentDependencies,abort.signal,captureAffordances);turn=agent.turn;
       hold=agent.hold;
       await yieldToEventLoop();
       if (closed) return;
@@ -897,7 +902,7 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
         await new Promise<void>((resolve)=>setTimeout(resolve,10));
         if (closed) return;
         turn=requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId));
-        agent=await orchestrateAdventureTurn(repo as Repo & Repository,turn.turnId,agentDependencies,abort.signal);turn=agent.turn;
+        agent=await orchestrateAdventureTurn(repo as Repo & Repository,turn.turnId,agentDependencies,abort.signal,captureAffordances);turn=agent.turn;
         hold=agent.hold;
       }
     }
@@ -957,6 +962,10 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
           turnId: turn.turnId, declaration: turn.declaration, narration });
       } catch { /* side lanes are best-effort by contract */ }
     }
+    // At most one bounded, read-only affordance event, ordered before the terminal event. It
+    // reflects exactly the advertised candidate set captured for this turn and changes no
+    // mechanics, receipts, confirmation, or terminal payload.
+    if (affordances.length > 0) { send({ type: "choice", payload: { choices: affordances } }); await yieldToEventLoop(); }
     finish(requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId)), "done");
   } catch (error) {
     if (closed || abort.signal.aborted) return;

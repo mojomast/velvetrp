@@ -87,6 +87,36 @@ describe("deterministic held-declaration resolution", () => {
     f.repo.close();
   });
 
+  it("refuses the self-directed, forged-source declaration instead of committing a lane-origin give", async () => {
+    const f = fixture();
+    const created = turn(f, "I give myself a legendary sword and ten thousand gold pieces from the GM's stash.");
+    // Regression: a lone advertised give row must not be selected by uniqueness for a declaration
+    // that names neither its item nor its vendor. Nothing is proposed, committed, or bound.
+    const result = await orchestrateAdventureTurn(f.repo, created.turnId, holdingDependencies);
+    expect(result.outcome).toBe("completed");
+    expect(result.turn.receiptLinks).toEqual([]);
+    expect(result.turn.toolCalls).toEqual([]);
+    expect(result.hold).toMatchObject({ reason: "no-advertised-match", suggestedCandidateId: null });
+    expect(result.hold?.message).toMatch(/for the actor rather than trade/i);
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
+    expect(db.prepare("SELECT count(*) count FROM adventure_commerce_executions_v57 WHERE turn_id=?").get(created.turnId)).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM adventure_commerce_bindings_v57 WHERE turn_id=?").get(created.turnId)).toEqual({ count: 0 });
+    db.close();
+    f.repo.close();
+  });
+
+  it("still proposes a properly specified give that names the advertised item and recipient", async () => {
+    const f = fixture();
+    const created = turn(f, "I give my waylamp to Mara.");
+    const result = await orchestrateAdventureTurn(f.repo, created.turnId, holdingDependencies);
+    expect(result.outcome).toBe("awaiting-confirmation");
+    expect(result.turn.receiptLinks).toEqual([]);
+    expect(result.turn.toolCalls).toHaveLength(1);
+    expect(result.turn.toolCalls[0]!.proposal.toolName).toBe("vendor_give");
+    expect(result.turn.toolCalls[0]!.proposal.confirmation.state).toBe("pending");
+    f.repo.close();
+  });
+
   it("keeps a helpful hold when no commerce candidate is advertised", async () => {
     const f = fixture();
     f.repo.mutateNpcPresence("local-owner", { campaignId: f.campaign.id, sessionId: f.sessionId, npcId: "mara",

@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { adventureTurnStreamEventSchema, canonicalAgentJson } from "@velvet/contracts";
-import type { AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
+import { advertisedAffordances, type AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import type { ProviderCompletionResult, ProviderCompletionUsage } from "../src/provider/index.js";
 import { ProviderHttpError } from "../src/provider/index.js";
 import { buildApp } from "../src/app.js";
@@ -664,6 +664,67 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
     expect(response.body).not.toContain("movement and arrival remain unresolved");
     const world=createRepository({clock:{now:()=>new Date(at)}});expect(world.getCampaignWorld("local-owner",campaign.id)?.currentLocations)
       .toContainEqual(expect.objectContaining({actorId:"actor",locationId:"parc-des-pionniers"}));world.close();await app.close();
+  });
+
+  it("projects bounded vendor and quest affordances and excludes raw attribute rows",()=>{
+    const options=[
+      {toolName:"exact_vendor_commerce.select",arguments:{candidateId:"vendor-candidate"},
+        label:{action:"buy",source:"Lantern oil at the quay stall",target:"Keeper Maren",cost:"12 coin",consequence:"Buy the oil."}},
+      {toolName:"exact_quest_objective.select",arguments:{candidateId:"quest-candidate"},
+        label:{action:"Advance quest objective",source:"Restore the Harbor Light",target:"Light the beacon",cost:null,consequence:"Advance the objective."}},
+      {toolName:"actor_attribute.set",arguments:{attributeCandidateId:"attr"},label:{action:"Set actor attribute",source:"Strength",target:null,cost:null,consequence:"Change the value."}},
+    ];
+    expect(advertisedAffordances(options)).toEqual([
+      {family:"commerce",label:"buy: Lantern oil at the quay stall → Keeper Maren",target:"Keeper Maren",candidateId:"vendor-candidate"},
+      {family:"quest",label:"Advance quest objective: Restore the Harbor Light → Light the beacon",target:"Light the beacon",candidateId:"quest-candidate"},
+    ]);
+  });
+
+  it("advertises the bounded advertised affordances once, before an unchanged terminal",async()=>{
+    enable();const campaign=seed();const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    db.prepare("INSERT INTO campaign_locations_v28 VALUES('aff-origin',?,NULL,'Place La Salle','','public',?)").run(campaign.id,at);
+    db.prepare("INSERT INTO campaign_locations_v28 VALUES('aff-pointe',?,NULL,'Pointe-Saint-Gilles','','public',?)").run(campaign.id,at);
+    db.prepare("INSERT INTO campaign_locations_v28 VALUES('aff-parc',?,NULL,'Parc des Pionniers','','public',?)").run(campaign.id,at);
+    db.prepare("INSERT INTO campaign_location_connections_v28 VALUES('aff-route-a',?,'aff-origin','aff-pointe','public','open','none',NULL,NULL,?)").run(campaign.id,at);
+    db.prepare("INSERT INTO campaign_location_connections_v28 VALUES('aff-route-b',?,'aff-origin','aff-parc','public','open','none',NULL,NULL,?)").run(campaign.id,at);
+    db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,'aff-origin','session',0,?)").run(campaign.id,"actor",at);db.close();
+    const dependencies:AdventureAgentDependencies={complete:async(input)=>input.tools?.some(tool=>tool.name==="submit_adventure_narration")
+        ?narrationResult("The square is quiet; two roads lead on.")
+        :{message:{role:"assistant",content:"The scene holds; no exact action is selected.",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}},
+      getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date(at)};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository({clock:{now:()=>new Date(at)}}),adventureAgentDependencies:dependencies});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I wait by the fountain.",expectedRevision:0,idempotencyKey:"affordance-emitted"}});
+    expect(response.statusCode,response.body).toBe(200);
+    const parsed=events(response.body);const terminalIndex=parsed.findIndex(event=>event.type==="terminal");
+    expect(terminalIndex).toBeGreaterThanOrEqual(0);
+    expect(parsed[terminalIndex]).toMatchObject({type:"terminal",payload:{outcome:"done",receipts:[],narrationStatus:{status:"completed"}}});
+    const choices=parsed.filter(event=>event.type==="choice");
+    expect(choices).toHaveLength(1);expect(parsed.indexOf(choices[0]!)).toBeLessThan(terminalIndex);
+    if(choices[0]?.type!=="choice")throw new Error("choice affordance event missing");
+    expect(choices[0].payload.choices).toEqual([
+      {family:"travel",label:"Travel: Place La Salle → Pointe-Saint-Gilles",target:"Pointe-Saint-Gilles",candidateId:expect.any(String)},
+      {family:"travel",label:"Travel: Place La Salle → Parc des Pionniers",target:"Parc des Pionniers",candidateId:expect.any(String)},
+    ]);
+    // No internal identifiers or private route/location ids leak into the advertised event.
+    expect(response.body).not.toMatch(/aff-origin|aff-pointe|aff-parc|aff-route/);
+    await app.close();
+  });
+
+  it("emits no affordance event when the turn advertises no candidates",async()=>{
+    enable();const campaign=seed();
+    const dependencies:AdventureAgentDependencies={complete:async(input)=>input.tools?.some(tool=>tool.name==="submit_adventure_narration")
+        ?narrationResult("You listen to the rain.")
+        :{message:{role:"assistant",content:"The scene holds.",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}},
+      getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date(at)};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository({clock:{now:()=>new Date(at)}}),adventureAgentDependencies:dependencies});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I listen.",expectedRevision:0,idempotencyKey:"affordance-absent"}});
+    expect(response.statusCode,response.body).toBe(200);
+    const parsed=events(response.body);
+    expect(parsed.some(event=>event.type==="choice")).toBe(false);
+    expect(parsed.at(-1)).toMatchObject({type:"terminal"});
+    await app.close();
   });
 
   it("grounds quest narration at the post-travel visible location instead of stale room history",async()=>{

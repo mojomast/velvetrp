@@ -48,6 +48,25 @@ describe("M2.11 adventure turn HTTP contracts", () => {
     expect(adventureTurnStreamEventSchema.safeParse({ ...event, type: "delta" }).success).toBe(false);
   });
 
+  it("bounds advertised choice affordances and rejects invented or over-cap rows", () => {
+    const choices = [
+      { family: "travel", label: "Travel: Quay → Mill", target: "Mill", candidateId: "candidate-1" },
+      { family: "commerce", label: "buy: Lantern oil at the stall → Maren", target: "Maren", candidateId: null },
+    ];
+    const event = { type: "choice", sequence: 5, timestamp: at, payload: { choices } };
+    expect(adventureTurnStreamEventSchema.parse(event)).toEqual(event);
+    // A choice event always advertises at least one candidate.
+    expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [] } }).success).toBe(false);
+    // Only the closed family vocabulary and the exact affordance shape are accepted.
+    expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ ...choices[0], family: "teleport" }] } }).success).toBe(false);
+    expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ ...choices[0], extra: true }] } }).success).toBe(false);
+    expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ family: "travel", label: "Go", target: null }] } }).success).toBe(false);
+    // Legacy single-choice fixtures are not part of the affordance vocabulary.
+    expect(adventureTurnStreamEventSchema.safeParse({ type: "choice", sequence: 5, timestamp: at, payload: { choiceId: "choice", label: "Go" } }).success).toBe(false);
+    expect(adventureTurnStreamEventSchema.safeParse({ ...event,
+      payload: { choices: Array.from({ length: 13 }, (_, index) => ({ ...choices[0], candidateId: `candidate-${index}` })) } }).success).toBe(false);
+  });
+
   it("requires unique plural proposal IDs and exact decision names", () => {
     const command = { proposalIds: ["one", "two"], decision: "approve", expectedRevision: 2, idempotencyKey: "confirm" };
     expect(adventureTurnConfirmRequestSchema.parse(command)).toEqual(command);

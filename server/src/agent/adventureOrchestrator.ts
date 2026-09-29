@@ -3,8 +3,9 @@ import { systemOneShadowQueue } from "./systemOneShadow.js";
 import { policyRequiresConfirmation } from "./confirmationPolicy.js";
 import {
   AGENT_TOOL_REGISTRY_VERSION, POST_V38_AGENT_TOOL_REGISTRY_VERSION, agentRequestObjectSchema, canonicalAgentJson, resourceIdSchema,
-  projectExactCandidateForProvider,providerSafeExactCandidateListSchema,
-    type AdventureInventoryCandidate,type AdventureCommerceCandidate,type AdventurePowerCandidate,type AdventureRestCandidate,type AdventureCombatConsumableCandidate,type AdventureCombatPowerCandidate,type AdventureQuestLifecycleCandidate,type AdventureProgressionCandidate,type AdventureProgressionRead,type AgentJsonObject,type PrivateAdventureTurn,type ProviderCandidateLabel,type ProviderSafeExactCandidate,
+  projectExactCandidateForProvider,providerSafeExactCandidateListSchema,providerCandidateLabelSchema,
+    MAX_ADVENTURE_AFFORDANCES,
+    type AdventureAffordance,type AdventureInventoryCandidate,type AdventureCommerceCandidate,type AdventurePowerCandidate,type AdventureRestCandidate,type AdventureCombatConsumableCandidate,type AdventureCombatPowerCandidate,type AdventureQuestLifecycleCandidate,type AdventureProgressionCandidate,type AdventureProgressionRead,type AgentJsonObject,type PrivateAdventureTurn,type ProviderCandidateLabel,type ProviderSafeExactCandidate,
 } from "@velvet/contracts";
 import { assembleCampaignAgentContext, campaignContextBasketText, type CampaignAgentAudience,
   type CampaignAgentContextSnapshot } from "../context.js";
@@ -768,6 +769,47 @@ export function adventureCandidateContext(options: readonly AdventureCandidateCo
   ].join("\n\n");
 }
 
+/** Server selection tool name to the closed public affordance family advertised to the client. */
+const ADVENTURE_AFFORDANCE_FAMILY: Readonly<Record<string, AdventureAffordance["family"]>> = {
+  "exact_actor_travel.select": "travel",
+  "exact_quest_objective.select": "quest",
+  "exact_quest_lifecycle.select": "quest-lifecycle",
+  "exact_srd_check.select": "check",
+  "exact_inventory_action.select": "inventory",
+  "exact_vendor_commerce.select": "commerce",
+  "exact_power_use.select": "power",
+  "exact_rest.select": "rest",
+  "exact_combat_consumable.select": "combat-consumable",
+  "exact_combat_power.select": "combat-power",
+  "exact_progression_apply.select": "progression",
+};
+/**
+ * Projects the bounded, role-safe affordance list from the exact advertised candidate options the
+ * provider already sees. Only server-issued labels are read: no provider output, no private IDs, and
+ * no executable instruction. Family order and advertised row order are preserved, duplicate rows are
+ * collapsed, and the list is capped small. Raw attribute and combat-action rows are intentionally
+ * excluded so the client only advertises the closed exact-candidate families.
+ */
+export function advertisedAffordances(options: readonly AdventureCandidateContextOption[]): AdventureAffordance[] {
+  const affordances: AdventureAffordance[] = []; const seen = new Set<string>();
+  for (const option of options) {
+    const family = ADVENTURE_AFFORDANCE_FAMILY[option.toolName];
+    if (!family) continue;
+    const parsed = providerCandidateLabelSchema.safeParse(option.label);
+    if (!parsed.success) continue;
+    const label = parsed.data;
+    const scope = label.target ? `${label.source ? `${label.source} ` : ""}→ ${label.target}` : (label.source ?? "");
+    const text = scope ? `${label.action}: ${scope}` : label.action;
+    const candidateId = typeof option.arguments["candidateId"] === "string" ? option.arguments["candidateId"] : null;
+    const key = `${family}\u0000${text}\u0000${candidateId ?? ""}`;
+    if (text.length === 0 || seen.has(key)) continue;
+    seen.add(key);
+    affordances.push({ family, label: text.slice(0, 500), target: label.target ? label.target.slice(0, 200) : null, candidateId });
+    if (affordances.length >= MAX_ADVENTURE_AFFORDANCES) break;
+  }
+  return affordances;
+}
+
 const normalized=(value:string)=>value.toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g," ").trim();
 const normalizedWords=(value:string)=>normalized(value).split(" ").filter(word=>word.length>=4);
 function mentionsLabel(declaration:string,label:string):boolean{
@@ -1017,10 +1059,35 @@ export function selectHeldRestCandidate<T extends { restKind: "short" | "long" }
   return null;
 }
 
+/** Transfer verbs whose recipient must be a present counterparty, never the actor. */
+const COMMERCE_TRANSFER_VERB = /\b(?:give|gives|gave|given|gift|gifts|gifted|gifting|hand|hands|handed|handing|donate|donates|donated|donating)\b/u;
+/** Acquisition verbs that create or seize rather than trade with an advertised vendor. */
+const COMMERCE_ACQUIRE_VERB = /\b(?:take|takes|took|taking|grab|grabs|grabbed|grabbing|grant|grants|granted|granting|claim|claims|claimed|claiming|reward|rewards|rewarded|rewarding|loot|loots|looted|looting)\b/u;
+const SELF_REFERENCE_WORD = /\bmyself\b/u;
+/** A GM/DM "stash" is a private authoritative store, never an advertised vendor row. */
+const FORGED_SOURCE_STASH = /\b(?:gm|game\s+master|dm|dungeon\s+master)(?:'s|s')?\s+stash\b/u;
+
+/**
+ * True when a declaration tries to give or take something for the actor rather than transact with a
+ * present counterparty: "give myself", "I take/grant myself", or anything sourced "from the GM's
+ * stash". Such a declaration can never map to a vendor candidate — the advertised vendor row is the
+ * only authorized counterparty — so the held-commerce path holds instead of proposing or committing
+ * anything. This is pure and deterministic over the declaration text only.
+ */
+export function selfDirectedCommerceDeclaration(declaration: string): boolean {
+  const text = declaration.toLocaleLowerCase("en-US");
+  if (FORGED_SOURCE_STASH.test(text)) return true;
+  if (!SELF_REFERENCE_WORD.test(text)) return false;
+  return COMMERCE_TRANSFER_VERB.test(text) || COMMERCE_ACQUIRE_VERB.test(text);
+}
+
 /**
  * The deterministic, advertised commerce candidate a declaration names, or null. The declared verb
- * must match the candidate action and, when the declaration names an item or vendor, the label must
- * match too; anything ambiguous stays a hold rather than guessing.
+ * must match the candidate action, and the declaration must genuinely name the candidate's
+ * operative fields — both the item and the vendor/recipient — so an unrelated or cheating
+ * declaration is never resolved merely because one row happens to be the only one advertised.
+ * Self-directed and forged-source declarations are rejected outright, and anything ambiguous stays a
+ * hold rather than guessing.
  */
 export function selectHeldCommerceCandidate<T extends { action: string; vendorLabel: string; itemLabel: string }>(
   declaration: string, candidates: readonly T[]): T | null {
@@ -1029,16 +1096,15 @@ export function selectHeldCommerceCandidate<T extends { action: string; vendorLa
     : /\b(?:sell|sells|sold)\b/u.test(text) ? "sell"
       : /\b(?:give|gives|gave|given|gift|gifts|hand|hands|handed|donate|donates|donated)\b/u.test(text) ? "give" : null;
   if (!action) return null;
+  if (selfDirectedCommerceDeclaration(declaration)) return null;
   const candidatesForAction = candidates.filter((candidate) => candidate.action === action);
   if (candidatesForAction.length === 0) return null;
-  // An item the declaration names is the strongest signal; a vendor narrows only when it is the sole
-  // candidate, so "buy a longsword from Mara" never resolves to a shield at the same stall.
-  const itemMatches = candidatesForAction.filter((candidate) => mentionsLabel(declaration, candidate.itemLabel));
-  if (itemMatches.length === 1) return itemMatches[0]!;
-  if (itemMatches.length > 1) return null;
-  const vendorMatches = candidatesForAction.filter((candidate) => mentionsLabel(declaration, candidate.vendorLabel));
-  if (vendorMatches.length === 1) return vendorMatches[0]!;
-  return candidatesForAction.length === 1 ? candidatesForAction[0]! : null;
+  // The declaration has to name the advertised item AND the advertised vendor/recipient. A single
+  // advertised row is never evidence on its own, so an unrelated or cheating declaration can never
+  // select it by uniqueness.
+  const matches = candidatesForAction.filter((candidate) => mentionsLabel(declaration, candidate.itemLabel)
+    && mentionsLabel(declaration, candidate.vendorLabel));
+  return matches.length === 1 ? matches[0]! : null;
 }
 
 /** The first travel row for a named destination, or the first advertised row. */
@@ -1105,8 +1171,17 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
       message: "The declared rest is not advertised from the current state; no rest candidate is available." };
   }
   if (intent.commerce || intent.give) {
+    if (selfDirectedCommerceDeclaration(context.declaration)) {
+      return { reason: "no-advertised-match", suggestedCandidateId: null, suggestedNextStep: null,
+        message: "The declaration tries to give or take something for the actor rather than trade with an advertised vendor; no mechanics were committed." };
+    }
+    // A vendor row may well be advertised; the declaration simply does not name its item and
+    // counterparty, so the transaction is refused rather than guessed. Say so plainly instead of
+    // claiming no vendor candidate exists.
     return { reason: "no-advertised-match", suggestedCandidateId: null, suggestedNextStep: null,
-      message: "The declared transaction is not advertised from the current state; no vendor candidate is available." };
+      message: context.commerceCandidates.length > 0
+        ? "The declared transaction does not name an advertised item and vendor; no mechanics were committed."
+        : "The declared transaction is not advertised from the current state; no vendor candidate is available." };
   }
   const travel = suggestedTravelCandidate(context.travelCandidates, reference.namedDestinations[0] ?? null);
   return { reason: "no-advertised-match", suggestedCandidateId: travel?.candidateId ?? null,
@@ -1295,7 +1370,8 @@ function settleProviderFailure(repository:Repository,turnId:string,providerCallI
 
 /** Runs the restart-safe bounded planning loop. Every database mutation is a short repository command. */
 export async function orchestrateAdventureTurn(repository: Repository, turnId: string,
-  dependencies: AdventureAgentDependencies = productionDependencies, signal?: AbortSignal): Promise<AdventureAgentResult> {
+  dependencies: AdventureAgentDependencies = productionDependencies, signal?: AbortSignal,
+  onAdvertisedAffordances?: (affordances: AdventureAffordance[]) => void): Promise<AdventureAgentResult> {
   throwIfAborted(signal);
   let turn = privateTurn(repository, turnId);
   for(const call of turn.toolCalls){
@@ -1437,7 +1513,7 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     catch{/* SRD checks are absent unless the complete authoritative sheet is compatible. */}
     try{inventoryCandidates=repository.generateAdventureInventoryCandidates(OWNER,turn.turnId);}
     catch{/* Inventory actions are absent unless every public label and private command is authoritative. */}
-    try{commerceCandidates=locationAllowed?repository.generateAdventureCommerceCandidates(OWNER,turn.turnId):[];}catch{/* Commerce fails closed unless a vendor is present and visible. */}
+    try{commerceCandidates=locationAllowed&&!selfDirectedCommerceDeclaration(turn.declaration)?repository.generateAdventureCommerceCandidates(OWNER,turn.turnId):[];}catch{/* Commerce fails closed unless a vendor is present and visible. */}
     try{powerCandidates=repository.generateAdventurePowerCandidates(OWNER,turn.turnId);}catch{/* Powers fail closed. */}
      try{restCandidates=locationAllowed?repository.generateAdventureRestCandidates(OWNER,turn.turnId):[];}catch{/* Rest fails closed. */}
      try{questLifecycle=repository.generateAdventureQuestLifecycleCandidates(OWNER,turn.turnId);}catch{/* Quest lifecycle fails closed. */}
@@ -1487,6 +1563,10 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
       legalActionDigest:candidate.digest},label:{action:candidate.kind,source:candidate.label,target:candidate.targetLabel,cost:null,
         consequence:"Execute only this server-issued combat action."}})),
   ];
+  // Advertise the bounded, role-safe exact-candidate affordances for this turn. This is a read-only
+  // projection of the same server-issued rows the provider sees; it never selects, commits, or
+  // changes mechanics, and a turn with no advertised candidates reports an empty list.
+  onAdvertisedAffordances?.(advertisedAffordances(candidateOptions));
   // The L2 shadow lane reasons over the exact same advertised rows the provider sees, minus the
   // non-candidate attribute/combat-action families, capped and bound to advertised tools only.
   const advertisedToolNames = new Set<string>(selected.map((tool) => tool.name));

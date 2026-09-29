@@ -172,8 +172,34 @@ export const adventureTurnMechanicsCommittedEventSchema = streamEnvelope("mechan
 }).strict());
 /** One bounded piece of persisted or safely derived narration. */
 export const adventureTurnNarrationDeltaEventSchema = streamEnvelope("narration_delta", z.object({ text: z.string().min(1).max(8_000) }).strict());
-/** One explicit, non-executable next choice. */
-export const adventureTurnChoiceEventSchema = streamEnvelope("choice", z.object({ choiceId: resourceIdSchema, label: z.string().trim().min(1).max(500) }).strict());
+/** Maximum advertised affordances carried by one choice event. */
+export const MAX_ADVENTURE_AFFORDANCES = 12;
+/** Closed family vocabulary for advertised, server-authored affordances. */
+export const adventureAffordanceFamilySchema = z.enum([
+  "travel", "quest", "quest-lifecycle", "check", "inventory", "commerce",
+  "power", "rest", "combat-consumable", "combat-power", "progression",
+]);
+/**
+ * One bounded, role-safe advertised candidate the client may offer as an explicit affordance.
+ * The family labels the advertised candidate family, `label` is the server-issued human-readable
+ * text, `target` is the advertised destination/vendor/target when one exists, and `candidateId`
+ * is the opaque server handle only when a real advertised candidate backs the row. It carries no
+ * private facts, no provider arguments, and no executable instruction; choosing it only declares.
+ */
+export const adventureAffordanceSchema = z.object({
+  family: adventureAffordanceFamilySchema,
+  label: z.string().trim().min(1).max(500),
+  target: z.string().trim().min(1).max(200).nullable(),
+  candidateId: resourceIdSchema.nullable(),
+}).strict();
+/**
+ * One bounded, non-executable list of the advertised candidates for a turn. A turn with no
+ * advertised candidates emits no choice event; a turn with any emits exactly one, before terminal.
+ * The list is derived from the same advertised candidate set the orchestrator already produced.
+ */
+export const adventureTurnChoiceEventSchema = streamEnvelope("choice", z.object({
+  choices: z.array(adventureAffordanceSchema).min(1).max(MAX_ADVENTURE_AFFORDANCES),
+}).strict());
 /** The single central terminal event for every opened stream. */
 export const adventureTurnTerminalEventSchema = streamEnvelope("terminal", z.object({
   outcome: z.enum(["done", "aborted", "error"]),
@@ -198,4 +224,6 @@ export type AdventureTurnHttpProposal = z.infer<typeof adventureTurnHttpProposal
 /** Safe initial-turn idempotency reconciliation locator. */
 export type AdventureTurnInitialReconcileRequest = z.infer<typeof adventureTurnInitialReconcileRequestSchema>;
 export type AdventureTurnConfirmRequest = z.infer<typeof adventureTurnConfirmRequestSchema>;
+/** One advertised, role-safe affordance carried by the choice stream event. */
+export type AdventureAffordance = z.infer<typeof adventureAffordanceSchema>;
 export type AdventureTurnStreamEvent = z.infer<typeof adventureTurnStreamEventSchema>;

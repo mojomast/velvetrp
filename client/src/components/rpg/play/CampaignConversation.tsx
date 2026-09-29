@@ -30,7 +30,7 @@ export function CampaignConversation({ transcript, transcriptState, legacyMessag
     || (!represented ? current?.narrationStatus.text ?? "" : "");
   const proposals = liveEvents.filter((event) => event.type === "tool_proposed");
   const receipts = liveEvents.filter((event) => event.type === "mechanics_committed").flatMap((event) => event.payload.receipts);
-  const choices = liveEvents.filter((event) => event.type === "choice");
+  const choices = liveEvents.filter((event) => event.type === "choice").flatMap((event) => event.payload.choices);
   const confirmation = [...liveEvents].reverse().find((event) => event.type === "confirmation_required");
   const terminal = [...liveEvents].reverse().find((event) => event.type === "terminal");
   const latestStatus = [...liveEvents].reverse().find((event) => event.type === "agent_status");
@@ -54,10 +54,10 @@ export function CampaignConversation({ transcript, transcriptState, legacyMessag
           {confirmation?.type === "confirmation_required" && <p className="live-confirmation">Waiting for confirmation of {confirmation.payload.proposalIds.length} proposed {confirmation.payload.proposalIds.length === 1 ? "action" : "actions"}.</p>}
           {receipts.length > 0 && <p className="live-receipts">{receipts.length} mechanic {receipts.length === 1 ? "receipt" : "receipts"} committed.</p>}
           {narration ? <ConversationText text={narration} kind="narration" /> : <p className="live-narration-placeholder">Awaiting narration...</p>}
-          {choices.length > 0 && <div className="conversation-choices" aria-label="Suggested next actions">{choices.map((event) => <button type="button" className="ghost" key={event.payload.choiceId} disabled={!canPrefill} onClick={() => onPrefillChoice(event.payload.label)}>{event.payload.label}</button>)}</div>}
+          {choices.length > 0 && <div className="conversation-choices" aria-label="Suggested next actions">{choices.map((choice, index) => <button type="button" className="ghost" key={`${choice.family}:${choice.candidateId ?? choice.label}:${index}`} aria-label={`Suggested action: ${choice.label}`} disabled={!canPrefill} onClick={() => onPrefillChoice(choice.label)}>{choice.label}</button>)}</div>}
           {terminal?.type === "terminal" && <p className="live-terminal">Turn {terminal.payload.outcome}.</p>}
         </div></article>}
-      {represented && choices.length > 0 && <div className="conversation-choices durable-choices" aria-label="Suggested next actions">{choices.map((event) => <button type="button" className="ghost" key={event.payload.choiceId} disabled={!canPrefill} onClick={() => onPrefillChoice(event.payload.label)}>{event.payload.label}</button>)}</div>}
+      {represented && choices.length > 0 && <div className="conversation-choices durable-choices" aria-label="Suggested next actions">{choices.map((choice, index) => <button type="button" className="ghost" key={`${choice.family}:${choice.candidateId ?? choice.label}:${index}`} aria-label={`Suggested action: ${choice.label}`} disabled={!canPrefill} onClick={() => onPrefillChoice(choice.label)}>{choice.label}</button>)}</div>}
     </div>
     {!following && <button type="button" className="ghost conversation-jump" onClick={() => { const log = logRef.current; if (log) log.scrollTop = log.scrollHeight; followLatestRef.current = true; setFollowing(true); }}>Jump to latest</button>}
   </section>;
