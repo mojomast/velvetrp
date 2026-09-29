@@ -5,7 +5,7 @@ import { generatedCampaignContentProviderSchema } from "@velvet/contracts";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { orchestrateAdventureTurn, type AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import { dmFixture } from "./fixtures/dmCampaign.js";
-import { seedLivingWorld } from "./fixtures/livingWorld.js";
+import { enableHumanPlayerTravel, seedLivingWorld } from "./fixtures/livingWorld.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -18,7 +18,7 @@ const dbFile = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 type Fixture = Awaited<ReturnType<typeof dmFixture>>;
 let sequence = 0;
 
-/** A provider that must never run for a pure unknown-person declaration. */
+/** A provider that must never run for a genuine unknown-person declaration. */
 function noDispatch(dispatches: { count: number }): AdventureAgentDependencies {
   return {
     complete: async () => { dispatches.count += 1; throw new Error("provider must not dispatch for an unknown-person declaration"); },
@@ -77,6 +77,8 @@ describe("unknown-person declaration resolution", () => {
   it("holds, and never advertises or commits a check, when the current place cannot anchor a persona", async () => {
     const f = await dmFixture(true);
     seedLivingWorld(f, 7);
+    // Place the actor at a real but non-generated campaign location, the seed-world shape.
+    enableHumanPlayerTravel(f, 7);
     const created = turn(f, PROBE);
     const dispatches = { count: 0 };
     const result = await orchestrateAdventureTurn(f.repo, created.turnId, noDispatch(dispatches));
@@ -121,23 +123,13 @@ describe("unknown-person declaration resolution", () => {
       expect.objectContaining({ artifact_kind: "lore", visibility: "gm" }),
     ]));
     db.close();
-
-    // A second orchestrator pass over the same still-declared turn replays the idempotent
-    // materialization instead of dispatching a provider that could now fabricate a check against
-    // the newly known person.
-    const replay = await orchestrateAdventureTurn(f.repo, created.turnId, noDispatch(dispatches));
-    expect(replay.hold).toMatchObject({ reason: "unknown-person" });
-    expect(replay.turn.toolCalls).toEqual([]);
-    expect(dispatches.count).toBe(0);
-    expect((f.repo.listCampaignNpcs(OWNER, f.campaign.id)?.npcs ?? []).filter((npc) =>
-      (npc as { publicState: { name: string } }).publicState.name.toLocaleLowerCase("en-US").includes("hooded stranger")))
-      .toHaveLength(1);
     f.repo.close();
   });
 
   it("does not intercept a declaration that names a known campaign person", async () => {
     const f = await dmFixture(true);
     seedLivingWorld(f, 8);
+    enableHumanPlayerTravel(f, 8);
     const created = turn(f, "I greet Maren.");
     const dispatches = { count: 0 };
     const dependencies: AdventureAgentDependencies = {
@@ -149,6 +141,24 @@ describe("unknown-person declaration resolution", () => {
     const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
     // A known person is in the campaign, so normal planning still runs and the unknown-person hold
     // is never produced.
+    expect(dispatches.count).toBe(1);
+    expect(result.hold?.reason).not.toBe("unknown-person");
+    f.repo.close();
+  });
+
+  it("does not intercept a benign read-only social declaration when the actor is unplaced", async () => {
+    const f = await dmFixture(true);
+    const created = turn(f, "I ask the ferryman what he saw");
+    const dispatches = { count: 0 };
+    const dependencies: AdventureAgentDependencies = {
+      complete: async () => { dispatches.count += 1; return { message: { role: "assistant", content: "The ferryman remembers the tide." },
+        usage: null, model: { requestedModel: "fake", responseModel: "fake" } }; },
+      getProvider: async () => ({ ...defaultProviderSettings(), model: "fake" }),
+      getHarness: async () => defaultHarnessSettings(), now: () => new Date("2036-01-01T00:00:00.000Z"),
+    };
+    const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
+    // `no-current-location` is not an unknown-person materialization case: the unchanged provider
+    // planning still runs and never produces the unknown-person hold.
     expect(dispatches.count).toBe(1);
     expect(result.hold?.reason).not.toBe("unknown-person");
     f.repo.close();

@@ -685,16 +685,23 @@ function isPurePersonContactDeclaration(declaration: string): boolean {
 }
 
 /**
- * Bounded deterministic resolution for a pure person-contact declaration that addresses someone the
- * prepared campaign never defined ("I approach a hooded stranger..."). The server-owned freeform
- * classifier (the same closed grammar the materialization lane uses) decides whether the declaration
- * names an unknown person; this helper only consumes that verdict.
+ * Bounded deterministic resolution for a declaration that genuinely addresses someone the prepared
+ * campaign never defined ("I approach a hooded stranger..."). The server-owned freeform classifier
+ * (the same closed grammar the materialization lane uses) decides whether the declaration names an
+ * unknown person; this helper only consumes that verdict.
  *
- * When the classifier authorizes a candidate, the receipted, idempotent freeform lane materializes
- * exactly that server-authored public archetype, keeping any GM-only goals in a separate `gm`
- * artifact. When it does not (the person has no generated public place, or the materialization is
- * refused), the turn holds. Either way the turn never advertises or commits a check against a
- * nonexistent persona, never invents stats, and never lets the provider pick the target.
+ * Only two verdicts are intercepted:
+ * - `materialize-npc`: an unknown person with a server-authored candidate and a generated public
+ *   place to anchor it, so the receipted, idempotent freeform lane materializes exactly that public
+ *   archetype (GM-only goals stay in a separate `gm` artifact).
+ * - `current-location-unmapped`: an unknown person named from a real campaign location that has no
+ *   generated public artifact, so materialization is unavailable and the turn holds with a reason.
+ *
+ * Every other verdict — `known-npc` (the person already exists), `no-current-location` (the actor
+ * is unplaced, so the lane is not applicable and a read-only social scene must keep its provider
+ * flow), `no-npc-intent`, and parse failures — falls through to the unchanged flow. Either
+ * intercepted verdict never advertises or commits a check against a nonexistent persona, never
+ * invents stats, and never lets the provider pick the target.
  *
  * Returns an orchestrator result when the declaration is an unknown-person declaration, else null
  * so the unchanged flow continues. The classifier never throws for a player-controlled actor; an
@@ -708,29 +715,21 @@ function resolveUnknownPersonDeclaration(repository: Repository, turn: PrivateAd
     return null;
   }
   const namesUnknownPerson = classification.intent === "materialize-npc"
-    || (classification.intent === "none"
-      && (classification.reason === "current-location-unmapped" || classification.reason === "no-current-location"));
-  // A pure declaration that now names a known person is left to the unchanged flow, except that a
-  // prior attempt of this same declaration may already have materialized that person (a crash
-  // between the content commit and the turn response). Materialization is idempotent, so it either
-  // replays the same durable draft or declines for a pre-existing campaign person.
-  const mayReplayMaterialization = classification.intent === "none" && classification.reason === "known-npc";
-  if (!namesUnknownPerson && !mayReplayMaterialization) return null;
+    || (classification.intent === "none" && classification.reason === "current-location-unmapped");
+  if (!namesUnknownPerson) return null;
   let materializedName: string | null = null;
-  if (classification.intent === "materialize-npc" || mayReplayMaterialization) {
+  if (classification.intent === "materialize-npc") {
     try {
       const materialized = repository.materializeFreeformNpc(OWNER, turn.campaignId, turn.sessionId, turn.actorId,
-        turn.declaration, classification.intent === "materialize-npc" ? { candidateId: classification.candidates[0]!.candidateId } : {});
+        turn.declaration, { candidateId: classification.candidates[0]!.candidateId });
       if (materialized.status === "materialized") materializedName = materialized.candidate.name;
     } catch {
       // A refused or unavailable materialization keeps the honest hold below; nothing is committed.
     }
   }
-  if (!namesUnknownPerson && materializedName === null) return null;
-  const subject = materializedName ?? (classification.intent === "materialize-npc" ? classification.npcName : "the person");
   const message = materializedName
-    ? `A new face appears: ${subject}. The declaration addresses someone the campaign had not defined, so the server introduced that person instead of rolling a check against a stranger.`
-    : `The declaration addresses ${subject}, who is not part of the campaign yet and cannot be introduced from the current state. No check can be rolled against a person the campaign has not defined.`;
+    ? `A new face appears: ${materializedName}. The declaration addresses someone the campaign had not defined, so the server introduced that person instead of rolling a check against a stranger.`
+    : "The declaration addresses someone who is not part of the campaign yet and cannot be introduced from the current state. No check can be rolled against a person the campaign has not defined.";
   return { turn: privateTurn(repository, turn.turnId), outcome: "completed", limitations: ADVENTURE_TOOL_LIMITATIONS,
     hold: { reason: "unknown-person", message, suggestedNextStep: null, suggestedCandidateId: null } };
 }
