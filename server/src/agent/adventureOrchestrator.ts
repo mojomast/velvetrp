@@ -428,6 +428,66 @@ function resolveHeldRestProposal(repository: Repository, turn: PrivateAdventureT
 }
 
 /**
+ * Bounded deterministic follow-on for a deliberate provider hold on an everyday transaction. The
+ * declaration names exactly one advertised commerce candidate (buy/sell/give with a present
+ * vendor), so the server records a `server-fallback` decision and appends the normal
+ * confirmation-required commerce proposal through the lane-origin path. Confirmation still gates
+ * every commit and the repository validates the advertised candidate projection and digest, so the
+ * server never forges provider evidence, never commits silently, and never auto-executes; a retry
+ * replays the same proposal because the idempotency key derives from the turn and candidate. A
+ * location-mismatched declaration never proposes a current-place transaction.
+ */
+function resolveHeldCommerceProposal(repository: Repository, turn: PrivateAdventureTurn,
+  declaration: string, candidates: readonly AdventureCommerceCandidate[], locationAllowed: boolean, now: Date):
+  { turn: PrivateAdventureTurn; outcome: "awaiting-confirmation" | "mechanics-committed" } | null {
+  if (!locationAllowed) return null;
+  if (turn.mode !== "original" || turn.receiptLinks.length > 0 || turn.toolCalls.length > 0) return null;
+  const commerce = selectHeldCommerceCandidate(declaration, candidates);
+  if (!commerce) return null;
+  const decisionId = id("server-hold-commerce", turn.turnId, commerce.candidateId);
+  const selection = { candidateId: commerce.candidateId, digest: commerce.digest };
+  try {
+    recordSystemOneDecision({
+      decisionId,
+      lane: "adventure-selection",
+      campaignId: turn.campaignId,
+      sessionId: turn.sessionId,
+      turnId: turn.turnId,
+      provider: "server-fallback",
+      model: "declaration-commerce-map-v1",
+      confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+      state: { declaration, selection },
+      questions: { resolution: "deterministic declaration-to-commerce mapping" },
+      answers: selection,
+      selection: { method: "server-fallback", ...selection },
+      confidenceBand: "act",
+      fallbackUsed: true,
+      shadow: true,
+      usage: null,
+      latencyMs: 0,
+      createdAt: now.toISOString(),
+    });
+  } catch {
+    // The insert-only row can only collide with a retry of this same deterministic decision.
+  }
+  const proposed = repository.appendAdventureCommerceProposalFromLane(OWNER, {
+    turnId: turn.turnId, decisionId, candidateId: commerce.candidateId, digest: commerce.digest,
+    expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
+    idempotencyKey: key("server-hold-commerce-proposal", turn.turnId, commerce.candidateId),
+  });
+  const proposal = proposed.toolCalls.at(-1)?.proposal;
+  if (!proposal) return null;
+  if (proposal.confirmation.state === "pending") {
+    return { turn: repository.waitForToolConfirmation(OWNER, { turnId: proposed.turnId, expectedTurnRevision: proposed.revision,
+      expectedCampaignRevision: proposed.campaignRevision, idempotencyKey: key("agent-wait", proposed.turnId, proposal.proposalId) }),
+      outcome: "awaiting-confirmation" };
+  }
+  const execution = repository.executeApprovedAgentProposalAtomically(OWNER, proposed.turnId, proposal.proposalId);
+  if (execution.status === "replan") return null;
+  return { turn: execution.turn, outcome: "mechanics-committed" };
+}
+
+/**
  * Deterministic server fallback for a provider hold on a concrete attempt.
  *
  * A provider response of `result: "complete"` with no tool calls is the provider's only deliberate
@@ -867,6 +927,21 @@ function mentionsLocation(declaration: string, name: string): boolean {
   if (words.length === 0) return false;
   const matched = words.filter((word) => mentionsLocationWord(intentWords, word)).length;
   return matched >= Math.min(2, words.length);
+}
+
+/**
+ * The names of every location the acting principal may already know. The audience-filtered world
+ * projection lists all locations for an owner/GM and the discovered public locations for a player
+ * controller; the location gate uses this broader set so a named but non-adjacent known place is
+ * still treated as a location mismatch. A read failure fails open to advertised destinations only.
+ */
+function knownLocationNames(repository: Repository, turn: PrivateAdventureTurn): string[] {
+  try {
+    const world = repository.getWorldProjection(OWNER, turn.campaignId, turn.sessionId);
+    return world ? [...new Set(world.locations.map((location) => location.name))] : [];
+  } catch {
+    return [];
+  }
 }
 
 /** How a declaration references the actor's current place and the advertised destinations. */
@@ -1330,14 +1405,20 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   let commerceCandidates:AdventureCommerceCandidate[]=[];
    let powerCandidates:AdventurePowerCandidate[]=[];let restCandidates:AdventureRestCandidate[]=[];let combatConsumables:AdventureCombatConsumableCandidate[]=[];let combatPowers:AdventureCombatPowerCandidate[]=[];let questLifecycle:AdventureQuestLifecycleCandidate[]=[];let progression:AdventureProgressionCandidate[]=[];
    let progressionRead:AdventureProgressionRead={available:false,className:null,currentLevel:null,eligibleLevel:null,mode:null,totalXp:null,milestoneCount:null,pendingChoices:[]};
+  // Every location the acting principal already knows broadens the declaration's location gate
+  // beyond adjacent advertised routes: a named but non-adjacent known place is still a mismatch.
+  // `knownLocationNames` fails open (advertised destinations only) if the world read is unavailable.
+  const knownLocationNamesList = knownLocationNames(repository, turn);
+  let locationAllowed = true;
   if(snapshot.audience.kind==="player"&&snapshot.audience.actorId===turn.actorId&&snapshot.authority.control!=="none"&&!snapshot.encounter){
     try{const batch=repository.generateActorTravelCandidates(OWNER,{turnId:turn.turnId,
       idempotencyKey:`provider-player:${digest(turn.turnId)}`,audienceMode:"player"});
       exactTravel=providerSafeExactCandidateListSchema.parse({version:"v1",candidates:batch.candidates.map((candidate)=>projectExactCandidateForProvider(candidate,batch.issuedAt))});}
     catch{/* Candidate generation is fail-closed; all established tools remain available. */}
-    const destinationNames=[...new Set(exactTravel.candidates.flatMap((candidate)=>candidate.semanticLabel?.target?[candidate.semanticLabel.target]:[]))];
+    const destinationNames=[...new Set([...exactTravel.candidates.flatMap((candidate)=>candidate.semanticLabel?.target?[candidate.semanticLabel.target]:[]),
+      ...knownLocationNamesList])];
     const locationReference=declarationLocationReference(turn.declaration,snapshot.currentActorLocation,destinationNames);
-    const locationAllowed=locationBoundCandidatesAllowed(locationReference);
+    locationAllowed=locationBoundCandidatesAllowed(locationReference);
     try{questCandidates=repository.listAdventureQuestObjectiveCandidates(OWNER,turn.turnId).map((candidate)=>({candidateId:candidate.candidateId,
       digest:candidate.digest,questTitle:candidate.questTitle,objectiveDescription:candidate.objectiveDescription,
       progress:candidate.progress,targetProgress:candidate.targetProgress}));}
@@ -1367,9 +1448,14 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
      providerQuestLifecycle=labeled(questLifecycle,candidateLabels.questLifecycle),providerProgression=labeled(progression,candidateLabels.progression);
    const modelQuest=relevantQuestCandidates(providerQuest,turn.declaration);
     const currentTools=selectAdventureTools(snapshot,providerTravel,modelQuest,providerChecks,providerInventory,providerCommerce,providerPowers,providerRests,providerConsumables,providerCombatPowers,providerQuestLifecycle,providerProgression);
+  // A declaration that names another known place must not commit a bare raw `actor_dice.roll`
+  // at the current place either. The location-bound exact rows are already withheld above, so this
+  // removes the only remaining whole-check shortcut; navigation stays advertised. Recovery keeps
+  // the persisted tool set untouched so an in-flight settlement never changes shape.
+  const gatedTools = locationAllowed ? currentTools : currentTools.filter((tool)=>tool.name!=="actor_dice.roll");
   const persistedToolNames=earlyRecovery?.response?.status==="succeeded"&&Array.isArray((earlyRecovery.request as any)?.advertisedTools)
     ?new Set((earlyRecovery.request as any).advertisedTools as string[]):null;
-  const selected = persistedToolNames?currentTools.filter((tool)=>persistedToolNames.has(tool.name)):currentTools;
+  const selected = persistedToolNames?gatedTools.filter((tool)=>persistedToolNames.has(tool.name)):gatedTools;
   if(persistedToolNames&&(selected.length!==persistedToolNames.size||selected.some((tool)=>!persistedToolNames.has(tool.name))))
     return{turn,outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};
   const pairOptions=(toolName:string,candidates:readonly LabeledCandidate<any>[])=>candidates.map(candidate=>({toolName,
@@ -1744,17 +1830,19 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
       // confirmation-required candidate. Every hold still carries a machine reason and a safe next
       // step, and a location-mismatched declaration never commits or proposes a current-place check.
       if (!snapshot.encounter) {
-        const heldDestinations = [...new Set(exactTravel.candidates.flatMap((candidate) =>
-          candidate.semanticLabel?.target ? [candidate.semanticLabel.target] : []))];
+        const heldDestinations = [...new Set([...exactTravel.candidates.flatMap((candidate) =>
+          candidate.semanticLabel?.target ? [candidate.semanticLabel.target] : []), ...knownLocationNamesList])];
         const heldReference = declarationLocationReference(turn.declaration, snapshot.currentActorLocation, heldDestinations);
         if (locationBoundCandidatesAllowed(heldReference)
           && resolveHeldDeclarationAsCheck(repository, turn, checkCandidates, dependencies.now())) {
           return { turn: privateTurn(repository, turn.turnId), outcome: "mechanics-committed", limitations: ADVENTURE_TOOL_LIMITATIONS };
         }
-        let followOn: ReturnType<typeof resolveHeldRestProposal> = null;
+        let followOn: ReturnType<typeof resolveHeldRestProposal> | ReturnType<typeof resolveHeldCommerceProposal> = null;
         try {
           followOn = resolveHeldRestProposal(repository, turn, turn.declaration, restCandidates,
-            locationBoundCandidatesAllowed(heldReference), dependencies.now());
+            locationBoundCandidatesAllowed(heldReference), dependencies.now())
+            ?? resolveHeldCommerceProposal(repository, turn, turn.declaration, commerceCandidates,
+              locationBoundCandidatesAllowed(heldReference), dependencies.now());
         } catch {
           // A deterministic follow-on must never break the turn; fall through to the helpful hold.
           followOn = null;
@@ -1763,8 +1851,8 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
       }
       safeEnemyFallback(repository, snapshot, turn.turnId);
       const hold = describeHeldDeclaration({ declaration: turn.declaration, currentLocation: snapshot.currentActorLocation,
-        destinationNames: [...new Set(exactTravel.candidates.flatMap((candidate) =>
-          candidate.semanticLabel?.target ? [candidate.semanticLabel.target] : []))],
+        destinationNames: [...new Set([...exactTravel.candidates.flatMap((candidate) =>
+          candidate.semanticLabel?.target ? [candidate.semanticLabel.target] : []), ...knownLocationNamesList])],
         checkCandidates, restCandidates, commerceCandidates, travelCandidates: exactTravel.candidates });
       return { turn: privateTurn(repository, turn.turnId), outcome: "completed", limitations: ADVENTURE_TOOL_LIMITATIONS, hold };
     }

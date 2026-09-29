@@ -173,6 +173,15 @@ describe("hold descriptions", () => {
     expect(hold.suggestedNextStep).toBe("Travel to Docks");
   });
 
+  it("reports the other destination reason when the declaration also names the current place", () => {
+    // A declaration that names the current place and another known place must not collapse to
+    // `already-at-location`; the destination reason takes precedence.
+    const hold = describeHeldDeclaration(context({ declaration: "I head back to the Market and then on to the Docks." }));
+    expect(hold.reason).toBe("location-mismatch");
+    expect(hold.message).toContain("Docks");
+    expect(hold.message).toContain("the actor is at Market");
+  });
+
   it("states the pending later step of a compound declaration that cannot chain", () => {
     const hold = describeHeldDeclaration(context({
       declaration: "I buy a longsword from Mara and then take a short rest.",

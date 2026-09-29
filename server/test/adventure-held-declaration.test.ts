@@ -63,17 +63,41 @@ function turn(f: ReturnType<typeof fixture>, declaration: string) {
 }
 
 describe("deterministic held-declaration resolution", () => {
-  it("describes the held everyday purchase instead of a silent no-op", async () => {
+  it("proposes a confirmation-required purchase for a held everyday buy instead of a silent no-op", async () => {
     const f = fixture();
     const created = turn(f, "I find Mara's stall and buy a waylamp from Mara.");
-    // The repository binds server-origin commerce to a succeeded provider call, so the honest
-    // outcome is a helpful hold that names the exact advertised candidate rather than a fabricated
-    // proposal.
+    // The server never forges provider evidence and never spends silently: a clear declaration that
+    // maps to exactly one advertised commerce candidate surfaces the ordinary confirmation-required
+    // proposal through the lane-origin path, and only an approved confirmation can commit.
+    const result = await orchestrateAdventureTurn(f.repo, created.turnId, holdingDependencies);
+    expect(result.outcome).toBe("awaiting-confirmation");
+    expect(result.turn.receiptLinks).toEqual([]);
+    expect(result.turn.toolCalls).toHaveLength(1);
+    const proposal = result.turn.toolCalls[0]!.proposal;
+    expect(proposal.toolName).toBe("vendor_buy");
+    expect(proposal.confirmation.state).toBe("pending");
+    expect(proposal.policy.review.summary).toMatch(/Mara.*Waylamp.*10 Glimmer/i);
+    f.repo.decideToolProposals("local-owner", { turnId: created.turnId, proposalIds: [proposal.proposalId], decision: "approved",
+      expectedTurnRevision: result.turn.revision, expectedCampaignRevision: 1, idempotencyKey: `held-buy-approve-${++sequence}` });
+    const completed = await orchestrateAdventureTurn(f.repo, created.turnId, { ...holdingDependencies,
+      complete: async () => { throw new Error("must not redispatch"); } });
+    expect(completed.turn.receiptLinks.length).toBeGreaterThan(0);
+    const receipt = f.repo.getAdventureCommercePublicReceipt("local-owner", f.campaign.id, completed.turn.receiptLinks[0]!.commandId)!;
+    expect(receipt).toMatchObject({ action: "buy", itemLabel: "Waylamp", balanceBefore: 30, balanceAfter: 20 });
+    f.repo.close();
+  });
+
+  it("keeps a helpful hold when no commerce candidate is advertised", async () => {
+    const f = fixture();
+    f.repo.mutateNpcPresence("local-owner", { campaignId: f.campaign.id, sessionId: f.sessionId, npcId: "mara",
+      expectedRevision: 1, idempotencyKey: `held-vendor-leave-${++sequence}`, mutation: { kind: "remove" } });
+    const created = turn(f, "I find Mara's stall and buy a waylamp from Mara.");
     const result = await orchestrateAdventureTurn(f.repo, created.turnId, holdingDependencies);
     expect(result.outcome).toBe("completed");
     expect(result.turn.toolCalls).toEqual([]);
-    expect(result.hold).toMatchObject({ reason: "no-advertised-match", suggestedCandidateId: expect.any(String) });
-    expect(result.hold?.suggestedNextStep).toBe("Buy Waylamp with Mara");
+    expect(result.turn.receiptLinks).toEqual([]);
+    expect(result.hold).toMatchObject({ reason: "no-advertised-match", suggestedCandidateId: null });
+    expect(result.hold?.message).toMatch(/transaction is not advertised/i);
     f.repo.close();
   });
 

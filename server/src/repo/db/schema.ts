@@ -139,6 +139,34 @@ export const ADVENTURE_EXACT_ACTION_EXECUTION_PREDECESSOR_SQL = `CREATE TABLE ad
   FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES adventure_exact_action_proposal_bindings_v56(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT
 )`;
 
+/**
+ * The exact commerce proposal binding table published before lane-origin rows existed: every row
+ * carried provider-call provenance. A database carrying this table (and otherwise current schema)
+ * is upgraded in place to the origin-aware shape beside the matching execution table.
+ */
+export const ADVENTURE_COMMERCE_BINDING_PREDECESSOR_SQL = `CREATE TABLE adventure_commerce_bindings_v57 (
+  proposal_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE, candidate_id TEXT NOT NULL UNIQUE,
+  candidate_digest TEXT NOT NULL, provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, execution_idempotency_key TEXT NOT NULL, bound_at TEXT NOT NULL,
+  UNIQUE(campaign_id,turn_id,proposal_id), FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES tool_proposals(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
+  FOREIGN KEY(candidate_id) REFERENCES adventure_commerce_candidates_v57(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT
+)`;
+
+/**
+ * The exact commerce execution table published before lane-origin rows existed: every row carried
+ * provider-call provenance. A database carrying this table (and otherwise current schema) is
+ * upgraded in place to the origin-aware shape beside the matching binding table.
+ */
+export const ADVENTURE_COMMERCE_EXECUTION_PREDECESSOR_SQL = `CREATE TABLE adventure_commerce_executions_v57 (
+  execution_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE, proposal_id TEXT NOT NULL UNIQUE,
+  provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, command_id TEXT NOT NULL, actor_id TEXT NOT NULL,
+  revision_before INTEGER NOT NULL, revision_after INTEGER NOT NULL CHECK(revision_after=revision_before+1), source_result_digest TEXT NOT NULL CHECK(length(source_result_digest)=64),
+  public_result_json TEXT NOT NULL CHECK(json_valid(public_result_json) AND json_type(public_result_json)='object'), result_digest TEXT NOT NULL CHECK(length(result_digest)=64), occurred_at TEXT NOT NULL,
+  FOREIGN KEY(candidate_id) REFERENCES adventure_commerce_candidates_v57(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES adventure_commerce_bindings_v57(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,actor_id,command_id,revision_after) REFERENCES rpg_m15_receipts_v25(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT
+)`;
+
 const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8")
@@ -496,6 +524,59 @@ export function upgradeAdventureExactActionOriginSchema(
 }
 
 /**
+ * Upgrades only the complete schema whose commerce proposal binding and execution tables predate
+ * lane-origin rows. Both tables are rebuilt in place to the single origin-aware shape, existing rows
+ * are written as `origin='provider'` with their provider provenance preserved, and the immutability
+ * triggers are recreated, so historical provider bindings, executions, and their receipts upgrade
+ * without data loss. Executions are dropped before bindings and created after them so the
+ * execution-to-binding foreign key stays valid throughout.
+ */
+export function upgradeAdventureCommerceOriginSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const bindingsTable = "adventure_commerce_bindings_v57";
+  const executionsTable = "adventure_commerce_executions_v57";
+  const predecessor = expected.map((object) => {
+    if (object.type !== "table") return object;
+    if (object.name === bindingsTable) return { ...object, sql: ADVENTURE_COMMERCE_BINDING_PREDECESSOR_SQL };
+    if (object.name === executionsTable) return { ...object, sql: ADVENTURE_COMMERCE_EXECUTION_PREDECESSOR_SQL };
+    return object;
+  });
+  if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
+  if (db.inTransaction) throw new Error("adventure commerce origin upgrade requires an independent transaction");
+  const bindingDefinition = expected.find((object) => object.type === "table" && object.name === bindingsTable)!;
+  const executionDefinition = expected.find((object) => object.type === "table" && object.name === executionsTable)!;
+  const bindingObjects = expected.filter((object) => object.type !== "table" && object.tbl_name === bindingsTable);
+  const executionObjects = expected.filter((object) => object.type !== "table" && object.tbl_name === executionsTable);
+  db.transaction(() => {
+    db.exec(`CREATE TEMP TABLE ${executionsTable}_upgrade AS SELECT * FROM ${executionsTable}`);
+    db.exec(`CREATE TEMP TABLE ${bindingsTable}_upgrade AS SELECT * FROM ${bindingsTable}`);
+    db.exec(`DROP TABLE ${executionsTable}`);
+    db.exec(`DROP TABLE ${bindingsTable}`);
+    db.exec(bindingDefinition.sql);
+    db.exec(executionDefinition.sql);
+    db.exec(`INSERT INTO ${bindingsTable} (proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,origin,
+      provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at)
+      SELECT proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,'provider',
+      provider_call_id,provider_tool_call_id,NULL,execution_idempotency_key,bound_at FROM ${bindingsTable}_upgrade`);
+    db.exec(`INSERT INTO ${executionsTable} (execution_id,candidate_id,campaign_id,turn_id,proposal_id,origin,
+      provider_call_id,provider_tool_call_id,system_one_decision_id,command_id,actor_id,revision_before,revision_after,
+      source_result_digest,public_result_json,result_digest,occurred_at)
+      SELECT execution_id,candidate_id,campaign_id,turn_id,proposal_id,'provider',
+      provider_call_id,provider_tool_call_id,NULL,command_id,actor_id,revision_before,revision_after,
+      source_result_digest,public_result_json,result_digest,occurred_at FROM ${executionsTable}_upgrade`);
+    db.exec(`DROP TABLE ${bindingsTable}_upgrade`);
+    db.exec(`DROP TABLE ${executionsTable}_upgrade`);
+    for (const object of [...bindingObjects, ...executionObjects]) db.exec(object.sql);
+    validate();
+  }).immediate();
+  return true;
+}
+
+/**
  * Upgrades only the complete schema whose `encounter.status` CHECK predates the
  * explicit `cancelled` state. The encounter table is rebuilt in place to widen
  * the CHECK and its indexes/triggers are recreated, so historical preparing,
@@ -556,6 +637,7 @@ const schemaRecognizers: SchemaRecognizer[] = [
   upgradeCatalogAttestationLimitSchema,
   upgradeAdventureCheckExecutionOriginSchema,
   upgradeAdventureExactActionOriginSchema,
+  upgradeAdventureCommerceOriginSchema,
   upgradeEncounterCancelledStatusSchema,
   upgradeFactionRelationsSchema,
 ];

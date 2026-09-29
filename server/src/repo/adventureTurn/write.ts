@@ -48,6 +48,17 @@ export interface AppendAdventureCombatProposalFromLaneInput {
   idempotencyKey: string;
 }
 
+/** One lane-origin commerce proposal request binding an already-recorded decision to an advertised candidate. */
+export interface AppendAdventureCommerceProposalFromLaneInput {
+  turnId: string;
+  decisionId: string;
+  candidateId: string;
+  digest: string;
+  expectedTurnRevision: number;
+  expectedCampaignRevision: number;
+  idempotencyKey: string;
+}
+
 type Database = DatabaseDriver.Database;
 type AggregateKind = "turn" | "draft";
 type Action = "turn" | "provider" | "draft";
@@ -76,6 +87,15 @@ export interface AdventureTurnWriteRepository {
    * the ordinary confirmation API. Replay-safe per decision and selection.
    */
   appendAdventureCombatProposalFromLane(principalId: string, input: AppendAdventureCombatProposalFromLaneInput): PrivateAdventureTurn;
+  /**
+   * Appends the normal confirmation-required commerce proposal for one advertised lane candidate.
+   * The already-recorded decision, the advertised commerce digest, and the exact server-derived
+   * arguments are validated, the binding is written with `origin='lane'` and the decision id, and
+   * mechanics still commit only through the ordinary confirmation API. Replay-safe per decision
+   * and selection. This is the server-origin peer of the provider commerce path and never forges
+   * provider evidence or spends without an approved confirmation.
+   */
+  appendAdventureCommerceProposalFromLane(principalId: string, input: AppendAdventureCommerceProposalFromLaneInput): PrivateAdventureTurn;
   /** Persists the exact confirmation wait command and immutable result. */
   waitForToolConfirmation(principalId: string, input: TurnMutationInput): PrivateAdventureTurn;
   /** Records one exact, non-expired proposal decision. */
@@ -376,12 +396,36 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
               args.providerCallId,args.providerToolCallId,executionKey,at);
         }else if(commandType(input.toolName)==="commerce_action"){
           const args=input.arguments as Record<string,unknown>;
-          const candidate=db.prepare("SELECT action,candidate_digest FROM adventure_commerce_candidates_v57 WHERE candidate_id=? AND turn_id=?").get(args.candidateId,row.id)as any;
-          const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=? AND response.provider_call_id=? AND response.status='succeeded'
-            AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')='exact_vendor_commerce.select'
-              AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`).get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.candidateId,args.digest);
-          if(!candidate||!response||candidate.candidate_digest!==args.digest||`vendor_${candidate.action}`!==input.toolName||!policy.requiresConfirmation)throw new AdventureTurnConflictError("commerce proposal is not bound to an exact provider candidate");
-          db.prepare("INSERT INTO adventure_commerce_bindings_v57 VALUES(?,?,?,?,?,?,?,?,?)").run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,args.providerCallId,args.providerToolCallId,executionKey,at);
+          const candidate=db.prepare("SELECT action,candidate_digest,session_id,batch_id FROM adventure_commerce_candidates_v57 WHERE candidate_id=? AND turn_id=?").get(args.candidateId,row.id)as any;
+          const laneDecisionId=typeof args.systemOneDecisionId==="string"?args.systemOneDecisionId:null;
+          if(laneDecisionId){
+            // Lane/server-origin proposal: the decision must already exist and match the turn, the
+            // selection must be an advertised commerce candidate whose batch projection verifies,
+            // and the derived server policy must still require confirmation. Only the ordinary
+            // confirmation API can approve the proposal; nothing commits here.
+            const batch=candidate&&db.prepare("SELECT projection_json,projection_digest FROM adventure_commerce_batches_v57 WHERE batch_id=?").get(candidate.batch_id)as any;
+            let projection:any=null;try{projection=batch&&JSON.parse(batch.projection_json);}catch{projection=null;}
+            const decision=db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(laneDecisionId)as any;
+            if(!candidate||candidate.candidate_digest!==args.digest||!batch
+              ||sha256(batch.projection_json)!==batch.projection_digest||!Array.isArray(projection?.candidates)
+              ||!projection.candidates.some((entry:any)=>entry?.candidateId===args.candidateId&&entry?.digest===args.digest)
+              ||!decision||decision.turn_id!==row.id||`vendor_${candidate.action}`!==input.toolName
+              ||(decision.campaign_id!==null&&decision.campaign_id!==row.campaign_id)
+              ||(decision.session_id!==null&&decision.session_id!==candidate.session_id)
+              ||!policy.requiresConfirmation)
+              throw new AdventureTurnConflictError("commerce proposal is not bound to an advertised lane candidate");
+            db.prepare(`INSERT INTO adventure_commerce_bindings_v57(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,origin,
+              provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at)
+              VALUES(?,?,?,?,?,'lane',NULL,NULL,?,?,?)`).run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,laneDecisionId,executionKey,at);
+          }else{
+            const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=? AND response.provider_call_id=? AND response.status='succeeded'
+              AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')='exact_vendor_commerce.select'
+                AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`).get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.candidateId,args.digest);
+            if(!candidate||!response||candidate.candidate_digest!==args.digest||`vendor_${candidate.action}`!==input.toolName||!policy.requiresConfirmation)throw new AdventureTurnConflictError("commerce proposal is not bound to an exact provider candidate");
+            db.prepare(`INSERT INTO adventure_commerce_bindings_v57(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,origin,
+              provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at)
+              VALUES(?,?,?,?,?,'provider',?,?,NULL,?,?)`).run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,args.providerCallId,args.providerToolCallId,executionKey,at);
+          }
         }else if(["power_action","rest_action","combat_consumable_action","combat_power_action","quest_lifecycle_action","progression_action"].includes(commandType(input.toolName))){
           const args=input.arguments as Record<string,unknown>,kind=commandType(input.toolName)==="power_action"?"power":commandType(input.toolName)==="rest_action"?"rest":commandType(input.toolName)==="combat_consumable_action"?"combat-consumable":commandType(input.toolName)==="combat_power_action"?"combat-power":commandType(input.toolName)==="progression_action"?"progression":input.toolName==="quest_accept"?"quest-accept":input.toolName==="quest_abandon"?"quest-abandon":"quest-reward";
           const candidate=db.prepare("SELECT candidate_digest,action_kind,public_json,session_id,batch_id FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?")
@@ -538,6 +582,58 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
             ...(consumable ? { combatConsumableConsequences: publicValue.consequences }
               : { combatPowerConsequences: publicValue.consequences }),
             encounterId: privateValue.encounterId, expectedCombatRevision: privateValue.expectedCombatRevision },
+          requiresConfirmation: true,
+          confirmationExpiresAt: utcIsoTimestampSchema.parse(new Date(context.clock.now().getTime() + 30 * 60_000).toISOString()),
+          expectedTurnRevision: input.expectedTurnRevision,
+          expectedCampaignRevision: input.expectedCampaignRevision,
+          idempotencyKey: input.idempotencyKey,
+        });
+      });
+    },
+    appendAdventureCommerceProposalFromLane(principalId, raw) {
+      const input = laneProposalInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const candidate = db.prepare(`SELECT candidate_id,candidate_digest,action,public_json,session_id,batch_id
+          FROM adventure_commerce_candidates_v57 WHERE candidate_id=? AND turn_id=?`).get(input.candidateId, row.id) as any;
+        const batch = candidate && db.prepare("SELECT projection_json,projection_digest FROM adventure_commerce_batches_v57 WHERE batch_id=?")
+          .get(candidate.batch_id) as any;
+        let projection: any = null; try { projection = batch && JSON.parse(batch.projection_json); } catch { projection = null; }
+        let publicValue: any = null; try { publicValue = candidate && JSON.parse(candidate.public_json); } catch { publicValue = null; }
+        const decision = db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(input.decisionId) as any;
+        if (!candidate || candidate.candidate_digest !== input.digest || !batch
+          || sha256(batch.projection_json) !== batch.projection_digest || !Array.isArray(projection?.candidates)
+          || !projection.candidates.some((entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest)
+          || !decision || decision.turn_id !== row.id
+          || (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id)
+          || (decision.session_id !== null && decision.session_id !== candidate.session_id))
+          throw new AdventureTurnConflictError("adventure commerce proposal is not bound to an advertised lane candidate");
+        const existing = db.prepare("SELECT binding.* FROM adventure_commerce_bindings_v57 binding WHERE binding.campaign_id=? AND binding.turn_id=?")
+          .get(row.campaign_id, row.id) as any;
+        if (existing) {
+          if (existing.origin === "lane" && existing.system_one_decision_id === input.decisionId
+            && existing.candidate_id === input.candidateId && existing.candidate_digest === input.digest)
+            return privateTurn(principalId, row.id);
+          throw new AdventureTurnConflictError("adventure commerce proposal replay changed");
+        }
+        const action = candidate.action;
+        if ((action !== "buy" && action !== "sell" && action !== "give")
+          || typeof publicValue?.vendorLabel !== "string" || !publicValue.vendorLabel
+          || typeof publicValue?.itemLabel !== "string" || !publicValue.itemLabel
+          || !Number.isSafeInteger(publicValue?.quantity) || publicValue.quantity < 1)
+          throw new AdventureTurnConflictError("adventure commerce candidate is unavailable");
+        // The advertised candidate owns every mechanical field; the lane proposal mirrors the
+        // provider path's exact argument shape minus its provider evidence. The single shared
+        // proposal implementation derives the confirmation policy, writes the origin='lane'
+        // binding through its commerce branch, and advances the turn to `proposed`.
+        return repository.appendToolProposal(principalId, {
+          turnId: input.turnId,
+          toolName: `vendor_${action}`,
+          arguments: { candidateId: input.candidateId, digest: input.digest, systemOneDecisionId: input.decisionId,
+            vendorLabel: publicValue.vendorLabel, shopLabel: publicValue.shopLabel, itemLabel: publicValue.itemLabel,
+            itemQuantity: publicValue.quantity, itemRecipient: publicValue.vendorLabel, commerceAction: action,
+            currencyLabel: publicValue.currencyLabel, priceMinorUnits: publicValue.priceMinorUnits,
+            commerceConsequence: publicValue.consequence },
           requiresConfirmation: true,
           confirmationExpiresAt: utcIsoTimestampSchema.parse(new Date(context.clock.now().getTime() + 30 * 60_000).toISOString()),
           expectedTurnRevision: input.expectedTurnRevision,
