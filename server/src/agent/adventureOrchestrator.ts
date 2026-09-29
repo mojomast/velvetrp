@@ -785,10 +785,10 @@ const ADVENTURE_AFFORDANCE_FAMILY: Readonly<Record<string, AdventureAffordance["
 };
 /**
  * Projects the bounded, role-safe affordance list from the exact advertised candidate options the
- * provider already sees. Only server-issued labels are read: no provider output, no private IDs, and
- * no executable instruction. Family order and advertised row order are preserved, duplicate rows are
- * collapsed, and the list is capped small. Raw attribute and combat-action rows are intentionally
- * excluded so the client only advertises the closed exact-candidate families.
+ * provider already sees. Only server-issued labels are read: no provider output, no server-internal
+ * ids, and no executable instruction. Family order and advertised row order are preserved, duplicate
+ * rows are collapsed, and the list is capped small. Raw attribute and combat-action rows are
+ * intentionally excluded so the client only advertises the closed exact-candidate families.
  */
 export function advertisedAffordances(options: readonly AdventureCandidateContextOption[]): AdventureAffordance[] {
   const affordances: AdventureAffordance[] = []; const seen = new Set<string>();
@@ -800,11 +800,10 @@ export function advertisedAffordances(options: readonly AdventureCandidateContex
     const label = parsed.data;
     const scope = label.target ? `${label.source ? `${label.source} ` : ""}→ ${label.target}` : (label.source ?? "");
     const text = scope ? `${label.action}: ${scope}` : label.action;
-    const candidateId = typeof option.arguments["candidateId"] === "string" ? option.arguments["candidateId"] : null;
-    const key = `${family}\u0000${text}\u0000${candidateId ?? ""}`;
+    const key = `${family}\u0000${text}`;
     if (text.length === 0 || seen.has(key)) continue;
     seen.add(key);
-    affordances.push({ family, label: text.slice(0, 500), target: label.target ? label.target.slice(0, 200) : null, candidateId });
+    affordances.push({ family, label: text.slice(0, 500), target: label.target ? label.target.slice(0, 200) : null });
     if (affordances.length >= MAX_ADVENTURE_AFFORDANCES) break;
   }
   return affordances;

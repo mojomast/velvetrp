@@ -18,8 +18,8 @@ describe("CampaignConversation", () => {
       { type: "mechanics_committed", sequence: 3, timestamp: at, payload: { receipts: [{ commandId: "command", proposalId: "proposal", linkedAt: at }] } },
       { type: "narration_delta", sequence: 4, timestamp: at, payload: { text: "The gate opens." } },
       { type: "choice", sequence: 5, timestamp: at, payload: { choices: [
-        { family: "travel", label: "Travel: Lantern Quay → Keeper House", target: "Keeper House", candidateId: "candidate-1" },
-        { family: "commerce", label: "buy: Lantern oil at the quay stall → Keeper Maren", target: "Keeper Maren", candidateId: null },
+        { family: "travel", label: "Travel: Lantern Quay → Keeper House", target: "Keeper House" },
+        { family: "commerce", label: "buy: Lantern oil at the quay stall → Keeper Maren", target: "Keeper Maren" },
       ] } },
       { type: "confirmation_required", sequence: 6, timestamp: at, payload: { proposalIds: ["proposal"], expiresAt: at } },
       { type: "terminal", sequence: 7, timestamp: at, payload: { outcome: "done", turn, narrationStatus: { status: "completed", text: "The gate opens.", source: "provider-assisted" }, receipts: [{ commandId: "command", proposalId: "proposal", linkedAt: at }] } },

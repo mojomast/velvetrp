@@ -675,8 +675,8 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
       {toolName:"actor_attribute.set",arguments:{attributeCandidateId:"attr"},label:{action:"Set actor attribute",source:"Strength",target:null,cost:null,consequence:"Change the value."}},
     ];
     expect(advertisedAffordances(options)).toEqual([
-      {family:"commerce",label:"buy: Lantern oil at the quay stall → Keeper Maren",target:"Keeper Maren",candidateId:"vendor-candidate"},
-      {family:"quest",label:"Advance quest objective: Restore the Harbor Light → Light the beacon",target:"Light the beacon",candidateId:"quest-candidate"},
+      {family:"commerce",label:"buy: Lantern oil at the quay stall → Keeper Maren",target:"Keeper Maren"},
+      {family:"quest",label:"Advance quest objective: Restore the Harbor Light → Light the beacon",target:"Light the beacon"},
     ]);
   });
 
@@ -703,11 +703,11 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
     expect(choices).toHaveLength(1);expect(parsed.indexOf(choices[0]!)).toBeLessThan(terminalIndex);
     if(choices[0]?.type!=="choice")throw new Error("choice affordance event missing");
     expect(choices[0].payload.choices).toEqual([
-      {family:"travel",label:"Travel: Place La Salle → Pointe-Saint-Gilles",target:"Pointe-Saint-Gilles",candidateId:expect.any(String)},
-      {family:"travel",label:"Travel: Place La Salle → Parc des Pionniers",target:"Parc des Pionniers",candidateId:expect.any(String)},
+      {family:"travel",label:"Travel: Place La Salle → Pointe-Saint-Gilles",target:"Pointe-Saint-Gilles"},
+      {family:"travel",label:"Travel: Place La Salle → Parc des Pionniers",target:"Parc des Pionniers"},
     ]);
-    // No internal identifiers or private route/location ids leak into the advertised event.
-    expect(response.body).not.toMatch(/aff-origin|aff-pointe|aff-parc|aff-route/);
+    // No server-internal candidate ids, internal identifiers, or private route/location ids leak.
+    expect(response.body).not.toMatch(/candidateId|candidate:|aff-origin|aff-pointe|aff-parc|aff-route/);
     await app.close();
   });
 

@@ -182,15 +182,14 @@ export const adventureAffordanceFamilySchema = z.enum([
 /**
  * One bounded, role-safe advertised candidate the client may offer as an explicit affordance.
  * The family labels the advertised candidate family, `label` is the server-issued human-readable
- * text, `target` is the advertised destination/vendor/target when one exists, and `candidateId`
- * is the opaque server handle only when a real advertised candidate backs the row. It carries no
- * private facts, no provider arguments, and no executable instruction; choosing it only declares.
+ * text, and `target` is the advertised destination/vendor/target when one exists. It carries no
+ * server-internal id, no private facts, no provider arguments, and no executable instruction;
+ * choosing it only declares.
  */
 export const adventureAffordanceSchema = z.object({
   family: adventureAffordanceFamilySchema,
   label: z.string().trim().min(1).max(500),
   target: z.string().trim().min(1).max(200).nullable(),
-  candidateId: resourceIdSchema.nullable(),
 }).strict();
 /**
  * One bounded, non-executable list of the advertised candidates for a turn. A turn with no
