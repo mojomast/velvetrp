@@ -584,6 +584,37 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
     await app.close();
   });
 
+  it("shows a deliberate hold's reason and safe next step without a narration provider dispatch",async()=>{
+    enable();const campaign=seed("dnd");const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    db.prepare("INSERT INTO campaign_locations_v28 VALUES('origin',?,NULL,'Ferry Deck','','public',?)").run(campaign.id,at);
+    db.prepare("INSERT INTO campaign_locations_v28 VALUES('destination',?,NULL,'Black Berth','','public',?)").run(campaign.id,at);
+    db.prepare("INSERT INTO campaign_location_connections_v28 VALUES('crossing',?,'origin','destination','public','open','none',NULL,NULL,?)").run(campaign.id,at);
+    db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,'origin','session',0,?)").run(campaign.id,"actor",at);
+    db.prepare("INSERT INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(campaign.id,"actor","origin",at);db.close();
+    // The declaration names a different advertised place with a concrete check attempt, so the
+    // server holds instead of committing a location-bound check. Planning may hold; narration must
+    // not dispatch, because the bounded reason and next step are already deterministic.
+    let calls=0;
+    const dependencies:AdventureAgentDependencies={complete:async()=>{calls+=1;
+      return{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};},
+      getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date(at)};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository({clock:{now:()=>new Date(at)}}),adventureAgentDependencies:dependencies});
+    const payload={campaignId:campaign.id,sessionId:"session",actorId:"actor",
+      declaration:"I search the warehouse crates at the Black Berth.",expectedRevision:0,idempotencyKey:"hold-player-visible"};
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload});
+    expect(calls).toBe(1);
+    const terminal=events(response.body).at(-1);
+    expect(terminal).toMatchObject({type:"terminal",payload:{receipts:[],narrationStatus:{status:"completed",source:"deterministic-fallback",
+      text:expect.stringContaining("The declaration names Black Berth, but the actor is at Ferry Deck.")}}});
+    if(terminal?.type!=="terminal")throw new Error("hold terminal missing");
+    expect(terminal.payload.narrationStatus.text).toContain("Suggested next step: Travel to Black Berth.");
+    expect(terminal.payload.narrationStatus.text).toContain("no movement or other campaign change is established");
+    // Replaying the same turn keeps the same player-visible hold text.
+    const replay=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload});
+    expect(events(replay.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{text:terminal.payload.narrationStatus.text,source:"deterministic-fallback"}}});
+    await app.close();
+  });
+
   it("narrates completed travel only from its committed exact-travel receipt",async()=>{
     enable();const campaign=seed();const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
     db.prepare("INSERT INTO campaign_locations_v28 VALUES('origin',?,NULL,'Ferry Deck','','public',?)").run(campaign.id,at);

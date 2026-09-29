@@ -17,7 +17,7 @@ import {
 } from "../../../repo/index.js";
 import { openSse, type SseWriter } from "../../roleplay/generationService.js";
 import { adventureProviderPromptEstimate, createAdventureTurnBudgetPolicy, effectiveAdventureTurnMaxTokens, initializeAdventureTurnBudget,
-  orchestrateAdventureTurn, type AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
+  orchestrateAdventureTurn, declarationIntent, type AdventureAgentDependencies, type AdventureHold } from "../../../agent/adventureOrchestrator.js";
 import type { Repository } from "../../../repo/index.js";
 import { completeWithProvider, ProviderHttpError } from "../../../provider/index.js";
 import { getPromptPreset } from "../../../presets.js";
@@ -204,6 +204,33 @@ function zeroReceiptFallback(declaration: string, currentLocation: string | null
 export function narrationFallback(declaration: string, values: readonly NarrationReceipt[], context?: NarrationFallbackContext): string {
   if (values.length > 0) return composeNarration(values);
   return zeroReceiptFallback(declaration, context?.currentLocation ?? null);
+}
+
+/**
+ * Deterministic, player-visible prose for a deliberate, actionable hold. The orchestrator has
+ * already bounded the machine reason and a safe next step over advertised candidates only, so this
+ * only frames them and keeps the standing no-mechanics guard. A candidate id is never rendered, so
+ * no private or server-internal fact can leak. The composition is pure, so replaying the same turn
+ * yields byte-identical prose and no provider call is required to explain the hold.
+ */
+export function holdNarration(hold: AdventureHold): string {
+  const message = hold.message.trim();
+  const step = hold.suggestedNextStep?.trim();
+  return `${message}${step ? ` Suggested next step: ${step}.` : ""} Nothing is resolved; no movement or other campaign change is established.`;
+}
+
+/**
+ * True when a deliberate hold should replace provider narration with the deterministic hold line.
+ * Only a declaration that names a concrete action family (or an advertised check it strongly maps
+ * to) gets a server-stated reason and next step; a pure conversation, question, or meta hold keeps
+ * its provider-backed prose. The classifier is the orchestrator's single deterministic vocabulary,
+ * so the route never invents its own intent.
+ */
+export function holdNarrationIsWarranted(hold: AdventureHold, declaration: string): boolean {
+  if (!hold.suggestedNextStep) return false;
+  const intent = declarationIntent(declaration);
+  return intent.commerce || intent.give || intent.rest || intent.check || intent.combat
+    || intent.travel || intent.quest || intent.progression;
 }
 
 /** Receipt-only prose retained for every provider and settings failure lane. */
@@ -535,8 +562,15 @@ function narrationRepairMessage(input: { values: readonly NarrationReceipt[]; cu
   ].join("\n\n") };
 }
 async function performNarration(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
-  signal: AbortSignal): Promise<NarrationResult> {
+  signal: AbortSignal, hold?: AdventureHold): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, turn);
+  // A deliberate hold with a safe advertised next step is narrated deterministically from the
+  // orchestrator's bounded reason, so the player always sees why the action did not resolve and
+  // what to try next. A held turn carries no receipts. A hold with no advertised step (for
+  // example pure conversation) keeps the existing provider-backed narration unchanged.
+  if (hold?.suggestedNextStep && turn.receiptLinks.length === 0 && holdNarrationIsWarranted(hold, turn.declaration)) {
+    return { turn, text: holdNarration(hold), source: "deterministic-fallback" };
+  }
   let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? []);
   if (!safeReceipts) return { turn, text: fallbackText,source:"deterministic-fallback" };
   const callId = key("narration-provider", turn.turnId);
@@ -694,8 +728,8 @@ function publicNarrationContext(repo:Repo&Repository,turn:PrivateAdventureTurn){
     safety:repo.getSessionZeroSafetyPolicy(OWNER,turn.campaignId)};
 }
 async function narrate(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
-  signal: AbortSignal): Promise<NarrationResult> {
-  return performNarration(repo,turn,dependencies,signal);
+  signal: AbortSignal, hold?: AdventureHold): Promise<NarrationResult> {
+  return performNarration(repo,turn,dependencies,signal,hold);
 }
 
 function projectTurn(turn: PrivateAdventureTurn) {
@@ -813,6 +847,7 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
   streamKind: "initial" | "resume" | "variant", agentDependencies?:AdventureAgentDependencies,
   onNarrationSettled?: AdventureTurnsHttpOptions["onNarrationSettled"]): Promise<void> {
   let writer: SseWriter | null = null; let heartbeat: NodeJS.Timeout | null = null; let sequence = 0; let closed = false; let terminal = false;
+  let hold: AdventureHold | undefined;
   const abort = new AbortController();
   const send = (event: Omit<AdventureTurnStreamEvent, "sequence" | "timestamp">) => {
     if (!writer || closed) return;
@@ -852,6 +887,7 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
     if ((streamKind === "initial" || streamKind === "resume") && (["declared","proposed"].includes(turn.state)
       ||turn.toolCalls.some((call)=>call.status==="approved"))) {
       let agent=await orchestrateAdventureTurn(repo as Repo & Repository,turn.turnId,agentDependencies,abort.signal);turn=agent.turn;
+      hold=agent.hold;
       await yieldToEventLoop();
       if (closed) return;
       // An exclusive dispatch owner may be running in another resume. Wait for
@@ -862,6 +898,7 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
         if (closed) return;
         turn=requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId));
         agent=await orchestrateAdventureTurn(repo as Repo & Repository,turn.turnId,agentDependencies,abort.signal);turn=agent.turn;
+        hold=agent.hold;
       }
     }
     if (closed) return;
@@ -899,7 +936,7 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
         expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
         idempotencyKey: key("http-narrating", turn.turnId), narrationStatus: "in-progress" });
       await yieldToEventLoop();
-       const narrated = await narrate(repo as Repo & Repository, turn, agentDependencies, abort.signal);
+       const narrated = await narrate(repo as Repo & Repository, turn, agentDependencies, abort.signal, hold);
        turn = narrated.turn; narration = narrated.text;
       if(turn.state!=="completed")try{turn = repo.updateAdventureTurnNarration(OWNER, { turnId: turn.turnId, expectedTurnRevision: turn.revision,
         expectedCampaignRevision: turn.campaignRevision, idempotencyKey: key("http-narrated", turn.turnId),
