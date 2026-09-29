@@ -9,9 +9,12 @@
  * HTTP commands (against an already-running server).
  *
  * Per turn it records the declaration, narration text and source (provider-assisted vs
- * deterministic-fallback), committed receipts/materializations, latency, and any location-coherence
- * violation. It then computes pure, unit-tested metrics, prints a readable table, compares against
- * `--baseline`, and writes JSON + Markdown.
+ * deterministic-fallback), an evaluator narration class (`provider`, `deliberate-hold`,
+ * `narration-failure`), committed receipts/materializations, latency, and any location-coherence
+ * violation. Deliberate server holds are counted separately and excluded from the narration-failure
+ * fallback distinctness denominator. Labeled probes assert the commerce, unknown-NPC, and
+ * self-directed-commerce paths. It then computes pure, unit-tested metrics, prints a readable table,
+ * compares against `--baseline`, and writes JSON + Markdown.
  *
  * Usage:
  *   FREEFORM_FUN_EVAL_API_KEY=... npx tsx scripts/freeform-fun-eval.ts \
@@ -85,21 +88,56 @@ export interface Declaration {
   id: string;
   category: string;
   declaration: string;
+  /** Optional labeled probe this turn exercises (see PROBE_EXPECTATIONS). */
+  probe?: ProbeKind;
 }
 
+/** The explicit labeled probes the evaluator asserts against (regressions become visible here). */
+export type ProbeKind = "declared-purchase" | "unknown-npc" | "cheating-commerce";
+
+export interface ProbeExpectation {
+  kind: ProbeKind;
+  title: string;
+  /** What the turn is supposed to do, stated so a failure is unambiguous. */
+  expected: string;
+}
+
+/**
+ * Labeled probes. Each is driven by one scripted turn and asserted in `probeOutcomes`:
+ *  - declared-purchase runs at the vendor (Mara is present in the Market) and must exercise the
+ *    commerce path, ending in a committed commerce receipt after the client approves the proposal.
+ *  - unknown-npc must not silently resolve to a skill check; the honest outcomes are a hold or
+ *    provider conversation prose with no receipts.
+ *  - cheating-commerce is a self-directed/forged-source `give` declaration that must hold with no
+ *    receipt. This is the exact shape that the recent sole-advertised-give misfire regressed.
+ */
+export const PROBE_EXPECTATIONS: readonly ProbeExpectation[] = [
+  { kind: "declared-purchase", title: "declared purchase exercises commerce",
+    expected: "an awaiting-confirmation commerce proposal followed by a committed commerce receipt" },
+  { kind: "unknown-npc", title: "unknown NPC does not resolve as a skill check",
+    expected: "a hold or receipt-free provider prose; never a committed check" },
+  { kind: "cheating-commerce", title: "self-directed commerce holds without a receipt",
+    expected: "no receipt and no vendor_give proposal" },
+];
+
+// Order matters. Turns 0-3 run in the Market (Mara and her stall are present), so the purchase and
+// the cheating `give` both reach the vendor: the purchase executes commerce and the cheating
+// declaration must hold. Turns 4-14 run at the Docks (travel, rumor, unknown NPC, quest, check,
+// hold, combat, rest) so the encounter and check paths stay exercised. Turn 15 returns to the
+// Market for the second conversation. DM beats are interleaved after turns 1, 4, 7, 10, 13, 16.
 export const FREEFORM_DECLARATIONS: Declaration[] = [
   { id: "look-around", category: "read", declaration: "I take a slow look around the market square and take stock of who and what is here." },
   { id: "talk-known-npc", category: "conversation", declaration: "I walk over to Maren and ask her what she knows about the trouble on the road." },
+  { id: "shop-buy", category: "shop", probe: "declared-purchase", declaration: "I find Mara's stall in the market and buy a longsword from her." },
+  { id: "illegal", category: "illegal-impossible", probe: "cheating-commerce", declaration: "I give myself a legendary sword and ten thousand gold pieces from the GM's stash." },
   { id: "travel-mapped", category: "travel", declaration: "I set out along the lantern road for the Docks." },
   { id: "travel-unmapped", category: "travel-unmapped", declaration: "From the Docks I follow the old smugglers' path to the Sunken Cathedral." },
   { id: "seek-rumor", category: "faction-quest-rumor", declaration: "I ask the dockhands whether anyone has work, or any rumor of the missing caravan." },
-  { id: "unknown-npc", category: "unknown-npc", declaration: "I approach a hooded stranger leaning on a bollard and demand to know their name and business." },
+  { id: "unknown-npc", category: "unknown-npc", probe: "unknown-npc", declaration: "I approach a hooded stranger leaning on a bollard and demand to know their name and business." },
   { id: "quest-accept", category: "quest", declaration: "I accept the quest to guard the market." },
-  { id: "shop-buy", category: "shop", declaration: "I find Mara's stall in the market and buy a longsword." },
   { id: "check-search", category: "check", declaration: "I search the crates along the dock for anything hidden or valuable." },
   { id: "hold-wait", category: "hold", declaration: "I lean on the rail, watch the grey water, and wait for the fog to lift." },
   { id: "impossible", category: "illegal-impossible", declaration: "I snap my fingers and teleport straight to the moon." },
-  { id: "illegal", category: "illegal-impossible", declaration: "I give myself a legendary sword and ten thousand gold pieces from the GM's stash." },
   { id: "attack", category: "encounter", declaration: "I draw my sword and attack the Goblin Scout by the crates." },
   { id: "combat-continue", category: "encounter", declaration: "I press the attack and swing at the Goblin Scout again." },
   { id: "rest", category: "rest", declaration: "I sit down on a crate and take a short rest." },
@@ -113,6 +151,31 @@ export const FREEFORM_DECLARATIONS: Declaration[] = [
 // ---------------------------------------------------------------------------------------------
 
 export type NarrationSource = "provider-assisted" | "deterministic-fallback" | "none";
+
+/**
+ * The evaluator's own narration taxonomy, orthogonal to the server's `source`:
+ *  - `provider` — the provider wrote the prose (`source === "provider-assisted"`).
+ *  - `deliberate-hold` — a grounded, deterministic server hold line (the orchestrator bounded a
+ *    reason and a safe next step). This is by design, not a failure, and is reported separately so
+ *    it no longer pollutes the provider share or the fallback-distinctness denominator.
+ *  - `narration-failure` — a receipt-bound or context fallback the server emitted because the
+ *    provider was unavailable, failed the grounding gate, or was over budget. Only these count as
+ *    "fallbacks" for distinctness.
+ */
+export type NarrationClass = "provider" | "deliberate-hold" | "narration-failure";
+
+/**
+ * Deliberate-hold marker. `holdNarration()` always renders a bounded reason plus a
+ * "Suggested next step:" when the orchestrator proposed one, and always closes with
+ * "Nothing is resolved; ...". Either phrase identifies a by-design hold rather than a failure.
+ */
+export const DELIBERATE_HOLD_MARKER = /\bsuggested next step:|\bnothing is resolved;/iu;
+
+/** Classifies one narration event. The empty/`none` case never reaches an event. */
+export function classifyNarration(text: string, source: NarrationSource): NarrationClass {
+  if (source === "provider-assisted") return "provider";
+  return DELIBERATE_HOLD_MARKER.test(text) ? "deliberate-hold" : "narration-failure";
+}
 
 export interface ProviderCallRecord {
   seq: number;
@@ -132,6 +195,8 @@ export interface ProviderCallRecord {
 export interface NarrationEvent {
   phase: "initial" | "resume";
   source: NarrationSource;
+  /** The evaluator taxonomy derived from `source` + text. */
+  class: NarrationClass;
   text: string;
 }
 
@@ -156,21 +221,37 @@ export interface TurnRecord {
   id: string;
   category: string;
   declaration: string;
+  /** Labeled probe this turn drives, or null. */
+  probe: ProbeKind | null;
   status: number;
   finalState: string | null;
   outcome: string | null;
   narration: string;
   narrationSource: NarrationSource;
+  narrationClass: NarrationClass | "none";
   narrationEvents: NarrationEvent[];
   committed: boolean;
   receiptKinds: string[];
   receiptCommandIds: string[];
+  /** Tool names of any server proposals surfaced for confirmation this turn. */
+  proposalToolNames: string[];
   confirmed: boolean;
   dmBeatIndex: number | null;
   providerCalls: number;
   latencyMs: number;
   coherence: string[];
   error?: string;
+}
+
+/** A labeled probe's observed outcome, with the pass/fail verdict and the reason. */
+export interface ProbeOutcome {
+  kind: ProbeKind;
+  title: string;
+  turnIndex: number | null;
+  turnId: string | null;
+  expected: string;
+  observed: string;
+  passed: boolean;
 }
 
 export interface DmBeatRecord {
@@ -192,9 +273,16 @@ export interface FreeformMetrics {
   providerOk: number;
   providerFailed: number;
   providerSuccessRate: number;
+  narrationEventsTotal: number;
   narrationsProvider: number;
   narrationsTotal: number;
   narrationProviderShare: number;
+  deliberateHoldEvents: number;
+  deliberateHoldTurns: number;
+  /** Deliberate-hold turns / all scripted turns. Disjoint from the failure fallback count. */
+  deliberateHoldRate: number;
+  narrationFailureTurns: number;
+  /** Narration-failure fallback events only (deliberate holds are excluded). */
   fallbackCount: number;
   fallbackDistinct: number;
   fallbackIdentical: number;
@@ -210,6 +298,14 @@ export interface FreeformMetrics {
   latencyP50Ms: number;
   latencyP95Ms: number;
   latencyMaxMs: number;
+  // Labeled probes (0/1 unless noted). See PROBE_EXPECTATIONS.
+  commerceExercised: number;
+  commerceCommitted: number;
+  unknownNpcResolvedAsCheck: number;
+  unknownNpcHeld: number;
+  cheatingCommerceHeld: number;
+  cheatingCommerceGiveMisfire: number;
+  cheatingCommerceReceipts: number;
 }
 
 export interface BaselineMetrics {
@@ -218,6 +314,7 @@ export interface BaselineMetrics {
   narrationsProvider?: number;
   narrationsTotal?: number;
   narrationProviderShare?: number;
+  deliberateHoldRate?: number;
   fallbackCount?: number;
   fallbackDistinct?: number;
   fallbackIdentical?: number;
@@ -226,16 +323,20 @@ export interface BaselineMetrics {
   dmBeatSuccessRate?: number;
   latencyAvgMs?: number;
   coherenceViolations?: number;
+  commerceCommitted?: number;
+  unknownNpcResolvedAsCheck?: number;
+  cheatingCommerceGiveMisfire?: number;
 }
 
 /**
- * The reported baseline for main@671241c: narration provider-assisted 7/18 (38.9%), 14 fallback
- * narration events of which 7 were byte-identical, materialization 8/18, ~7.1 s per turn. The
- * 14/18 fallback denominator is narration events (a resumed turn can narrate twice), while 7/18 is
- * provider-assisted turns, so the two numerators intentionally overlap.
+ * Pre-split baseline for main@671241c, kept as the honest "confounded" reference. Its
+ * `fallbackCount: 14` counts every deterministic-fallback narration event, so it includes
+ * by-design deliberate holds; the new `fallbackCount` counts narration-failure events only and is
+ * therefore NOT directly comparable. `narrationProviderShare`, `materializedTurns`, and latency
+ * remain comparable.
  */
-export const DOCUMENTED_BASELINE: BaselineMetrics = {
-  label: "reported-main-671241c",
+export const DOCUMENTED_BASELINE_OLD: BaselineMetrics = {
+  label: "reported-main-671241c-pre-split",
   turns: 18,
   narrationsProvider: 7,
   narrationsTotal: 18,
@@ -245,6 +346,28 @@ export const DOCUMENTED_BASELINE: BaselineMetrics = {
   materializedTurns: 8,
   materializationRate: 8 / 18,
   latencyAvgMs: 7100,
+};
+
+/**
+ * The comparison baseline for the new scripted session and metric split. Populated from the
+ * calibration live run recorded in docs/freeform-fun-eval.md; single runs vary with provider luck,
+ * so this is a reference point, not a threshold. `--baseline=<artifact.json>` overrides it.
+ */
+export const DOCUMENTED_BASELINE: BaselineMetrics = {
+  label: "calibrated-classified-v2",
+  turns: 18,
+  narrationsProvider: 12,
+  narrationsTotal: 18,
+  narrationProviderShare: 12 / 18,
+  deliberateHoldRate: 2 / 18,
+  fallbackCount: 4,
+  fallbackIdentical: 0,
+  materializedTurns: 9,
+  materializationRate: 9 / 18,
+  latencyAvgMs: 9868,
+  commerceCommitted: 1,
+  unknownNpcResolvedAsCheck: 0,
+  cheatingCommerceGiveMisfire: 0,
 };
 
 export interface EvalArtifact {
@@ -257,12 +380,19 @@ export interface EvalArtifact {
   baseUrl: string | null;
   world: { campaignId: string; sessionId: string; actorId: string } | null;
   declarations: number;
+  narrationClassification: {
+    classes: NarrationClass[];
+    deliberateHoldMarker: string;
+    fallbackDistinctnessScope: string;
+    probes: ProbeExpectation[];
+  };
   reliability: {
     providerCalls: boolean;
     dmCandidates: boolean;
     coherence: boolean;
     notes: string[];
   };
+  probes: ProbeOutcome[];
   metrics: FreeformMetrics;
   turns: TurnRecord[];
   dmBeats: DmBeatRecord[];
@@ -338,20 +468,92 @@ export function detectCoherenceViolations(probe: CoherenceProbe): string[] {
   return [...new Set(violations)];
 }
 
+const COMMERCE_PROPOSAL_TOOLS = new Set(["vendor_buy", "vendor_sell", "vendor_give"]);
+
+/** Self-describing JSON record of the narration taxonomy, so the artifact documents the split. */
+export function narrationClassificationDescriptor(): EvalArtifact["narrationClassification"] {
+  return {
+    classes: ["provider", "deliberate-hold", "narration-failure"],
+    deliberateHoldMarker: DELIBERATE_HOLD_MARKER.source,
+    fallbackDistinctnessScope: "narration-failure narration events only (deliberate-hold excluded)",
+    probes: [...PROBE_EXPECTATIONS],
+  };
+}
+
+/** True when this turn either surfaced a commerce proposal or committed a commerce receipt. */
+export function turnExercisesCommerce(turn: Pick<TurnRecord, "proposalToolNames" | "receiptKinds">): boolean {
+  return turn.receiptKinds.includes("commerce")
+    || turn.proposalToolNames.some((name) => COMMERCE_PROPOSAL_TOOLS.has(name));
+}
+
+/**
+ * Labeled-probe verdicts. Each probe is bound to one scripted turn by `TurnRecord.probe`; a missing
+ * labeled turn fails the probe explicitly instead of silently passing.
+ */
+export function probeOutcomes(turns: readonly TurnRecord[]): ProbeOutcome[] {
+  return PROBE_EXPECTATIONS.map((expectation) => {
+    const turn = turns.find((candidate) => candidate.probe === expectation.kind) ?? null;
+    let observed = "no labeled turn ran";
+    let passed = false;
+    if (turn) {
+      const receipts = `[${turn.receiptKinds.join(",")}]`;
+      if (expectation.kind === "declared-purchase") {
+        const committed = turn.receiptKinds.includes("commerce");
+        const exercised = turnExercisesCommerce(turn);
+        observed = committed ? "committed commerce receipt"
+          : exercised ? `commerce proposal surfaced (${turn.proposalToolNames.join(",") || receipts})`
+          : `no commerce: receipts=${receipts} state=${turn.finalState ?? "-"} narration=${turn.narrationClass}`;
+        passed = committed;
+      } else if (expectation.kind === "unknown-npc") {
+        const check = turn.receiptKinds.includes("check");
+        observed = check ? `resolved as a skill check: receipts=${receipts}`
+          : `held / receipt-free: receipts=${receipts} narration=${turn.narrationClass}`;
+        passed = !check;
+      } else {
+        const misfire = turn.receiptKinds.includes("commerce") || turn.receiptKinds.includes("inventory")
+          || turn.proposalToolNames.includes("vendor_give");
+        observed = misfire
+          ? `give misfire: receipts=${receipts} proposals=[${turn.proposalToolNames.join(",")}]`
+          : `held without a receipt: receipts=${receipts} narration=${turn.narrationClass}`;
+        passed = !misfire && turn.receiptCommandIds.length === 0;
+      }
+    }
+    return { kind: expectation.kind, title: expectation.title, turnIndex: turn?.index ?? null,
+      turnId: turn?.id ?? null, expected: expectation.expected, observed, passed };
+  });
+}
+
 export function computeMetrics(
   turns: readonly TurnRecord[],
   beats: readonly DmBeatRecord[],
   providerCalls: readonly ProviderCallRecord[],
 ): FreeformMetrics {
   const provider = providerSuccess(providerCalls);
-  const narrationsProvider = turns.filter((turn) => turn.narrationSource === "provider-assisted").length;
-  const turnsWithNarration = turns.filter((turn) => turn.narrationSource !== "none").length;
-  const fallbackEvents = turns.flatMap((turn) => turn.narrationEvents.filter((event) => event.source === "deterministic-fallback"));
+  const narrationEvents = turns.flatMap((turn) => turn.narrationEvents);
+  const narrationsProvider = turns.filter((turn) => turn.narrationClass === "provider").length;
+  const turnsWithNarration = turns.filter((turn) => turn.narrationClass !== "none").length;
+  const deliberateHoldEvents = narrationEvents.filter((event) => event.class === "deliberate-hold").length;
+  const deliberateHoldTurns = turns.filter((turn) => turn.narrationClass === "deliberate-hold").length;
+  const narrationFailureTurns = turns.filter((turn) => turn.narrationClass === "narration-failure").length;
+  // Fallback distinctness is measured over narration-failure events only. Deliberate holds are
+  // excluded so a stable by-design hold line can no longer masquerade as fallback collapse.
+  const fallbackEvents = narrationEvents.filter((event) => event.class === "narration-failure");
   const fallback = fallbackDistinctness(fallbackEvents.map((event) => event.text));
   const materializedTurns = turns.filter((turn) => turn.committed).length;
   const beatSuccess = beats.filter((beat) => beat.success).length;
   const violationTurns = turns.filter((turn) => turn.coherence.length > 0).length;
   const latency = latencyStats(turns.map((turn) => turn.latencyMs));
+  const purchase = turns.find((turn) => turn.probe === "declared-purchase");
+  const commerceCommitted = purchase?.receiptKinds.includes("commerce") ? 1 : 0;
+  const commerceExercised = purchase && turnExercisesCommerce(purchase) ? 1 : 0;
+  const unknownNpc = turns.find((turn) => turn.probe === "unknown-npc");
+  const unknownNpcResolvedAsCheck = unknownNpc?.receiptKinds.includes("check") ? 1 : 0;
+  const unknownNpcHeld = unknownNpc && !unknownNpc.committed && unknownNpcResolvedAsCheck === 0 ? 1 : 0;
+  const cheating = turns.find((turn) => turn.probe === "cheating-commerce");
+  const cheatingCommerceReceipts = cheating?.receiptCommandIds.length ?? 0;
+  const cheatingCommerceGiveMisfire = cheating && (cheating.receiptKinds.includes("commerce")
+    || cheating.receiptKinds.includes("inventory") || cheating.proposalToolNames.includes("vendor_give")) ? 1 : 0;
+  const cheatingCommerceHeld = cheating && !cheating.committed && cheatingCommerceGiveMisfire === 0 ? 1 : 0;
   return {
     turns: turns.length,
     turnsWithNarration,
@@ -359,9 +561,14 @@ export function computeMetrics(
     providerOk: provider.ok,
     providerFailed: provider.failed,
     providerSuccessRate: provider.rate,
+    narrationEventsTotal: narrationEvents.length,
     narrationsProvider,
     narrationsTotal: turns.length,
     narrationProviderShare: turns.length === 0 ? 0 : narrationsProvider / turns.length,
+    deliberateHoldEvents,
+    deliberateHoldTurns,
+    deliberateHoldRate: turns.length === 0 ? 0 : deliberateHoldTurns / turns.length,
+    narrationFailureTurns,
     fallbackCount: fallback.count,
     fallbackDistinct: fallback.distinct,
     fallbackIdentical: fallback.count - fallback.distinct,
@@ -377,6 +584,13 @@ export function computeMetrics(
     latencyP50Ms: latency.p50Ms,
     latencyP95Ms: latency.p95Ms,
     latencyMaxMs: latency.maxMs,
+    commerceExercised,
+    commerceCommitted,
+    unknownNpcResolvedAsCheck,
+    unknownNpcHeld,
+    cheatingCommerceHeld,
+    cheatingCommerceGiveMisfire,
+    cheatingCommerceReceipts,
   };
 }
 
@@ -390,8 +604,9 @@ export interface MetricDiff {
 }
 
 const LOWER_IS_BETTER = new Set([
-  "providerFailed", "fallbackCount", "fallbackIdentical", "coherenceViolations",
-  "latencyAvgMs", "latencyP50Ms", "latencyP95Ms", "latencyMaxMs",
+  "providerFailed", "fallbackCount", "fallbackIdentical", "narrationFailureTurns",
+  "unknownNpcResolvedAsCheck", "cheatingCommerceGiveMisfire", "cheatingCommerceReceipts",
+  "coherenceViolations", "latencyAvgMs", "latencyP50Ms", "latencyP95Ms", "latencyMaxMs",
 ]);
 
 /** Numeric diff of the baseline keys that also exist in the current metrics. */
@@ -453,6 +668,14 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
     for (const note of artifact.reliability.notes) lines.push(`- ${note}`);
     lines.push("");
   }
+  lines.push("## Labeled probes");
+  lines.push("");
+  lines.push("| probe | turn | passed | expected | observed |");
+  lines.push("| --- | --- | --- | --- | --- |");
+  for (const probe of artifact.probes) {
+    lines.push(`| ${probe.kind} | ${probe.turnIndex ?? "-"} (${probe.turnId ?? "-"}) | ${probe.passed ? "yes" : "NO"} | ${probe.expected} | ${probe.observed} |`);
+  }
+  lines.push("");
   if (artifact.metrics.coherenceViolationTurns > 0) {
     lines.push("## Location-coherence violations");
     lines.push("");
@@ -463,10 +686,10 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
   }
   lines.push("## Turns");
   lines.push("");
-  lines.push("| # | id | category | state | narration | committed | latency | coherence |");
-  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
+  lines.push("| # | id | category | state | narration class | source | committed | receipt kinds | latency | coherence |");
+  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const turn of artifact.turns) {
-    lines.push(`| ${turn.index} | ${turn.id} | ${turn.category} | ${turn.finalState ?? "-"} | ${turn.narrationSource} | ${turn.committed ? "yes" : "no"} | ${Math.round(turn.latencyMs)} ms | ${turn.coherence.length || "-"} |`);
+    lines.push(`| ${turn.index} | ${turn.id} | ${turn.category} | ${turn.finalState ?? "-"} | ${turn.narrationClass} | ${turn.narrationSource} | ${turn.committed ? "yes" : "no"} | ${turn.receiptKinds.join(",") || "-"} | ${Math.round(turn.latencyMs)} ms | ${turn.coherence.length || "-"} |`);
   }
   lines.push("");
   if (artifact.dmBeats.length > 0) {
@@ -550,7 +773,8 @@ function streamOf(response: HttpResponse): StreamResult {
 function narrationEventsOf(phases: Array<{ phase: "initial" | "resume"; narration: string; narrationSource: NarrationSource }>): NarrationEvent[] {
   return phases
     .filter((phase) => phase.narrationSource !== "none" && phase.narration.trim().length > 0)
-    .map((phase) => ({ phase: phase.phase, source: phase.narrationSource, text: phase.narration }));
+    .map((phase) => ({ phase: phase.phase, source: phase.narrationSource,
+      class: classifyNarration(phase.narration, phase.narrationSource), text: phase.narration }));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -802,10 +1026,10 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     const turnStarted = Date.now();
     const revision = repo.getCampaignAdministration(OWNER, campaignId)!.revision;
     const record: TurnRecord = {
-      index, id: entry.id, category: entry.category, declaration: entry.declaration,
-      status: 0, finalState: null, outcome: null, narration: "", narrationSource: "none", narrationEvents: [],
-      committed: false, receiptKinds: [], receiptCommandIds: [], confirmed: false, dmBeatIndex: null,
-      providerCalls: 0, latencyMs: 0, coherence: [],
+      index, id: entry.id, category: entry.category, declaration: entry.declaration, probe: entry.probe ?? null,
+      status: 0, finalState: null, outcome: null, narration: "", narrationSource: "none", narrationClass: "none",
+      narrationEvents: [], committed: false, receiptKinds: [], receiptCommandIds: [], proposalToolNames: [],
+      confirmed: false, dmBeatIndex: null, providerCalls: 0, latencyMs: 0, coherence: [],
     };
     const phases: Array<{ phase: "initial" | "resume"; narration: string; narrationSource: NarrationSource }> = [];
     let turnId: string | undefined;
@@ -823,6 +1047,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
       if (first.confirmationRequired?.proposalIds?.length && turnId) {
         const view = JSON.parse((await request("GET", `/adventure-turns/${turnId}`)).body);
         record.confirmed = true;
+        record.proposalToolNames = (view.proposals ?? []).map((proposal: any) => String(proposal.toolName));
         const confirmed = await request("POST", `/adventure-turns/${turnId}/confirm`, {
           proposalIds: first.confirmationRequired.proposalIds, decision: "approve",
           expectedRevision: view.turn.revision, idempotencyKey: `ff-confirm-${options.seed}-${index}`,
@@ -841,12 +1066,17 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
       const finalPhase = phases[phases.length - 1]!;
       record.narration = finalPhase.narration;
       record.narrationSource = finalPhase.narrationSource;
+      record.narrationClass = finalPhase.narrationSource === "none" || finalPhase.narration.trim().length === 0
+        ? "none" : classifyNarration(finalPhase.narration, finalPhase.narrationSource);
       record.narrationEvents = narrationEventsOf(phases);
       if (turnId) {
         const view = JSON.parse((await request("GET", `/adventure-turns/${turnId}`)).body);
         record.receiptCommandIds = (view.receipts ?? []).map((receipt: any) => receipt.commandId as string);
         record.receiptKinds = record.receiptCommandIds.flatMap((commandId) => receiptProbe(turnId!, commandId).kinds);
         record.committed = record.receiptCommandIds.length > 0;
+        if (record.proposalToolNames.length === 0 && Array.isArray(view.proposals)) {
+          record.proposalToolNames = view.proposals.map((proposal: any) => String(proposal.toolName));
+        }
       }
     } catch (error) {
       record.error = (error as Error).message.slice(0, 300);
@@ -900,7 +1130,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
   for (let index = 0; index < limit; index += 1) {
     const entry = FREEFORM_DECLARATIONS[index]!;
     const record = await runPlayerTurn(entry, index);
-    if (!options.quiet) process.stderr.write(`turn ${index} ${entry.id} state=${record.finalState} source=${record.narrationSource} committed=${record.committed}\n`);
+    if (!options.quiet) process.stderr.write(`turn ${index} ${entry.id} state=${record.finalState} class=${record.narrationClass} source=${record.narrationSource} committed=${record.committed}\n`);
     if (dmAfter.has(index)) {
       const beat = await runDmBeat(index, index === 0 ? "open" : "continue");
       record.dmBeatIndex = index;
@@ -912,14 +1142,19 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
 
   const metrics = computeMetrics(turnRecords, dmBeats, providerCalls);
   const artifact: EvalArtifact = {
-    version: 1, generatedAt: new Date().toISOString(), mode: "in-process",
+    version: 2, generatedAt: new Date().toISOString(), mode: "in-process",
     provider: { baseUrl: providerConfig.baseUrl, model: providerConfig.model },
     seed: options.seed, dataDir: directory, baseUrl: null,
     world: { campaignId, sessionId, actorId }, declarations: limit,
+    narrationClassification: narrationClassificationDescriptor(),
     reliability: {
       providerCalls: true, dmCandidates: true, coherence: true,
-      notes: ["Location coherence is a conservative heuristic over committed receipts and the resolved actor location."],
+      notes: [
+        "Location coherence is a conservative heuristic over committed receipts and the resolved actor location.",
+        "Narration classes: provider (source=provider-assisted), deliberate-hold (grounded server hold marker), narration-failure (every other deterministic fallback). fallbackDistinctness is computed over narration-failure events only.",
+      ],
     },
+    probes: probeOutcomes(turnRecords),
     metrics, turns: turnRecords, dmBeats, providerCalls,
   };
   const markdown = renderMarkdown(artifact, options.baseline);
@@ -979,10 +1214,10 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
   for (let index = 0; index < limit; index += 1) {
     const entry = FREEFORM_DECLARATIONS[index]!;
     const record: TurnRecord = {
-      index, id: entry.id, category: entry.category, declaration: entry.declaration,
-      status: 0, finalState: null, outcome: null, narration: "", narrationSource: "none", narrationEvents: [],
-      committed: false, receiptKinds: [], receiptCommandIds: [], confirmed: false, dmBeatIndex: null,
-      providerCalls: 0, latencyMs: 0, coherence: [],
+      index, id: entry.id, category: entry.category, declaration: entry.declaration, probe: entry.probe ?? null,
+      status: 0, finalState: null, outcome: null, narration: "", narrationSource: "none", narrationClass: "none",
+      narrationEvents: [], committed: false, receiptKinds: [], receiptCommandIds: [], proposalToolNames: [],
+      confirmed: false, dmBeatIndex: null, providerCalls: 0, latencyMs: 0, coherence: [],
     };
     const started = Date.now();
     try {
@@ -998,6 +1233,7 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
       if (first.confirmationRequired?.proposalIds?.length && first.turnId) {
         const view = JSON.parse((await request("GET", `/adventure-turns/${first.turnId}`)).body);
         record.confirmed = true;
+        record.proposalToolNames = (view.proposals ?? []).map((proposal: any) => String(proposal.toolName));
         const confirmed = await request("POST", `/adventure-turns/${first.turnId}/confirm`, {
           proposalIds: first.confirmationRequired.proposalIds, decision: "approve",
           expectedRevision: view.turn.revision, idempotencyKey: `ff-base-confirm-${index}`,
@@ -1015,6 +1251,8 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
       const finalPhase = phases[phases.length - 1]!;
       record.narration = finalPhase.narration;
       record.narrationSource = finalPhase.narrationSource;
+      record.narrationClass = finalPhase.narrationSource === "none" || finalPhase.narration.trim().length === 0
+        ? "none" : classifyNarration(finalPhase.narration, finalPhase.narrationSource);
       record.narrationEvents = narrationEventsOf(phases);
       if (first.turnId) {
         const view = JSON.parse((await request("GET", `/adventure-turns/${first.turnId}`)).body);
@@ -1027,7 +1265,7 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
     }
     record.latencyMs = Date.now() - started;
     turns.push(record);
-    if (!options.quiet) process.stderr.write(`turn ${index} ${entry.id} source=${record.narrationSource} committed=${record.committed}\n`);
+    if (!options.quiet) process.stderr.write(`turn ${index} ${entry.id} class=${record.narrationClass} committed=${record.committed}\n`);
     if (dmAfter.has(index)) {
       const beat = await runBaseDmBeat(request, campaignId, sessionId, options, index);
       record.dmBeatIndex = index;
@@ -1037,17 +1275,20 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
   }
 
   const artifact: EvalArtifact = {
-    version: 1, generatedAt: new Date().toISOString(), mode: "base-url",
+    version: 2, generatedAt: new Date().toISOString(), mode: "base-url",
     provider: { baseUrl: root, model: "unknown" }, seed: 0, dataDir: null, baseUrl: root,
     world: { campaignId, sessionId, actorId }, declarations: limit,
+    narrationClassification: narrationClassificationDescriptor(),
     reliability: {
       providerCalls: false, dmCandidates: false, coherence: false,
       notes: [
         "base-url mode cannot intercept provider calls: providerSuccessRate and fallback distinctness are unreliable.",
         "base-url mode cannot resolve receipt command ids to locations: location-coherence violations are not measured.",
+        "base-url mode cannot resolve typed receipt kinds, so the labeled-probe assertions (commerce/check) are unreliable here.",
         "DM-beat offered candidates require provider-call interception and are empty in base-url mode.",
       ],
     },
+    probes: probeOutcomes(turns),
     metrics: computeMetrics(turns, beats, []), turns, dmBeats: beats, providerCalls: [],
   };
   const markdown = renderMarkdown(artifact, options.baseline);
