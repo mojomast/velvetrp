@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { systemOneShadowQueue } from "./systemOneShadow.js";
+import { policyRequiresConfirmation } from "./confirmationPolicy.js";
 import {
   AGENT_TOOL_REGISTRY_VERSION, POST_V38_AGENT_TOOL_REGISTRY_VERSION, agentRequestObjectSchema, canonicalAgentJson, resourceIdSchema,
   projectExactCandidateForProvider,providerSafeExactCandidateListSchema,
@@ -1153,7 +1154,6 @@ function appendMutationProposal(repository: Repository, turn: PrivateAdventureTu
   commerceCandidates:readonly AdventureCommerceCandidate[]=[],powerCandidates:readonly AdventurePowerCandidate[]=[],restCandidates:readonly AdventureRestCandidate[]=[],combatConsumables:readonly AdventureCombatConsumableCandidate[]=[],combatPowers:readonly AdventureCombatPowerCandidate[]=[],questLifecycle:readonly AdventureQuestLifecycleCandidate[]=[],progression:readonly AdventureProgressionCandidate[]=[]): PrivateAdventureTurn {
   if (call.kind !== "mutation") throw new Error("call is not a mutation");
   const argumentsWithServerRevision = { ...call.arguments, expectedTimelineRevision: timelineRevision };
-  let requiresConfirmation = call.tool.confirmation === "required";
   if(call.toolName==="actor_attribute.set"){
     const candidate=snapshot?.attributeCandidates.find((item)=>item.candidateId===call.arguments.attributeCandidateId
       &&item.digest===call.arguments.attributeCandidateDigest);
@@ -1173,52 +1173,59 @@ function appendMutationProposal(repository: Repository, turn: PrivateAdventureTu
   if(call.toolName==="exact_inventory_action.select"){
     const candidate=inventoryCandidates.find((value)=>value.candidateId===call.arguments.candidateId&&value.digest===call.arguments.digest);
     if(!candidate||!providerCallId)throw new Error("inventory action is not an exact advertised candidate");
-    requiresConfirmation=candidate.confirmationRequired;proposalToolName=`inventory_item_${candidate.action}`;
+    proposalToolName=`inventory_item_${candidate.action}`;
     Object.assign(argumentsWithServerRevision,{providerCallId,providerToolCallId:call.providerToolCallId,itemLabel:candidate.itemLabel,
       itemAction:candidate.action,itemQuantity:candidate.quantity,itemSlot:candidate.slot,itemRecipient:candidate.recipient});
   }
   if(call.toolName==="exact_vendor_commerce.select"){
     const candidate=commerceCandidates.find(value=>value.candidateId===call.arguments.candidateId&&value.digest===call.arguments.digest);
-    if(!candidate||!providerCallId)throw new Error("commerce action is not an exact advertised candidate");requiresConfirmation=true;proposalToolName=`vendor_${candidate.action}`;
+    if(!candidate||!providerCallId)throw new Error("commerce action is not an exact advertised candidate");proposalToolName=`vendor_${candidate.action}`;
     Object.assign(argumentsWithServerRevision,{providerCallId,providerToolCallId:call.providerToolCallId,vendorLabel:candidate.vendorLabel,shopLabel:candidate.shopLabel,itemLabel:candidate.itemLabel,itemQuantity:candidate.quantity,itemRecipient:candidate.vendorLabel,commerceAction:candidate.action,currencyLabel:candidate.currencyLabel,priceMinorUnits:candidate.priceMinorUnits,commerceConsequence:candidate.consequence});
   }
   if(call.toolName==="exact_power_use.select"||call.toolName==="exact_rest.select"){
     const candidates=call.toolName==="exact_power_use.select"?powerCandidates:restCandidates;
     const candidate=candidates.find(value=>value.candidateId===call.arguments.candidateId&&value.digest===call.arguments.digest)as any;
     if(!candidate||!providerCallId)throw new Error("power or rest action is not an exact advertised candidate");
-    requiresConfirmation=true;proposalToolName=call.toolName==="exact_power_use.select"?"power_use":candidate.restKind==="short"?"rest_short":"rest_long";
+    proposalToolName=call.toolName==="exact_power_use.select"?"power_use":candidate.restKind==="short"?"rest_short":"rest_long";
     Object.assign(argumentsWithServerRevision,{providerCallId,providerToolCallId:call.providerToolCallId,
       ...(call.toolName==="exact_power_use.select"?{powerName:candidate.powerName,powerTargets:candidate.targets,powerCosts:candidate.costs}:{restName:candidate.restName,recovery:candidate.recovery})});
   }
   if(call.toolName==="exact_combat_consumable.select"){
     const candidate=combatConsumables.find(value=>value.candidateId===call.arguments.candidateId&&value.digest===call.arguments.digest);
     if(!candidate||!providerCallId)throw new Error("combat consumable is not an exact advertised candidate");
-    requiresConfirmation=true;proposalToolName="combat_consumable_use";
+    proposalToolName="combat_consumable_use";
     Object.assign(argumentsWithServerRevision,{providerCallId,providerToolCallId:call.providerToolCallId,powerName:candidate.itemName,
       powerTargets:[candidate.target],powerCosts:["1 action",`consume ${candidate.quantity} ${candidate.itemName}`],combatConsumableConsequences:candidate.consequences,
       encounterId:snapshot?.encounter?.encounterId,expectedCombatRevision:snapshot?.encounter?.revision});
   }
   if(call.toolName==="exact_combat_power.select"){
     const candidate=combatPowers.find(value=>value.candidateId===call.arguments.candidateId&&value.digest===call.arguments.digest);
-    if(!candidate||!providerCallId)throw new Error("combat power is not an exact advertised candidate");requiresConfirmation=true;proposalToolName="combat_power_use";
+    if(!candidate||!providerCallId)throw new Error("combat power is not an exact advertised candidate");proposalToolName="combat_power_use";
     Object.assign(argumentsWithServerRevision,{providerCallId,providerToolCallId:call.providerToolCallId,powerName:candidate.powerName,powerTargets:[candidate.target],powerCosts:["1 action",...candidate.costs],combatPowerConsequences:candidate.consequences,encounterId:snapshot?.encounter?.encounterId,expectedCombatRevision:snapshot?.encounter?.revision});
   }
   if(call.toolName==="exact_quest_lifecycle.select"){
     const candidate=questLifecycle.find(value=>value.candidateId===call.arguments.candidateId&&value.digest===call.arguments.digest);
-    if(!candidate||!providerCallId)throw new Error("quest lifecycle action is not an exact advertised candidate");requiresConfirmation=candidate.confirmationRequired;
+    if(!candidate||!providerCallId)throw new Error("quest lifecycle action is not an exact advertised candidate");
     proposalToolName=candidate.action==="accept"?"quest_accept":candidate.action==="abandon"?"quest_abandon":"quest_reward_claim";
     Object.assign(argumentsWithServerRevision,{providerCallId,providerToolCallId:call.providerToolCallId,questTitle:candidate.questTitle,
       ...(candidate.reward?{rewardLabel:candidate.reward.label}:{})});
   }
   if(call.toolName==="exact_progression_apply.select"){
     const candidate=progression.find(value=>value.candidateId===call.arguments.candidateId&&value.digest===call.arguments.digest);
-    if(!candidate||!providerCallId)throw new Error("progression action is not an exact advertised candidate");requiresConfirmation=true;proposalToolName="character_progression_apply";
+    if(!candidate||!providerCallId)throw new Error("progression action is not an exact advertised candidate");proposalToolName="character_progression_apply";
     Object.assign(argumentsWithServerRevision,{providerCallId,providerToolCallId:call.providerToolCallId,progressionClass:candidate.className,levelBefore:candidate.levelBefore,levelAfter:candidate.levelAfter});
   }
+  // The server policy table (confirmationPolicy.ts) is the single source of truth for whether this
+  // mutation auto-commits or waits for one confirmation. Candidate flags above only select the exact
+  // tool name; the derived policy remains authoritative in the repository and is what the expiry is
+  // computed from, so a divergent call site cannot silently skip or add a confirmation.
+  const toolName = proposalToolName
+    ?? (call.toolName === "actor_dice.roll" ? "roll_actor_dice" : call.toolName==="combat_action.execute"?"combat_action":"set_actor_attribute");
+  const requiresConfirmation = policyRequiresConfirmation(toolName, { autonomousEnemy: snapshot?.audience.kind === "enemy" });
   const expiry = requiresConfirmation ? new Date(now.getTime() + 30 * 60_000).toISOString() : undefined;
   return repository.appendToolProposal(OWNER, {
     turnId: turn.turnId,
-    toolName: proposalToolName??(call.toolName === "actor_dice.roll" ? "roll_actor_dice" : call.toolName==="combat_action.execute"?"combat_action":"set_actor_attribute"),
+    toolName,
     arguments: argumentsWithServerRevision,
     requiresConfirmation,
     ...(expiry ? { confirmationExpiresAt: expiry } : {}),

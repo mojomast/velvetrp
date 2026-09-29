@@ -372,6 +372,9 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         .get((input.arguments as any).encounterId,row.campaign_id));
       const policy=deriveConfirmationPolicy({toolName:input.toolName,arguments:input.arguments,campaignRevision:row.campaign_revision,
         turnRevision:input.expectedTurnRevision,timelineRevision,...(combatRevision===undefined?{}:{combatRevision}),autonomousEnemy,at});
+      // The derived policy is the single source of truth; the caller's flag must already agree, so a
+      // divergent call site fails loudly instead of silently skipping or inventing a confirmation.
+      if(policy.requiresConfirmation!==input.requiresConfirmation)throw new AdventureTurnConflictError("proposal confirmation flag disagrees with the server policy");
       if(policy.requiresConfirmation&&!input.confirmationExpiresAt)throw new AdventureTurnConflictError("server policy requires a confirmation expiry");
       db.prepare(`INSERT INTO tool_proposals(proposal_id,campaign_id,turn_id,position,tool_name,arguments_json,requires_confirmation,confirmation_expires_at,idempotency_key,proposed_at)
         VALUES(?,?,?,?,?,?,?,?,?,?)`).run(proposalId, row.campaign_id, row.id, position, input.toolName, argumentsJson, policy.requiresConfirmation ? 1 : 0,

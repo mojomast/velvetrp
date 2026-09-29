@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { canonicalAgentJson, confirmationPolicyAttestationSchema, CONFIRMATION_POLICY_VERSION,
-  type ConfirmationPolicyAttestation, type ConfirmationPolicyCategory } from "@velvet/contracts";
+  type ConfirmationAuthorizer, type ConfirmationPolicyAttestation, type ConfirmationPolicyCategory } from "@velvet/contracts";
 
 type ProposalPolicyInput = {
   toolName:string; arguments:Record<string,unknown>; campaignRevision:number; turnRevision:number;
@@ -9,41 +9,93 @@ type ProposalPolicyInput = {
 
 const digest=(value:unknown)=>createHash("sha256").update(canonicalAgentJson(value as never)).digest("hex");
 
+/**
+ * Confirmation policy v1 — the single server-owned source of truth for whether a proposed adventure
+ * mechanic is executed directly or held for one human confirmation. Provider output only supplies
+ * arguments; it never influences this table.
+ *
+ * Rule: an action auto-commits only when it is bounded, reversible, and spends no tracked resource.
+ * Anything that spends, is irreversible, or carries a real consequence requires exactly one
+ * confirmation (never a silent spend, never a second confirmation for the same declared action).
+ *
+ * | Category                              | Examples                                          | Confirmation        | Authorizer |
+ * |---------------------------------------|---------------------------------------------------|---------------------|------------|
+ * | deterministic-roll                    | raw dice with no DC/outcome                       | auto-commit         | controller |
+ * | inventory-equip / inventory-unequip   | wear/wield/stow a carried item                    | auto-commit         | controller |
+ * | (outside this table) travel / checks / quest objective progress: bounded, reversible reads of state | | auto-commit | controller |
+ * | purchase / currency-transfer          | buy, sell, pay, transfer coin                     | single confirmation | controller |
+ * | important-item-loss/consume/gift      | drop, destroy, consume, give away an item         | single confirmation | controller |
+ * | ambiguous-limited-resource-use        | power, combat consumable/power, finite resource   | single confirmation | controller |
+ * | rest-timing                           | short/long rest recovery and time advance         | single confirmation | controller |
+ * | quest-accept / quest-abandon / quest-reward-claim | quest lifecycle                        | single confirmation | controller |
+ * | character-progression                 | level/feature/resource advancement                | single confirmation | controller |
+ * | combat-action-consequential           | a consequential combat action (player turns only)| single confirmation | controller |
+ * | combat-start / companion-change       | start an encounter, change a companion            | single confirmation | gm         |
+ * | gm-override                           | GM-authoritative attribute write                  | single confirmation | gm         |
+ * | generated-* / ambiguous-consequential-change | unreviewed world/story/quest generation, unknown tool | single confirmation | gm |
+ *
+ * Autonomous enemy combat resolves without confirmation because the server, not the player, owns
+ * that turn; the consequential player combat action stays gated.
+ */
+export const AUTO_COMMIT_CATEGORIES: readonly ConfirmationPolicyCategory[] =
+  ["deterministic-roll","inventory-equip","inventory-unequip"];
+
+/** Maps a proposal tool name to its closed policy category; unknown tools fail into the ambiguous bucket. */
+export function confirmationCategoryFor(toolName:string):ConfirmationPolicyCategory {
+  if(toolName==="inventory_item_equip")return "inventory-equip";
+  if(toolName==="inventory_item_unequip")return "inventory-unequip";
+  if(toolName==="inventory_item_drop")return "important-item-loss";
+  if(toolName==="inventory_item_consume")return "important-item-consume";
+  if(toolName==="inventory_item_gift")return "important-item-gift";
+  if(toolName==="roll_actor_dice"||toolName==="roll")return "deterministic-roll";
+  if(toolName==="combat_action")return "combat-action-consequential";
+  if(toolName==="set_actor_attribute")return "gm-override";
+  if(toolName==="power_use"||toolName==="combat_consumable_use"||toolName==="combat_power_use")return "ambiguous-limited-resource-use";
+  if(toolName==="rest_short"||toolName==="rest_long")return "rest-timing";
+  if(toolName==="quest_accept")return "quest-accept";
+  if(toolName==="quest_abandon")return "quest-abandon";
+  if(toolName==="quest_reward_claim")return "quest-reward-claim";
+  if(toolName==="character_progression_apply")return "character-progression";
+  if(toolName==="vendor_buy")return "purchase";
+  if(toolName==="vendor_sell")return "currency-transfer";
+  if(toolName==="vendor_give")return "important-item-gift";
+  if(/currency.*transfer/.test(toolName))return "currency-transfer";
+  if(/purchase/.test(toolName))return "purchase";
+  if(/item.*(?:remove|loss)/.test(toolName))return "important-item-loss";
+  if(/item.*consume/.test(toolName))return "important-item-consume";
+  if(/item.*gift/.test(toolName))return "important-item-gift";
+  if(/resource/.test(toolName))return "ambiguous-limited-resource-use";
+  if(/rest/.test(toolName))return "rest-timing";
+  if(/companion/.test(toolName))return "companion-change";
+  if(/combat.*start/.test(toolName))return "combat-start";
+  if(/world/.test(toolName))return "generated-world-change";
+  if(/quest/.test(toolName))return "generated-quest-change";
+  if(/story/.test(toolName))return "generated-story-change";
+  return "ambiguous-consequential-change";
+}
+
+/** The confirmation half of the rule table; `autonomousEnemy` only relaxes server-owned combat. */
+export function requiresConfirmationFor(category:ConfirmationPolicyCategory,options:{autonomousEnemy?:boolean}={}):boolean {
+  if(AUTO_COMMIT_CATEGORIES.includes(category))return false;
+  if(category==="combat-action-consequential"&&options.autonomousEnemy===true)return false;
+  return true;
+}
+
+/** Who must approve a confirmation-required proposal; generated and GM-authoritative changes need a GM. */
+export function requiredAuthorizerFor(category:ConfirmationPolicyCategory):ConfirmationAuthorizer {
+  return category==="gm-override"||category.startsWith("generated-")||category==="combat-start"||category==="companion-change"?"gm":"controller";
+}
+
+/** Convenience for call sites that only need the boolean rule for one tool name. */
+export function policyRequiresConfirmation(toolName:string,options:{autonomousEnemy?:boolean}={}):boolean {
+  return requiresConfirmationFor(confirmationCategoryFor(toolName),options);
+}
+
 /** Closed server policy. Provider output contains arguments only and has no confirmation-policy control. */
 export function deriveConfirmationPolicy(input:ProposalPolicyInput):ConfirmationPolicyAttestation {
-  let category:ConfirmationPolicyCategory="ambiguous-consequential-change";
-  if(input.toolName==="inventory_item_equip")category="inventory-equip";
-  else if(input.toolName==="inventory_item_unequip")category="inventory-unequip";
-  else if(input.toolName==="inventory_item_drop")category="important-item-loss";
-  else if(input.toolName==="inventory_item_consume")category="important-item-consume";
-  else if(input.toolName==="inventory_item_gift")category="important-item-gift";
-  else if(input.toolName==="roll_actor_dice"||input.toolName==="roll")category="deterministic-roll";
-  else if(input.toolName==="combat_action")category="combat-action-consequential";
-  else if(input.toolName==="set_actor_attribute")category="gm-override";
-  else if(input.toolName==="power_use"||input.toolName==="combat_consumable_use"||input.toolName==="combat_power_use")category="ambiguous-limited-resource-use";
-  else if(input.toolName==="rest_short"||input.toolName==="rest_long")category="rest-timing";
-  else if(input.toolName==="quest_accept")category="quest-accept";
-  else if(input.toolName==="quest_abandon")category="quest-abandon";
-  else if(input.toolName==="quest_reward_claim")category="quest-reward-claim";
-  else if(input.toolName==="character_progression_apply")category="character-progression";
-  else if(input.toolName==="vendor_buy")category="purchase";
-  else if(input.toolName==="vendor_sell")category="currency-transfer";
-  else if(input.toolName==="vendor_give")category="important-item-gift";
-  else if(/currency.*transfer/.test(input.toolName))category="currency-transfer";
-  else if(/purchase/.test(input.toolName))category="purchase";
-  else if(/item.*(?:remove|loss)/.test(input.toolName))category="important-item-loss";
-  else if(/item.*consume/.test(input.toolName))category="important-item-consume";
-  else if(/item.*gift/.test(input.toolName))category="important-item-gift";
-  else if(/resource/.test(input.toolName))category="ambiguous-limited-resource-use";
-  else if(/rest/.test(input.toolName))category="rest-timing";
-  else if(/companion/.test(input.toolName))category="companion-change";
-  else if(/combat.*start/.test(input.toolName))category="combat-start";
-  else if(/world/.test(input.toolName))category="generated-world-change";
-  else if(/quest/.test(input.toolName))category="generated-quest-change";
-  else if(/story/.test(input.toolName))category="generated-story-change";
-  const requiresConfirmation=!(["deterministic-roll","inventory-equip","inventory-unequip"] as ConfirmationPolicyCategory[]).includes(category)
-    &&!(category==="combat-action-consequential"&&input.autonomousEnemy===true);
-  const requiredAuthorizer=category==="gm-override"||category.startsWith("generated-")||category==="combat-start"||category==="companion-change"?"gm":"controller";
+  const category=confirmationCategoryFor(input.toolName);
+  const requiresConfirmation=requiresConfirmationFor(category,input.autonomousEnemy===undefined?{}:{autonomousEnemy:input.autonomousEnemy});
+  const requiredAuthorizer=requiredAuthorizerFor(category);
   const itemLabel=typeof input.arguments.itemLabel==="string"?input.arguments.itemLabel:"selected inventory item";
   const quantity=Number.isSafeInteger(input.arguments.itemQuantity)?input.arguments.itemQuantity:1;
   const slot=typeof input.arguments.itemSlot==="string"?input.arguments.itemSlot:"selected";

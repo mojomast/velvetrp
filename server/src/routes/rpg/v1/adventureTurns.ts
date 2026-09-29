@@ -1071,10 +1071,17 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
          decision: body.data.decision === "approve" ? "approved" : "rejected", expectedTurnRevision: body.data.expectedRevision,
          expectedCampaignRevision: before.campaignRevision, idempotencyKey: body.data.idempotencyKey });
        const planning=(repo as Repo&Repository).getDurableAgentPlanningState(OWNER,turn.turnId);
+       // A single approval executes the confirmed mechanics for any agent-originated turn: the
+       // approval is the only human decision, and the following resume request only narrates the
+       // already-committed receipt. Directly appended legacy proposals (no provider start, no
+       // decision round, no tool call) stay decision-only so their own callers keep controlling
+       // execution, and a rejection never resumes.
+       const agentOriginated=Boolean(planning&&(planning.providerStarts>0||planning.decisionRounds>0||planning.totalToolCalls>0));
        const providerSelected=turn.toolCalls.some((call)=>call.status==="approved"&&call.proposal.executionBinding.commandType==="combat_action")
-         ||Boolean(planning?.toolCalls.some((call)=>call.kind==="mutation"));
+         ||Boolean(planning?.toolCalls.some((call)=>call.kind==="mutation"))||agentOriginated;
+       const hasApproved=turn.toolCalls.some((call)=>call.status==="approved");
        const noPending=!turn.toolCalls.some(({proposal})=>proposal.confirmation.state==="pending");
-       if(noPending&&providerSelected)turn=(await orchestrateAdventureTurn(repo as Repo&Repository,turn.turnId,options.agentDependencies)).turn;
+       if(noPending&&hasApproved&&providerSelected)turn=(await orchestrateAdventureTurn(repo as Repo&Repository,turn.turnId,options.agentDependencies)).turn;
       const token = resumeToken(turn); const response = { turn: projectTurn(turn), ...(token ? { resumeToken: token } : {}) };
       return reply.send(adventureTurnConfirmResponseSchema.parse(response));
     } catch (error) { return fail(request, reply, error); }
