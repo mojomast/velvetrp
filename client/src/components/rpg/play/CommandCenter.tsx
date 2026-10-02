@@ -104,7 +104,7 @@ export function CommandCenter({ headingRef, title, role, phase, actor, tools, ac
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       const editing = event.target instanceof Element && Boolean(event.target.closest("input,textarea,select,[contenteditable=true]"));
-      if (document.querySelector("dialog[open]")) return;
+      if (document.querySelector('dialog[open], .campaign-drawers-overlay .atlas-drawer-slot:not([hidden])')) return;
       if (event.key === "?" && !editing && !event.altKey && !event.ctrlKey && !event.metaKey) { event.preventDefault(); onTool("help"); return; }
       const panes = [preferences.contextVisible ? document.getElementById("campaign-context-panel") : null, centerRef.current,
         preferences.quickToolsVisible ? document.getElementById("campaign-quick-tools") : null].filter((pane): pane is HTMLElement => pane !== null);

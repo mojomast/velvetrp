@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sheetReferencesSchema, sheetContextSchema } from "./sheet-references.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema, campaignIdSchema, principalIdSchema } from "./rpg-characters.js";
@@ -165,6 +166,7 @@ export const privateAdventureTurnSchema = z.object({
   ...turnBase,
   principalId: principalIdSchema,
   declaration: z.string().trim().min(1).max(8_000),
+  sheetContext: sheetContextSchema.optional(),
   toolCalls: z.array(toolCallSchema).max(MAX_ADVENTURE_TURN_TOOLS),
   providerCalls: z.array(providerCallMetadataSchema).max(64),
   receiptLinks: z.array(finalReceiptLinkSchema).max(MAX_ADVENTURE_TURN_TOOLS),
@@ -203,11 +205,13 @@ export const turnMutationInputSchema = z.object({ turnId: resourceIdSchema, expe
 /** Strict input for an original declaration or narration-only derivative. */
 export const createAdventureTurnInputSchema = z.object({ campaignId: campaignIdSchema, timelineId: resourceIdSchema,
   sessionId: resourceIdSchema, actorId: actorIdSchema, declaration: z.string().trim().min(1).max(8_000),
+  sheetReferences: sheetReferencesSchema.optional(),
   mode: adventureTurnModeSchema.optional(), priorTurnId: resourceIdSchema.nullable().optional(),
   expectedCampaignRevision: revisionSchema, idempotencyKey: idempotencyKeySchema,
   executionLimits: agentExecutionLimitsSchema.optional(),
 }).strict().superRefine((value, context) => {
     const mode = value.mode ?? "original";
+    if (mode !== "original" && value.sheetReferences !== undefined) context.addIssue({ code: "custom", path: ["sheetReferences"], message: "derivatives inherit the original sheet context" });
     if ((mode === "original") !== ((value.priorTurnId ?? null) === null)) context.addIssue({ code: "custom", path: ["priorTurnId"], message: "narration derivatives require priorTurnId" });
   });
 /** Strict input for appending one bounded proposal. */

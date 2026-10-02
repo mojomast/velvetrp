@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { characterSheetHttpResponseSchema, type CatalogDefinition, type PublishContentCatalogInput } from "../../packages/contracts/src/index.js";
 import { calculateCatalogDigest, MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
+import { AxeBuilder } from "@axe-core/playwright";
 
 const runId = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const deterministicAdventureNarration = "A concise deterministic reply from the selected character.";
@@ -1693,7 +1694,16 @@ test("M5.4 CampaignPlay shows one provider-committed travel receipt across reloa
   expect(await (await request.get("http://127.0.0.1:18788/stats")).json()).toMatchObject({exactTravelSelections:1});
 });
 
-test("CampaignPlay sheet references remain draft-only until one explicit declaration", async ({ page, request }) => {
+test("CampaignPlay sheet references remain draft-only until one explicit declaration", async ({ page, request }, testInfo) => {
+  test.setTimeout(120_000);
+  const audit = async (name: string, selector: string) => {
+    const screenshot = testInfo.outputPath(`${name}.png`);
+    await page.screenshot({ path: screenshot });
+    await testInfo.attach(name, { path: screenshot, contentType: "image/png" });
+    const result = await new AxeBuilder({ page }).include(selector).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+    await testInfo.attach(`${name}-accessibility`, { body: JSON.stringify(result.violations, null, 2), contentType: "application/json" });
+    expect.soft(result.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map((node) => ({ target: node.target, summary: node.failureSummary })) })), name).toEqual([]);
+  };
   const fixture = MECHANICS_STARTER_CATALOG;
   const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
   const campaignName = `${runId}-Sheet-References`;
@@ -1799,34 +1809,87 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   await page.getByText("World routes and travel", { exact: true }).click();
   await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
   await expect(page.getByRole("button", { name: `Prefill travel to ${destinationName}` })).toBeVisible();
+  await audit("play-desktop", ".campaign-play-page");
 
   const composer = page.getByLabel("What do you do?");
   await composer.fill("Consult my character sheet before I investigate: ");
   await page.getByRole("button", { name: "Character", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: `${playerName}'s character sheet` });
   await expect(sheet).toBeVisible();
-  await sheet.getByRole("button", { name: "Waylamp", exact: true }).click();
-  await sheet.getByRole("button", { name: "Steady Strike", exact: true }).click();
-  await sheet.getByRole("button", { name: "Might", exact: true }).click();
-  await expect(composer).toHaveValue(/Consult my character sheet.*I use Waylamp.*I use Steady Strike.*I rely on my Might/s);
+  await expect(sheet).toHaveAttribute("aria-modal", "true");
+  await expect(page.locator("[data-command-center]")).toHaveJSProperty("inert", true);
+  await expect(sheet.getByRole("button", { name: "Close character sheet" })).toBeFocused();
+  const firstControl = sheet.getByRole("button", { name: "Open drawer at top" });
+  await firstControl.focus(); await page.keyboard.press("Shift+Tab");
+  await expect(sheet.getByRole("button", { name: "Back to draft", exact: true })).toBeFocused();
+  await page.keyboard.press("Tab"); await expect(firstControl).toBeFocused();
+  await sheet.getByRole("searchbox").fill("Waylamp");
+  await sheet.getByRole("button", { name: "Reference Waylamp", exact: true }).focus();
+  await page.keyboard.press("Space");
+  await expect(sheet.getByRole("button", { name: "Reference Waylamp", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await sheet.getByRole("button", { name: "Clear search" }).click();
+  await expect(sheet.getByRole("searchbox")).toBeFocused();
+  await sheet.getByRole("button", { name: "Reference Steady Strike", exact: true }).click();
+  await sheet.getByRole("button", { name: "Reference Might", exact: true }).click();
+  await expect(composer).toHaveValue("Consult my character sheet before I investigate: ");
   expect(adventureRequests).toHaveLength(0);
-  await sheet.getByRole("button", { name: "Close character sheet" }).click();
+  await audit("sheet-desktop", ".sheet-context-drawer");
+  await sheet.getByRole("button", { name: "Back to draft (3)" }).click();
+  await expect(composer).toBeFocused();
+  await page.reload();
+  await expect(composer).toHaveValue("Consult my character sheet before I investigate: ");
+  await expect(page.getByRole("button", { name: "Remove Waylamp reference" })).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 568 });
+  await composer.scrollIntoViewIfNeeded();
+  await audit("play-mobile", ".campaign-play-page");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.getByRole("button", { name: "Add from character sheet" }).click();
+  await expect(sheet).toBeVisible();
+  await audit("sheet-mobile", ".sheet-context-drawer");
+  await sheet.getByRole("searchbox").fill("Might");
+  const might = sheet.getByRole("button", { name: "Reference Might", exact: true });
+  await expect(might).toBeInViewport();
+  expect((await might.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await might.click(); await expect(might).toHaveAttribute("aria-pressed", "false");
+  await might.press("Enter"); await expect(might).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Add from character sheet" })).toBeFocused();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  for (const theme of ["light", "dark", "contrast"]) {
+    await page.getByRole("button", { name: "Display", exact: true }).click();
+    await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption(theme);
+    await page.getByRole("dialog", { name: "Campaign workbench" }).getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: "Add from character sheet" }).click();
+    await audit(`sheet-${theme}`, ".sheet-context-drawer");
+    await sheet.getByRole("button", { name: "Back to draft (3)" }).click();
+    await audit(`play-${theme}`, ".campaign-play-page");
+  }
 
-  const declaration = await composer.inputValue();
+  const declaration = (await composer.inputValue()).trim();
   await page.getByRole("button", { name: "Declare action" }).click();
   await expect.poll(() => adventureRequests.length).toBe(1);
+  const submitted = JSON.parse(adventureRequests[0]!);
+  expect(submitted.declaration).toBe(declaration);
+  expect(submitted.sheetReferences).toHaveLength(3);
+  expect(submitted).not.toHaveProperty("sheetContext");
   await expect(page.getByText(deterministicAdventureNarration, { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("region", { name: "Committed mechanics" })).toHaveCount(0);
   const afterStats = await (await request.get("http://127.0.0.1:18788/stats")).json() as typeof beforeStats;
   expect(afterStats.exactTravelSelections).toBe(beforeStats.exactTravelSelections);
   expect(afterStats.actorSheetReads).toBe(beforeStats.actorSheetReads + 1);
   expect(afterStats.narrationResponses).toBeGreaterThan(beforeStats.narrationResponses);
+  const contextStats = await (await request.get("http://127.0.0.1:18788/stats")).json() as { sheetContextRequests: Array<{ lane: string; entries: Array<{ label: string; value: string }> }> };
+  for (const lane of ["planning", "narration"]) expect(contextStats.sheetContextRequests).toContainEqual({ lane, entries: expect.arrayContaining([
+    expect.objectContaining({ label: "Waylamp", value: expect.stringContaining("Quantity 1") }), expect.objectContaining({ label: "Might", value: "15" }),
+  ]) });
 
   await page.reload();
   await page.getByText("World routes and travel", { exact: true }).click();
   await expect(page.getByText(declaration, { exact: true })).toBeVisible();
   await expect(page.getByText(deterministicAdventureNarration, { exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
+  await page.getByText("Character context · 3 references", { exact: true }).click();
+  await expect(page.locator(".sent-sheet-context").getByText("Waylamp", { exact: true })).toBeVisible();
   const visibleText = await page.locator("body").innerText();
   for (const privateId of [...Object.values(privateIds), ...privateSheetIds]) expect(visibleText).not.toContain(privateId);
 });

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ActorGameplaySheetResponse } from "@velvet/contracts";
+import { gameplaySheetEntries, sheetReferenceKey, sheetSectionLabels, type ActorGameplaySheetResponse } from "@velvet/contracts";
 import { GameplaySheetDrawer } from "./GameplaySheetDrawer";
 
 const at = "2030-01-01T00:00:00.000Z";
@@ -33,28 +33,42 @@ describe("GameplaySheetDrawer", () => {
   it("renders the strict contract's complete categories, item, spell, availability, and effect details", () => {
     render(<GameplaySheetDrawer sheet={sheet} canReference onClose={vi.fn()} onReference={vi.fn()} />);
     expect(screen.getByRole("dialog", { name: "Arden Vale's character sheet" }).getAttribute("aria-modal")).toBe("false");
-    for (const heading of ["Identity", "Classes", "Attributes", "Derived stats and progression", "Progression", "Proficiencies", "Choices", "Resources", "Inventory and equipment", "Known powers and spells", "Active effects"]) expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
-    for (const detail of ["Warden, level 3", "Might", "Maximum HP", "Survival", "Resolve", "Sentinel", "Focus", "Moonlit rope", "Guiding Spark", "Guardian Rush", "Spent Ward", "Blessed"]) expect(screen.getByText(detail)).toBeTruthy();
-    expect(screen.getByText("Unavailable: spell slot unavailable")).toBeTruthy();
-    expect(screen.getByText(/2 rounds remaining; concentration; recovers on long rest/)).toBeTruthy();
-    expect(screen.getByText("+2 to guard")).toBeTruthy();
-    expect(screen.getByText(/explicitly press Declare action/)).toBeTruthy();
+    for (const heading of Object.values(sheetSectionLabels).filter((value) => value !== "Stat calculations")) expect(screen.getByRole("heading", { name: new RegExp(heading) })).toBeTruthy();
+    for (const detail of ["Warden", "Might", "Maximum HP", "Survival", "Resolve", "Sentinel", "Focus", "Moonlit rope", "Guiding Spark", "Guardian Rush", "Spent Ward", "Blessed"]) expect(screen.getByText(detail)).toBeTruthy();
+    expect(screen.getByText(/Unavailable: spell slot unavailable/)).toBeTruthy();
+    expect(screen.getByText(/2 rounds remaining.*concentration.*Recovers on long rest/)).toBeTruthy();
+    expect(screen.getByText(/\+2 to guard/)).toBeTruthy();
   });
 
-  it("emits natural-language fragments from every reference category without form submission", () => {
+  it("selects every fact including numbers, progression, calculations and unavailable spells without submission", () => {
     const reference = vi.fn(); const submit = vi.fn();
     render(<form onSubmit={submit}><GameplaySheetDrawer sheet={sheet} canReference onClose={vi.fn()} onReference={reference} /></form>);
-    const cases = [["Emberkin", "I draw on my Emberkin heritage to "], ["Wayfinder", "I draw on my Wayfinder background to "], ["Warden, level 3", "I use my Warden training to "], ["Might", "I rely on my Might to "], ["Guard", "I account for my Guard defense as I "], ["Survival", "I use my Survival proficiency to "], ["Sentinel", "I draw on my choice of Sentinel to "], ["Focus", "I draw on Focus to "], ["Moonlit rope", "I use Moonlit rope to "], ["Guiding Spark", "I cast Guiding Spark to "], ["Guardian Rush", "I use Guardian Rush to "], ["Blessed", "I account for Blessed as I "]] as const;
-    for (const [name, fragment] of cases) { fireEvent.click(screen.getByRole("button", { name })); expect(reference).toHaveBeenLastCalledWith(fragment); }
+    fireEvent.click(screen.getByText("How stats were calculated"));
+    const cases = gameplaySheetEntries(sheet);
+    for (const entry of cases) { fireEvent.click(screen.getByRole("button", { name: `Reference ${entry.label}`, hidden: true })); expect(reference).toHaveBeenLastCalledWith(entry); }
     expect(reference).toHaveBeenCalledTimes(cases.length); expect(submit).not.toHaveBeenCalled();
   });
 
-  it("fails closed for unavailable powers and non-ready play", () => {
+  it("allows questions about unavailable powers but disables references during non-ready play", () => {
     const reference = vi.fn(); const { rerender } = render(<GameplaySheetDrawer sheet={sheet} canReference onClose={vi.fn()} onReference={reference} />);
-    expect((screen.getByRole("button", { name: "Spent Ward" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Reference Spent Ward" }) as HTMLButtonElement).disabled).toBe(false);
     rerender(<GameplaySheetDrawer sheet={sheet} canReference={false} onClose={vi.fn()} onReference={reference} />);
-    expect((screen.getByRole("button", { name: "Guiding Spark" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Guiding Spark" })); expect(reference).not.toHaveBeenCalled();
-    expect(screen.getByText(/disabled until play is ready and unambiguous/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Reference Guiding Spark" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Reference Guiding Spark" })); expect(reference).not.toHaveBeenCalled();
+    expect(screen.getByText(/References are available when play is ready/)).toBeTruthy();
+  });
+
+  it("searches all fact values and keeps selected controls removable at the limit", () => {
+    const entries = gameplaySheetEntries(sheet), selected = entries.slice(0, 16);
+    render(<GameplaySheetDrawer sheet={sheet} canReference selectedKeys={new Set(selected.map((entry) => sheetReferenceKey(entry.reference)))} onClose={vi.fn()} onReference={vi.fn()} />);
+    expect((screen.getByRole("button", { name: "Reference Name" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole("button", { name: "Reference Name" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "spell slot unavailable" } });
+    expect(screen.getByRole("button", { name: "Reference Spent Ward" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Reference Name" })).toBeNull();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "nonexistent" } });
+    expect(screen.getByText(/No entries match/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(document.activeElement).toBe(screen.getByRole("searchbox"));
   });
 });

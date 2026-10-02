@@ -9,7 +9,8 @@ import {
   providerCallOutcomeInputSchema, providerCallStartInputSchema, resourceIdSchema, canonicalAgentJson,
   canonicalSha256DigestSchema, expectedRevisionSchema, idempotencyKeySchema, revisionSchema,
   reviewGenerationDraftInputSchema, stagedGenerationContentSchema, turnMutationInputSchema,
-  updateTurnNarrationInputSchema, utcIsoTimestampSchema,
+  updateTurnNarrationInputSchema, utcIsoTimestampSchema, gameplaySheetEntries, sheetReferenceKey, sheetContextSchema,
+  type ActorGameplaySheetResponse, type SheetContextEntry,
   type AppendToolProposalInput, type ApplyGenerationDraftInput, type CreateAdventureTurnInput,
   type CreateGenerationDraftInput, type DecideToolProposalInput, type DecideToolProposalsInput, type DraftMutationInput,
   type LinkTurnReceiptInput, type PrivateAdventureTurn, type PrivateGenerationDraft,
@@ -64,7 +65,9 @@ type AggregateKind = "turn" | "draft";
 type Action = "turn" | "provider" | "draft";
 
 /** Runtime and transaction guard dependencies for M1.10 writes. */
-export interface AdventureTurnWriteContext { clock: Clock; ids: IdGenerator; guard(): void }
+export interface AdventureTurnWriteContext { clock: Clock; ids: IdGenerator; guard(): void;
+  getActorGameplaySheet?: (principalId: string, actorId: string) => ActorGameplaySheetResponse | null;
+}
 
 /** Authoritative M1.10 mutation surface. */
 export interface AdventureTurnWriteRepository {
@@ -235,13 +238,13 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     return commandId;
   };
   const finish = <T>(kind: AggregateKind, row: any, principalId: string, mutationType: string, input: any, expected: number,
-    state: string, narration: string | null, at: string, read: () => T): T => {
+    state: string, narration: string | null, at: string, read: () => T, sheetContext?: SheetContextEntry[]): T => {
     const resulting = expected + 1;
     if (row.revision !== resulting) throw new AdventureTurnStaleError(`${kind} physical revision did not advance exactly once`);
     const commandId = command(kind, row, principalId, mutationType, input, expected, resulting, at), eventId = id();
     db.prepare(`INSERT INTO adventure_coordination_events_v36(event_id,command_id,aggregate_kind,campaign_id,aggregate_id,principal_id,mutation_type,
       expected_revision,resulting_revision,resulting_state,narration_status,event_json,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(eventId, commandId, kind, row.campaign_id, row.id, principalId, mutationType, expected, resulting, state, narration, canonical({ state, narrationStatus: narration }), at);
+      .run(eventId, commandId, kind, row.campaign_id, row.id, principalId, mutationType, expected, resulting, state, narration, canonical({ state, narrationStatus: narration, ...(sheetContext?.length ? { sheetContext } : {}) }), at);
     const result = read();
     db.prepare(`INSERT INTO adventure_coordination_receipts_v36(command_id,event_id,aggregate_kind,campaign_id,aggregate_id,expected_revision,resulting_revision,result_json)
       VALUES(?,?,?,?,?,?,?,?)`).run(commandId, eventId, kind, row.campaign_id, row.id, expected, resulting, canonical(result));
@@ -335,12 +338,24 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         AND command.campaign_id=? AND command.idempotency_key=? AND command.mutation_type='turn-create'`).get(input.campaignId, input.idempotencyKey) as any;
       if (existingCommand) { const row = turn(existingCommand.aggregate_id); const old = replay("turn", row, principalId, "turn-create", input, -1, privateAdventureTurnSchema); if (old) return old; }
       const mode = input.mode ?? "original", priorId = input.priorTurnId ?? null; let state = "declared", narration = "none";
+      let sheetContext: SheetContextEntry[] | undefined;
+      if (input.sheetReferences?.length) {
+        const sheet = context.getActorGameplaySheet?.(principalId, input.actorId);
+        if (!sheet || sheet.identity.actorId !== input.actorId) throw new AdventureTurnUnavailableError("character sheet is unavailable");
+        const entries = new Map(gameplaySheetEntries(sheet).map((entry) => [sheetReferenceKey(entry.reference), entry]));
+        sheetContext = sheetContextSchema.parse(input.sheetReferences.map((reference) => {
+          const entry = entries.get(sheetReferenceKey(reference));
+          if (!entry) throw new AdventureTurnStaleError("a selected sheet reference is no longer available");
+          return entry;
+        }));
+      }
       if (mode !== "original") {
         const prior = turn(priorId!); authority(principalId, prior, input.expectedCampaignRevision, "turn");
         if (prior.campaign_id !== input.campaignId || prior.timeline_id !== input.timelineId || prior.session_id !== input.sessionId || prior.actor_id !== input.actorId)
           throw new AdventureTurnConflictError("narration ancestry is out of scope");
         const priorState = latest("turn", prior.campaign_id, prior.id)?.resulting_state;
         if (!["completed", "cancelled", "failed"].includes(priorState)) throw new AdventureTurnConflictError("narration retry requires a terminal ancestor");
+        sheetContext = privateTurn(principalId, prior.id).sheetContext;
         state = "mechanics-committed"; narration = "pending";
       }
       const row = { id: id(), campaign_id: input.campaignId, timeline_id: input.timelineId, session_id: input.sessionId, actor_id: input.actorId,
@@ -356,7 +371,7 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         max_decision_rounds,max_tool_calls,max_mutation_calls,max_provider_calls,max_duration_ms,started_at,deadline_at)
         VALUES(?,?,?,?,?,?,?,?,?,?)`).run(row.campaign_id, row.id, AGENT_TOOL_REGISTRY_VERSION,
           limits.decisionRounds, limits.toolCalls, limits.mutationCalls, limits.providerCalls, limits.durationMs, at, deadlineAt);
-      return finish("turn", row, principalId, "turn-create", input, -1, state, narration, at, () => privateTurn(principalId, row.id));
+      return finish("turn", row, principalId, "turn-create", input, -1, state, narration, at, () => privateTurn(principalId, row.id), sheetContext);
     }); },
     appendToolProposal(principalId, raw) { const input = appendToolProposalInputSchema.parse(raw); return immediate(() => {
       const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");

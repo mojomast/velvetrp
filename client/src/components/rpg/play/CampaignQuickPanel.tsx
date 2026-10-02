@@ -1,68 +1,56 @@
-import { useEffect, useState } from "react";
-import type { ActorEffectsResponse, ActorResourcesHttpGetResponse, InventoryHttpGetResponse } from "@velvet/contracts";
-import type { CampaignPlayActor } from "@velvet/contracts";
-
-export interface CampaignQuickPanelApi {
-  getActorResources: (campaignId: string, actorId: string) => Promise<ActorResourcesHttpGetResponse>;
-  getActorInventory: (campaignId: string, actorId: string) => Promise<InventoryHttpGetResponse>;
-  getActorEffects: (actorId: string) => Promise<ActorEffectsResponse>;
-}
+import { useEffect, useId, useState } from "react";
+import { gameplaySheetEntries, MAX_SHEET_REFERENCES, sheetReferenceKey, type ActorGameplaySheetResponse, type CampaignPlayActor, type SheetContextEntry, type SheetReferenceSection } from "@velvet/contracts";
 
 interface CampaignQuickPanelProps {
   campaignId: string;
   selectedActorId: string | null;
   actors: readonly CampaignPlayActor[];
-  api: CampaignQuickPanelApi;
+  getSheet: (actorId: string) => Promise<ActorGameplaySheetResponse>;
   refreshKey?: number;
   canOpenSheet?: boolean;
-  onOpenSheet?: () => void;
-  openSheetButtonRef?: React.RefObject<HTMLButtonElement>;
+  onOpenSheet: () => void;
+  selectedKeys: ReadonlySet<string>;
+  onReference: (entry: SheetContextEntry) => void;
 }
 
-type QuickState = {
-  resources: ActorResourcesHttpGetResponse | null;
-  inventory: InventoryHttpGetResponse | null;
-  effects: ActorEffectsResponse | null;
-};
-
-/** Read-only character summary for the Command Center side panel. */
-export function CampaignQuickPanel({ campaignId, selectedActorId, actors, api, refreshKey = 0, canOpenSheet = false, onOpenSheet = () => undefined, openSheetButtonRef }: CampaignQuickPanelProps) {
-  const [state, setState] = useState<QuickState>({ resources: null, inventory: null, effects: null });
-  const [loading, setLoading] = useState(false);
-  const [failures, setFailures] = useState(0);
-
+/** One actor-bound read supplies friendly names and exact reference identities to the side rail. */
+export function CampaignQuickPanel({ campaignId, selectedActorId, actors, getSheet, refreshKey = 0, canOpenSheet = false, onOpenSheet, selectedKeys, onReference }: CampaignQuickPanelProps) {
+  const id = useId();
+  const [sheet, setSheet] = useState<ActorGameplaySheetResponse | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    let current = true;
-    setState({ resources: null, inventory: null, effects: null });
-    setFailures(0);
-    if (!selectedActorId || !actors.some((actor) => actor.actorId === selectedActorId)) return () => { current = false; };
-    setLoading(true);
-    void Promise.allSettled([
-      api.getActorResources(campaignId, selectedActorId),
-      api.getActorInventory(campaignId, selectedActorId),
-      api.getActorEffects(selectedActorId),
-    ] as const).then(([resources, inventory, effects]) => {
+    let current = true; setSheet(null);
+    if (!selectedActorId) { setStatus("ready"); return; }
+    setStatus("loading");
+    void getSheet(selectedActorId).then((value) => {
       if (!current) return;
-      setState({
-        resources: resources.status === "fulfilled" ? resources.value : null,
-        inventory: inventory.status === "fulfilled" ? inventory.value : null,
-        effects: effects.status === "fulfilled" ? effects.value : null,
-      });
-      setFailures([resources, inventory, effects].filter((result) => result.status === "rejected").length);
-      setLoading(false);
-    });
+      if (value.identity.actorId !== selectedActorId) { setStatus("error"); return; }
+      setSheet(value); setStatus("ready");
+    }, () => { if (current) setStatus("error"); });
     return () => { current = false; };
-  }, [actors, api, campaignId, selectedActorId, refreshKey]);
-
-  const actor = actors.find((candidate) => candidate.actorId === selectedActorId);
+  }, [campaignId, selectedActorId, getSheet, refreshKey, retry]);
+  const entries = sheet && sheet.identity.actorId === selectedActorId ? gameplaySheetEntries(sheet) : [];
+  const actor = actors.find((entry) => entry.actorId === selectedActorId);
+  function section(kind: SheetReferenceSection, title: string, empty: string) {
+    const all = entries.filter((entry) => entry.reference.section === kind && entry.reference.key !== "capacity");
+    return <section aria-label={title}><div className="quick-section-heading"><h3>{title}</h3><span>{all.length}</span></div>
+      {all.length ? <ul className="quick-reference-list">{all.slice(0, 6).map((entry, index) => {
+        const key = sheetReferenceKey(entry.reference), selected = selectedKeys.has(key);
+        const description = `${id}-${kind}-${index}`;
+        return <li key={key}><button type="button" aria-label={`Reference ${entry.label}`} aria-describedby={description} aria-pressed={selected}
+          disabled={!canOpenSheet || (!selected && selectedKeys.size >= MAX_SHEET_REFERENCES)} onClick={() => onReference(entry)}><span><strong>{entry.label}</strong><span id={description}>{entry.value}</span></span><span aria-hidden="true">{selected ? "✓" : "+"}</span></button></li>;
+      })}</ul> : <p className="quick-empty">{empty}</p>}
+      {all.length > 6 && <button type="button" className="ghost" onClick={onOpenSheet} disabled={!canOpenSheet}>View all {all.length} in sheet</button>}
+    </section>;
+  }
   return <aside className="campaign-quick-panel" aria-label="Character quick tools" tabIndex={-1}>
-    <header><div><p className="eyebrow">ACTING CHARACTER</p><h2>{actor?.name ?? "No actor selected"}</h2></div>{loading && <span role="status">Refreshing...</span>}</header>
-    <div className="quick-sheet-action"><button ref={openSheetButtonRef} type="button" className="primary" disabled={!selectedActorId || !canOpenSheet} onClick={onOpenSheet}>Open character sheet</button>{selectedActorId && !canOpenSheet && <small>Available when play is ready and unambiguous.</small>}</div>
-    {failures > 0 && <p className="quick-panel-warning" role="alert">{failures} character {failures === 1 ? "lane is" : "lanes are"} unavailable. No state was inferred.</p>}
-    <section aria-labelledby="quick-party-heading"><div className="quick-section-heading"><h3 id="quick-party-heading">Party</h3><span>{actors.length}</span></div>{actors.length ? <ul className="quick-party-list">{actors.map((member) => <li className={member.actorId === selectedActorId ? "is-acting" : ""} key={member.actorId}>{member.name}<span>{member.actorId === selectedActorId ? "Acting" : "Available"}</span></li>)}</ul> : <p className="quick-empty">No controlled actors available.</p>}</section>
-    <section aria-labelledby="quick-resources-heading"><div className="quick-section-heading"><h3 id="quick-resources-heading">Health & resources</h3><span>{state.resources?.resources.length ?? 0}</span></div>{state.resources?.resources.length ? <ul className="quick-resource-list">{state.resources.resources.map((resource) => <li key={resource.name}><div><strong>{resource.name}</strong><span>{resource.current} / {resource.max}</span></div><progress value={resource.current} max={Math.max(1, resource.max)} aria-label={`${resource.name}: ${resource.current} of ${resource.max}`} /></li>)}</ul> : <p className="quick-empty">{selectedActorId ? "No resource tracks available." : "Select an acting character."}</p>}</section>
-    <section aria-labelledby="quick-inventory-heading"><div className="quick-section-heading"><h3 id="quick-inventory-heading">Inventory quick access</h3><span>{state.inventory?.entries.length ?? 0}</span></div>{state.inventory?.entries.length ? <ul className="quick-inventory-list">{state.inventory.entries.slice(0, 8).map((entry) => <li key={entry.entryId}><span>{entry.item.definitionId}</span><strong>{entry.kind === "stackable" ? `x${entry.quantity}` : "1"}</strong></li>)}</ul> : <p className="quick-empty">No carried items.</p>}{state.inventory && state.inventory.entries.length > 8 && <p className="quick-more">+{state.inventory.entries.length - 8} more in the character sheet</p>}</section>
-    <section aria-labelledby="quick-effects-heading"><div className="quick-section-heading"><h3 id="quick-effects-heading">Active effects</h3><span>{state.effects?.effects.length ?? 0}</span></div>{state.effects?.effects.length ? <ul className="quick-effects-list">{state.effects.effects.map((effect) => <li key={effect.effectId}><strong>{effect.modifiers.map((modifier) => modifier.kind).join(", ") || "Effect"}</strong><span>{effect.duration.kind.replaceAll("_", " ")}</span></li>)}</ul> : <p className="quick-empty">No active effects.</p>}</section>
-    <p className="quick-panel-note">Inventory and effects are read-only here. Commands remain in the authoritative character and combat workspaces.</p>
+    <header><div><p className="eyebrow">ACTING CHARACTER</p><h2>{actor?.name ?? "No character selected"}</h2></div></header>
+    <div className="quick-sheet-action"><button type="button" className="primary" disabled={!selectedActorId || !canOpenSheet} onClick={onOpenSheet}>Open character sheet</button></div>
+    <p className="quick-panel-note">Select a detail to attach it to your next action. Nothing is spent or rolled.</p>
+    {status === "loading" && <p role="status">Refreshing character…</p>}
+    {status === "error" && <div className="quick-panel-warning"><p role="status">Character summary is unavailable.</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Retry character summary</button></div>}
+    {sheet && <>{section("resources", "Health & resources", "No resource tracks listed.")}{section("inventory", "Inventory quick access", "No carried items.")}{section("effects", "Active effects", "No active effects.")}</>}
+    <section aria-label="Party"><div className="quick-section-heading"><h3>Party</h3><span>{actors.length}</span></div><ul className="quick-party-list">{actors.map((member) => <li key={member.actorId}>{member.name}<span>{member.actorId === selectedActorId ? "Acting" : "Available"}</span></li>)}</ul></section>
   </aside>;
 }

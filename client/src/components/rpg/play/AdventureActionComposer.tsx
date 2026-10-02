@@ -1,4 +1,6 @@
-import { FormEvent } from "react";
+import { FormEvent, useId } from "react";
+import { sheetReferenceKey, type SheetContextEntry } from "@velvet/contracts";
+import "./sheetContext.css";
 
 /** A server-authorized actor offered by the campaign play bootstrap. */
 export interface AdventureComposerActor {
@@ -19,12 +21,18 @@ export interface AdventureActionComposerProps {
   onActorChange: (actorId: string) => void;
   onSubmit: (declaration: string) => void;
   composerRef?: React.RefObject<HTMLTextAreaElement>;
+  sheetContext?: readonly SheetContextEntry[];
+  onRemoveReference?: (key: string) => void;
+  onClearReferences?: () => void;
+  onOpenSheet?: () => void;
+  contextNotice?: string;
 }
 
 /** Renders exact actor selection and declaration submission without client-side mechanics. */
 export function AdventureActionComposer({ actors, selectedActorId, role, eligible, inactive, phase,
-  declaration, onDeclarationChange, onActorChange, onSubmit, composerRef }: AdventureActionComposerProps) {
+  declaration, onDeclarationChange, onActorChange, onSubmit, composerRef, sheetContext = [], onRemoveReference, onClearReferences, onOpenSheet, contextNotice }: AdventureActionComposerProps) {
   const observer = role === "observer";
+  const id = useId();
   const actorAvailable = actors.some((actor) => actor.actorId === selectedActorId);
   const disabled = observer || inactive || !eligible || !actorAvailable || phase !== "ready";
   const status = observer ? "Observer access is read-only."
@@ -38,21 +46,26 @@ export function AdventureActionComposer({ actors, selectedActorId, role, eligibl
   function submit(event: FormEvent) {
     event.preventDefault();
     const exact = declaration.trim();
-    if (disabled || exact.length === 0) return;
+    if (disabled || exact.length === 0 || exact.length > 8000) return;
     onSubmit(exact);
   }
 
-  return <form className="adventure-composer" onSubmit={submit} aria-describedby="adventure-composer-status">
+  return <form className="adventure-composer" onSubmit={submit} aria-describedby={`${id}-status`}>
     <label><span>Acting character</span><select aria-label="Acting character" value={actorAvailable ? selectedActorId : ""}
       disabled={observer || inactive || phase !== "ready" || actors.length === 0}
       onChange={(event) => onActorChange(event.target.value)}>
       <option value="">Select a character</option>
       {actors.map((actor) => <option key={actor.actorId} value={actor.actorId}>{actor.name}</option>)}
     </select></label>
-    <label className="adventure-declaration"><span>What do you do?</span><textarea ref={composerRef} rows={2} maxLength={8000}
+    <div className="action-context"><div className="action-context-heading"><span>Context for the DM{sheetContext.length ? ` · ${sheetContext.length}` : ""}</span>{onOpenSheet && <button type="button" disabled={disabled} onClick={onOpenSheet}>Add from character sheet</button>}</div>
+      {sheetContext.length > 0 ? <><ul aria-label="Selected character references">{sheetContext.map((entry) => <li key={sheetReferenceKey(entry.reference)}><span><strong>{entry.label}</strong><span>{entry.value}</span></span><button type="button" disabled={disabled} aria-label={`Remove ${entry.label} reference`} onClick={() => { onRemoveReference?.(sheetReferenceKey(entry.reference)); composerRef?.current?.focus(); }}>Remove</button></li>)}</ul><button type="button" className="context-clear" disabled={disabled} onClick={() => { onClearReferences?.(); composerRef?.current?.focus(); }}>Clear references</button></> : <p className="action-context-hint">Attach an item, spell, skill, or any sheet detail. Your words describe the action.</p>}
+      <p role="status" aria-atomic="true" className={contextNotice ? "sheet-context-note" : "sr-only"}>{contextNotice ?? ""}</p></div>
+    <label className="adventure-declaration"><span>What do you do?</span><textarea ref={composerRef} rows={3} maxLength={8000}
+      aria-describedby={`${id}-help`}
       value={declaration} disabled={disabled} onChange={(event) => onDeclarationChange(event.target.value)}
-      placeholder="Describe an action in the fiction…" /></label>
-    <button className="primary" type="submit" disabled={disabled || declaration.trim().length === 0}>Declare action</button>
-    <p id="adventure-composer-status" className="adventure-composer-status" role="status">{status}</p>
+      placeholder="What are you trying to do, and how?" /></label>
+    <p id={`${id}-help`} className="declaration-help">{sheetContext.length ? "Your words and references are sent together, using current sheet values. " : ""}{declaration.length.toLocaleString()} / 8,000 characters</p>
+    <button className="primary" type="submit" disabled={disabled || declaration.trim().length === 0 || declaration.trim().length > 8000}>Declare action</button>
+    <p id={`${id}-status`} className="adventure-composer-status" role="status" aria-label="Action availability">{status}</p>
   </form>;
 }

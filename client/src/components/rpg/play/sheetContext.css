@@ -1,0 +1,110 @@
+/* Character sheet → action context. Native controls, readable values, generous hit areas. */
+.campaign-play-page form.adventure-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "actor actor" "context context" "declaration declaration" "help submit" "status status"; gap: 8px 12px; }
+.campaign-play-page .adventure-composer > label:first-child { grid-area: actor; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.campaign-play-page .adventure-composer > label:first-child select { min-width: 0; max-width: 70%; min-height: 44px; }
+.campaign-play-page .adventure-composer > .action-context { grid-area: context; }
+.campaign-play-page .adventure-composer > .adventure-declaration { grid-area: declaration; }
+.campaign-play-page .adventure-composer textarea { width: 100%; min-height: 76px; max-height: 220px; resize: vertical; font-size: 16px; line-height: 1.5; }
+.campaign-play-page .adventure-composer > .declaration-help { grid-area: help; align-self: center; }
+.campaign-play-page .adventure-composer > button[type="submit"] { grid-area: submit; min-height: 44px; }
+.campaign-play-page .adventure-composer > .adventure-composer-status { grid-area: status; }
+.gameplay-sheet-drawer.sheet-context-drawer { display: flex; flex-direction: column; overflow: hidden; font-size: 14px; line-height: 1.5; }
+.sheet-context-drawer > header { position: static; flex: none; padding: 18px 20px; gap: 16px; }
+.sheet-context-drawer > header h2 { font-size: clamp(18px, 2vw, 23px); overflow-wrap: anywhere; }
+.sheet-context-drawer .eyebrow { font-size: 11px; letter-spacing: .1em; }
+.sheet-context-intro { padding: 16px 20px 10px; }
+.sheet-context-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 6px !important; }
+.sheet-context-filters { display: grid; gap: 6px; padding: 6px 20px 14px; border-bottom: 1px solid var(--border); }
+.sheet-context-filters > label { font-weight: 600; }
+.sheet-search-row { display: flex; gap: 8px; }
+.sheet-search-row input { min-width: 0; flex: 1; }
+.sheet-jump { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.sheet-jump select { width: auto; max-width: 100%; }
+.sheet-context-sections { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 16px 20px; scrollbar-gutter: stable; }
+.sheet-context-sections > section { margin-bottom: 24px; }
+.sheet-context-drawer .sheet-context-sections h3 { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; scroll-margin-block: 12px; color: var(--eyebrow); font-size: 15px; }
+.sheet-context-sections h3 > span { color: var(--muted); font-size: 12px; font-weight: 400; }
+.sheet-context-drawer .sheet-reference-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 205px), 1fr)); gap: 8px; list-style: none; padding: 0; margin: 0; }
+.sheet-context-drawer .sheet-reference-grid > li { min-width: 0; display: flex; }
+.sheet-context-drawer .sheet-reference { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 64px; padding: 12px; border: 1px solid var(--control-border); border-radius: 10px; background: var(--surface-2); color: var(--text); text-align: start; font-size: 14px; line-height: 1.5; }
+.sheet-reference-copy { display: grid; min-width: 0; gap: 3px; overflow-wrap: anywhere; }
+.sheet-reference-copy > span { color: var(--muted); font-size: 13px; }
+.sheet-reference-mark { font-size: 11px; white-space: nowrap; flex: none; color: var(--eyebrow); font-weight: 600; }
+.sheet-context-drawer .sheet-reference:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
+.sheet-context-drawer .sheet-reference[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); box-shadow: inset 3px 0 var(--accent); }
+.sheet-context-drawer :is(button, input, select, summary) { min-height: 44px; }
+.sheet-context-drawer .atlas-drawer-controls { flex: none; }
+.sheet-context-drawer .atlas-drawer-side-control button { min-width: 44px; width: 44px; min-height: 44px; }
+.sheet-context-drawer .atlas-character-actions { flex: none; }
+.sheet-context-drawer summary { display: flex; align-items: center; cursor: pointer; gap: 8px; }
+.sheet-context-drawer summary::before { content: "+"; }
+.sheet-context-drawer details[open] > summary::before { content: "−"; }
+.sheet-context-drawer .sheet-calculations .sheet-reference-grid { grid-template-columns: 1fr; }
+.sheet-context-footer { flex: none; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--border); padding: 14px 20px max(14px, env(safe-area-inset-bottom)); background: var(--surface-2); }
+.sheet-context-footer p { font-size: 12px; color: var(--muted); max-height: 3em; overflow: auto; }
+.sheet-context-footer .button-row { gap: 8px; }
+.sheet-context-drawer .sheet-context-footer button { min-height: 44px; }
+.sheet-no-results { padding: 20px 0; }
+:is(.campaign-play-page, .living-atlas) .adventure-composer > .action-context { grid-column: 1 / -1; min-width: 0; }
+.action-context-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 600; }
+.action-context-heading button { padding: 6px 10px; min-height: 44px; font-size: 12px; }
+.action-context-hint { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+.action-context ul { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 8px 0; padding: 3px; max-height: 140px; overflow: auto; }
+.action-context li { display: flex; flex: 1 1 190px; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 4px 10px; max-width: 100%; border: 1px solid var(--control-border); border-radius: 9px; background: var(--surface-2); }
+.action-context li > span { display: grid; font-size: 12px; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.action-context li > span > span { color: var(--muted); }
+.action-context li button { width: auto; min-height: 44px; font-size: 11px; padding: 5px 8px; flex: none; }
+.action-context .context-clear { min-height: 44px; font-size: 12px; }
+.declaration-help { grid-column: 1 / -1; color: var(--muted); font-size: 12px; margin: 0; }
+.sent-sheet-context { margin-top: 8px; border-top: 1px solid var(--border); font-size: 12px; }
+.sent-sheet-context summary { padding: 10px 0; cursor: pointer; min-height: 44px; }
+.sent-sheet-context ul { display: grid; gap: 8px; padding: 0; list-style: none; }
+.sent-sheet-context li { display: grid; gap: 2px; overflow-wrap: anywhere; }
+.sent-sheet-context li span { color: var(--muted); }
+.quick-reference-list { display: grid; gap: 6px; list-style: none; padding: 0; }
+.quick-reference-list button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 10px; text-align: start; border: 1px solid var(--control-border); background: var(--surface-2); }
+.quick-reference-list button > span:first-child { display: grid; gap: 3px; overflow-wrap: anywhere; min-width: 0; }
+.quick-reference-list button > span > span { color: var(--muted); font-size: 12px; }
+.quick-reference-list button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 var(--accent); }
+.quick-reference-list button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+:is(.sheet-context-drawer, .adventure-composer, .sent-sheet-context) :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.campaign-drawers-overlay .sheet-context-drawer > header { position: static; }
+.campaign-drawers-overlay [data-orientation="horizontal"] .sheet-context-intro { display: none; }
+.campaign-drawers-overlay [data-orientation="horizontal"] .sheet-context-filters { padding-block: 6px; }
+.campaign-drawers-overlay [data-orientation="horizontal"] .sheet-context-filters > .sheet-context-note,
+.campaign-drawers-overlay [data-orientation="horizontal"] .sheet-jump { display: none; }
+.campaign-drawers-overlay .atlas-character-reference { max-height: 100dvh; }
+.living-atlas .atlas-drawer-slot > .sheet-context-drawer { padding: 0; overflow: hidden; }
+.living-atlas .sheet-context-drawer > header { position: static; top: auto; }
+@media (max-width: 600px), (max-height: 640px) {
+  .sheet-context-intro { padding: 10px 12px 4px; font-size: 13px; }
+  .sheet-context-intro .sheet-context-note { display: none; }
+  .sheet-context-drawer > header { padding: 12px; }
+  .sheet-context-filters { padding: 6px 12px 10px; }
+  .sheet-context-sections { padding: 12px; }
+  .sheet-context-footer { padding: 10px 12px max(10px, env(safe-area-inset-bottom)); }
+  .sheet-context-footer .button-row { flex: 1 1 auto; }
+  .sheet-context-footer .primary { flex: 1; }
+}
+@media (max-width: 600px) {
+  .campaign-play-page form.adventure-composer { grid-template-columns: minmax(0, 1fr); grid-template-areas: "actor" "context" "declaration" "help" "submit" "status"; }
+  .gameplay-sheet-drawer.sheet-context-drawer > header { flex-direction: column; align-items: stretch; gap: 8px; }
+  .sheet-context-drawer > header .atlas-drawer-controls { justify-content: space-between; }
+  .sheet-context-drawer > header h2 { font-size: 17px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sheet-context-drawer .atlas-character-actions { flex-wrap: nowrap; padding: 6px 10px; }
+  .sheet-context-drawer .atlas-character-actions button { font-size: 12px; padding-inline: 8px; }
+  .sheet-context-footer { gap: 8px; }
+  .sheet-context-footer > div:first-child { width: 100%; }
+  .sheet-context-footer p { font-size: 11px; }
+}
+@media (max-height: 640px) {
+  .sheet-context-intro, .sheet-jump, .sheet-context-filters > .sheet-context-note { display: none; }
+  .campaign-drawers-overlay .atlas-drawer-slot:is([data-side="top"], [data-side="bottom"]) { height: 100dvh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.campaign-play-page, .campaign-drawers-overlay, .living-atlas) * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
+@media (forced-colors: active) {
+  .sheet-context-drawer .sheet-reference[aria-pressed="true"] { border: 3px solid Highlight; }
+  .sheet-reference-mark { color: ButtonText; }
+}

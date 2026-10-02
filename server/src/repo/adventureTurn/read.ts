@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   MAX_ADVENTURE_TRANSCRIPT_TURNS, adventureTurnTranscriptEntrySchema, privateAdventureTurnSchema, privateGenerationDraftSchema, resourceIdSchema,
-  roleSafeAdventureTurnSchema, roleSafeGenerationDraftSchema,
+  roleSafeAdventureTurnSchema, roleSafeGenerationDraftSchema, sheetContextSchema,
   type AdventureTurnTranscriptEntry,
   type PrivateAdventureTurn, type PrivateGenerationDraft, type RoleSafeAdventureTurn, type RoleSafeGenerationDraft,
 } from "@velvet/contracts";
@@ -120,6 +120,13 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
 
 /** Creates principal-sensitive, non-mutating turn and draft projections. */
 export function createAdventureTurnReadRepository(db: Database): AdventureTurnReadRepository {
+  // Existing immutable creation events hold the server-resolved reference snapshot.
+  // Older turns have no context. No schema migration or mutable sidecar is needed.
+  const sheetContext = (campaignId: string, turnId: string) => {
+    const row = db.prepare(`SELECT json_extract(event_json,'$.sheetContext') context FROM adventure_coordination_events_v36
+      WHERE aggregate_kind='turn' AND campaign_id=? AND aggregate_id=? AND resulting_revision=0`).get(campaignId, turnId) as { context: string | null } | undefined;
+    return row?.context ? { sheetContext: sheetContextSchema.parse(JSON.parse(row.context)) } : {};
+  };
   const membership = (principalId: string, campaignId: string) => db.prepare(
     "SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?",
   ).get(campaignId, principalId) as { role: string } | undefined;
@@ -193,6 +200,7 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
           provider: call.provider, model: call.model, attempt: call.attempt, promptTokens: call.prompt_tokens,
           completionTokens: call.completion_tokens, outcomeCode: call.outcome_code, recordedAt: call.recorded_at }));
       return privateAdventureTurnSchema.parse({ ...common(row, effective), principalId:row.principal_id,declaration: row.declaration,
+        ...sheetContext(row.campaign_id, row.id),
         toolCalls: proposals.map((proposal) => { const proposalLinks = links.filter((link) => link.proposalId === proposal.proposal_id); return ({ proposal: { proposalId: proposal.proposal_id, position: proposal.position,
            toolName: proposal.tool_name, argumentsJson: proposal.arguments_json, proposedAt: proposal.proposed_at,
              policy:policy(proposal),
@@ -317,7 +325,7 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
         }>;
       return rows.reverse()
         .map((row) => adventureTurnTranscriptEntrySchema.parse({ turnId: row.turn_id, actorId: row.actor_id,
-        declaration: row.declaration, narration: row.narration, completedAt: row.completed_at }));
+        declaration: row.declaration, narration: row.narration, completedAt: row.completed_at, ...sheetContext(row.campaign_id, row.turn_id) }));
     },
     getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey) {
       const row = db.prepare("SELECT id FROM generation_drafts WHERE campaign_id=? AND idempotency_key=?")

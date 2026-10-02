@@ -657,11 +657,11 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       bodyOverrides: DIRECT_TOOL_BODY_OVERRIDES,
       parallelToolCalls:false,promptVersion: conversation ? CONVERSATION_NARRATION_PROMPT_VERSION : "adventure-narration-v1",
       schemaVersion: "adventure-narration-v1",
-      messages: conversation ? conversationNarrationMessages({ declaration: turn.declaration,
+      messages: conversation ? conversationNarrationMessages({ declaration: turn.declaration, sheetContext: turn.sheetContext ?? [],
         currentLocation:publicContext.currentLocation,currentActorName:publicContext.currentActorName,publicContext:publicContext.context,harness, history,
         rulesetDescriptor:publicContext.ruleset.descriptor,
         safetyPolicy: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId) })
-        : adventureNarrationMessages({ declaration: turn.declaration, receipts: safeReceipts,
+        : adventureNarrationMessages({ declaration: turn.declaration, sheetContext: turn.sheetContext ?? [], receipts: safeReceipts,
         currentLocation:publicContext.currentLocation,currentActorName:publicContext.currentActorName,publicContext:publicContext.context,harness, history,
         rulesetDescriptor:publicContext.ruleset.descriptor,
         safetyPolicy: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId) }) };
@@ -793,7 +793,7 @@ async function narrate(repo: Repo & Repository, turn: PrivateAdventureTurn, depe
 function projectTurn(turn: PrivateAdventureTurn) {
   return { turnId: turn.turnId, campaignId: turn.campaignId, sessionId: turn.sessionId, actorId: turn.actorId,
     mode: turn.mode === "narration-fallback" ? "narration-retry" as const : turn.mode, priorTurnId: turn.priorTurnId,
-    declaration: turn.declaration, state: turn.state, revision: turn.revision, createdAt: turn.createdAt, updatedAt: turn.updatedAt };
+    declaration: turn.declaration, ...(turn.sheetContext?.length ? { sheetContext: turn.sheetContext } : {}), state: turn.state, revision: turn.revision, createdAt: turn.createdAt, updatedAt: turn.updatedAt };
 }
 const proposals = (turn: PrivateAdventureTurn): AdventureTurnHttpProposal[] => turn.toolCalls.map(({ proposal }) => ({
   proposalId: proposal.proposalId, position: proposal.position, toolName: proposal.toolName,
@@ -1081,6 +1081,7 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
         if (!campaign) throw new AdventureTurnUnavailableError();
         turn = repo.createAdventureTurn(OWNER, { campaignId: body.data.campaignId, timelineId: campaign.activeTimelineId,
           sessionId: body.data.sessionId, actorId: body.data.actorId, declaration: body.data.declaration,
+          ...(body.data.sheetReferences?.length ? { sheetReferences: body.data.sheetReferences } : {}),
           expectedCampaignRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey });
         // Creation receipts intentionally replay their historical result; stream the fresh durable aggregate.
         turn = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));

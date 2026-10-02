@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actorGameplaySheetResponseSchema } from "../src/index.js";
+import { actorGameplaySheetResponseSchema, adventureTurnInitialStreamRequestSchema, gameplaySheetEntries, sheetReferenceKey, sheetReferencesSchema, MAX_SHEET_REFERENCES } from "../src/index.js";
 
 const reference = (kind: "race" | "background" | "class" | "item" | "ability", definitionId: string) => ({
   kind, packId: "starter", packVersion: "1.0.0", definitionId,
@@ -27,6 +27,35 @@ const sheet = {
 };
 
 describe("actor gameplay sheet HTTP contract", () => {
+  it("covers every sheet category with exact identity, values and unavailable power context", () => {
+    const value = actorGameplaySheetResponseSchema.parse({ ...sheet, knownPowers: [{ ...sheet.knownPowers[0], available: false, unavailableReasons: ["spell-slot-unavailable"] }] });
+    const entries = gameplaySheetEntries(value);
+    expect(new Set(entries.map((entry) => entry.reference.section))).toEqual(new Set(["identity", "classes", "attributes", "derived", "progression", "proficiencies", "choices", "resources", "inventory", "powers", "calculations"]));
+    expect(entries).toContainEqual({ reference: { section: "resources", key: "health" }, label: "Health", value: "8 / 12" });
+    expect(entries.find((entry) => entry.label === "Sword")?.value).toContain("Equipped: hand");
+    expect(entries.find((entry) => entry.reference.section === "powers")?.value).toContain("Unavailable");
+    expect(new Set(entries.map((entry) => sheetReferenceKey(entry.reference))).size).toBe(entries.length);
+  });
+  it("accepts only bounded unique selectors, never client-authored facts or another actor", () => {
+    const reference = { section: "inventory", key: "item:one" };
+    const base = { campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I use this", expectedRevision: 0, idempotencyKey: "context-test" };
+    expect(adventureTurnInitialStreamRequestSchema.parse(base)).toEqual(base);
+    expect(adventureTurnInitialStreamRequestSchema.safeParse({ ...base, sheetReferences: [reference] }).success).toBe(true);
+    for (const invalid of [[reference, reference], [{ ...reference, value: "Quantity 999" }], [{ ...reference, actorId: "other" }], [{ section: "privateNotes", key: "secret" }],
+      Array.from({ length: MAX_SHEET_REFERENCES + 1 }, (_, key) => ({ section: "inventory", key: String(key) }))]) {
+      expect(sheetReferencesSchema.safeParse(invalid).success).toBe(false);
+    }
+  });
+  it("preserves duplicate item identity and SRD-specific statistics without inventing starter defenses", () => {
+    const item = sheet.inventory.items[0]!;
+    const entries = gameplaySheetEntries(actorGameplaySheetResponseSchema.parse({ ...sheet, rulesetId: "dnd-5e", rulesetVersion: "5.1",
+      derived: { ...sheet.derived, armorClass: 16 }, inventory: { ...sheet.inventory, items: [item, { ...item, entryId: "second-sword", quantity: 2, equippedSlot: null }] } }));
+    expect(entries.filter((entry) => entry.label === "Sword").map((entry) => entry.reference.key)).toEqual(["item:sword-entry", "item:second-sword"]);
+    expect(entries.find((entry) => entry.reference.key === "item:second-sword")).toMatchObject({ catalogReference: item.item, value: "Quantity 2 · Not equipped" });
+    expect(entries.find((entry) => entry.label === "Armor Class")?.value).toBe("16");
+    expect(entries.find((entry) => entry.label === "Agility")?.value).toContain("+2 modifier");
+    expect(entries.filter((entry) => entry.reference.section === "derived").map((entry) => entry.label)).not.toContain("Guard");
+  });
   it("accepts the complete strict public projection", () => {
     expect(actorGameplaySheetResponseSchema.parse(sheet)).toEqual(sheet);
   });

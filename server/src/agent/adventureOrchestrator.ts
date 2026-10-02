@@ -1682,7 +1682,7 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   const messages = adventurePlanningMessages({
     authorityContext: basketText,
     candidateContext:adventureCandidateContext(candidateOptions,turn.declaration),
-    declaration: turn.declaration, audience: snapshot.audience.kind, campaignRole: snapshot.authority.role,
+    declaration: turn.declaration, sheetContext: turn.sheetContext ?? [], audience: snapshot.audience.kind, campaignRole: snapshot.authority.role,
     control: snapshot.authority.control, limitations: ADVENTURE_TOOL_LIMITATIONS, harness, history,
     rulesetDescriptor:snapshot.ruleset.descriptor,
     safetyPolicy: repository.getSessionZeroSafetyPolicy(OWNER, turn.campaignId),

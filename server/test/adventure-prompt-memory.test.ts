@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AdventureTurnTranscriptEntry } from "@velvet/contracts";
-import { adventureNarrationMessages, adventurePlanningMessages } from "../src/agent/adventurePrompt.js";
+import { adventureNarrationMessages, adventurePlanningMessages, conversationNarrationMessages } from "../src/agent/adventurePrompt.js";
 import { dmNarrationMessages } from "../src/agent/dmNarration.js";
 import { defaultHarnessSettings } from "../src/defaults.js";
 
@@ -21,6 +21,19 @@ const historyData = (history: AdventureTurnTranscriptEntry[], recentTurns = 32) 
   JSON.parse(historyMessage(history, recentTurns).content.split("\n\n").at(-1)!);
 
 describe("bounded adventure memory prompts", () => {
+  it("carries exact selected references separately from intent through planning and both narration lanes", () => {
+    const sheetContext = [{ reference: { section: "powers" as const, key: '["spell","catalog","1","ward"]' }, label: "Ward", value: "Unavailable: no spell slots" }];
+    const common = { declaration: "Can I use this to help?", sheetContext, harness: defaultHarnessSettings(), history: [], currentLocation: "Quay", publicContext: {} };
+    for (const prompt of [adventurePlanningMessages({ ...common, authorityContext: "", audience: "player", campaignRole: "player", control: "controlled", limitations: [] }),
+      adventureNarrationMessages({ ...common, receipts: [] }), conversationNarrationMessages(common)]) {
+      expect(prompt[0]?.content).toContain("not additional actions");
+      expect(prompt[0]?.content).toContain("current legal candidates and verified receipts override");
+      const context = prompt.find((message) => message.content?.startsWith("PLAYER-SELECTED CHARACTER SHEET CONTEXT"));
+      expect(context?.role).toBe("user"); expect(JSON.parse(context!.content!.split("\n").slice(1).join("\n"))).toEqual(sheetContext);
+      expect(prompt.at(-1)?.content).toContain(common.declaration);
+      expect(prompt.at(-1)?.content).not.toContain("Ward");
+    }
+  });
   it("pins epistemic rules in both immutable authority messages", () => {
     const planning = adventurePlanningMessages({ authorityContext: "Current public facts", declaration: "Recall the offer",
       audience: "player", campaignRole: "player", control: "controlled", limitations: [],

@@ -118,7 +118,7 @@ See [Provider configuration](docs/provider-configuration.md) for endpoint restri
 2. **Build and inspect.** Choose **Build world** to authorize the serial generation-and-apply plan. New worlds receive the SRD starter setup. Follow the stage progress, then use **Manage world** to inspect locations, cast, quests, and preparation. Public handouts and scene prompts have separate publication controls.
 3. **Prepare the table.** Choose **Prepare to play**. Create or finalize a campaign character, complete rules and safety preparation, and create or attach a room. The readiness view identifies what is still needed; a prepared world is not yet a running session.
 4. **Enter the adventure.** Activate a ready room and enter the Living Atlas. Use human-DM mode, review an AI suggestion, or explicitly delegate the Director and choose **Open scene**.
-5. **Say what you do.** Write a free-form declaration, use the sheet or map to prefill one, and review confirmations when required. Reopen saved campaigns from the searchable library to continue.
+5. **Say what you do.** Write a free-form declaration. Use **Add from character sheet** to attach exact items, spells, skills, resources, or any other sheet detail alongside your words; **Back to draft** returns to your writing. Review or remove references, then **Declare action**. Map suggestions can also prepare a declaration. Reopen saved campaigns from the searchable library to continue.
 
 For character-only roleplay, start from the **Character library**, create or select your cast, and open a solo or group conversation. A campaign is optional.
 
@@ -132,6 +132,7 @@ The [worldbuilding guide](docs/campaign-generation.md) explains stage minimums, 
 | **Library and preparation** | Search, role/lifecycle filters, recent/name sorting, blank campaigns, world/play handoffs, starter rules, safety review, opening designation, character and room readiness. |
 | **Character roleplay** | Rich editable profiles, import/export, solo and group rooms, speaker routing, streaming, cancellation, alternate replies, branches, approved/pending memories, scoped lore, summaries, and editable scene canon. |
 | **Campaign continuity** | Durable DM transcript, narration-only variants, source-attributed recall, location-aware NPC presence, witnessed/told/gossip observations, trust-gated disclosure, and private context inspection. |
+| **At-the-table interaction** | Searchable, fully referenceable gameplay sheet; up to 16 exact DM context attachments per action; per-character tab-local drafts; removable previews and persisted transcript context; keyboard-operable drawers, mobile reflow, and light/dark/high-contrast display. |
 | **Character mechanics** | Drafts, allocation choices, server rolls and full rerolls, finalization, derived sheets, XP/progression, inventory, equipment, resources, effects, rests, and supported magic-item attunement. |
 | **Tactical play** | Exploration/combat grids, fog, movement previews, terrain, cover, range, supported opportunity and readied reactions, combat logs, encounter building, reviewed encounter generation, and reward workflows. |
 | **World and social systems** | Directed travel, actor placement and camp, NPC placement, factions and reputation, quests and objectives, clues/story graphs, present-vendor commerce, bilateral trade, and companion creation/grant administration. |

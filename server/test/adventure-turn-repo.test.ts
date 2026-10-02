@@ -6,6 +6,9 @@ import {
   AdventureTurnUnavailableError, createRepository,
 } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
+import { createAdventureTurnWriteRepository } from "../src/repo/adventureTurn/write.js";
+import { createAdventureTurnReadRepository } from "../src/repo/adventureTurn/read.js";
+import { type ActorGameplaySheetResponse } from "@velvet/contracts";
 
 useTmpDataDir();
 const AT = "2035-01-01T00:00:00.000Z";
@@ -55,6 +58,42 @@ const createInput = (identity: { campaignId: string; timelineId: string }, key =
 });
 
 describe("M1.10 adventure turn repository", () => {
+  it("resolves selected sheet facts atomically, keeps replay snapshots, and inherits them across derivatives", () => {
+    const identity = seed(), db = new DatabaseDriver(dbPath());
+    const reads = createAdventureTurnReadRepository(db);
+    let value = 2, sequence = 0, lookups = 0;
+    // Other fields are populated because the shared index covers the entire sheet.
+    const sheet = (): ActorGameplaySheetResponse => ({ identity: { actorId: "actor", name: "Hero" },
+      race: { label: "Human", reference: { kind: "race", packId: "pack", packVersion: "1", definitionId: "human" } },
+      background: { label: "Guide", reference: { kind: "background", packId: "pack", packVersion: "1", definitionId: "guide" } },
+      classes: [], attributes: [], proficiencies: [], choices: [],
+      derived: { maxHp: 10, defenses: { guard: 10, evasion: 10, will: 10 }, initiative: 0, speed: 30, carryingLimit: 100, spellAttack: 0, saveDc: 10, explanations: [] },
+      progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, pendingChoiceCount: 0, updatedAt: AT },
+      resources: [{ resourceId: "focus", label: "Focus", current: value, capacity: 3 }], inventory: { capacity: 10, items: [] }, knownPowers: [], activeEffects: [],
+    });
+    const writes = createAdventureTurnWriteRepository(db, { clock: { now: () => new Date(AT) }, ids: { nextId: () => `context-${++sequence}` }, guard() {},
+      getActorGameplaySheet: (principal, actorId) => { lookups++; expect([principal, actorId]).toEqual(["player", "actor"]); return sheet(); } }, reads);
+    const input = { ...createInput(identity), declaration: "Could this help?", sheetReferences: [{ section: "resources" as const, key: "focus" }] };
+    const created = writes.createAdventureTurn("player", input);
+    expect(created.sheetContext).toEqual([{ reference: input.sheetReferences[0], label: "Focus", value: "2 / 3" }]);
+    expect(created.receiptLinks).toEqual([]);
+    value = 1;
+    expect(writes.createAdventureTurn("player", input)).toEqual(created); expect(lookups).toBe(1);
+    expect(() => writes.createAdventureTurn("player", { ...input, sheetReferences: [] })).toThrow(AdventureTurnConflictError);
+    expect(() => writes.createAdventureTurn("unrelated", { ...input, idempotencyKey: "unauthorized" })).toThrow(AdventureTurnAuthorizationError);
+    expect(lookups).toBe(1);
+    const before = (db.prepare("SELECT COUNT(*) count FROM adventure_turns").get() as { count: number }).count;
+    expect(() => writes.createAdventureTurn("player", { ...input, idempotencyKey: "stale", sheetReferences: [{ section: "inventory", key: "item:someone-elses-item" }] })).toThrow(AdventureTurnStaleError);
+    expect((db.prepare("SELECT COUNT(*) count FROM adventure_turns").get() as { count: number }).count).toBe(before);
+    writes.updateAdventureTurnNarration("player", { turnId: created.turnId, narrationStatus: "pending", terminalState: "cancelled", expectedTurnRevision: 0, expectedCampaignRevision: 0, idempotencyKey: "finish-context" });
+    const derivative = writes.createAdventureTurn("player", { ...createInput(identity, "retry-context"), mode: "narration-retry", priorTurnId: created.turnId });
+    expect(derivative.sheetContext).toEqual(created.sheetContext);
+    expect(reads.getAdventureTurn("unrelated", created.turnId)).not.toHaveProperty("sheetContext");
+    db.close();
+    const reopened = factory();
+    expect(reopened.getAdventureTurn("player", derivative.turnId)).toMatchObject({ sheetContext: created.sheetContext });
+    reopened.close();
+  });
   it("survives restart, seals duplicate confirmation, preserves receipts, and supports narration-only retries", () => {
     const identity = seed(); let repo = factory();
     const created = repo.createAdventureTurn("player", createInput(identity));

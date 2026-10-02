@@ -4,6 +4,7 @@ const replyText = "A concise deterministic reply from the selected character.";
 let exactTravelSelections = 0;
 let actorSheetReads = 0;
 let narrationResponses = 0;
+const sheetContextRequests = [];
 
 // The server maps dotted registry tool names to the provider `^[a-zA-Z0-9_-]+$` wire alphabet.
 const wireName = (name) => name.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -36,7 +37,7 @@ const server = createServer((request, response) => {
     return;
   }
   if(request.method==="GET"&&request.url==="/stats"){
-    response.writeHead(200,{"Content-Type":"application/json"});response.end(JSON.stringify({exactTravelSelections,actorSheetReads,narrationResponses}));return;
+    response.writeHead(200,{"Content-Type":"application/json"});response.end(JSON.stringify({exactTravelSelections,actorSheetReads,narrationResponses,sheetContextRequests}));return;
   }
   if (request.method !== "POST" || request.url !== "/v1/chat/completions") {
     response.writeHead(404).end();
@@ -60,6 +61,11 @@ const server = createServer((request, response) => {
         response.writeHead(400).end();return;
       }
       const narrationTool=parsed.tools?.find((tool)=>tool?.function?.name==="submit_adventure_narration")??null;
+      const sheetContext = parsed.messages?.find((message) => typeof message.content === "string" && message.content.startsWith("PLAYER-SELECTED CHARACTER SHEET CONTEXT AT DECLARATION"));
+      if (sheetContext) {
+        sheetContextRequests.push({ lane: narrationTool ? "narration" : "planning", entries: JSON.parse(sheetContext.content.split("\n").slice(1).join("\n")) });
+        if (sheetContextRequests.length > 64) sheetContextRequests.shift();
+      }
       if(narrationTool){const schema=narrationTool.function;
         if(schema.parameters?.additionalProperties!==false||schema.parameters?.required?.length!==1
           ||schema.parameters.required[0]!=="narration"||parsed.tool_choice?.function?.name!=="submit_adventure_narration"){

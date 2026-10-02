@@ -1,78 +1,76 @@
-import type { ActorGameplaySheetResponse } from "@velvet/contracts";
-import { AtlasDrawerSideControl, type AtlasDrawerSide } from "./PlaySurface";
+import { useContext, useId, useMemo, useState, type ReactNode } from "react";
+import { gameplaySheetEntries, MAX_SHEET_REFERENCES, sheetReferenceKey, sheetSectionLabels, type ActorGameplaySheetResponse, type SheetContextEntry, type SheetReferenceSection } from "@velvet/contracts";
+import { AtlasDrawerSideControl, DrawerModalContext, type AtlasDrawerSide } from "./PlaySurface";
+import "./sheetContext.css";
 
 export interface GameplaySheetDrawerProps {
   sheet: ActorGameplaySheetResponse;
   canReference: boolean;
+  selectedKeys?: ReadonlySet<string>;
   onClose: () => void;
-  onReference: (fragment: string) => void;
+  onReference: (entry: SheetContextEntry) => void;
+  onCompose?: () => void;
+  onRefresh?: () => void;
+  actions?: ReactNode;
+  notice?: string;
   closeButtonRef?: React.RefObject<HTMLButtonElement>;
-  /** Command Center only: current drawer edge and the four-way persistence hook. */
   side?: AtlasDrawerSide;
   onSideChange?: (side: AtlasDrawerSide) => void;
 }
 
-const signed = (value: number) => value >= 0 ? `+${value}` : String(value);
-const words = (value: string) => value.replace(/[-_]/g, " ");
-
-function Empty({ children }: { children: string }) { return <p className="gameplay-sheet-empty">{children}</p>; }
-
-function durationText(duration: ActorGameplaySheetResponse["activeEffects"][number]["duration"]): string {
-  if (duration.kind === "rounds") return `${duration.remaining} round${duration.remaining === 1 ? "" : "s"} remaining`;
-  if (duration.kind === "until_timestamp") return `until ${new Date(duration.expiresAt).toLocaleString()}`;
-  return "until removed";
-}
-
-function modifierText(modifier: ActorGameplaySheetResponse["activeEffects"][number]["modifiers"][number]): string {
-  if (modifier.kind === "flat") return `${signed(modifier.amount)} to ${words(modifier.appliesToId)}`;
-  if (modifier.kind === "proficiency") return `${signed(modifier.bonus)} proficiency to ${words(modifier.appliesToId)}`;
-  return `${words(modifier.kind)}: ${words(modifier.appliesToId)}`;
-}
-
-const derivedEntries = (sheet: ActorGameplaySheetResponse): Array<readonly [string, string | number | undefined, string]> => {
-  const defenses: Array<readonly [string, string | number | undefined, string]> = sheet.rulesetId === "dnd-5e" ? [["Armor Class", sheet.derived.armorClass, "my Armor Class"]] : [
-    ["Guard", sheet.derived.defenses.guard, "my Guard defense"],
-    ["Evasion", sheet.derived.defenses.evasion, "my Evasion defense"],
-    ["Will", sheet.derived.defenses.will, "my Will defense"],
-  ];
-  return [["Maximum HP", sheet.derived.maxHp, "my maximum health"], ...defenses,
-  ["Initiative", signed(sheet.derived.initiative), "my initiative"],
-  ["Speed", sheet.derived.speed, "my speed"],
-  ["Carrying limit", sheet.derived.carryingLimit, "my carrying limit"],
-  ["Spell attack", signed(sheet.derived.spellAttack), "my spell attack"],
-  ["Save DC", sheet.derived.saveDc, "my save difficulty"],
-  ];
-};
-
-/** Read-only actor projection. Reference controls only compose text for an explicit later declaration. */
-export function GameplaySheetDrawer({ sheet, canReference, onClose, onReference, closeButtonRef, side = "right", onSideChange }: GameplaySheetDrawerProps) {
-  const hintId = "gameplay-sheet-reference-hint";
-  const reference = (label: string, fragment: string, available = true) => (
-    <button type="button" disabled={!canReference || !available} aria-describedby={hintId} onClick={() => onReference(fragment)}>{label}</button>
-  );
-  const progression = sheet.progression;
-
-  return <aside className="gameplay-sheet-drawer" role="dialog" aria-modal="false" aria-labelledby="gameplay-sheet-title" aria-describedby={hintId}>
-    <header><div><p className="eyebrow">READ-ONLY REFERENCE · {sheet.rulesetId ?? "velvet-starter-v1"} @ {sheet.rulesetVersion ?? "1.0.0"}</p><h2 id="gameplay-sheet-title">{sheet.identity.name}&apos;s character sheet</h2></div>
+/** Every meaningful sheet entry is a native toggle; selecting references never edits the player's words. */
+export function GameplaySheetDrawer({ sheet, canReference, selectedKeys = new Set(), onClose, onReference, onCompose, onRefresh,
+  closeButtonRef, side = "right", onSideChange, actions, notice }: GameplaySheetDrawerProps) {
+  const id = useId();
+  const modal = useContext(DrawerModalContext);
+  const [query, setQuery] = useState("");
+  const [announcement, setAnnouncement] = useState("");
+  const entries = useMemo(() => gameplaySheetEntries(sheet), [sheet]);
+  const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
+  const matches = entries.filter((entry) => terms.every((term) => `${sheetSectionLabels[entry.reference.section]} ${entry.label} ${entry.value}`.toLocaleLowerCase().includes(term)));
+  const atLimit = selectedKeys.size >= MAX_SHEET_REFERENCES;
+  const sections = Object.keys(sheetSectionLabels) as SheetReferenceSection[];
+  function toggle(entry: SheetContextEntry) {
+    const selected = selectedKeys.has(sheetReferenceKey(entry.reference));
+    if (!canReference || (!selected && atLimit)) return;
+    onReference(entry);
+    setAnnouncement(`${entry.label} ${selected ? "removed from" : "added to"} your action context.`);
+  }
+  function cards(section: SheetReferenceSection) {
+    const items = matches.filter((entry) => entry.reference.section === section);
+    return items.length ? <ul className="sheet-reference-grid">{items.map((entry) => {
+      const key = sheetReferenceKey(entry.reference), selected = selectedKeys.has(key);
+      const duplicates = entries.filter((other) => other.reference.section === section && other.label === entry.label);
+      const label = duplicates.length > 1 ? `${entry.label} (${duplicates.indexOf(entry) + 1})` : entry.label;
+      const descriptionId = `${id}-entry-${entries.indexOf(entry)}`;
+      return <li key={key}><button type="button" className="sheet-reference" aria-label={`Reference ${label}`} aria-describedby={descriptionId} aria-pressed={selected}
+        disabled={!canReference || (atLimit && !selected)} onClick={() => toggle(entry)}>
+        <span className="sheet-reference-copy"><strong>{label}</strong><span id={descriptionId}>{entry.value}</span></span>
+        <span className="sheet-reference-mark" aria-hidden="true">{selected ? "✓ Added" : "+ Add"}</span>
+      </button></li>;
+    })}</ul> : <p className="gameplay-sheet-empty">{query ? "No matching entries." : "Nothing listed yet."}</p>;
+  }
+  return <aside className="gameplay-sheet-drawer sheet-context-drawer" role="dialog" aria-modal={modal} aria-labelledby={`${id}-title`} tabIndex={-1}>
+    <header><div><p className="eyebrow">YOUR CHARACTER · LEVEL {sheet.progression.level}</p><h2 id={`${id}-title`}>{sheet.identity.name}&apos;s character sheet</h2></div>
       <div className="atlas-drawer-controls"><AtlasDrawerSideControl tool="character" side={side} onSideChange={onSideChange} />
         <button ref={closeButtonRef} type="button" aria-label="Close character sheet" onClick={onClose}>Close</button></div></header>
-    <p id={hintId} className="gameplay-sheet-hint">Reference buttons only append words to your existing declaration draft and move focus to the composer. They never submit, roll, use an item or power, or change character state. Review and explicitly press Declare action to proceed.{!canReference && " References are disabled until play is ready and unambiguous."}</p>
-
-    <section aria-labelledby="gameplay-sheet-identity"><h3 id="gameplay-sheet-identity">Identity</h3><dl>
-      <div><dt>Name</dt><dd>{sheet.identity.name}</dd></div>
-      <div><dt>Race</dt><dd>{reference(sheet.race.label, `I draw on my ${sheet.race.label} heritage to `)}</dd></div>
-      <div><dt>Background</dt><dd>{reference(sheet.background.label, `I draw on my ${sheet.background.label} background to `)}</dd></div>
-    </dl></section>
-    <section aria-labelledby="gameplay-sheet-classes"><h3 id="gameplay-sheet-classes">Classes</h3>{sheet.classes.length ? <ul>{sheet.classes.map((entry) => <li key={`${entry.reference.packId}:${entry.reference.packVersion}:${entry.reference.definitionId}`}>{reference(`${entry.label}, level ${entry.level}`, `I use my ${entry.label} training to `)}</li>)}</ul> : <Empty>No classes listed.</Empty>}</section>
-    <section aria-labelledby="gameplay-sheet-attributes"><h3 id="gameplay-sheet-attributes">Attributes</h3>{sheet.attributes.length ? <ul>{sheet.attributes.map((entry) => <li key={entry.attributeId}>{reference(entry.label, `I rely on my ${entry.label} to `)} <strong>{entry.value}</strong></li>)}</ul> : <Empty>No attributes listed.</Empty>}</section>
-    <section aria-labelledby="gameplay-sheet-derived"><h3 id="gameplay-sheet-derived">Derived stats and progression</h3><dl>{derivedEntries(sheet).map(([label, value, phrase]) => <div key={label}><dt>{reference(label, `I account for ${phrase} as I `)}</dt><dd>{value}</dd></div>)}</dl>
-      <h4>Progression</h4><dl><div><dt>Mode</dt><dd>{words(progression.mode)}</dd></div><div><dt>Level</dt><dd>{progression.level}</dd></div><div><dt>Total XP</dt><dd>{progression.totalXp}</dd></div><div><dt>Milestones</dt><dd>{progression.milestoneCount}</dd></div><div><dt>Pending choices</dt><dd>{progression.pendingChoiceCount}</dd></div></dl>
-      <details><summary>How stats were calculated</summary><ul>{sheet.derived.explanations.map((entry) => <li key={entry.statistic}><strong>{words(entry.statistic)}</strong>: {entry.formula} = {entry.result}</li>)}</ul></details></section>
-    <section aria-labelledby="gameplay-sheet-proficiencies"><h3 id="gameplay-sheet-proficiencies">Proficiencies</h3>{sheet.proficiencies.length ? <ul>{sheet.proficiencies.map((entry) => <li key={entry.proficiencyId}>{reference(entry.label, `I use my ${entry.label} proficiency to `)} <span>{words(entry.category)}</span></li>)}</ul> : <Empty>No proficiencies listed.</Empty>}</section>
-    <section aria-labelledby="gameplay-sheet-choices"><h3 id="gameplay-sheet-choices">Choices</h3>{sheet.choices.length ? <ul>{sheet.choices.map((entry) => <li key={entry.choiceId}><span>{entry.label}: </span>{reference(entry.selection.label, `I draw on my choice of ${entry.selection.label} to `)}</li>)}</ul> : <Empty>No choices listed.</Empty>}</section>
-    <section aria-labelledby="gameplay-sheet-resources"><h3 id="gameplay-sheet-resources">Resources</h3>{sheet.resources.length ? <ul>{sheet.resources.map((entry) => <li key={entry.resourceId}>{reference(entry.label, `I draw on ${entry.label} to `)} <strong>{entry.current} / {entry.capacity}</strong></li>)}</ul> : <Empty>No resources listed.</Empty>}</section>
-    <section aria-labelledby="gameplay-sheet-inventory"><h3 id="gameplay-sheet-inventory">Inventory and equipment</h3><p>{sheet.inventory.items.length} of {sheet.inventory.capacity} capacity entries</p>{sheet.inventory.items.length ? <ul>{sheet.inventory.items.map((entry) => <li key={entry.entryId}>{reference(entry.label, `I use ${entry.label} to `)} <strong>x{entry.quantity}</strong>{entry.equippedSlot && <span> Equipped: {words(entry.equippedSlot)}</span>}</li>)}</ul> : <Empty>No inventory listed.</Empty>}</section>
-    <section aria-labelledby="gameplay-sheet-powers"><h3 id="gameplay-sheet-powers">Known powers and spells</h3>{sheet.knownPowers.length ? <ul>{sheet.knownPowers.map((entry) => <li key={`${entry.power.kind}:${entry.power.packId}:${entry.power.packVersion}:${entry.power.definitionId}`}>{reference(entry.label, entry.power.kind === "spell" ? `I cast ${entry.label} to ` : `I use ${entry.label} to `, entry.available)} <span>{entry.available ? "Available" : `Unavailable: ${entry.unavailableReasons.map(words).join(", ")}`}</span></li>)}</ul> : <Empty>No known powers or spells.</Empty>}</section>
-    <section aria-labelledby="gameplay-sheet-effects"><h3 id="gameplay-sheet-effects">Active effects</h3>{sheet.activeEffects.length ? <ul>{sheet.activeEffects.map((entry) => { const label = entry.source?.label ?? "Unlabeled effect"; return <li key={entry.effectId}>{reference(label, `I account for ${label} as I `)} <span>{durationText(entry.duration)}; {words(entry.stacking)}{entry.recovery !== "none" ? `; recovers on ${words(entry.recovery)}` : ""}</span><ul>{entry.modifiers.map((modifier, index) => <li key={index}>{modifierText(modifier)}</li>)}</ul></li>; })}</ul> : <Empty>No active effects.</Empty>}</section>
+    {actions}
+    <div className="sheet-context-intro"><p>Select any entry to give the DM precise context alongside your words. Choose several, then return to your draft.</p>
+      <p className="sheet-context-note">References are shared with your declaration. Selecting one never rolls, casts, or spends anything—even an unavailable spell can be discussed.</p>
+      {!canReference && <p role="status">References are available when play is ready and your character is selected.</p>}
+    </div>
+    <div className="sheet-context-filters"><label htmlFor={`${id}-search`}>Find in character sheet</label><div className="sheet-search-row"><input id={`${id}-search`} type="search" placeholder="Try rope, Strength, spell, or health…" value={query} onChange={(event) => setQuery(event.target.value)} />
+      {query && <button type="button" onClick={() => { setQuery(""); document.getElementById(`${id}-search`)?.focus(); }}>Clear search</button>}</div>
+      <label className="sheet-jump">Jump to section<select value="" onChange={(event) => { const target = document.getElementById(`${id}-${event.target.value}`); if (target) { target.scrollIntoView?.({ block: "start" }); target.focus({ preventScroll: true }); } }}><option value="">Choose a section…</option>{sections.filter((section) => section !== "calculations" && (!query || matches.some((entry) => entry.reference.section === section))).map((section) => <option key={section} value={section}>{sheetSectionLabels[section]}</option>)}</select></label>
+      <p className="sheet-context-note" role="status">{query ? `${matches.length} matching entries` : `${entries.length} referenceable entries`}</p>
+    </div>
+    <div className="sheet-context-sections">{sections.filter((section) => section !== "calculations" && (!query || matches.some((entry) => entry.reference.section === section))).map((section) => <section key={section} aria-labelledby={`${id}-${section}`}>
+      <h3 tabIndex={-1} id={`${id}-${section}`}>{sheetSectionLabels[section]} <span>{matches.filter((entry) => entry.reference.section === section).length}</span></h3>{cards(section)}
+    </section>)}
+      {(!query || matches.some((entry) => entry.reference.section === "calculations")) && <details className="sheet-calculations" open={query ? true : undefined}><summary>How stats were calculated</summary>{cards("calculations")}</details>}
+      {matches.length === 0 && <p className="sheet-no-results">No entries match “{query}”. Try an item name, a statistic, or clear the search.</p>}
+    </div>
+    <footer className="sheet-context-footer"><div><strong>{selectedKeys.size} / {MAX_SHEET_REFERENCES} references selected</strong><p role="status" aria-atomic="true">{announcement || notice || "Your writing stays exactly as you left it."}</p>{atLimit && <p>Remove a selection to add another.</p>}</div>
+      <div className="button-row">{onRefresh && <button type="button" onClick={onRefresh}>Refresh sheet</button>}<button type="button" className="primary" onClick={onCompose ?? onClose}>Back to draft{selectedKeys.size ? ` (${selectedKeys.size})` : ""}</button></div></footer>
   </aside>;
 }

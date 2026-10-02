@@ -1,5 +1,6 @@
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { createContext, useContext, useEffect, useRef, type ReactNode, type RefObject } from "react";
 import "./playSurface.css";
+export const DrawerModalContext = createContext(false);
 
 export const ATLAS_TOOLS = ["character", "inventory", "advancement", "travel", "dice", "context", "combat", "gm", "security", "create", "director", "images", "help"] as const;
 export type AtlasTool = (typeof ATLAS_TOOLS)[number];
@@ -85,14 +86,15 @@ export function AtlasDrawerSideControl({ tool, side, onSideChange }: { tool: Atl
   </div>;
 }
 
-/** Non-modal: the map and composer remain keyboard reachable while a tool is open. */
+/** Command Center overlays are modal; the legacy dock remains non-modal. */
 export function AtlasDrawer({ tool, open, onClose, side = "right", onSideChange, children }: { tool: AtlasTool; open: boolean;
   onClose: () => void; side?: AtlasDrawerSide; onSideChange?: (side: AtlasDrawerSide) => void; children: ReactNode }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const modal = useContext(DrawerModalContext);
   useEffect(() => { if (open) headingRef.current?.focus({ preventScroll: true }); }, [open]);
   const horizontal = side === "top" || side === "bottom";
   return <div id={`atlas-${tool}`} className="atlas-drawer-slot" data-side={side} data-orientation={horizontal ? "horizontal" : "vertical"} hidden={!open}>
-    <aside className="atlas-drawer" role="dialog" aria-modal="false" aria-labelledby={`atlas-${tool}-heading`} tabIndex={-1}>
+    <aside className="atlas-drawer" role="dialog" aria-modal={modal} aria-labelledby={`atlas-${tool}-heading`} tabIndex={-1}>
       <header className="atlas-drawer-heading"><div><span className="atlas-kicker">AT THE TABLE</span><h2 ref={headingRef} tabIndex={-1} id={`atlas-${tool}-heading`}>{atlasToolLabels[tool]}</h2></div>
         <div className="atlas-drawer-controls"><AtlasDrawerSideControl tool={tool} side={side} onSideChange={onSideChange} />
           <button type="button" onClick={onClose} aria-label={`Close ${atlasToolLabels[tool]}`}>Close</button></div></header>

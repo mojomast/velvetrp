@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdventureTurnGetResponse } from "@velvet/contracts";
 import { ApiError } from "../../../api";
 import { CampaignPlayPage, type CampaignPlayApi } from "./CampaignPlayPage";
+import { CampaignQuickPanel } from "./CampaignQuickPanel";
 import type { RpgCharacterSheetApi } from "../actor/RpgCharacterSheetPage";
 import type { StudioAuthorization } from "../StudioAuthorization";
 import { resetNarrativeMutationRegistryForTests } from "../narrativeMutationRegistry";
@@ -136,7 +137,7 @@ describe("CampaignPlayPage", () => {
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; });
     HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.open = false; });
   });
-  afterEach(() => { cleanup(); localStorage.clear(); resetNarrativeMutationRegistryForTests(); });
+  afterEach(() => { cleanup(); localStorage.clear(); sessionStorage.clear(); resetNarrativeMutationRegistryForTests(); });
   it("renders a scrim behind the open drawer and closes the drawer when it is clicked", async () => {
     const client = api();
     render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
@@ -307,13 +308,13 @@ describe("CampaignPlayPage", () => {
     fireEvent.keyDown(window, { key: "F6" });
     expect(document.activeElement).toBe(screen.getByRole("region", { name: "Campaign narration and actions" }));
     fireEvent.keyDown(window, { key: "?" });
-    expect(screen.getByRole("dialog", { name: "Help" }).getAttribute("aria-modal")).toBe("false");
+    expect(screen.getByRole("dialog", { name: "Help" }).getAttribute("aria-modal")).toBe("true");
     fireEvent.change(screen.getByLabelText("Search the field guide"), { target: { value: "orchestration" } });
     expect(screen.getByRole("heading", { name: "What the adventure agents can and cannot do" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Dice at the table" })).toBeNull();
     expect(screen.getByRole("log")).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Help" })));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("region", { name: "Campaign narration and actions" })));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -546,17 +547,95 @@ describe("CampaignPlayPage", () => {
     expect(composer.value).toBe(""); expect(screen.getByRole("log").textContent).toContain("I listen");
   });
 
-  it("opens the actor-bound accessible drawer and only appends/focuses until explicit declaration", async () => {
+  it("attaches exact sheet facts, preserves writing, and returns to the draft before an explicit declaration", async () => {
     const client = api(); render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByText(/first declaration/); const composer = screen.getByLabelText("What do you do?") as HTMLTextAreaElement;
     fireEvent.change(composer, { target: { value: "I inspect the arch." } }); const trigger = screen.getByRole("button", { name: "Character" }); fireEvent.click(trigger);
-    const drawer = await screen.findByRole("dialog", { name: "Aria's character sheet" }); expect(drawer.getAttribute("aria-modal")).toBe("false");
+    const drawer = await screen.findByRole("dialog", { name: "Aria's character sheet" }); expect(drawer.getAttribute("aria-modal")).toBe("true");
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close character sheet" })));
-    expect(client.getActorGameplaySheet).toHaveBeenCalledWith("actor"); fireEvent.click(screen.getByRole("button", { name: "Moonlit rope" }));
-    expect(composer.value).toBe("I inspect the arch. I use Moonlit rope to "); await waitFor(() => expect(document.activeElement).toBe(composer)); expect(client.streamAdventureTurn).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Spent Ward" })); expect(composer.value).not.toContain("Spent Ward");
-    fireEvent.click(screen.getByRole("button", { name: "Close character sheet" })); await waitFor(() => expect(document.activeElement).toBe(trigger));
+    expect(client.getActorGameplaySheet).toHaveBeenCalledWith("actor"); fireEvent.click(screen.getByRole("button", { name: "Reference Moonlit rope" }));
+    expect(composer.value).toBe("I inspect the arch."); expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Reference Spent Ward" })); expect(composer.value).not.toContain("Spent Ward");
+    expect(screen.getByRole("button", { name: "Reference Spent Ward" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Back to draft (2)" })); await waitFor(() => expect(document.activeElement).toBe(composer));
     expect(client.streamAdventureTurn).not.toHaveBeenCalled(); fireEvent.click(screen.getByRole("button", { name: "Declare action" })); await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(client.streamAdventureTurn).mock.calls[0]![0]).toMatchObject({ declaration: "I inspect the arch.", sheetReferences: [{ section: "inventory", key: "item:rope" }, { section: "powers", key: '["spell","pack","1","spent"]' }] });
+    expect(vi.mocked(client.streamAdventureTurn).mock.calls[0]![0]).not.toHaveProperty("sheetContext");
+  });
+
+  it("keeps each actor's draft and references across tab reload, removal and selection changes", async () => {
+    const client = api(); vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({ ...bootstrap, playableActors: [...bootstrap.playableActors, { actorId: "other", name: "Bea" }] });
+    const props = { campaignId: "campaign", sessionId: "session", authorizationGeneration: 1, api: client, onBack: vi.fn(), onUnavailable: vi.fn() };
+    const view = render(<CampaignPlayPage {...props} />);
+    await screen.findByText(/first declaration/);
+    fireEvent.change(screen.getByLabelText("What do you do?"), { target: { value: "Can this help?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add from character sheet" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reference Moonlit rope" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to draft (1)" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Acting character" }), { target: { value: "other" } });
+    expect((screen.getByLabelText("What do you do?") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.queryByRole("button", { name: "Remove Moonlit rope reference" })).toBeNull();
+    fireEvent.change(screen.getByRole("combobox", { name: "Acting character" }), { target: { value: "actor" } });
+    view.unmount(); render(<CampaignPlayPage {...props} />); await screen.findByText(/first declaration/);
+    expect((screen.getByLabelText("What do you do?") as HTMLTextAreaElement).value).toBe("Can this help?");
+    fireEvent.click(screen.getByRole("button", { name: "Remove Moonlit rope reference" }));
+    expect((screen.getByLabelText("What do you do?") as HTMLTextAreaElement).value).toBe("Can this help?");
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("refreshes selected facts and reports removed entries while preserving the typed intent", async () => {
+    const client = api();
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByText(/first declaration/);
+    fireEvent.change(screen.getByLabelText("What do you do?"), { target: { value: "Could these help?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add from character sheet" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reference Moonlit rope" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reference Level" }));
+    vi.mocked(client.getActorGameplaySheet).mockResolvedValue({ ...sheet, progression: { ...sheet.progression, level: 2 }, inventory: { capacity: 10, items: [] } });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh sheet" }));
+    await screen.findByRole("button", { name: "Back to draft (1)" });
+    expect(screen.getAllByText(/1 reference is no longer available/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Remove Moonlit rope reference" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Back to draft (1)" }));
+    expect(screen.getByRole("list", { name: "Selected character references" }).textContent).toContain("Level2");
+    expect((screen.getByLabelText("What do you do?") as HTMLTextAreaElement).value).toBe("Could these help?");
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("retains separate in-memory drafts when browser storage is unavailable", async () => {
+    const client = api(); vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({ ...bootstrap, playableActors: [...bootstrap.playableActors, { actorId: "other", name: "Bea" }] });
+    const storage = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage unavailable"); });
+    try {
+      render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+      await screen.findByText(/first declaration/);
+      const composer = screen.getByLabelText("What do you do?") as HTMLTextAreaElement;
+      fireEvent.change(composer, { target: { value: "Aria investigates" } });
+      fireEvent.change(screen.getByRole("combobox", { name: "Acting character" }), { target: { value: "other" } });
+      fireEvent.change(composer, { target: { value: "Bea listens" } });
+      fireEvent.change(screen.getByRole("combobox", { name: "Acting character" }), { target: { value: "actor" } });
+      expect(composer.value).toBe("Aria investigates");
+      fireEvent.change(screen.getByRole("combobox", { name: "Acting character" }), { target: { value: "other" } });
+      expect(composer.value).toBe("Bea listens"); expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+    } finally { storage.mockRestore(); }
+  });
+
+  it("uses exact quick-summary references and opens the full sheet without issuing a declaration", async () => {
+    const client = api(), onReference = vi.fn(), onOpenSheet = vi.fn();
+    render(<CampaignQuickPanel campaignId="campaign" selectedActorId="actor" actors={bootstrap.playableActors} getSheet={client.getActorGameplaySheet}
+      canOpenSheet selectedKeys={new Set()} onReference={onReference} onOpenSheet={onOpenSheet} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Reference Moonlit rope" }));
+    expect(onReference).toHaveBeenCalledWith(expect.objectContaining({ reference: { section: "inventory", key: "item:rope" }, label: "Moonlit rope" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open character sheet" }));
+    expect(onOpenSheet).toHaveBeenCalledOnce(); expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+
+  it("rejects a quick-summary response for another actor and offers a read-only retry", async () => {
+    const client = api(); vi.mocked(client.getActorGameplaySheet).mockResolvedValueOnce({ ...sheet, identity: { actorId: "other", name: "Someone else" } });
+    render(<CampaignQuickPanel campaignId="campaign" selectedActorId="actor" actors={bootstrap.playableActors} getSheet={client.getActorGameplaySheet}
+      canOpenSheet selectedKeys={new Set()} onReference={vi.fn()} onOpenSheet={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Retry character summary" }));
+    expect(await screen.findByRole("button", { name: "Reference Moonlit rope" })).toBeTruthy();
+    expect(screen.queryByText("Someone else")).toBeNull(); expect(client.streamAdventureTurn).not.toHaveBeenCalled();
   });
 
   it("owns loading and access-error drawer states without changing or submitting the draft", async () => {

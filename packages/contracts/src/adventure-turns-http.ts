@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sheetReferencesSchema, sheetContextSchema } from "./sheet-references.js";
 import { confirmationDecisionKindSchema, narrationStatusSchema } from "./adventure-turns.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
@@ -16,6 +17,7 @@ export const adventureTurnInitialStreamRequestSchema = z.object({
   sessionId: resourceIdSchema,
   actorId: actorIdSchema,
   declaration: z.string().trim().min(1).max(8_000),
+  sheetReferences: sheetReferencesSchema.optional(),
   expectedRevision: expectedRevisionSchema,
   idempotencyKey: idempotencyKeySchema,
 }).strict();
@@ -48,6 +50,7 @@ export const adventureTurnHttpProjectionSchema = z.object({
   mode: z.enum(["original", "narration-retry", "narration-swipe"]),
   priorTurnId: resourceIdSchema.nullable(),
   declaration: z.string().trim().min(1).max(8_000),
+  sheetContext: sheetContextSchema.optional(),
   state: z.enum(["declared", "proposed", "awaiting-confirmation", "confirmed", "mechanics-committed", "narrating", "completed", "cancelled", "failed"]),
   revision: revisionSchema,
   createdAt: utcIsoTimestampSchema,
@@ -112,6 +115,7 @@ export const adventureTurnTranscriptEntrySchema = z.object({
   turnId: resourceIdSchema,
   actorId: actorIdSchema,
   declaration: z.string().trim().min(1).max(8_000),
+  sheetContext: sheetContextSchema.optional(),
   narration: z.string().trim().min(1).max(8_000),
   completedAt: utcIsoTimestampSchema,
 }).strict();

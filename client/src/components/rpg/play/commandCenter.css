@@ -27,6 +27,10 @@
 .campaign-play-page .conversation-exchange { padding: 9px 11px; line-height: 1.5; }
 .campaign-play-page .conversation-exchange p { margin-top: 4px; }
 .campaign-play-page .conversation-exchange time { margin-top: 5px; }
+.campaign-play-page .back-link, .campaign-play-page .campaign-context-drawer h3 { color: var(--eyebrow); }
+.campaign-play-page .route-map-canvas, .campaign-play-page .route-map-location.is-current { color: var(--eyebrow); }
+.campaign-play-page .route-map-location.is-reachable, .campaign-play-page .route-map-connection.is-reachable { color: light-dark(#23613d, #80c99c); }
+.campaign-play-page .route-map-canvas text { fill: var(--text); }
 /* Tool drawers overlay the table from a fixed edge slot; the open drawer sits above
    its scrim, and each tool can attach to the top, bottom, left, or right edge.
    Top and bottom drawers keep to the centre lane: CampaignPlayPage publishes the
@@ -59,7 +63,8 @@
 .campaign-drawers-overlay .atlas-drawer-content { flex: 1 1 auto; max-height: none; background: var(--surface); }
 .campaign-drawers-overlay .atlas-drawer-controls button { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
 .campaign-drawers-overlay .atlas-drawer-controls button:hover:not(:disabled) { border-color: var(--accent); }
-.campaign-drawers-overlay .atlas-drawer-controls button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.campaign-drawers-overlay .atlas-drawer-controls button[aria-pressed="true"] { border-color: var(--focus); color: var(--eyebrow); }
+.campaign-drawers-overlay :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 /* The character reference slot wraps the gameplay sheet directly. Pin the sheet to the
    slot so the reference follows the chosen edge and scrolls inside the drawer. */
 .campaign-drawers-overlay .atlas-character-reference > .gameplay-sheet-drawer {
@@ -104,6 +109,12 @@
   .campaign-drawers-overlay { --drawer-inset-right: 0px !important; }
 }
 @media (max-width: 900px) {
+  /* Two scrolling tool rows leave the small-screen draft unobscured. */
+  .campaign-play-page .campaign-play-nav { position: static; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+  .campaign-play-page .campaign-nav-group { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding: 3px; scrollbar-width: thin; }
+  .campaign-play-page .campaign-nav-group > * { flex: none; }
+  .campaign-play-page .campaign-nav-group-setup { border-left: 0; }
+  .campaign-play-page .campaign-play-title, .campaign-play-page .campaign-play-status { max-width: 100%; }
   /* The workbench stacks into one column; the centre lane is the whole viewport. */
   .campaign-drawers-overlay { --drawer-inset-left: 0px !important; --drawer-inset-right: 0px !important; }
   .campaign-drawers-overlay .atlas-drawer-slot[data-side="right"], .campaign-drawers-overlay .atlas-drawer-slot[data-side="left"] { width: min(680px, 100vw); }

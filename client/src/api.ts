@@ -1133,7 +1133,7 @@ export interface AdventureTurnClientStreamHandle {
 
 /** Closed initial or server-token continuation input accepted by the client stream method. */
 export type AdventureTurnClientStreamRequest =
-  | { kind: "initial"; campaignId: string; sessionId: string; actorId: string; declaration: string; expectedRevision: number; idempotencyKey: string }
+  | { kind: "initial"; campaignId: string; sessionId: string; actorId: string; declaration: string; sheetReferences?: import("@velvet/contracts").SheetReference[]; expectedRevision: number; idempotencyKey: string }
   | { kind: "resume"; resumeToken: string; expected: AdventureTurnClientBinding }
   | { kind: "narration-retry" | "narration-swipe"; campaignId: string; sessionId: string; actorId: string;
     priorTurnId: string; expectedRevision: number; idempotencyKey: string };
@@ -1271,7 +1271,7 @@ export async function moveTacticalMapToken(campaignId: string, sessionId: string
 export function streamAdventureTurn(requestInput: AdventureTurnClientStreamRequest, onEvent: (event: AdventureTurnStreamEvent) => void): AdventureTurnClientStreamHandle {
   const request = requestInput.kind === "initial"
     ? parseApiInput(() => adventureTurnInitialStreamRequestSchema.parse({ campaignId: requestInput.campaignId, sessionId: requestInput.sessionId,
-      actorId: requestInput.actorId, declaration: requestInput.declaration, expectedRevision: requestInput.expectedRevision, idempotencyKey: requestInput.idempotencyKey }))
+      actorId: requestInput.actorId, declaration: requestInput.declaration, ...(requestInput.sheetReferences?.length ? { sheetReferences: requestInput.sheetReferences } : {}), expectedRevision: requestInput.expectedRevision, idempotencyKey: requestInput.idempotencyKey }))
     : requestInput.kind === "resume"
       ? parseApiInput(() => adventureTurnResumeStreamRequestSchema.parse({ resumeToken: requestInput.resumeToken }))
       : parseApiInput(() => adventureTurnNarrationVariantStreamRequestSchema.parse({ variant: requestInput.kind,

@@ -96,11 +96,20 @@ This family requires `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true
 
 `POST /api/rpg/v1/adventure-turns/stream` accepts exactly one of:
 
-- Initial: `{ campaignId, sessionId, actorId, declaration, expectedRevision, idempotencyKey }`.
+- Initial: `{ campaignId, sessionId, actorId, declaration, sheetReferences?, expectedRevision, idempotencyKey }`.
 - Narration derivative: `{ variant: "narration-retry" | "narration-swipe", campaignId, sessionId, actorId, priorTurnId, expectedRevision, idempotencyKey }`.
 - Resume: `{ resumeToken }`.
 
 The durable turn is created or recovered before SSE framing. Every successful stream therefore sets `X-Adventure-Turn-Id` before the first body frame. Preserve this header even if parsing later fails. Narration derivatives create a new durable narration-only turn, reuse the prior declaration and receipts, and never rerun mechanics.
+
+Optional `sheetReferences` contains at most 16 unique `{ section, key }` selectors
+from the acting character's gameplay sheet. The server resolves authorized current
+values atomically with turn creation. It never accepts client-authored labels or
+values as sheet facts. Missing entries fail before stream framing. `sheetContext?`
+on the turn and completed transcript contains the resolved reference, label, value,
+and optional exact catalog reference. Original-turn replay and narration derivatives
+retain this declaration-time snapshot; current legal commands and receipts still
+govern mechanics. Draft text remains separate and keeps its 8,000-character limit.
 
 Every data event has an envelope whose event name equals `type` and whose exact top-level order is `{ type, sequence, timestamp, payload }`. `sequence` starts at 0 per connection; it is not a durable cross-connection cursor. `timestamp` is canonical UTC.
 

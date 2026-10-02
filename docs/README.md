@@ -34,6 +34,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [System One Director disagreement report](system-one-disagreement-report.md) - Read-only, deterministic comparison of the shadow Director lane's would-be selections against the authoritative provider composition, producing a review queue of divergent cases.
 - [Administration UX](administration-ux.md) - Campaign administration interaction guidance.
 - [Frontend control plane](frontend-control-plane.md) - Searchable campaign library, staged worldbuilder, world/play handoffs, Campaign Command Center, preparation, session recovery, and browser acceptance coverage.
+- [Play surface and character context audit (2026-10-02)](play-sheet-context-audit-2026-10-02.md) - Complete sheet-reference coverage, exact DM attachments, accessible drawer/composer interaction, October 2026 research, and focused validation.
 - [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.
 - [DM evaluation](dm-evaluation.md) - Deterministic and live DM behavior evaluation guidance.
 - [Campaign generation and expansion](campaign-generation.md) - Prompt-to-world walkthrough, all-14-section coverage, staged and reviewed generation, dependency-aware apply, recovery, planning and explicit material delivery; subordinate to the API reference for HTTP contracts.

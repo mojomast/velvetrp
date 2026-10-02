@@ -124,6 +124,40 @@ retained as secondary advanced setup for operations not yet migrated.
 Existing API clients, sheets, map rendering, and command safeguards are reused.
 This is not a replacement of every legacy authoring or administration screen.
 
+## Character context while playing
+
+**Character**, **Open character sheet**, and **Add from character sheet** open the
+same searchable reference sheet for the acting character. Every displayed fact is
+selectable: identity, ancestry/background, classes, attributes, statistics and
+defenses, progression, proficiencies, choices, health/resources, inventory and
+equipment, powers/spells, active effects, and calculation explanations.
+
+Select up to 16 entries, including unavailable powers when asking about them.
+Selections use native toggle buttons with readable values, an Added state, and
+keyboard/screen-reader feedback. Search covers names, values, and section names;
+the section picker provides direct navigation. **Back to draft** focuses the
+composer. Individual removal and **Clear references** preserve the player's text.
+Quick-summary resources, items, and effects offer the same reference interaction.
+
+Only exact selectors accompany the declaration. The server resolves current
+authorized sheet values and catalog identities, persists the snapshot with the
+immutable turn-creation event, and supplies it separately to DM planning and both
+narration lanes. The transcript exposes an expandable **Character context** record.
+References establish intent context; selecting a power does not use it or expand
+the server's legal commands. Narration retries inherit the original context.
+
+Draft text and references survive reload in this tab, scoped by campaign, room,
+and actor. They clear only when the original declaration is acknowledged or exact
+reconciliation confirms it. Refreshing the sheet updates previews and reports
+entries that disappeared. A stale selector is rejected before a turn is created.
+
+Command Center overlays are modal: the background is inert, Tab stays inside the
+visible drawer, Escape/Close restores the trigger, and Back to draft focuses the
+composer. Mobile tool rows scroll horizontally rather than covering the draft.
+The legacy Atlas dock remains non-modal. See the
+[October 2026 interaction audit](play-sheet-context-audit-2026-10-02.md) for the
+research, coverage, and validation scope.
+
 ## Director
 
 Living Atlas shows Human DM by default and exposes a Director drawer. An owner or

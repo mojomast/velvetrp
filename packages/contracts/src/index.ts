@@ -32,6 +32,7 @@ export * from "./character-builder-http.js";
 export * from "./character-progression-http.js";
 export * from "./character-sheet-http.js";
 export * from "./gameplay-sheet-http.js";
+export * from "./sheet-references.js";
 export * from "./campaign-administration-http.js";
 export * from "./campaign-administration-integrations.js";
 export * from "./campaign-history-http.js";

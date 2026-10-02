@@ -223,7 +223,7 @@ for (const device of [
         const target = await button.getAttribute("aria-controls");
         const drawer = page.locator(`#${target}`).getByRole("dialog");
         await expect(drawer).toBeVisible();
-        await expect(drawer).toHaveAttribute("aria-modal", "false");
+        await expect(drawer).toHaveAttribute("aria-modal", "true");
         await expect(livingMap).toBeVisible();
         await expect(conversation).toBeVisible();
         await expect(camera).toHaveText(cameraBefore);

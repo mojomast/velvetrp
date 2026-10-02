@@ -806,7 +806,7 @@ function createRepositoryComposition<T>(
       throw new Error("companion mutation cannot run inside a repository transaction");
     }
   });
-  const adventureTurnRepository = createAdventureTurnRepository(db, dependencies, () => {
+  const adventureTurnRepository = createAdventureTurnRepository(db, { ...dependencies, getActorGameplaySheet: actorGameplaySheetReadRepository.getActorGameplaySheet }, () => {
     assertOpen(); if (transactionDepth > 0 && atomicGenerationApplyDepth === 0) throw new Error("M1.10 operation cannot run inside a repository transaction");
   },{
     executeSetActorAttribute:(principal,input)=>campaignCommandWriteOperations.executeSetActorAttribute(principal,input),
