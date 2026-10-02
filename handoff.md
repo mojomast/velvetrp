@@ -2,13 +2,23 @@
 
 ## Current Baseline
 
-- Commit `8955b10` is the pushed `main`/`origin/main` baseline. The tree contains the completed SRD 5.1 parity program (Waves 0-4) plus the follow-on runtime surfaces and API E2E coverage.
+- The 2026-10-02 roleplay/worldbuilding delivery builds on commit `51836da` (`fix(rpg): narrate a held turn from its own declaration, not a scene receipt`). It includes the earlier SRD 5.1 parity program, follow-on runtime surfaces, and the implementation and documentation updates summarized below.
 - Persistence: one current disposable development schema; additive late-schema tables install in place and exact-predecessor upgrades are narrowly recognized. Unknown or partially upgraded schemas reject without repair.
 - HTTP: 177 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
 - Security: the server remains loopback-only with fixed `local-owner`. Feature flags and local ownership are not authentication or remote-safe authorization.
 - Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns disposable-data/configuration guidance, `docs/repo-architecture.md` owns persistence structure, `docs/ROADMAP.md` owns milestone status, and `docs/srd-5.1-coverage.v1.json` + `docs/srd-5.1-coverage.md` own the bounded SRD parity claims.
 
 ## Delivered
+
+### Roleplay and worldbuilding — 2026-10-02 delivery
+
+- Eleven serial stages generate and apply all 14 world-content sections, with bounded count targets, typed references, located NPCs, actionable quests, directed travel checks, and an opening bound to accepted canon.
+- The searchable/filterable campaign library hosts generation inline and hands off to world editing or room preparation. Tab-scoped journals retain exact requests, starter setup and recovery; explicit retry/revision follows authoritative reconciliation.
+- Free-form fallbacks distinguish real attempts from speech, questions, negation and hypotheticals. Routine observation avoids checks/dice; original conversation receives explicit local NPC presence and disclosable knowledge.
+- Branch-aware chat context, complete Director receipt history, preserved negation, event-time NPC/faction witnessing, and interrupted single-speaker stream reconciliation improve continuity.
+- Shadow/unpromoted room routing and record-only advisory calls are asynchronous; corrected selected-option confidence uses a new speaker composition binding.
+- Live evidence: a complete 125-artifact world; an 18-turn before/after comparison with 3/3 probes and 6/6 Director beats; separate final observation/presence probes. The full comparison predates the final narrow refinements.
+- The [implementation audit](docs/roleplay-worldbuilding-audit-2026-10-02.md) owns detailed counts, artifact paths, validation results and remaining limits. The full serial server checkpoint exposed eight failures, all corrected with focused passing runs; it was not repeated in full afterward.
 
 ### SRD 5.1 parity program (Waves 0-4)
 
@@ -18,7 +28,7 @@
 - Wave 3: deterministic encounter builder, encounter rewards, and NPC selection.
 - Wave 4: product surfaces and verification.
 
-### Most recent session additions
+### Earlier SRD runtime additions
 
 - Magic-item attunement end to end: additive `actor_item_attunements_v65`, `server/src/repo/attunementRepo.ts`, `GET`/`POST /campaigns/:campaignId/actors/:actorId/attunements`, and the `MagicItemAttunementPanel` client surface.
 - Monster multiattack: `planMonsterTurn` exposes the ordered attack sequence and the durable enemy turn resolves one ordered damage outcome per step, stopping early when the target drops. The action-resolution contract allows a bounded multi-outcome attack.
@@ -38,6 +48,7 @@
 
 ## Verification
 
+- Run heavy suites and browser passes sequentially; do not launch overlapping heavy validation jobs. Use `npm run test:server:serial -- <affected-file>` and `--workers=1` for scoped browser passes when appropriate.
 - Focused: run the affected server test file and `npm run typecheck --workspace velvet-mvp-server`.
 - Broad but fast: `npm run test:server:quick`.
 - Wave-boundary checkpoint: `npm run test --workspace velvet-mvp-server` and `npm run test --workspace velvet-mvp-client`.
@@ -57,11 +68,14 @@
 
 ## Next Task
 
-No in-flight work. Candidate follow-ups, in rough priority:
+The implementation and documentation pass are complete. Consult the audit for validation scope; no deployment has been performed. Candidate follow-ups, in rough priority:
 
+- Address the observed free-form NPC attack/combat-initiation and short-rest gaps using exact supported mechanics.
+- Add durable legacy-generation status reconciliation and cross-device worldbuilding recovery if promoted; current recovery uses transcript snapshots and tab-scoped journals.
+- Repeat the full live comparison when evaluating the final observation/presence refinements; the one-turn probe is not a replacement for an 18-turn run.
 - Give the remaining `partial` domains runtime + API evidence where their bounded behavior is already complete, then flip them honestly (for example the `monster-turn-planner` save riders or the spell execution lanes).
 - Surface vision/obscurement and mounted states through campaign persistence and the tactical map so the remaining pure rules have runtime callers. Underwater now has a durable caller; mounted still needs persisted mount/size state and vision needs persisted light/obscurement.
 
 ## Working Tree
 
-`.hydration/` and `.opencode/skills/seed-test-campaign/` remain intentionally untracked and must not be staged. There is no uncommitted runtime work as of this handoff.
+The delivery includes roleplay, worldbuilding, recovery, evaluator, test and documentation changes. `.hydration/` and `.opencode/skills/seed-test-campaign/` predate this work, remain intentionally untracked, and must not be staged. Live evaluation worlds used isolated temporary storage; see the audit for paths. Publishing this delivery to Git does not deploy it.

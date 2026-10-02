@@ -1,5 +1,13 @@
 # Free-form fun evaluator
 
+Before/after comparisons label provider-call totals, materialization counts, and deliberate holds as
+**changed**, rather than inherently better or worse. Routine roleplay should not need extra checks,
+and fewer unnecessary receipts or paid calls is not a playability regression. Probe verdicts and
+failure/coherence metrics establish correctness separately.
+
+The in-process verdict also rejects a check receipt on the scripted routine look-around turn.
+A completed request and fluent narration alone do not establish correct free-form action handling.
+
 `scripts/freeform-fun-eval.ts` is a committed, reusable before/after instrument for the free-form
 roleplay loop. It exists so every free-form, narration, materialization, or DM-beat fix can be
 scored against the same scripted session on a real campaign, instead of an ad-hoc live playtest.
@@ -32,13 +40,28 @@ Flags:
 | --- | --- |
 | `--data-dir=<dir>` | Bootstrap a living world (dnd-5e SRD catalog, market/docks/chapel, NPCs, vendor) or attach to a world whose `freeform-fun-eval.manifest.json` already exists. |
 | `--base-url=<url>` | Point at a running server. Requires `--campaign-id`, `--session-id`, `--actor-id`. |
-| `--turns=<n>` | Cap the declared turns (default: all 18, max 18). |
+| `--turns=<n>` | Run the first n declarations (integer 1–18; default: all 18). |
 | `--seed=<n>` | World seed used by the bootstrap path (default 11). |
 | `--port=<n>` | In-process server port (default 18814). |
 | `--out=<path.json>` | JSON artifact path. A sibling `.md` report is always written. |
 | `--baseline=<path.json>` | Baseline artifact/metrics to compare against. Defaults to the embedded calibrated baseline. |
 | `--keep` | Keep a bootstrapped temporary world (only meaningful without `--data-dir`). |
 | `--quiet` | Suppress per-turn stderr progress lines. |
+
+### Run verdict and repeat runs
+
+Version 3 artifacts include an objective `verdict` with failures and skipped checks. The CLI exits
+with status 1 when a requested turn fails to complete, has an HTTP/error response or no narration,
+a Director beat fails, a measured coherence check fails, or a requested labeled probe fails. In-process
+live runs also fail when no provider call succeeds. Artifacts are still written for diagnosis.
+Quality/latency baselines remain descriptive; occasional receipt-grounded fallback narration alone
+does not fail the run. Probes beyond `--turns` and typed-receipt/provider checks unavailable in
+`--base-url` mode are explicitly skipped.
+
+Each invocation uses new command idempotency keys, so attaching to an existing world exercises new
+turns instead of silently replaying previous results. The first interleaved Director beat uses `open`.
+For comparable before/after evidence, bootstrap separate fresh worlds with the same seed; a repeated
+run against an existing world necessarily starts from that world's changed state.
 
 Provider configuration is read from the environment (no secret is committed):
 
@@ -180,6 +203,19 @@ threshold. `--baseline=<artifact.json>` overrides it.
 
 ## Validation
 
+### Latest comparison (2026-10-02)
+
+The [roleplay/worldbuilding audit](roleplay-worldbuilding-audit-2026-10-02.md#live-free-form-evidence)
+records separate fresh-world 18-turn baseline/after runs: 3/3 labeled probes and
+6/6 Director beats passed in both, provider-assisted narration rose from 11 to 13,
+and narration-failure turns fell from 3 to 1. Each run encountered one provider error.
+The complete after run predates the final routine-observation/presence refinements;
+a separate final one-turn probe confirmed receipt-free observation without the
+remote NPC. The broad comparison was not rerun after those final changes.
+
+The calibration evidence below is historical. In particular, its check on
+`look-around` would fail the current unnecessary-observation-check verdict.
+
 Live run against a throwaway `/tmp` world with `deepseek-v4-flash` (bootstrap path, 18 turns,
 `TMPDIR=/home/mojo/.tmp-velvet`). The sibling `.md` report is the `--out` path with a `.md` suffix.
 
@@ -243,7 +279,7 @@ fallbacks and all four are distinct. Turn 12 resolved the attack as an `inventor
 (draw) rather than an encounter start, so the encounter path was not exercised this run; that is
 provider-selection variance, not an evaluator failure (the probe set does not assert combat).
 
-### Pure-test results
+### Historical calibration pure-test results
 
 ```text
 npx tsx --test scripts/test/freeform-fun-eval.test.ts

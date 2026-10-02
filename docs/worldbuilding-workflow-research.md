@@ -1,0 +1,36 @@
+# Prompt-to-world workflow: research and implementation
+
+Research checked 2026-10-02, against Velvet's campaign-content generation, staged-draft apply, generated-foundation/planning readers, and worldbuilding panel.
+
+## Sources and decisions
+
+- [NN/g: Progress Indicators Make a Slow System Less Insufferable](https://www.nngroup.com/articles/progress-indicators/): a long task needs informative progress, not an indefinite spinner. The panel reports applied stages out of the plan's total, current phase, per-stage errors, and a next action. This measures completed work, not a made-up time estimate.
+- [NN/g: Progressive Disclosure](https://www.nngroup.com/articles/progressive-disclosure/): put common actions first, with advanced configuration available separately. One premise is the default; explicit JSON planning remains an advanced mode. One Build world action authorizes its scoped serial stages without repeated approvals.
+- [NN/g: Visibility of System Status](https://www.nngroup.com/articles/visibility-system-status/) and [W3C: Understanding Status Messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html): expose phase, outcome, and next action through text and polite status regions without moving focus. Native progress semantics complement the stage list; errors use alerts.
+- [AWS Builders' Library: Making retries safe with idempotent APIs](https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/): a client request identifier expresses intent; retries must retain the original parameters and key. Persist generation request bodies before dispatch, and persist apply draft ID, expected revision, full selected-key list, and idempotency key before mutation. Resume only dispatches untouched pending stages; interrupted work requires reconciliation or an explicit retained-request retry.
+- [AWS Builders' Library: Timeouts, retries, and backoff with jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/): a timeout does not prove the operation failed. Ambiguous campaign creation is not repeated, and ambiguous paid generation is not silently redispatched.
+- [Justin Alexander: Don't Prep Plots](https://thealexandrian.net/wordpress/4147/roleplaying-games/dont-prep-plots) and [Node-Based Scenario Design](https://www.thealexandrian.net/creations/misc/node-design/node-design.html): prepare situations, agendas, and interconnected places rather than a prescribed sequence of player actions. Default prompts ask for free exploration, NPC reactions, alternative approaches, and noncombat monster interactions. Graph hydration proceeds from factions and locations to opening/arcs, cast, story/clues, quests, monsters, special items, encounters, lore, and scenes/handouts.
+
+## Readiness and correctness
+
+Every stage sends `desiredCounts` keyed by preview arrays alongside `sections`. The client checks distinct artifact keys against every requested minimum before applying. The server owns schema, typed-reference, visibility, pinned-catalog, revision, and idempotency validation. A successful provider response alone is never completion.
+
+Default-mode checks additionally require a public opening tied to an accepted public location, located NPCs, actionable quest objectives, and public location graphs with both directed outward and return reachability. Locations precede the opening so its start reference can actually resolve. Explicit context selectors use only accepted public keys and stay within the 16-key limit. GM-only information is not promoted into public derivative context.
+
+Completion is based on all planned stages passing coverage and receiving authoritative apply confirmation. The interface calls this prepared world content. It does **not** certify that a room is attached, an actor exists, startup is complete, or a combat has started. Items and monsters are labelled narrative concepts unless catalog-bound. Play navigation is labelled “Prepare to play.”
+
+## Recovery and limits
+
+- A versioned session-storage journal survives reload in the same browser tab and is indexed by campaign after creation. It includes the immutable premise, complete stage plan, dependency keys, exact request intents, known draft IDs, and starter-setup state. Writes happen before dispatch; unavailable storage blocks recoverable mutations. This is not a server-side background worker or cross-device job dashboard.
+- Known interrupted applies are reconciled through read-only draft reads on mount. Confirmed unapplied drafts with incomplete coverage or invalid world links expose **Generate revised stage**: a new explicit paid request with the same scope and validation feedback. Pending stages may resume serially, while interrupted stages have explicit recovery controls.
+- Interrupted generation uses the server's read-only `/campaign-content-drafts/reconcile` endpoint with the retained request. A succeeded job recovers its draft; running or outcome-uncertain jobs block redispatch. A confirmed failed attempt exposes a separate paid-retry action acknowledging that exact attempt number. A confirmed missing job can dispatch the original authorized request with its original key. Reload itself performs no paid generation.
+- Creating a campaign has no client idempotency token. An interrupted creation stays blocked and points to the library instead of creating a duplicate. Starter failure preserves the created campaign and retries setup before world generation. `onCampaignCreated` fires only after successful starter setup.
+- Content-generation apply is additive. A stale revision/dependency or a conflicting selection must be resolved using the authoritative world/draft tools; changing keys or revisions behind the user's back is not a recovery strategy.
+- Minimum counts and connectivity are necessary structural checks, not a guarantee of interesting prose, balanced combat, or complete player freedom. Provider budgets can still reject a stage, and the UI retains that interruption rather than announcing success.
+- Server-side idempotency remains the concurrency authority. Session storage is tab-scoped, and the client serial lock prevents overlapping dispatch in one mounted panel; it is not a distributed lease across independently opened tabs.
+- Navigating away pauses further stage writes. Late responses retain only their own draft/apply result, preserving a remounted panel's newer progress. A completed build can start another world without deleting accepted content or its per-campaign journal.
+- Scoped form, progress and stage-card styles use theme tokens in both the library and campaign workspace. Desktop light/dark and 390px screenshots were checked after catching an inherited dark-background/light-theme mismatch.
+
+## Integrator interface
+
+`WorldbuildingAgentPanel` preserves `campaignId`, `initialCampaignName`, injected `api`, and `onCampaignCreated`. Optional `onManageWorld(campaignId)` and `onStartPlaying(campaignId)` expose next steps without coupling the component to routing. The latter is enabled only after the planned build is fully applied. Hosts should keep the builder mounted while stages run and use creation notification to update library state rather than navigate away immediately.

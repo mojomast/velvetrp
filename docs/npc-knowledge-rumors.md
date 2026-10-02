@@ -1,7 +1,11 @@
 # Bounded NPC knowledge and rumors
 
-Status: researched, not implemented. This document is a design and evaluation
-plan, not a shipped contract. It proposes how Velvet can move from a rigid
+Status: historical research and evaluation design. The observation ledger,
+bounded propagation, disclosure gates and narration integration are now implemented;
+the per-agent belief projection and other deferred proposals below are not.
+See [Plan 4](plan-4-living-knowledge.md) for the delivered scope and
+[campaign memory](campaign-memory.md) for current witness/presence behavior.
+The original proposal describes how Velvet can move from a rigid
 harness to a living world by giving NPCs bounded, attributable, privacy-safe
 knowledge of campaign events — including the motivating example of an NPC
 bringing up a lost bet that another character heard about and laughed at.

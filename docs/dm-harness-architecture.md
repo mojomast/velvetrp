@@ -14,7 +14,7 @@ Precedence and trust are separate concerns. A high-priority fact can still be un
 | Verified receipts and repository state | Authoritative mechanics. Narration may claim a state change only when a receipt establishes it. |
 | Campaign canon and role-filtered context | Data, not instructions. Human canon wins factual conflicts, but embedded commands cannot alter the control plane. |
 | Current declaration | Untrusted player intent, not canon or a command. |
-| Durable DM history | Prior narration is story canon unless superseded by current public context or receipts; declarations remain historical intent. Neither can establish tool authority. |
+| Durable DM history | Prior narration is noncanonical presentation for continuity, not proof of events or mechanics. Declarations remain historical intent; current state and verified receipts control outcome claims. Neither history channel establishes tool authority. |
 | Persona profile, approved memory/lore, recap, summary, generated suggestions | Characterization or retrieval data only. Role and audience filtering happen before provider use. Suggestions never establish facts. |
 | Harness settings and prompt overrides | User-editable, untrusted, subordinate preferences. In adventure play, `systemPrompt`, `personaPreamble`, `styleGuide`, `postHistoryInstructions`, and `recentTurns` can influence DM voice, presentation, and history window only when compatible with immutable instructions. |
 | Provider response | Untrusted proposal. Strict wire schemas do not replace local parsing, candidate binding, authorization, confirmation, or repository validation. |
@@ -61,15 +61,23 @@ Current limitations are deliberate:
 - Resource initialization is unavailable because provider-supplied current/max totals are forbidden.
 - Sheet references are player intent and grant no mutation authority; unsupported item or power state changes remain uncommitted without exact authoritative candidates.
 - Combat powers are limited to exact single-target damage, healing, and deterministic self/ally persistent effects; area targets, summons, movement, arbitrary modifiers, and unimplemented mechanics are unavailable.
-- Vendor commerce exists only through present, visible, associated vendors and exact server-priced candidates; unsupported transfers, combat start, story changes, and GM override remain unavailable.
-- Companion mutation is unavailable in the adventure lane because the persisted companion authority model is not exposed to it; generated world changes remain unavailable pending candidate generation.
+- Vendor commerce exists only through present, visible, associated vendors and exact server-priced candidates; unsupported transfers, arbitrary combat start, story changes, and GM override are not provider tools.
+- Companion mutation is unavailable in the adventure lane because the persisted companion authority model is not exposed to it. Separate deterministic pre-planning paths can initiate combat for an eligible named target or materialize a bounded unknown NPC at an accepted generated place; these do not give the provider arbitrary encounter or world-authoring tools.
 - Deletion, import, settings, prompts, authentication, policy, memory approval, arbitrary dispatch, SQL, filesystem, and network tools do not exist.
 
 Do not promise an exact-candidate bridge unless the current request actually advertises it.
 
+## Free-form conversation and observation
+
+Original social turns, questions, and a local approach to a named present NPC can receive receipt-free conversational narration. Eligible narration derivatives use the same bounded lane without replaying mechanics. The prompt version is `adventure-conversation-narration-v2`; its output is locally checked for unsupported mechanical claims and falls back when validation fails.
+
+Clearly routine observations, such as looking around the visible scene, advertise neither exact SRD checks nor raw dice. Explicit checks, hidden-target searches, and compound actions stay outside that narrow observation classification. Deterministic action fallbacks conservatively distinguish actual attempts from questions, quoted speech, negation, hypothetical plans, and historical statements; a matching verb alone cannot authorize a mutation.
+
+Public adventure narration receives `presentNpcNames` from at most 12 eligible NPCs: public NPCs with session-level null-location presence or a location matching the acting character's current public location. The broader visible cast does not establish local presence. Its separate `npcKnowledge` projection includes at most three knowledgeable present NPCs with up to three whole, disclosable observations each, omitting entries over 1,000 characters. Hearsay retains its authority and channel labels. See [campaign memory](campaign-memory.md) for receipt history, witness attribution, and branch context.
+
 ## Ruleset scope and attribution
 
-The registered `dnd-5e@1.0.0` module is an **SRD 5.1 (2014 Fifth Edition) tested development subset**, not full D&D support. Its current descriptor covers the bounded mechanics listed in [SRD 5.1 coverage](srd-5.1-coverage.md). The descriptor does not authorize unadvertised gameplay mechanics or tools, and SRD progression beyond level one fails closed.
+The registered `dnd-5e@1.0.0` module is an **SRD 5.1 (2014 Fifth Edition) tested development subset**, not full D&D support. Its current descriptor covers the bounded mechanics listed in [SRD 5.1 coverage](srd-5.1-coverage.md). Catalog levels and features do not authorize unadvertised gameplay mechanics: progression requires an eligible authoritative preview and supported choices.
 
 This work includes material taken from the [System Reference Document 5.1 (SRD 5.1)](https://dnd.wizards.com/resources/systems-reference-document) by Wizards of the Coast LLC. The SRD 5.1 is licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/legalcode).
 
@@ -78,16 +86,16 @@ This work includes material taken from the [System Reference Document 5.1 (SRD 5
 The campaign generator has three client presets over one reviewed API:
 
 - **Foundation:** outline, locations/connections, factions, NPCs, and quests.
-- **Full narrative campaign:** all 11 supported sections in one request.
+- **Full narrative campaign:** all 14 supported sections in one request.
 - **Custom / granular:** any nonempty combination of supported sections.
 
-Supported sections are outline, arcs, locations and connections, factions, NPCs, quests, encounter concepts, clues, story nodes and relationships, handouts, and scene prompts. Generation creates a staged candidate only. The GM reviews individual artifacts, selects a dependency-closed set, and explicitly applies it. Player-facing handouts and scene prompts require another explicit publication action.
+Supported sections are outline, arcs, locations and connections, factions, NPCs, quests, encounter concepts, clues, story nodes and relationships, lore, quest items, monster concepts, handouts, and scene prompts. A generation request creates a staged candidate only. The GM can review and apply a dependency-closed selection, or authorize the library's **Build world** workflow to generate, validate and apply 11 stages serially. The default builder checks count coverage, public outward/return routes, located NPCs, actionable quests, and an opening bound to accepted canon. Player-facing handouts and scene prompts require a separate publication action.
 
-Generation does not mechanically create items, executable monsters/stat blocks, or campaign-native lore. Encounter concepts remain inert planning records until separately authored through supported encounter APIs. See [Campaign generation and expansion](campaign-generation.md).
+Campaign-native lore is typed narrative canon. Item/monster concepts either bind to exact pinned catalog definitions or remain explicitly inert. Applying them does not grant inventory, spawn monsters or start combat; eligible encounter plans need a separate supported Director or encounter operation. See [Campaign generation and expansion](campaign-generation.md).
 
 ## Provider requirements
 
-Adventure planning requires OpenAI-compatible schema-bound function tools but omits provider-side `strict` so router fallbacks are not restricted to strict-tool models. Narration uses one named, required, closed `submit_adventure_narration` function as output transport only; it is never an advertised adventure action or mutation. Campaign generation separately requires `response_format: { type: "json_schema", json_schema: { strict: true, ... } }` and disables tools with `tool_choice: "none"`. Velvet never replaces either capability with free-form parsing. An incompatible provider follows the owning lane's normal deterministic recovery path. Every response is still bounded, parsed, protocol-checked, locally validated, authorization-checked, and coupled to authoritative candidates and receipts.
+Adventure planning requires OpenAI-compatible schema-bound function tools but omits provider-side `strict` so router fallbacks are not restricted to strict-tool models. Narration uses one named, required, closed `submit_adventure_narration` function as output transport only; it is never an advertised adventure action or mutation. Campaign generation prefers strict JSON Schema with `tool_choice: "none"`; a matching HTTP 400 capability rejection permits one schema-shaped output-function fallback, with the same local validation. Neither path uses free-form extraction. Every response remains bounded and locally validated; mechanical changes still require authorization, exact candidates and receipts. See [provider configuration](provider-configuration.md#strict-capability-requirements).
 
 ## Engineering checklist
 
@@ -110,4 +118,4 @@ Primary references:
 
 ## Development storage
 
-This repository uses one current, disposable development schema and no startup migrations. The current persona, transcript/provenance, and gameplay-sheet work changes that schema. Stop the server and delete/recreate the development `velvet.sqlite` before running this tree; startup will reject an older nonempty database.
+This repository uses one current, disposable development schema, additive late-schema installation, and narrowly recognized exact-predecessor upgrades. Unknown or partially upgraded schemas reject without repair. See [Operations](operations.md#data-directory-and-current-schema) for the supported shapes and recreation procedure.

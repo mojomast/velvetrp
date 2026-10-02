@@ -1,6 +1,6 @@
 # Bounded campaign memory
 
-This implementation note describes the uncommitted memory checkpoint after pushed commit `11e0107`. Runtime code and shared contracts remain authoritative. Recall adds no HTTP operation, provider, or campaign state transition. The new `recallSchema.sql` asset stores frozen narration dispatch context, not a searchable memory database or new story truth.
+This implementation note describes bounded campaign recall and its continuity refinements through 2026-10-02. Runtime code and shared contracts remain authoritative. Recall adds no HTTP operation, provider, or campaign state transition. `recallSchema.sql` stores frozen narration dispatch context, not a searchable memory database or new story truth. The [latest audit](roleplay-worldbuilding-audit-2026-10-02.md) records implementation and validation status.
 
 ## Prompt behavior
 
@@ -19,11 +19,31 @@ Recent history is capped independently of other context: the configured count is
 
 The byte budget includes the title, explanatory text, JSON keys, escaping, timestamps, actor attribution, and omission metadata. Selection considers newest exchanges first, retains only whole declaration/response pairs, then presents accepted pairs chronologically. An oversized pair is omitted completely; an older pair inside the two-exchange window may still fit. `omittedRecentExchanges` counts omissions within that window, not the entire historical corpus. Original text is not sliced. These are byte limits, not exact token counts; they do not bound the entire provider request or replace aggregate provider guards.
 
+## Conversation presence and branch continuity
+
+Public adventure narration uses an explicit `presentNpcNames` roster of at most 12
+eligible public NPCs, scoped to the acting character's public location or session-level
+null-location presence. A broader visible-cast entry does not establish co-location.
+Its separate `npcKnowledge` projection selects at most three knowledgeable present
+NPCs, with up to three disclosable whole observations each; entries over 1,000
+characters are omitted. Attribution, authority and channel labels remain intact.
+
+Legacy character-chat swipes and edited branches build summaries, synthesized scene
+context and same-session memory from the selected ancestry. Discarded-turn memories
+are excluded; manual canon and eligible character-wide memories from other sessions
+remain available. Successful branch changes reset derived scene state before
+resynthesis, including provider-unavailable paths. A canceled swipe preserves the
+prior branch. See [Streaming](streaming.md#legacy-token-and-swipe-streams).
+
 ## Scene-only director
 
-`server/src/agent/dmNarration.ts` has a narrower contract than adventure conversation. Its history contains only verified public past receipt summaries, never previous atmospheric model prose. Historical outcomes are background, not current state or permission to replay events. Do not reconstruct old dialogue or invent recollections.
+`server/src/agent/dmNarration.ts` has a narrower contract than adventure conversation. Its history contains only verified public past receipt summaries, including every committed step of a composed beat in execution order, never previous atmospheric model prose. Historical outcomes are background, not current state or permission to replay events. Do not reconstruct old dialogue or invent recollections. A separate `priorScenes` channel carries recent published prose as non-authoritative continuity, including receipt-free holds.
 
-The server preserves the committed result. Generated atmosphere, optional present-public-NPC dialogue, and a player-directed question remain non-authoritative. The strict scene schema and heuristic validator are unchanged; memory instructions do not expand their allowed actions. Prompt tests establish instruction construction, not a proof that arbitrary generated prose is factual.
+The Director's `npcKnowledge` channel selects whole observations of at most 300 characters; oversized observations are omitted rather than cut before a possible correction or negation. Verified evidence is selected ahead of trust-disclosed hearsay. Up to four knowledgeable NPCs are selected from the advertised public cast, with at most four observations each; empty knowledge slots do not crowd out later cast members.
+
+Check witnesses are selected at commit time using the source actor's authoritative session location. Location-bound NPCs must match that actor, not another member of a split party; an unknown source location does not establish a match. Null-location NPC presence retains its session-level meaning. Faction witnesses use the same bounded eligible NPC set. Later movement does not remove recorded memories; remote NPCs may still receive explicitly labeled rumor through the separate gossip channel.
+
+The server preserves the committed result. Generated atmosphere, optional present-public-NPC dialogue, and a player-directed question (optional for transition beats) remain non-authoritative. The strict scene schema and heuristic validator bound their allowed actions. Prompt tests establish instruction construction, not a proof that arbitrary generated prose is factual. Previously stored false-witness observations are not retroactively rewritten by the event-time eligibility correction.
 
 ## Retrieval integration scope
 
@@ -37,7 +57,7 @@ The server preserves the committed result. Generated atmosphere, optional presen
 | `travel-receipt`, `combat-receipt`, `quest-receipt` | `committed-outcome`; bound exact travel, generalized combat receipts, and bound quest-objective outcomes. Travel requires the source principal and visible/discovered destination eligibility; quest sources enforce public definition/objective or reward eligibility where applicable. |
 | `mechanic-receipt` | `committed-outcome`; core events explicitly included in the active timeline through its revision, hydrated through the mechanic receipt reader. |
 | `recap` | `authored-recap`, not verified mechanics; active-timeline recaps through the current revision, selected for this session or with no selected-session restriction. Player scope requires `members` visibility; private director planning can read GM recaps. |
-| `director-receipt` | `committed-outcome`; public summary of an eligible director receipt on the active timeline, even without successful narration. Story resource disclosure is checked; prior director model prose is never searched. |
+| `director-receipt` | `committed-outcome`; public summary of each eligible director composition receipt on the active timeline, even without successful narration. The legacy first-receipt mirror is deduplicated; older runs without composition receipts remain searchable. Story resource disclosure is checked across both legacy selections and ordered compositions before ranking; prior director model prose is never searched. |
 
 The requested session authorizes the snapshot and selects applicable recaps, but turn and director-receipt searches are campaign-wide on the active timeline, not restricted to that room. Player turn sources are limited to the controlled actor, even for `local-owner`; director planning can search eligible actors campaign-wide. Most source families require the active timeline exactly. Only core mechanic events use explicit timeline-event inclusion to admit inherited events through the cutoff. Inherited turn, recap, and other domain history without proven lineage is conservatively excluded, not automatically replayed from the parent branch.
 
@@ -55,7 +75,7 @@ The measured runtime correction is deliberately narrower than a temporal parser:
 
 The repository obtains a current authorized audience snapshot before searching. SQL candidate eligibility applies campaign, actor, timeline, recap visibility, and source-specific disclosure before matching/ranking; receipt readers further validate hydrated outcomes. Public adventure narration requires a player audience; director purposes require a DM audience. Owner invocation does not remove the player actor filter or expose GM-only recaps. Authorization is read again on each call; there is no reusable search cache or new forgetting API.
 
-Public narration context excludes private target facts. Director narration gets only eligible public director outcomes, not private planning or prior presentation. These are source/access boundaries, not a complete in-world NPC knowledge model. Future aliases, summaries, caches, FTS statistics, and vectors would need the same pre-ranking visibility policy and invalidation; none is implemented here.
+Public narration context excludes private target facts. Director recall returns only eligible public director outcomes, not private planning or prior presentation; its separately labeled prior-scene continuity channel remains non-authoritative. These are source/access boundaries, not a complete in-world NPC knowledge model. Future aliases, summaries, caches, FTS statistics, and vectors would need the same pre-ranking visibility policy and invalidation; none is implemented here.
 
 Safety is not relevance-ranked. `assembleCampaignAgentContext` and `campaignPublicContext` reject safety overflow with `mandatory campaign safety context exceeds budget`, rather than silently omitting a required line. Existing safety policy and aggregate dispatch guards remain separate from recall packing.
 
@@ -103,7 +123,7 @@ Anthropic's reported retrieval failure reductions are top-20 results on its eval
 
 The integration tests in `campaign-context.test.ts`, `adventure-agent-orchestrator.test.ts`, and `rpg-adventure-turn-route.test.ts` cover their respective assembly and dispatch seams. Broader alias resolution, semantic paraphrases, 1,000-distractor scale/latency, generic supersession, intent/outcome atomic bundling, and NPC knowledge inference remain future evaluation or implementation work. Do not claim the proposed golden matrix in [memory framework evaluation](memory-framework-evaluation.md) is already passing or implemented.
 
-The final focused gate passed 180 server tests across ten files, all workspace
+The original memory checkpoint's focused gate passed 180 server tests across ten files, all workspace
 typechecks, and eight memory/director/control-plane browser tests.
 `e2e/tests/campaign-memory.spec.ts` exercises real HTTP and disposable SQLite with
 fake completions: an exchange behind 105 distractions reaches the recall packet,

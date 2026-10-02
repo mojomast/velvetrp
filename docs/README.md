@@ -33,11 +33,11 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [System One decision review](system-one-decision-review.md) - Read-only human review of the immutable System One decision log, turning incorrect verdicts into negative examples for a lane's evaluation corpus.
 - [System One Director disagreement report](system-one-disagreement-report.md) - Read-only, deterministic comparison of the shadow Director lane's would-be selections against the authoritative provider composition, producing a review queue of divergent cases.
 - [Administration UX](administration-ux.md) - Campaign administration interaction guidance.
-- [Frontend control plane](frontend-control-plane.md) - Campaign Command Center workspace, preparation, session recovery, and browser acceptance coverage.
+- [Frontend control plane](frontend-control-plane.md) - Searchable campaign library, staged worldbuilder, world/play handoffs, Campaign Command Center, preparation, session recovery, and browser acceptance coverage.
 - [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.
 - [DM evaluation](dm-evaluation.md) - Deterministic and live DM behavior evaluation guidance.
-- [Campaign generation and expansion](campaign-generation.md) - Reviewed generation, dependency-aware apply, planning projections, provider attempt handling, and explicit material delivery; subordinate to the API reference for HTTP contracts.
-- [Campaign startup](campaign-startup.md) - The owner/GM startup command: AI delegation, public-material publication, the gated opening beat, per-location scene images, deterministic replay, public-only scope, and the hydration/first-room automatic paths.
+- [Campaign generation and expansion](campaign-generation.md) - Prompt-to-world walkthrough, all-14-section coverage, staged and reviewed generation, dependency-aware apply, recovery, planning and explicit material delivery; subordinate to the API reference for HTTP contracts.
+- [Campaign startup](campaign-startup.md) - The owner/GM startup command: AI delegation, public-material publication, the gated opening beat, per-location scene images, deterministic replay, hydration startup/retry, and preparation-only browser handoffs.
 - [Free-form materialization](freeform-materialization.md) - Bounded, server-authored location and NPC creation: closed candidate sets, atomic receipted apply/world writes, deterministic idempotency, public visibility with separate GM content, and no fabricated stats/items/prices. Shop stock is repository-only and not yet routed.
 - [Scene image integration](scene-image-integration.md) - Optional DM scene illustrations from the private Supra2 service: server-mediated boundaries, the five `VELVET_SCENE_IMAGES_*` keys, manual/automatic limits and cooldown, dedup and stale-scene protection, sidecar retention and campaign-authorized serving, DM and player access, security rules, prompting primer, and verification.
 - [Supra2 service deployment](supra2-service-deployment.md) - Inference-host runbook for the private Supra2-IMG service: Strix Halo and ROCm prerequisites, pinned checkpoint verification, the current `/health`, `/api/status`, `/api/generate`, `/api/batch`, `/api/cancel`, and `/images/...` contract, tailnet authorization, persistence, historical timings, and upgrade/license policy.
@@ -48,6 +48,10 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 ## Planning and historical records
 
+- [Roleplay and worldbuilding audit (2026-10-02)](roleplay-worldbuilding-audit-2026-10-02.md) - Implementation results, isolated live evaluations, and observed limits for free-form play and complete world generation.
+- [World-generation backend research](world-generation-backend-research.md) - Source-grounded generation design, count/reference validation, directed travel and catalog-context decisions.
+- [Worldbuilding workflow research](worldbuilding-workflow-research.md) - Staged generation, coverage, exact recovery, navigation and preparation handoffs.
+- [World library workflow research](world-library-workflow-research.md) - Saved-world discovery, inline generation and library usability decisions.
 - [Playability execution protocol](playability-execution.md) - Ordered three-plan program, small-context subagent workflow, API budget, milestone commits, and reusable execution trigger.
 - [Playability progress](playability-progress.md) - Durable execution ledger with committed milestone handoffs, validation results, and remaining live budget.
 - [Plan 1: Campaign readiness](plan-1-campaign-readiness.md) - Private provider-free preparation diagnostics and actionable GM remedies; planned, not an activation replacement.
@@ -58,7 +62,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Context inspection contract](context-inspection.md) - GM-only bounded persisted-dispatch inspection lanes, withholding policy, and byte/token units.
 - [Reviewed adventure runner](reviewed-adventure-runner.md) - Bounded provider-free and explicitly authorized live execution policy.
 - [Reviewed adventure report template](reviewed-adventure-report-template.md) - Stable evidence and observation format for matched branches.
-- [Bounded campaign memory](campaign-memory.md) - Implemented direct SQLite recall, source/authority scope, exact packing limits, scan limitations, immutable narration provenance, and migration behavior.
+- [Bounded campaign memory](campaign-memory.md) - Direct SQLite recall, source/authority scope, branch continuity, local NPC knowledge and witnesses, exact packing limits, immutable narration provenance, and migration behavior.
 - [RPG memory framework evaluation](memory-framework-evaluation.md) - Research comparison of SQLite, LangGraph, Mem0, Graphiti/Zep, and Letta, with proposed evaluation gates rather than implementation claims.
 - [Free-form generation research](freeform-generation-research.md) - Research and design record for bounded free-form materialization (locations, NPCs, hostiles, shops, factions/quests/clues) plus the Jev lane plan; a design record, not runtime behavior.
 - [Bounded NPC knowledge and rumors](npc-knowledge-rumors.md) - Research design and evaluation plan for per-agent observation ledgers, rumor propagation, and attribution/privacy/false-memory gates; the ledger and its gates are now shipped, the per-agent belief projection is not.
@@ -92,6 +96,6 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Roleplay architecture notes (2026)](roleplay-architecture-2026.md) - Dated architecture decisions and historical checkpoints; current status statements may age.
 - [Roleplay product/feature snapshot (2026)](trending-roleplay-features-2026.md) - Dated internal planning snapshot, not external research, provenance, a commitment, or a contract.
 - [SRD 5.1 parity plan](srd-5.1-parity-plan.md) - Gap map and phased plan for full SRD 5.1 rules and content coverage; planning only.
-- [OmniVoice Studio support plan](omnivoice-support-plan.md) - Proposed optional voiced narration design and remote OmniVoice builder handoff; planning only.
+- [Optional OmniVoice support](omnivoice-support-plan.md) - Implemented opt-in narration playback, persistent narrator/NPC casting, captions, bounded presentation storage, configuration, and remaining voice roadmap.
 
 For behavior conflicts, prefer shared runtime contracts and current code, then the [API reference](api.md), [Streaming](streaming.md), and normative repository architecture where applicable. Use dated planning records only for historical rationale.

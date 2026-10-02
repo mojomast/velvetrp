@@ -1,8 +1,35 @@
 # Campaign generation and expansion
 
-Campaign generation is a reviewed, additive API. It never edits accepted generated artifacts in place and it never applies a provider response automatically.
+Campaign generation is an additive API. It never edits accepted generated artifacts in place; staging and application are separate requests.
 
 The client offers three directions: **Foundation** requests an outline, locations/connections, factions, NPCs, and quests; **Full narrative campaign** requests all 14 supported sections in one prompt; and **Custom / granular** retains independent section selection. A full request is still only one dependency-linked draft and is never auto-applied.
+
+The campaign library also offers **Generate world**. Its **Build world** action explicitly authorizes an 11-stage workflow covering all 14 sections: each stage generates, validates coverage and links, then applies before the next stage starts. The tab retains progress and exact request identities; interrupted work reconciles before resuming. **Manage world** opens the editor and **Prepare to play** opens room preparation. See [worldbuilding workflow](worldbuilding-workflow-research.md).
+
+## Generate, manage and prepare to play
+
+1. Open the campaign library and choose **Generate world**. Enter a world name and premise, review the tone/exclusions, then choose **Build world**. New campaigns receive SRD 5.1 starter setup before generation. Generation requires the campaign, mechanics and combat features and a configured compatible provider.
+2. Keep the builder open while its stages run. Each successful stage becomes accepted content before the next stage begins; library refresh preserves the mounted builder. The default plan is:
+
+   | Stage | Minimum new artifacts |
+   | --- | --- |
+   | Factions | 4 factions |
+   | Locations | 6 locations, 10 directed connections |
+   | Foundation | 1 outline, 3 arcs |
+   | Cast | 6 NPCs |
+   | Story | 8 story nodes, 6 relationships, 5 clues |
+   | Quests | 5 quests |
+   | Enemies and monsters | 4 monster concepts |
+   | Items | 4 quest-item concepts |
+   | Encounters | 5 encounter plans |
+   | Lore | 6 lore entries |
+   | Table material | 3 handouts, 4 scene prompts |
+
+3. If interrupted, use the displayed reconciliation/recovery action. Known drafts are read before any retry. Confirmed failed attempts need an explicit paid retry; an unapplied candidate rejected by the builder can use **Generate revised stage**. Navigating away pauses further stage writes, and the same tab can recover its saved journal after reload.
+4. Choose **Manage world** to edit and inspect the accepted world. After all planned stages are confirmed applied, **Prepare to play** opens room preparation. Create/finalize a character, attach the room, and satisfy the existing activation/startup requirements there.
+5. A completed run can start another world without deleting its accepted content. Find saved campaigns through library search, role/status filters, and updated/name ordering; publication status alone does not establish play readiness.
+
+The default builder validates a public opening bound to an accepted location, located NPCs, actionable quests, and public maps with directed outward and return reachability. Its advanced JSON plan supports custom scope and minimums. The backend's all-14-section gate applies to one complete request; staged builds rely on the builder's additional checks across accepted stages. Structural coverage does not certify narrative quality or a started room.
 
 ## Section candidates
 
@@ -27,19 +54,19 @@ For provider-free hydration, the same request may include `reviewedContent` cont
 
 The provider response is sparse: unrequested sections must be empty. A faction, NPC, quest, clue, lore entry, concept, handout, or scene prompt does not need an opening or a location graph. Stable lowercase-hyphen keys can reference another candidate or an accepted artifact named in `expandArtifactKeys`. Candidate, objective, and reward keys must be globally unambiguous. Strict local Zod parsing, requested-section checks, duplicate-key checks, missing-reference checks, graph-cycle checks, self-connection checks, transitive public-to-GM dependency checks, objective-DAG checks, and the provider adapter's strict JSON Schema response format run before staging. Critical graph, visibility, objective, and catalog-pin checks run again inside apply.
 
-A full 14-section request must contain at least one artifact in each section before it can be staged, including reviewed API content. Granular requests retain sparse behavior. This checks structural coverage, not literary quality or campaign solvability; a GM must still review the preparation and the chosen apply subset.
+A full 14-section request must contain at least one artifact in each section, a public starting location with outward directed reachability to every new public location, located NPCs, and actionable quests before it can be staged, including reviewed API content. Granular requests retain sparse behavior. Optional `desiredCounts`, keyed by preview array names, imposes minimum new counts within existing array caps and requested sections. Positive NPC targets require location keys; positive quest targets require objectives. Counts are checked after tolerant cleanup and belong to the request's idempotency identity, including reconciliation. See the [API count table](api.md#campaign-content-requests-and-coverage) for exact field mappings and caps. These are structural checks, not literary-quality or campaign-solvability guarantees.
 
 Expansion keys are resolved server-side to accepted canon, its immutable digest, source draft, and any materialized server resource ID. Only public accepted content is sent back to the provider; a GM-only dependency remains an opaque key. The draft captures both the campaign-content revision before the provider call and exact dependency digests. `derivativeContextKeys` exposes that immutable base in the review view. Regeneration with `expandArtifactKeys` plus `revisionFeedback` creates an additive derivative draft; it never edits the accepted source artifact. Apply fails closed if either the content revision or a dependency digest is stale.
 
 Public expansion filtering is field-sensitive: faction `gmNotes`, NPC `privateGoals`, and GM-only quest objectives/rewards are omitted even when the enclosing accepted artifact is public. Filtering never modifies the immutable accepted source.
 
-Campaign text, accepted canon, tone, exclusions, and revision feedback are framed as untrusted quoted data in the provider request. Instructions embedded in any of those values are explicitly non-authoritative. Provider tool use remains disabled with `toolChoice: "none"`. Logical request identity uses recursively key-sorted canonical JSON before SHA-256 hashing, so object property order does not alter identity.
+Campaign text, accepted canon, tone, exclusions, and revision feedback are framed as untrusted quoted data in the provider request. Instructions embedded in any of those values are explicitly non-authoritative. The primary dispatch uses strict JSON Schema with `toolChoice: "none"`. If the provider returns a matching HTTP 400 capability error, the adapter makes one compatibility fallback dispatch using a schema-shaped output function with `toolChoice: "auto"`; its arguments pass through the same parsing and validation. This function is output transport, not an executable campaign tool. Logical request identity uses recursively key-sorted canonical JSON before SHA-256 hashing, so object property order does not alter identity.
 
 Candidate GET/POST responses omit faction GM notes and NPC private goals. They do not expose provider prompts, credentials, principals, hidden goals, or provider-call records.
 
 ## Region packs
 
-`POST /api/rpg/v1/campaigns/:campaignId/region-packs` replaces 11-32 separate generation requests for an opening or quest area with one coherent region pack: exactly one provider dispatch and exactly one atomic apply. The body is strict and bounded:
+`POST /api/rpg/v1/campaigns/:campaignId/region-packs` replaces multiple separate generation requests for an opening or quest area with one coherent region pack: one generation attempt and exactly one atomic apply. The output-format compatibility fallback described above can add a second provider dispatch within that attempt. The body is strict and bounded:
 
 - `idempotencyKey`;
 - `brief` (<=2000), optional `tone` (<=200), optional `exclusions` (<=16);
@@ -54,7 +81,7 @@ The server composes the region brief, then runs the same parse -> sanitize -> va
 - at least four and at most sixteen new public locations, at most twenty-four connections, at most 128 applied keys, and at least `locations - 1` connections;
 - exactly one outline whose `startLocationKey` is one of the new pack locations (self-anchoring), unless the campaign already designates an immutable starting location, in which case `anchorLocationKey` is required and at least one connection must reach it;
 - every connection endpoint in-pack or equal to the supplied accepted anchor, with no self-connections and no duplicate directed `(from, to)` pairs;
-- a connected undirected graph that includes every new location and the anchor; and
+- directed reachability from the designated start or required accepted anchor to every new location; return travel needs explicit reverse connections; and
 - every `npc.locationKey`, `quest.locationKeys`, and `clue.locationKey` resolving in-pack or to accepted canon.
 
 Locations and connections in the pack must be public; GM-only opening-area geography is rejected. When anchoring to existing canon the server passes the accepted `anchorLocationKey` through `expandArtifactKeys`, so the provider sees that one public artifact and nothing else private. A validation or provider failure writes no draft, no accepted artifact, and no starting location; there is no automatic second paid request.
@@ -83,7 +110,7 @@ No handout or scene prompt is delivered on apply. A GM explicitly publishes a `p
 
 ## Runnable campaign preparation
 
-Generation prompt `campaign-content-v6` enriches existing artifact fields rather than introducing a campaign-script aggregate or executable instruction language. The wire shape remains `campaign-content-v4`; existing accepted drafts do not need a migration.
+Current generation prompt `campaign-content-v7` enriches existing artifact fields with runnable preparation, typed-reference, count and directed-route instructions. The wire shape remains `campaign-content-v4`; existing accepted drafts do not need a migration. Its provider-facing catalog includes exact item references only for quest items, and exact enemy-template references only for monsters/encounters; prose-only requests receive no catalog. Entries contain only their exact reference and name. Full server-side catalog validation remains authoritative.
 
 - Public outlines establish stakes and an actionable invitation, not future outcomes.
 - GM-only arc summaries describe antagonist agendas, early/middle/final progression, branching consequences, setbacks, transitions, alternative finales and aftermath.
@@ -118,6 +145,8 @@ The existing adventure orchestrator still selects player or enemy mechanical con
 One v52 generation job owns `(campaignId, idempotencyKey, requestDigest)`. A concurrent exact request does not call the provider: it waits for the durable winner for a bounded interval, then returns that draft or a conflict. Reusing the key with different generation direction remains an idempotency conflict.
 
 A failed provider attempt is terminal. It is not silently repeated. To retry the same logical request, the caller must send `retryFailedAttempt: { failedAttempt: N }`, where `N` is the current failed attempt. A stale acknowledgement conflicts. Every retry gets a separate attempt row while retaining the same logical job and request digest.
+
+The narrow HTTP 400 output-format fallback described above happens within one generation attempt. Other provider or candidate-validation failures do not trigger a replacement generation automatically.
 
 The provider call remains outside campaign-domain transactions. Validated draft, dependencies, candidate, and terminal success are staged atomically; application uses a separate short immediate transaction. Expired running attempts are settled lazily as `outcome-uncertain` after a fixed ten-minute lease. Provider-free reconciliation can recover an existing candidate, but cannot prove whether an uncertain provider call was charged. No recovery automatically repeats paid generation.
 

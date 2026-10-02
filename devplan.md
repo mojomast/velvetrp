@@ -26,9 +26,12 @@ This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns curr
 - [x] Drift remediation: v53 migration policy/evidence, current API/docs/configuration reconciliation, and executable drift guards.
 - [x] Playability program (Plans 1-5): readiness diagnostics, the reviewed human/AI adventure, measured campaign memory, the living knowledge ledger, and the living Director.
 - [x] Browser-playable client surfaces: character-sheet actions (checks, powers/spells, effects, resources, rests, equipment), vendor sale, bilateral trade accept/cancel, room detach, actor placement and camp, companion administration, and reviewed encounter generation, each covered by the deterministic E2E gate.
+- [x] 2026-10-02 delivery: complete staged worldbuilding over all 14 sections, bounded count/reference validation, searchable campaign library and world/play handoffs, exact interrupted-build recovery, free-form conversation/observation improvements, branch-aware continuity, event-time witnesses, interrupted chat reconciliation, asynchronous advisory routing, and evaluator/hydration repairs. See the [audit](docs/roleplay-worldbuilding-audit-2026-10-02.md) for live evidence and validation limits.
 
 ## Remaining
 
+- [ ] Observed free-form NPC attack/combat-initiation and short-rest gaps.
+- [ ] Durable legacy-generation settlement and cross-device worldbuilding recovery if promoted.
 - [ ] M5.2 delegated companion grant exercise and dismissal.
 - [ ] M5.3 remaining milestone scope outside the deliberately bounded consumable lane.
 - [ ] M5.5 persistence, command, and client integration if separately promoted.
@@ -37,4 +40,4 @@ This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns curr
 
 ## Next
 
-Scope the closed declarative rules IR milestone with exact consumers, contract boundaries, current-schema impact, and exclusions before implementation.
+Follow [handoff.md](handoff.md#next-task) for the current delivery and prioritized playability follow-ups. The closed declarative rules IR remains later roadmap work rather than the immediate handoff.

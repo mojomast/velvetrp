@@ -36,8 +36,9 @@ contracts, the [API reference](api.md), [repository architecture](repo-architect
 [provider configuration](provider-configuration.md), or milestone status in the
 [roadmap](ROADMAP.md). TypeSafe product facts were verified September 16, 2026
 against the live API and the public documentation listed under [Sources](#sources).
-The API was exercised live during this work; the decision-record sidecar and every
-lane above shadow mode remain future work.
+The sidecar and routing integration are implemented; historical promotion evidence
+does not by itself activate the current composition. See
+[version-bound promotion](jev-promotion-binding.md) for the exact runtime gate.
 
 ## Summary
 
@@ -525,8 +526,10 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   `server/src/agent/systemOneRoomRouting.ts`. Code composes the answer: participants
   that clear `actionThreshold` are ordered by probability and capped, then passed
   through the existing `ensureGroupSpeakers`. When no participant clears the threshold,
-  the aggregate choice acts as a fallback if its top pick is a real participant and its
-  probability clears `reviewThreshold`; otherwise the lane defers. Declaration/intent
+   the aggregate choice acts as a fallback if its named pick is a real participant and
+   `probabilities[choice]` clears `reviewThreshold`; another option's higher probability
+   or aggregate confidence cannot authorize that pick. Missing/invalid selected-option
+   probability defers. Declaration/intent
   classification is still unimplemented.
 - **Composition.** `act` uses the Jev selection; `confirm`/`fallback` returns the
   recorded decision without applying it, so `selectRoomSpeakers` continues to the LLM
@@ -538,15 +541,22 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   is **`active`** **and** it carries a recorded, passing promotion
   (`server/src/agent/systemOnePromotion.ts` `isLanePromoted`). Otherwise it records the
   would-be decision in `shadow` and leaves routing unchanged (`fallback_used: true`). Room routing is the
-  first promoted lane (evidence: the benchmark below). Usage is recorded under the
-  `room_routing_system_one` kind.
+   first promoted lane (evidence: the benchmark below). Usage is recorded under the
+   `room_routing_system_one` kind.
+- **Current binding and scheduling.** The speaker composition is `room-routing-v2`.
+  A matching passing evaluation binding is required before awaiting a potentially active
+  selection; the actual response model is checked again after dispatch. Shadow and
+  unmatched active configurations evaluate asynchronously alongside the primary LLM
+  route. A historical benchmark or lane-wide promotion label does not authorize a
+  changed composition or justify lowering thresholds.
 - **Budget.** Each dispatch reserves against the lane's own budget
   (`server/src/agent/systemOneBudget.ts`) before shipping and settles from reported
   usage; a denied reserve, like any lane failure, falls back without dispatching.
 - **Decision records.** Every dispatch (active or shadow) is written immutably to
   `system_one_decisions_v1` via `server/src/repo/systemOneDecisionRepo.ts`, with
   request/questions/state digests and a re-verifiable integrity assertion. Recording is
-  advisory and can never fail a room turn.
+   advisory and can never fail a room turn. Asynchronous records may appear after
+   `room_done`; pending work is process-local and can be lost on shutdown.
 - **Authority.** Jev only nominates participant ids from the closed room roster; the
   server still selects tools and legal commands, and the deterministic fallback is
   unchanged.
@@ -573,7 +583,8 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   mode; an `active` mode is still record-only because no promoted active path exists. It
   reviews the raw user content, records one immutable decision per room turn with the hazard
   list mirrored into `selection.flags` for the review queue, and never blocks, rewrites,
-  sanitizes, or influences routing/generation/fallbacks; a lane failure is swallowed.
+   sanitizes, or influences routing/generation/fallbacks; a lane failure is swallowed.
+   Its provider call is asynchronous and does not delay the primary room response.
 - **Evaluation.** [System One guardrails benchmark](system-one-guardrails-benchmark.md) runs
   56 frozen labeled messages plus 1 confirmed harvested live case x 3 repeats (171 live calls,
   production-shaped: no `uid` decorrelator, 75 acted). The first 40-case run acted at
@@ -614,8 +625,10 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   runs. Its safety gate routes `requiresHumanDecision`/`safetySensitive` requests to
   `human-review` unconditionally.
 - **Composition.** `act` routes to the chosen handler; `confirm` and `fallback` use the
-  currently configured handler, so the router can only ever change behavior toward a
-  cheaper or human path, never bypass a required safety check.
+   currently configured handler, so the router can only ever change behavior toward a
+   cheaper or human path, never bypass a required safety check. A `deterministic`
+   choice cannot act unless `hasDeterministicPath` is true. The production record-only
+   call is asynchronous and cannot delay or change the primary handler.
 - **Authority.** Selects *which* handler runs, never *what* it does. It cannot skip
   authorization, candidate binding, confirmation, or receipts.
 - **Evaluation.** [System One cost-router benchmark](system-one-router-benchmark.md)

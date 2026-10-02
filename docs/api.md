@@ -282,16 +282,21 @@ relationship the director blocks AI resolution with
 `scene-resolution-requires-gm-binding-or-human-adjudication`; human mode can offer
 an explicit adjudication proposal instead. GM-only generated nodes/clues produce
 `story-public-rendering-required`: author a separate reviewed public-safe rendering,
-not a prompt asking the narrator to redact private preparation. Scene binding has
-no dedicated browser editor or automatic public-conversion operation.
+not a prompt asking the narrator to redact private preparation. The GM Director
+drawer offers reviewed scene/objective/encounter binding choices; exact check-turn
+bindings remain available through the API. Binding does not convert private material
+into public content.
 
 Human mode requires owner/GM suggestion requests and exact approval. Persisted AI
 delegation permits eligible players to request a beat under the same server rules.
 Takeover revokes future delegation, not committed mechanics or an in-flight charge.
-Each beat uses the existing configured provider for at most one private planning
-call and one isolated public narration call, each with a 30-second deadline, bounded
-aggregate tokens/cost, and no paid retries. Approval may dispatch narration but does
-not replan. Narration failure preserves committed effects and uses safe fallback.
+Each beat uses the existing configured provider for up to three private planning
+rounds and one isolated public narration phase, each with a 120-second deadline
+and bounded aggregate tokens/cost. Narrow pre-dispatch rejection retries may add
+transport attempts; timeouts, 429 and 5xx are not automatically retried. See
+[Director failure handling](ai-dungeon-master.md#provider-and-mutation-failures).
+Approval may dispatch narration but does not replan. Narration failure preserves
+committed effects and uses safe fallback.
 
 GETs and mode changes are provider-free. Reconcile history and the saved run before
 explicit recovery; preserve exact request keys after ambiguous responses. Unknown
@@ -308,7 +313,7 @@ Starting-location and room-activation routes require campaign plus mechanics fla
 
 - `GET /rpg/v1/campaigns/:campaignId/starting-location` reads the authoritative designation. `POST /rpg/v1/campaigns/:campaignId/starting-location-commands` accepts `campaignStartingLocationDesignationRequestSchema` with the public location, expected revision, and idempotency key. Missing/denied state is 404; stale/conflicting state is 409. Unexpected 500 outcomes require GET reconciliation without automatic retry.
 - `GET /rpg/v1/campaigns/:campaignId/rooms/:sessionId/activation-readiness` reads readiness and activation state. `POST /rpg/v1/campaigns/:campaignId/rooms/:sessionId/activation-commands` accepts `campaignRoomActivationRequestSchema` and returns readiness plus a receipt bound to the submitted revision/key. Missing state is 404 and conflicts are 409. Read readiness on conflict; an unknown 500 outcome must be reconciled using the identical activation request, not a new request identity.
-- `POST /rpg/v1/campaigns/:campaignId/region-packs` accepts `campaignRegionPackRequestSchema` and creates a whole opening/quest area in exactly one provider dispatch and one atomic apply. It fixes the internal sections to outline, locations, factions, NPCs, quests, clues, and story; rejects query parameters and non-JSON bodies; and requires the same campaign/mechanics/combat gates as campaign-content generation. The server validates a connected public location graph, a self-anchored start (or an accepted `anchorLocationKey` once a starting location is already designated), and location references before staging. The 201 response carries the applied draft projection, applied artifact keys, the content receipt, and the designated start location. An exact replay converges on the existing draft without a second provider call. See [Campaign generation](campaign-generation.md#region-packs).
+- `POST /rpg/v1/campaigns/:campaignId/region-packs` accepts `campaignRegionPackRequestSchema` and creates a whole opening/quest area in one generation attempt and one atomic apply. It fixes the internal sections to outline, locations, factions, NPCs, quests, clues, and story, adding encounters when `linked.encounters` is true; rejects query parameters and non-JSON bodies; and requires the same campaign/mechanics/combat gates as campaign-content generation. The server validates public directed reachability from a self-anchored start (or an accepted `anchorLocationKey` once a starting location is already designated) to every new location, and validates location references before staging. Return travel needs explicit reverse routes. The 201 response carries the applied draft projection, applied artifact keys, the content receipt, and the designated start location. An exact replay converges on the existing draft without another generation. See [Campaign generation](campaign-generation.md#region-packs), including its provider output-format fallback.
 - `POST /rpg/v1/campaign-content-drafts/reconcile` is a provider-free recovery read transported as POST with `campaignContentGenerationRequestSchema`. It retains the generation lane's campaign/mechanics/combat gates and `no-store`, verifies campaign authority, and looks up the exact logical request digest and idempotency key without starting another generation attempt. The 200 response carries `campaignId`, `idempotencyKey`, `state`, `attempt`, and nullable `draftId`; states include `not-found` and `outcome-uncertain` as well as stored call states. It neither applies content nor authorizes an automatic paid retry. See [Campaign generation](campaign-generation.md) and [Hydration CLI](hydration-cli.md).
 
 ### Tactical maps (4 operations)
@@ -637,6 +642,8 @@ SSE opens with `Content-Type: text/event-stream; charset=utf-8`, `Cache-Control:
 
 Conditional events are not promises that every stream contains every event. Current narration is composed over verified public receipts; provider output is strictly parsed but cannot establish displayed mechanical claims. Without a receipt it leaves a requested mechanical change unresolved. A raw dice receipt exposes only its total and establishes neither success nor failure; exact travel completion requires a verified receipt naming the destination. Initial and narration-derivative streams emit `turn_started`; resume does not replay `turn_started` or `tool_proposed`. The current bounded loop executes only the state-dependent tools documented in [DM harness architecture](dm-harness-architecture.md), with local argument/candidate validation, required confirmation, durable idempotency, and receipt reconciliation. Approved work that is not yet linked to a mechanics receipt remains `pending-mechanics`; it is never narrated as committed.
 
+Eligible original social/observation turns and narration derivatives can complete with receipt-free conversational prose. Clearly routine observation advertises neither check candidates nor raw dice; explicit checks, uncertain searches and compound actions retain mechanics. Narration context includes an explicit local `presentNpcNames` roster and bounded, disclosable `npcKnowledge`, rather than treating every campaign-visible NPC as co-located. These are internal prompt projections, not additions to the public turn schema. See [free-form conversation and observation](dm-harness-architecture.md#free-form-conversation-and-observation).
+
 Current noncombat player planning also advertises exact public quest-objective candidates when the quest is active, the objective is incomplete, and all objective dependencies are complete. The provider selects only an opaque candidate ID and digest from server enums. It cannot supply quest/objective IDs, revisions, progress amounts, visibility, dependencies, or completion state. A valid selection executes the existing authoritative `advance-objective` command once under a turn-derived idempotency key; its immutable quest receipt is discovered by the adventure turn and grounds narration, replay, restart recovery, and narration derivatives. One declaration can advance at most one objective point. Story-graph mutations remain unavailable without separately authored exact links and GM-authorized candidates.
 
 Noncombat planning also exposes exact role-safe quest accept, abandon, and unclaimed public reward candidates. The server fixes the quest/reward identities, current quest revision, controlled recipient, reward value, and all eligibility; abandon and reward claim require controller confirmation, and current policy also confirms acceptance. Execution rederives the same candidate immediately before invoking the existing quest command once. Public receipts contain only the readable quest action/status and, for claims, the reward label/kind/value and recipient name.
@@ -649,7 +656,7 @@ The server writes `: heartbeat` SSE comments every `VELVET_SSE_HEARTBEAT_MS`, de
 
 Generation kind is exactly `encounter`, `location`, `npc`, `faction`, `quest`, `storyline`, or `content-pack`; `brief` is trimmed, nonblank, and at most 8,000 characters, and `constraints` contains at most 64 trimmed nonblank strings of at most 1,000 characters. The M2.11 create lane is deterministic user-brief fallback, not provider generation. Its exact provenance is `{ source: "user-brief", method: "deterministic-fallback", applicationScope: "draft-review" }`; each change is `{ changeId, summary, content: { brief, constraints } }`; each validation issue is `{ path, code, severity, message }`. Draft field order is `{ draftId, campaignId, kind, state, revision, createdAt, updatedAt }`, with state `staged`, `in-review`, `approved`, `rejected`, `applied`, or `cancelled`.
 
-At M2.11 completion, generation apply accepted only known staged change IDs and returned `application: { scope: "draft-only", campaignDomainMutated: false }` plus exactly one draft receipt `{ receiptId, reviewDecisionId, scope: "draft-only", selectedChanges, appliedAt }`. It was draft-only review sealing: it did not create a campaign command receipt or mutate campaign-domain content. M4.2, M4.5, and M4.6 subsequently completed tool bridging, encounter generation, and campaign-content generation/application respectively. M4.6 registered `POST /rpg/v1/campaign-content-drafts`, `GET /rpg/v1/campaign-content-drafts/:draftId`, and `POST /rpg/v1/campaign-content-drafts/:draftId/apply`; v50-v53 expanded that lane and added generated foundation/planning and material-delivery operations described below. These routes require campaign plus mechanics plus combat. The campaign-content draft GET and the three generated campaign GETs do not disable Fastify's implicit HEAD aliases; discovery has an implicit HEAD as well. Every implicit alias is excluded from both the historical 95- and 117-operation checkpoints and the current 145-operation count. The M2.11 baseline guarantees above are not retroactively extended to these later routes.
+At M2.11 completion, generation apply accepted only known staged change IDs and returned `application: { scope: "draft-only", campaignDomainMutated: false }` plus exactly one draft receipt `{ receiptId, reviewDecisionId, scope: "draft-only", selectedChanges, appliedAt }`. It was draft-only review sealing: it did not create a campaign command receipt or mutate campaign-domain content. M4.2, M4.5, and M4.6 subsequently completed tool bridging, encounter generation, and campaign-content generation/application respectively. M4.6 registered `POST /rpg/v1/campaign-content-drafts`, `GET /rpg/v1/campaign-content-drafts/:draftId`, and `POST /rpg/v1/campaign-content-drafts/:draftId/apply`; v50-v53 expanded that lane and added generated foundation/planning and material-delivery operations described below. These routes require campaign plus mechanics plus combat. The campaign-content draft GET and the three generated campaign GETs do not disable Fastify's implicit HEAD aliases; discovery has an implicit HEAD as well. Every implicit alias is excluded from both the historical 95- and 117-operation checkpoints and the current 177-operation count. The M2.11 baseline guarantees above are not retroactively extended to these later routes.
 
 ### NPC presence (M5.1, 2 operations)
 
@@ -694,7 +701,7 @@ Both operations require campaign and mechanics features and fixed trusted-local 
 | `POST` | `/rpg/v1/combats/:combatId/rewards/:rewardBundleId/claim-commands` | `{ rewardClaimId, expectedRevision, idempotencyKey }`; no query; JSON only | `200 { reward, receipt }` with claimed state |
 | `GET` | `/rpg/v1/campaigns/:campaignId/combats/:combatId/rewards/:rewardBundleId/claim-results/:claimIdentity` | No query; `claimIdentity` is the original idempotency key or reward-claim ID | `200 { reward, requestBinding, receipt }` |
 | `GET` | `/rpg/v1/campaigns/:campaignId/generated-foundation` | No query | `200 { campaignId, revision, opening }` |
-| `GET` | `/rpg/v1/campaigns/:campaignId/generated-planning` | No query or body | `200 { campaignId, deliveryRevision, encounters, deliverables }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/generated-planning` | No query or body | `200 { campaignId, deliveryRevision, encounters, lore, questItems, monsterConcepts, deliverables }` |
 | `GET` | `/rpg/v1/campaigns/:campaignId/published-materials` | No query or body | `200 { campaignId, revision, materials }` |
 | `POST` | `/rpg/v1/campaigns/:campaignId/material-publications` | `{ artifactKey, expectedRevision, idempotencyKey }`; no query; JSON only | `200 { material, receipt }` |
 
@@ -704,9 +711,42 @@ Actor placement requires campaign plus mechanics and repository-derived owner/GM
 
 Combat reward operations require campaign plus mechanics plus combat. Reward list and claim projections expose only bounded bundle ID, recipient actor ID, creation time, typed rewards, and `unclaimed` or exact claimed state. The recipient controller and owner/GM may list bundles, but claim and exact-result authority belongs only to the current recipient controller. Missing, denied, malformed, and cross-bound values are the same non-disclosing `404 RPG_COMBAT_NOT_FOUND`. Claim stale/conflict outcomes are typed 409s. A claim atomically settles the immutable reward claim and recipient wallet once. An unexpected claim response is ambiguous: the client must use the exact claim-result GET, then refresh rewards and wallet, without replaying POST. The exact-result read never executes a command; it verifies campaign/combat/bundle/recipient, original request evidence, canonical request digest, claim state, and receipt, while omitting private command/controller records. Its `404` does not prove non-commit or authorize automatic replay.
 
-Generated campaign reads and material publication require campaign plus mechanics plus combat and fixed `local-owner`; all reject queries and use no-store responses. `generated-foundation` returns the latest accepted public outline or `opening: null`. `generated-planning` is the GM projection for inert encounter concepts and generated handout/scene-prompt candidates; it creates no encounter or combat rows. `published-materials` is the player-safe projection and contains only explicitly published public handouts or scene prompts. Publication requires current owner/GM authority, an accepted public handout/scene-prompt with a materialized resource, and the current delivery revision. It appends one command, receipt, and projection; exact replay converges, changed reuse/stale state conflicts, and GM-only artifacts remain non-disclosing. A lost publication response is reconciled through `published-materials`; POST is never automatically retried.
+Generated campaign reads and material publication require campaign plus mechanics plus combat and fixed `local-owner`; all reject queries and use no-store responses. `generated-foundation` returns the latest accepted public outline or `opening: null`. `generated-planning` is the GM projection for encounter plans, typed lore, quest-item and monster concepts, and generated handout/scene-prompt candidates. Concepts retain either exact pinned catalog bindings or an explicit inert reason; this read creates no inventory, encounter or combat rows. `published-materials` is the player-safe projection and contains only explicitly published public handouts or scene prompts. Publication requires current owner/GM authority, an accepted public handout/scene-prompt with a materialized resource, and the current delivery revision. It appends one command, receipt, and projection; exact replay converges, changed reuse/stale state conflicts, and GM-only artifacts remain non-disclosing. A lost publication response is reconciled through `published-materials`; POST is never automatically retried.
 
-The reviewed campaign-content draft lane now accepts a nonempty subset of outline, arcs, locations, factions, NPCs, quests, encounter concepts, clues, story, handouts, and scene prompts. Candidate responses remove faction GM notes and NPC private goals. Apply requires `{ expectedRevision, idempotencyKey, selectedArtifactKeys }`, validates dependency closure and stale digests, and materializes selected standard-domain records atomically. Concurrent exact provider requests coalesce; failed paid calls require explicit `retryFailedAttempt` acknowledgement and are never silently repeated. See [Campaign generation and expansion](campaign-generation.md) for section limits, privacy, provider observability, NPC placement reconciliation, and deliberate exclusions.
+#### Campaign-content requests and coverage
+
+`POST /rpg/v1/campaign-content-drafts` returns a staged draft/preview with status 201. Its strict request requires `campaignId`, `brief` (nonblank, at most 2,000 characters), `tone` (nonblank, at most 200), `exclusions` (at most 16 nonblank strings of at most 200), and `idempotencyKey`. Optional fields are:
+
+- `sections`: 1–14 entries from the table below; defaults to `outline`, `locations`, `factions`, `quests`, `npcs`.
+- `expandArtifactKeys`: up to 16 accepted artifact keys; defaults to `[]`.
+- `revisionFeedback`: nonblank text up to 2,000 characters or `null`; defaults to `null`.
+- `retryFailedAttempt`: `{ failedAttempt: N }`, integer 1–32, or `null`; defaults to `null`.
+- `tolerateInvalidReferences`: optional boolean enabling bounded reference cleanup before validation.
+- `reviewedContent`: optional strict candidate for provider-free hydration; it passes the same coverage/reference checks.
+- `desiredCounts`: optional strict object of minimum **new** artifacts per preview array, using the fields and maxima below. Values are integers from zero through the corresponding cap; accepted canon does not count toward them. A zero is a zero minimum, not a requirement that the array be empty.
+
+| Section | Preview/count field and maximum |
+| --- | --- |
+| `outline` | `outlines`: 1 |
+| `arcs` | `arcs`: 8 |
+| `locations` | `locations`: 16; `connections`: 24 |
+| `factions` | `factions`: 12 |
+| `npcs` | `npcs`: 16 |
+| `quests` | `quests`: 16 |
+| `encounters` | `encounters`: 16 |
+| `clues` | `clues`: 24 |
+| `story` | `storyNodes`: 24; `storyRelationships`: 32 |
+| `lore` | `lore`: 24 |
+| `quest-items` | `questItems`: 16 |
+| `monster-concepts` | `monsterConcepts`: 16 |
+| `handouts` | `handouts`: 12 |
+| `scene-prompts` | `scenePrompts`: 16 |
+
+Count fields must belong to requested sections, even when zero; unknown fields, out-of-range counts and unrequested count fields return `400 RPG_INVALID_REQUEST`. Counts are checked after tolerant cleanup. Positive NPC counts require every new NPC to have a valid `locationKey`; positive quest counts require every new quest to have actionable objectives. Omitting `desiredCounts` preserves sparse requests. Request identity includes counts, so reconciliation uses the original body and changed counts under the same key conflict. Only the failed-attempt acknowledgement is excluded from the logical digest.
+
+A request covering all 14 sections additionally requires content in every section, a public outline bound to a new public starting location, public directed paths from that start to all new public locations, located NPCs and actionable quests. This gate validates that single candidate; it does not certify the union of separate sparse requests. The client worldbuilder adds its own cross-stage coverage and outward/return-route checks.
+
+Candidate responses remove faction GM notes and NPC private goals. Typed references must resolve to the correct artifact kind, with public-to-GM dependency and exact catalog-pin checks. Apply requires `{ expectedRevision, idempotencyKey, selectedArtifactKeys }`, with 1–128 selected keys, revalidates typed references, dependency closure and stale digests, and materializes selected standard-domain records atomically. Concurrent exact generation requests coalesce; a settled failure requires explicit `retryFailedAttempt` acknowledgement. Provider-free reconciliation never dispatches generation. See [Campaign generation and expansion](campaign-generation.md) for output-format compatibility fallback, privacy, observability, NPC placement and recovery.
 
 ### Actor gameplay sheet and DM harness
 

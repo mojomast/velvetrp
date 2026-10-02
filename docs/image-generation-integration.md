@@ -1,10 +1,10 @@
 # Image generation integration (proposed)
 
-This is a design proposal, not a shipped contract. Today the only image support in the
-repository is the disabled `images` discovery flag
-(`packages/contracts/src/feature-flags.ts`, `server/src/routes/roleplay/system.ts`,
-`client/src/App.tsx`); there is no adapter, route, storage, contract, or UI. The plan below
-keeps the feature optional, provider-agnostic, and review-gated, mirroring the two shipped
+This is the historical design proposal, not the current integration contract.
+The adapter, contracts, sidecar storage, HTTP routes and client scene-image surfaces
+have since been implemented; see [Scene image integration](scene-image-integration.md)
+for configuration and current scope. The original plan below
+keeps the feature optional, provider-agnostic, and review-gated, mirroring the two
 precedents: the voice sidecar (`server/src/voice/**`) for generated media bytes, and the
 System One / Jev lane (`server/src/agent/systemOne*.ts`, `server/src/provider/systemOneCompletion.ts`)
 for paid-provider gating, budgets, and promotion evidence.

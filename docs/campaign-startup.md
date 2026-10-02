@@ -106,9 +106,9 @@ Generation must still supply the content those candidates depend on.
 
 - **Public opening root story node.** When the `story` section is requested and
   nonempty, the first/root node (the single node, or the node with no incoming
-  relationship) must have `visibility: "public"` (`:138`). Secrets belong in
-  separate GM-only nodes. The `campaign-content-v6` output rules restate this
-  (`:183`).
+  relationship) must have `visibility: "public"`. Secrets belong in
+  separate GM-only nodes. The current `campaign-content-v7` output rules restate
+  this; complete requests also require a public start and directed reachability.
 - **Exact pinned encounter rosters.** A candidate carrying any
   `participantNpcKeys`, `monsterConceptKeys`, or `enemyReferences` must carry at
   least one exact pinned enemy reference, and every reference must resolve to a
@@ -127,24 +127,25 @@ Generation must still supply the content those candidates depend on.
 
 ## Automatic creation paths
 
-The startup command is normally invoked automatically so a fresh campaign is
-playable without a manual detour.
+The hydration CLI can invoke startup after generation. The browser's generated-world
+handoff opens room preparation; creating content or attaching a room alone does not
+invoke startup or establish play readiness.
 
 ### Hydration CLI
 
-`scripts/hydrate-campaign.ts` runs startup after every generation/apply pass. It
-is **on by default for `--create-campaign`** and can be forced with `--startup`
-or opted out with `--skip-startup`
-(`(options.startup ?? (options.createCampaign !== undefined))`,
-`scripts/hydrate-campaign.ts:354-370`). It resolves the campaign's first attached
-room from the rooms list deterministically (`firstAttachedRoom`, `:158-173`); if
-none is attached it logs a skip and leaves `ledger.startup` unrecorded so a later
-run can retry (`:360-363`). It otherwise POSTs the command with an empty body
-(`:364-368`). Reported blockers are logged; the ledger records
-`startup.status: "complete"` even when blockers exist, so the CLI does not
-automatically re-attempt on resume — re-invoke the command (or attach a room
-first) to finish. A persisted `startup.status: "dispatching"` at load means the
-outcome is uncertain and stops the run for explicit inspection (`:323`).
+`scripts/hydrate-campaign.ts` attempts startup after a generation/apply pass when
+enabled and not already recorded complete. It is **on by default for
+`--create-campaign`**, can be forced with `--startup`, and can be disabled with
+`--skip-startup`. It resolves the first attached room deterministically using
+`firstAttachedRoom`. With no room, it logs a skip and leaves startup eligible for
+a later run. Otherwise it POSTs the empty-body command.
+
+Reported blockers are logged and recorded as `startup.status: "blocked"`.
+Resuming with startup enabled retries the idempotent startup command after
+preparation is corrected, without regenerating or reapplying accepted content.
+A completed startup is skipped. A persisted `startup.status: "dispatching"` at
+load remains uncertain and stops for explicit inspection. See
+[Hydration CLI](hydration-cli.md#campaign-startup).
 
 ### Client
 

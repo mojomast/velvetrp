@@ -16,6 +16,14 @@ exact ownership; milestone commits must remain buildable.
 
 ## Outcome
 
+The 2026-10-02 refinement selects check witnesses at commit time from the source
+actor's authoritative location. Location-bound NPCs must match that actor rather
+than another split-party member; null-location NPCs retain session-level presence.
+Faction witnesses use the same eligible set. Existing observations are not rewritten.
+Public adventure narration now also receives explicit local NPC presence and bounded
+disclosable knowledge. See [campaign memory](campaign-memory.md) and the
+[implementation audit](roleplay-worldbuilding-audit-2026-10-02.md).
+
 One bounded, attributable, privacy-safe observation ledger shared across the
 game, so that committed events shape what specific agents know and can act on
 later. At minimum the NPC rumor case must work end to end (witnessed bet,
@@ -24,7 +32,7 @@ plus at least two other interaction levels from the survey below. Every wired
 level gets evaluation for attribution, privacy, and false-memory failures. If
 a level cannot meet its gate, record it incomplete rather than overclaiming.
 
-## Interaction levels (surveyed against current code)
+## Interaction levels (original pre-implementation survey)
 
 | Level | Today | Knowledge opportunity | Authority guard |
 | --- | --- | --- | --- |

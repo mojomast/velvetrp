@@ -1,5 +1,27 @@
 # Campaign Control Plane
 
+## Campaign library and worldbuilding
+
+**Campaigns & worlds** provides name search, role/lifecycle filters, and recently
+updated or alphabetical sorting. Lifecycle reads are bounded and isolated per card;
+an unavailable status does not hide the campaign or imply it is ready to play.
+
+**Generate world** opens the builder inline. **Build world** authorizes an 11-stage
+serial generate → validate → apply workflow covering all 14 sections. Locations
+precede the opening; later stages use exact accepted public keys. The default plan
+checks counts, public directed outward/return routes, NPC locations, actionable
+quests, and the opening's binding. The library refreshes after creation without
+unmounting the builder or moving focus away from its progress.
+
+The builder retains exact generation/apply requests and starter-setup state in a
+tab-scoped journal. Reload reconciles known drafts; failed paid attempts and revised
+unapplied candidates have explicit recovery actions. Navigating away pauses later
+stage writes. **Manage world** opens world editing; **Prepare to play** becomes
+available after the plan is applied and opens room preparation, where character,
+room and activation requirements still apply. A completed run can build another
+world without deleting accepted content. See [campaign generation](campaign-generation.md)
+for the step-by-step workflow and stage minimums.
+
 ## Preparation Readiness
 
 The Director drawer includes an owner/GM-only, explicit `Inspect preparation`
@@ -111,8 +133,10 @@ future delegation, not committed mechanics or an already dispatched provider bil
 
 Open scene requests an opening without inventing a player declaration. Continue
 scene requests one bounded beat, not autoplay. Both use the existing configured
-provider, with at most two calls per beat and a 30-second deadline per call, no
-automatic paid retries. In human mode an owner/GM requests a suggestion and uses
+provider, with up to three planning rounds and one narration phase per beat,
+120-second phase deadlines, and aggregate budget checks. Narrow pre-dispatch
+rejection retries are described in [AI dungeon master](ai-dungeon-master.md#provider-and-mutation-failures);
+uncertain paid outcomes are never automatically retried. In human mode an owner/GM requests a suggestion and uses
 Approve exact proposal or Reject proposal in the private review. Public narration
 appears in the DM chronicle independently of the player transcript and drawer.
 
@@ -123,9 +147,11 @@ disclosure; exact check-turn bindings remain available through the API. AI scene
 resolution still requires fresh committed evidence matching the exact binding.
 
 The director is separate from the player adventure agent. Its public narrator
-returns structured atmosphere, optional dialogue by a present public NPC, and a
-player-facing question. This scene description is non-authoritative and is never
-fed back as canonical memory; subsequent narration uses verified receipt summaries.
+returns structured atmosphere, optional dialogue by present public NPCs, and a
+player-facing question (optional for transition beats). This scene description is
+non-authoritative; subsequent narration receives complete verified receipt history
+and a separate labeled prior-scene continuity channel. Recorded NPC knowledge
+retains attribution and disclosure limits.
 
 Mode review, pending runs, and uncertain outcomes lock conflicting room commands.
 Closing Director preserves those locks, the mounted map, and the unsubmitted action
@@ -139,6 +165,14 @@ evidence of authenticated remote-player isolation. See [director API](api.md#cam
 and [AI dungeon master](ai-dungeon-master.md) for authority, budgets, and limitations.
 
 ## Validation
+
+`e2e/tests/worldbuilding-wizard.spec.ts` covers opening designation on desktop/mobile
+and the complete staged-world workflow through real validation/application. Its lost
+response case proves reconciliation without duplicate generation, followed by world
+editing and room-preparation handoffs. Desktop light/dark and 390px screenshots were
+inspected after the builder/library styling updates. The
+[2026-10-02 audit](roleplay-worldbuilding-audit-2026-10-02.md#validation) records the
+latest focused runs and their scope.
 
 `e2e/tests/campaign-control-plane.spec.ts` exercises desktop (1440px) and mobile
 (390px) entry, navigation, generation brief review without provider calls, staged

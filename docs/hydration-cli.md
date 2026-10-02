@@ -43,6 +43,12 @@ The CLI prints a warning whenever concurrency exceeds 1. `--allow-stale-regenera
 
 A recipe has ordered DAG stages. Every job supplies the exact generation `sections`, prose direction, and `desiredCounts` keyed by provider preview field (`locations`, `storyNodes`, `questItems`, and so on). Counts must belong to a requested section. Optional job values are `tone`, `exclusions`, static `expandArtifactKeys`, dynamic `expandFrom`, `revisionFeedback`, and `minCount`.
 
+Recipe `desiredCounts` are aggregate CLI targets: `generationBody` embeds them in
+the brief and the ledger schedules missing content as additive fill work. The CLI
+does not send the optional HTTP `desiredCounts` field, whose per-request hard
+minimums are used by the browser worldbuilder. This preserves sparse-success and
+split/fill behavior for existing recipes and ledgers.
+
 `expandFrom` selects actual accepted outputs from earlier jobs instead of predicting provider keys:
 
 ```json
@@ -69,6 +75,7 @@ The reusable `scripts/recipes/harness-wars.json` recipe demonstrates a serial de
 - Two confirmed failed paid attempts split desired counts in half. Odd single-section counts are deterministic (for example, 5 encounters becomes children requesting 2 and 3). Children preserve sections and prompts and receive deterministic new keys. Splitting recurses to `minCount`.
 - A unit that still has two confirmed failures at `minCount` is recorded as a durable deficit. The run completes with a deficit count instead of retrying or looping forever.
 - Sparse successful output is applied once, then missing counts become deterministic additive fill work. It is never treated as a failed paid call.
+- The same count reconciliation runs after a lost apply response or interrupted apply: recovering a committed sparse draft still schedules its missing content. Child-work keys retain the parent recipe identity, so identically named jobs in different recipes cannot replay one another's fill/split requests.
 - Concurrent provider calls may stage against one content revision. The apply lane serializes them. A candidate proven stale by HTTP 409 stops as resumable `stale` work unless `--allow-stale-regeneration` explicitly authorizes fresh additive replacement under a new key.
 - Network loss, a running/missing/uncertain reconciliation result, or an apply that cannot be proven committed stops the run as `uncertain`. Outcome-uncertain work is never retried automatically.
 - A changed recipe, including changed `expandFrom` selectors, API base, or campaign is rejected for an existing ledger. Select a new ledger path for a deliberately different run.
@@ -77,22 +84,21 @@ Campaign creation and starter setup are intentionally not auto-retried if their 
 
 ## Campaign startup
 
-After every generation/apply pass, the CLI runs the server-owned, idempotent
-campaign startup command so a freshly created campaign is immediately playable.
+After a generation/apply pass, the CLI can run the server-owned, idempotent
+campaign startup command for an attached room. Successful world hydration alone
+does not establish play readiness.
 Startup is **on by default for `--create-campaign`**; force it with `--startup`
-or opt out with `--skip-startup`
-(`(options.startup ?? (options.createCampaign !== undefined))`,
-`scripts/hydrate-campaign.ts:359`). When creating with `--campaign-id` instead,
+or opt out with `--skip-startup`. When using `--campaign-id` instead,
 pass `--startup` explicitly.
 
 The CLI resolves the campaign's first attached room deterministically from the
-rooms list (`firstAttachedRoom`, `scripts/hydrate-campaign.ts:158-173`). If no
+rooms list (`firstAttachedRoom`). If no
 room is attached it logs a skip and leaves `ledger.startup` unrecorded so a later
-run can retry (`:360-363`). Otherwise it POSTs the startup command with an empty
-body (`:364-368`). Reported blockers are logged, and the ledger records
-`startup.status: "complete"` even when blockers exist, so the CLI does not
-automatically re-attempt on resume; re-invoke the command (or attach a room
-first) to finish. A persisted `startup.status: "dispatching"` at load means the
-outcome is uncertain and stops the run for explicit inspection (`:323`). See
+run can retry. Otherwise it POSTs the startup command with an empty
+body. Reported blockers are logged, and the ledger records
+`startup.status: "blocked"` until they are cleared. Resuming retries the idempotent startup
+command without regenerating or reapplying accepted world content. A completed startup is skipped.
+A persisted `startup.status: "dispatching"` at load means the
+outcome is uncertain and stops the run for explicit inspection. See
 [campaign startup](campaign-startup.md) for the command's order, idempotency
 keys, and public-only scope.
