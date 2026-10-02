@@ -63,10 +63,6 @@ export interface RoomRoutingComposition {
   topSignal: number | null;
 }
 
-function topProbability(probabilities: Record<string, number>): number {
-  return Object.values(probabilities).reduce((max, value) => (value > max ? value : max), 0);
-}
-
 /**
  * Composes a room-routing decision from the battery.
  *
@@ -96,7 +92,10 @@ export function composeRoomRoutingSelection(
   }
 
   const best = answers[ROOM_ROUTING_BEST_SPEAKER_KEY];
-  const bestTop = best && best.type === "choice" ? topProbability(best.probabilities) : null;
+  // Confidence belongs to the named option, not whichever other option has most mass.
+  const chosenProbability = best && best.type === "choice" ? best.probabilities[best.choice] : undefined;
+  const bestTop = typeof chosenProbability === "number" && Number.isFinite(chosenProbability)
+    && chosenProbability >= 0 && chosenProbability <= 1 ? chosenProbability : null;
   if (best && best.type === "choice" && best.choice !== ROOM_ROUTING_NONE && participantIds.has(best.choice) && bestTop !== null && bestTop >= thresholds.reviewThreshold) {
     return { band: "act", method: "best-pick", speakerIds: [best.choice], topSignal: bestTop };
   }

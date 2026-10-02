@@ -185,6 +185,16 @@ export function composeRouterDecision(
   // 3. Confident handler choice. Act only above `actionThreshold`, and only when the
   //    move is toward a cheaper handler or human review.
   if (choice && chosen && signal !== null && signal >= thresholds.actionThreshold) {
+    if (chosen === "deterministic" && !request.hasDeterministicPath) {
+      return {
+        band: "confirm",
+        handler: currentHandler,
+        complexity,
+        deterministicSufficient,
+        topSignal: signal,
+        reason: "refused deterministic: no deterministic path exists",
+      };
+    }
     if (mayAdoptHandler(currentHandler, chosen)) {
       return {
         band: "act",

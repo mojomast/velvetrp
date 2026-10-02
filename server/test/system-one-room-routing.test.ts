@@ -9,7 +9,7 @@ import {
   ROOM_ROUTING_NONE,
   type RoomRoutingParticipant,
 } from "../src/agent/systemOneRoomRouting.js";
-import { selectRoomSpeakers, type RoomRoutingSystemOne } from "../src/llm.js";
+import { selectRoomSpeakers, type RoomRoutingSystemOne, type SystemOneRoomRoutingDecision } from "../src/llm.js";
 import { getPromptPreset } from "../src/presets.js";
 import { createFakeSystemOneCaller } from "../src/provider/systemOneFake.js";
 import type { SystemOneCaller } from "../src/provider/systemOneCompletion.js";
@@ -59,6 +59,46 @@ afterEach(async () => {
 });
 
 describe("System One room routing lane", () => {
+  it.each(["shadow", "unpromoted", "threshold-mismatch"])("does not wait for %s advisory inference and records its late decision exactly once", async (mode) => {
+    fake = await startFakeProvider('["Aria"]');
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const fakeCaller = createFakeSystemOneCaller({ scripted: { c1: { type: "noul", noul: 0.1 }, c2: { type: "noul", noul: 0.99 } } });
+    const caller: SystemOneCaller = async (input) => { await blocked; return fakeCaller(input); };
+    const dependency = systemOneLane(caller, mode === "shadow" ? { laneModes: defaultSystemOneLaneModes() } : {});
+    if (mode === "unpromoted") delete SYSTEM_ONE_PROMOTION_RECORDS["speaker-routing"]!.evaluatedBindings;
+    if (mode === "threshold-mismatch") dependency.thresholds = { actionThreshold: 0.9, reviewThreshold: 0.8 };
+    const decisions: SystemOneRoomRoutingDecision[] = [];
+    dependency.onAdvisoryDecision = (decision) => { decisions.push(decision); };
+    let completed = false;
+    const routing = route(dependency, fake.baseUrl).then((selection) => { completed = true; return selection; });
+    try {
+      await expect.poll(() => completed).toBe(true);
+      const selection = await routing;
+      expect(selection).toMatchObject({ kind: "llm", speakerIds: ["c1"] });
+      expect(selection.systemOneDecision).toBeUndefined();
+      expect(decisions).toEqual([]);
+      release();
+      await expect.poll(() => decisions.length).toBe(1);
+      expect(decisions[0]).toMatchObject({ shadow: true, fallbackUsed: true, lane: "speaker-routing" });
+      expect(decisions[0]!.selection).toMatchObject({ speakerIds: ["c2"] });
+      // Late completion cannot mutate the already returned selection or attach a
+      // second copy for the route to record again.
+      expect(selection).toMatchObject({ kind: "llm", speakerIds: ["c1"] });
+      expect(selection.systemOneDecision).toBeUndefined();
+    } finally { release(); await routing; }
+  });
+
+  it("isolates a rejected late advisory recorder from the ordinary selection", async () => {
+    fake = await startFakeProvider('["Aria"]');
+    const dependency = systemOneLane(createFakeSystemOneCaller({ scripted: { c2: { type: "noul", noul: 0.99 } } }),
+      { laneModes: defaultSystemOneLaneModes() });
+    let calls = 0;
+    dependency.onAdvisoryDecision = async () => { calls += 1; throw new Error("recording unavailable"); };
+    expect(await route(dependency, fake.baseUrl)).toMatchObject({ kind: "llm", speakerIds: ["c1"] });
+    await expect.poll(() => calls).toBe(1);
+  });
+
   it.each(["missing", "model", "threshold"])("falls back with %s evaluation binding", async reason => {
     fake = await startFakeProvider({ replyTexts: ['["Aria"]'] });
     const caller = createFakeSystemOneCaller({ scripted: { c1: { type: "noul", noul: 0.1 }, c2: { type: "noul", noul: 0.99 } },
@@ -101,6 +141,30 @@ describe("System One room routing lane", () => {
     expect(composeRoomRoutingSelection(projection, weak, thresholds, 2)).toMatchObject({ band: "fallback", method: "defer", speakerIds: [] });
   });
 
+  it.each(["c2", ROOM_ROUTING_NONE])("does not borrow confidence from %s to select a weakly named speaker", (other) => {
+    const answers = {
+      [ROOM_ROUTING_BEST_SPEAKER_KEY]: {
+        type: "choice" as const, choice: "c1", confidence: 0.95,
+        probabilities: { c1: 0.05, c2: 0, [ROOM_ROUTING_NONE]: 0, [other]: 0.95 },
+      },
+    };
+    expect(composeRoomRoutingSelection(projection, answers, thresholds, 2)).toMatchObject({
+      band: "fallback", method: "defer", speakerIds: [], topSignal: 0.05,
+    });
+  });
+
+  it("defers when the named speaker has no probability instead of using another option or confidence", () => {
+    const answers = {
+      [ROOM_ROUTING_BEST_SPEAKER_KEY]: {
+        type: "choice" as const, choice: "c1", confidence: 0.95,
+        probabilities: { c2: 0.95, [ROOM_ROUTING_NONE]: 0.05 },
+      },
+    };
+    expect(composeRoomRoutingSelection(projection, answers, thresholds, 2)).toMatchObject({
+      band: "fallback", method: "defer", speakerIds: [],
+    });
+  });
+
   it("composes only action-threshold participants, highest first, capped", () => {
     const answers = {
       c1: { type: "noul", noul: 0.4 } as const,
@@ -123,7 +187,11 @@ describe("System One room routing lane", () => {
       responseModel: "jev-1.13.0",
       usage: { input_tokens: 210, output_tokens: 6 },
     });
-    const selection = await route(systemOneLane(caller, { model: "jev-1.13.0" }));
+    const dependency = systemOneLane(caller, { model: "jev-1.13.0" });
+    let advisoryCalls = 0;
+    dependency.onAdvisoryDecision = () => { advisoryCalls += 1; };
+    const selection = await route(dependency);
+    expect(advisoryCalls).toBe(0);
     expect(selection.speakerIds).toEqual(["c2"]);
     expect(selection.source).toBe("model");
     expect(selection.kind).toBe("system-one");

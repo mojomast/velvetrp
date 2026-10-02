@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CHARACTER_BUILDER_STANDARD_ARRAY, type CharacterBuilderAttributeScores } from "@velvet/contracts";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
-import { orchestrateAdventureTurn, type AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
+import { orchestrateAdventureTurn, selectHeldRestCandidate, selectHeldCommerceCandidate, type AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import { createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
 import type { ProviderCompletionResult } from "../src/provider/index.js";
 import { dmFixture } from "./fixtures/dmCampaign.js";
@@ -63,6 +63,47 @@ function turn(f: ReturnType<typeof fixture>, declaration: string) {
 }
 
 describe("deterministic held-declaration resolution", () => {
+  it.each([
+    "I don't buy a waylamp from Mara.",
+    "Could I buy a waylamp from Mara?",
+    "If Mara has a waylamp, I will buy it from Mara.",
+    'I say, "Buy a waylamp from Mara."',
+    "I am considering buying a waylamp from Mara.",
+    "I already bought a waylamp from Mara.",
+    "I buy or sell a waylamp with Mara.",
+  ])("does not infer a transaction from %s", (declaration) => {
+    expect(selectHeldCommerceCandidate(declaration, [{ action: "buy", vendorLabel: "Mara", itemLabel: "Waylamp" }])).toBeNull();
+  });
+
+  it.each([
+    "I give Mara a long look.", "I take a short sword.", "I tell a long story.",
+    "I won't take a short rest.", "Should I take a long rest?",
+    'I say, "Take a short rest."', "If it is safe, I take a long rest.", "I already took a long rest.",
+  ])("does not infer a rest from %s", (declaration) => {
+    expect(selectHeldRestCandidate(declaration, [{ restKind: "short" }, { restKind: "long" }])).toBeNull();
+  });
+
+  it("recognizes present-progressive trade intent", () => {
+    const candidate = { action: "buy", vendorLabel: "Mara", itemLabel: "Waylamp" };
+    expect(selectHeldCommerceCandidate("I am buying a waylamp from Mara.", [candidate])).toBe(candidate);
+  });
+
+  it("keeps declined and sequenced transactions held without creating a confirmation or execution", async () => {
+    const f = fixture();
+    try {
+      for (const declaration of ["I don't buy a waylamp from Mara.",
+        "I wait for Mara to return; then I buy a waylamp from Mara.",
+        "I buy a waylamp from Mara and then search the stalls."]) {
+        const created = turn(f, declaration);
+        const result = await orchestrateAdventureTurn(f.repo, created.turnId, holdingDependencies);
+        expect(result.outcome, declaration).toBe("completed");
+        expect(result.turn.receiptLinks, declaration).toEqual([]);
+        expect(result.turn.toolCalls, declaration).toEqual([]);
+        if (declaration.includes("then")) expect(result.hold?.reason).toBe("pending-compound-step");
+      }
+    } finally { f.repo.close(); }
+  });
+
   it("proposes a confirmation-required purchase for a held everyday buy instead of a silent no-op", async () => {
     const f = fixture();
     const created = turn(f, "I find Mara's stall and buy a waylamp from Mara.");

@@ -175,14 +175,30 @@ describe("hold descriptions", () => {
     checkCandidates: [], restCandidates: [], commerceCandidates: [], travelCandidates: [], ...patch,
   });
 
-  it("offers navigation for an everyday attack that names no reachable target (case: attack)", () => {
+  it("does not substitute navigation for an everyday attack that names no reachable target", () => {
     const hold = describeHeldDeclaration(context({
       declaration: "I draw my sword and attack the Goblin Scout by the crates.",
       travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
     }));
     expect(hold.reason).toBe("no-advertised-match");
-    expect(hold.suggestedNextStep).toBe("Travel to Docks");
-    expect(hold.suggestedCandidateId).toBe("travel:docks");
+    expect(hold.suggestedNextStep).toBeNull();
+    expect(hold.suggestedCandidateId).toBeNull();
+  });
+
+  it.each(["From the Docks I follow old smugglers path to Sunken Cathedral",
+    "From Docks I follow the old smugglers path to Sunken Cathedral."])("does not mistake a journey's source for its destination: %s", declaration => {
+    const hold = describeHeldDeclaration(context({ declaration, currentLocation: "Docks",
+      travelCandidates: [{ candidateId: "travel:market", semanticLabel: { target: "Market" } }] }));
+    expect(hold).toMatchObject({ reason: "no-advertised-match", suggestedNextStep: null, suggestedCandidateId: null });
+    expect(hold.message).toContain("No matching travel route");
+    expect(hold.message).not.toContain("already at");
+  });
+
+  it("does not suggest an unrelated route for a known destination with no advertised route", () => {
+    const hold = describeHeldDeclaration(context({ declaration: "I travel to the Docks.",
+      travelCandidates: [{ candidateId: "travel:elsewhere", semanticLabel: { target: "Elsewhere" } }] }));
+    expect(hold.suggestedCandidateId).toBeNull();
+    expect(hold.suggestedNextStep).toBe("Move to Docks first");
   });
 
   it("declines a mismatched-location check and points at navigation", () => {

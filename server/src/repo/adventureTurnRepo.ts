@@ -12,6 +12,8 @@ export * from "./adventureTurn/index.js";
 
 /** Complete read/write adventure-turn and generation-draft repository. */
 export interface AdventureTurnRepository extends AdventureTurnReadRepository, AdventureTurnWriteRepository, AdventureTurnAgentExecutionRepository, AdventureTurnAgentResponseRepository {
+  /** Public, presently co-located NPC identities for player adventure narration. */
+  getAdventureNarrationPresentNpcs(principalId: string, turnId: string): Array<{ npcId: string; name: string }>;
   /** Validates consent/context, executes mechanics, and links its receipt in one SQLite transaction. */
   executeApprovedAgentProposalAtomically(principalId:string,turnId:string,proposalId:string):
     {status:"committed"|"replan";turn:PrivateAdventureTurn;reason?:string};
@@ -34,7 +36,20 @@ export function createAdventureTurnRepository(db: DatabaseDriver.Database, depen
   const writes=createAdventureTurnWriteRepository(db,{...dependencies,guard},reads);
   const responses=createAdventureTurnAgentResponseRepository(db,{...dependencies,guard});
   const base={...reads,...writes,...createAdventureTurnAgentExecutionRepository(db,{...dependencies,guard}),...responses};
-  return {...base,executeApprovedAgentProposalAtomically(principalId,turnId,proposalId){
+  return {...base,getAdventureNarrationPresentNpcs(principalId,turnId){
+    const turn = reads.getAdventureTurn(principalId, turnId);
+    if (!turn || !("declaration" in turn)) return [];
+    return db.prepare(`SELECT npc.npc_id npcId,npc.public_name name
+      FROM campaign_npc_presence_v43 presence JOIN campaign_npcs_v28 npc USING(campaign_id,npc_id)
+      WHERE presence.campaign_id=? AND presence.session_id=? AND presence.state='present'
+        AND NOT EXISTS(SELECT 1 FROM campaign_generation_accepted_artifacts_v52 hidden
+          WHERE hidden.campaign_id=npc.campaign_id AND hidden.server_resource_id=npc.npc_id AND hidden.visibility='gm')
+        AND (presence.location_id IS NULL OR EXISTS(SELECT 1 FROM campaign_actor_locations_v28 current
+          JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
+          WHERE current.campaign_id=presence.campaign_id AND current.session_id=presence.session_id
+            AND current.actor_id=? AND current.location_id=presence.location_id AND location.visibility='public'))
+      ORDER BY npc.npc_id LIMIT 12`).all(turn.campaignId,turn.sessionId,turn.actorId) as Array<{npcId:string;name:string}>;
+  },executeApprovedAgentProposalAtomically(principalId,turnId,proposalId){
     guard();if(!executors)throw new Error("agent command executors are unavailable");
     return db.transaction(()=>{
       const current=reads.getAdventureTurn(principalId,turnId);

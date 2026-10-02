@@ -47,6 +47,18 @@ describe("region pack validator", () => {
     expect(() => validateRegionPack(content, { locationCount: 4, anchorLocationKey: "river-gate", anchorRequired: true, acceptedLocationKeys: accepted(["river-gate"]) })).not.toThrow();
   });
 
+  it("rejects undirected-only connectivity from the actual starting location or accepted anchor", () => {
+    const reversed = connectedPack();
+    reversed.connections[0]!.fromLocationKey = "bridge";
+    reversed.connections[0]!.toLocationKey = "gate";
+    expect(() => validateRegionPack(reversed, { locationCount: 4, anchorRequired: false, acceptedLocationKeys: accepted([]) })).toThrow(/directed paths/);
+    const wrongStart = connectedPack({ outlines: [outline("tower")] });
+    expect(() => validateRegionPack(wrongStart, { locationCount: 4, anchorRequired: false, acceptedLocationKeys: accepted([]) })).toThrow(/directed paths/);
+    const anchored = connectedPack();
+    anchored.connections.push(connection("outbound-only", "tower", "accepted-gate"));
+    expect(() => validateRegionPack(anchored, { locationCount: 4, anchorRequired: true, anchorLocationKey: "accepted-gate", acceptedLocationKeys: accepted(["accepted-gate"]) })).toThrow(/directed paths/);
+  });
+
   it("fails closed when anchoring is required but no accepted anchor is supplied", () => {
     const content = connectedPack({ outlines: [outline()] });
     expect(() => validateRegionPack(content, { locationCount: 4, anchorRequired: true, acceptedLocationKeys: accepted(["river-gate"]) }))

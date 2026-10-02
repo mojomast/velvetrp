@@ -68,7 +68,7 @@ async function setupSrdCampaign(request: APIRequestContext, label: string): Prom
 
 async function openRoom(page: Page, campaignName: string): Promise<void> {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
@@ -118,7 +118,7 @@ test("DM encounter builder panel plans an encounter from the browser", async ({ 
   expect(pinned.status(), await pinned.text()).toBe(204);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${fixture.campaignName}` }).click();
   await page.getByRole("button", { name: "Manage workspace" }).click();
 
@@ -138,7 +138,7 @@ test("character sheet shows recorded advancement choices from the browser", asyn
   // The advancement panel is mounted on the full character sheet, which the
   // campaign roster opens directly for a mechanics-enabled campaign.
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${fixture.campaignName}` }).click();
   await page.getByRole("button", { name: `Open ${runId}-Advancement-Actor` }).click();
 

@@ -487,9 +487,10 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     // The SPA briefly renders the character library ("Velvet") before feature
     // discovery routes the shell to the campaign library. Wait for the settled
     // view instead of the transient loading heading, and allow cold-start time.
-    await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible({ timeout: 15_000 });
     expect(await json<{ ok: boolean }>(request, "GET", "/health")).toEqual({ ok: true });
     const campaignName = `${runId}-Campaign`;
+    await page.getByText("Start with a blank campaign", { exact: true }).click();
     await page.getByLabel("Campaign name").fill(campaignName);
     await page.getByRole("button", { name: "Create campaign" }).click();
     await expect(page.locator(".campaign-card").filter({ hasText: campaignName })).toBeFocused();
@@ -695,7 +696,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
       request, "POST", "/rpg/v1/campaigns", { name: mechanicsCampaignName },
     );
     await page.getByRole("button", { name: "← Campaigns" }).click();
-    await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: `Open campaign ${renamedCampaignName}` })).toBeVisible();
     await page.getByRole("button", { name: `Open campaign ${mechanicsCampaignName}` }).click();
     await page.getByRole("button", { name: "Open advanced setup" }).click();
@@ -730,7 +731,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
       contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }],
     });
     await page.getByRole("button", { name: "← Campaigns" }).click();
-    await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "← Character library" }).click();
     await expect(page.getByRole("heading", { name: "Characters" })).toBeVisible();
 
@@ -1499,7 +1500,7 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   }, 200);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
@@ -1666,7 +1667,7 @@ test("M5.4 CampaignPlay shows one provider-committed travel receipt across reloa
     if(relevant(url.pathname))productionTraffic.push(browserRequest.postData()??"");});
   page.on("response",async response=>{const url=new URL(response.url());if(relevant(url.pathname)&&response.request().resourceType()!=="eventsource")
     productionTraffic.push(await response.text().catch(()=>""));});
-  await page.goto("/");await expect(page.getByRole("heading",{name:"Campaigns",exact:true})).toBeVisible();await page.getByRole("button",{name:`Open campaign ${runId}-M5.4-Travel`}).click();
+  await page.goto("/");await expect(page.getByRole("heading",{name:"Campaigns & worlds",exact:true})).toBeVisible();await page.getByRole("button",{name:`Open campaign ${runId}-M5.4-Travel`}).click();
   await page.getByRole("button",{name:"Open advanced setup"}).click();
   await page.getByRole("button",{name:"Open attached room 1 of 1"}).click();
   await page.setViewportSize({width:1366,height:768});await expect(page.getByLabel("What do you do?")).toBeVisible();
@@ -1789,7 +1790,7 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
@@ -2001,7 +2002,7 @@ test("M5.3 browser reconciles one committed consumable POST without replay", asy
     target: expect.objectContaining({ actorBacked: true }) })]);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open combat tracker" }).click();

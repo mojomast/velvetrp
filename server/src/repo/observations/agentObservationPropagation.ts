@@ -34,6 +34,8 @@ export interface WitnessObservationInput {
   observedRevision: number;
   summary: string;
   authority?: "verified" | "rumor";
+  /** Authoritative acting actor, resolved inside the event's commit transaction. */
+  sourceActorId?: string;
 }
 
 export interface ToldOnArrivalInput {
@@ -59,8 +61,20 @@ interface KnowerObservationRow { source_command_id: string; hop_count: number; t
 
 const KNOWS_ROW = "observation_id";
 
+// Null NPC locations mean session-level presence. A location-bound NPC needs a
+// positive match to the source actor, never just another party member's location.
+// Missing source/location evidence cannot establish a location-bound witness.
+const WITNESS_NPCS = `SELECT presence.npc_id FROM campaign_npc_presence_v43 presence
+  WHERE presence.campaign_id=? AND presence.session_id=? AND presence.state='present'
+    AND (presence.location_id IS NULL OR EXISTS (
+      SELECT 1 FROM campaign_actor_locations_v28 actor
+      WHERE actor.campaign_id=presence.campaign_id AND actor.session_id=presence.session_id
+        AND actor.actor_id=? AND actor.location_id=presence.location_id))
+  ORDER BY presence.npc_id LIMIT ?`;
+
 /**
- * Records a witnessed hop-0 observation for every NPC present in the session.
+ * Records a witnessed hop-0 observation for NPCs present at the source actor's
+ * event-time location, including session-level (null-location) NPC presence.
  * Bounded by MAX_WITNESS_FANOUT and skipped when the agent is at the write cap.
  * The caller owns the transaction; this function never opens its own.
  */
@@ -70,9 +84,8 @@ export function propagateWitnessObservations(
   input: WitnessObservationInput,
 ): AgentObservation[] {
   const repository = createAgentObservationRepository(db, dependencies);
-  const present = db.prepare(`SELECT npc_id FROM campaign_npc_presence_v43
-    WHERE campaign_id=? AND session_id=? AND state='present' ORDER BY npc_id LIMIT ?`)
-    .all(input.campaignId, input.sessionId, MAX_WITNESS_FANOUT) as NpcIdRow[];
+  const present = db.prepare(WITNESS_NPCS)
+    .all(input.campaignId, input.sessionId, input.sourceActorId ?? null, MAX_WITNESS_FANOUT) as NpcIdRow[];
   const countObservations = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
     WHERE campaign_id=? AND agent_kind='npc' AND agent_id=?`);
   const selectWitnessed = db.prepare(`SELECT ${KNOWS_ROW} FROM agent_observations
@@ -113,12 +126,11 @@ export function propagateFactionWitnessObservations(
   const repository = createAgentObservationRepository(db, dependencies);
   const factions = db.prepare(`SELECT DISTINCT membership.faction_id AS faction_id
     FROM campaign_npc_faction_memberships_v28 membership
-    JOIN campaign_npc_presence_v43 presence
-      ON presence.campaign_id=membership.campaign_id AND presence.npc_id=membership.npc_id
-    WHERE membership.campaign_id=? AND presence.session_id=? AND presence.state='present'
+    WHERE membership.campaign_id=? AND membership.npc_id IN (${WITNESS_NPCS})
       AND membership.membership_role IN ${FACTION_SHARING_ROLES}
     ORDER BY faction_id LIMIT ?`)
-    .all(input.campaignId, input.sessionId, MAX_FACTION_WITNESS_FANOUT) as FactionIdRow[];
+    .all(input.campaignId, input.campaignId, input.sessionId, input.sourceActorId ?? null,
+      MAX_WITNESS_FANOUT, MAX_FACTION_WITNESS_FANOUT) as FactionIdRow[];
   const countObservations = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
     WHERE campaign_id=? AND agent_kind='faction' AND agent_id=?`);
   const selectWitnessed = db.prepare(`SELECT ${KNOWS_ROW} FROM agent_observations

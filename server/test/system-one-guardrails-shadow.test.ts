@@ -283,6 +283,9 @@ async function runRoomTurn(guardrailsMode: "shadow" | "off"): Promise<{
     url: `/api/sessions/${session.id}/room-turn`,
     payload: { content: "Who should inspect the signal?", maxSpeakers: 2 },
   });
+  for (const lane of ["speaker-routing", "cost-router", ...(guardrailsMode === "shadow" ? ["guardrails" as const] : [])] as const) {
+    await expect.poll(() => listSystemOneDecisionsByLane(lane, 10).length).toBe(1);
+  }
   const guardrails = listSystemOneDecisionsByLane("guardrails", 10);
   const systemOneRequests = systemOne.requestCount();
   const body = response.json() as {

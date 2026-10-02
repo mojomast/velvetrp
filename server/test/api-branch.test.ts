@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import { addMemoryFacts, addMessage, getSessionContextSource, getSummary, updateSessionContextSource, updateSessionSynthesizedSource, upsertSummary } from "../src/repo/index.js";
+import { generationRegistry } from "../src/routes/roleplay/generationRegistry.js";
 import { startFakeProvider, useTmpDataDir, type FakeProvider } from "./helpers.js";
 
 process.env.NODE_ENV = "test";
@@ -53,6 +55,82 @@ async function postUserMessage(app: ReturnType<typeof buildApp>, sessionId: stri
 }
 
 describe("branching api", () => {
+  it.each(["swipe", "swipe/stream", "branch"])("excludes abandoned derived context and memories from %s generation", async (operation) => {
+    provider = await startFakeProvider("A new possibility unfolds.");
+    const app = buildApp();
+    await app.inject({ method: "PUT", url: "/api/provider", payload: { baseUrl: provider.baseUrl } });
+    const { character, session } = await setupScene(app);
+    const first = await postUserMessage(app, session.id, "We arrive at the gate.");
+    const discarded = await addMessage(session.id, "user", "Remember the discarded emerald crown.");
+    await addMemoryFacts(character.id, [{ kind: "event", content: "discarded emerald crown", sourceTurnId: discarded.id, userApproved: true }]);
+    await addMemoryFacts(character.id, [{ kind: "fact", content: "manual compass", sourceTurnId: "manual", userApproved: true }]);
+    await updateSessionContextSource(session.id, "The captain carries a silver map.");
+    await updateSessionSynthesizedSource(session.id, "ABANDONED_SYNTHESIS: the gate was destroyed.");
+    await upsertSummary(session.id, { summary: "ABANDONED_SUMMARY: we sailed away.", keyEvents: [], emotionalBeat: "steady" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: operation === "branch" ? `/api/sessions/${session.id}/branch` : `/api/sessions/${session.id}/messages/${first.reply.id}/${operation}`,
+      ...(operation === "branch" ? { payload: { messageId: first.reply.id, content: "We wait outside the gate." } } : {}),
+    });
+    expect(response.statusCode).toBe(200);
+    if (operation.endsWith("stream")) expect(response.body).toContain("event: done");
+    const prompt = provider.requests.at(-1)!.systemContent;
+    expect(prompt).toContain("silver map");
+    expect(prompt).toContain("manual compass");
+    expect(prompt).not.toMatch(/ABANDONED_|discarded emerald crown/);
+    expect(provider.sceneRequests.at(-1)!.lastUserContent).not.toContain("ABANDONED_SYNTHESIS");
+    expect(await getSummary(session.id)).toBeNull();
+    const context = (await app.inject({ method: "GET", url: `/api/sessions/${session.id}/context` })).json().context;
+    expect(context.rememberedFacts).toEqual(["Aria: manual compass"]);
+    await app.close();
+  });
+
+  it("clears invalid derived state on activation even without a synthesis provider", async () => {
+    const app = buildApp();
+    const { session } = await setupScene(app);
+    const first = await addMessage(session.id, "user", "The original path.");
+    await addMessage(session.id, "user", "A discarded future.");
+    await updateSessionContextSource(session.id, "Keep manual canon.");
+    await updateSessionSynthesizedSource(session.id, "A discarded future.");
+    await upsertSummary(session.id, { summary: "A discarded future.", keyEvents: [], emotionalBeat: "steady" });
+    const response = await app.inject({ method: "POST", url: `/api/sessions/${session.id}/messages/${first.id}/activate` });
+    expect(response.statusCode).toBe(200);
+    expect(await getSessionContextSource(session.id)).toMatchObject({ sourceOfTruth: "Keep manual canon.", synthesizedSource: "" });
+    expect(await getSummary(session.id)).toBeNull();
+    await app.close();
+  });
+
+  it("can remember the same fact again on a replacement branch without reviving discarded facts", async () => {
+    const app = buildApp();
+    const { session } = await setupScene(app);
+    const first = await postUserMessage(app, session.id, "Remember the compass is silver; the ship is red");
+    const branch = await app.inject({ method: "POST", url: `/api/sessions/${session.id}/branch`,
+      payload: { messageId: first.reply.id, content: "Remember the compass is silver; the ship is blue" } });
+    expect(branch.statusCode).toBe(200);
+    const readContext = async () => (await app.inject({ method: "GET", url: `/api/sessions/${session.id}/context` })).json().context.rememberedFacts;
+    expect(await readContext()).toEqual(["Aria: the ship is blue", "Aria: the compass is silver"]);
+    await app.inject({ method: "POST", url: `/api/sessions/${session.id}/messages/${first.reply.id}/activate` });
+    expect(await readContext()).toEqual(["Aria: the ship is red", "Aria: the compass is silver"]);
+    await app.close();
+  });
+
+  it("rejects branch activation while another generation owns the session", async () => {
+    const app = buildApp();
+    const { session } = await setupScene(app);
+    const first = await addMessage(session.id, "user", "First path.");
+    const latest = await addMessage(session.id, "user", "Current path.");
+    const release = generationRegistry.tryAcquire(session.id)!;
+    try {
+      const response = await app.inject({ method: "POST", url: `/api/sessions/${session.id}/messages/${first.id}/activate` });
+      expect(response.statusCode).toBe(409);
+      const read = await app.inject({ method: "GET", url: `/api/sessions/${session.id}/messages` });
+      expect(read.json().messages.at(-1).id).toBe(latest.id);
+    } finally { release(); }
+    expect((await app.inject({ method: "POST", url: `/api/sessions/${session.id}/messages/${first.id}/activate` })).statusCode).toBe(200);
+    await app.close();
+  });
+
   it("swipes a character reply through the full pipeline and tracks siblings", async () => {
     provider = await startFakeProvider("The captain nods slowly, considering the stars.");
     const app = buildApp();

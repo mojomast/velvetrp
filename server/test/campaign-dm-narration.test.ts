@@ -32,6 +32,44 @@ function commitWithoutNarration(f:Awaited<ReturnType<typeof prepare>>){
   return f.repo.executeDmBeat('local-owner',f.run.runId);
 }
 describe('public AI DM narration',()=>{
+  it('retains every composed outcome and atmospheric continuity from a receipt-free hold',async()=>{
+    const f=await dmFixture();
+    f.repo.setDmControl('local-owner',f.campaign.id,{mode:'ai',expectedRevision:0,idempotencyKey:'auto'});
+    const open=(key:string)=>f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,
+      {intent:'continue',expectedModeRevision:1,idempotencyKey:key});
+    const finish=(runId:string,text:string)=>{
+      const claim=f.repo.claimDmNarration('local-owner',runId,'fake','fake',{messages:[]},100,100)!;
+      f.repo.settleDmNarration('local-owner',runId,claim,text,'ok');
+      f.repo.getDmNarrationWork('local-owner',runId);
+      expect(f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,runId).state).toBe('completed');
+    };
+    const first=open('composition');
+    const planning=f.repo.claimDmPlanning('local-owner',first.runId,'fake','fake')!;
+    const selected=['ambient-beat','advance-time'].map(action=>{
+      const candidate=planning.candidates.find(item=>item.action===action)!;
+      return {candidateId:candidate.candidateId,digest:candidate.digest};
+    });
+    f.repo.settleDmPlanning('local-owner',first.runId,planning.claimId,selected,null);
+    f.repo.executeDmBeat('local-owner',first.runId);
+    finish(first.runId,'Rain patters on the road.');
+    const receipts=f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,first.runId).receipts;
+    const hold=open('hold');
+    const holdPlanning=f.repo.claimDmPlanning('local-owner',hold.runId,'fake','fake')!;
+    f.repo.settleDmPlanning('local-owner',hold.runId,holdPlanning.claimId,null,null);
+    const context=f.repo.getDmNarrationWork('local-owner',hold.runId)!.context as {history:string[]};
+    expect(receipts).toHaveLength(2);
+    for(const receipt of receipts)expect(context.history.join('\n')).toContain(receipt.summary);
+    finish(hold.runId,'A breeze stirs the roadside grass. What would you like to inspect?');
+    expect(f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,hold.runId).receipts).toEqual([]);
+    const next=open('next');
+    const nextPlanning=f.repo.claimDmPlanning('local-owner',next.runId,'fake','fake')!;
+    f.repo.settleDmPlanning('local-owner',next.runId,nextPlanning.claimId,null,null);
+    const nextContext=f.repo.getDmNarrationWork('local-owner',next.runId)!.context as {history:string[];priorScenes:string[]};
+    expect(nextContext.priorScenes).toEqual(['Rain patters on the road.','A breeze stirs the roadside grass. What would you like to inspect?']);
+    expect(nextContext.history.join('\n')).not.toContain('roadside grass');
+    f.repo.close();
+  });
+
   it('uses public place and NPC portrayal, committed reveals and public history, never private plans or harness strings',async()=>{
     const f=await dmFixture();f.graph();f.advance();const db=database();
     const content=generatedCampaignContentProviderSchema.parse({

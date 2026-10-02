@@ -3,7 +3,7 @@ import { readAuthoringField, writeAuthoringField } from "./generationRecovery";
 
 afterEach(()=>{sessionStorage.clear();vi.unstubAllGlobals();});
 it("retains bounded authoring and exact keys across a fresh module load",async()=>{
-  const input={campaignId:"campaign",brief:"Exact brief",tone:"hopeful",exclusions:[],idempotencyKey:"exact-reload",sections:["handouts"],expandArtifactKeys:[],revisionFeedback:null,retryFailedAttempt:null};
+  const input={campaignId:"campaign",brief:"Exact brief",tone:"hopeful",exclusions:[],idempotencyKey:"exact-reload",sections:["handouts"],desiredCounts:{handouts:3},expandArtifactKeys:[],revisionFeedback:null,retryFailedAttempt:null};
   writeAuthoringField("campaign","generationIntent",{input,failedAttempt:null,ambiguous:true});
   writeAuthoringField("campaign","answers",{premise:"Saved premise",heroes:"",stakes:"",opening:""});
   vi.resetModules();const restarted=await import("./generationRecovery");
@@ -19,6 +19,9 @@ it("rejects corrupt, cross-campaign and unbounded persisted intents and excludes
   sessionStorage.clear();writeAuthoringField("campaign","draft",{privatePreview:"not persisted"});expect(sessionStorage.length).toBe(0);
   const value={input:{campaignId:"other",brief:"Other",tone:"hopeful",exclusions:[],sections:["handouts"],idempotencyKey:"key"},failedAttempt:null,ambiguous:true};
   sessionStorage.setItem(key,JSON.stringify({generationIntent:value}));expect(readAuthoringField("campaign","generationIntent")).toBeUndefined();
+  const invalidCount={...value,input:{...value.input,campaignId:"campaign",desiredCounts:{npcs:4}}};
+  sessionStorage.setItem(key,JSON.stringify({generationIntent:invalidCount}));expect(readAuthoringField("campaign","generationIntent")).toBeUndefined();
+  expect(()=>writeAuthoringField("campaign","generationIntent",invalidCount)).toThrow();
 });
 
 it("retains a bounded staged hydration cursor and named context choices",()=>{

@@ -129,7 +129,35 @@ export const generatedCampaignContentProviderSchema = z.object({
   scenePrompts: z.array(scenePrompt).max(16).default([]),
 }).strict();
 
-/** Prose-only direction. retryFailedAttempt is an explicit acknowledgement of one known failed paid attempt. */
+export const campaignGenerationSectionFields = {
+  outline: ["outlines"], arcs: ["arcs"], locations: ["locations", "connections"],
+  factions: ["factions"], npcs: ["npcs"], quests: ["quests"], encounters: ["encounters"],
+  clues: ["clues"], story: ["storyNodes", "storyRelationships"], lore: ["lore"],
+  "quest-items": ["questItems"], "monster-concepts": ["monsterConcepts"],
+  handouts: ["handouts"], "scene-prompts": ["scenePrompts"],
+} as const;
+
+/** Minimum new candidates per preview field, bounded by the existing provider array caps. */
+export const campaignGenerationDesiredCountsSchema = z.object({
+  outlines: z.number().int().min(0).max(1).optional(),
+  arcs: z.number().int().min(0).max(8).optional(),
+  locations: z.number().int().min(0).max(16).optional(),
+  connections: z.number().int().min(0).max(24).optional(),
+  factions: z.number().int().min(0).max(12).optional(),
+  npcs: z.number().int().min(0).max(16).optional(),
+  quests: z.number().int().min(0).max(16).optional(),
+  encounters: z.number().int().min(0).max(16).optional(),
+  clues: z.number().int().min(0).max(24).optional(),
+  storyNodes: z.number().int().min(0).max(24).optional(),
+  storyRelationships: z.number().int().min(0).max(32).optional(),
+  lore: z.number().int().min(0).max(24).optional(),
+  questItems: z.number().int().min(0).max(16).optional(),
+  monsterConcepts: z.number().int().min(0).max(16).optional(),
+  handouts: z.number().int().min(0).max(12).optional(),
+  scenePrompts: z.number().int().min(0).max(16).optional(),
+}).strict();
+
+/** retryFailedAttempt is an explicit acknowledgement of one known failed paid attempt. */
 export const campaignContentGenerationRequestSchema = z.object({
   campaignId: campaignIdSchema,
   brief: text.max(2_000),
@@ -146,7 +174,13 @@ export const campaignContentGenerationRequestSchema = z.object({
   tolerateInvalidReferences: z.boolean().optional(),
   /** Optional reviewed candidate content for provider-free API hydration. */
   reviewedContent: generatedCampaignContentProviderSchema.optional(),
-}).strict();
+  desiredCounts: campaignGenerationDesiredCountsSchema.optional(),
+}).strict().superRefine((value, ctx) => {
+  const fields = new Set<string>(value.sections.flatMap((section) => [...campaignGenerationSectionFields[section]]));
+  for (const field of Object.keys(value.desiredCounts ?? {})) {
+    if (!fields.has(field)) ctx.addIssue({ code: "custom", path: ["desiredCounts", field], message: "Count targets must belong to requested sections" });
+  }
+});
 
 const publicFaction = faction.omit({ gmNotes: true });
 /** Reconciliation never dispatches a provider, including for a missing job. */

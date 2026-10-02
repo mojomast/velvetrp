@@ -44,11 +44,11 @@ import {
 import { generationRegistry } from "./generationRegistry.js";
 
 /** Resolves the optional room-routing System One lane from the flag, setting, and key. */
-async function resolveRoomRoutingSystemOne(): Promise<RoomRoutingSystemOne | undefined> {
+async function resolveRoomRoutingSystemOne(sessionId: string): Promise<RoomRoutingSystemOne | undefined> {
   if (!readRpgFeatureFlags().systemOne) return undefined;
   const settings = await getSystemOneSettings();
   if (!settings.enabled || !canUseSystemOne(settings)) return undefined;
-  return { settings, caller: callSystemOne };
+  return { settings, caller: callSystemOne, onAdvisoryDecision: (decision) => recordRoomRoutingDecision(sessionId, decision) };
 }
 
 /** Resolves the optional guardrails shadow lane from the flag, setting, key, and lane mode. */
@@ -315,7 +315,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       let routingSystemOne: RoomRoutingSystemOne | undefined;
       let selection;
       try {
-        routingSystemOne = await resolveRoomRoutingSystemOne();
+        routingSystemOne = await resolveRoomRoutingSystemOne(session.id);
         selection = await selectRoomSpeakers({
           participants: session.participants,
           primaryCharacterId: session.primaryCharacterId,
@@ -339,7 +339,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       if (selection.systemOneDecision) recordRoomRoutingDecision(session.id, selection.systemOneDecision);
       if (routingSystemOne && systemOneLaneMode(routingSystemOne.settings, "cost-router") !== "off") {
         try {
-          await recordRouterShadowDecision(
+          void recordRouterShadowDecision(
             session.id,
             { summary: content, hasDeterministicPath: false, requiresHumanDecision: false, safetySensitive: false },
             routingSystemOne,
@@ -353,7 +353,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       try {
         const guardrailsSystemOne = await resolveGuardrailsSystemOne();
         if (guardrailsSystemOne) {
-          await recordGuardrailShadowDecision(guardrailsSystemOne.settings, guardrailsSystemOne.caller, {
+          void recordGuardrailShadowDecision(guardrailsSystemOne.settings, guardrailsSystemOne.caller, {
             content: rawContent,
             sessionId: session.id,
           });
@@ -455,7 +455,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           provider,
           harness,
           preset: getPromptPreset(session.presetId),
-          systemOne: await resolveRoomRoutingSystemOne(),
+          systemOne: await resolveRoomRoutingSystemOne(session.id),
         });
       } catch {
         request.log.error({ operation: "room-continuation-routing" }, "room continuation routing failed; using deterministic fallback");
@@ -668,6 +668,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         character,
         history,
         userContent: parent.content,
+        contextHistory: [...history, parent],
         log: request.log,
       });
       const swipeGroupId = source.swipeGroupId ?? source.id;
@@ -679,7 +680,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         speakerCharacterId: character.id,
         usage: outcome.usage,
       });
-      await maybeUpdateSummary(session.id, false, request.log);
+      await maybeUpdateSummary(session.id, true, request.log);
       return {
         reply: replyMessage,
         swipeIndex,
@@ -749,6 +750,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           character,
           history,
           userContent: parent.content,
+          contextHistory: [...history, parent],
           generationId,
           release,
           persist: async (outcome) => {
@@ -785,9 +787,15 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
     if (!message) {
       return reply.code(404).send({ error: "message not found" });
     }
-    await setActiveBranch(session.id, message.id);
-    await maybeUpdateSummary(session.id, true, request.log);
-    return { activeLeafId: message.id, messages: await listMessages(session.id) };
+    const release = generationRegistry.tryAcquire(session.id);
+    if (!release) return reply.code(409).send({ error: "generation already in flight for this session" });
+    try {
+      await setActiveBranch(session.id, message.id);
+      await maybeUpdateSummary(session.id, true, request.log);
+      return { activeLeafId: message.id, messages: await listMessages(session.id) };
+    } finally {
+      release();
+    }
   });
 
   app.post<{ Params: { id: string }; Body: { messageId?: string; content?: string; speakerCharacterId?: string } }>(
@@ -855,6 +863,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           character,
           history,
           userContent: content,
+          contextHistory: [...history, userMessage],
           log: request.log,
         });
         const replyMessage = await addMessage(session.id, "character", outcome.text, { parentId: userMessage.id, speakerCharacterId: character.id, usage: outcome.usage });

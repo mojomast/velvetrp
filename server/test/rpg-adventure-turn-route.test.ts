@@ -170,7 +170,7 @@ describe("M2.11 adventure turn routes", () => {
       expect(text).not.toMatch(/GM_SECRET_|UNPUBLISHED_|UNACCEPTED_|OPENING_NOT_REPLAYED|NEAR_|FAR_|UNREVEALED_|ABSENT_/);
       for(const name of ["combat_start","story_change"])expect(input.tools.map((tool:any)=>tool.name)).not.toContain(name);
     }
-    expect(inputs[1].messages[0].content).toContain("at most 8 sentences and 180 words");
+    expect(inputs[1].messages[0].content).toContain("never more than six sentences or 120 words");
     expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{receipts:[],narrationStatus:{text:narration,source:"provider-assisted"}}});
     expect(response.body).not.toMatch(/GM_SECRET_|UNPUBLISHED_|UNACCEPTED_/);
     const turnId=response.headers["x-adventure-turn-id"] as string;
@@ -260,7 +260,8 @@ describe("M2.11 adventure turn routes", () => {
     expect(planningInput.toolChoice).toBe("auto");
     expect(planningInput.tools).not.toEqual([]);
     expect(planningInput.tools.some((tool:any)=>tool.name==="submit_adventure_narration")).toBe(false);
-    expect(narrationInput.messages[0].content).toContain("IMMUTABLE ADVENTURE NARRATION AUTHORITY");
+    expect(narrationInput.messages[0].content).toContain(_kind === "social"
+      ? "IMMUTABLE CONVERSATION NARRATION AUTHORITY" : "IMMUTABLE ADVENTURE NARRATION AUTHORITY");
     const descriptor=ruleset==="dnd"?DND_5E_RULESET_DESCRIPTOR:VELVET_LEGACY_RULESET_DESCRIPTOR;
     const otherDescriptor=ruleset==="dnd"?VELVET_LEGACY_RULESET_DESCRIPTOR:DND_5E_RULESET_DESCRIPTOR;
     expect(planningInput.messages[0].content).toContain(canonicalAgentJson(descriptor as never));

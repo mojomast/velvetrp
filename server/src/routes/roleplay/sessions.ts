@@ -107,7 +107,8 @@ export const roleplaySessionRoutes: FastifyPluginAsync = async (app) => {
       await listLoreEntries(participantIds), participantIds, messages.map((message) => message.content).join("\n"), harness.loreChars,
     );
     const memories = (await Promise.all(session.participants.map(async (participant) =>
-      (await listApprovedMemories(participant.id, 3)).map((memory) => ({ characterName: participant.name, memory }))))).flat();
+      (await listApprovedMemories(participant.id, 3, { sessionId: session.id, sourceTurnIds: messages.map((message) => message.id) }))
+        .map((memory) => ({ characterName: participant.name, memory }))))).flat();
     return { context: buildSessionContextBasket(session, messages, memories, lore, await getSessionContextSource(session.id)) };
   });
 

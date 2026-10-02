@@ -5,6 +5,15 @@ import {
 } from "../src/index.js";
 
 describe("campaign content generation contracts", () => {
+  it("accepts optional per-field minimums only within requested section bounds", () => {
+    const base={campaignId:"campaign",brief:"A living harbor",tone:"hopeful",exclusions:[],idempotencyKey:"counts",sections:["locations","npcs"]};
+    expect(campaignContentGenerationRequestSchema.parse(base).desiredCounts).toBeUndefined();
+    expect(campaignContentGenerationRequestSchema.parse({...base,desiredCounts:{locations:8,connections:9,npcs:12}}).desiredCounts).toEqual({locations:8,connections:9,npcs:12});
+    for(const desiredCounts of [{locations:17},{connections:25},{npcs:-1},{npcs:1.5},{npcs:"2"},{quests:0},{unknown:1}]){
+      expect(campaignContentGenerationRequestSchema.safeParse({...base,desiredCounts}).success).toBe(false);
+    }
+    expect(campaignContentGenerationRequestSchema.safeParse({...base,desiredCounts:{connections:0}}).success).toBe(true);
+  });
   it("keeps runnable GM scenes and NPC secrets in existing bounded artifacts", () => {
     const scene={key:"finale",title:"Finale",visibility:"gm",prompt:"Entry: the bell rings. If refused, the envoy returns. Recover missed evidence from the keeper. End with negotiation or departure."};
     const parsed=generatedCampaignContentProviderSchema.parse({scenePrompts:[scene],arcs:[{

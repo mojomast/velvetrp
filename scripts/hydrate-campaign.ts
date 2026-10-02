@@ -35,7 +35,7 @@ interface Ledger {
   schemaVersion: 1; recipeDigest: string; recipeName: string; apiBase: string; campaignId: string | null;
   createdCampaign: boolean; creationStatus: "not-requested" | "pending" | "dispatching" | "complete";
   createCampaignName?: string; starterSetup?: { starter: "original" | "mechanics" | "srd-5.1"; status: "dispatching" | "complete" };
-  startup?: { status: "dispatching" | "complete"; sessionId: string };
+  startup?: { status: "dispatching" | "blocked" | "complete"; sessionId: string };
   works: Record<string, Work>; updatedAt: string;
 }
 export interface HydrateOptions {
@@ -196,7 +196,7 @@ function childId(parent: Work, kind: "split" | "fill" | "stale", index: number):
 function makeChild(parent: Work, kind: "split" | "fill" | "stale", index: number, counts: Record<string, number>): Work {
   const id = childId(parent, kind, index), path = `${parent.path}/${kind}-${index}`;
   const { draft: _draft, failedAttempt: _attempt, acceptedPublicArtifactKeys: _accepted, reason: _reason, ...basis } = parent;
-  return { ...basis, id, path, status: "pending", idempotencyKey: `hydrate-${digest(`${parent.rootId}:${path}`).slice(0, 40)}`, desiredCounts: counts,
+  return { ...basis, id, path, status: "pending", idempotencyKey: `hydrate-${digest(`${parent.idempotencyKey}:${kind}:${index}`).slice(0, 40)}`, desiredCounts: counts,
     confirmedFailures: 0, children: [] };
 }
 function splitWork(ledger: Ledger, work: Work): boolean {
@@ -215,6 +215,21 @@ function splitWork(ledger: Ledger, work: Work): boolean {
 }
 function addReplacement(ledger: Ledger, work: Work, kind: "fill" | "stale", counts: Record<string, number>): void {
   const child = makeChild(work, kind, work.children.length + 1, counts); ledger.works[child.id] = child; work.children.push(child.id); work.status = "expanded";
+}
+/** Reconciliation and first-response success must enforce identical coverage requirements. */
+function recordAppliedWork(ledger: Ledger, work: Work): void {
+  work.status = "applied";
+  recordAcceptedPublicArtifacts(work);
+  const { counts } = keysAndCounts(work.draft!.preview);
+  const missing: Record<string, number> = {};
+  for (const [field, desired] of Object.entries(work.desiredCounts)) {
+    const count = Math.max(0, desired - (counts[field] ?? 0));
+    if (count > 0) missing[field] = count;
+  }
+  if (Object.keys(missing).length) {
+    addReplacement(ledger, work, "fill", missing);
+    work.reason = "sparse candidate applied; additive fill scheduled";
+  }
 }
 function rootComplete(ledger: Ledger, rootId: string): boolean {
   const root = ledger.works[rootId]; if (!root) return false;
@@ -242,7 +257,7 @@ function resolveExpansionKeys(recipe: HydrationRecipe, ledger: Ledger, work: Wor
 async function recoverGeneration(work: Work, ledger: Ledger, save: () => Promise<void>, fetcher: Fetch): Promise<"staged" | "failed" | "uncertain"> {
   const campaignId = ledger.campaignId!, body = generationBody(work, campaignId), recovery = await request(fetcher, ledger.apiBase, "/api/rpg/v1/campaign-content-drafts/reconcile", "POST", body);
   if (recovery.state === "succeeded" && typeof recovery.draftId === "string") {
-    work.draft = await request(fetcher, ledger.apiBase, `/api/rpg/v1/campaign-content-drafts/${encodeURIComponent(recovery.draftId)}`) as unknown as DraftView; work.status = work.draft.draft.state === "applied" ? "applied" : "staged"; if (work.status === "applied") recordAcceptedPublicArtifacts(work); await save(); return "staged";
+    work.draft = await request(fetcher, ledger.apiBase, `/api/rpg/v1/campaign-content-drafts/${encodeURIComponent(recovery.draftId)}`) as unknown as DraftView; work.status = "staged"; if (work.draft.draft.state === "applied") recordAppliedWork(ledger, work); await save(); return "staged";
   }
   if (recovery.state === "failed" && typeof recovery.attempt === "number") { work.failedAttempt = recovery.attempt; work.confirmedFailures = recovery.attempt; await save(); return "failed"; }
   work.status = "uncertain"; work.reason = `generation reconciliation state: ${String(recovery.state)}`; await save(); return "uncertain";
@@ -254,7 +269,7 @@ async function stageWork(work: Work, ledger: Ledger, save: () => Promise<void>, 
     work.status = "dispatching"; await save();
     try {
       work.draft = await request(fetcher, ledger.apiBase, "/api/rpg/v1/campaign-content-drafts", "POST", generationBody(work, ledger.campaignId!, work.confirmedFailures > 0)) as unknown as DraftView;
-      work.status = work.draft.draft.state === "applied" ? "applied" : "staged"; if (work.status === "applied") recordAcceptedPublicArtifacts(work); await save(); return;
+      work.status = "staged"; if (work.draft.draft.state === "applied") recordAppliedWork(ledger, work); await save(); return;
     } catch {
       try { const recovered = await recoverGeneration(work, ledger, save, fetcher); if (recovered !== "failed") return; }
       catch { work.status = "uncertain"; work.reason = "generation request and reconciliation outcomes could not be confirmed"; await save(); return; }
@@ -268,23 +283,19 @@ async function applyWork(work: Work, ledger: Ledger, save: () => Promise<void>, 
   if (work.status === "applying") {
     try { work.draft = await request(fetcher, ledger.apiBase, `/api/rpg/v1/campaign-content-drafts/${encodeURIComponent(work.draft.draft.draftId)}`) as unknown as DraftView; }
     catch { work.status = "uncertain"; work.reason = "apply reconciliation could not read authoritative draft state"; await save(); return; }
-    if (work.draft.draft.state === "applied") { work.status = "applied"; recordAcceptedPublicArtifacts(work); await save(); return; }
+    if (work.draft.draft.state === "applied") { recordAppliedWork(ledger, work); await save(); return; }
     work.status = "uncertain"; work.reason = "an interrupted apply was not proven committed; refusing automatic retry"; await save(); return;
   }
-  const { keys, counts } = keysAndCounts(work.draft.preview); if (!keys.length) { work.status = "failed"; work.reason = "candidate contains no selectable artifacts"; await save(); return; }
+  const { keys } = keysAndCounts(work.draft.preview); if (!keys.length) { work.status = "failed"; work.reason = "candidate contains no selectable artifacts"; await save(); return; }
   work.status = "applying"; await save();
   try {
     await request(fetcher, ledger.apiBase, `/api/rpg/v1/campaign-content-drafts/${encodeURIComponent(work.draft.draft.draftId)}/apply`, "POST", { expectedRevision: work.draft.draft.revision, idempotencyKey: `${work.idempotencyKey}-apply`, selectedArtifactKeys: keys });
-    work.status = "applied";
-    recordAcceptedPublicArtifacts(work);
-    const missing: Record<string, number> = {};
-    for (const [field, desired] of Object.entries(work.desiredCounts)) { const count = Math.max(0, desired - (counts[field] ?? 0)); if (count > 0) missing[field] = count; }
-    if (Object.keys(missing).length) { addReplacement(ledger, work, "fill", missing); work.reason = "sparse candidate applied; additive fill scheduled"; }
+    recordAppliedWork(ledger, work);
     await save();
   } catch (error) {
     try {
       work.draft = await request(fetcher, ledger.apiBase, `/api/rpg/v1/campaign-content-drafts/${encodeURIComponent(work.draft.draft.draftId)}`) as unknown as DraftView;
-      if (work.draft.draft.state === "applied") { work.status = "applied"; recordAcceptedPublicArtifacts(work); await save(); return; }
+      if (work.draft.draft.state === "applied") { recordAppliedWork(ledger, work); await save(); return; }
       if (error instanceof ApiError && error.status === 409) {
         if (allowStaleRegeneration) { addReplacement(ledger, work, "stale", work.desiredCounts); work.reason = "stale staged candidate replaced under explicit stale-regeneration policy"; }
         else { work.status = "stale"; work.reason = "paid candidate became stale; rerun with --allow-stale-regeneration to authorize replacement"; }
@@ -365,7 +376,7 @@ export async function hydrateCampaign(options: HydrateOptions): Promise<Ledger> 
       const summary = await request(fetcher, apiBase, `/api/rpg/v1/campaigns/${encodeURIComponent(ledger.campaignId)}/rooms/${encodeURIComponent(sessionId)}/startup-commands`, "POST", {});
       const blockers = Array.isArray(summary.blockers) ? summary.blockers.filter((blocker): blocker is string => typeof blocker === "string") : [];
       if (blockers.length) log(`Startup blockers for room ${sessionId}: ${blockers.join(", ")}; the room can be re-readied idempotently.`);
-      ledger.startup = { status: "complete", sessionId }; await save();
+      ledger.startup = { status: blockers.length ? "blocked" : "complete", sessionId }; await save();
     }
   }
   const deficits = Object.values(ledger.works).filter((work) => work.status === "deficit");

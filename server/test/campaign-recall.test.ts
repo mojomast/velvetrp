@@ -74,6 +74,30 @@ describe("bounded source-attributed campaign recall", () => {
     expect(f.repo.getCampaignRecall("local-owner",request)!.hits).toEqual(result.hits);
     f.repo.close();
   });
+  it("recalls every committed composition receipt exactly once before narration is published", async () => {
+    const f = await dmFixture();
+    f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "auto" });
+    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id,
+      { intent: "open", expectedModeRevision: 1, idempotencyKey: "composition" });
+    const work = f.repo.claimDmPlanning("local-owner", run.runId, "fake", "fake")!;
+    const selections = ["ambient-beat", "advance-time"].map(action => {
+      const candidate = work.candidates.find(item => item.action === action)!;
+      return { candidateId: candidate.candidateId, digest: candidate.digest };
+    });
+    f.repo.settleDmPlanning("local-owner", run.runId, work.claimId, selections, null);
+    f.repo.executeDmBeat("local-owner", run.runId);
+    const committed = f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, run.runId);
+    expect(committed.narration).toBeNull();
+    expect(committed.receipts).toHaveLength(2);
+    for (const receipt of committed.receipts) {
+      const recall = f.repo.getCampaignRecall("local-owner", { ...query(f, receipt.summary),
+        audience: { kind: "dm" }, purpose: "dm-narration" })!;
+      expect(recall.hits.filter(hit => hit.text === receipt.summary)).toHaveLength(1);
+      expect(recall.hits.every(hit => hit.sourceKind === "director-receipt" && hit.authority === "committed-outcome")).toBe(true);
+    }
+    f.repo.close();
+  });
+
   it("retrieves old intent and presentation beyond 100 later turns and old recaps beyond latest three, with no filler", async () => {
     const f = await dmFixture();
     const old = declare(f, "I ask the ferryman about the silver heron", "old");

@@ -147,7 +147,7 @@ function fakeSystemOneResponse(body: string): unknown {
   return { model: "jev-shadow", answers, usage: { input_tokens: 100, output_tokens: 10 } };
 }
 
-async function startFakeSystemOne(): Promise<FakeSystemOne> {
+async function startFakeSystemOne(responseGate?: Promise<void>): Promise<FakeSystemOne> {
   let requests = 0;
   const server: Server = createServer((req, res) => {
     if (req.method === "POST" && req.url === "/v1/systemone") {
@@ -155,8 +155,10 @@ async function startFakeSystemOne(): Promise<FakeSystemOne> {
       req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
       req.on("end", () => {
         requests += 1;
-        res.writeHead(200, { "Content-Type": "application/json", "x-typesafe-request-id": "req_shadow" });
-        res.end(JSON.stringify(fakeSystemOneResponse(body)));
+        void (responseGate ?? Promise.resolve()).then(() => {
+          res.writeHead(200, { "Content-Type": "application/json", "x-typesafe-request-id": "req_shadow" });
+          res.end(JSON.stringify(fakeSystemOneResponse(body)));
+        });
       });
       return;
     }
@@ -189,7 +191,7 @@ afterEach(async () => {
   if (savedSystemOneEnv.key === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = savedSystemOneEnv.key;
 });
 
-async function runRoomTurn(systemOneEnabled: boolean): Promise<{
+async function runRoomTurn(systemOneEnabled: boolean, responseGate?: Promise<void>): Promise<{
   status: number;
   routing: string;
   selectedSpeakerIds: string[];
@@ -201,7 +203,7 @@ async function runRoomTurn(systemOneEnabled: boolean): Promise<{
   provider = await startFakeProvider({
     replyTexts: ['["One", "Two"]', "One answers first.", "Two reacts to One."],
   });
-  systemOne = await startFakeSystemOne();
+  systemOne = await startFakeSystemOne(responseGate);
   process.env.FEATURE_SYSTEM_ONE = "true";
   process.env.TYPESAFE_BASE_URL = systemOne.baseUrl;
   process.env.TYPESAFE_API_KEY = "shadow-test-key";
@@ -213,7 +215,7 @@ async function runRoomTurn(systemOneEnabled: boolean): Promise<{
     url: "/api/provider/system-one",
     // The guardrails lane has its own shadow test; keep it off here so this test counts only
     // the speaker-routing and cost-router lanes it exercises.
-    payload: systemOneEnabled ? { enabled: true, laneModes: { guardrails: "off" } } : { enabled: false },
+    payload: systemOneEnabled ? { enabled: true, laneModes: { guardrails: responseGate ? "shadow" : "off" } } : { enabled: false },
   });
 
   const characterInput = (name: string) => ({
@@ -233,6 +235,10 @@ async function runRoomTurn(systemOneEnabled: boolean): Promise<{
     url: `/api/sessions/${session.id}/room-turn`,
     payload: { content: "Who should inspect the signal?", maxSpeakers: 2 },
   });
+  if (systemOneEnabled && !responseGate) {
+    await expect.poll(() => listSystemOneDecisionsByLane("cost-router", 10).length).toBe(1);
+    await expect.poll(() => listSystemOneDecisionsByLane("speaker-routing", 10).length).toBe(1);
+  }
   const costRouter = listSystemOneDecisionsByLane("cost-router", 10);
   const speakerRouting = listSystemOneDecisionsByLane("speaker-routing", 10);
   const systemOneRequests = systemOne.requestCount();
@@ -255,6 +261,28 @@ async function runRoomTurn(systemOneEnabled: boolean): Promise<{
 }
 
 describe("cost-router shadow classification in the room turn", () => {
+  it("finishes the room turn before all three advisory lanes respond and records each late decision once", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let completed = false;
+    const turn = runRoomTurn(true, gate).then((result) => { completed = true; return result; });
+    try {
+      await expect.poll(() => completed, { timeout: 3000 }).toBe(true);
+      const result = await turn;
+      expect(result.status).toBe(200);
+      expect(result.replyContents).toEqual(["One answers first.", "Two reacts to One."]);
+      expect(result.costRouter).toEqual([]);
+      expect(result.speakerRouting).toEqual([]);
+    } finally { release(); await turn; }
+    for (const lane of ["speaker-routing", "cost-router", "guardrails"] as const) {
+      await expect.poll(() => listSystemOneDecisionsByLane(lane, 10).length).toBe(1);
+      const row = listSystemOneDecisionsByLane(lane, 10)[0]!;
+      expect(row).toMatchObject({ lane, shadow: true, fallbackUsed: true, model: "jev-shadow" });
+      expect(JSON.stringify(row.state)).toContain("Who should inspect the signal?");
+      expect(row.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
+    }
+  });
+
   it("leaves routing and generation unchanged when the shadow classifier is enabled", async () => {
     const result = await runRoomTurn(true);
     expect(result.status).toBe(200);

@@ -1,4 +1,4 @@
-import type { CampaignContentDraftView, CampaignContentGenerationRequest } from "@velvet/contracts";
+import { campaignGenerationDesiredCountsSchema, type CampaignContentDraftView, type CampaignContentGenerationRequest } from "@velvet/contracts";
 
 export type WorldbuildingSection = CampaignContentGenerationRequest["sections"][number];
 export type ArtifactField = Exclude<keyof CampaignContentDraftView["preview"], "npcStats">;
@@ -121,6 +121,7 @@ export function parseWorldbuildingPlan(value: unknown): WorldbuildingPlan {
       desiredCounts[field] = count;
     }
     if (Object.keys(desiredCounts).length === 0) fail(`${id}.desiredCounts must not be empty`);
+    if (!campaignGenerationDesiredCountsSchema.safeParse(desiredCounts).success) fail(`${id}.desiredCounts exceeds the supported per-field limits`);
     let expandFrom: WorldbuildingExpandSelector[] | undefined;
     if (stage.expandFrom !== undefined) {
       if (!Array.isArray(stage.expandFrom)) fail(`${id}.expandFrom must be an array`);
@@ -165,19 +166,32 @@ export function labelForSections(sections: readonly WorldbuildingSection[]): str
 
 /** The reviewed default plan run by prompt mode. */
 export function defaultWorldbuildingStages(): WorldbuildingStagePlan[] {
-  return [
-    { id: "factions", label: "Factions", sections: ["factions"], brief: "Create the factions whose competing aims give the premise traction.", desiredCounts: { factions: 4 } },
-    { id: "foundation", label: "Foundation", sections: ["outline", "arcs"], brief: "State the opening situation, the player-facing premise, and the longer narrative arcs.", desiredCounts: { outlines: 1, arcs: 3 } },
-    { id: "locations", label: "Locations", sections: ["locations"], brief: "Map distinct, traversable places and the routes that connect them.", desiredCounts: { locations: 6, connections: 4 } },
-    { id: "cast", label: "Cast", sections: ["npcs"], brief: "Populate the world with characters bound to the accepted places and factions.", desiredCounts: { npcs: 6 } },
+  const stages: WorldbuildingStagePlan[] = [
+    { id: "factions", label: "Factions", sections: ["factions"], brief: "Create the factions whose competing aims give the premise traction. Give each public visibility and a spoiler-free description; put hidden aims and secrets in gmNotes.", desiredCounts: { factions: 4 } },
+    { id: "locations", label: "Locations", sections: ["locations"], brief: "Map distinct traversable places. Every location and connection must have visibility public with spoiler-free descriptions. Keep secrets for later GM lore and scenes. Every place must be reachable from every other through directed routes, including explicit reverse connections for return travel; no stranded destinations.", desiredCounts: { locations: 6, connections: 10 } },
+    { id: "foundation", label: "Foundation", sections: ["outline", "arcs"], brief: "State the opening situation, player-facing premise, and narrative arcs. The public outline must set startLocationKey to an accepted public location.", desiredCounts: { outlines: 1, arcs: 3 } },
+    { id: "cast", label: "Cast", sections: ["npcs"], brief: "Populate accepted places and factions with public characters, including allies, rivals, and enemies. Bind each locationKey to an accepted place. Public descriptions cover observable behavior; privateGoals contain agendas, secrets and reactions to player choices.", desiredCounts: { npcs: 6 } },
     { id: "story", label: "Story", sections: ["story", "clues"], brief: "Shape narrative beats and discoverable clues that can be recovered in more than one way.", desiredCounts: { storyNodes: 8, storyRelationships: 6, clues: 5 } },
-    { id: "quests", label: "Quests", sections: ["quests"], brief: "Turn the arcs into actionable objectives with bounded, typed rewards.", desiredCounts: { quests: 5 } },
-    { id: "bestiary", label: "Bestiary", sections: ["monster-concepts"], brief: "Create narrative monster concepts; mark mechanics inert unless an accepted pin exists.", desiredCounts: { monsterConcepts: 4 } },
+    { id: "quests", label: "Quests", sections: ["quests"], brief: "Offer actionable optional objectives with bounded typed rewards. Each quest must reference accepted places through locationKeys; use accepted public arcs when available.", desiredCounts: { quests: 5 } },
+    { id: "bestiary", label: "Enemies and monsters", sections: ["monster-concepts"], brief: "Create enemies and monsters with habitats, motives, tells, and noncombat approaches; mark mechanics inert unless an accepted pin exists.", desiredCounts: { monsterConcepts: 4 } },
     { id: "items", label: "Items", sections: ["quest-items"], brief: "Create quest items tied to accepted quests and places, binding mechanics only to accepted pins.", desiredCounts: { questItems: 4 } },
-    { id: "encounters", label: "Encounters", sections: ["encounters"], brief: "Prepare encounter plans with objectives, terrain, escalation, and resolution.", desiredCounts: { encounters: 5 } },
+    { id: "encounters", label: "Encounters", sections: ["encounters"], brief: "Prepare situated encounter plans with objectives, terrain, escalation, and resolution. For combat rosters use exact pinned enemy references; otherwise describe noncombat situations without a mechanical roster.", desiredCounts: { encounters: 5 } },
     { id: "lore", label: "Lore", sections: ["lore"], brief: "Record typed campaign history, customs, truths, and beliefs tied to accepted canon.", desiredCounts: { lore: 6 } },
-    { id: "table", label: "Table material", sections: ["handouts", "scene-prompts"], brief: "Prepare review-only public handouts and runnable GM scene prompts.", desiredCounts: { handouts: 3, scenePrompts: 4 } },
+    { id: "table", label: "Table material", sections: ["handouts", "scene-prompts"], brief: "Prepare review-only public handouts and runnable GM scenes. Each scene must use an accepted locationKey and relevant accepted npcKeys, with multiple approaches and reactions rather than prescribed player actions.", desiredCounts: { handouts: 3, scenePrompts: 4 } },
   ];
+  const dependencies: Record<string, WorldbuildingExpandSelector[]> = {
+    locations: [{ stageId: "factions", fields: ["factions"], limit: 4 }],
+    foundation: [{ stageId: "locations", fields: ["locations"], limit: 6 }, { stageId: "factions", fields: ["factions"], limit: 4 }],
+    cast: [{ stageId: "locations", fields: ["locations"], limit: 6 }, { stageId: "factions", fields: ["factions"], limit: 4 }],
+    story: [{ stageId: "cast", fields: ["npcs"], limit: 6 }, { stageId: "locations", fields: ["locations"], limit: 6 }],
+    quests: [{ stageId: "story", fields: ["storyNodes", "clues"], limit: 4 }, { stageId: "cast", fields: ["npcs"], limit: 3 }, { stageId: "locations", fields: ["locations"], limit: 6 }, { stageId: "foundation", fields: ["arcs"], limit: 3 }],
+    bestiary: [{ stageId: "locations", fields: ["locations"], limit: 6 }, { stageId: "factions", fields: ["factions"], limit: 4 }],
+    items: [{ stageId: "quests", fields: ["quests"], limit: 5 }, { stageId: "locations", fields: ["locations"], limit: 6 }],
+    encounters: [{ stageId: "bestiary", fields: ["monsterConcepts"], limit: 4 }, { stageId: "locations", fields: ["locations"], limit: 6 }, { stageId: "quests", fields: ["quests"], limit: 5 }],
+    lore: [{ stageId: "factions", fields: ["factions"], limit: 4 }, { stageId: "locations", fields: ["locations"], limit: 6 }],
+    table: [{ stageId: "locations", fields: ["locations"], limit: 6 }, { stageId: "cast", fields: ["npcs"], limit: 6 }, { stageId: "encounters", fields: ["encounters"], limit: 2 }, { stageId: "lore", fields: ["lore"], limit: 2 }],
+  };
+  return stages.map((stage) => ({ ...stage, expandFrom: dependencies[stage.id] }));
 }
 
 export function buildDefaultPlan(tone: string, exclusions: string[]): WorldbuildingPlan {
@@ -187,7 +201,46 @@ export function buildDefaultPlan(tone: string, exclusions: string[]): Worldbuild
 export function composeStageBrief(prompt: string, stage: WorldbuildingStagePlan): string {
   const targets = Object.entries(stage.desiredCounts).map(([field, count]) => `${count} ${field}`).join(", ");
   const direction = prompt.trim();
-  return `${direction ? `${direction}\n\n` : ""}${stage.brief}\n\nHydration target for this additive candidate: ${targets}. Return as many requested items as safely fit; do not duplicate accepted canon.`;
+  return `${direction ? `${direction}\n\n` : ""}${stage.brief}\n\nMinimum coverage: ${targets}. Preserve accepted canon and connect new material to it. Support free exploration and player choices rather than a mandatory plot sequence.`;
+}
+
+export function coverageIssues(preview: CampaignContentDraftView["preview"], counts: Record<string, number>): string[] {
+  return Object.entries(counts).flatMap(([field, minimum]) => {
+    const items = preview[field as ArtifactField] ?? [];
+    const actual = new Set(items.map((item) => item.key).filter(Boolean)).size;
+    return actual < minimum ? [`Coverage incomplete: ${field} requires ${minimum}, received ${actual}.`] : [];
+  });
+}
+
+/** Additional prompt-mode readiness checks; server apply remains authoritative for typed references. */
+export function worldLinkIssues(preview: CampaignContentDraftView["preview"], accepted: Record<string, Record<string, string[]>>): string[] {
+  const issues: string[] = [];
+  const places = new Set([...Object.values(accepted).flatMap((fields) => fields.locations ?? []), ...preview.locations.filter((place) => place.visibility === "public").map((place) => place.key)]);
+  for (const outline of preview.outlines) {
+    if (outline.visibility !== "public" || !outline.startLocationKey || !places.has(outline.startLocationKey)) issues.push("The opening must reference an accepted public starting location.");
+  }
+  if (preview.npcs.some((npc) => !npc.locationKey || !places.has(npc.locationKey))) issues.push("Every character needs an accepted public location.");
+  if (preview.quests.some((quest) => !quest.objectives?.length)) issues.push("Every quest needs actionable objectives.");
+  if (preview.quests.some((quest) => !quest.locationKeys?.length || quest.locationKeys.some((key) => !places.has(key)))) issues.push("Every quest needs accepted public location anchors.");
+  if (preview.scenePrompts.some((scene) => !scene.locationKey || !places.has(scene.locationKey))) issues.push("Every scene needs an accepted public location.");
+  const publicPlaces = preview.locations.filter((place) => place.visibility === "public");
+  if (preview.locations.length && publicPlaces.length !== preview.locations.length) issues.push("World-map locations must be public; place secrets in GM lore and scenes.");
+  if (publicPlaces.length > 1) {
+    const edges = preview.connections.filter((edge) => edge.visibility === "public");
+    const root = publicPlaces[0]!.key;
+    const reachable = (reverse: boolean) => {
+      const visited = new Set([root]);
+      for (let pass = 0; pass < places.size; pass++) for (const edge of edges) {
+        const from = reverse ? edge.toLocationKey : edge.fromLocationKey;
+        const to = reverse ? edge.fromLocationKey : edge.toLocationKey;
+        if (visited.has(from)) visited.add(to);
+      }
+      return visited;
+    };
+    const outward = reachable(false), homeward = reachable(true);
+    if (publicPlaces.some((place) => !outward.has(place.key) || !homeward.has(place.key))) issues.push("Locations need directed outward and return routes; the map contains a stranded destination.");
+  }
+  return issues;
 }
 
 export function artifactKeysFromPreview(preview: CampaignContentDraftView["preview"]): string[] {

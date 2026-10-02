@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -104,6 +104,50 @@ test("applies sparse success and creates additive fill work", async () => {
   assert.equal(parent.status, "expanded"); assert.equal(parent.children.length, 1);
   assert.deepEqual(ledger.works[parent.children[0]!]!.desiredCounts, { locations: 2 });
   assert.equal(ledger.works[parent.children[0]!]!.status, "applied");
+});
+
+test("a lost sparse apply response still schedules its missing content after reconciliation", async () => {
+  let first = true;
+  const api = new FakeApi(async (body, current) => { if (first) { first = false; return current.success(body, 1); } return current.success(body); });
+  const originalFetch = api.fetch;
+  let dropResponse = true;
+  api.fetch = async (input, init) => {
+    const response = await originalFetch(input, init);
+    if (String(input).endsWith("/apply") && dropResponse) { dropResponse = false; throw new Error("lost committed response"); }
+    return response;
+  };
+  const ledger = await run(baseRecipe(3), api, await ledgerPath());
+  const parent = ledger.works.places!;
+  assert.equal(parent.status, "expanded");
+  assert.deepEqual(ledger.works[parent.children[0]!]!.desiredCounts, { locations: 2 });
+  assert.equal(ledger.works[parent.children[0]!]!.status, "applied");
+  assert.equal(api.calls.filter((call) => call.path.endsWith("/draft-1/apply")).length, 1);
+});
+
+test("resuming an interrupted sparse apply fills deficits without reapplying committed content", async () => {
+  const file = await ledgerPath(), api = new FakeApi();
+  await run(baseRecipe(3), api, file);
+  const saved = JSON.parse(await readFile(file, "utf8"));
+  const parent = saved.works.places;
+  parent.status = "applying";
+  parent.draft.preview.locations = parent.draft.preview.locations.slice(0, 1);
+  api.drafts.get(parent.draft.draft.draftId).preview = parent.draft.preview;
+  await writeFile(file, JSON.stringify(saved));
+  const resumed = await run(baseRecipe(3), api, file);
+  assert.equal(resumed.works.places!.status, "expanded");
+  assert.deepEqual(resumed.works[resumed.works.places!.children[0]!]!.desiredCounts, { locations: 2 });
+  assert.equal(api.calls.filter((call) => call.path.endsWith("/draft-1/apply")).length, 1);
+});
+
+test("fill keys are scoped to the recipe even when jobs share the same name", async () => {
+  const childKeys: string[] = [];
+  for (const name of ["Harbor world", "Mountain world"]) {
+    let first = true;
+    const api = new FakeApi(async (body, current) => { if (first) { first = false; return current.success(body, 1); } return current.success(body); });
+    const ledger = await run({ ...baseRecipe(2), name }, api, await ledgerPath());
+    childKeys.push(ledger.works[ledger.works.places!.children[0]!]!.idempotencyKey);
+  }
+  assert.notEqual(childKeys[0], childKeys[1]);
 });
 
 test("resume neither redispatches nor reapplies completed work", async () => {
@@ -250,12 +294,13 @@ test("runs the startup command for a created campaign's first attached room afte
   assert.deepEqual(startupCall.body, {});
   assert.ok(api.calls.indexOf(startupCall) > api.calls.indexOf(starterCall), "startup must follow starter setup");
   assert.ok(api.calls.findIndex((call) => call.path.endsWith("/apply")) < api.calls.indexOf(startupCall), "startup must follow content application");
-  assert.deepEqual(ledger.startup, { status: "complete", sessionId: "room-1" });
+  assert.deepEqual(ledger.startup, { status: "blocked", sessionId: "room-1" });
   assert.ok(messages.some((message) => message.includes("Startup blockers") && message.includes("opening-blocked")));
 });
 
 test("resume skips a completed startup and does not re-query the room", async () => {
   const path = await ledgerPath(), api = new FakeApi();
+  api.startupBlockers = [];
   const first = await hydrateCampaign(createdCampaignOptions(path, api));
   assert.equal(first.startup?.status, "complete");
   const prior = api.calls.length;
@@ -264,4 +309,18 @@ test("resume skips a completed startup and does not re-query the room", async ()
   assert.equal(api.calls.filter((call) => call.path.endsWith("/startup-commands")).length, 1);
   assert.equal(api.calls.filter((call) => call.method === "GET" && call.path.endsWith("/rooms")).length, 1);
   assert.deepEqual(resumed.startup, { status: "complete", sessionId: "room-1" });
+});
+
+test("resume retries blocked startup without regenerating or reapplying the world", async () => {
+  const path = await ledgerPath(), api = new FakeApi();
+  const first = await hydrateCampaign(createdCampaignOptions(path, api, () => {}));
+  assert.equal(first.startup?.status, "blocked");
+  const generationCount = api.calls.filter((call) => call.path.endsWith("campaign-content-drafts")).length;
+  const applyCount = api.calls.filter((call) => call.path.endsWith("/apply")).length;
+  api.startupBlockers = [];
+  const resumed = await hydrateCampaign(createdCampaignOptions(path, api, () => {}));
+  assert.equal(resumed.startup?.status, "complete");
+  assert.equal(api.calls.filter((call) => call.path.endsWith("/startup-commands")).length, 2);
+  assert.equal(api.calls.filter((call) => call.path.endsWith("campaign-content-drafts")).length, generationCount);
+  assert.equal(api.calls.filter((call) => call.path.endsWith("/apply")).length, applyCount);
 });

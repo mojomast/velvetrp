@@ -1,16 +1,25 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   classifyNarration,
   computeMetrics,
   detectCoherenceViolations,
   diffMetrics,
+  diffVerdict,
+  evaluateRun,
   fallbackDistinctness,
   latencyStats,
   narrationClassificationDescriptor,
   probeOutcomes,
   providerSuccess,
+  runAgainstBaseUrl,
   turnExercisesCommerce,
+  validateTurnCount,
   type DmBeatRecord,
   type NarrationEvent,
   type ProviderCallRecord,
@@ -234,6 +243,106 @@ test("probeOutcomes: a missing labeled turn fails instead of silently passing", 
     assert.equal(outcome.passed, false);
     assert.equal(outcome.observed, "no labeled turn ran");
   }
+});
+
+test("negative probes do not treat failed HTTP requests or incomplete turns as successful holds", () => {
+  for (const probe of ["unknown-npc", "cheating-commerce"] as const) {
+    for (const overrides of [{ status: 503 }, { finalState: "awaiting-confirmation" }, { error: "connection lost" }]) {
+      const outcome = probeOutcomes([turn({ probe, ...overrides })]).find((value) => value.kind === probe)!;
+      assert.equal(outcome.passed, false);
+      assert.match(outcome.observed, /turn did not complete/);
+    }
+  }
+});
+
+test("run verdict fails total provider outages even when fallback turns complete", () => {
+  const result = evaluateRun({ mode: "in-process", declarations: 1, dmBeats: [], providerCalls: [],
+    turns: [turn({ narration: "The scene holds.", narrationClass: "narration-failure" })] });
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.failures, ["no live provider call succeeded"]);
+  assert.equal(result.skipped.length, 3);
+});
+
+test("run verdict catches missing narration, HTTP failures, incomplete DM beats, and coherence failures", () => {
+  const result = evaluateRun({ mode: "base-url", declarations: 1, providerCalls: [],
+    turns: [turn({ status: 409, finalState: null, coherence: ["travel-destination-not-reached"] })],
+    dmBeats: [{ index: 1, intent: "open", state: "unknown", receipts: [], candidatesOffered: [], narration: "", blockers: [], latencyMs: 0, success: false }] });
+  assert.equal(result.passed, false);
+  assert.ok(result.failures.some((value) => value.includes("HTTP 409")));
+  assert.ok(result.failures.some((value) => value.includes("missing terminal")));
+  assert.ok(result.failures.some((value) => value.includes("missing narration")));
+  assert.ok(result.failures.some((value) => value.includes("travel-destination-not-reached")));
+  assert.ok(result.failures.some((value) => value.includes("DM beat 1: state=unknown")));
+});
+
+test("a shortened run skips probes outside its turn range but fails requested probes", () => {
+  const providerCall: ProviderCallRecord = { seq: 1, lane: "adventure-narration-v1", ok: true, finishReason: "stop", detail: "", tools: [],
+    promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0, latencyMs: 1, dmCandidates: null };
+  const first = turn({ id: "look-around", narration: "The market is quiet." });
+  assert.equal(evaluateRun({ mode: "in-process", declarations: 1, turns: [first], dmBeats: [], providerCalls: [providerCall] }).passed, true);
+  const unnecessaryRoll = evaluateRun({ mode: "in-process", declarations: 1, turns: [{ ...first, committed: true, receiptKinds: ["check"] }], dmBeats: [], providerCalls: [providerCall] });
+  assert.equal(unnecessaryRoll.passed, false);
+  assert.deepEqual(unnecessaryRoll.failures, ["routine observation: looking around committed an unnecessary check"]);
+  const result = evaluateRun({ mode: "in-process", declarations: 3,
+    turns: [first, turn({ index: 1, narration: "Maren greets you." }), turn({ index: 2, probe: "declared-purchase", narration: "The stall is closed." })],
+    dmBeats: [], providerCalls: [providerCall] });
+  assert.equal(result.passed, false);
+  assert.ok(result.failures.some((value) => value.startsWith("declared-purchase:")));
+  assert.equal(result.skipped.length, 2);
+});
+
+test("turn counts cannot create empty or misleading successful evaluations", () => {
+  for (const value of [0, -1, 1.5, NaN, Infinity, 19]) assert.throws(() => validateTurnCount(value), /--turns/);
+  validateTurnCount(1);
+  validateTurnCount(18);
+});
+
+test("repeat evaluations dispatch fresh commands and open their first Director beat", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "freeform-eval-test-"));
+  const keys: string[] = [];
+  const intents: string[] = [];
+  const server = createServer((req, res) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      const input = body ? JSON.parse(body) : {};
+      if (input.idempotencyKey) keys.push(input.idempotencyKey);
+      if (req.url?.endsWith("/adventure-turns/stream")) {
+        res.writeHead(200, { "content-type": "text/event-stream", "x-adventure-turn-id": "turn-1" });
+        res.end(`event: narration_delta\ndata: {"payload":{"text":"The market stirs."}}\n\nevent: terminal\ndata: {"payload":{"turn":{"turnId":"turn-1","state":"completed"},"outcome":"completed","narrationStatus":{"source":"provider-assisted"}}}\n\n`);
+        return;
+      }
+      res.setHeader("content-type", "application/json");
+      if (req.url?.endsWith("/beat-commands")) {
+        intents.push(input.intent);
+        res.end(JSON.stringify({ runId: "run-1", intent: input.intent, state: "completed", narration: "A bell rings.", receipts: [] }));
+      } else if (req.url?.endsWith("/dm")) res.end(JSON.stringify({ mode: "ai", revision: 0 }));
+      else if (req.url?.endsWith("/play-bootstrap")) res.end(JSON.stringify({ expectedRevision: 0 }));
+      else res.end(JSON.stringify({ receipts: [] }));
+    });
+  });
+  try {
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    for (let run = 0; run < 2; run += 1) {
+      const artifact = await runAgainstBaseUrl({ baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+        campaignId: "campaign", sessionId: "session", actorId: "actor", turns: 2,
+        out: path.join(directory, `run-${run}.json`), baseline: null, quiet: true });
+      assert.equal(artifact.verdict.passed, true);
+    }
+    assert.equal(keys.length, 6);
+    assert.equal(new Set(keys).size, keys.length, "new evaluations must not replay an older run's paid generation or actions");
+    assert.deepEqual(intents, ["open", "open"]);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("diagnostic call and receipt counts do not mislabel fewer unnecessary actions as worse", () => {
+  const diffs = diffMetrics({ providerCalls: 55, materializedTurns: 5, fallbackDistinct: 1, narrationFailureTurns: 1 },
+    { providerCalls: 57, materializedTurns: 7, fallbackDistinct: 3, narrationFailureTurns: 3 });
+  assert.deepEqual(diffs.map(diffVerdict), ["changed (-2)", "changed (-2)", "changed (-2)", "better (-2)"]);
 });
 
 test("diffMetrics: computes per-key deltas and direction", () => {

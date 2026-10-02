@@ -33,6 +33,7 @@
  * (provider success, fallback distinctness, DM candidates) are reported as unavailable in
  * `--base-url` mode rather than faked.
  */
+import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -397,6 +398,13 @@ export interface EvalArtifact {
   turns: TurnRecord[];
   dmBeats: DmBeatRecord[];
   providerCalls: ProviderCallRecord[];
+  verdict: EvalVerdict;
+}
+
+export interface EvalVerdict {
+  passed: boolean;
+  failures: string[];
+  skipped: string[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -495,7 +503,9 @@ export function probeOutcomes(turns: readonly TurnRecord[]): ProbeOutcome[] {
     const turn = turns.find((candidate) => candidate.probe === expectation.kind) ?? null;
     let observed = "no labeled turn ran";
     let passed = false;
-    if (turn) {
+    if (turn && (turn.error || turn.status < 200 || turn.status >= 300 || turn.finalState !== "completed")) {
+      observed = `turn did not complete: HTTP ${turn.status}, state=${turn.finalState ?? "-"}${turn.error ? `, ${turn.error}` : ""}`;
+    } else if (turn) {
       const receipts = `[${turn.receiptKinds.join(",")}]`;
       if (expectation.kind === "declared-purchase") {
         const committed = turn.receiptKinds.includes("commerce");
@@ -521,6 +531,39 @@ export function probeOutcomes(turns: readonly TurnRecord[]): ProbeOutcome[] {
     return { kind: expectation.kind, title: expectation.title, turnIndex: turn?.index ?? null,
       turnId: turn?.id ?? null, expected: expectation.expected, observed, passed };
   });
+}
+
+/** Objective completion/probe checks, independent of stochastic quality and latency baselines. */
+export function evaluateRun(input: Pick<EvalArtifact, "mode" | "declarations" | "turns" | "dmBeats" | "providerCalls">): EvalVerdict {
+  const failures: string[] = [];
+  const skipped: string[] = [];
+  if (input.turns.length === 0) failures.push("no player turns ran");
+  if (input.turns.length !== input.declarations) failures.push("the requested player turns did not all run");
+  for (const turn of input.turns) {
+    if (turn.error) failures.push(`turn ${turn.index} (${turn.id}): ${turn.error}`);
+    if (turn.status < 200 || turn.status >= 300) failures.push(`turn ${turn.index} (${turn.id}): HTTP ${turn.status}`);
+    if (turn.finalState !== "completed") failures.push(`turn ${turn.index} (${turn.id}): state=${turn.finalState ?? "missing terminal"}`);
+    if (!turn.narration.trim()) failures.push(`turn ${turn.index} (${turn.id}): missing narration`);
+    for (const violation of turn.coherence) failures.push(`turn ${turn.index} (${turn.id}): ${violation}`);
+  }
+  for (const beat of input.dmBeats) {
+    if (!beat.success || beat.state !== "completed") failures.push(`DM beat ${beat.index}: state=${beat.state}`);
+    if (!beat.narration.trim()) failures.push(`DM beat ${beat.index}: missing narration`);
+  }
+  if (input.mode === "in-process") {
+    if (!input.providerCalls.some((call) => call.ok)) failures.push("no live provider call succeeded");
+    if (input.turns.some((turn) => turn.id === "look-around" && turn.receiptKinds.includes("check"))) {
+      failures.push("routine observation: looking around committed an unnecessary check");
+    }
+    const requestedProbes = new Set(FREEFORM_DECLARATIONS.slice(0, input.declarations).flatMap((entry) => entry.probe ? [entry.probe] : []));
+    for (const probe of probeOutcomes(input.turns)) {
+      if (!requestedProbes.has(probe.kind)) skipped.push(`${probe.kind}: outside requested turn range`);
+      else if (!probe.passed) failures.push(`${probe.kind}: ${probe.observed}`);
+    }
+  } else {
+    skipped.push("live provider accounting and typed receipt probes: unavailable in base-url mode");
+  }
+  return { passed: failures.length === 0, failures, skipped };
 }
 
 export function computeMetrics(
@@ -606,7 +649,15 @@ export interface MetricDiff {
 const LOWER_IS_BETTER = new Set([
   "providerFailed", "fallbackCount", "fallbackIdentical", "narrationFailureTurns",
   "unknownNpcResolvedAsCheck", "cheatingCommerceGiveMisfire", "cheatingCommerceReceipts",
-  "coherenceViolations", "latencyAvgMs", "latencyP50Ms", "latencyP95Ms", "latencyMaxMs",
+  "coherenceViolations", "coherenceViolationTurns", "latencyAvgMs", "latencyP50Ms", "latencyP95Ms", "latencyMaxMs",
+]);
+
+// More mechanical receipts or paid calls are not inherently better: routine observations
+// should often resolve as receipt-free prose, and a correct hold can prevent an invalid action.
+const CONTEXT_ONLY_METRICS = new Set([
+  "turns", "providerCalls", "providerOk", "narrationEventsTotal", "narrationsTotal",
+  "deliberateHoldEvents", "deliberateHoldTurns", "deliberateHoldRate",
+  "materializedTurns", "materializationRate", "dmBeats", "fallbackDistinct", "unknownNpcHeld",
 ]);
 
 /** Numeric diff of the baseline keys that also exist in the current metrics. */
@@ -636,6 +687,7 @@ export function formatMetricValue(key: string, value: number): string {
 
 export function diffVerdict(diff: MetricDiff): string {
   if (diff.delta === 0) return "=";
+  if (CONTEXT_ONLY_METRICS.has(diff.key)) return `changed (${diff.delta > 0 ? "+" : ""}${Number(diff.delta.toFixed(3))})`;
   const improved = diff.lowerIsBetter ? diff.delta < 0 : diff.delta > 0;
   return `${improved ? "better" : "worse"} (${diff.delta > 0 ? "+" : ""}${Number(diff.delta.toFixed(3))})`;
 }
@@ -647,6 +699,10 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
   lines.push(`Generated: ${artifact.generatedAt}  `);
   lines.push(`Mode: ${artifact.mode}  |  Model: ${artifact.provider.model}  |  Seed: ${artifact.seed}  |  Turns: ${artifact.declarations}`);
   if (artifact.world) lines.push(`World: campaign=${artifact.world.campaignId} session=${artifact.world.sessionId} actor=${artifact.world.actorId}`);
+  lines.push("");
+  lines.push(`Result: **${artifact.verdict.passed ? "PASS" : "FAIL"}**`);
+  for (const failure of artifact.verdict.failures) lines.push(`- ${failure}`);
+  for (const skip of artifact.verdict.skipped) lines.push(`- Not measured: ${skip}`);
   lines.push("");
   lines.push("## Metrics");
   lines.push("");
@@ -801,6 +857,8 @@ interface ReceiptProbe {
 }
 
 export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifact: EvalArtifact; markdown: string; output: string; markdownPath: string }> {
+  validateTurnCount(options.turns);
+  const runKey = randomUUID();
   const providerConfig = await resolveProviderKey(resolveProviderConfig());
   const provider: ProviderSettings = {
     ...defaultProviderSettings(),
@@ -1038,7 +1096,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     try {
       const first = streamOf(await request("POST", "/adventure-turns/stream", {
         campaignId, sessionId, actorId, declaration: entry.declaration,
-        expectedRevision: revision, idempotencyKey: `ff-${options.seed}-${index}`,
+        expectedRevision: revision, idempotencyKey: `ff-${runKey}-${index}`,
       }));
       turnId = first.turnId;
       lastState = first.state; lastOutcome = first.outcome;
@@ -1050,7 +1108,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
         record.proposalToolNames = (view.proposals ?? []).map((proposal: any) => String(proposal.toolName));
         const confirmed = await request("POST", `/adventure-turns/${turnId}/confirm`, {
           proposalIds: first.confirmationRequired.proposalIds, decision: "approve",
-          expectedRevision: view.turn.revision, idempotencyKey: `ff-confirm-${options.seed}-${index}`,
+          expectedRevision: view.turn.revision, idempotencyKey: `ff-confirm-${runKey}-${index}`,
         });
         const parsed = confirmed.status >= 200 && confirmed.status < 300 ? JSON.parse(confirmed.body) : {};
         const token = parsed.resumeToken ?? view.resumeToken;
@@ -1106,7 +1164,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     const started = Date.now();
     const control = repo.getDmControl(OWNER, campaignId);
     const run = repo.openDmBeat(OWNER, campaignId, sessionId, { intent,
-      expectedModeRevision: control.revision, idempotencyKey: `ff-dm-${options.seed}-${index}` });
+      expectedModeRevision: control.revision, idempotencyKey: `ff-dm-${runKey}-${index}` });
     const planningCallsBefore = providerCalls.length;
     await orchestrateCampaignDmBeat(repo, OWNER, run.runId, deps);
     const executed = repo.getDmRun(OWNER, campaignId, sessionId, run.runId);
@@ -1123,7 +1181,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
   };
 
   const control = repo.getDmControl(OWNER, campaignId);
-  if (control.mode !== "ai") repo.setDmControl(OWNER, campaignId, { mode: "ai", expectedRevision: control.revision, idempotencyKey: `ff-ai-${options.seed}` });
+  if (control.mode !== "ai") repo.setDmControl(OWNER, campaignId, { mode: "ai", expectedRevision: control.revision, idempotencyKey: `ff-ai-${runKey}` });
 
   const dmAfter = new Set([1, 4, 7, 10, 13, 16]);
   const limit = Math.max(0, Math.min(options.turns, FREEFORM_DECLARATIONS.length));
@@ -1132,7 +1190,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     const record = await runPlayerTurn(entry, index);
     if (!options.quiet) process.stderr.write(`turn ${index} ${entry.id} state=${record.finalState} class=${record.narrationClass} source=${record.narrationSource} committed=${record.committed}\n`);
     if (dmAfter.has(index)) {
-      const beat = await runDmBeat(index, index === 0 ? "open" : "continue");
+      const beat = await runDmBeat(index, dmBeats.length === 0 ? "open" : "continue");
       record.dmBeatIndex = index;
       if (!options.quiet) process.stderr.write(`  dm ${index} state=${beat.state} receipts=${beat.receipts.join(",") || "-"} candidates=${beat.candidatesOffered.length}\n`);
     }
@@ -1142,7 +1200,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
 
   const metrics = computeMetrics(turnRecords, dmBeats, providerCalls);
   const artifact: EvalArtifact = {
-    version: 2, generatedAt: new Date().toISOString(), mode: "in-process",
+    version: 3, generatedAt: new Date().toISOString(), mode: "in-process",
     provider: { baseUrl: providerConfig.baseUrl, model: providerConfig.model },
     seed: options.seed, dataDir: directory, baseUrl: null,
     world: { campaignId, sessionId, actorId }, declarations: limit,
@@ -1156,6 +1214,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     },
     probes: probeOutcomes(turnRecords),
     metrics, turns: turnRecords, dmBeats, providerCalls,
+    verdict: evaluateRun({ mode: "in-process", declarations: limit, turns: turnRecords, dmBeats, providerCalls }),
   };
   const markdown = renderMarkdown(artifact, options.baseline);
   const markdownPath = options.out.endsWith(".json") ? `${options.out.slice(0, -5)}.md` : `${options.out}.md`;
@@ -1181,6 +1240,8 @@ export interface BaseUrlOptions {
 }
 
 export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalArtifact> {
+  validateTurnCount(options.turns);
+  const runKey = randomUUID();
   if (!options.campaignId || !options.sessionId || !options.actorId)
     throw new Error("--base-url requires --campaign-id, --session-id and --actor-id");
   const root = options.baseUrl.replace(/\/$/, "");
@@ -1195,7 +1256,7 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
   const control = controlResponse.status >= 200 && controlResponse.status < 300 ? JSON.parse(controlResponse.body) : { mode: "ai", revision: 0 };
   if (control.mode !== "ai") {
     await request("POST", `/campaigns/${campaignId}/dm/mode-commands`,
-      { mode: "ai", expectedRevision: control.revision, idempotencyKey: `ff-base-ai-${Date.now()}` });
+      { mode: "ai", expectedRevision: control.revision, idempotencyKey: `ff-base-ai-${runKey}` });
   }
 
   const campaignRevision = async (): Promise<number> => {
@@ -1223,7 +1284,7 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
     try {
       const first = streamOf(await request("POST", "/adventure-turns/stream", {
         campaignId, sessionId, actorId, declaration: entry.declaration,
-        expectedRevision: await campaignRevision(), idempotencyKey: `ff-base-${index}`,
+        expectedRevision: await campaignRevision(), idempotencyKey: `ff-base-${runKey}-${index}`,
       }));
       record.status = first.status;
       let lastState = first.state; let lastOutcome = first.outcome;
@@ -1236,12 +1297,13 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
         record.proposalToolNames = (view.proposals ?? []).map((proposal: any) => String(proposal.toolName));
         const confirmed = await request("POST", `/adventure-turns/${first.turnId}/confirm`, {
           proposalIds: first.confirmationRequired.proposalIds, decision: "approve",
-          expectedRevision: view.turn.revision, idempotencyKey: `ff-base-confirm-${index}`,
+          expectedRevision: view.turn.revision, idempotencyKey: `ff-base-confirm-${runKey}-${index}`,
         });
         const parsed = confirmed.status >= 200 && confirmed.status < 300 ? JSON.parse(confirmed.body) : {};
         const token = parsed.resumeToken ?? view.resumeToken;
         if (token) {
           const resumed = streamOf(await request("POST", "/adventure-turns/stream", { resumeToken: token }));
+          record.status = resumed.status;
           lastState = resumed.state; lastOutcome = resumed.outcome;
           phases.push({ phase: "resume", narration: resumed.narration, narrationSource: resumed.narrationSource });
         }
@@ -1267,7 +1329,7 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
     turns.push(record);
     if (!options.quiet) process.stderr.write(`turn ${index} ${entry.id} class=${record.narrationClass} committed=${record.committed}\n`);
     if (dmAfter.has(index)) {
-      const beat = await runBaseDmBeat(request, campaignId, sessionId, options, index);
+      const beat = await runBaseDmBeat(request, campaignId, sessionId, runKey, index, beats.length === 0 ? "open" : "continue");
       record.dmBeatIndex = index;
       beats.push(beat);
       if (!options.quiet) process.stderr.write(`  dm ${index} state=${beat.state}\n`);
@@ -1275,7 +1337,7 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
   }
 
   const artifact: EvalArtifact = {
-    version: 2, generatedAt: new Date().toISOString(), mode: "base-url",
+    version: 3, generatedAt: new Date().toISOString(), mode: "base-url",
     provider: { baseUrl: root, model: "unknown" }, seed: 0, dataDir: null, baseUrl: root,
     world: { campaignId, sessionId, actorId }, declarations: limit,
     narrationClassification: narrationClassificationDescriptor(),
@@ -1290,6 +1352,7 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
     },
     probes: probeOutcomes(turns),
     metrics: computeMetrics(turns, beats, []), turns, dmBeats: beats, providerCalls: [],
+    verdict: evaluateRun({ mode: "base-url", declarations: limit, turns, dmBeats: beats, providerCalls: [] }),
   };
   const markdown = renderMarkdown(artifact, options.baseline);
   const markdownPath = options.out.endsWith(".json") ? `${options.out.slice(0, -5)}.md` : `${options.out}.md`;
@@ -1299,19 +1362,19 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
 }
 
 async function runBaseDmBeat(
-  request: Requester, campaignId: string, sessionId: string, options: BaseUrlOptions, index: number,
+  request: Requester, campaignId: string, sessionId: string, runKey: string, index: number, intent: "open" | "continue",
 ): Promise<DmBeatRecord> {
   const started = Date.now();
   const control = JSON.parse((await request("GET", `/campaigns/${campaignId}/dm`)).body);
   let run = JSON.parse((await request("POST", `/campaigns/${campaignId}/rooms/${sessionId}/dm/beat-commands`,
-    { intent: index === 0 ? "open" : "continue", expectedModeRevision: control.revision, idempotencyKey: `ff-base-dm-${index}` })).body);
+    { intent, expectedModeRevision: control.revision, idempotencyKey: `ff-base-dm-${runKey}-${index}` })).body);
   if (run.state === "awaiting-approval") {
     const proposal = JSON.parse((await request("GET", `/campaigns/${campaignId}/rooms/${sessionId}/dm/runs/${run.runId}/proposal`)).body);
     run = JSON.parse((await request("POST", `/campaigns/${campaignId}/rooms/${sessionId}/dm/runs/${run.runId}/decision-commands`,
-      { decision: "approved", expectedRevision: proposal.run.revision, idempotencyKey: `ff-base-dm-approve-${index}` })).body);
+      { decision: "approved", expectedRevision: proposal.run.revision, idempotencyKey: `ff-base-dm-approve-${runKey}-${index}` })).body);
   }
   return {
-    index, intent: run.intent ?? (index === 0 ? "open" : "continue"), state: run.state ?? "unknown",
+    index, intent: run.intent ?? intent, state: run.state ?? "unknown",
     receipts: (run.receipts ?? []).map((receipt: any) => receipt.action),
     candidatesOffered: [], narration: run.narration ?? "", blockers: run.blockers ?? [],
     latencyMs: Date.now() - started, success: run.state === "completed",
@@ -1328,6 +1391,18 @@ export function argValue(args: readonly string[], name: string): string | undefi
   const index = args.indexOf(`--${name}`);
   if (index >= 0 && index + 1 < args.length && !args[index + 1]!.startsWith("--")) return args[index + 1];
   return undefined;
+}
+
+export function validateTurnCount(turns: number): void {
+  if (!Number.isInteger(turns) || turns < 1 || turns > FREEFORM_DECLARATIONS.length) {
+    throw new Error(`--turns must be an integer between 1 and ${FREEFORM_DECLARATIONS.length}`);
+  }
+}
+
+function printVerdict(verdict: EvalVerdict): void {
+  process.stdout.write(`\nResult: ${verdict.passed ? "PASS" : "FAIL"}\n`);
+  for (const failure of verdict.failures) process.stdout.write(`- ${failure}\n`);
+  if (!verdict.passed) process.exitCode = 1;
 }
 
 function printMetricTable(metrics: FreeformMetrics, baseline: BaselineMetrics | null): void {
@@ -1364,6 +1439,7 @@ async function main(): Promise<void> {
       actorId: argValue(args, "actor-id"), turns, out, baseline, quiet,
     });
     printMetricTable(artifact.metrics, baseline);
+    printVerdict(artifact.verdict);
     process.stdout.write(`\njson: ${out}\nmarkdown: ${out.endsWith(".json") ? out.slice(0, -5) : out}.md\n`);
     return;
   }
@@ -1375,6 +1451,7 @@ async function main(): Promise<void> {
     out, baseline, keep: args.includes("--keep"), quiet,
   });
   printMetricTable(result.artifact.metrics, baseline);
+  printVerdict(result.artifact.verdict);
   process.stdout.write(`\njson: ${result.output}\nmarkdown: ${result.markdownPath}\n`);
 }
 

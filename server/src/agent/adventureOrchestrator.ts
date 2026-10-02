@@ -31,6 +31,7 @@ import { ADVENTURE_TOOL_LIMITATIONS, executeAdventureRead, parseAdventureToolArg
 import { adventurePlanningMessages } from "./adventurePrompt.js";
 import { candidateLabels, labeled, type LabeledCandidate } from "./providerCandidateProjection.js";
 import { declarationCheckCandidateLabel, mapDeclarationToCheck } from "./declarationCheckMap.js";
+import { isDirectDeclarationAttempt, isRoutineObservationDeclaration } from "./declarationAttempt.js";
 import { adventureTurnBudgets, type TurnBudgetPolicy } from "./turnBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "./directToolReasoning.js";
 import { detectAttackTarget } from "./attackIntent.js";
@@ -384,6 +385,7 @@ function resolveHeldRestProposal(repository: Repository, turn: PrivateAdventureT
   { turn: PrivateAdventureTurn; outcome: "awaiting-confirmation" | "mechanics-committed" } | null {
   if (!locationAllowed) return null;
   if (turn.mode !== "original" || turn.receiptLinks.length > 0 || turn.toolCalls.length > 0) return null;
+  if (declarationIntent(declaration).steps.length > 1) return null;
   const rest = selectHeldRestCandidate(declaration, candidates);
   if (!rest) return null;
   const decisionId = id("server-hold-rest", turn.turnId, rest.candidateId);
@@ -444,6 +446,7 @@ function resolveHeldCommerceProposal(repository: Repository, turn: PrivateAdvent
   { turn: PrivateAdventureTurn; outcome: "awaiting-confirmation" | "mechanics-committed" } | null {
   if (!locationAllowed) return null;
   if (turn.mode !== "original" || turn.receiptLinks.length > 0 || turn.toolCalls.length > 0) return null;
+  if (declarationIntent(declaration).steps.length > 1) return null;
   const commerce = selectHeldCommerceCandidate(declaration, candidates);
   if (!commerce) return null;
   const decisionId = id("server-hold-commerce", turn.turnId, commerce.candidateId);
@@ -518,6 +521,8 @@ export function resolveHeldDeclarationAsCheck(repository: Repository, turn: Priv
   candidates: ReturnType<Repository["generateAdventureCheckCandidates"]>, now: Date): boolean {
   try {
     if (turn.mode !== "original" || turn.receiptLinks.length > 0 || turn.toolCalls.length > 0) return false;
+    // A later check must not leapfrog an unresolved purchase, journey or conversation.
+    if (declarationIntent(turn.declaration).steps.length > 1) return false;
     const mapping = mapDeclarationToCheck(turn.declaration);
     if (!mapping || mapping.confidence !== "strong") return false;
     const candidate = candidates.find((entry) => entry.label === declarationCheckCandidateLabel(mapping));
@@ -785,6 +790,7 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 }
 
 export function relevantCheckCandidates<T extends {label:string}>(candidates:readonly T[],declaration:string):T[]{
+  if (isRoutineObservationDeclaration(declaration)) return [];
   const words=[...new Set(declaration.toLowerCase().match(/[a-z]+/gu)??[])].filter((word)=>word.length>=4);
   const scored=candidates.map((candidate)=>({candidate,score:words.filter((word)=>candidate.label.toLowerCase().includes(word)).length}));
   const maximum=Math.max(0,...scored.map(({score})=>score));
@@ -1112,9 +1118,10 @@ export interface HeldDeclarationContext {
 /** The deterministic, advertised rest candidate a declaration names, or null. */
 export function selectHeldRestCandidate<T extends { restKind: "short" | "long" }>(
   declaration: string, candidates: readonly T[]): T | null {
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0 || !isDirectDeclarationAttempt(declaration)) return null;
   const text = declaration.toLocaleLowerCase("en-US");
-  const wantsShort = /\bshort\b/u.test(text), wantsLong = /\blong\b/u.test(text);
+  // Duration adjectives alone ("a long story", "a short sword") never request a rest.
+  const wantsShort = /\bshort\s+rest\b/u.test(text), wantsLong = /\blong\s+rest\b/u.test(text);
   if (wantsShort && !wantsLong) return candidates.find((candidate) => candidate.restKind === "short") ?? null;
   if (wantsLong && !wantsShort) return candidates.find((candidate) => candidate.restKind === "long") ?? null;
   return null;
@@ -1152,10 +1159,14 @@ export function selfDirectedCommerceDeclaration(declaration: string): boolean {
  */
 export function selectHeldCommerceCandidate<T extends { action: string; vendorLabel: string; itemLabel: string }>(
   declaration: string, candidates: readonly T[]): T | null {
+  if (!isDirectDeclarationAttempt(declaration)) return null;
   const text = declaration.toLocaleLowerCase("en-US");
-  const action = /\b(?:buy|buys|bought|purchase|purchases|purchased|order|orders|ordered)\b/u.test(text) ? "buy"
-    : /\b(?:sell|sells|sold)\b/u.test(text) ? "sell"
-      : /\b(?:give|gives|gave|given|gift|gifts|hand|hands|handed|donate|donates|donated)\b/u.test(text) ? "give" : null;
+  const actions = [
+    /\b(?:buy|buys|buying|bought|purchase|purchases|purchasing|purchased|order|orders|ordering|ordered)\b/u.test(text) ? "buy" : null,
+    /\b(?:sell|sells|selling|sold)\b/u.test(text) ? "sell" : null,
+    /\b(?:give|gives|giving|gave|given|gift|gifts|gifting|hand|hands|handing|handed|donate|donates|donating|donated)\b/u.test(text) ? "give" : null,
+  ].filter((action) => action !== null);
+  const action = actions.length === 1 ? actions[0] : null;
   if (!action) return null;
   if (selfDirectedCommerceDeclaration(declaration)) return null;
   const candidatesForAction = candidates.filter((candidate) => candidate.action === action);
@@ -1168,7 +1179,7 @@ export function selectHeldCommerceCandidate<T extends { action: string; vendorLa
   return matches.length === 1 ? matches[0]! : null;
 }
 
-/** The first travel row for a named destination, or the first advertised row. */
+/** Only a travel row for the named destination is a relevant suggestion. */
 function suggestedTravelCandidate(travelCandidates: HeldDeclarationContext["travelCandidates"], destination: string | null):
   HeldDeclarationContext["travelCandidates"][number] | null {
   if (destination) {
@@ -1176,7 +1187,7 @@ function suggestedTravelCandidate(travelCandidates: HeldDeclarationContext["trav
       && normalized(candidate.semanticLabel.target) === normalized(destination));
     if (named) return named;
   }
-  return travelCandidates[0] ?? null;
+  return null;
 }
 
 /**
@@ -1186,6 +1197,9 @@ function suggestedTravelCandidate(travelCandidates: HeldDeclarationContext["trav
 export function describeHeldDeclaration(context: HeldDeclarationContext): AdventureHold {
   const reference = declarationLocationReference(context.declaration, context.currentLocation, context.destinationNames);
   const intent = declarationIntent(context.declaration);
+  const namesCurrentAsSource = context.currentLocation !== null
+    && [`from ${normalized(context.currentLocation)}`, `from the ${normalized(context.currentLocation)}`]
+      .some(source => ` ${normalized(context.declaration)} `.includes(` ${source} `));
   const compoundPending = intent.steps.length >= 2
     ? intent.steps.slice(1).find((step) => step.commerce || step.rest || step.check || step.combat || step.quest) : undefined;
   if (reference.mismatchedDestination) {
@@ -1198,7 +1212,7 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
   }
   const rest = selectHeldRestCandidate(context.declaration, context.restCandidates);
   const commerce = selectHeldCommerceCandidate(context.declaration, context.commerceCandidates);
-  if (intent.travel && reference.namesCurrentLocation && reference.namedDestinations.length === 0) {
+  if (intent.travel && reference.namesCurrentLocation && !namesCurrentAsSource && reference.namedDestinations.length === 0) {
     const destination = context.destinationNames.find((name) => !context.currentLocation || normalized(name) !== normalized(context.currentLocation));
     return { reason: "already-at-location", suggestedCandidateId: null,
       message: `The actor is already at ${context.currentLocation ?? "the declared place"}.`,
@@ -1209,11 +1223,21 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
       : compoundPending.rest ? "the rest"
         : compoundPending.check ? "the check"
           : compoundPending.combat ? "the attack" : "the next step";
-    const suggestion = commerce ? `Buy ${commerce.itemLabel} from ${commerce.vendorLabel}`
-      : rest ? `Take a ${rest.restName.toLowerCase()}` : null;
-    return { reason: "pending-compound-step", suggestedCandidateId: commerce?.candidateId ?? rest?.candidateId ?? null,
-      message: `Only the first step of a compound declaration can run this turn; ${pending} remains pending.`,
-      suggestedNextStep: suggestion ?? "Restate the remaining step on the next turn" };
+    // Suggestions must preserve the player's order too: a later advertised rest or transaction
+    // cannot stand in for an unresolved first step just because it has an exact candidate.
+    const first = intent.steps[0]!.text;
+    const firstCommerce = selectHeldCommerceCandidate(first, context.commerceCandidates);
+    const firstRest = selectHeldRestCandidate(first, context.restCandidates);
+    const firstMapping = mapDeclarationToCheck(first);
+    const firstCheck = firstMapping?.confidence === "strong" ? context.checkCandidates.find((candidate) =>
+      candidate.label === declarationCheckCandidateLabel(firstMapping)) : undefined;
+    const suggestion = firstCommerce
+      ? `${firstCommerce.action === "buy" ? "Buy" : firstCommerce.action === "sell" ? "Sell" : "Give"} ${firstCommerce.itemLabel} ${firstCommerce.action === "buy" ? "from" : "to"} ${firstCommerce.vendorLabel}`
+      : firstRest ? `Take a ${firstRest.restName.toLowerCase()}`
+        : firstCheck ? `Resolve the ${firstMapping!.skill} attempt first` : null;
+    return { reason: "pending-compound-step", suggestedCandidateId: firstCommerce?.candidateId ?? firstRest?.candidateId ?? firstCheck?.candidateId ?? null,
+      message: `No step of this compound declaration was committed; ${pending} remains pending after the first step.`,
+      suggestedNextStep: suggestion ?? "Clarify or restate the first step before continuing" };
   }
   if (rest) {
     return { reason: "no-advertised-match", suggestedCandidateId: rest.candidateId,
@@ -1244,9 +1268,12 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
         ? "The declared transaction does not name an advertised item and vendor; no mechanics were committed."
         : "The declared transaction is not advertised from the current state; no vendor candidate is available." };
   }
-  const travel = suggestedTravelCandidate(context.travelCandidates, reference.namedDestinations[0] ?? null);
+  const travel = intent.travel
+    ? suggestedTravelCandidate(context.travelCandidates, reference.namedDestinations[0] ?? null) : null;
   return { reason: "no-advertised-match", suggestedCandidateId: travel?.candidateId ?? null,
-    message: "The declaration names no advertised exact action that can be committed from the current state.",
+    message: intent.travel && !travel
+      ? "No matching travel route is advertised for the requested destination; no journey was committed."
+      : "The declaration names no advertised exact action that can be committed from the current state.",
     suggestedNextStep: travel ? `Travel to ${travel.semanticLabel?.target ?? "an advertised destination"}` : null };
 }
 export function initializeAdventureTurnBudget(turn: PrivateAdventureTurn, policy: TurnBudgetPolicy): void {
@@ -1605,7 +1632,9 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   // at the current place either. The location-bound exact rows are already withheld above, so this
   // removes the only remaining whole-check shortcut; navigation stays advertised. Recovery keeps
   // the persisted tool set untouched so an in-flight settlement never changes shape.
-  const gatedTools = locationAllowed ? currentTools : currentTools.filter((tool)=>tool.name!=="actor_dice.roll");
+  // Routine observation must not acquire a fabricated check through the raw-roll shortcut either.
+  const allowDice = locationAllowed && !isRoutineObservationDeclaration(turn.declaration);
+  const gatedTools = allowDice ? currentTools : currentTools.filter((tool)=>tool.name!=="actor_dice.roll");
   const persistedToolNames=earlyRecovery?.response?.status==="succeeded"&&Array.isArray((earlyRecovery.request as any)?.advertisedTools)
     ?new Set((earlyRecovery.request as any).advertisedTools as string[]):null;
   const selected = persistedToolNames?gatedTools.filter((tool)=>persistedToolNames.has(tool.name)):gatedTools;

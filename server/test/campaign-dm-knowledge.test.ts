@@ -139,9 +139,9 @@ describe("director narration knowledge channel", () => {
     const npcs = Array.from({ length: 5 }, (_, index) => createNpc(f, db, index, true));
     const ledgerDb = openDb();
     const ledger = createAgentObservationRepository(ledgerDb, { clock, ids });
-    const long = "w".repeat(400);
     for (const npcId of npcs) {
-      for (let index = 0; index < 6; index += 1) observe(ledger, f, npcId, `${long} ${index}`, "verified");
+      for (let index = 0; index < 6; index += 1) observe(ledger, f, npcId, `The witness saw lantern ${index} on the road.`, "verified");
+      observe(ledger, f, npcId, `${"The witness considered the accusation. ".repeat(9)}But it was not true.`, "verified");
     }
     const runId = runBeat(f);
     const { npcKnowledge } = knowledgeContext(runId);
@@ -149,9 +149,38 @@ describe("director narration knowledge channel", () => {
     expect(npcKnowledge.length).toBeGreaterThan(0);
     for (const npc of npcKnowledge) {
       expect(npc.entries.length).toBeLessThanOrEqual(4);
-      for (const entry of npc.entries) expect(entry.text.length).toBeLessThanOrEqual(300);
+      for (const entry of npc.entries) {
+        expect(entry.text.length).toBeLessThanOrEqual(300);
+        expect(entry.text).toMatch(/^The witness saw lantern \d on the road\.$/);
+      }
     }
     ledgerDb.close();
+    db.close();
+    f.repo.close();
+  });
+
+  it("keeps verified evidence ahead of newer hearsay and lets knowledgeable cast members survive empty-NPC slots", async () => {
+    const f = await dmFixture();
+    f.graph();
+    const db = openDb();
+    const npcs = Array.from({ length: 6 }, (_, index) => createNpc(f, db, index, true)).sort();
+    const knowledgeable = npcs[4]!;
+    const relation = openDb(false);
+    relation.prepare(`INSERT INTO campaign_npc_relationships_v32
+      (campaign_id,npc_id,actor_id,affinity,trust,fear,last_command_id,updated_at) VALUES(?,?,?,?,?,?,?,?)`)
+      .run(f.campaign.id, knowledgeable, f.actorId, 0, 0, 0, "knowledge-relationship", new Date(BASE).toISOString());
+    relation.close();
+    const ledger = createAgentObservationRepository(db, { clock, ids });
+    observe(ledger, f, knowledgeable, "The hero did not steal the lantern.", "verified");
+    for (let index = 0; index < 5; index++) {
+      observe(ledger, f, knowledgeable, `The hero stole lantern ${index}, according to gossip.`, "rumor");
+    }
+    const { npcKnowledge } = knowledgeContext(runBeat(f));
+    expect(npcKnowledge).toHaveLength(1);
+    expect(npcKnowledge[0]!.npcId).toBe(knowledgeable);
+    expect(npcKnowledge[0]!.entries).toHaveLength(4);
+    expect(npcKnowledge[0]!.entries[0]).toMatchObject({ text: "The hero did not steal the lantern.", authority: "verified" });
+    expect(npcKnowledge[0]!.entries.slice(1).every(entry => entry.authority === "rumor")).toBe(true);
     db.close();
     f.repo.close();
   });

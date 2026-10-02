@@ -7,8 +7,10 @@ import type { ProviderCompletionInput, ProviderCompletionResult } from "../src/p
 import { buildApp } from "../src/app.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { createRepository } from "../src/repo/index.js";
+import { createAgentObservationRepository } from "../src/repo/observations/agentObservationRepo.js";
 import {
-  conversationNarrationEligible, conversationNarrationMatches, narrationFallback, CONVERSATION_NARRATION_PROMPT_VERSION,
+  conversationNarrationEligible, conversationNarrationMatches, declarationAllowsConversationNarration,
+  holdNarrationIsWarranted, narrationFallback, CONVERSATION_NARRATION_PROMPT_VERSION,
 } from "../src/routes/rpg/v1/adventureTurns.js";
 import { VELVET_LEGACY_RULESET_DESCRIPTOR } from "../src/rulesets/index.js";
 import { useTmpDataDir } from "./helpers.js";
@@ -104,6 +106,123 @@ const variant = (app: ReturnType<typeof buildApp>, campaignId: string, priorTurn
     payload: { variant: mode, campaignId, sessionId: "session", actorId: "actor", priorTurnId, expectedRevision: 0, idempotencyKey } });
 
 describe("conversation narration for held turns", () => {
+  it("narrates original social and observation holds with present NPC knowledge and no invented mechanics", async () => {
+    enable();
+    const campaign = seed(), repo = createRepository({ clock: { now: () => new Date(at) } });
+    const persona = repo.createCharacter({ name: "Maren", age: 40, archetype: "Keeper", boundaries: "", fictionalConfirmed: true });
+    repo.createNpc("local-owner", { campaignId: campaign.id, npcId: "maren", personaId: persona.id, name: "Maren", speechControl: "manual" });
+    repo.mutateNpcPresence("local-owner", { campaignId: campaign.id, sessionId: "session", npcId: "maren",
+      expectedRevision: 0, idempotencyKey: "maren-present", mutation: { kind: "place", locationId: "quay" } });
+    repo.createLocation("local-owner", { campaignId: campaign.id, locationId: "remote", name: "Remote Camp", description: "Far away." });
+    for (const npcId of ["remote-witness", "absent-witness"]) {
+      const witness = repo.createCharacter({ name: npcId, age: 30, archetype: "Witness", boundaries: "", fictionalConfirmed: true });
+      repo.createNpc("local-owner", { campaignId: campaign.id, npcId, personaId: witness.id, name: npcId, speechControl: "manual" });
+    }
+    repo.mutateNpcPresence("local-owner", { campaignId: campaign.id, sessionId: "session", npcId: "remote-witness",
+      expectedRevision: 1, idempotencyKey: "witness-remote", mutation: { kind: "place", locationId: "remote" } });
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    let sequence = 0;
+    const ledger = createAgentObservationRepository(db, { clock: { now: () => new Date(at) }, ids: { nextId: () => `social-knowledge-${++sequence}` } });
+    for (const [authority, text] of [["verified", "The road's old bridge is closed."], ["rumor", "ROAD-PRIVATE-RUMOR"]] as const) {
+      ledger.record({ campaignId: campaign.id, timelineId: campaign.activeTimelineId, agentKind: "npc", agentId: "maren",
+        sourceCommandId: `social-observation-${authority}`, observedRevision: 0, channel: "witnessed", hopCount: 0, text, authority });
+    }
+    for (const agentId of ["remote-witness", "absent-witness"]) ledger.record({ campaignId: campaign.id,
+      timelineId: campaign.activeTimelineId, agentKind: "npc", agentId, sourceCommandId: `observation-${agentId}`,
+      observedRevision: 0, channel: "witnessed", hopCount: 0, text: `The road has OFFSCENE-KNOWLEDGE-${agentId}.`, authority: "verified" });
+    db.close();
+    const calls: ProviderCompletionInput[] = [];
+    const prose = 'Maren answers, "The old bridge is closed. What part of the road concerns you?"';
+    const replies = [prose, 'Maren asks, "What kind of work are you looking for?"',
+      'Maren asks, "What brings you here?"', "A bronze bell waits at the fog-damp landing."];
+    let narrationCount = 0;
+    const app = buildApp({ campaignRepositoryFactory: () => repo, adventureAgentDependencies: dependencies(async input => {
+      calls.push(input);
+      return input.tools?.some(tool => tool.name === "submit_adventure_narration") ? narrationResult(replies[narrationCount++]!)
+        : { message: { role: "assistant", content: "No mechanical action is needed." }, usage: null,
+          model: { requestedModel: "test", responseModel: "test" } };
+    }) });
+    try {
+      for (const [index, declaration] of ["I walk over to Maren and ask her what she knows about trouble on the road.",
+        "I ask Maren whether anyone has work for a traveler.", "I find Maren and ask what she makes of strangers.",
+        "I look around the quay."].entries()) {
+        const response = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream",
+          payload: { campaignId: campaign.id, sessionId: "session", actorId: "actor", declaration,
+            expectedRevision: 0, idempotencyKey: `original-social-${index}` } });
+        expect(response.statusCode, response.body).toBe(200);
+        expect(calls.at(-1)?.promptVersion, JSON.stringify(calls.map(call => ({ promptVersion: call.promptVersion, tools: call.tools?.map(tool => tool.name) }))))
+          .toBe(CONVERSATION_NARRATION_PROMPT_VERSION);
+        expect(events(response.body).at(-1), declaration).toMatchObject({ type: "terminal", payload: {
+          outcome: "done", receipts: [], narrationStatus: { text: replies[index], source: "provider-assisted" },
+        } });
+        expect(events(response.body).some(event => event.type === "tool_proposed")).toBe(false);
+        const narration = calls.at(-1)!;
+        expect(narration.promptVersion).toBe(CONVERSATION_NARRATION_PROMPT_VERSION);
+        if (index === 0) expect(JSON.stringify(narration.messages)).toContain("The road's old bridge is closed.");
+        expect(JSON.stringify(narration.messages)).not.toContain("ROAD-PRIVATE-RUMOR");
+        expect(JSON.stringify(narration.messages)).not.toContain("OFFSCENE-KNOWLEDGE");
+        const context = JSON.parse(String(narration.messages[1]!.content).split("\n\n").at(-1)!).publicCampaignContext;
+        expect(context.presentNpcNames).toEqual(["Maren"]);
+        expect(narration.messages[0]!.content).toContain("Only NPCs listed in presentNpcNames");
+      }
+      expect(calls.filter(call => call.promptVersion === CONVERSATION_NARRATION_PROMPT_VERSION)).toHaveLength(4);
+    } finally { await app.close(); }
+  });
+
+  it("rejects unreceipted mechanical gains from the original conversation narrator", async () => {
+    enable();
+    const campaign = seed(), repo = createRepository({ clock: { now: () => new Date(at) } });
+    const app = buildApp({ campaignRepositoryFactory: () => repo, adventureAgentDependencies: dependencies(async input =>
+      input.tools?.some(tool => tool.name === "submit_adventure_narration") ? narrationResult("You gain a sword.")
+        : { message: { role: "assistant", content: "No mechanics." }, usage: null,
+          model: { requestedModel: "test", responseModel: "test" } }) });
+    try {
+      const response = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream",
+        payload: { campaignId: campaign.id, sessionId: "session", actorId: "actor", declaration: "I ask about work.",
+          expectedRevision: 0, idempotencyKey: "original-social-no-gain" } });
+      expect(events(response.body).at(-1)).toMatchObject({ type: "terminal", payload: { receipts: [],
+        narrationStatus: { source: "deterministic-fallback", text: narrationFallback("I ask about work.", []) } } });
+    } finally { await app.close(); }
+  });
+
+  it("distinguishes conversation topics and local approaches from unresolved mechanical actions", () => {
+    for (const declaration of ["I ask the dockhands about the road.", "I ask Maren whether anyone has work.",
+      "I walk over to Maren and ask about the road.", "I find Maren and ask about strangers.", "I look around the quay."]) {
+      expect(declarationAllowsConversationNarration(declaration, ["Maren"]), declaration).toBe(true);
+      expect(holdNarrationIsWarranted({ reason: "no-advertised-match", message: "No exact match.",
+        suggestedNextStep: "Travel to Docks", suggestedCandidateId: "docks" }, declaration, ["Maren"])).toBe(false);
+    }
+    for (const declaration of ["I walk over to Docks and ask about the road.", "I attack Maren and ask about work.",
+      "I ask Maren and then buy a sword.", "I travel to the Sunken Cathedral.", "I search for hidden doors.", "I take a short rest."]) {
+      expect(declarationAllowsConversationNarration(declaration, ["Maren"]), declaration).toBe(false);
+    }
+  });
+
+  it.each([
+    "I take a slow look around the market square and take stock of who and what is here.",
+    "I take a look around the market square.",
+    "I have a quick look around the market square.",
+    "I take a careful look around the market square.",
+    "I take stock of who and what is here.",
+    "I take stock of what is here.",
+  ])("allows routine observation phrasing: %s", declaration => {
+    expect(declarationAllowsConversationNarration(declaration)).toBe(true);
+    expect(holdNarrationIsWarranted({ reason: "no-advertised-match", message: "No exact match.",
+      suggestedNextStep: "Travel to Docks", suggestedCandidateId: "docks" }, declaration)).toBe(false);
+  });
+
+  it.each([
+    "I take a careful look around for hidden doors.",
+    "I take a slow look around, searching for traps.",
+    "I take a slow look around and take a sword.",
+    "I take stock of who and what is here and attack the guard.",
+    "I have a quick look around and then travel to the Docks.",
+    "I look around with a Perception check.",
+    "I look around and climb the wall.",
+  ])("keeps uncertain or compound mechanical observation out of conversation: %s", declaration => {
+    expect(declarationAllowsConversationNarration(declaration)).toBe(false);
+  });
+
   it("persists provider conversation prose for a held turn's narration derivative without receipts or state changes", async () => {
     enable();
     const campaign = seed(), repo = createRepository();

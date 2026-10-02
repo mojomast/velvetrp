@@ -30,12 +30,27 @@ function toMemory(row: MemoryRow): MemoryFact {
 export async function addMemoryFacts(characterId: string, facts: NewMemoryFact[]): Promise<MemoryFact[]> {
   const db = getRepositoryDatabase();
   const seen = new Set<string>();
+  // A matching fact on an abandoned sibling must not prevent this branch from
+  // remembering it. Ancestor, manual, and cross-session facts still deduplicate.
   const existing = db.prepare(
-    "SELECT 1 FROM memories WHERE character_id = ? AND forgotten_at IS NULL AND lower(trim(content)) = lower(trim(?)) LIMIT 1",
+    `WITH RECURSIVE ancestry(id, parent_id) AS (
+      SELECT id, parent_id FROM messages WHERE id = ?
+      UNION
+      SELECT m.id, m.parent_id FROM messages m JOIN ancestry a ON m.id = a.parent_id
+    )
+    SELECT 1 FROM memories WHERE character_id = ? AND forgotten_at IS NULL
+      AND lower(trim(content)) = lower(trim(?))
+      AND (
+        source_turn_id IN (SELECT id FROM ancestry)
+        OR NOT EXISTS (
+          SELECT 1 FROM messages prior JOIN messages current ON prior.session_id = current.session_id
+          WHERE prior.id = memories.source_turn_id AND current.id = ?
+        )
+      ) LIMIT 1`,
   );
   const uniqueFacts = facts.filter((fact) => {
     const key = fact.content.trim().toLocaleLowerCase();
-    if (!key || seen.has(key) || existing.get(characterId, fact.content)) return false;
+    if (!key || seen.has(key) || existing.get(fact.sourceTurnId, characterId, fact.content, fact.sourceTurnId)) return false;
     seen.add(key);
     return true;
   });
@@ -72,15 +87,20 @@ export async function addMemoryFacts(characterId: string, facts: NewMemoryFact[]
   return created;
 }
 
-export async function listApprovedMemories(characterId: string, limit = 8): Promise<MemoryFact[]> {
+/** Optional ancestry excludes discarded same-session facts before applying the limit. */
+export async function listApprovedMemories(characterId: string, limit = 8, scope?: { sessionId: string; sourceTurnIds: string[] }): Promise<MemoryFact[]> {
   const rows = getRepositoryDatabase()
     .prepare(
       `SELECT * FROM memories
-       WHERE character_id = ? AND user_approved = 1 AND forgotten_at IS NULL
+        WHERE character_id = ? AND user_approved = 1 AND forgotten_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM messages WHERE messages.id = memories.source_turn_id AND messages.session_id = ?
+          AND messages.id NOT IN (SELECT value FROM json_each(?))
+        )
        ORDER BY created_at DESC, rowid DESC
        LIMIT ?`,
     )
-    .all(characterId, limit) as MemoryRow[];
+    .all(characterId, scope?.sessionId ?? null, JSON.stringify(scope?.sourceTurnIds ?? []), limit) as MemoryRow[];
   return rows.map(toMemory);
 }
 

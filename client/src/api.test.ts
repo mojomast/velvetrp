@@ -43,6 +43,58 @@ describe("P3.5 context inspection API binding", () => {
   });
 });
 
+describe("single-speaker stream completion", () => {
+  it.each(["message", "swipe"])("rejects premature EOF for %s", async (kind) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('event: delta\ndata: {"seq":0,"text":"partial"}\n\n')));
+    const onDelta = vi.fn(); const onDone = vi.fn();
+    const handle = kind === "message" ? streamMessage("session", "hello", undefined, { onDelta, onDone }) : streamSwipe("session", "reply", undefined, { onDelta, onDone });
+    await expect(handle.done).rejects.toThrow("ended before the turn completed");
+    expect(onDelta).toHaveBeenCalledExactlyOnceWith(0, "partial");
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it.each(["done", "boundary", "error", "aborted"])("settles at %s and ignores trailing frames without waiting for EOF", async (terminal) => {
+    const cancel = vi.fn();
+    const body = new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode(`event: ${terminal}\ndata: {}\n\nevent: delta\ndata: {"seq":1,"text":"late"}\n\nevent: done\ndata: {}\n\n`));
+    }, cancel });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body)));
+    const onDelta = vi.fn(); const onDone = vi.fn(); const onBoundary = vi.fn(); const onError = vi.fn(); const onAborted = vi.fn();
+    await streamMessage("session", "hello", undefined, { onDelta, onDone, onBoundary, onError, onAborted }).done;
+    expect(onDelta).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalledTimes(terminal === "done" ? 1 : 0);
+    expect(onBoundary).toHaveBeenCalledTimes(terminal === "boundary" ? 1 : 0);
+    expect(onError).toHaveBeenCalledTimes(terminal === "error" ? 1 : 0);
+    expect(onAborted).toHaveBeenCalledTimes(terminal === "aborted" ? 1 : 0);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe("room stream completion", () => {
+  it.each(["error", "disconnect"])("rejects a %s after preserving already received replies", async (failure) => {
+    const reply = { id: "saved-reply", content: "An answer already saved" };
+    const events = `event: room_reply\ndata: ${JSON.stringify({ reply, index: 0, total: 2 })}\n\n`
+      + (failure === "error" ? 'event: error\ndata: {"error":"Provider unavailable"}\n\n' : "");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(events)));
+    const handlers = { onReply: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
+    await expect(streamRoomContinuation("room", handlers)).rejects.toThrow(failure === "error" ? "Provider unavailable" : "ended before the turn completed");
+    expect(handlers.onReply).toHaveBeenCalledWith(reply, 0, 2);
+    expect(handlers.onDone).not.toHaveBeenCalled();
+    if (failure === "error") expect(handlers.onError).toHaveBeenCalledWith("Provider unavailable");
+  });
+
+  it("settles and releases the connection at room_done even when the transport stays open", async () => {
+    const cancel = vi.fn();
+    const result = { replies: [], messages: [] };
+    const body = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(`event: room_done\ndata: ${JSON.stringify(result)}\n\n`)); }, cancel });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body)));
+    const onDone = vi.fn();
+    await streamRoomContinuation("room", { onReply: vi.fn(), onDone });
+    expect(onDone).toHaveBeenCalledExactlyOnceWith(result);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+
 describe("tactical map API binding", () => {
   const at = "2030-01-01T00:00:00.000Z";
   const projection = { mapId: "map", width: 5, height: 5, grid: { kind: "square", feetPerCell: 5 }, tiles: [{ position: { x: 1, y: 1 }, terrain: "floor", visibility: "visible" }], tokens: [{ tokenId: "actor", label: "Hero", position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly" }], authoritativePath: null, reachable: [{ x: 1, y: 1 }] };
@@ -711,7 +763,7 @@ describe("opaque legacy URL path segments", () => {
   });
 
   it("uses the helper for every session and message path interpolation", async () => {
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}", { status: 200 })));
+    const fetchMock = vi.fn().mockImplementation((url, init?: RequestInit) => Promise.resolve(new Response((init?.headers as Record<string, string> | undefined)?.Accept === "text/event-stream" ? "event: room_done\ndata: {}\n\n" : String(url).endsWith("/stream") ? "event: done\ndata: {}\n\n" : "{}", { status: 200 })));
     vi.stubGlobal("fetch", fetchMock);
     const sessionId = " room/%?#雪 ";
     const messageId = " message/%?#龍 ";

@@ -678,6 +678,20 @@ export default function App() {
     setView(target);
   }
 
+  function openLibraryCampaign(campaignId: string, destination?: "world" | "play") {
+    cancelRoomOpenForNavigation();
+    const target: View = destination === "world" && campaignMechanicsAvailable && narrativeStudioAvailable ? "campaign-world"
+      : destination === "play" ? "campaign-rooms" : "campaign-overview";
+    const request = ++transitionRequestRef.current;
+    campaignEntryRef.current = true;
+    campaignDetailEntryRef.current = request;
+    studioEntryRef.current = request;
+    currentNavigationRef.current = { view: target, campaignId, chatReturnCampaignId: "" };
+    setChatReturnCampaignId("");
+    setActiveCampaignId(campaignId);
+    setView(target);
+  }
+
   function renderCurrentView() {
   const activeCharacter = characters.find((item) => item.id === activeCharacterId) ?? null;
   if (loading) return <main className="page"><section className="card loading-card"><h1 className="title">Velvet</h1><p className="subtitle">Opening your library…</p></section></main>;
@@ -695,7 +709,7 @@ export default function App() {
   if (view === "memory" && activeCharacter) return <main className="page"><MemoryManager character={activeCharacter} onClose={goHome} /></main>;
   if (view === "lore") return <main className="page"><LoreManager characters={characters} onClose={goHome} /></main>;
   if (view === "content-packs" && contentStudioAvailable) return <ContentPackLibraryPage api={contentPackLibraryApi} backLabel="← Campaigns" focusHeadingRequest={contentHeadingFocusRequest === contentStudioEntryRef.current ? contentHeadingFocusRequest : undefined} onHeadingFocused={(request) => setContentHeadingFocusRequest((current) => current === request ? null : current)} onBack={() => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; setContentReturnFocusRequest(request); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; setView("campaigns"); }} />;
-  if (view === "campaigns" && campaignLibraryAvailable) return <CampaignLibraryPage onBack={goHome} focusContentPacksRequest={contentReturnFocusRequest ?? undefined} onContentPacksFocused={(request) => setContentReturnFocusRequest((current) => current === request ? null : current)} onContentPacks={contentStudioAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; contentStudioEntryRef.current = request; setContentHeadingFocusRequest(request); currentNavigationRef.current = { view: "content-packs", campaignId: "", chatReturnCampaignId: "" }; setView("content-packs"); } : undefined} onOpen={(campaignId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-overview", campaignId, chatReturnCampaignId: "" }; setChatReturnCampaignId(""); campaignDetailEntryRef.current = ++transitionRequestRef.current; setActiveCampaignId(campaignId); setView("campaign-overview"); }} />;
+  if (view === "campaigns" && campaignLibraryAvailable) return <CampaignLibraryPage onBack={goHome} focusContentPacksRequest={contentReturnFocusRequest ?? undefined} onContentPacksFocused={(request) => setContentReturnFocusRequest((current) => current === request ? null : current)} onContentPacks={contentStudioAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; contentStudioEntryRef.current = request; setContentHeadingFocusRequest(request); currentNavigationRef.current = { view: "content-packs", campaignId: "", chatReturnCampaignId: "" }; setView("content-packs"); } : undefined} onOpen={openLibraryCampaign} />;
   if (view === "campaign-detail" && campaignLibraryAvailable && activeCampaignId) {
     const focusRequest = campaignHeadingFocusRequest?.campaignId === activeCampaignId
       && campaignHeadingFocusRequest.request === campaignDetailEntryRef.current ? campaignHeadingFocusRequest.request : undefined;
@@ -801,7 +815,7 @@ export default function App() {
 }
 
 interface ChatProps { embedded?: boolean; session: Session; initialMessages: ChatMessage[]; provider: ProviderSettings | null; harness: HarnessSettings | null; features: FeatureFlags; externalError: string | null; navigationBusy: boolean; onSessionChange: (session: Session) => void; onProviderChange: (provider: ProviderSettings) => void; onHarnessChange: (harness: HarnessSettings) => void; onOpenPrivate: (characterId: string) => Promise<void>; backLabel: string; onBack: () => void; }
-function Chat({ embedded = false, session, initialMessages, provider, harness, features, externalError, navigationBusy, onSessionChange, onProviderChange, onHarnessChange, onOpenPrivate, backLabel, onBack }: ChatProps) {
+function Chat({ embedded = false, session, initialMessages, provider, harness, features, externalError, navigationBusy, onSessionChange: updateSession, onProviderChange, onHarnessChange, onOpenPrivate, backLabel, onBack }: ChatProps) {
   const [messages, setMessages] = useState(initialMessages); const [draft, setDraft] = useState(""); const [targetId, setTargetId] = useState(session.primaryCharacterId); const [sending, setSending] = useState(false); const [roomSending, setRoomSending] = useState(false); const [error, setError] = useState<string | null>(null); const [streamText, setStreamText] = useState(""); const [streamSpeakerId, setStreamSpeakerId] = useState(session.primaryCharacterId); const [swipeInfo, setSwipeInfo] = useState<SiblingsResponse | null>(null); const [settingsOpen, setSettingsOpen] = useState(false);
   const handleRef = useRef<StreamHandle | null>(null); const streamRef = useRef(""); const scrollRef = useRef<HTMLDivElement>(null); const settingsTriggerRef = useRef<HTMLButtonElement>(null); const mobileSettingsDialogRef = useRef<HTMLDialogElement>(null);
   const followLatestRef = useRef(true); const [showJumpLatest, setShowJumpLatest] = useState(false);
@@ -811,6 +825,14 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
   const [autoRoomRounds, setAutoRoomRounds] = useState(() => { try { const saved = Number(localStorage.getItem("velvet.room.autoRounds") ?? 1); return Number.isFinite(saved) ? Math.max(0, Math.min(3, saved)) : 1; } catch { return 1; } });
   const [autoRunning, setAutoRunning] = useState(false);
   const stopAutoRef = useRef(false);
+  const activeChatRef = useRef(true);
+  const singleStreamRef = useRef<{ cancelPromise?: Promise<void> } | null>(null);
+  useEffect(() => { activeChatRef.current = true; return () => { activeChatRef.current = false; stopAutoRef.current = true; }; }, []);
+  function onSessionChange(next: Session) {
+    if (!activeChatRef.current) return;
+    if (next.state === "closed" || next.stoppedAt) stopAutoRef.current = true;
+    updateSession(next);
+  }
   const [contextBasket, setContextBasket] = useState<SessionContextBasket | null>(null);
   const [contextRevision, setContextRevision] = useState(0);
   const [overallUsage, setOverallUsage] = useState<UsageSummary | null>(null);
@@ -844,13 +866,74 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
     return { "--speaker-hue": String((258 + index * 137.508) % 360) } as CSSProperties;
   };
   const latestCharacter = useMemo(() => [...messages].reverse().find((item) => item.role === "character") ?? null, [messages]);
-  const latestUserParent = useMemo(() => latestCharacter?.parentId ? messages.find((item) => item.id === latestCharacter.parentId && item.role === "user") ?? null : null, [latestCharacter, messages]);
+  const latestUserParent = useMemo(() => latestCharacter?.parentId && messages.at(-1)?.id === latestCharacter.id ? messages.find((item) => item.id === latestCharacter.parentId && item.role === "user") ?? null : null, [latestCharacter, messages]);
+  useEffect(() => {
+    let current = true;
+    setSwipeInfo(null);
+    if (latestCharacter && latestUserParent) {
+      void getSiblings(session.id, latestCharacter.id).then((result) => { if (current) setSwipeInfo(result); }).catch(() => undefined);
+    }
+    return () => { current = false; };
+  }, [session.id, latestCharacter?.id, latestUserParent?.id]);
   const usage = messages.reduce((total, item) => total + (item.usage?.totalTokens ?? 0), 0);
   const formatCost = (value: number | null) => value === null ? "Pricing not configured" : value > 0 && value < .0001 ? "< $0.0001" : `$${value.toFixed(4)}`;
-  async function refreshSwipe(id: string) { try { setSwipeInfo(await getSiblings(session.id, id)); } catch { setSwipeInfo(null); } }
   async function saveSourceOfTruth() { if (navigationBusy) return; setSavingSource(true); setError(null); try { await updateSessionContext(session.id, sourceDraft); const { context } = await getSessionContext(session.id); setContextBasket(context); setSourceDraft(context.editableSource); sourceDialogRef.current?.close(); } catch (err) { setError(messageFor(err, "Could not save the scene source of truth.")); } finally { setSavingSource(false); } }
-  function applyResult(result: { messages?: ChatMessage[]; reply: ChatMessage; session?: Session; providerError?: boolean }) { const branch = result.messages ?? [...messages, result.reply]; setMessages(branch); setContextRevision((revision) => revision + 1); if (result.session) onSessionChange(result.session); if (result.providerError) setError("The provider could not be reached, so a safe fallback reply was saved."); const parent = result.reply.parentId ? branch.find((item) => item.id === result.reply.parentId) : null; if (parent?.role === "user") void refreshSwipe(result.reply.id); else setSwipeInfo(null); }
-  function finish() { setSending(false); setStreamText(""); streamRef.current = ""; handleRef.current = null; }
+  function applyResult(result: { messages?: ChatMessage[]; reply: ChatMessage; session?: Session; providerError?: boolean }) { setMessages((current) => result.messages ?? [...current, result.reply]); setContextRevision((revision) => revision + 1); if (result.session) onSessionChange(result.session); if (result.providerError) setError("The provider could not be reached, so a safe fallback reply was saved."); }
+  async function runSingleStream(start: (handlers: Parameters<typeof streamMessage>[3]) => StreamHandle, optimistic?: ChatMessage) {
+    const operation: { cancelPromise?: Promise<void> } = {};
+    singleStreamRef.current = operation;
+    const current = () => activeChatRef.current && singleStreamRef.current === operation;
+    const previousIds = new Set(messages.map((message) => message.id));
+    let receivedUser = false;
+    let completed = false;
+    const handle = start({
+      onUserMessage: (message) => {
+        if (!current()) return;
+        receivedUser = true;
+        setMessages((items) => items.map((item) => item.id === optimistic?.id ? message : item));
+      },
+      onDelta: (_seq, text) => { if (current()) { streamRef.current += text; setStreamText(streamRef.current); } },
+      onState: (next) => { if (current() && next) onSessionChange(next); },
+      onDone: (payload) => { if (current()) { completed = true; applyResult(payload); } },
+      onBoundary: (payload) => {
+        if (!current()) return;
+        completed = true; setStreamText(""); applyResult(payload);
+        setError("The reply crossed the agreed boundaries, so a boundary-safe reply was saved instead.");
+      },
+      onError: (text, violations) => { if (current()) setError(violations.length ? `${text}: ${violations.join("; ")}` : text); },
+    });
+    handleRef.current = handle;
+    try {
+      await handle.done;
+    } catch (err) {
+      if (current() && !(err instanceof Error && err.name === "AbortError")) setError(messageFor(err, "The reply was interrupted."));
+    } finally {
+      // Only this owner finalizes. A delayed cancel response must never finish a newer send.
+      await operation.cancelPromise;
+      if (current()) {
+        handleRef.current = null;
+        if (!completed || operation.cancelPromise) {
+          try {
+            const snapshot = await getSession(session.id);
+            if (!current()) return;
+            setMessages(snapshot.messages); onSessionChange(snapshot.session);
+            setContextRevision((revision) => revision + 1);
+            const savedUser = receivedUser || snapshot.messages.some((message) => !previousIds.has(message.id) && message.role === "user" && message.content === optimistic?.content);
+            if (optimistic && !savedUser) setDraft((draft) => draft || optimistic.content);
+          } catch {
+            if (current()) setError("The reply was interrupted and saved messages could not be refreshed. Reopen this chat to check what was saved before sending again.");
+          }
+        }
+        if (current()) {
+          singleStreamRef.current = null; setSending(false); setStreamText(""); streamRef.current = "";
+        }
+      }
+    }
+  }
+  function cancelSingleStream() {
+    const operation = singleStreamRef.current; const handle = handleRef.current;
+    if (operation && handle && !operation.cancelPromise) operation.cancelPromise = Promise.resolve().then(() => handle.cancel()).catch(() => undefined);
+  }
   const roomHandlers = () => ({
     onState: (next: Session | undefined) => { if (next) onSessionChange(next); },
     onReply: (reply: ChatMessage) => setMessages((current) => [...current, reply]),
@@ -858,10 +941,10 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
     onError: (text: string) => setError(text),
   });
   async function runAutomaticRounds(rounds: number) {
-    if (rounds < 1) return;
-    stopAutoRef.current = false; setAutoRunning(true);
+    if (rounds < 1 || !activeChatRef.current || stopAutoRef.current) return;
+    setAutoRunning(true);
     try {
-      for (let round = 0; round < rounds && !stopAutoRef.current; round++) {
+      for (let round = 0; round < rounds && activeChatRef.current && !stopAutoRef.current; round++) {
         await streamRoomContinuation(session.id, roomHandlers(), Math.min(roomMaxSpeakers, session.participants.length));
       }
     } finally { setAutoRunning(false); }
@@ -872,7 +955,7 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
     const optimistic: ChatMessage = { id: `local-${Date.now()}`, sessionId: session.id, role: "user", speakerCharacterId: null, content, parentId: null, createdAt: new Date().toISOString() };
     setMessages((current) => [...current, optimistic]);
     if (roomTurn) {
-      setRoomSending(true); let receivedUser = false;
+      stopAutoRef.current = false; setRoomSending(true); let receivedUser = false;
       try {
         await streamRoomMessage(session.id, content, {
           onUserMessage: (message) => { receivedUser = true; setMessages((current) => current.map((item) => item.id === optimistic.id ? message : item)); },
@@ -885,24 +968,23 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
         await runAutomaticRounds(autoRoomRounds);
       } catch (err) {
         setError(messageFor(err, "Failed to send message to the room."));
-        if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content);
+        if (!receivedUser) { setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); }
       } finally { setRoomSending(false); setSending(false); }
       return;
     }
     if (provider?.streaming) {
-      let receivedUser = false; const handle = streamMessage(session.id, content, targetId, { onUserMessage: (message) => { receivedUser = true; setMessages((current) => current.map((item) => item.id === optimistic.id ? message : item)); }, onDelta: (_seq, text) => { streamRef.current += text; setStreamText(streamRef.current); }, onState: (next) => { if (next) onSessionChange(next); }, onDone: (payload) => applyResult(payload), onBoundary: (payload) => { setStreamText(""); applyResult(payload); setError("The reply crossed the agreed boundaries, so a boundary-safe reply was saved instead."); }, onError: (text, violations) => { setError(violations.length ? `${text}: ${violations.join("; ")}` : text); if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); } });
-      handleRef.current = handle; try { await handle.done; } catch (err) { if (!(err instanceof Error && err.name === "AbortError")) { setError(messageFor(err, "Failed to send message.")); if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); } } finally { finish(); } return;
+      await runSingleStream((handlers) => streamMessage(session.id, content, targetId, handlers), optimistic); return;
     }
     try { applyResult(await sendMessage(session.id, content, targetId)); } catch (err) { setError(messageFor(err, "Failed to send message.")); setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); } finally { setSending(false); }
   }
   async function continueAs() { if (sending || navigationBusy || closed) return; setSending(true); setStreamSpeakerId(targetId); setError(null); try { applyResult(await continueSession(session.id, targetId)); } catch (err) { setError(messageFor(err, "Could not continue the scene.")); } finally { setSending(false); } }
   async function continueRoomTurn() { if (sending || navigationBusy || closed || session.participants.length < 2 || !latestCharacter) return; setSending(true); setRoomSending(true); setError(null); setSwipeInfo(null); try { await streamRoomContinuation(session.id, roomHandlers(), Math.min(roomMaxSpeakers, session.participants.length)); } catch (err) { setError(messageFor(err, "Could not give the room another turn.")); } finally { setRoomSending(false); setSending(false); } }
-  async function regenerate() { if (!latestCharacter || !latestUserParent || sending || navigationBusy || closed) return; setSending(true); setStreamSpeakerId(targetId); setError(null); if (provider?.streaming) { const handle = streamSwipe(session.id, latestCharacter.id, targetId, { onDelta: (_seq, text) => { streamRef.current += text; setStreamText(streamRef.current); }, onDone: applyResult, onBoundary: (payload) => { applyResult(payload); setError("The reply crossed the agreed boundaries, so a boundary-safe reply was saved instead."); }, onError: (text) => setError(text) }); handleRef.current = handle; try { await handle.done; } catch (err) { if (!(err instanceof Error && err.name === "AbortError")) setError(messageFor(err, "Failed to regenerate reply.")); } finally { finish(); } } else { try { applyResult(await swipeMessage(session.id, latestCharacter.id, targetId)); } catch (err) { setError(messageFor(err, "Failed to regenerate reply.")); } finally { setSending(false); } } }
+  async function regenerate() { if (!latestCharacter || !latestUserParent || sending || navigationBusy || closed) return; setSending(true); setStreamSpeakerId(targetId); setError(null); if (provider?.streaming) { await runSingleStream((handlers) => streamSwipe(session.id, latestCharacter.id, targetId, handlers)); } else { try { applyResult(await swipeMessage(session.id, latestCharacter.id, targetId)); } catch (err) { setError(messageFor(err, "Failed to regenerate reply.")); } finally { setSending(false); } } }
   async function retry() { if (!latestCharacter || !latestUserParent || sending || navigationBusy || closed) return; setSending(true); setError(null); try { applyResult(await branchMessage(session.id, latestCharacter.id, latestUserParent.content, targetId)); } catch (err) { setError(messageFor(err, "Failed to retry turn.")); } finally { setSending(false); } }
-  async function navigateSwipe(direction: -1 | 1) { if (!swipeInfo || sending || navigationBusy) return; const sorted = [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0)); const active = swipeInfo.activeMessageId ?? latestCharacter?.id; const target = sorted[sorted.findIndex((item) => item.id === active) + direction]; if (!target) return; setSending(true); try { const data = await activateMessage(session.id, target.id); setMessages(data.messages); await refreshSwipe(target.id); } catch (err) { setError(messageFor(err, "Could not switch reply.")); } finally { setSending(false); } }
+  async function navigateSwipe(direction: -1 | 1) { if (!swipeInfo || sending || navigationBusy) return; const sorted = [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0)); const active = swipeInfo.activeMessageId ?? latestCharacter?.id; const target = sorted[sorted.findIndex((item) => item.id === active) + direction]; if (!target) return; setSending(true); setError(null); try { const data = await activateMessage(session.id, target.id); setMessages(data.messages); setContextRevision((revision) => revision + 1); } catch (err) { setError(messageFor(err, "Could not switch reply.")); } finally { setSending(false); } }
   const sortedSwipes = swipeInfo ? [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0)) : []; const activeSwipe = sortedSwipes.findIndex((item) => item.id === (swipeInfo?.activeMessageId ?? latestCharacter?.id));
   const chat = <section className={`chat-app ${settingsOpen ? "settings-visible" : ""}`} style={{ "--settings-width": `${settingsWidth}px` } as CSSProperties}>
-    <div className="chat-main"><header className="chat-header"><div><button className="back-link" onClick={onBack}>{backLabel}</button>{embedded ? <h2 className="chat-title">{session.title || session.participants.map((item) => item.name).join(" & ")}</h2> : <h1 className="chat-title">{session.title || session.participants.map((item) => item.name).join(" & ")}</h1>}<p className="chat-meta">{session.participants.map((item) => item.name).join(" · ")} · {session.state}</p><p className="chat-meta token-status">ACTIVE BRANCH // {usage.toLocaleString()} TOKENS{overallUsage ? ` · LIFETIME // ${overallUsage.totalTokens.toLocaleString()} TOKENS · ${formatCost(overallUsage.estimatedCostUsd)}` : ""}</p></div><div className="chat-actions">{handleRef.current && <button className="ghost" disabled={navigationBusy} onClick={() => { if (!navigationBusy) void handleRef.current?.cancel().finally(finish); }}>Stop generating</button>}<button ref={settingsTriggerRef} className="ghost" disabled={navigationBusy} aria-expanded={settingsOpen} onClick={() => { if (!navigationBusy) setSettingsOpen((open) => !open); }}>Prompt & settings</button><button className="danger" disabled={closed || navigationBusy} onClick={() => { if (!navigationBusy) void stopSession(session.id).then(onSessionChange).catch((err) => setError(messageFor(err, "Could not end session."))); }}>End session</button></div></header>
+    <div className="chat-main"><header className="chat-header"><div><button className="back-link" onClick={onBack}>{backLabel}</button>{embedded ? <h2 className="chat-title">{session.title || session.participants.map((item) => item.name).join(" & ")}</h2> : <h1 className="chat-title">{session.title || session.participants.map((item) => item.name).join(" & ")}</h1>}<p className="chat-meta">{session.participants.map((item) => item.name).join(" · ")} · {session.state}</p><p className="chat-meta token-status">ACTIVE BRANCH // {usage.toLocaleString()} TOKENS{overallUsage ? ` · LIFETIME // ${overallUsage.totalTokens.toLocaleString()} TOKENS · ${formatCost(overallUsage.estimatedCostUsd)}` : ""}</p></div><div className="chat-actions">{handleRef.current && <button className="ghost" disabled={navigationBusy} onClick={() => { if (!navigationBusy) cancelSingleStream(); }}>Stop generating</button>}<button ref={settingsTriggerRef} className="ghost" disabled={navigationBusy} aria-expanded={settingsOpen} onClick={() => { if (!navigationBusy) setSettingsOpen((open) => !open); }}>Prompt & settings</button><button className="danger" disabled={closed || navigationBusy} onClick={() => { if (!navigationBusy) void stopSession(session.id).then(onSessionChange).catch((err) => setError(messageFor(err, "Could not end session."))); }}>End session</button></div></header>
       {overallUsage && <details className="usage-dashboard"><summary>Overall usage & estimated cost <span>{overallUsage.totalTokens.toLocaleString()} tokens · {formatCost(overallUsage.estimatedCostUsd)}</span></summary><div className="usage-totals"><div><strong>{overallUsage.promptTokens.toLocaleString()}</strong><small>Prompt tokens</small></div><div><strong>{overallUsage.completionTokens.toLocaleString()}</strong><small>Completion tokens</small></div><div><strong>{overallUsage.calls.toLocaleString()}</strong><small>Tracked calls</small></div><div><strong>{formatCost(overallUsage.estimatedCostUsd)}</strong><small>Estimated lifetime cost</small></div></div><p className="meta-text">{overallUsage.providerMeasuredTokens.toLocaleString()} provider-reported tokens · {overallUsage.estimatedTokens.toLocaleString()} locally estimated tokens. Cost uses ${overallUsage.pricing.promptPerMillion ?? "unset"}/M input and ${overallUsage.pricing.completionPerMillion ?? "unset"}/M output.</p><div className="usage-breakdowns"><section><h3>By operation</h3>{overallUsage.byKind.map((item) => <p key={item.kind}><span>{item.kind.replaceAll("_", " ")}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section><section><h3>By model</h3>{overallUsage.byModel.map((item) => <p key={item.model}><span>{item.model}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section><section><h3>Top sessions</h3>{overallUsage.bySession.slice(0, 8).map((item) => <p key={item.sessionId}><span>{item.title || "Untitled session"}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section></div></details>}
       {closed && <p className="closed-banner">This session is closed{session.stopReason ? ` (${session.stopReason})` : ""}. You can read its history, but it is no longer writable.</p>}
       {contextBasket && <details className="context-basket" open><summary>Shared context basket <span>{contextBasket.recentEvents.length + contextBasket.rememberedFacts.length + contextBasket.activeLore.length} elements</span></summary><div className="source-truth"><div><span className="eyebrow">AUTHORITATIVE SCENE · LIVE</span><p>{contextBasket.sourceOfTruth}</p><div className="source-timestamps">{contextBasket.sourceUpdatedAt && <small>Manual canon updated {new Date(contextBasket.sourceUpdatedAt).toLocaleString()}</small>}{contextBasket.synthesizedUpdatedAt && <small>Scene facts synthesized {new Date(contextBasket.synthesizedUpdatedAt).toLocaleString()}</small>}</div></div><button className="primary small" disabled={navigationBusy} onClick={() => { if (!navigationBusy) { setSourceDraft(contextBasket.editableSource); sourceDialogRef.current?.showModal(); } }}>Edit manual canon</button></div><div className="context-grid"><section><h3>Participants</h3>{contextBasket.participants.map((participant) => <p key={participant.id}><strong>{participant.name}</strong> · {participant.archetype}</p>)}</section><section><h3>Recent events</h3>{contextBasket.recentEvents.length ? contextBasket.recentEvents.map((event, index) => <p key={index}>{event}</p>) : <p className="meta-text">No events yet.</p>}</section><section><h3>Remembered facts</h3>{contextBasket.rememberedFacts.length ? contextBasket.rememberedFacts.map((fact, index) => <p key={index}>{fact}</p>) : <p className="meta-text">No approved shared memories.</p>}</section><section><h3>Active lore & threads</h3>{contextBasket.activeLore.map((entry, index) => <p key={`lore-${index}`}>{entry}</p>)}{contextBasket.openThreads.map((thread, index) => <p key={`thread-${index}`}>Open: {thread}</p>)}{!contextBasket.activeLore.length && !contextBasket.openThreads.length && <p className="meta-text">Nothing active.</p>}</section></div></details>}

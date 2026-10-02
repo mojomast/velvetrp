@@ -191,7 +191,7 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     expect(narrationData).toEqual({
       mandatorySessionZeroSafetyPolicy: { hardLimits: [], veils: [], pvpPolicy: "explicit-consent",
         romancePolicy: "fade-to-black", lethalityPolicy: "consent-required", paused: false, revision: 1 },
-      publicCampaignContext: { summary: [], recap: [], cast: [], world: [], quests: [], canon: [], acceptedPublicPreparation: [],
+      publicCampaignContext: { summary: [], recap: [], cast: [], world: [], quests: [], canon: [], acceptedPublicPreparation: [], presentNpcNames: [], npcKnowledge: [],
         historicalRecall: { version: "recall-v1", coverage: "bounded-records-active-timeline", scan: "direct-sql-unbounded",
           incomplete: false, query: "set my might precisely", hits: [], scopeDigest: expect.any(String) } },
       verifiedReceiptFacts: [{ kind: "mechanic", event: { type: "actor_attribute_set", data: { valueBefore: expect.any(Number), valueAfter: 16 } } }],

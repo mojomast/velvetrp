@@ -46,6 +46,7 @@ export function buildRegionPackBrief(input: RegionPackBriefInput): string {
     `Return exactly one outline, ${input.locationCount} new public locations, and public connections that make one connected traversable region.`,
     "Every location and connection in this pack must be public. Do not emit GM-only locations or connections in the opening area.",
     "Every connection endpoint must be a new location key in this pack or the supplied accepted anchor location key. Never connect a location to itself and never repeat the same directed connection.",
+    "Connections permit travel only fromLocationKey -> toLocationKey. Every new location must be reachable from the starting location or required accepted anchor by following these directions. Add explicit reverse connections for intended return travel.",
   ];
   if (input.anchorRequired) {
     lines.push(`The campaign already has an immutable starting location. Do not re-anchor it. Connect at least one connection to the accepted anchor location '${input.anchorLocationKey}', and keep every new location reachable from that anchor.`);
@@ -142,16 +143,14 @@ export function validateRegionPack(content: GeneratedCampaignContentProvider, in
     const signature = `${connection.fromLocationKey}\u0000${connection.toLocationKey}`;
     if (directed.has(signature)) fail("region pack contains a duplicate directed connection");
     directed.add(signature);
-    for (const [from, to] of [[connection.fromLocationKey, connection.toLocationKey], [connection.toLocationKey, connection.fromLocationKey]] as const) {
-      const neighbors = adjacency.get(from) ?? new Set<string>();
-      neighbors.add(to);
-      adjacency.set(from, neighbors);
-    }
+    const neighbors = adjacency.get(connection.fromLocationKey) ?? new Set<string>();
+    neighbors.add(connection.toLocationKey);
+    adjacency.set(connection.fromLocationKey, neighbors);
   }
 
   const nodes = new Set<string>(packKeys);
   if (anchor !== undefined) nodes.add(anchor);
-  const first = nodes.values().next().value as string | undefined;
+  const first = input.anchorRequired ? anchor : content.outlines[0]?.startLocationKey;
   const reachable = new Set<string>();
   if (first !== undefined) {
     const stack = [first];
@@ -162,7 +161,7 @@ export function validateRegionPack(content: GeneratedCampaignContentProvider, in
       for (const neighbor of adjacency.get(current) ?? []) if (!reachable.has(neighbor)) stack.push(neighbor);
     }
   }
-  if (reachable.size !== nodes.size) fail("region pack location graph must be connected including every location and the anchor");
+  if (reachable.size !== nodes.size) fail("region pack location graph must be connected by directed paths from its start or required anchor");
 
   const resolves = (key: string) => packKeys.has(key) || input.acceptedLocationKeys.has(key);
   for (const npc of content.npcs) if (npc.locationKey !== undefined && !resolves(npc.locationKey)) fail("region pack NPC location must resolve in-pack or to accepted canon");

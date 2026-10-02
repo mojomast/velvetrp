@@ -97,6 +97,12 @@ export function createCampaignRecallReadRepository(db: DatabaseDriver.Database, 
             AND event.aggregate_id=ancestry.id AND event.aggregate_kind='turn' AND event.resulting_state='completed'
             AND event.resulting_revision=(SELECT max(latest.resulting_revision) FROM adventure_coordination_events_v36 latest
               WHERE latest.campaign_id=turn.campaign_id AND latest.aggregate_kind='turn' AND latest.aggregate_id=ancestry.id))
+      ), director_receipts AS (
+        SELECT run_id,CASE WHEN ordinal=0 THEN run_id ELSE command_key END source_id,public_json
+          FROM dm_composition_receipts
+        UNION ALL
+        SELECT run_id,run_id,public_json FROM dm_receipts legacy
+          WHERE NOT EXISTS(SELECT 1 FROM dm_composition_receipts composition WHERE composition.run_id=legacy.run_id)
       ), sources AS (
         SELECT 'declaration' sourceKind,'intent' authority,id sourceId,session_id sessionId,timeline_id timelineId,
           id rootTurnId,actor_id actorId,declaration text FROM eligible WHERE NOT @publicOnly
@@ -177,12 +183,13 @@ export function createCampaignRecallReadRepository(db: DatabaseDriver.Database, 
           AND (@dm OR recap.visibility='members') AND (json_array_length(recap.selected_session_ids)=0
             OR EXISTS(SELECT 1 FROM json_each(recap.selected_session_ids) selected WHERE selected.value=@session))
         UNION ALL
-        SELECT 'director-receipt','committed-outcome',run.run_id,run.session_id,run.timeline_id,NULL,NULL,
-          json_extract(receipt.public_json,'$.summary') FROM dm_runs run JOIN dm_receipts receipt USING(run_id)
+        SELECT 'director-receipt','committed-outcome',receipt.source_id,run.session_id,run.timeline_id,NULL,NULL,
+          json_extract(receipt.public_json,'$.summary') FROM dm_runs run JOIN director_receipts receipt USING(run_id)
         WHERE run.campaign_id=@campaign AND run.timeline_id=@timeline
           AND NOT EXISTS(SELECT 1 FROM json_each(run.candidates_json) binding
-            WHERE json_extract(binding.value,'$.candidate.candidateId')=json_extract(run.proposal_json,'$.candidateId')
-              AND json_extract(binding.value,'$.candidate.action') IN ('reveal-node','resolve-node','reveal-clue')
+            JOIN json_each(CASE WHEN json_type(run.proposal_json)='array' THEN run.proposal_json ELSE json_array(run.proposal_json) END) selection
+              ON json_extract(selection.value,'$.candidateId')=json_extract(binding.value,'$.candidate.candidateId')
+            WHERE json_extract(binding.value,'$.candidate.action') IN ('reveal-node','resolve-node','reveal-clue')
               AND NOT (${publicStoryResourceSql("run.campaign_id", "json_extract(binding.value,'$.target')")}))
       ) SELECT sources.* FROM sources
         LEFT JOIN campaign_actors actor ON actor.campaign_id=@campaign AND actor.id=sources.actorId

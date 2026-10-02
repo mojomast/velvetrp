@@ -2,7 +2,8 @@ import { campaignContentGenerationRecoverySchema, campaignContentGenerationReque
 import { z } from "zod";
 
 export const generationIntentSchema = z.object({
-  input: campaignContentGenerationRequestSchema.omit({ reviewedContent: true }),
+  input: z.object(campaignContentGenerationRequestSchema.shape).omit({ reviewedContent: true }).strict()
+    .refine((input) => campaignContentGenerationRequestSchema.safeParse(input).success, "Stored generation request is invalid"),
   failedAttempt: z.number().int().min(1).max(32).nullable(), ambiguous: z.boolean(),
 }).strict();
 const fields: Record<string, z.ZodType> = {

@@ -6,7 +6,7 @@ import type { SystemOneConfidenceThresholds, SystemOneLane, SystemOneSettings } 
  */
 export const SYSTEM_ONE_EXECUTION_CONTRACTS = {
   "speaker-routing": {
-    questionVersion: "room-routing-v1", compositionVersion: "room-routing-v1",
+    questionVersion: "room-routing-v1", compositionVersion: "room-routing-v2",
     candidateStrategy: "room-participants-v1", stateVersion: "room-routing-v1",
   },
   "adventure-selection": {

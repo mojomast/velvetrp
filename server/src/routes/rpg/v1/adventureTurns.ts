@@ -23,6 +23,7 @@ import type { Repository } from "../../../repo/index.js";
 import { completeWithProvider, ProviderHttpError } from "../../../provider/index.js";
 import { getPromptPreset } from "../../../presets.js";
 import { adventureNarrationMessages, conversationNarrationMessages } from "../../../agent/adventurePrompt.js";
+import { isRoutineObservationDeclaration } from "../../../agent/declarationAttempt.js";
 import { adventureTurnBudgets } from "../../../agent/turnBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "../../../agent/directToolReasoning.js";
 import type { CompletionFunctionTool, CompletionMessage, ProviderCompletionInput, ProviderCompletionResult } from "../../../provider/index.js";
@@ -84,8 +85,8 @@ const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve
   | {kind:"rest";restKind:"short"|"long";restName:"Short rest"|"Long rest";recovery:Array<{label:string;before:number;after:number}>};
 type NarrationResult={turn:PrivateAdventureTurn;text:string;source:"provider-assisted"|"deterministic-fallback"};
 const NARRATION_TOOL_NAME = "submit_adventure_narration";
-/** Prompt provenance recorded for a receipt-free narration derivative of a settled hold. */
-export const CONVERSATION_NARRATION_PROMPT_VERSION = "adventure-conversation-narration-v1";
+/** Prompt provenance recorded for receipt-free conversation and eligible hold derivatives. */
+export const CONVERSATION_NARRATION_PROMPT_VERSION = "adventure-conversation-narration-v2";
 /** Short-prose bound for conversation narration; the receipt-bound prompt keeps its own limits. */
 export const CONVERSATION_NARRATION_MAX_CHARACTERS = 2_000;
 export const CONVERSATION_NARRATION_MAX_WORDS = 120;
@@ -225,10 +226,28 @@ export function holdNarration(hold: AdventureHold): string {
  * question, or meta). It is the orchestrator's single deterministic vocabulary, so the route never
  * invents its own intent.
  */
-function declarationNamesConcreteAction(declaration: string): boolean {
+function declarationNamesConcreteAction(declaration: string, presentNpcNames: readonly string[] = []): boolean {
+  if (declarationAllowsConversationNarration(declaration, presentNpcNames)) return false;
   const intent = declarationIntent(declaration);
   return intent.commerce || intent.give || intent.rest || intent.check || intent.combat
     || intent.travel || intent.quest || intent.progression;
+}
+
+/** Speech topics are not action requests; a local social approach is not campaign travel. */
+export function declarationAllowsConversationNarration(declaration: string, presentNpcNames: readonly string[] = []): boolean {
+  const text = declaration.trim().toLocaleLowerCase("en-US");
+  // Do not turn an explicit later mechanical step into an apparently completed exchange.
+  if (/\b(?:then|and then)\b|;|\band\s+(?:i\s+)?(?:buy|sell|give|take(?!\s+stock\b)|attack|travel|go|leave|rest|search|climb|cast|accept|claim)\b/u.test(text)) return false;
+  const speech = /\b(?:ask|greet|say|tell|talk|speak|whisper|answer|reply|chat|hail|thank)\b/u.exec(text);
+  if (speech) {
+    let prefix = text.slice(0, speech.index).trim();
+    const approach = /^(?:i\s+)?(?:walk over to|step over to|go over to|approach|find)\s+([^,.;!?]+?)\s+and\s*$/u.exec(prefix);
+    if (approach && presentNpcNames.some(name => normalizedNarration(name) === normalizedNarration(approach[1]!))) prefix = "";
+    // No preceding travel, transaction, check or combat action may be silently skipped.
+    return /^(?:i)?(?:\s*(?:politely|quietly|softly))?$/u.test(prefix);
+  }
+  if (/^(?:what|who|where|why|how|when|can|could|should|would|is|are)\b/u.test(text) && text.endsWith("?")) return true;
+  return isRoutineObservationDeclaration(declaration);
 }
 
 /**
@@ -237,8 +256,8 @@ function declarationNamesConcreteAction(declaration: string): boolean {
  * to) gets a server-stated reason and next step; a pure conversation, question, or meta hold keeps
  * its provider-backed prose.
  */
-export function holdNarrationIsWarranted(hold: AdventureHold, declaration: string): boolean {
-  return Boolean(hold.suggestedNextStep) && declarationNamesConcreteAction(declaration);
+export function holdNarrationIsWarranted(hold: AdventureHold, declaration: string, presentNpcNames: readonly string[] = []): boolean {
+  return Boolean(hold.suggestedNextStep) && declarationNamesConcreteAction(declaration, presentNpcNames);
 }
 
 /**
@@ -254,9 +273,9 @@ export function holdNarrationIsWarranted(hold: AdventureHold, declaration: strin
  * Returns null when no hold applies, leaving the caller on the existing receipt-bound path.
  */
 export function deliberateHoldNarration(hold: AdventureHold | undefined, declaration: string,
-  values: readonly NarrationReceipt[]): string | null {
-  if (!hold || !declarationNamesConcreteAction(declaration)) return null;
-  if (holdNarrationIsWarranted(hold, declaration)) return holdNarration(hold);
+  values: readonly NarrationReceipt[], presentNpcNames: readonly string[] = []): string | null {
+  if (!hold || !declarationNamesConcreteAction(declaration, presentNpcNames)) return null;
+  if (holdNarrationIsWarranted(hold, declaration, presentNpcNames)) return holdNarration(hold);
   return values.length > 0 ? narrationFallback(declaration, []) : null;
 }
 
@@ -591,13 +610,15 @@ function narrationRepairMessage(input: { values: readonly NarrationReceipt[]; cu
 async function performNarration(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal, hold?: AdventureHold): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, turn);
-  // A deliberate hold is the turn's own deterministic narration. It is computed from the
-  // orchestrator's bounded reason (never from provider output), so no provider dispatch happens
-  // for a held declaration. A held declaration does not resolve its own mechanics, so any receipt
+  // A deliberate mechanical hold is the turn's own deterministic narration. It is computed from
+  // the orchestrator's bounded reason, never from provider output. Social/routine declarations
+  // instead continue to bounded conversation narration. A held declaration does not resolve its own mechanics, so any receipt
   // linked to the turn is a scene side effect (for example a deterministic enemy-fallback combat
   // receipt) and must not overwrite the declaration with an unrelated line. A pure conversation,
   // question, or meta hold is not a concrete action and keeps the provider-backed path unchanged.
-  const heldText = deliberateHoldNarration(hold, turn.declaration, safeReceipts ?? []);
+  const presentNpcNames = safeReceipts?.length === 0
+    ? repo.getAdventureNarrationPresentNpcs(OWNER, turn.turnId).map(npc => npc.name) : [];
+  const heldText = deliberateHoldNarration(hold, turn.declaration, safeReceipts ?? [], presentNpcNames);
   if (heldText) return { turn, text: heldText, source: "deterministic-fallback" };
   let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? []);
   if (!safeReceipts) return { turn, text: fallbackText,source:"deterministic-fallback" };
@@ -618,13 +639,14 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
     const publicContext=publicNarrationContext(repo,turn);
     if(!publicContext)return {turn,text:fallbackText,source:"deterministic-fallback"};
     fallbackText = narrationFallback(turn.declaration, safeReceipts, { currentLocation: publicContext.currentLocation });
-    // Receipt-free conversation narration applies only to a narration derivative whose immediate
-    // prior is a settled original hold. The prior is resolved fresh and never via the chain, so a
-    // derivative of a derivative, a pending confirmation, or any inherited mechanics stays on the
-    // receipt-bound path below.
+    // An original nonmechanical exchange also needs conversation narration on its first response,
+    // including a resume after planning where the transient hold object is no longer available.
+    // Derivatives retain the settled-original guard; receipts and proposals never enter this lane.
     const priorProjection = safeReceipts.length === 0 && turn.mode !== "original" && turn.priorTurnId
       ? repo.getAdventureTurn(OWNER, turn.priorTurnId) : null;
-    const conversation = conversationNarrationEligible(turn,
+    const originalConversation = turn.mode === "original" && safeReceipts.length === 0
+      && turn.toolCalls.length === 0 && declarationAllowsConversationNarration(turn.declaration, presentNpcNames);
+    const conversation = originalConversation || conversationNarrationEligible(turn,
       priorProjection && "declaration" in priorProjection ? priorProjection : null);
     const completionLimit = effectiveAdventureTurnMaxTokens(provider);
     const completionInput: ProviderCompletionInput = { provider: { ...provider, samplers: { ...provider.samplers, maxTokens: completionLimit } },
@@ -751,8 +773,16 @@ function publicNarrationContext(repo:Repo&Repository,turn:PrivateAdventureTurn){
     excludeRootTurnId: turn.mode === "original" ? turn.turnId : turn.priorTurnId ?? turn.turnId });
   if (!historicalRecall) return null;
   const cast=currentActorName?snapshot.visibleCast.filter(entry=>entry!==`${currentActorName}.`&&!entry.startsWith(`${currentActorName} at `)):snapshot.visibleCast;
+  const presentNpcs = repo.getAdventureNarrationPresentNpcs(OWNER, turn.turnId);
+  const npcKnowledge = presentNpcs.map(({ npcId, name }) => ({
+    name,
+    entries: repo.listAgentKnowledge(OWNER, { campaignId: turn.campaignId, agentKind: "npc", agentId: npcId,
+      listenerActorId: turn.actorId, query: turn.declaration, limit: 8 })
+      .filter(entry => entry.disclosable && entry.text.length <= 1_000)
+      .slice(0, 3).map(entry => ({ text: entry.text, authority: entry.authority, channel: entry.channel, observedAt: entry.createdAt })),
+  })).filter(npc => npc.entries.length > 0).slice(0, 3);
   return{ruleset:snapshot.ruleset,currentLocation:snapshot.currentActorLocation,currentActorName,
-    context:{...campaignPublicContext({...snapshot,visibleCast:cast}),historicalRecall},
+    context:{...campaignPublicContext({...snapshot,visibleCast:cast}),historicalRecall,presentNpcNames:presentNpcs.map(npc=>npc.name),npcKnowledge},
     safety:repo.getSessionZeroSafetyPolicy(OWNER,turn.campaignId)};
 }
 async function narrate(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,

@@ -378,8 +378,9 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       ORDER BY delivery.published_at DESC,artifact.artifact_key LIMIT 2`).all(r.campaign_id);
     // Generated prose is presentation, not canonical memory. Only verified receipt summaries recur.
     const history = (db.prepare(`SELECT COALESCE(
-        (SELECT json_extract(json_group_array(json_extract(composition.public_json,'$.summary')),'$[#-1]')
-          FROM dm_composition_receipts composition WHERE composition.run_id=run.run_id),
+        (SELECT group_concat(summary,char(10)) FROM (
+          SELECT json_extract(composition.public_json,'$.summary') summary
+          FROM dm_composition_receipts composition WHERE composition.run_id=run.run_id ORDER BY composition.ordinal)),
         json_extract(receipt.public_json,'$.summary')) narration
       FROM dm_public_history history JOIN dm_runs run USING(run_id) JOIN dm_receipts receipt USING(run_id)
       WHERE run.campaign_id=? AND run.session_id=? AND run.timeline_id=? AND run.run_id<>?
@@ -394,7 +395,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     // Prior published atmospheric prose, labeled non-authoritative, for continuity. The same public-source
     // guard as history keeps any run that revealed non-public story text out of this channel.
     const priorScenes = (db.prepare(`SELECT history.narration FROM dm_public_history history
-      JOIN dm_runs run USING(run_id) JOIN dm_receipts receipt USING(run_id)
+      JOIN dm_runs run USING(run_id)
       WHERE run.campaign_id=? AND run.session_id=? AND run.timeline_id=? AND run.run_id<>?
       AND NOT EXISTS(SELECT 1 FROM json_each(run.candidates_json) binding
         JOIN json_each(CASE WHEN json_type(run.proposal_json)='array' THEN run.proposal_json ELSE json_array(run.proposal_json) END) selection
@@ -428,7 +429,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
           JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
           WHERE current.campaign_id=presence.campaign_id AND current.session_id=presence.session_id
             AND current.location_id=presence.location_id AND location.visibility='public'))
-      ORDER BY npc.npc_id LIMIT ?`).all(r.campaign_id,r.session_id,MAX_KNOWLEDGE_NPCS) as {npcId:string;npcName:string}[])
+       ORDER BY npc.npc_id LIMIT 6`).all(r.campaign_id,r.session_id) as {npcId:string;npcName:string}[])
       .map(({npcId,npcName})=>{
         // A missing relationship row never qualifies; any session-participating actor at or
         // above the disclosure threshold authorizes this NPC's hearsay for the narrator.
@@ -441,14 +442,16 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         const entries = (db.prepare(`SELECT text,channel,authority,relayer_agent_id relayerNpcId FROM agent_observations
           WHERE campaign_id=? AND agent_kind='npc' AND agent_id=?
             AND timeline_id=(SELECT active_timeline_id FROM campaigns WHERE id=?)
-          ORDER BY created_at DESC, observation_id ASC`).all(r.campaign_id,npcId,r.campaign_id) as
+           ORDER BY CASE authority WHEN 'verified' THEN 0 ELSE 1 END,created_at DESC, observation_id ASC`).all(r.campaign_id,npcId,r.campaign_id) as
           {text:string;channel:string;authority:string;relayerNpcId:string|null}[])
-          .filter(entry=>entry.authority==='verified'||trusted)
-          .slice(0,MAX_KNOWLEDGE_ENTRIES_PER_NPC)
-          .map(entry=>({...entry,text:entry.text.slice(0,MAX_KNOWLEDGE_TEXT_LENGTH)}));
+           // Never truncate evidence: a trailing negation or correction can reverse its meaning.
+           .filter(entry=>(entry.authority==='verified'||trusted)&&entry.text.length<=MAX_KNOWLEDGE_TEXT_LENGTH)
+           .slice(0,MAX_KNOWLEDGE_ENTRIES_PER_NPC);
         return { npcId, npcName, entries };
       })
-      .filter(({entries})=>entries.length>0);
+       // Consider the whole advertised cast before applying the knowledge-NPC budget.
+       .filter(({entries})=>entries.length>0)
+       .slice(0,MAX_KNOWLEDGE_NPCS);
     const receipts = receiptsFor(r.run_id);
     // A beat that only advances recorded time or presents ambiance hands pacing back without requiring a question.
     const transition = receipts.length > 0

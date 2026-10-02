@@ -19,7 +19,7 @@ import type { SystemOneCaller } from "./provider/systemOneCompletion.js";
 import { buildRoomRoutingQuestions, composeRoomRoutingSelection } from "./agent/systemOneRoomRouting.js";
 import { calibrateTopSignal } from "./agent/systemOneCalibration.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./agent/systemOnePolicy.js";
-import { isLanePromoted } from "./agent/systemOnePromotion.js";
+import { isLanePromoted, promotionRecord } from "./agent/systemOnePromotion.js";
 import { systemOneEvaluationBinding } from "./agent/systemOneBinding.js";
 import { estimateTurnTokens } from "./agent/turnBudget.js";
 import { systemOneLaneBudgets } from "./agent/systemOneBudget.js";
@@ -122,6 +122,8 @@ export interface RoomRoutingSystemOne {
   caller: SystemOneCaller;
   /** Defaults to `settings.confidencePolicy["speaker-routing"]`. */
   thresholds?: SystemOneConfidenceThresholds;
+  /** Enables nonblocking advisory routing; receives its decision once, when ready. */
+  onAdvisoryDecision?: (decision: SystemOneRoomRoutingDecision) => void | Promise<void>;
 }
 
 type SystemOneRoomRoutingOutcome =
@@ -141,6 +143,7 @@ async function trySystemOneRoomRouting(input: {
   history: Message[];
   userContent: string;
   maxSpeakers: number;
+  advisoryOnly?: boolean;
 }): Promise<SystemOneRoomRoutingOutcome> {
   const { systemOne, participants, history, userContent, maxSpeakers } = input;
   if (!systemOne || !systemOne.settings.enabled || !canUseSystemOne(systemOne.settings)) return null;
@@ -177,7 +180,7 @@ async function trySystemOneRoomRouting(input: {
     const composed = composeRoomRoutingSelection(projection, result.answers, thresholds, maxSpeakers);
     // A lane changes behavior only when it is `active` and has a recorded, passing promotion.
     // Otherwise it still records the would-be decision.
-    const active = systemOneLaneMode(systemOne.settings, "speaker-routing") === "active"
+    const active = !input.advisoryOnly && systemOneLaneMode(systemOne.settings, "speaker-routing") === "active"
       && isLanePromoted("speaker-routing", systemOneEvaluationBinding("speaker-routing",
         systemOne.settings, result.model.responseModel, "room-speaker-selection", {}, thresholds));
     const decision: SystemOneRoomRoutingDecision = {
@@ -308,7 +311,22 @@ export async function selectRoomSpeakers(input: {
     decision ? { ...selection, systemOneDecision: decision } : selection;
   const fallbackSelection: RoomSpeakerSelection = { speakerIds: fallback, source: "fallback", usage: null };
   if (participants.length === 1) return fallbackSelection;
-  const outcome = await trySystemOneRoomRouting({ systemOne: input.systemOne, participants, history, userContent, maxSpeakers });
+  const systemOne = input.systemOne;
+  // Response aliases are only known after inference. Wait only when at least one
+  // evaluated response binding could authorize this exact request configuration;
+  // trySystemOneRoomRouting still validates the actual response binding afterward.
+  const canAct = systemOne && systemOneLaneMode(systemOne.settings, "speaker-routing") === "active"
+    && promotionRecord("speaker-routing")?.evaluatedBindings?.some((binding) =>
+      isLanePromoted("speaker-routing", systemOneEvaluationBinding("speaker-routing", systemOne.settings,
+        binding.responseModel, "room-speaker-selection", {}, systemOne.thresholds ?? systemOne.settings.confidencePolicy["speaker-routing"])));
+  const detached = Boolean(systemOne?.onAdvisoryDecision && !canAct);
+  const pending = trySystemOneRoomRouting({ systemOne, participants, history, userContent, maxSpeakers, advisoryOnly: detached });
+  if (detached) {
+    void pending.then(async (result) => {
+      if (result?.kind === "shadow") await systemOne?.onAdvisoryDecision?.(result.decision);
+    }).catch(() => { /* Advisory recording must never affect routing or cause an unhandled rejection. */ });
+  }
+  const outcome = detached ? null : await pending;
   if (outcome?.kind === "selection") return outcome.selection;
   const shadowDecision = outcome?.kind === "shadow" ? outcome.decision : undefined;
   if (!canUseProvider(provider)) return withDecision(fallbackSelection, shadowDecision);

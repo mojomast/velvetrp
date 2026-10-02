@@ -1,0 +1,43 @@
+.admin-section.worldbuilding-panel {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+  line-height: 1.6;
+}
+.worldbuilding-panel .admin-section-heading { align-items: center; }
+.worldbuilding-panel .status-pill { max-width: 55%; overflow-wrap: anywhere; white-space: normal; text-align: right; color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+.worldbuilding-panel > p { color: var(--muted); max-width: 78ch; }
+.worldbuilding-panel label { display: grid; gap: .45rem; font-size: .9rem; font-weight: 600; }
+.worldbuilding-panel :is(input:not([type="radio"]), textarea) { width: 100%; min-width: 0; padding: .7rem .85rem; background: var(--surface-2); color: var(--text); border: 1px solid var(--control-border); border-radius: 8px; font: inherit; font-weight: 400; }
+.worldbuilding-panel textarea { resize: vertical; }
+.worldbuilding-panel :is(input, textarea):disabled { opacity: .8; }
+.worldbuilding-panel button { min-height: 42px; padding: .55rem .85rem; border-radius: 8px; font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.worldbuilding-panel button:not(.primary) { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.worldbuilding-panel button:disabled { opacity: .5; cursor: default; }
+.worldbuilding-panel :is(button, input, textarea):focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.worldbuilding-panel .worldbuilding-mode { display: flex; flex-wrap: wrap; gap: .7rem 1.5rem; margin: 1.25rem 0; padding: .7rem 1rem; border: 1px solid var(--border); border-radius: 8px; }
+.worldbuilding-panel .worldbuilding-mode label { display: flex; align-items: center; gap: .5rem; }
+.worldbuilding-panel .worldbuilding-mode input { accent-color: var(--accent); }
+.worldbuilding-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-block: 1rem; }
+.worldbuilding-form label:first-child { grid-column: 1 / -1; }
+.worldbuilding-form > button { justify-self: start; grid-column: 1 / -1; }
+.worldbuilding-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin-top: 1rem; }
+.worldbuilding-panel [role="alert"] { color: var(--danger); }
+.worldbuilding-panel > [role="status"] { padding: .75rem 1rem; border-left: 3px solid var(--accent); background: var(--surface-2); color: var(--text); border-radius: 4px; }
+.worldbuilding-progress { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.worldbuilding-progress progress { width: 100%; height: .75rem; margin-top: .75rem; accent-color: var(--accent); }
+.worldbuilding-progress > ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; padding: 0; list-style: none; counter-reset: world-stage; }
+.worldbuilding-progress > ol > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; gap: .4rem .65rem; padding: .85rem 1rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; counter-increment: world-stage; }
+.worldbuilding-progress > ol > li > strong::before { content: counter(world-stage) ". "; color: var(--muted); }
+.worldbuilding-progress > ol > li > small { grid-column: 1 / -1; grid-row: 2; color: var(--muted); overflow-wrap: anywhere; }
+.worldbuilding-progress > ol > li > span { grid-column: 2; grid-row: 1; align-self: start; color: var(--muted); font-size: .8rem; }
+.worldbuilding-progress > ol > li[data-status="applied"] > span { color: var(--eyebrow); font-weight: 600; }
+.worldbuilding-progress > ol > li > :is(div, p, ul) { grid-column: 1 / -1; }
+.worldbuilding-progress > ol > li > div { display: flex; flex-wrap: wrap; gap: .5rem; }
+.worldbuilding-handoff { border-top: 1px solid var(--border); padding-top: 1rem; }
+.worldbuilding-handoff > p { flex-basis: 100%; margin: .25rem 0 0; color: var(--muted); font-size: .85rem; }
+@media (max-width: 620px) {
+  .worldbuilding-panel .admin-section-heading { align-items: flex-start; flex-direction: column; }
+  .worldbuilding-panel .status-pill { max-width: 100%; text-align: left; }
+  .worldbuilding-form, .worldbuilding-progress > ol { grid-template-columns: minmax(0, 1fr); }
+}

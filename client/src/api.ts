@@ -817,22 +817,29 @@ async function streamRoom(path: string, body: Record<string, unknown>, handlers:
   });
   if (!response.ok) throw await errorFromResponse(response);
   if (!response.body) throw new ApiError(0, "room stream response had no body");
+  let completed = false;
   const push = createSseParser((event, data) => {
+    if (completed) return;
     const payload = (data ?? {}) as Record<string, unknown>;
     if (event === "user_message") handlers.onUserMessage?.(payload.message as ChatMessage);
     else if (event === "state") handlers.onState?.(payload.session as Session | undefined, String(payload.state ?? ""));
     else if (event === "room_reply") handlers.onReply(payload.reply as ChatMessage, Number(payload.index), Number(payload.total));
-    else if (event === "room_done") handlers.onDone(payload as unknown as RoomTurnResult | RoomContinuationResult);
-    else if (event === "error") handlers.onError?.(String(payload.error ?? "room stream failed"));
+    else if (event === "room_done") { completed = true; handlers.onDone(payload as unknown as RoomTurnResult | RoomContinuationResult); }
+    else if (event === "error") {
+      const error = String(payload.error ?? "room stream failed");
+      handlers.onError?.(error);
+      throw new ApiError(0, error);
+    }
   });
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   try {
-    while (true) {
+    while (!completed) {
       const { done, value } = await reader.read();
       if (done) break;
       push(decoder.decode(value, { stream: true }));
     }
+    if (!completed) throw new ApiError(0, "The room stream ended before the turn completed. Reopen the conversation to check its saved history.");
   } finally {
     await reader.cancel().catch(() => undefined);
   }
@@ -1030,11 +1037,16 @@ function streamSse(
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    const push = createSseParser((event, data) => dispatchStreamEvent(handlers, event, data));
+    let terminal = false;
+    const push = createSseParser((event, data) => {
+      if (terminal) return;
+      terminal = ["done", "boundary", "aborted", "error"].includes(event);
+      dispatchStreamEvent(handlers, event, data);
+    });
     try {
-      while (true) {
+      while (!terminal) {
         const { done: finished, value } = await reader.read();
-        if (finished) break;
+        if (finished) throw new ApiError(0, "Stream ended before the turn completed.");
         push(decoder.decode(value, { stream: true }));
       }
     } finally {

@@ -107,7 +107,7 @@ async function api<T>(request: APIRequestContext, method: string, path: string, 
 
 async function openCampaign(page: Page, name: string) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${name}`, exact: true }).click();
   await expect(page.getByTestId("campaign-overview")).toBeVisible();
 }

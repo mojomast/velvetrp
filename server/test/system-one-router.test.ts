@@ -155,6 +155,20 @@ describe("System One cost router", () => {
     });
   });
 
+  it.each([0.1, 0.99])("refuses a confident deterministic choice without a server-owned path (noul %s)", (noul) => {
+    const answers = {
+      [ROUTER_HANDLER_KEY]: handlerChoice("deterministic", 0.99),
+      [ROUTER_DETERMINISTIC_KEY]: deterministic(noul),
+    };
+    expect(composeRouterDecision(request(), answers, thresholds, "frontier-generation")).toMatchObject({
+      band: "confirm", handler: "frontier-generation",
+      reason: "refused deterministic: no deterministic path exists",
+    });
+    expect(composeRouterDecision(request({ hasDeterministicPath: true }), answers, thresholds, "frontier-generation")).toMatchObject({
+      band: "act", handler: "deterministic",
+    });
+  });
+
   it("returns the status quo without throwing on missing or partial answers", () => {
     expect(() => composeRouterDecision(request(), {}, thresholds, "cheap-generation")).not.toThrow();
     expect(composeRouterDecision(request(), {}, thresholds, "cheap-generation")).toMatchObject({

@@ -180,11 +180,19 @@ describe("agent observation propagation", () => {
   it("bounds witness fan-out by MAX_WITNESS_FANOUT", async () => {
     const f = await fixture(MAX_WITNESS_FANOUT + 1);
     for (const npcId of f.npcs) f.place(npcId);
+    const ordered = [...f.npcs].sort();
+    f.addFaction("faction-in-budget", [{ npcId: ordered[0]! }]);
+    f.addFaction("faction-outside-budget", [{ npcId: ordered[MAX_WITNESS_FANOUT]! }]);
     const rows = propagateWitnessObservations(f.db, f.dependencies, {
       campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
       sourceCommandId: "check-command:fanout", observedRevision: 1, summary: "A crowd watches.",
     });
     expect(rows).toHaveLength(MAX_WITNESS_FANOUT);
+    const factions = propagateFactionWitnessObservations(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: "check-command:fanout", observedRevision: 1, summary: "A crowd watches.",
+    });
+    expect(factions.map(row => row.agentId)).toEqual(["faction-in-budget"]);
     f.repo.close();
   });
 
@@ -503,8 +511,23 @@ describe("agent observation propagation", () => {
     f.repo.close();
   });
 
-  it("records a witnessed observation when a committed check runs with an NPC present", async () => {
+  it.each([true, false])("scopes committed check witnesses and factions to the source actor (known location: %s)", async (knownLocation) => {
     const { repo, campaign } = checkSeed();
+    const setup = new DatabaseDriver(dbPath());
+    setup.pragma("foreign_keys=ON");
+    for (const location of ["local", "remote"]) {
+      setup.prepare(`INSERT INTO campaign_locations_v28
+        (location_id,campaign_id,public_name,visibility,created_at) VALUES(?,?,?,'public',?)`)
+        .run(location, campaign.id, location, at);
+    }
+    // Another party member is remote; their location must not authorize witnesses
+    // for the acting hero, even when that hero has no recorded location.
+    setup.prepare("INSERT INTO characters VALUES ('other-persona','Other hero',30,'hero','',1,0,?)").run(at);
+    setup.prepare("INSERT INTO campaign_characters VALUES ('other-cc',?,'other-persona',?,?)").run(campaign.id, at, at);
+    setup.prepare("INSERT INTO rpg_campaign_sheets VALUES ('other-sheet',?,'other-cc','pack','1','race','human','pack','1','background','sage',?,?)").run(campaign.id, at, at);
+    setup.prepare("INSERT INTO campaign_actors VALUES ('other-actor',?,'other-cc','other-sheet','player-character','principal',?,?)").run(campaign.id, at, at);
+    setup.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,'other-actor','remote','session',0,?)").run(campaign.id, at);
+    if (knownLocation) setup.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,'actor','local','session',0,?)").run(campaign.id, at);
     const persona = repo.createCharacter({ name: "Watcher", age: 40, archetype: "Guide", boundaries: "", fictionalConfirmed: true });
     const npc = repo.createCampaignNpc("local-owner", campaign.id, {
       personaId: persona.id, publicState: { name: "Watcher" },
@@ -513,6 +536,22 @@ describe("agent observation propagation", () => {
     }).npc;
     repo.mutateNpcPresence("local-owner", { campaignId: campaign.id, sessionId: "session", npcId: npc.npcId,
       expectedRevision: 0, idempotencyKey: "watcher-place", mutation: { kind: "place", locationId: null } });
+    const locatedNpcs = new Map<string, string>();
+    for (const [index, location] of ["local", "remote"].entries()) {
+      const locatedPersona = repo.createCharacter({ name: location, age: 40, archetype: "Guide", boundaries: "", fictionalConfirmed: true });
+      const located = repo.createCampaignNpc("local-owner", campaign.id, {
+        personaId: locatedPersona.id, publicState: { name: location },
+        privateState: { goals: "Watch", gmNotes: "Notes", merchantState: null },
+        expectedRevision: index + 1, idempotencyKey: `watcher-${location}`,
+      }).npc;
+      locatedNpcs.set(location, located.npcId);
+      repo.mutateNpcPresence("local-owner", { campaignId: campaign.id, sessionId: "session", npcId: located.npcId,
+        expectedRevision: index + 1, idempotencyKey: `place-${location}`, mutation: { kind: "place", locationId: location } });
+      setup.prepare("INSERT INTO campaign_factions_v28 VALUES(?,?,?,?,?)").run(`faction-${location}`, campaign.id, location, "public", at);
+      setup.prepare("INSERT INTO campaign_npc_faction_memberships_v28 VALUES(?,?,?,?,?)")
+        .run(campaign.id, `faction-${location}`, located.npcId, "member", at);
+    }
+    setup.close();
     const created = repo.createAdventureTurn("local-owner", { campaignId: campaign.id, timelineId: campaign.activeTimelineId,
       sessionId: "session", actorId: "actor", declaration: "I make a strength check.", expectedCampaignRevision: 0, idempotencyKey: "witness-check" });
     const candidate = repo.generateAdventureCheckCandidates("local-owner", created.turnId)
@@ -532,11 +571,15 @@ describe("agent observation propagation", () => {
     const commandId = result.turn.receiptLinks[0]!.commandId;
     const db = new DatabaseDriver(dbPath());
     const rows = db.prepare(`SELECT agent_id,channel,hop_count,text,authority FROM agent_observations
-      WHERE campaign_id=? AND agent_kind='npc' AND source_command_id=?`).all(campaign.id, commandId) as Array<{ agent_id: string; channel: string; hop_count: number; text: string; authority: string }>;
+      WHERE campaign_id=? AND agent_kind='npc' AND source_command_id=? AND channel='witnessed'`).all(campaign.id, commandId) as Array<{ agent_id: string; channel: string; hop_count: number; text: string; authority: string }>;
+    const factions = db.prepare(`SELECT agent_id FROM agent_observations
+      WHERE campaign_id=? AND agent_kind='faction' AND source_command_id=?`).all(campaign.id, commandId);
     db.close();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toEqual({ agent_id: npc.npcId, channel: "witnessed", hop_count: 0,
+    expect(rows.map(row => row.agent_id).sort()).toEqual(
+      [npc.npcId, ...(knownLocation ? [locatedNpcs.get("local")!] : [])].sort());
+    for (const row of rows) expect(row).toMatchObject({ channel: "witnessed", hop_count: 0,
       text: "A Strength check ended in success.", authority: "verified" });
+    expect(factions).toEqual(knownLocation ? [{ agent_id: "faction-local" }] : []);
     repo.close();
   });
 });

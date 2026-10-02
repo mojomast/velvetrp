@@ -270,6 +270,88 @@ describe("persistence and multi-character frontend", () => {
     render(<App/>);await screen.findAllByText("SECRET");fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await waitFor(()=>expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}").view).toBe("campaigns"));expect(document.body.textContent).not.toContain("SECRET");
   });
 
+  it.each(["acknowledged-error", "lost-ack-eof"])("reconciles an interrupted saved user without restoring a duplicate draft (%s)", async (failure) => {
+    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    routes.unshift({ method: "GET", match: /\/api\/provider$/, handler: () => json({ ...provider, streaming: true }) });
+    const user = message("saved-user", "user", "I inspect the door.");
+    let reads = 0; let posts = 0;
+    routes.push(
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: ++reads === 1 ? [] : [user] }) },
+      { method: "POST", match: /\/api\/sessions\/sess-1\/stream$/, handler: () => {
+        posts++;
+        return sse(failure === "acknowledged-error" ? [{ event: "user_message", data: { message: user, generationId: "generation" } }, { event: "error", data: { error: "Interrupted provider" } }] : []);
+      } },
+    );
+    render(<App />);
+    const composer = await screen.findByPlaceholderText("Write a message…") as HTMLInputElement;
+    fireEvent.change(composer, { target: { value: user.content } });
+    fireEvent.click(screen.getByRole("button", { name: "Send to Aria" }));
+    await waitFor(() => { expect(reads).toBe(2); expect(composer.disabled).toBe(false); });
+    expect(screen.getAllByText(user.content)).toHaveLength(1);
+    expect(composer.value).toBe("");
+    expect(posts).toBe(1);
+  });
+
+  it.each(["message", "swipe"])("waits for cancellation and recovers a committed %s reply", async (kind) => {
+    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    routes.unshift({ method: "GET", match: /\/api\/provider$/, handler: () => json({ ...provider, streaming: true }) });
+    const user = message("saved-user", "user", "I inspect the door.");
+    const reply = { ...message("saved-reply", "character", "The key fits the lock.", aria.id), parentId: user.id };
+    const previousReply = { ...message("old-reply", "character", "The door is shut.", aria.id), parentId: user.id };
+    const canceled = deferred<Response>(); let reads = 0; let posts = 0; let cancels = 0;
+    let delivery!: ReadableStreamDefaultController<Uint8Array>;
+    routes.push(
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: ++reads === 1 ? (kind === "swipe" ? [user, previousReply] : []) : [user, reply] }) },
+      { method: "POST", match: /\/api\/sessions\/sess-1(?:\/messages\/old-reply\/swipe)?\/stream$/, handler: () => {
+        posts++;
+        return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+          delivery = controller;
+          controller.enqueue(new TextEncoder().encode((kind === "message" ? `event: user_message\ndata: ${JSON.stringify({ message: user })}\n\n` : "") + 'event: delta\ndata: {"seq":0,"text":"The key"}\n\n'));
+        } }));
+      } },
+      { method: "POST", match: /\/api\/sessions\/sess-1\/generation\/cancel$/, handler: () => { cancels++; delivery.close(); return canceled.promise; } },
+    );
+    render(<App />);
+    const composer = await screen.findByPlaceholderText("Write a message…") as HTMLInputElement;
+    if (kind === "swipe") fireEvent.click(screen.getByRole("button", { name: "Regenerate reply" }));
+    else {
+      fireEvent.change(composer, { target: { value: user.content } });
+      fireEvent.click(screen.getByRole("button", { name: "Send to Aria" }));
+    }
+    await screen.findByText("The key");
+    fireEvent.click(screen.getByRole("button", { name: "Stop generating" }));
+    await waitFor(() => expect(cancels).toBe(1));
+    expect(composer.disabled).toBe(true); expect(reads).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "Stop generating" }));
+    await act(async () => { canceled.resolve(json({ ok: true, aborted: "generation" })); });
+    await screen.findByText(reply.content);
+    await waitFor(() => expect(composer.disabled).toBe(false));
+    expect(composer.value).toBe(""); expect(screen.getAllByText(user.content)).toHaveLength(1);
+    expect(screen.queryByText(previousReply.content)).toBeNull();
+    expect(posts).toBe(1); expect(cancels).toBe(1); expect(reads).toBe(2);
+  });
+
+  it("ignores an interrupted stream reconciliation that arrives after navigation", async () => {
+    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    routes.unshift({ method: "GET", match: /\/api\/provider$/, handler: () => json({ ...provider, streaming: true }) });
+    const recovery = deferred<Response>(); let reads = 0;
+    routes.push(
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => ++reads === 1 ? json({ session: baseSession, messages: [] }) : recovery.promise },
+      { method: "POST", match: /\/api\/sessions\/sess-1\/stream$/, handler: () => sse([]) },
+    );
+    render(<App />);
+    fireEvent.change(await screen.findByPlaceholderText("Write a message…"), { target: { value: "I wait." } });
+    fireEvent.click(screen.getByRole("button", { name: "Send to Aria" }));
+    await waitFor(() => expect(reads).toBe(2));
+    fireEvent.click(screen.getByRole("button", { name: "← Library" }));
+    await screen.findByRole("heading", { name: "Characters" });
+    await act(async () => { recovery.resolve(json({ session: { ...baseSession, title: "STALE RECOVERY", state: "closed" }, messages: [message("late", "character", "Late saved reply", aria.id)] })); });
+    expect(screen.getByRole("heading", { name: "Characters" })).toBeTruthy();
+    expect(screen.queryByText("Late saved reply")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("home");
+    expect(document.body.textContent).not.toContain("STALE RECOVERY");
+  });
+
   it("restores a saved session and renders each message's actual speaker", async () => {
     installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     let savedSource = "They are waiting in the observatory.";
@@ -373,7 +455,7 @@ describe("persistence and multi-character frontend", () => {
     await openLibrary();
     expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).endsWith("/api/rpg/v1/features"))).toHaveLength(1);
     fireEvent.click(await screen.findByRole("button", { name: "Campaigns" }));
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
     expect(screen.getByText("No campaigns yet.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create campaign" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "← Character library" }));
@@ -396,7 +478,7 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
     const contentPacks = await screen.findByRole("button", { name: "Content packs" });
     await waitFor(() => expect(document.activeElement).toBe(contentPacks));
-    expect(screen.getByRole("heading", { name: "Campaigns" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Campaigns & worlds" })).toBeTruthy();
   });
 
   it("falls home when restored content studio mechanics are unavailable", async () => {
@@ -475,7 +557,7 @@ describe("persistence and multi-character frontend", () => {
     expect(document.body.textContent).not.toContain(campaignAccess.ownerPrincipalId);
     expect(document.body.textContent).not.toContain(campaignAccess.activeTimelineId);
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").campaignId).toBeUndefined());
   });
 
@@ -708,12 +790,12 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
     expect((screen.getByRole("button", { name: "Open attached room 1 of 1" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
     hydration.resolve(json({ session: baseSession, messages: [message("late-room", "character", "Must not open", aria.id)] }));
     await hydration.promise;
     await Promise.resolve();
     expect(screen.queryByText("Must not open")).toBeNull();
-    expect(screen.getByRole("heading", { name: "Campaigns" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Campaigns & worlds" })).toBeTruthy();
   });
 
   it("does not request room history when Back cancels its pending campaign preflight", async () => {
@@ -733,13 +815,13 @@ describe("persistence and multi-character frontend", () => {
     await openAdvancedCampaign();
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
 
     preflight.resolve(json(campaignDetail));
     await preflight.promise;
     await Promise.resolve();
     expect(sessionReads).toBe(0);
-    expect(screen.getByRole("heading", { name: "Campaigns" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Campaigns & worlds" })).toBeTruthy();
   });
 
   it("retains an unacknowledged return refresh across Campaigns, then consumes it once on reopen", async () => {
@@ -761,7 +843,7 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(screen.getByRole("button", { name: "← Back to campaign" }));
     await waitFor(() => expect(roomReads).toBe(2));
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
     interruptedRefresh.resolve(json({ attached: [attached], eligible: [] }));
     await openAdvancedCampaign();
     const consumedFocus = await screen.findByRole("heading", { name: "Rooms" });
@@ -793,7 +875,7 @@ describe("persistence and multi-character frontend", () => {
     await screen.findByText("That room is no longer available. Latest campaign rooms are being refreshed.");
     await waitFor(() => expect(roomReads).toBe(2));
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
     interruptedRefresh.resolve(json({ attached: [attached], eligible: [] }));
     await openAdvancedCampaign();
     const roomsHeading = await screen.findByRole("heading", { name: "Rooms" });
@@ -878,7 +960,7 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
     await openAdvancedCampaign();
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
     expect(screen.queryByRole("heading", { name: "Rooms" })).toBeNull();
     expect(screen.queryByRole("button", { name: "← Campaigns" })).toBeNull();
     expect(screen.queryByText("Room could not be opened. Please try again.")).toBeNull();
@@ -1104,7 +1186,7 @@ describe("persistence and multi-character frontend", () => {
     routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) });
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character", campaignId: "bad/id", campaignCharacterId: "entry" }));
     render(<App />);
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
     cleanup();
 
     installFetch([aria], [], false);
@@ -1235,7 +1317,7 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) },
     );
     render(<App />);
-    await screen.findByRole("heading", { name: "Campaigns" });
+    await screen.findByRole("heading", { name: "Campaigns & worlds" });
     expect(screen.queryByText("private missing")).toBeNull();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaigns" }));
     expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").campaignId).toBeUndefined();
@@ -1264,6 +1346,80 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.change(screen.getByPlaceholderText("Write a message…"), { target: { value: "hello" } }); fireEvent.click(screen.getByRole("button", { name: "Send to Rowan" }));
     await screen.findByText("Rowan reply"); expect(sendBody).toMatchObject({ content: "hello", speakerCharacterId: rowan.id });
     fireEvent.click(screen.getByRole("button", { name: "Continue as Rowan" })); await screen.findByText("Rowan continues"); expect(continueBody).toEqual({ speakerCharacterId: rowan.id });
+  });
+
+  it.each([false, true])("stops room automation after a stream failure (user accepted: %s)", async (accepted) => {
+    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    const user = message("accepted-user", "user", "I open the door.");
+    const continuation = vi.fn(() => sse([{ event: "room_done", data: { messages: [], replies: [] } }]));
+    routes.push(
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
+      { method: "POST", match: /\/api\/sessions\/sess-1\/room-turn$/, handler: () => sse([...(accepted ? [{ event: "user_message", data: { message: user } }] : []), { event: "error", data: { error: "Room provider unavailable" } }]) },
+      { method: "POST", match: /\/api\/sessions\/sess-1\/room-continue$/, handler: continuation },
+    );
+    render(<App />); await screen.findByText(/scene is ready/i);
+    fireEvent.change(screen.getByPlaceholderText("Write a message…"), { target: { value: user.content } });
+    fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
+    await screen.findByRole("alert");
+    await waitFor(() => expect((screen.getByPlaceholderText("Write a message…") as HTMLInputElement).disabled).toBe(false));
+    expect(screen.getByRole("alert").textContent).toBe("Room provider unavailable");
+    expect(continuation).not.toHaveBeenCalled();
+    expect((screen.getByPlaceholderText("Write a message…") as HTMLInputElement).value).toBe(accepted ? "" : user.content);
+    expect(screen.queryByText(user.content, { selector: ".message p" }) !== null).toBe(accepted);
+  });
+
+  it("does not launch automatic room rounds after leaving a pending conversation", async () => {
+    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    const pending = deferred<Response>();
+    const continuation = vi.fn(() => sse([{ event: "room_done", data: { messages: [], replies: [] } }]));
+    routes.push(
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
+      { method: "POST", match: /\/api\/sessions\/sess-1\/room-turn$/, handler: () => pending.promise },
+      { method: "POST", match: /\/api\/sessions\/sess-1\/room-continue$/, handler: continuation },
+    );
+    render(<App />); await screen.findByText(/scene is ready/i);
+    fireEvent.change(screen.getByPlaceholderText("Write a message…"), { target: { value: "I open the door." } });
+    fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
+    fireEvent.click(screen.getByRole("button", { name: "← Library" }));
+    await screen.findByRole("heading", { name: "Characters" });
+    await act(async () => pending.resolve(sse([{ event: "room_done", data: { session: baseSession, messages: [], replies: [] } }])));
+    expect(continuation).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Characters" })).toBeTruthy();
+  });
+
+  it("does not offer destructive reply alternatives behind an unanswered user message", async () => {
+    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    const first = message("u1", "user", "Which path?");
+    const reply = { ...message("m1", "character", "Take the bridge.", aria.id), parentId: first.id };
+    const unanswered = { ...message("u2", "user", "I cross the bridge."), parentId: reply.id };
+    routes.push({ method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [first, reply, unanswered] }) });
+    render(<App />); await screen.findByText(unanswered.content);
+    expect(screen.queryByRole("button", { name: "Regenerate reply" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry last turn" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Continue as Aria" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("restores saved alternative replies on reopen and refreshes scene context when switching", async () => {
+    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    const user = message("u1", "user", "Which path?");
+    const first = { ...message("m1", "character", "Take the bridge.", aria.id), parentId: user.id };
+    const second = { ...message("m2", "character", "Take the tunnel.", aria.id), parentId: user.id, swipeIndex: 1 };
+    let active = second;
+    let contextReads = 0;
+    routes.push(
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [user, active] }) },
+      { method: "GET", match: /\/api\/sessions\/sess-1\/messages\/m[12]\/siblings$/, handler: () => json({ siblings: [first, second], activeMessageId: active.id }) },
+      { method: "POST", match: /\/api\/sessions\/sess-1\/messages\/m1\/activate$/, handler: () => { active = first; return json({ messages: [user, active] }); } },
+      { method: "GET", match: /\/api\/sessions\/sess-1\/context$/, handler: () => { contextReads += 1; return json({ context: { sourceOfTruth: active.content, editableSource: "", participants: [], recentEvents: [], rememberedFacts: [], activeLore: [], openThreads: [] } }); } },
+    );
+    render(<App />);
+    await screen.findByText("2/2");
+    const readsBefore = contextReads;
+    fireEvent.click(screen.getByRole("button", { name: "Previous reply" }));
+    await screen.findByText("1/2");
+    expect(screen.queryByText(second.content)).toBeNull();
+    expect(screen.getAllByText(first.content)).toHaveLength(2);
+    expect(contextReads).toBeGreaterThan(readsBefore);
   });
 
   it("sends one message to the room and renders all selected replies", async () => {

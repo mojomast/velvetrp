@@ -85,7 +85,7 @@ async function addMechanicsCharacter(request: APIRequestContext, campaignId: str
 
 async function openRoom(page: Page, campaignName: string): Promise<void> {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
@@ -348,7 +348,7 @@ test("cast studio creates a companion, grants, and revokes from the browser", as
   }, 200);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${fixture.campaignName}` }).click();
   await page.getByRole("button", { name: "Cast & factions" }).click();
   await expect(page.getByRole("heading", { name: "Cast & factions" })).toBeVisible();
@@ -394,7 +394,7 @@ test("combat lifecycle generates and applies an encounter draft from the browser
   expect(candidates.enemies.length).toBeGreaterThan(0);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${fixture.campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open combat tracker" }).click();

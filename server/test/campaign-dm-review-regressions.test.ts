@@ -17,7 +17,9 @@ async function beat(f:Awaited<ReturnType<typeof dmFixture>>,key:string,evidenceT
   return f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,run.runId);
 }
 describe('reproduced director review findings',()=>{
-  it.each(['story-node','clue'] as const)('never advertises or publishes accepted GM-only %s text, including historical manual reveals',async(kind)=>{
+  it.each([
+    ['story-node', false], ['story-node', true], ['clue', false], ['clue', true],
+  ] as const)('never advertises or publishes accepted GM-only %s text, including historical manual reveals (composition=%s)',async(kind,composition)=>{
     const f=await dmFixture();f.advance();const db=database();
     const content=generatedCampaignContentProviderSchema.parse({[kind==='clue'?'clues':'storyNodes']:[{key:'secret',title:'SECRET_TITLE',description:'SECRET_MAYOR_IS_MURDERER',visibility:'gm'}]});
     const context=f.repo.getCampaignGenerationContext('local-owner',f.campaign.id,[])!;
@@ -38,13 +40,20 @@ describe('reproduced director review findings',()=>{
     db.prepare(`INSERT INTO dm_runs VALUES(?,?,?,?,?,?,'ai',1,'continue',?,?,?,?,?,'awaiting-approval',1,?,'[]',?,?)`).run(
       legacy,f.campaign.id,f.session.id,f.campaign.activeTimelineId,'local-owner','local-owner','legacy',
       JSON.stringify({intent:'continue',expectedModeRevision:1,idempotencyKey:'legacy'}),'{}',JSON.stringify([{candidate:{candidateId:'legacy',digest:'a'.repeat(64),action:'reveal-node',label:'SECRET_TITLE'},target:node.nodeId,revision:1}]),
-      'a'.repeat(64),JSON.stringify({candidateId:'legacy',digest:'a'.repeat(64)}),at,new Date(f.options.clock.now().getTime()+60000).toISOString());
+      'a'.repeat(64),JSON.stringify(composition?[{candidateId:'legacy',digest:'a'.repeat(64)}]:{candidateId:'legacy',digest:'a'.repeat(64)}),at,new Date(f.options.clock.now().getTime()+60000).toISOString());
     db.prepare("INSERT INTO dm_decisions VALUES(?,?,'ai-policy-v1','{}',?)").run(legacy,'local-owner',at);
     const revealed=f.repo.executeStorylineCommand('local-owner',node.storylineId,{kind:'reveal-node',targetId:node.nodeId,data:{},expectedRevision:f.repo.getCampaignStory('local-owner',f.campaign.id)!.revision,idempotencyKey:commandKey});
     db.prepare('INSERT INTO dm_receipts VALUES(?,?,?,?,?)').run(legacy,commandKey,'reveal-node',JSON.stringify(revealed.receipt),JSON.stringify({action:'reveal-node',summary:'SECRET_MAYOR_IS_MURDERER'}));
     db.prepare('INSERT INTO dm_public_history VALUES(?,?,?)').run(legacy,'SECRET_MAYOR_IS_MURDERER',at);
     db.prepare("UPDATE dm_runs SET state='completed',revision=2 WHERE run_id=?").run(legacy);
     expect(f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,legacy)).toMatchObject({state:'blocked',receipts:[],narration:null});
+    for (const purpose of ['dm-planning','dm-narration'] as const) {
+      const recall=f.repo.getCampaignRecall('local-owner',{campaignId:f.campaign.id,sessionId:f.session.id,
+        audience:{kind:'dm'},purpose,query:'SECRET_MAYOR_IS_MURDERER'})!;
+      expect(recall.hits).toEqual([]);
+    }
+    expect(f.repo.getCampaignRecall('local-owner',{campaignId:f.campaign.id,sessionId:f.session.id,
+      audience:{kind:'player',actorId:f.actorId},purpose:'public-narration',query:'SECRET_MAYOR_IS_MURDERER'})!.hits).toEqual([]);
     db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('player','Player',0)").run();f.advance();
     f.repo.addCampaignMembership('local-owner',f.campaign.id,{principalId:'player',role:'player'});
     expect(JSON.stringify(f.repo.getCampaignStory('player',f.campaign.id))).not.toContain('SECRET_');

@@ -1,0 +1,23 @@
+.world-library .world-library-start { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 12px; background: var(--surface); }
+.world-library .campaign-panel { background: var(--surface); color: var(--text); box-shadow: none; }
+.world-library .world-library-start h2, .world-library .world-library-saved-heading h2 { margin: 0 0 .5rem; }
+.world-library .world-library-start p { color: var(--muted); max-width: 42rem; margin: 0; line-height: 1.6; }
+.world-library .world-library-start button { flex-shrink: 0; }
+.world-library .world-library-blank { margin-block: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; }
+.world-library .world-library-blank summary { cursor: pointer; font-weight: 600; }
+.world-library .world-library-blank .campaign-create { margin-bottom: 0; }
+.world-library .world-library-generator { padding: 1rem; border: 1px solid var(--border); border-radius: 12px; }
+.world-library .world-library-saved-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.world-library .world-library-filters { display: grid; grid-template-columns: minmax(12rem, 2fr) repeat(3, minmax(8rem, 1fr)); gap: .75rem; margin-block: 1rem; }
+.world-library .world-library-filters label { display: grid; gap: .5rem; color: var(--muted); font-size: .8rem; font-weight: 600; }
+.world-library .world-library-filters :is(input, select) { width: 100%; min-width: 0; min-height: 44px; }
+.world-library .campaign-card { display: flex; flex-direction: column; }
+.world-library .campaign-card h3 { margin: 0 0 1rem; overflow-wrap: anywhere; font-size: 1.1rem; }
+.world-library .campaign-card .campaign-open { margin-top: auto; min-height: 44px; }
+.world-library .world-library-announcement:empty { display: none; }
+.world-library :is(button, input, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+@media (max-width: 760px) {
+  .world-library .world-library-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .world-library .world-library-start, .world-library .world-library-saved-heading { align-items: stretch; flex-direction: column; }
+}
+@media (max-width: 440px) { .world-library .world-library-filters { grid-template-columns: 1fr; } }

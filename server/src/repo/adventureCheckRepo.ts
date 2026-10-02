@@ -194,6 +194,7 @@ function commitCheckExecution(db: DatabaseDriver.Database, deps: M16Dependencies
   const witnessSummary = `A ${receipt.skill ?? receipt.ability} check ended in ${receipt.outcome}.`;
   propagateWitnessObservations(db, deps, {
     campaignId: current.campaignId,
+    sourceActorId: current.actorId,
     timelineId: current.timelineId,
     sessionId: current.sessionId,
     sourceCommandId: commandId,
@@ -202,6 +203,7 @@ function commitCheckExecution(db: DatabaseDriver.Database, deps: M16Dependencies
   });
   propagateFactionWitnessObservations(db, deps, {
     campaignId: current.campaignId,
+    sourceActorId: current.actorId,
     timelineId: current.timelineId,
     sessionId: current.sessionId,
     sourceCommandId: commandId,

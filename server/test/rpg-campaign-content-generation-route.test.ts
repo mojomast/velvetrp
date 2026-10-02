@@ -1,10 +1,10 @@
 import DatabaseDriver from "better-sqlite3";
 import Fastify from "fastify";
 import path from "node:path";
-import { SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
+import { SRD_5_1_STARTER_IDENTITY, campaignContentGenerationRequestSchema } from "@velvet/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
-import { campaignContentGenerationHttpRoutes, canonicalCampaignGenerationJson, normalizeGeneratedCampaignContentProvider, sanitizeGeneratedCampaignContent } from "../src/routes/rpg/v1/campaignContentGeneration.js";
+import { campaignContentGenerationHttpRoutes, canonicalCampaignGenerationJson, generateCandidate, normalizeGeneratedCampaignContentProvider, sanitizeGeneratedCampaignContent } from "../src/routes/rpg/v1/campaignContentGeneration.js";
 import { createRepository, MECHANICS_STARTER_CATALOG, SRD_5_1_STARTER_CATALOG, updateProviderSettings } from "../src/repo/index.js";
 import { createSession, transitionSession } from "../src/repo/sessionRepo.js";
 import { useTmpDataDir } from "./helpers.js";
@@ -24,6 +24,72 @@ const request=(campaignId:string,idempotencyKey="content-draft")=>({campaignId,b
 const db=()=>new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
 
 describe("campaign-content section generation",()=>{
+  it.each([
+    {sections:["factions"],kinds:[]},
+    {sections:["locations"],kinds:[]},
+    {sections:["outline","arcs","npcs","quests","clues","story","lore","handouts","scene-prompts"],kinds:[]},
+    {sections:["quest-items"],kinds:["item"]},
+    {sections:["monster-concepts"],kinds:["enemy-template"]},
+    {sections:["encounters"],kinds:["enemy-template"]},
+    {sections:["quest-items","monster-concepts","encounters"],kinds:["item","enemy-template"]},
+  ])("supplies a compact capability-scoped catalog for $sections",async({sections,kinds})=>{
+    const item={kind:"item",packId:"exact-item-pack",packVersion:"1.2.3",definitionId:"silver-key"};
+    const enemy={kind:"enemy-template",packId:"exact-enemy-pack",packVersion:"4.5.6",definitionId:"harbor-guard"};
+    const catalog=[{reference:item,name:"Silver Key",description:"LARGE_ITEM_CANONICAL_BLOB".repeat(100),canonical:{effects:["private projection sentinel"]}},
+      {reference:enemy,name:"Harbor Guard",description:"LARGE_ENEMY_CANONICAL_BLOB".repeat(100),canonical:{statistics:"large stat block"}}];
+    const before=structuredClone(catalog),rulesIdentity={rulesProfileId:"profile",rulesetId:"rules",rulesetVersion:"1.0.0"};
+    let supplied:any;
+    await generateCandidate(campaignContentGenerationRequestSchema.parse({...request("campaign","scoped-catalog"),sections}),
+      {catalog,rulesIdentity,artifacts:[],safety:{hardLimits:[],veils:[]}},
+      {generationDraftRepositoryAccessor:()=>{throw new Error("candidate construction must not access repository");},generateCampaignContent:async(prompt)=>{supplied=prompt;return {};}},
+      new AbortController().signal,null);
+    expect(supplied.pinnedCatalog).toEqual(catalog.filter((entry)=>kinds.includes(entry.reference.kind)).map(({reference,name})=>({reference,name})));
+    expect(supplied.campaignRulesIdentity).toEqual(rulesIdentity);
+    expect(JSON.stringify(supplied)).not.toMatch(/LARGE_ITEM_CANONICAL_BLOB|LARGE_ENEMY_CANONICAL_BLOB|private projection sentinel|large stat block/);
+    expect(catalog).toEqual(before);
+  });
+  it("enforces declared new candidate minimums after sanitization and preserves idempotent identity", async () => {
+    enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Declared coverage"});
+    let prompt:any;
+    const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async(value)=>{prompt=value;return content;}});
+    const headers={"content-type":"application/json"},url="/api/rpg/v1/campaign-content-drafts";
+    const invalid=await app.inject({method:"POST",url,headers,payload:{...request(campaign.id,"invalid-count"),desiredCounts:{npcs:17}}});
+    expect(invalid.statusCode).toBe(400);expect(prompt).toBeUndefined();
+    const short=await app.inject({method:"POST",url,headers,payload:{...request(campaign.id,"too-small"),desiredCounts:{npcs:2}}});
+    expect(short.statusCode,short.body).toBe(503);
+    expect(repo.getGenerationDraftByIdempotencyKey("local-owner",campaign.id,"too-small")).toBeNull();
+    expect(prompt.outputRules).toContain('"npcs":2');
+    const accepted=await app.inject({method:"POST",url,headers,payload:{...request(campaign.id,"enough"),desiredCounts:{locations:1,npcs:1}}});
+    expect(accepted.statusCode,accepted.body).toBe(201);
+    const replay=await app.inject({method:"POST",url,headers,payload:{...request(campaign.id,"enough"),desiredCounts:{npcs:1,locations:1}}});
+    expect(replay.json().draft.draftId).toBe(accepted.json().draft.draftId);
+    const conflict=await app.inject({method:"POST",url,headers,payload:{...request(campaign.id,"enough"),desiredCounts:{npcs:2,locations:1}}});
+    expect(conflict.statusCode).toBe(409);
+    const sanitized=await app.inject({method:"POST",url,headers,payload:{...request(campaign.id,"dropped-edge"),tolerateInvalidReferences:true,desiredCounts:{connections:1},reviewedContent:{...content,connections:[{key:"wrong-edge",fromLocationKey:"old-road",toLocationKey:"mara",description:"Not a place",visibility:"public"}]}}});
+    expect(sanitized.statusCode,sanitized.body).toBe(503);
+    expect(repo.getGenerationDraftByIdempotencyKey("local-owner",campaign.id,"dropped-edge")).toBeNull();
+    await app.close();
+  });
+
+  it("rejects wrong-kind accepted references and revalidates kinds atomically at apply", async () => {
+    enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Typed closure"});
+    const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async()=>content});
+    const headers={"content-type":"application/json"},url="/api/rpg/v1/campaign-content-drafts";
+    const created=await app.inject({method:"POST",url,headers,payload:request(campaign.id,"typed-base")});
+    expect(created.statusCode,created.body).toBe(201);
+    const draftId=created.json().draft.draftId;
+    const database=db();database.exec("DROP TRIGGER campaign_generation_candidate_artifacts_v52_immutable_update");
+    const changed={...content.npcs[0],factionKeys:["old-road"]};
+    database.prepare("UPDATE campaign_generation_candidate_artifacts_v52 SET canonical_json=? WHERE draft_id=? AND artifact_key='mara'").run(JSON.stringify(changed),draftId);database.close();
+    const applied=await app.inject({method:"POST",url:`${url}/${draftId}/apply`,headers,payload:{expectedRevision:0,idempotencyKey:"typed-apply",selectedArtifactKeys:["rainy-opening","old-road","mara"]}});
+    expect(applied.statusCode,applied.body).toBe(409);
+    expect(repo.getCampaignGeneratedFoundation("local-owner",campaign.id)!.opening).toBeNull();
+    const accepted=await app.inject({method:"POST",url:`${url}/${draftId}/apply`,headers,payload:{expectedRevision:0,idempotencyKey:"place-apply",selectedArtifactKeys:["old-road"]}});
+    expect(accepted.statusCode,accepted.body).toBe(200);
+    const expansion=await app.inject({method:"POST",url,headers,payload:{...request(campaign.id,"typed-expansion"),sections:["npcs"],expandArtifactKeys:["old-road"],reviewedContent:{npcs:[changed]}}});
+    expect(expansion.statusCode,expansion.body).toBe(503);
+    await app.close();
+  });
   it("rejects a nominal full campaign with missing sections while retaining sparse requests", async () => {
     enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Full coverage"});
     const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async()=>content});
@@ -103,7 +169,7 @@ describe("campaign-content section generation",()=>{
 
   it("supplies the exact SRD rules identity and pins while rejecting Velvet references",async()=>{
     enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"SRD generation"});repo.installSrdStarterCatalog("local-owner");repo.configureSrdStarterCatalog("local-owner",campaign.id,{expectedRevision:0,idempotencyKey:"srd-generation-pins"});const srdItem=SRD_5_1_STARTER_CATALOG.definitions.find((definition)=>definition.reference.kind==="item")!.reference,srdEnemy=SRD_5_1_STARTER_CATALOG.definitions.find((definition)=>definition.reference.kind==="enemy-template")!.reference,velvetItem=MECHANICS_STARTER_CATALOG.definitions.find((definition)=>definition.reference.kind==="item")!.reference;let call=0;
-    const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async(prompt)=>{expect((prompt as any).campaignRulesIdentity).toEqual({rulesProfileId:SRD_5_1_STARTER_IDENTITY.rulesProfileId,rulesetId:SRD_5_1_STARTER_IDENTITY.rulesetId,rulesetVersion:SRD_5_1_STARTER_IDENTITY.rulesetVersion});expect((prompt as any).pinnedCatalog.map((entry:any)=>entry.reference)).toEqual(expect.arrayContaining([srdItem,srdEnemy]));expect((prompt as any).pinnedCatalog.map((entry:any)=>entry.reference)).not.toContainEqual(velvetItem);return {questItems:[{key:`generated-key-${call}`,name:"Generated Key",description:"An exact catalog-bound key.",visibility:"public",questKeys:[],locationKeys:[],mechanics:{state:"catalog-bound",reference:call++===0?srdItem:velvetItem}}]};}});
+    const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async(prompt)=>{expect((prompt as any).campaignRulesIdentity).toEqual({rulesProfileId:SRD_5_1_STARTER_IDENTITY.rulesProfileId,rulesetId:SRD_5_1_STARTER_IDENTITY.rulesetId,rulesetVersion:SRD_5_1_STARTER_IDENTITY.rulesetVersion});expect((prompt as any).pinnedCatalog.map((entry:any)=>entry.reference)).toContainEqual(srdItem);expect((prompt as any).pinnedCatalog.map((entry:any)=>entry.reference)).not.toContainEqual(srdEnemy);expect((prompt as any).pinnedCatalog.every((entry:any)=>entry.reference.kind==="item"&&Object.keys(entry).sort().join(",")==="name,reference")).toBe(true);expect((prompt as any).pinnedCatalog.map((entry:any)=>entry.reference)).not.toContainEqual(velvetItem);return {questItems:[{key:`generated-key-${call}`,name:"Generated Key",description:"An exact catalog-bound key.",visibility:"public",questKeys:[],locationKeys:[],mechanics:{state:"catalog-bound",reference:call++===0?srdItem:velvetItem}}]};}});
     const accepted=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"srd-exact"),sections:["quest-items"]}});expect(accepted.statusCode,accepted.body).toBe(201);expect(accepted.json().preview.questItems[0].mechanics.reference).toEqual(srdItem);
     const rejected=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"velvet-mismatch"),sections:["quest-items"]}});expect(rejected.statusCode,rejected.body).toBe(503);await app.close();
   });
@@ -181,7 +247,7 @@ describe("campaign-content section generation",()=>{
     enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Metrics"});await updateProviderSettings({model:"requested-model",pricing:{promptPerMillion:2,completionPerMillion:4}});const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async()=>({content,responseModel:"provider-model",usage:{promptTokens:100,completionTokens:50,totalTokens:150}})});const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:request(campaign.id,"metrics")});expect(response.statusCode,response.body).toBe(201);
     const database=db(),row=database.prepare(`SELECT job.job_id,job.attempt_count,attempt.provider,attempt.requested_model,attempt.response_model,
       attempt.prompt_tokens,attempt.completion_tokens,attempt.total_tokens,attempt.latency_ms,attempt.estimated_cost_usd,
-       attempt.prompt_version,attempt.schema_version,attempt.terminal_at FROM campaign_generation_jobs_v52 job JOIN campaign_generation_attempts_v52 attempt ON attempt.job_id=job.job_id`).get() as any;expect(row).toMatchObject({attempt_count:1,requested_model:"requested-model",response_model:"provider-model",prompt_tokens:100,completion_tokens:50,total_tokens:150,prompt_version:"campaign-content-v6",schema_version:"campaign-content-v4"});expect(row.job_id).toMatch(/^campaign-generation-/);expect(row.latency_ms).toBeGreaterThanOrEqual(0);expect(row.estimated_cost_usd).toBeCloseTo(0.0004);expect(row.terminal_at).toBeTruthy();database.close();await app.close();
+       attempt.prompt_version,attempt.schema_version,attempt.terminal_at FROM campaign_generation_jobs_v52 job JOIN campaign_generation_attempts_v52 attempt ON attempt.job_id=job.job_id`).get() as any;expect(row).toMatchObject({attempt_count:1,requested_model:"requested-model",response_model:"provider-model",prompt_tokens:100,completion_tokens:50,total_tokens:150,prompt_version:"campaign-content-v7",schema_version:"campaign-content-v4"});expect(row.job_id).toMatch(/^campaign-generation-/);expect(row.latency_ms).toBeGreaterThanOrEqual(0);expect(row.estimated_cost_usd).toBeCloseTo(0.0004);expect(row.terminal_at).toBeTruthy();database.close();await app.close();
   });
 
   it("reconciles a pending NPC placement when one running attached session becomes available",async()=>{

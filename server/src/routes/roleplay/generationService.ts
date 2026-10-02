@@ -63,19 +63,38 @@ export async function assemblePipelineContext(input: {
   character: Character;
   history: Message[];
   userContent: string;
+  /** Exact ancestry for a retry/edit, including its user turn. */
+  contextHistory?: Message[];
 }): Promise<PipelineContext> {
   const { session, character, history, userContent } = input;
   const preset = getPromptPreset(session.presetId);
   const harness = await getHarnessSettings();
   const provider = await getProviderSettings();
-  const memories = await listApprovedMemories(character.id, 8);
-  const summary = await getSummary(session.id);
+  const memoryScope = {
+    sessionId: session.id,
+    sourceTurnIds: (input.contextHistory ?? await listMessages(session.id)).map((message) => message.id),
+  };
+  const memories = await listApprovedMemories(character.id, 8, memoryScope);
+  const archivedHistory = history.slice(0, Math.max(0, history.length - harness.recentTurns));
+  const summary = input.contextHistory
+    ? (archivedHistory.length ? {
+      sessionId: session.id,
+      ...buildEpisodeSummary(archivedHistory, harness.summaryChars,
+        Object.fromEntries(session.participants.map((participant) => [participant.id, participant.name]))),
+      updatedAt: new Date().toISOString(),
+    } : null)
+    : await getSummary(session.id);
   const contextText = [...history.map((message) => message.content), userContent].join("\n");
   const participantIds = session.participants.map((participant) => participant.id);
   const lore = selectLoreEntries(await listLoreEntries(participantIds), participantIds, contextText, harness.loreChars);
   const sharedMemories = (await Promise.all(session.participants.map(async (participant) =>
-    (await listApprovedMemories(participant.id, 3)).map((memory) => ({ characterName: participant.name, memory }))))).flat();
+    (await listApprovedMemories(participant.id, 3, memoryScope)).map((memory) => ({ characterName: participant.name, memory }))))).flat();
   const source = await getSessionContextSource(session.id);
+  // Session-wide synthesized state belongs to the old leaf during a retry/edit.
+  if (input.contextHistory) {
+    source.synthesizedSource = "";
+    source.synthesizedUpdatedAt = null;
+  }
   const sharedContext = contextBasketText(buildSessionContextBasket(session, history, sharedMemories, lore, source));
   return { preset, harness, provider, memories, summary, lore, sharedContext };
 }
@@ -85,6 +104,7 @@ export async function runCharacterPipeline(input: {
   character: Character;
   history: Message[];
   userContent: string;
+  contextHistory?: Message[];
   log: { error: (obj: object, msg: string) => void };
 }): Promise<GenerationOutcome> {
   const { session, character, history, userContent, log } = input;
@@ -93,6 +113,7 @@ export async function runCharacterPipeline(input: {
     character,
     history,
     userContent,
+    ...(input.contextHistory ? { contextHistory: input.contextHistory } : {}),
   });
   let providerError = false;
   let replyText: string;
@@ -135,6 +156,7 @@ async function streamCharacterPipeline(input: {
   character: Character;
   history: Message[];
   userContent: string;
+  contextHistory?: Message[];
   controller: AbortController;
   onDelta: (delta: string) => void;
   log: { error: (obj: object, msg: string) => void };
@@ -146,6 +168,7 @@ async function streamCharacterPipeline(input: {
     character,
     history,
     userContent,
+    ...(input.contextHistory ? { contextHistory: input.contextHistory } : {}),
   });
   let providerError = false;
   const boundaryOutcome = (violations: string[]): StreamPipelineResult => ({
@@ -229,6 +252,7 @@ export async function runSseGeneration(input: {
   character: Character;
   history: Message[];
   userContent: string;
+  contextHistory?: Message[];
   generationId: string;
   release: () => void;
   announce?: (sse: SseWriter) => void;
@@ -262,6 +286,7 @@ export async function runSseGeneration(input: {
       character,
       history,
       userContent,
+      ...(input.contextHistory ? { contextHistory: input.contextHistory } : {}),
       controller,
       onDelta: (delta) => {
         sse?.send("delta", { seq, text: delta });
@@ -286,7 +311,7 @@ export async function runSseGeneration(input: {
       return;
     }
     const { replyMessage, extra } = await persist(outcome);
-    await maybeUpdateSummary(session.id, false, request.log);
+    await maybeUpdateSummary(session.id, Boolean(input.contextHistory), request.log);
     finished = true;
     if (result.kind === "boundary") {
       sse.send("boundary", {
@@ -330,6 +355,9 @@ export async function maybeUpdateSummary(
   const activeBranch = await listMessages(sessionId);
   const harness = await getHarnessSettings();
   const session = await getSession(sessionId);
+  // A branch change invalidates the previous leaf's derived facts even if the
+  // synthesis provider is unavailable. Manual canon is retained independently.
+  if (force) await updateSessionSynthesizedSource(sessionId, "");
   if (session && activeBranch.length > 0) {
     try {
       const source = await getSessionContextSource(sessionId);

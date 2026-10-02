@@ -20,6 +20,8 @@
  *   declaration with no trigger at all.
  */
 
+import { isDirectDeclarationAttempt } from "./declarationAttempt.js";
+
 export interface DeclarationCheckMapping {
   /** Display ability label, matching `ABILITY_NAMES` in `adventureCheckRepo.ts`. */
   ability: string;
@@ -116,7 +118,8 @@ export function declarationCheckCandidateLabel(mapping: Pick<DeclarationCheckMap
 /** Irregular forms the suffix generator cannot derive; everything else is built from the base word. */
 const IRREGULAR_FORMS: Record<string, readonly string[]> = {
   lie: ["lie", "lies", "lied", "lying"],
-  hide: ["hide", "hides", "hid", "hidden", "hiding"],
+  // "Hidden" commonly describes a search target, not an instruction to hide.
+  hide: ["hide", "hides", "hiding"],
   hear: ["hear", "hears", "heard", "hearing"],
   steal: ["steal", "steals", "stole", "stolen", "stealing"],
   sing: ["sing", "sings", "sang", "sung", "singing"],
@@ -207,7 +210,7 @@ function isMetaTalk(text: string): boolean { return META_TALK.test(text); }
  */
 export function mapDeclarationToCheck(declaration: string): DeclarationCheckMapping | null {
   const text = declaration.trim();
-  if (!text) return null;
+  if (!isDirectDeclarationAttempt(text)) return null;
   const lowered = text.toLocaleLowerCase("en-US");
   if (isQuestion(lowered) || isGreeting(lowered) || isMetaTalk(lowered)) return null;
   // Classification is not adjudication. Ambiguous, negated or routine prose must
@@ -231,6 +234,12 @@ export function mapDeclarationToCheck(declaration: string): DeclarationCheckMapp
   if (strongSkills.length > 1) return null;
   if (strongSkills.length === 1) {
     const hit = strongHits.find((candidate) => candidate.skill === strongSkills[0]!)!;
+    // Ordinary looking/listening provides scene framing, not evidence of an uncertain task.
+    // Keep it available for provider adjudication without manufacturing a DC 15 check on hold.
+    if (hit.skill === "Perception" && !/\b(?:hidden|concealed|faint|distant|ambush|danger|invisible)\b/u.test(lowered)) {
+      return { ability: hit.ability, skill: hit.skill, confidence: "weak",
+        rationale: "Observation alone does not establish uncertainty or a need for a Perception check." };
+    }
     const contextual = /\b(?:icy|sheer|slippery|impossible|underwater|raging|blindfolded|broken|disadvantage|advantage)\b/u.test(lowered);
     return { ability: hit.ability, skill: hit.skill, confidence: contextual ? "weak" : "strong",
       rationale: contextual ? `Situational ${hit.skill} attempt requires director adjudication of difficulty and roll mode.` : `Strong ${hit.skill} trigger "${hit.trigger}" for ${hit.ability}.` };
