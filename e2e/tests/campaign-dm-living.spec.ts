@@ -8,6 +8,7 @@ import { buildApp } from "../../server/src/app.js";
 import { closeRepo } from "../../server/src/repo/index.js";
 import { createAgentObservationRepository } from "../../server/src/repo/observations/agentObservationRepo.js";
 import { dmDependencies, dmFixture } from "../../server/test/fixtures/dmCampaign.js";
+import { openTableTool } from "../support/adventure-table.js";
 
 test("living director composes ambient/time beats, narrates without a forced question, and never pays on reload", async ({ page, playwright }) => {
   test.setTimeout(120_000);
@@ -88,14 +89,15 @@ test("living director composes ambient/time beats, narrates without a forced que
     await page.goto("/");
     await page.getByRole("button", { name: `Open campaign ${f.campaign.name}`, exact: true }).click();
     await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-    await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
     await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-    await page.getByRole("button", { name: "Director", exact: true }).click();
+    await openTableTool(page, "Director");
     await page.getByRole("button", { name: "Review AI delegation", exact: true }).click();
     await page.getByRole("button", { name: "Confirm AI delegation", exact: true }).click();
     expect(calls).toEqual([]);
     await page.getByRole("button", { name: "Open scene", exact: true }).click();
-    await expect(page.getByRole("region", { name: "DM chronicle" })).toContainText("A hush falls over the gate");
+    await expect(page.getByRole("button", { name: "Continue scene", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Close Director", exact: true }).click();
+    await expect(page.getByRole("region", { name: "The story so far", exact: true })).toContainText("A hush falls over the gate");
     expect(calls).toEqual(["campaign-dm-v1", "campaign-dm-narration-v1"]);
     expect(narrationPrompts).toHaveLength(1);
     const narrationPrompt = narrationPrompts[0]!;
@@ -109,7 +111,7 @@ test("living director composes ambient/time beats, narrates without a forced que
     // Reload must only read state and never spend another provider call.
     const beforeReload = calls.length;
     await page.reload();
-    await page.getByRole("button", { name: "Director", exact: true }).click();
+    await openTableTool(page, "Director");
     await expect(page.getByRole("button", { name: "Continue scene", exact: true })).toBeEnabled();
     expect(calls).toHaveLength(beforeReload);
 

@@ -1,16 +1,16 @@
 import type { CSSProperties } from "react";
 import "./conversationText.css";
 
-// Stable across reloads, independent of transcript order. All colors are legible
-// against the dark play surface; the speaker's name remains the primary cue.
+// Stable across reloads, independent of transcript order. The speaker's name
+// remains the primary cue; the table chooses the matching light/dark palette.
 
-export function speakerColor(identity: string): string {
+export function speakerColor(identity: string, light = false): string {
   let hash = 0;
   for (const char of identity.normalize("NFKC")) hash = (Math.imul(hash, 31) + char.codePointAt(0)!) >>> 0;
-  return `hsl(${hash % 360} 75% 78%)`;
+  return `hsl(${hash % 360} ${light ? "45% 28%" : "75% 78%"})`;
 }
 export function SpeakerName({ identity, name }: { identity: string; name: string }) {
-  return <strong className="conversation-speaker" style={{ "--speaker-color": speakerColor(identity) } as CSSProperties}>{name}</strong>;
+  return <strong className="conversation-speaker" style={{ "--speaker-color": speakerColor(identity), "--speaker-color-light": speakerColor(identity, true) } as CSSProperties}>{name}</strong>;
 }
 
 /** Presentation only. Never evaluates HTML/Markdown or infers game mechanics. */

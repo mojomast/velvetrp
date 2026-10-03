@@ -166,7 +166,7 @@ export default function App() {
   const [activeCampaignCharacterId, setActiveCampaignCharacterId] = useState(stored.campaignCharacterId ?? "");
   const [playSelectedActorId, setPlaySelectedActorId] = useState(stored.playSelectedActorId ?? "");
   const [playTurnId, setPlayTurnId] = useState(stored.adventureTurnId ?? "");
-  const [playSurface, setPlaySurface] = useState<"center" | "atlas">(stored.playSurface === "atlas" ? "atlas" : "center");
+  const [playSurface, setPlaySurface] = useState<"story" | "atlas">(stored.playSurface === "atlas" ? "atlas" : "story");
   const [characterDraftIds, setCharacterDraftIds] = useState<Record<string, string>>(stored.characterDraftIds ?? {});
   const [activeCampaignName, setActiveCampaignName] = useState("");
   const [chatReturnCampaignId, setChatReturnCampaignId] = useState(stored.chatReturnCampaignId ?? "");
@@ -272,7 +272,7 @@ export default function App() {
     const restore = () => {
       if (!active) return;
       // Previously persisted standalone combat routes return to the new in-room entry.
-      const target = document.querySelector<HTMLButtonElement>('[data-atlas-tool="combat"]');
+      const target = document.querySelector<HTMLButtonElement>('.table-menu-button') ?? document.querySelector<HTMLButtonElement>('[data-atlas-tool="combat"]');
       if (target) { target.focus(); setPlayCombatReturnFocus(null); }
       else if (attempts++ < 40) window.setTimeout(restore, 25);
     };
@@ -452,7 +452,7 @@ export default function App() {
     combatEntryRef.current = request;
     setChatReturnCampaignId(navigation.view === "chat" ? navigation.chatReturnCampaignId ?? navigation.campaignId ?? "" : "");
     setActiveCampaignCharacterId(navigation.campaignCharacterId ?? "");
-    setPlaySurface(navigation.view === "campaign-play" && navigation.playSurface === "atlas" ? "atlas" : "center");
+    setPlaySurface(navigation.view === "campaign-play" && navigation.playSurface === "atlas" ? "atlas" : "story");
     setCombatReturnView("campaign-detail");
     setCombatActorRole(undefined); setCombatControlledActorId(""); setInitialCombatId(""); setPlayCombatReturnFocus(null);
     if ((navigation.view === "campaign-play" || navigation.view === "chat") && navigation.campaignId && navigation.sessionId) {

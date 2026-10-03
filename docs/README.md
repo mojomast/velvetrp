@@ -33,7 +33,8 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [System One decision review](system-one-decision-review.md) - Read-only human review of the immutable System One decision log, turning incorrect verdicts into negative examples for a lane's evaluation corpus.
 - [System One Director disagreement report](system-one-disagreement-report.md) - Read-only, deterministic comparison of the shadow Director lane's would-be selections against the authoritative provider composition, producing a review queue of divergent cases.
 - [Administration UX](administration-ux.md) - Campaign administration interaction guidance.
-- [Frontend control plane](frontend-control-plane.md) - Searchable campaign library, staged worldbuilder, world/play handoffs, Campaign Command Center, preparation, session recovery, and browser acceptance coverage.
+- [Adventure Table and campaign control plane](frontend-control-plane.md) - Story-first gameplay, editable first moves, character attachments, Story/Map navigation, automatic readiness reads, preparation, and recovery.
+- [Adventure Table design audit (2026-10-03)](adventure-table-design-2026-10-03.md) - Comparable-product research, implemented interaction model, accessibility criteria, new gameplay screenshots, and serialized validation.
 - [Play surface and character context audit (2026-10-02)](play-sheet-context-audit-2026-10-02.md) - Complete sheet-reference coverage, exact DM attachments, accessible drawer/composer interaction, October 2026 research, and focused validation.
 - [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.
 - [DM evaluation](dm-evaluation.md) - Deterministic and live DM behavior evaluation guidance.

@@ -6,6 +6,7 @@ import { campaignDmHistorySchema, campaignDmReadinessResponseSchema, campaignPla
 import { buildApp } from "../../server/src/app.js";
 import { closeRepo } from "../../server/src/repo/index.js";
 import { dmDependencies, dmFixture } from "../../server/test/fixtures/dmCampaign.js";
+import { openTableTool } from "../support/adventure-table.js";
 
 test.use({ viewport: { width: 1440, height: 1000 }, isMobile: false, hasTouch: false });
 
@@ -97,10 +98,9 @@ test("GM inspects provider-free readiness and repairs a story obstacle through H
     await page.goto("/");
     await page.getByRole("button", { name: `Open campaign ${fixture.campaign.name}`, exact: true }).click();
     await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-    await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
     await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Director", exact: true }).click();
+    await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: fixture.campaign.name, level: 1, exact: true })).toBeVisible();
+    await openTableTool(page, "Director");
     await expect(page.getByRole("heading", { name: "Preparation readiness", exact: true })).toBeVisible();
     expect(readinessGets).toEqual([]);
     expect(writes).toEqual([]);
@@ -123,9 +123,8 @@ test("GM inspects provider-free readiness and repairs a story obstacle through H
     await expect(page.getByRole("heading", { name: "Activation readiness", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Inspection coverage: complete", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Manual review limitations", exact: true })).toBeVisible();
-    // This fixture has no director run, so the DM chronicle is correctly absent.
-    // The private-sentinel leak check therefore covers the whole play surface: the
-    // readiness diagnostics, the scene rail, and the conversation.
+    // The private-sentinel leak check covers the whole play surface, including
+    // readiness diagnostics and the story. This fixture has no director run.
     expect(await page.locator("body").innerText()).not.toContain("SECRET_");
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -152,9 +151,8 @@ test("GM inspects provider-free readiness and repairs a story obstacle through H
     await expect(page.getByTestId("campaign-rooms")).toBeVisible();
     releaseDelayedResponse!();
     await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-    await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
     await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-    await page.getByRole("button", { name: "Director", exact: true }).click();
+    await openTableTool(page, "Director");
     await expect(page.getByRole("heading", { name: "Preparation readiness", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Preparation diagnostics", exact: true })).toHaveCount(0);
 
@@ -183,9 +181,9 @@ test("GM inspects provider-free readiness and repairs a story obstacle through H
       await expect(enterAdventure).toBeVisible();
       await enterAdventure.click();
     } else {
-      await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
+      await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: fixture.campaign.name, level: 1, exact: true })).toBeVisible();
     }
-    await page.getByRole("button", { name: "Director", exact: true }).click();
+    await openTableTool(page, "Director");
     await page.getByRole("button", { name: "Inspect preparation", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Preparation diagnostics", exact: true })).toBeVisible();
     expect(writes).toEqual(writesBeforeReload);
@@ -195,11 +193,10 @@ test("GM inspects provider-free readiness and repairs a story obstacle through H
     await expect(page.getByTestId("campaign-rooms")).toBeVisible();
     projectPlayerBootstrap = true;
     const readinessBeforePlayer = [...readinessGets];
-    await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
     await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
+    await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: fixture.campaign.name, level: 1, exact: true })).toBeVisible();
     expect(playerProjectionUsed).toBe(true);
-    await page.getByRole("button", { name: "Director", exact: true }).click();
+    await openTableTool(page, "Director");
     await expect(page.getByRole("button", { name: "Inspect preparation", exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Preparation readiness", exact: true })).toHaveCount(0);
     expect(readinessGets).toEqual(readinessBeforePlayer);

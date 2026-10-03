@@ -72,11 +72,11 @@ async function openRoom(page: Page, campaignName: string): Promise<void> {
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
-  await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
+  await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: campaignName, level: 1, exact: true })).toBeVisible();
 }
 
 async function openCharacterTools(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Character", exact: true }).click();
+  await page.getByRole("navigation", { name: "Play tools", exact: true }).getByRole("button", { name: "Character", exact: true }).click();
   await page.getByRole("button", { name: "Inventory & equipment" }).click();
   await expect(page.getByRole("heading", { name: "Resources", exact: true })).toBeVisible();
 }

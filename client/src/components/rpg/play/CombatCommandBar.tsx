@@ -24,6 +24,8 @@ export interface CombatCommandBarProps {
   refreshKey?: number;
   /** Blocks declaration insertion while the room reference is not ready. */
   disabled?: boolean;
+  /** The story-first table uses the shared durable combat review/recovery controller. */
+  reviewInTool?: boolean;
   onOpenCombat: () => void;
   onInsertDeclaration: (declaration: string) => void;
   onChanged: () => void;
@@ -35,7 +37,7 @@ export interface CombatCommandBarProps {
  * completion command next to the round and turn indicator instead of burying it
  * inside the combat tool.
  */
-export function CombatCommandBar({ campaignId, sessionId, controlledActorId, canManage, api, refreshKey = 0, disabled = false, onOpenCombat, onInsertDeclaration, onChanged }: CombatCommandBarProps) {
+export function CombatCommandBar({ campaignId, sessionId, controlledActorId, canManage, api, refreshKey = 0, disabled = false, reviewInTool = false, onOpenCombat, onInsertDeclaration, onChanged }: CombatCommandBarProps) {
   const active = useActiveCombat(campaignId, sessionId, api, refreshKey);
   const [pending, setPending] = useState<"complete" | "enemy" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function CombatCommandBar({ campaignId, sessionId, controlledActorId, can
   const livingEnemies = combat.combatants.filter((combatant) => combatant.team === "enemies" && LIVING_STATUSES.has(combatant.status)).length;
   const livingAllies = combat.combatants.filter((combatant) => combatant.team === "allies" && LIVING_STATUSES.has(combatant.status)).length;
   const terminal = combat.currentCombatant === null && (livingEnemies === 0 || livingAllies === 0);
-  const statusText = terminal ? "ALL ENEMIES DEFEATED"
+  const statusText = terminal ? (livingEnemies === 0 ? "ALL ENEMIES DEFEATED" : "PARTY DEFEATED")
     : ownTurn ? "YOUR TURN"
       : current ? `${current.displayName ?? (current.kind === "actor" ? current.actorId : "ENEMY")}'S TURN`
         : "COMBAT";
@@ -65,7 +67,7 @@ export function CombatCommandBar({ campaignId, sessionId, controlledActorId, can
         : "Waiting on the current turn.";
 
   async function runEnemyTurn(): Promise<void> {
-    if (!api?.resolveEnemyTurn) return;
+    if (!api?.resolveEnemyTurn || disabled || reviewInTool || pending) return;
     setPending("enemy"); setNotice(null);
     try {
       await api.resolveEnemyTurn(combatId, { expectedRevision: combat.revision, idempotencyKey: commandId() });
@@ -79,6 +81,7 @@ export function CombatCommandBar({ campaignId, sessionId, controlledActorId, can
   }
 
   async function complete(): Promise<void> {
+    if (disabled || reviewInTool || pending) return;
     setPending("complete"); setNotice(null);
     try {
       const result = await api!.endCombat(combatId, { expectedRevision: combat.revision, idempotencyKey: commandId() });
@@ -100,8 +103,8 @@ export function CombatCommandBar({ campaignId, sessionId, controlledActorId, can
     </div>
     <div className="combat-command-actions">
       {ownTurn && <button type="button" className="primary" disabled={disabled} onClick={() => onInsertDeclaration("I end my turn.")}>End turn</button>}
-      {canManage && enemyTurn && api.resolveEnemyTurn && <button type="button" className="primary" disabled={pending !== null} onClick={() => void runEnemyTurn()}>Run enemy turn</button>}
-      {canManage && terminal && <button type="button" className="primary" disabled={pending !== null} onClick={() => void complete()}>{pending === "complete" ? "Completing…" : "Complete encounter"}</button>}
+      {canManage && enemyTurn && api.resolveEnemyTurn && !reviewInTool && <button type="button" className="primary" disabled={disabled || pending !== null} onClick={() => void runEnemyTurn()}>Run enemy turn</button>}
+      {canManage && terminal && <button type="button" className="primary" disabled={disabled || pending !== null} onClick={() => reviewInTool ? onOpenCombat() : void complete()}>{pending === "complete" ? "Completing…" : reviewInTool ? "Review encounter completion" : "Complete encounter"}</button>}
       <button type="button" className="ghost" onClick={onOpenCombat}>Open combat</button>
     </div>
     {notice && <p className="combat-command-notice" role="status">{notice}</p>}

@@ -7,6 +7,7 @@ import { campaignDmHistorySchema, campaignDmRunSchema, generatedCampaignContentP
 import { buildApp } from "../../server/src/app.js";
 import { closeRepo } from "../../server/src/repo/index.js";
 import { dmCompletion, dmDependencies, dmFixture } from "../../server/test/fixtures/dmCampaign.js";
+import { openTableTool } from "../support/adventure-table.js";
 
 test("director persists explicit delegation, bounded scenes and human review without read replay", async ({ page, playwright }) => {
   test.setTimeout(90_000);
@@ -80,10 +81,8 @@ test("director persists explicit delegation, bounded scenes and human review wit
       await page.goto("/");
       await page.getByRole("button", { name: `Open campaign ${f.campaign.name}`, exact: true }).click();
       await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-      await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
       await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-      await page.getByRole("button", { name: "Director", exact: true }).click();
-      await expect(page.getByRole("button", { name: "Refresh DM state", exact: true })).toBeEnabled();
+      await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: f.campaign.name, level: 1, exact: true })).toBeVisible();
     };
     const history = async () => {
       const response = await request.get(room);
@@ -94,32 +93,38 @@ test("director persists explicit delegation, bounded scenes and human review wit
       return campaignDmHistorySchema.parse(JSON.parse(text));
     };
     await enter();
+    const table = page.locator("[data-adventure-table]");
+    // Inspect mounted form state even while a Director modal makes the table inert.
+    const composer = table.locator(".adventure-composer textarea");
+    const actor = table.locator('.adventure-composer select[aria-label="Acting character"]');
+    await composer.fill("My unsubmitted player choice");
+    const map = await table.getByRole("region", { name: "Campaign maps", exact: true, includeHidden: true }).elementHandle();
+    const story = table.getByRole("region", { name: "The story so far", exact: true });
+    await openTableTool(page, "Director");
+    await expect(page.getByRole("button", { name: "Refresh DM state", exact: true })).toBeEnabled();
     await expect(page.getByRole("heading", { name: "Human DM", exact: true })).toBeVisible();
     expect((await history()).control).toMatchObject({ mode: "human", revision: 0 });
     expect(writes).toEqual([]); expect(calls).toEqual([]);
-    const composer = page.getByRole("textbox", { name: "What do you do?" });
-    await composer.fill("My unsubmitted player choice");
-    const map = await page.getByRole("region", { name: "Campaign maps", exact: true }).elementHandle();
     await page.getByRole("button", { name: "Review AI delegation", exact: true }).click();
     await expect(composer).toBeDisabled();
-    await expect(page.getByRole("combobox", { name: "Acting character", exact: true })).toBeDisabled();
+    await expect(actor).toBeDisabled();
     expect(writes).toEqual([]);
     await page.getByRole("button", { name: "Confirm AI delegation", exact: true }).click();
     await expect(page.getByRole("heading", { name: "AI DM / no human DM", exact: true })).toBeVisible();
     expect((await history()).control).toMatchObject({ mode: "ai", revision: 1 });
     expect(calls).toEqual([]);
     await page.getByRole("button", { name: "Open scene", exact: true }).click();
-    await expect(page.getByRole("region", { name: "DM chronicle" })).toContainText("stone gate");
     await expect(page.getByRole("button", { name: "Continue scene", exact: true })).toBeEnabled();
     expect(calls).toEqual(["campaign-dm-v1", "campaign-dm-narration-v1"]);
     await page.getByRole("button", { name: "Close Director", exact: true }).click();
     await expect(composer).toHaveValue("My unsubmitted player choice");
     expect(await map!.evaluate(node => node.isConnected)).toBe(true);
-    await expect(page.getByRole("region", { name: "DM chronicle" })).toBeVisible();
+    await expect(story).toBeVisible();
+    await expect(story).toContainText("stone gate");
     await expect(page.getByRole("log")).not.toContainText("SECRET_");
     // No matching encounter candidate: the fake explicitly holds for a player choice.
     action = "encounter-start";
-    await page.getByRole("button", { name: "Director", exact: true }).click();
+    await openTableTool(page, "Director");
     await page.getByRole("button", { name: "Continue scene", exact: true }).click();
     await expect(page.getByRole("button", { name: "Continue scene", exact: true })).toBeEnabled();
     expect(calls).toHaveLength(4);
@@ -143,7 +148,7 @@ test("director persists explicit delegation, bounded scenes and human review wit
     const writesBeforeRead = [...writes];
     // Reload restores the exact saved run through GET, never another planning POST.
     await page.reload();
-    await page.getByRole("button", { name: "Director", exact: true }).click();
+    await openTableTool(page, "Director");
     await expect(page.getByRole("button", { name: "Reject proposal", exact: true })).toBeEnabled();
     const focusedRead = page.waitForResponse(response => response.url().endsWith(room) && response.request().method() === "GET");
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
@@ -156,8 +161,10 @@ test("director persists explicit delegation, bounded scenes and human review wit
     expect(calls).toHaveLength(5);
     await page.getByRole("button", { name: "Continue scene", exact: true }).click();
     await page.getByRole("button", { name: "Approve exact proposal", exact: true }).click();
-    await expect(page.getByRole("region", { name: "DM chronicle" })).toContainText("brass key");
     await expect(page.getByRole("button", { name: "Continue scene", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Close Director", exact: true }).click();
+    await expect(story).toBeVisible();
+    await expect(story).toContainText("brass key");
     expect(calls).toHaveLength(7);
     expect(publicPrompts).toHaveLength(3);
     expect(publicPrompts.join("\n")).not.toContain("SECRET_");
@@ -165,7 +172,7 @@ test("director persists explicit delegation, bounded scenes and human review wit
     expect(writes.filter(url => url.endsWith("/mode-commands"))).toHaveLength(2);
     expect(writes.filter(url => url.endsWith("/decision-commands"))).toHaveLength(2);
     expect(writes).toHaveLength(8);
-    await expect(page.getByRole("region", { name: "DM chronicle" })).not.toContainText("SECRET_");
+    await expect(story).not.toContainText("SECRET_");
     const db = new DatabaseDriver(path.join(dataDir, "velvet.sqlite"), { readonly: true });
     try {
       expect(db.prepare("SELECT count(*) AS n FROM adventure_turns").get()).toEqual({ n: 0 });

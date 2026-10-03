@@ -15,8 +15,9 @@ import { SessionControls, type SessionCommandApi } from "../session/SessionContr
 import { createClientId } from "../../../utils/clientId";
 import { AtlasDrawer, AtlasDrawerSideControl, DrawerModalContext, PlaySurface, type AtlasDrawerSide, type AtlasTool } from "./PlaySurface";
 import { useActionDraft } from "./useActionDraft";
-import { campaignDestinations, type CampaignDestination } from "../shell/CampaignShell";
+import { campaignDestinations, useCampaignShell, type CampaignDestination } from "../shell/CampaignShell";
 import { CommandCenter } from "./CommandCenter";
+import { AdventureTable, FirstTurnGuide, type AdventureTableView } from "./AdventureTable";
 import { VoiceControls } from "../../../voice/VoiceControls";
 import { CampaignQuickPanel } from "./CampaignQuickPanel";
 import { useCampaignWorkbenchPreferences } from "./campaignWorkbenchPreferences";
@@ -100,8 +101,8 @@ export interface CampaignPlayPageProps {
   authorization?: StudioAuthorization;
   studioAvailable?: boolean;
   onOpenCombat?: () => void;
-  /** Room presentation: the one-screen command center or the living atlas. */
-  surface?: "center" | "atlas";
+  /** Story-first table by default; legacy presentations remain explicit opt-ins. */
+  surface?: "story" | "center" | "atlas";
   /** Feature discovery for scene images; both the illustration and DM panel need it. */
   imagesEnabled?: boolean;
   sceneImageApi?: SceneImageApi;
@@ -144,16 +145,18 @@ function readPendingInitial(campaignId: string, sessionId: string): PendingIniti
 /** Coordinates durable play independently of the atlas presentation and tool drawers. */
 export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneration, api, legacyMessages = [], legacyParticipants = [], onBack, onUnavailable,
   onSelectedActorChange, onTurnIdChange, initialSelectedActorId, initialTurnId, authorizationCanAct = true, focusHeading,
-  combatAvailable = false, combatApi, worldApi, actorToolsApi, advancementApi, characterBuilderApi, authorization, onNavigate, surface = "center",
+  combatAvailable = false, combatApi, worldApi, actorToolsApi, advancementApi, characterBuilderApi, authorization, onNavigate, surface = "story",
   imagesEnabled = false, sceneImageApi }: CampaignPlayPageProps) {
   if (!authorizationCanAct) {
     try { localStorage.removeItem(stateKey(campaignId, sessionId)); localStorage.removeItem(lockKey(campaignId, sessionId));
       if (initialTurnId) localStorage.removeItem(confirmationKey(initialTurnId)); } catch { /* synchronous authority cleanup is best effort */ }
   }
+  const { identity } = useCampaignShell();
+  const [tableView, setTableView] = useState<AdventureTableView>("story");
   const initial = useRef(readSafeState(campaignId, sessionId)).current;
   const [bootstrap, setBootstrap] = useState<CampaignPlayBootstrap | null>(null);
   const [sessionLocked, setSessionLocked] = useState(false);
-  const [dmLocked, setDmLocked] = useState(false);
+  const [dmLocked, setDmLocked] = useState(true);
   const [dmHistory, setDmHistory] = useState<CampaignDmHistory | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
   useEffect(() => { if (!authorizationCanAct || (bootstrap && !["owner", "gm"].includes(bootstrap.principal.role))) setSessionLocked(false); }, [authorizationCanAct, bootstrap]);
@@ -337,7 +340,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
 
   // An overlay with a scrim is modal: keep focus visible, not behind the drawer.
   useEffect(() => {
-    if (surface !== "center" || !activeTool) return;
+    if (surface === "atlas" || !activeTool) return;
     const isolated: HTMLElement[] = [];
     // Include the enclosing campaign navigation, not only the play workspace.
     for (let node: HTMLElement | null = drawerOverlayRef.current; node && node !== document.body; node = node.parentElement) {
@@ -573,7 +576,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const pending = turn?.confirmation.state === "pending" ? turn.confirmation : null;
   const confirmationApi = useMemo(() => ({ confirmAdventureTurn: api.confirmAdventureTurn, getAdventureTurn: api.getAdventureTurn }), [api]);
   const activeBinding = turn ? { campaignId, sessionId, actorId: turn.turn.actorId, turnId: turn.turn.turnId, priorTurnId: turn.turn.priorTurnId } : null;
-  if (!bootstrap) return <main className="living-atlas atlas-loading"><p className="atlas-kicker">VELVET / LIVING ATLAS</p>
+  if (!bootstrap) return <main className="living-atlas atlas-loading"><p className="atlas-kicker">VELVET / ADVENTURE TABLE</p>
     {bootstrapError ? <><p role="alert">{bootstrapError}</p><div className="button-row"><button type="button" onClick={() => void loadBootstrap()}>Retry connection</button><button type="button" onClick={onBack}>Leave room</button></div></> : <p role="status">Opening campaign play...</p>}
   </main>;
   const actionable = authorizationCanAct && bootstrap.session.adventureEligible && bootstrap.session.active
@@ -598,7 +601,9 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   }
   function openTool(tool: AtlasTool) {
     if (activeTool === tool) { closeTool(); return; }
-    const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    let focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const menu = focused?.closest<HTMLDialogElement>("dialog.table-dialog");
+    if (menu) { menu.close(); focused = document.querySelector<HTMLElement>(".table-menu-button"); focused?.focus(); }
     if (!activeTool) toolOriginRef.current = focused && focused !== document.body ? focused : document.querySelector<HTMLElement>(`[data-atlas-tool="${tool === "inventory" || tool === "advancement" ? "character" : tool}"]`);
     setActiveTool(tool); setVisitedTools((current) => current.includes(tool) ? current : [...current, tool]);
     if (tool === "character") void openSheet();
@@ -639,6 +644,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   }
   function backToDraft() {
     setActiveTool(null);
+    setTableView("story");
     requestAnimationFrame(() => { composerRef.current?.focus(); composerRef.current?.scrollIntoView?.({ block: "nearest" }); });
   }
 
@@ -654,7 +660,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const freeformSeekApi: FreeformSeekApi | null = api.seekFreeformFaction && api.seekFreeformQuest && api.seekFreeformRumor
     ? { seekFaction: api.seekFreeformFaction, seekQuest: api.seekFreeformQuest, seekRumor: api.seekFreeformRumor }
     : null;
-  const campaignNav = onNavigate ? <label className="campaign-nav-select"><select aria-label="Open a campaign destination" value="" onChange={(event) => { const destination = event.target.value as CampaignDestination; if (destination) onNavigate(destination); }}><option value="">Campaign views…</option>{campaignDestinations(bootstrap.principal.role, Boolean(worldApi), combatAvailable).filter((item) => item.id !== "play").map((item) => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.label}</option>)}</select></label> : null;
+  const campaignNav = onNavigate ? <label className="campaign-nav-select"><select aria-label="Open a campaign destination" disabled={sessionLocked || roomToolsLocked} value="" onChange={(event) => { const destination = event.target.value as CampaignDestination; if (destination && !sessionLocked && !roomToolsLocked) onNavigate(destination); }}><option value="">Campaign views…</option>{campaignDestinations(bootstrap.principal.role, Boolean(worldApi), combatAvailable).filter((item) => item.id !== "play").map((item) => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.label}</option>)}</select></label> : null;
   function applyPrefill(value: string, mode: "replace" | "append") {
     if (!referenceReady) return;
     setDeclaration((current) => mode === "replace" || current.length === 0 ? value : `${current}${/\s$/.test(current) ? "" : " "}${value}`);
@@ -666,6 +672,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     if (declaration.trim().length === 0) { applyPrefill(value, "replace"); return; }
     setPendingPrefill(value);
     setActiveTool(null);
+    setTableView("story");
     requestAnimationFrame(() => { prefillReviewRef.current?.focus(); prefillReviewRef.current?.scrollIntoView?.({ block: "nearest" }); });
   };
   const activeActorName = bootstrap.playableActors.find((actor) => actor.actorId === selectedActorId)?.name ?? null;
@@ -679,14 +686,14 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       widgets={preferences.widgets} refreshKey={reconciliationRevision + liveRefreshRevision} api={api} onSceneResolved={resolveScene} onPrefillDeclaration={prefill} onOpenWorld={() => openTool("travel")} onOpenCombat={() => openTool("combat")} />
   </section>;
   const quickNode = actorToolsApi
-    ? <CampaignQuickPanel campaignId={campaignId} selectedActorId={selectedActorId || null} actors={bootstrap.playableActors} getSheet={api.getActorGameplaySheet}
+    ? <CampaignQuickPanel compact={surface === "story"} campaignId={campaignId} selectedActorId={selectedActorId || null} actors={bootstrap.playableActors} getSheet={api.getActorGameplaySheet}
         selectedKeys={new Set(sheetContext.map((entry) => sheetReferenceKey(entry.reference)))} onReference={toggleSheetReference}
         refreshKey={reconciliationRevision + liveRefreshRevision} canOpenSheet={referenceReady} onOpenSheet={() => openTool("character")} />
     : <p className="quick-panel-note">Character services are unavailable in this room.</p>;
   const noticesNode = <>
     {error && <p className="atlas-notice" role="alert">{error}</p>}
     {playBlocker && <p className="atlas-notice" role="status">{playBlocker}</p>}
-    {dmLocked && <p className="atlas-notice" role="status">Director work needs review or recovery. Open Director; takeover remains available to the GM.</p>}
+    {dmLocked && <p className="atlas-notice" role="status">{dmHistory ? "Director work needs review or recovery. Open Director; takeover remains available to the GM." : "Table state is being checked or needs review. Open Director for details."}</p>}
     {(sessionLocked || combatLocked || travelLocked || inventoryLocked || advancementLocked) && <p className="atlas-notice" role="status">{sessionLocked ? "A GM session operation needs review or recovery. Open GM tools to continue." : travelLocked ? "Travel needs review or recovery. Open Travel to continue." : inventoryLocked || advancementLocked ? "A character operation needs review or recovery. Open Character tools to continue." : "A combat operation needs completion or recovery. Open Combat & rewards to continue."}</p>}
   </>;
   const reconcileNode = <>
@@ -703,15 +710,18 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       canAct={authorizationCanAct} unstarted={startupUnstarted} loaded={startupLoaded} onStarted={refreshAfterTool} />
   </>;
   const replayToggleNode = <div className="atlas-turn-tools" aria-label="Session replay">
-      <button type="button" className="ghost" aria-pressed={replayOpen} onClick={() => setReplayOpen((open) => !open)}>{replayOpen ? "Close replay" : "Replay this session"}</button>
+      <button type="button" className="ghost" aria-pressed={replayOpen} onClick={() => { setReplayOpen((open) => !open); setTableView("story"); document.querySelector<HTMLDialogElement>("dialog.table-dialog[open]")?.close(); requestAnimationFrame(() => document.getElementById("table-story")?.focus()); }}>{replayOpen ? "Close replay" : "Replay this session"}</button>
     </div>;
+  const confirmationNode = actionable && pending && activeBinding ? <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} binding={activeBinding} api={confirmationApi} restoreFocusRef={composerRef}
+    onReconciled={(value, token) => { void applyReconciled({ ...value, ...(token ? { resumeToken: token } : {}) }, true); }} /> : null;
   const conversationNode = replayOpen
     ? <CampaignReplay campaignId={campaignId} sessionId={sessionId} dmHistory={dmHistory} transcript={transcript} actorNames={actorNames} trace={api} onExit={() => setReplayOpen(false)} />
     : <>
     <CampaignConversation transcript={transcript} transcriptState={transcriptState} legacyMessages={legacyMessages} legacyParticipants={legacyParticipants}
-      current={turn} liveEvents={liveEvents} actorNames={actorNames} onPrefillChoice={prefill} canPrefill={referenceReady} />
-    {actionable && pending && activeBinding && <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} binding={activeBinding} api={confirmationApi} restoreFocusRef={composerRef}
-      onReconciled={(value, token) => { void applyReconciled({ ...value, ...(token ? { resumeToken: token } : {}) }, true); }} />}
+      current={turn} liveEvents={liveEvents} actorNames={actorNames} onPrefillChoice={prefill} canPrefill={referenceReady}
+      storyMode={surface === "story"} visible={surface !== "story" || tableView === "story"} directorHistory={surface === "story" ? dmHistory : undefined}
+      emptyState={surface === "story" && actionable ? <FirstTurnGuide disabled={!referenceReady} onSuggestion={prefill} onHelp={() => openTool("help")} /> : undefined} />
+    {surface !== "story" && confirmationNode}
     {turn && <MechanicReceiptCard campaignId={campaignId} links={turn.receipts} api={api} compact />}
     {actionable && turn && ["completed", "cancelled", "failed"].includes(turn.turn.state) && <div className="atlas-turn-tools" aria-label="Adventure narration alternatives">
       <button type="button" disabled={!referenceReady} onClick={() => void narrateVariant("narration-swipe")}>Swipe narration</button>
@@ -729,15 +739,15 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const combatBarNode = actionable && combatAvailable && combatApi
     ? <CombatCommandBar campaignId={campaignId} sessionId={sessionId} controlledActorId={selectedActorId || undefined}
         canManage={authorizationCanAct && (bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm")}
-        api={combatApi} refreshKey={reconciliationRevision + liveRefreshRevision} disabled={!referenceReady}
+        api={combatApi} refreshKey={reconciliationRevision + liveRefreshRevision} disabled={!referenceReady} reviewInTool={surface === "story"}
         onOpenCombat={() => openTool("combat")} onInsertDeclaration={prefill} onChanged={refreshAfterTool} />
     : null;
   const situationNode = actionable && combatAvailable && combatApi
     ? <SituationActions campaignId={campaignId} sessionId={sessionId} controlledActorId={selectedActorId || undefined} api={combatApi} refreshKey={reconciliationRevision + liveRefreshRevision} disabled={!referenceReady} onInsert={prefill} />
     : null;
-  const composerNode = <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={authorizationCanAct ? bootstrap.principal.role : "observer"} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
+  const composerNode = <AdventureActionComposer presentation={surface === "story" ? "table" : undefined} actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={authorizationCanAct ? bootstrap.principal.role : "observer"} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
       phase={sessionLocked || roomToolsLocked || phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"}
-      declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => void submit(value)} composerRef={composerRef}
+      declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => { setTableView("story"); void submit(value); }} composerRef={composerRef}
       sheetContext={sheetContext} onOpenSheet={() => openTool("character")} contextNotice={contextNotice}
       onRemoveReference={(key) => { setSheetContext((current) => current.filter((entry) => sheetReferenceKey(entry.reference) !== key)); setContextNotice("Reference removed. Your words are unchanged."); }}
       onClearReferences={() => { setSheetContext([]); setContextNotice("References cleared. Your words are unchanged."); }} />;
@@ -754,12 +764,12 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const drawerSide = (tool: AtlasTool) => preferences.drawerSides?.[tool] ?? "right";
   // The four-way header control writes the same per-tool preference the Display dialog edits.
   // The legacy atlas keeps its default edge and hides the control.
-  const drawerSideChange = (tool: AtlasTool) => surface === "center"
+  const drawerSideChange = (tool: AtlasTool) => surface !== "atlas"
     ? (side: AtlasDrawerSide) => onPreferences({ ...preferences, drawerSides: { ...preferences.drawerSides, [tool]: side } })
     : undefined;
   const characterSide = drawerSide("character");
   const characterActions = <nav className="atlas-character-actions" aria-label="Character mechanics"><button type="button" onClick={() => openTool("inventory")}>Inventory & equipment</button><button type="button" onClick={() => openTool("advancement")}>Advancement</button></nav>;
-  const drawersNode = <DrawerModalContext.Provider value={surface === "center"}>
+  const drawersNode = <DrawerModalContext.Provider value={surface !== "atlas"}>
     <AtlasDrawer tool="director" open={activeTool === "director"} onClose={closeTool} side={drawerSide("director")} onSideChange={drawerSideChange("director")}>
       <CampaignDmPanel key={`dm:${campaignId}:${sessionId}:${authorizationGeneration}`} bootstrap={bootstrap} api={api.dm}
         blocked={sessionLocked || combatLocked || travelLocked || inventoryLocked || advancementLocked || !["idle", "terminal"].includes(phase)}
@@ -771,7 +781,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       data-orientation={characterSide === "top" || characterSide === "bottom" ? "horizontal" : "vertical"} hidden={activeTool !== "character"}>
       {sheetState.kind === "ready" && <GameplaySheetDrawer sheet={sheetState.sheet} canReference={referenceReady && sheetState.actorId === selectedActorId} closeButtonRef={sheetCloseRef} onClose={closeTool} onReference={toggleSheetReference} side={characterSide} onSideChange={drawerSideChange("character")}
         selectedKeys={new Set(sheetContext.map((entry) => sheetReferenceKey(entry.reference)))} onCompose={backToDraft} onRefresh={() => void openSheet()} actions={characterActions} notice={contextNotice} />}
-      {sheetState.kind !== "ready" && <aside className="gameplay-sheet-drawer" role="dialog" aria-modal={surface === "center"} tabIndex={-1} aria-labelledby="atlas-sheet-heading"><header><div><h2 id="atlas-sheet-heading">{sheetState.kind === "loading" ? "Opening character sheet" : "Character sheet unavailable"}</h2></div>
+      {sheetState.kind !== "ready" && <aside className="gameplay-sheet-drawer" role="dialog" aria-modal={surface !== "atlas"} tabIndex={-1} aria-labelledby="atlas-sheet-heading"><header><div><h2 id="atlas-sheet-heading">{sheetState.kind === "loading" ? "Opening character sheet" : "Character sheet unavailable"}</h2></div>
         <div className="atlas-drawer-controls"><AtlasDrawerSideControl tool="character" side={characterSide} onSideChange={drawerSideChange("character")} /><button ref={sheetCloseRef} type="button" aria-label="Close character sheet" onClick={closeTool}>Close</button></div></header>
         {characterActions}
         {sheetState.kind === "loading" ? <p role="status">Loading authoritative character details...</p> : <><p role="status">{sheetState.kind === "error" ? sheetState.message : "Character references are available only for a controlled actor while play is ready and unambiguous."}</p><button type="button" disabled={!referenceReady} onClick={() => void openSheet()}>Open character sheet</button></>}
@@ -790,7 +800,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
         blocked={toolBlocked || combatLocked || inventoryLocked || advancementLocked} onLockChange={setTravelLocked} onStateChange={refreshAfterTool} onBack={closeTool} />
       : <p>Direct travel requires authorized world services. World route buttons can still prepare a declaration; they do not commit travel.</p>)}</AtlasDrawer>
     <AtlasDrawer tool="dice" open={activeTool === "dice"} onClose={closeTool} side={drawerSide("dice")} onSideChange={drawerSideChange("dice")}>{visitedTools.includes("dice") && <CampaignDicePanel campaignId={campaignId} api={api} canView={canViewDice} canRoll={canRollDice && !dmLocked} actorNames={bootstrap.playableActors.map((actor) => actor.name)} selectedActorName={bootstrap.playableActors.find((actor) => actor.actorId === selectedActorId)?.name} refreshKey={liveRefreshRevision} />}</AtlasDrawer>
-    <AtlasDrawer tool="context" open={activeTool === "context"} onClose={closeTool} side={drawerSide("context")} onSideChange={drawerSideChange("context")}>{visitedTools.includes("context") && <><p>Known locations, present cast, objectives, and published lore. Review direct party travel in Travel; use Character for inventory and advancement.</p><div className="atlas-character-actions"><button type="button" onClick={() => openTool("travel")}>Plan party travel</button><button type="button" onClick={() => openTool("inventory")}>Manage possessions</button></div><CampaignContextDrawer hideMaps readOnly={!referenceReady} key={`context:${authorizationGeneration}:${audience}`} campaignId={campaignId} sessionId={sessionId} selectedActorId={selectedActorId || null} playableActorIds={bootstrap.playableActors.map((actor) => actor.actorId)} audience={audience} authorizationGeneration={authorizationGeneration} refreshKey={reconciliationRevision + liveRefreshRevision} api={api} onSceneResolved={resolveScene} onPrefillDeclaration={prefill} onOpenWorld={() => openTool("travel")} onOpenCombat={() => openTool("combat")} /></>}</AtlasDrawer>
+    <AtlasDrawer tool="context" open={activeTool === "context"} onClose={closeTool} side={drawerSide("context")} onSideChange={drawerSideChange("context")}>{visitedTools.includes("context") && <><p>Known locations, present cast, objectives, and published lore. Review direct party travel in Travel; use Character for inventory and advancement.</p><div className="atlas-character-actions"><button type="button" onClick={() => openTool("travel")}>Plan party travel</button><button type="button" onClick={() => openTool("inventory")}>Manage possessions</button></div><CampaignContextDrawer hideMaps readOnly={!referenceReady} key={`context:${authorizationGeneration}:${audience}`} campaignId={campaignId} sessionId={sessionId} selectedActorId={selectedActorId || null} playableActorIds={bootstrap.playableActors.map((actor) => actor.actorId)} audience={audience} authorizationGeneration={authorizationGeneration} refreshKey={reconciliationRevision + liveRefreshRevision} api={api} onPrefillDeclaration={prefill} onOpenWorld={() => openTool("travel")} onOpenCombat={() => openTool("combat")} /></>}</AtlasDrawer>
     <AtlasDrawer tool="combat" open={activeTool === "combat"} onClose={closeTool} side={drawerSide("combat")} onSideChange={drawerSideChange("combat")}>{visitedTools.includes("combat") && (combatAvailable && combatApi
       ? <CombatTrackerPage key={`combat:${authorizationGeneration}:${selectedActorId}`} embedded api={combatApi} campaignId={campaignId} sessionId={sessionId} actorRole={authorizationCanAct ? bootstrap.principal.role : "observer"} audience={audience} controlledActorId={selectedActorId || undefined}
         blocked={toolBlocked || travelLocked || inventoryLocked || advancementLocked} onLockChange={setCombatLocked} onStateChange={() => setReconciliationRevision((value) => value + 1)} onBack={closeTool} />
@@ -810,6 +820,17 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   if (surface === "atlas") return <PlaySurface headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
     tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
     map={contextNode} conversation={<>{sceneImageNode}{noticesNode}{reconcileNode}{legacyChronicleNode}{conversationNode}</>} activity={activityNode} composer={composerNode} drawers={drawersMount} />;
+  if (surface === "story") return <>
+    <AdventureTable headingRef={headingRef} campaignName={identity?.id === campaignId ? identity.name : "Adventure room"} scene={activeScene} role={role}
+      status={playBlocker ? "Read-only adventure" : phase === "streaming" ? "The DM is responding…" : phase === "awaiting-confirmation" ? "Your action needs a decision" : phase === "ambiguous" ? "Check your last action before continuing" : roomToolsLocked || sessionLocked ? "Finish the open review to continue" : "Your move · take your time"}
+      view={tableView} onView={setTableView} tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
+      story={conversationNode} map={contextNode} composer={<>{situationNode}{composerNode}</>} notices={<>{combatBarNode}{noticesNode}{reconcileNode}{confirmationNode}</>}
+      character={quickNode} illustration={sceneImageNode} tableControls={<>{dmNoticeNode}{replayToggleNode}{voiceNode}</>} campaignNav={campaignNav} preferences={preferences} onPreferences={onPreferences} />
+    <div ref={drawerOverlayRef} className="campaign-drawers-overlay adventure-overlays">
+      {activeTool !== null && <button type="button" tabIndex={-1} className="campaign-drawers-scrim" aria-label="Close open drawer" onClick={closeTool} />}
+      {drawersNode}
+    </div>
+  </>;
   // Top and bottom drawers keep to the centre lane between the visible side columns.
   // The Command Center CSS zeroes both insets once the side columns stack full width.
   const drawerInsets = {

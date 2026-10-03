@@ -8,6 +8,7 @@ import { campaignRoomActivationReadinessSchema, campaignRoomActivationResponseSc
 import { buildApp } from "../../server/src/app.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../../server/src/defaults.js";
 import { closeRepo, createRepository, createSession, MECHANICS_STARTER_CATALOG, SRD_5_1_STARTER_CATALOG } from "../../server/src/repo/index.js";
+import { openTableTool, openTableTools } from "../support/adventure-table.js";
 
 const tabletopTest = test.extend<{ tabletop: { request: APIRequestContext; campaignId: string; campaignName: string; roomId: string; actorId: string } }>({
   tabletop: async ({ page, playwright }, use) => {
@@ -142,7 +143,7 @@ for (const device of [
   test.describe(device.name, () => {
     test.use({ viewport: device.viewport, isMobile: device.isMobile, hasTouch: device.hasTouch });
 
-    tabletopTest("successful activation opens Campaign Command Center and confirms one tactical move", async ({ page, tabletop }, testInfo) => {
+    tabletopTest("successful activation opens Adventure Table and confirms one tactical move", async ({ page, tabletop }, testInfo) => {
       const { request, campaignId, campaignName, roomId, actorId } = tabletop;
       const roomPath = `/api/rpg/v1/campaigns/${campaignId}/rooms/${roomId}`;
       const activationMethods: string[] = [];
@@ -151,16 +152,16 @@ for (const device of [
         if (event.url().includes(`${roomPath}/activation-`)) activationMethods.push(event.method());
         if (event.url().includes(`${roomPath}/tactical-maps`) && event.method() === "POST") mapWrites.push(new URL(event.url()).pathname);
       });
+      const initialReadinessResponse = page.waitForResponse((response) => response.request().method() === "GET" && response.url().endsWith(`${roomPath}/activation-readiness`));
       await openCampaign(page, campaignName);
       await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
       await expect(page.getByTestId("campaign-rooms")).toBeVisible();
-      const initialReadinessResponse = page.waitForResponse((response) => response.url().endsWith(`${roomPath}/activation-readiness`));
-      await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
       const initialReadiness = campaignRoomActivationReadinessSchema.parse(await (await initialReadinessResponse).json());
       expect(initialReadiness).toMatchObject({ campaignId, sessionId: roomId, active: false, ready: true, blockers: [] });
       await expect(page.getByRole("button", { name: "Start room", exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: "Enter adventure", exact: true })).toHaveCount(0);
       const activated = page.waitForResponse((response) => response.url().endsWith(`${roomPath}/activation-commands`));
+      const currentReadinessResponse = page.waitForResponse((response) => response.request().method() === "GET" && response.url().endsWith(`${roomPath}/activation-readiness`));
       await page.getByRole("button", { name: "Start room", exact: true }).click();
       const activationResponse = await activated;
       expect(activationResponse.status()).toBe(200);
@@ -170,14 +171,12 @@ for (const device of [
       const activationCommand = activationResponse.request().postDataJSON();
       expect(activation.receipt.idempotencyKey).toBe(activationCommand.idempotencyKey);
       await expect(page.getByRole("status")).toContainText("Activation receipt confirmed");
-      await expect(page.getByRole("button", { name: "Enter adventure", exact: true })).toHaveCount(0);
-      const currentReadinessResponse = page.waitForResponse((response) => response.url().endsWith(`${roomPath}/activation-readiness`));
-      await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
       const currentReadiness = campaignRoomActivationReadinessSchema.parse(await (await currentReadinessResponse).json());
       expect(currentReadiness).toMatchObject({ campaignId, sessionId: roomId, active: true, ready: true, blockers: [] });
       await expect(page.getByRole("button", { name: "Start room", exact: true })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Enter adventure", exact: true })).toBeVisible();
-      expect(activationMethods).toEqual(["GET", "POST", "GET"]);
+      expect(activationMethods.filter((method) => method !== "GET")).toEqual(["POST"]);
+      expect(activationMethods.filter((method) => method === "GET").length).toBeGreaterThanOrEqual(2);
       const replayResponse = await request.post(`${roomPath}/activation-commands`, { data: activationCommand });
       expect(replayResponse.status(), await replayResponse.text()).toBe(200);
       expect(campaignRoomActivationResponseSchema.parse(await replayResponse.json())).toEqual(activation);
@@ -190,18 +189,33 @@ for (const device of [
         idempotencyKey: "tabletop-map" } });
       expect(map.status(), await map.text()).toBe(200);
       await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-      await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
-      await expect(page.getByText("CAMPAIGN COMMAND CENTER", { exact: true })).toBeVisible();
-      const tools = page.getByRole("navigation", { name: "In-room tools", exact: true });
+      const table = page.locator("[data-adventure-table]");
+      await expect(table).toBeVisible();
+      await expect(table.getByRole("heading", { name: campaignName, level: 1, exact: true })).toBeVisible();
+      const tools = table.getByRole("navigation", { name: "Play tools", exact: true });
       await expect(tools).toBeVisible();
-      const livingMap = page.getByRole("region", { name: "Living map", exact: true });
-      await expect(livingMap).toBeVisible();
-      await expect(livingMap.getByRole("region", { name: "Tactical map", exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Exploration grid", exact: true })).toHaveAttribute("aria-pressed", "true");
-      const conversation = page.getByRole("region", { name: "Campaign narration and actions", exact: true });
+      const storyTab = tools.getByRole("tab", { name: "Story", exact: true });
+      const mapTab = tools.getByRole("tab", { name: "Map", exact: true });
+      const storyPanel = table.locator("#table-story");
+      const mapPanel = table.locator("#table-map");
+      await expect(storyTab).toHaveAttribute("aria-selected", "true");
+      await expect(mapTab).toHaveAttribute("aria-selected", "false");
+      await expect(storyPanel).toBeVisible();
+      await expect(mapPanel).toHaveCount(1);
+      await expect(mapPanel).toBeHidden();
+      const livingMap = mapPanel.locator('[aria-label="Living map"]');
+      await expect(livingMap).toHaveCount(1);
+      const mapHandle = await livingMap.elementHandle();
+      const conversation = table.getByRole("region", { name: "The story so far", exact: true });
       await expect(conversation).toBeVisible();
+      const form = table.locator(".adventure-composer");
+      await expect(page.locator(".adventure-composer")).toHaveCount(1);
+      const composerHandle = await form.elementHandle();
+      const composer = form.getByRole("textbox", { name: "What do you do?", exact: true });
+      await expect(form.getByRole("button", { name: "Send action", exact: true })).toBeDisabled();
+      await composer.fill("I inspect the rain gate.");
       await testInfo.attach("scene-layout", { contentType: "application/json", body: JSON.stringify(await page.evaluate(() =>
-        [...document.querySelectorAll(".control-workspace, .campaign-tabletop, .tabletop-stage, #play-maps, .tactical-map-panel, canvas, #play-conversation, .adventure-composer, .adventure-composer label, .adventure-composer select, .adventure-composer textarea, .adventure-composer button")].map((element) => ({
+        [...document.querySelectorAll("[data-adventure-table], .table-layout, .table-stage, #table-map, .tactical-map-panel, canvas, #table-story, .adventure-composer, .adventure-composer label, .adventure-composer select, .adventure-composer textarea, .adventure-composer button")].map((element) => ({
           element: element.id || element.className || element.tagName, width: element.getBoundingClientRect().width,
           right: element.getBoundingClientRect().right, minWidth: getComputedStyle(element).minWidth,
           columns: getComputedStyle(element).gridTemplateColumns,
@@ -209,14 +223,38 @@ for (const device of [
       await testInfo.attach("scene-default", { contentType: "image/png", body: await page.screenshot() });
       await noOverflow(page, true);
 
+      await mapTab.click();
+      await expect(mapTab).toHaveAttribute("aria-selected", "true");
+      await expect(storyPanel).toBeHidden();
+      await expect(livingMap).toBeVisible();
+      await expect(livingMap.getByRole("region", { name: "Tactical map", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Exploration grid", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect(composer).toHaveValue("I inspect the rain gate.");
       await page.getByRole("button", { name: "Zoom in", exact: true }).click();
       await page.getByText("Camera controls and movement help", { exact: true }).click();
       await page.getByRole("button", { name: "Pan right", exact: true }).click();
       const camera = page.getByLabel("Map camera", { exact: true });
       const cameraBefore = await camera.innerText();
       expect(cameraBefore).toContain("Zoom: 125%.");
-      for (const tool of ["character", "context"]) {
-        const button = tools.locator(`[data-atlas-tool="${tool}"]`);
+      const canvasHandle = await livingMap.locator("canvas").elementHandle();
+      await storyTab.click();
+      await expect(storyTab).toHaveAttribute("aria-selected", "true");
+      await expect(conversation).toBeVisible();
+      await expect(mapPanel).toBeHidden();
+      await expect(composer).toHaveValue("I inspect the rain gate.");
+      expect(await mapHandle!.evaluate((node) => node.isConnected)).toBe(true);
+      expect(await canvasHandle!.evaluate((node) => node.isConnected)).toBe(true);
+      expect(await composerHandle!.evaluate((node) => node.isConnected)).toBe(true);
+      await expect(page.locator(".adventure-composer")).toHaveCount(1);
+      await storyTab.press("ArrowRight");
+      await expect(mapTab).toBeFocused();
+      await expect(mapTab).toHaveAttribute("aria-selected", "true");
+      await expect(livingMap).toBeVisible();
+      await expect(camera).toHaveText(cameraBefore);
+      for (const name of ["Character", "Field journal"]) {
+        // Keep observing the mounted primary tools while the modal makes the table inert.
+        const button = table.getByRole("navigation", { name: "Play tools", exact: true, includeHidden: true })
+          .getByRole("button", { name, exact: true, includeHidden: true });
         await button.focus();
         await page.keyboard.press("Enter");
         await expect(button).toHaveAttribute("aria-expanded", "true");
@@ -224,21 +262,46 @@ for (const device of [
         const drawer = page.locator(`#${target}`).getByRole("dialog");
         await expect(drawer).toBeVisible();
         await expect(drawer).toHaveAttribute("aria-modal", "true");
+        await expect(table).toHaveJSProperty("inert", true);
         await expect(livingMap).toBeVisible();
-        await expect(conversation).toBeVisible();
+        await expect(storyPanel).toBeHidden();
         await expect(camera).toHaveText(cameraBefore);
         await page.keyboard.press("Escape");
         await expect(drawer).toBeHidden();
+        await expect(table).toHaveJSProperty("inert", false);
+        await expect(button).toHaveAttribute("aria-expanded", "false");
         await expect(button).toBeFocused();
         await expect(camera).toHaveText(cameraBefore);
+        await expect(composer).toHaveValue("I inspect the rain gate.");
         await noOverflow(page, true);
       }
-      const form = page.locator(".adventure-composer");
-      await expect(form.getByRole("button", { name: "Declare action", exact: true })).toBeDisabled();
-      await form.getByRole("textbox", { name: "What do you do?", exact: true }).fill("I inspect the rain gate.");
+      const tableTools = table.getByRole("button", { name: "Table tools", exact: true });
+      const menu = await openTableTools(page);
+      await menu.getByRole("button", { name: "Close table tools", exact: true }).click();
+      await expect(menu).toBeHidden();
+      await expect(tableTools).toBeFocused();
+      await openTableTools(page);
+      await menu.getByRole("button", { name: "Display", exact: true }).click();
+      await expect(menu).toBeHidden();
+      const display = page.getByRole("dialog", { name: "Campaign workbench", exact: true });
+      await expect(display).toBeVisible();
+      await display.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(display).toBeHidden();
+      await expect(tableTools).toBeFocused();
+      const director = await openTableTool(page, "Director");
+      await director.getByRole("button", { name: "Close Director", exact: true }).click();
+      await expect(director).toBeHidden();
+      await expect(tableTools).toBeFocused();
+      await expect(camera).toHaveText(cameraBefore);
+      await expect(composer).toHaveValue("I inspect the rain gate.");
+      await expect(page.locator(".adventure-composer")).toHaveCount(1);
+      await expect(page.getByRole("region", { name: "Campaign maps", exact: true, includeHidden: true })).toHaveCount(1);
+      expect(await mapHandle!.evaluate((node) => node.isConnected)).toBe(true);
+      expect(await canvasHandle!.evaluate((node) => node.isConnected)).toBe(true);
+      expect(await composerHandle!.evaluate((node) => node.isConnected)).toBe(true);
       const bounds = (await form.boundingBox())!;
       for (const control of [form.getByRole("combobox", { name: "Acting character", exact: true }),
-        form.getByRole("textbox", { name: "What do you do?", exact: true }), form.getByRole("button", { name: "Declare action", exact: true })]) {
+        composer, form.getByRole("button", { name: "Send action", exact: true })]) {
         await expect(control).toBeVisible();
         await expect(control).toBeEnabled();
         const box = (await control.boundingBox())!;
@@ -283,8 +346,9 @@ for (const device of [
       await expect(page.getByText("Authoritative tactical map refreshed.", { exact: true })).toBeVisible();
       await expect(camera).toHaveText(cameraBefore);
       await expect(cells.getByRole("row").filter({ hasText: "Aster" })).toContainText("3, 2");
+      await expect(composer).toHaveValue("I inspect the rain gate.");
       expect(mapWrites).toEqual([`${roomPath}/tactical-maps/exploration/previews`, `${roomPath}/tactical-maps/exploration/move-commands`]);
-      expect(activationMethods).toEqual(["GET", "POST", "GET"]);
+      expect(activationMethods.filter((method) => method !== "GET")).toEqual(["POST"]);
       await noOverflow(page, true);
     });
 
@@ -430,12 +494,11 @@ for (const device of [
       await page.getByRole("button", { name: "Finalize playable character once", exact: true }).click();
       await expect(page.getByRole("heading", { name: "Playable character finalized", exact: true })).toBeVisible();
       await expect(page.getByText(/^Authoritative sheet: level 1/)).toBeVisible();
-      await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-      await expect(page.getByTestId("campaign-rooms")).toBeVisible();
       const activationRequests: string[] = [];
       page.on("request", (event) => { if (event.url().includes("/activation-")) activationRequests.push(event.method()); });
-      const readinessResponse = page.waitForResponse((response) => response.url().endsWith(`/rooms/${room.id}/activation-readiness`));
-      await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
+      const readinessResponse = page.waitForResponse((response) => response.request().method() === "GET" && response.url().endsWith(`/rooms/${room.id}/activation-readiness`));
+      await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
+      await expect(page.getByTestId("campaign-rooms")).toBeVisible();
       const response = await readinessResponse;
       expect(response.status()).toBe(200);
       const readiness = campaignRoomActivationReadinessSchema.parse(await response.json());
@@ -444,7 +507,8 @@ for (const device of [
       for (const blocker of readiness.blockers) await expect(page.getByRole("listitem").filter({ hasText: blocker.replaceAll("-", " ") })).toBeVisible();
       await expect(page.getByRole("button", { name: "Start room", exact: true })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Enter adventure", exact: true })).toHaveCount(0);
-      expect(activationRequests).toEqual(["GET"]);
+      expect(activationRequests.length).toBeGreaterThan(0);
+      expect(activationRequests.every((method) => method === "GET")).toBe(true);
       await noOverflow(page);
     });
   });

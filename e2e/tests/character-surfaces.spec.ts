@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
+import { openTableTool } from "../support/adventure-table.js";
 
 const runId = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -89,11 +90,11 @@ async function openRoom(page: Page, campaignName: string): Promise<void> {
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
-  await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
+  await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: campaignName, level: 1, exact: true })).toBeVisible();
 }
 
 async function openCharacterTools(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Character", exact: true }).click();
+  await page.getByRole("navigation", { name: "Play tools", exact: true }).getByRole("button", { name: "Character", exact: true }).click();
   await page.getByRole("button", { name: "Inventory & equipment" }).click();
   await expect(page.getByRole("heading", { name: "Resources", exact: true })).toBeVisible();
 }
@@ -291,7 +292,7 @@ test("world expedition places an unplaced actor and camps once from the browser"
   expect(location.status()).toBe(204);
 
   await openRoom(page, fixture.campaignName);
-  await page.getByRole("button", { name: "Travel" }).click();
+  await openTableTool(page, "Travel");
   await expect(page.getByRole("heading", { name: "Expedition", exact: true })).toBeVisible();
   const expedition = page.locator(".world-expedition");
   await expedition.locator("select").nth(0).selectOption(fixture.actorId);

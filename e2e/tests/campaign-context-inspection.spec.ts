@@ -7,6 +7,7 @@ import { generatedCampaignContentProviderSchema } from "../../packages/contracts
 import { buildApp } from "../../server/src/app.js";
 import { closeRepo } from "../../server/src/repo/index.js";
 import { createSettledDmDispatches, dmDependencies, dmFixture } from "../../server/test/fixtures/dmCampaign.js";
+import { openTableTool } from "../support/adventure-table.js";
 
 type ProvenanceMode = "record" | "omit";
 
@@ -90,14 +91,12 @@ async function withInspectableDirectorRun(
   }
 }
 
-async function enterDirector(page: Page, campaignName: string) {
+async function enterRoom(page: Page, campaignName: string) {
   await page.goto("/");
   await page.getByRole("button", { name: `Open campaign ${campaignName}`, exact: true }).click();
   await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-  await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
   await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-  await page.getByRole("button", { name: "Director", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Context inspection", exact: true })).toBeVisible();
+  await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: campaignName, level: 1, exact: true })).toBeVisible();
 }
 
 test("GM inspects one exact persisted director dispatch without replaying provider work", async ({ page }) => {
@@ -108,14 +107,19 @@ test("GM inspects one exact persisted director dispatch without replaying provid
       const pathname = new URL(request.url()).pathname;
       if (request.method() === "POST" && (/adventure-turns\/stream$/.test(pathname) || /\/dm\/(beat-commands|runs\/[^/]+\/resume)$/.test(pathname))) providerCapablePosts.push(pathname);
     });
-    await enterDirector(page, campaignName);
+    await enterRoom(page, campaignName);
 
     const composer = page.getByRole("textbox", { name: "What do you do?", exact: true });
     await composer.fill("Unsubmitted context-inspection draft");
-    const map = page.getByRole("region", { name: "Campaign maps", exact: true });
-    const conversation = page.getByRole("region", { name: "Campaign narration and actions", exact: true });
+    const map = page.getByRole("region", { name: "Campaign maps", exact: true, includeHidden: true });
+    const conversation = page.getByRole("region", { name: "The story so far", exact: true });
+    await expect(map).toHaveCount(1);
+    await expect(map).toBeHidden();
+    await expect(conversation).toBeVisible();
     const mapHandle = await map.elementHandle();
     const conversationHandle = await conversation.elementHandle();
+    await openTableTool(page, "Director");
+    await expect(page.getByRole("heading", { name: "Context inspection", exact: true })).toBeVisible();
     const source = page.getByRole("combobox", { name: "Turn or director run", exact: true });
     await source.selectOption(`director-run:${runId}`);
     await expect(source.locator("option:checked")).toHaveText(`Director run ${runId} (open, completed)`);
@@ -162,14 +166,19 @@ test("GM inspects one exact persisted director dispatch without replaying provid
     expect(providerCalls()).toBe(0);
     expect(await mapHandle!.evaluate(node => node.isConnected)).toBe(true);
     expect(await conversationHandle!.evaluate(node => node.isConnected)).toBe(true);
+    await page.getByRole("button", { name: "Close Director", exact: true }).click();
     await expect(composer).toHaveValue("Unsubmitted context-inspection draft");
 
     await page.reload();
-    await expect(page.getByRole("region", { name: "Campaign maps", exact: true })).toBeVisible();
-    // The persisted director scene is restored into the compact DM chronicle in the scene rail.
-    // The conversation region holds durable adventure-turn transcripts only, and this fixture
-    // produced director dispatches without an adventure turn.
-    await expect(page.getByRole("region", { name: "DM chronicle", exact: true })).toContainText("A quiet moment leaves room to consider the scene.");
+    await expect(conversation).toBeVisible();
+    await expect(map).toHaveCount(1);
+    await expect(map).toBeHidden();
+    // Persisted director narration joins the default story even without an adventure turn.
+    await expect(conversation).toContainText("A quiet moment leaves room to consider the scene.");
+    await page.getByRole("tab", { name: "Map", exact: true }).click();
+    await expect(map).toBeVisible();
+    await page.getByRole("tab", { name: "Story", exact: true }).click();
+    await expect(conversation).toBeVisible();
     await expect(page.getByRole("textbox", { name: "What do you do?", exact: true })).toBeEnabled();
     expect(providerCapablePosts).toEqual([]);
     expect(providerCalls()).toBe(0);
@@ -179,7 +188,9 @@ test("GM inspects one exact persisted director dispatch without replaying provid
 test("GM sees a safe unavailable state when exact dispatch provenance was not recorded", async ({ page }) => {
   test.setTimeout(90_000);
   await withInspectableDirectorRun(page, "omit", async ({ campaignName, runId, planningDispatchId, providerCalls }) => {
-    await enterDirector(page, campaignName);
+    await enterRoom(page, campaignName);
+    await openTableTool(page, "Director");
+    await expect(page.getByRole("heading", { name: "Context inspection", exact: true })).toBeVisible();
     await page.getByRole("combobox", { name: "Turn or director run", exact: true }).selectOption(`director-run:${runId}`);
     await page.getByRole("button", { name: "Load dispatch references", exact: true }).click();
     await page.getByRole("combobox", { name: "Recorded dispatch", exact: true }).selectOption(`director-planning:${planningDispatchId}`);

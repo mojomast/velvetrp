@@ -638,10 +638,11 @@ describe("persistence and multi-character frontend", () => {
     );
     await openLibrary(); fireEvent.click(screen.getByRole("button", { name: "Campaigns" })); await openAdvancedCampaign();
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
-    await screen.findByRole("heading", { name: "Adventure room" }); expect(screen.getByRole("heading", { name: "Read-only pre-campaign history" })).toBeTruthy(); expect(screen.getByText("Campaign room history")).toBeTruthy();
+    await screen.findByRole("heading", { name: campaignAccess.name }); expect(screen.getByRole("heading", { name: "Read-only pre-campaign history" })).toBeTruthy(); expect(screen.getByText("Campaign room history")).toBeTruthy();
     expect(screen.queryByLabelText(/Message for/)).toBeNull(); expect(screen.getByLabelText("What do you do?")).toBeTruthy();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-play", campaignId: campaignAccess.id, sessionId: baseSession.id, playSelectedActorId: "actor" }));
     const storedPlay = JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}"); expect(storedPlay.selectedIds).toBeUndefined(); expect(storedPlay.primaryId).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "Table tools" }));
     fireEvent.click(screen.getByRole("button", { name: "Travel" }));
     await screen.findByRole("heading", { name: "World explorer" });
     expect(screen.getByLabelText("Eligible route")).toBeTruthy();
@@ -666,7 +667,7 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/, handler: () => json({ encounters: [] }) },
     );
     render(<App />); await screen.findByText("Restored adventure narration");
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Adventure room" })));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: campaignAccess.name })));
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-play", adventureTurnId: "restored-turn" }));
   });
 
@@ -707,11 +708,14 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
     );
 
-    render(<App />); await screen.findByRole("heading", { name: "Adventure room" });
+    render(<App />); await screen.findByRole("heading", { name: campaignAccess.name });
+    fireEvent.click(screen.getByRole("tab", { name: "Map" }));
     const map = screen.getByRole("region", { name: "Living map" });
     const composer = screen.getByLabelText("What do you do?");
     fireEvent.change(composer, { target: { value: "Keep my draft at the table" } });
     fireEvent.click(screen.getByRole("button", { name: "Field journal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close Field journal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Table tools" }));
     fireEvent.click(screen.getByRole("button", { name: "Combat & rewards" }));
     await screen.findByRole("heading", { name: "Combat tracker" });
     expect(combatPage.props).toMatchObject({ embedded: true, campaignId: campaignAccess.id, sessionId: baseSession.id, actorRole: "owner", audience: "gm", controlledActorId: "actor" });
@@ -726,8 +730,8 @@ describe("persistence and multi-character frontend", () => {
     cleanup(); combatPage.props = null; render(<App />); await screen.findByRole("heading", { name: "Combat tracker" });
     expect(combatPage.props).toMatchObject({ sessionId: baseSession.id, actorRole: "owner", controlledActorId: "actor", initialCombatId: "combat-one" });
     fireEvent.click(screen.getByRole("button", { name: "Return to room" }));
-    await screen.findByRole("heading", { name: "Adventure room" });
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Combat & rewards" })));
+    await screen.findByRole("heading", { name: campaignAccess.name });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Table tools" })));
   });
 
   it("keeps the legacy campaign-detail combat entry free of room authority", async () => {

@@ -11,10 +11,11 @@ interface CampaignQuickPanelProps {
   onOpenSheet: () => void;
   selectedKeys: ReadonlySet<string>;
   onReference: (entry: SheetContextEntry) => void;
+  compact?: boolean;
 }
 
 /** One actor-bound read supplies friendly names and exact reference identities to the side rail. */
-export function CampaignQuickPanel({ campaignId, selectedActorId, actors, getSheet, refreshKey = 0, canOpenSheet = false, onOpenSheet, selectedKeys, onReference }: CampaignQuickPanelProps) {
+export function CampaignQuickPanel({ campaignId, selectedActorId, actors, getSheet, refreshKey = 0, canOpenSheet = false, onOpenSheet, selectedKeys, onReference, compact = false }: CampaignQuickPanelProps) {
   const id = useId();
   const [sheet, setSheet] = useState<ActorGameplaySheetResponse | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -45,12 +46,12 @@ export function CampaignQuickPanel({ campaignId, selectedActorId, actors, getShe
     </section>;
   }
   return <aside className="campaign-quick-panel" aria-label="Character quick tools" tabIndex={-1}>
-    <header><div><p className="eyebrow">ACTING CHARACTER</p><h2>{actor?.name ?? "No character selected"}</h2></div></header>
+    <header><div><p className="eyebrow">YOUR CHARACTER{compact && sheet ? ` · LEVEL ${sheet.progression.level}` : ""}</p><h2>{actor?.name ?? "No character selected"}</h2>{compact && sheet && <p className="quick-character-class">{sheet.classes.map((entry) => entry.label).join(" · ")}</p>}</div></header>
     <div className="quick-sheet-action"><button type="button" className="primary" disabled={!selectedActorId || !canOpenSheet} onClick={onOpenSheet}>Open character sheet</button></div>
     <p className="quick-panel-note">Select a detail to attach it to your next action. Nothing is spent or rolled.</p>
     {status === "loading" && <p role="status">Refreshing character…</p>}
     {status === "error" && <div className="quick-panel-warning"><p role="status">Character summary is unavailable.</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Retry character summary</button></div>}
-    {sheet && <>{section("resources", "Health & resources", "No resource tracks listed.")}{section("inventory", "Inventory quick access", "No carried items.")}{section("effects", "Active effects", "No active effects.")}</>}
-    <section aria-label="Party"><div className="quick-section-heading"><h3>Party</h3><span>{actors.length}</span></div><ul className="quick-party-list">{actors.map((member) => <li key={member.actorId}>{member.name}<span>{member.actorId === selectedActorId ? "Acting" : "Available"}</span></li>)}</ul></section>
+    {sheet && <>{section("resources", "Health & resources", "No resource tracks listed.")}{compact ? <details className="quick-more"><summary>Equipment & effects</summary>{section("inventory", "Inventory quick access", "No carried items.")}{section("effects", "Active effects", "No active effects.")}</details> : <>{section("inventory", "Inventory quick access", "No carried items.")}{section("effects", "Active effects", "No active effects.")}</>}</>}
+    {(!compact || actors.length > 1) && <section aria-label="Your characters"><div className="quick-section-heading"><h3>Your characters</h3><span>{actors.length}</span></div><ul className="quick-party-list">{actors.map((member) => <li key={member.actorId}>{member.name}<span>{member.actorId === selectedActorId ? "Acting" : "Available"}</span></li>)}</ul></section>}
   </aside>;
 }

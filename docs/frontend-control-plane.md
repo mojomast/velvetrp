@@ -1,6 +1,55 @@
 # Campaign Control Plane
 
+The default campaign play surface is the **Adventure Table**. Campaign preparation
+and authoring retain their own destinations; entering play removes the full campaign
+rail and management toolbar so the story and next action occupy the table.
+
+## Adventure Table
+
+- **One story:** public Director openings and continuations join the durable player
+  turn transcript in chronological order. Private Director proposals stay in the
+  Director tool. Prior non-campaign room messages are labelled read-only history.
+- **Story / Map:** both tab panels remain mounted when switching views. The map,
+  draft, and tool controllers keep their state. A single composer serves both views;
+  **Send action** returns to Story and submits through the existing durable turn path.
+- **Primary tools:** **Character**, **Journal** (accessible name **Field journal**),
+  and **Dice** are directly available. Character also leads to **Inventory & equipment**
+  and **Advancement**.
+- **Table tools:** a native modal dialog exposes **Director**, **Travel**,
+  **Combat & rewards**, **Help**, and role-appropriate **GM tools**, **Rules & safety**,
+  **Create character**, and optional **Scene images**. It also contains Director/startup
+  status, **Replay this session**, voice controls when available, **Display**, and the
+  campaign-destination selector.
+- **First action:** **Look around**, **Introduce myself**, and **Find a lead** prepare
+  editable intentions. If the composer already contains text, **Append suggestion**,
+  **Replace declaration**, or **Cancel** preserves the player's choice. Suggestions,
+  including map and combat suggestions, never submit themselves.
+- **Combat:** a compact bar reports round/turn or terminal encounter status. **End
+  turn** prepares a declaration; **Review encounter completion** opens the existing
+  combat review/recovery controller. The Adventure Table bar does not directly finish
+  an encounter or run an enemy turn.
+- **Display:** desktop provides a reading area above the composer and a compact
+  location/character companion. The companion is hidden at 900px and below while the primary
+  tools remain available. At 600px and below, story, notices, and composer use natural
+  page flow instead of a fixed-height multi-column workspace.
+
+The Story/Map tabs use roving focus: Left/Right changes and activates the tab,
+Home selects Story, and End selects Map. Tab enters the selected tab and then
+continues through the remaining controls. **Skip to your action** reaches the composer;
+`F6` and `Shift+F6` cycle visible
+play regions, and `?` outside text fields opens Help. Native dialogs and modal tool
+drawers support Escape/Close. Tool closure restores the invoking control;
+**Back to draft** selects Story and focuses the composer.
+
+See the [Adventure Table design audit](adventure-table-design-2026-10-03.md) for
+implementation references, research, accessibility review criteria, and current
+[play screenshots](../README.md#screenshots).
+
 ## Campaign library and worldbuilding
+
+With campaign features enabled and no saved navigation, the application opens
+**Campaigns & worlds**. Existing navigation is restored; opening a campaign from the
+library enters its next-step overview.
 
 **Campaigns & worlds** provides name search, role/lifecycle filters, and recently
 updated or alphabetical sorting. Lifecycle reads are bounded and isolated per card;
@@ -22,9 +71,27 @@ room and activation requirements still apply. A completed run can build another
 world without deleting accepted content. See [campaign generation](campaign-generation.md)
 for the step-by-step workflow and stage minimums.
 
+## Room readiness and entry
+
+Overview presents **Your next step**, **Sessions**, and the party roster. **Continue
+preparation** opens the existing setup flow. **Go to Sessions** moves focus to the
+session list; having a party and room is guidance, not proof of readiness.
+
+For eligible owner/GM room cards, authoritative activation readiness is read
+automatically on mount and window focus. **Check room readiness** remains available.
+Blockers link to preparation, a public starting location, or character building.
+**Start room** is explicit; after its activation receipt is confirmed, another GET
+must establish current readiness before **Enter adventure** becomes available.
+
+An uncertain activation keeps the original request and idempotency key. Automatic
+reads never replay it or clear that pending state. **Retry exact room start** recovers
+the receipt using the saved command. If activation succeeds but the following GET
+fails, retry the readiness read. An already active, ready room with no pending local
+command can be entered without obtaining another activation receipt.
+
 ## Preparation Readiness
 
-The Director drawer includes an owner/GM-only, explicit `Inspect preparation`
+**Table tools → Director** includes an owner/GM-only, explicit `Inspect preparation`
 read. Its private report separates existing activation readiness from bounded
 preparation diagnostics, coverage, awaiting evidence, and manual-review limits.
 It neither starts a scene nor asserts campaign solvability. The panel is not
@@ -38,13 +105,14 @@ destinations instead of the original campaign-detail page. The original page is
 retained as secondary advanced setup for operations not yet migrated.
 
 - Overview reads campaign configuration, party, and attached sessions to explain
-  the next preparation step. Configuration is not presented as proof of readiness.
+  the next preparation step. Focus refresh preserves the visible snapshot and open
+  preparation drafts. Configuration is not presented as proof of readiness.
 - Preparation now brings starter rules installation, current safety review,
   explicit campaign publication, and room creation/attachment into the new
   workspace. Saving safety does not clear a pause or loosen existing boundaries.
-- Rooms checks authoritative activation readiness and starts prepared sessions
-  through the provider-free activation API. An uncertain command retains its exact
-  idempotency key; entering play requires confirmed activation and a current read.
+- Rooms automatically reads authoritative activation readiness and explicitly starts
+  prepared sessions through the provider-free activation API. Pending commands retain
+  their exact keys until receipt recovery; room entry requires a current readiness read.
 - Connecting rooms is preparation-only: attaching a room does not change the
   Director mode, publish materials, dispatch a beat, or enqueue images. The
   idempotent campaign startup command is exposed to the client as
@@ -61,9 +129,10 @@ retained as secondary advanced setup for operations not yet migrated.
   Personas can be created inline. An uncertain persona creation retains a browser
   storage lock and offers authoritative identity selection, not an automatic POST
   retry or an assumption based on a matching name.
-- The live table uses the new Living Atlas surface, replacing the old play layout.
-  Maps and conversation remain mounted together on desktop and mobile. Non-modal
-  drawers overlay the map without replacing conversation or its action composer.
+- The live table defaults to Adventure Table (`surface="story"`). Story and Map stay
+  mounted behind modal tools. A saved `playSurface: "atlas"` selects the optional
+  legacy Living Atlas; the older multi-column Command Center remains an internal,
+  explicit `surface="center"` compatibility/test path.
 - Tactical token movement uses selection, authoritative preview, and explicit
   confirmation. Preview does not move a token. A confirmed move survives refresh.
 - Combat maps match the selected actor against the active encounter and combat
@@ -77,11 +146,12 @@ retained as secondary advanced setup for operations not yet migrated.
 - The live table provides reviewed controls to start and complete encounters and to
   take eligible rests. Exact requests are retained for uncertain outcomes, and a
   confirmed revision must be observed before another operation is enabled.
-- Active and ready rooms expose `Enter adventure` immediately. Reopening a room no
-  longer requires a duplicate activation receipt from the current browser.
-- Living Atlas provides Character, Inventory & Equipment, Advancement, Travel,
-  Dice, Field Journal, Combat & Rewards, GM Tools, and searchable Help. Existing
-  domain controllers own commands and recovery; the new shell owns only layout.
+- Active and ready rooms expose `Enter adventure` after the automatic read, unless
+  an exact pending activation still needs recovery. Reopening a room does not require
+  a duplicate activation receipt from the current browser.
+- Adventure Table exposes character, journal, dice, and secondary table tools through
+  existing domain controllers. Those controllers own commands and recovery; the shell
+  owns presentation, tabs, and tool entry.
   Closing a drawer does not release an unresolved operation lock.
 - Embedded combat preserves the room and selected actor and uses the main map,
   rather than mounting a second tactical grid. Ambiguous direct power commands
@@ -151,17 +221,20 @@ and actor. They clear only when the original declaration is acknowledged or exac
 reconciliation confirms it. Refreshing the sheet updates previews and reports
 entries that disappeared. A stale selector is rejected before a turn is created.
 
-Command Center overlays are modal: the background is inert, Tab stays inside the
-visible drawer, Escape/Close restores the trigger, and Back to draft focuses the
-composer. Mobile tool rows scroll horizontally rather than covering the draft.
-The legacy Atlas dock remains non-modal. See the
-[October 2026 interaction audit](play-sheet-context-audit-2026-10-02.md) for the
-research, coverage, and validation scope.
+Adventure Table tool overlays are modal: the background is inert, Tab stays inside
+the visible drawer, and Escape/Close restores the trigger. Tools reached through
+Table tools return focus to that visible menu button. **Back to draft** focuses the
+composer in Story. Narrow layouts wrap the primary tool row and keep the composer in
+page flow. The legacy Atlas dock remains non-modal. See the
+[sheet-context audit](play-sheet-context-audit-2026-10-02.md) for the attachment
+contract and earlier evidence, and the
+[Adventure Table audit](adventure-table-design-2026-10-03.md) for the current shell.
 
 ## Director
 
-Living Atlas shows Human DM by default and exposes a Director drawer. An owner or
-GM must choose Review AI delegation and Confirm AI delegation before AI-led play.
+Adventure Table shows the current DM mode in **Table tools** and opens the Director
+drawer from there. Human DM is the initial mode. An owner or GM must choose Review AI
+delegation and Confirm AI delegation before AI-led play.
 Take over has its own explicit confirmation and makes no provider call. It revokes
 future delegation, not committed mechanics or an already dispatched provider bill.
 
@@ -172,7 +245,8 @@ provider, with up to three planning rounds and one narration phase per beat,
 rejection retries are described in [AI dungeon master](ai-dungeon-master.md#provider-and-mutation-failures);
 uncertain paid outcomes are never automatically retried. In human mode an owner/GM requests a suggestion and uses
 Approve exact proposal or Reject proposal in the private review. Public narration
-appears in the DM chronicle independently of the player transcript and drawer.
+appears alongside player turns in Adventure Table's Story view. The legacy Atlas and
+internal Command Center retain their separate chronicle presentations.
 
 The GM-only preparation disclosure offers named scene, quest-objective, and room
 encounter choices, followed by review against a fresh story revision and explicit
@@ -200,51 +274,32 @@ and [AI dungeon master](ai-dungeon-master.md) for authority, budgets, and limita
 
 ## Validation
 
-`e2e/tests/worldbuilding-wizard.spec.ts` covers opening designation on desktop/mobile
-and the complete staged-world workflow through real validation/application. Its lost
-response case proves reconciliation without duplicate generation, followed by world
-editing and room-preparation handoffs. Desktop light/dark and 390px screenshots were
-inspected after the builder/library styling updates. The
-[2026-10-02 audit](roleplay-worldbuilding-audit-2026-10-02.md#validation) records the
-latest focused runs and their scope.
+Current Adventure Table results belong in the
+[2026-10-03 validation record](adventure-table-design-2026-10-03.md#validation-record).
+Implementation descriptions and screenshots do not establish test passes or
+accessibility conformance. Earlier executed results remain in the
+[2026-10-02 implementation audit](roleplay-worldbuilding-audit-2026-10-02.md#validation)
+and [sheet-context audit](play-sheet-context-audit-2026-10-02.md).
 
-`e2e/tests/campaign-control-plane.spec.ts` exercises desktop (1440px) and mobile
-(390px) entry, navigation, generation brief review without provider calls, staged
-character finalization, blocked and successful activation, tabletop drawers, and a
-persisted tactical move. It checks horizontal overflow and composer controls.
-`campaign-preparation.spec.ts` adds rules/safety/publication/room setup and inline
-persona creation, including lost-response recovery. `campaign-combat-map.spec.ts`
-adds reviewed full-roster placement, verified off-turn binding, real map generation,
-and current-turn movement spending. `campaign-session-recovery.spec.ts` covers
-encounter start/completion, short-rest recovery, refresh safety, and generation
-reconciliation without a second provider dispatch. All four files use the normal
-root Playwright configuration and CI discovery. Fixtures use disposable storage,
-not live campaign data.
+Relevant checks include the owning client tests for App, CampaignShell,
+CampaignOverviewPage, CampaignPlayPage, CampaignConversation, AdventureActionComposer,
+GameplaySheetDrawer, and CombatCommandBar, plus the client typecheck. Browser coverage
+is organized under `e2e/tests/`:
 
-`campaign-dm.spec.ts` adds the real browser/HTTP/persisted director lifecycle with an
-in-process fake provider, disposable SQLite, and an ephemeral loopback API port.
-It checks delegation, narration, continuation, takeover, private rejection/approval,
-GET-only saved-run recovery, no load/focus POST, preserved map/draft and room locks,
-and absence of seeded secrets from public output and narrator inputs. It uses the
-normal root Playwright configuration; no live database or paid endpoint is used.
+- `campaign-control-plane.spec.ts`: entry, desktop/mobile navigation, composer, and
+  tactical interaction.
+- `campaign-preparation.spec.ts` and `worldbuilding-wizard.spec.ts`: setup,
+  character/room handoffs, and interrupted-write recovery.
+- `campaign-combat-map.spec.ts` and `campaign-session-recovery.spec.ts`: map
+  authority, encounter lifecycle, and exact recovery.
+- `campaign-dm.spec.ts`: Director delegation, public narration, private review,
+  saved-run recovery, and preserved room state.
+- `character-surfaces.spec.ts`: checks, resources, inventory, trade, travel,
+  companion administration, and reviewed encounter application.
 
-`character-surfaces.spec.ts` drives the deterministic mechanics through the real
-client and HTTP layer: a server-resolved check plus effect apply/remove and resource
-adjustment, a present-vendor sale from a server-issued quote, bilateral trade accept
-and cancel across two controlled actors, expedition actor placement and camp,
-companion create/grant/revoke, and reviewed encounter generation and application.
-It also uses disposable SQLite and the in-process fake provider, so no paid call is
-charged.
-
-The final Living Atlas focused browser gate passes 12 director, desktop/mobile
-control-plane, combat-map, and session-recovery tests, including camera retention through refresh,
-movement, and drawer interaction. Additional fixture browser checks cover 320px
-layouts and embedded travel/inventory review geometry. Focused client, server, and
-contract tests cover grounding, historical replay, invalid-database rollback,
-accepted agent preparation, and secret-free narration. These checks do not claim
-live-provider or authenticated multi-user coverage.
-The production build still warns about a large JavaScript chunk; route-level
-code splitting remains follow-up work.
+The integration owner records the actual commands, counts, and remaining observations
+after serialized validation. Deterministic browser fixtures use disposable storage and
+a fake provider; the demonstration screenshots have separate provenance in the audit.
 
 ## Remaining Work
 
@@ -287,5 +342,8 @@ Research informing the design includes
 [human-AI interaction guidelines](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/),
 [server-side authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html),
 and [accessible dialog behavior](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
-The new table also draws on [Foundry's scene-centered interaction model](https://foundryvtt.com/article/player-orientation/)
-and [WCAG alternatives to dragging](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html).
+Adventure Table's [design audit](adventure-table-design-2026-10-03.md) records the
+observed Owlbear, Foundry, D&D Beyond, Alchemy, and AI Dungeon patterns separately from
+Velvet recommendations and implementation. It also links the W3C tab, modal-dialog,
+reflow, and focus criteria used for review. Tactical tools additionally draw on
+[WCAG alternatives to dragging](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html).

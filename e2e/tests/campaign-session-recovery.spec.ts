@@ -11,6 +11,7 @@ import { buildApp } from "../../server/src/app.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../../server/src/defaults.js";
 import { closeRepo, createSession, MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
 import { createDeterministicE2ERepository } from "../../server/src/repo/testing/deterministicE2EFixtureRepo.js";
+import { openTableTool } from "../support/adventure-table.js";
 
 const reviewedDice = {
   integer(minimum: number, maximum: number) {
@@ -230,19 +231,17 @@ for (const device of [
         if (event.method() === "POST" && (pathname.includes("/start-commands") || pathname.includes("/end-commands") || pathname.includes("/rest-commands"))) writes.push(pathname);
         if (event.method() === "POST" && pathname.endsWith(`/campaigns/${campaignId}/rooms/${roomId}/activation-commands`)) activationPosts += 1;
       });
+      const readinessResponse = page.waitForResponse((response) => response.request().method() === "GET" && response.url().endsWith(`/campaigns/${campaignId}/rooms/${roomId}/activation-readiness`));
       await openCampaign(page, campaignName);
       await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-      const readinessResponse = page.waitForResponse((response) => response.url().endsWith(`/campaigns/${campaignId}/rooms/${roomId}/activation-readiness`));
-      await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
       const browserReadiness = campaignRoomActivationReadinessSchema.parse(await (await readinessResponse).json());
       expect(browserReadiness).toMatchObject({ campaignId, sessionId: roomId, active: true, ready: true, blockers: [], actorIds: [actorId] });
       await expect(page.getByRole("button", { name: "Start room", exact: true })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Enter adventure", exact: true })).toBeVisible();
       expect(activationPosts).toBe(0);
       await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-      await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
-      await expect(page.getByText("CAMPAIGN COMMAND CENTER", { exact: true })).toBeVisible();
-      await page.getByRole("navigation", { name: "In-room tools", exact: true }).locator('[data-atlas-tool="gm"]').click();
+      await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: campaignName, level: 1, exact: true })).toBeVisible();
+      await openTableTool(page, "GM tools");
       const controls = page.getByRole("region", { name: "Run this scene", exact: true });
       await expect(controls).toBeVisible();
 
@@ -292,7 +291,7 @@ for (const device of [
 
       await controls.getByRole("button", { name: "Refresh session readiness", exact: true }).click();
       await page.reload();
-      await page.getByRole("navigation", { name: "In-room tools", exact: true }).locator('[data-atlas-tool="gm"]').click();
+      await openTableTool(page, "GM tools");
       await expect(page.getByRole("region", { name: "Run this scene", exact: true })).toBeVisible();
       await expect(page.getByText("Recovery Gate drill", { exact: true })).toBeVisible();
       expect(writes).toHaveLength(3);

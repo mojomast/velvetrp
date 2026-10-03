@@ -28,7 +28,7 @@ export interface StoredNavigation {
   adventureTurnId?: string;
   /** Exact actor selected from the latest server play bootstrap. */
   playSelectedActorId?: string;
-  /** Alternate room surface: the living atlas instead of the command center. */
+  /** Optional legacy surface. New and restored rooms otherwise use the Adventure Table. */
   playSurface?: "atlas";
 }
 

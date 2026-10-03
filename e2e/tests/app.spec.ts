@@ -1505,7 +1505,8 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
-  await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: campaignName })).toBeVisible();
+  await page.getByRole("tab", { name: "Map", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Tactical map" })).toBeVisible();
   await page.getByText("Accessible cells and tokens", { exact: true }).click();
   await page.getByRole("button", { name: "3, 2" }).click();
@@ -1677,7 +1678,7 @@ test("M5.4 CampaignPlay shows one provider-committed travel receipt across reloa
   await page.screenshot({path:"test-results/campaign-command-center-after/e2e-playable-mobile-390x844.png",fullPage:true});
   await page.setViewportSize({width:1366,height:768});
   const travelStream=page.waitForRequest(browserRequest=>new URL(browserRequest.url()).pathname==="/api/rpg/v1/adventure-turns/stream");
-  await page.getByLabel("What do you do?").fill("Travel to the public harbor.");await page.getByRole("button",{name:"Declare action"}).click();
+  await page.getByLabel("What do you do?").fill("Travel to the public harbor.");await page.getByRole("button",{name:"Send action"}).click();
   const submitted=await travelStream,submittedBody=submitted.postDataJSON() as {actorId:string;expectedRevision:number;idempotencyKey:string};expect(submittedBody).toMatchObject({actorId,expectedRevision:3});
   const receiptRegion=page.getByRole("region",{name:"Committed mechanics"}),receiptLine=receiptRegion.getByText(`Travel → ${destinationName}`);await expect(receiptLine).toBeVisible({timeout:15_000});await expect(receiptLine).toHaveCount(1);
   expect(receiptMethods).toEqual(["GET"]);
@@ -1804,12 +1805,26 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
-  await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: campaignName })).toBeVisible();
   await expect(page.getByLabel("What do you do?")).toHaveCount(1);
+  await page.getByRole("tab", { name: "Map", exact: true }).click();
   await page.getByText("World routes and travel", { exact: true }).click();
   await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
   await expect(page.getByRole("button", { name: `Prefill travel to ${destinationName}` })).toBeVisible();
-  await audit("play-desktop", ".campaign-play-page");
+  await audit("map-desktop", ".adventure-table");
+  await page.getByRole("tab", { name: "Story", exact: true }).click();
+  await audit("play-desktop", ".adventure-table");
+  const playUrl = page.url();
+  const skipAction = page.getByRole("link", { name: "Skip to your action" });
+  await skipAction.focus();
+  await skipAction.press("Enter");
+  await expect(page.locator("#table-action")).toBeFocused();
+  await expect(page).toHaveURL(playUrl);
+  const tableTools = page.getByRole("button", { name: "Table tools", exact: true });
+  await tableTools.click();
+  await audit("table-tools", "dialog.table-dialog");
+  await page.keyboard.press("Escape");
+  await expect(tableTools).toBeFocused();
 
   const composer = page.getByLabel("What do you do?");
   await composer.fill("Consult my character sheet before I investigate: ");
@@ -1817,7 +1832,7 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   const sheet = page.getByRole("dialog", { name: `${playerName}'s character sheet` });
   await expect(sheet).toBeVisible();
   await expect(sheet).toHaveAttribute("aria-modal", "true");
-  await expect(page.locator("[data-command-center]")).toHaveJSProperty("inert", true);
+  await expect(page.locator("[data-adventure-table]")).toHaveJSProperty("inert", true);
   await expect(sheet.getByRole("button", { name: "Close character sheet" })).toBeFocused();
   const firstControl = sheet.getByRole("button", { name: "Open drawer at top" });
   await firstControl.focus(); await page.keyboard.press("Shift+Tab");
@@ -1841,7 +1856,7 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   await expect(page.getByRole("button", { name: "Remove Waylamp reference" })).toBeVisible();
   await page.setViewportSize({ width: 320, height: 568 });
   await composer.scrollIntoViewIfNeeded();
-  await audit("play-mobile", ".campaign-play-page");
+  await audit("play-mobile", ".adventure-table");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   await page.getByRole("button", { name: "Add from character sheet" }).click();
   await expect(sheet).toBeVisible();
@@ -1856,17 +1871,18 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   await expect(page.getByRole("button", { name: "Add from character sheet" })).toBeFocused();
   await page.setViewportSize({ width: 1280, height: 900 });
   for (const theme of ["light", "dark", "contrast"]) {
+    await page.getByRole("button", { name: "Table tools", exact: true }).click();
     await page.getByRole("button", { name: "Display", exact: true }).click();
     await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption(theme);
     await page.getByRole("dialog", { name: "Campaign workbench" }).getByRole("button", { name: "Close", exact: true }).click();
     await page.getByRole("button", { name: "Add from character sheet" }).click();
     await audit(`sheet-${theme}`, ".sheet-context-drawer");
     await sheet.getByRole("button", { name: "Back to draft (3)" }).click();
-    await audit(`play-${theme}`, ".campaign-play-page");
+    await audit(`play-${theme}`, ".adventure-table");
   }
 
   const declaration = (await composer.inputValue()).trim();
-  await page.getByRole("button", { name: "Declare action" }).click();
+  await page.getByRole("button", { name: "Send action" }).click();
   await expect.poll(() => adventureRequests.length).toBe(1);
   const submitted = JSON.parse(adventureRequests[0]!);
   expect(submitted.declaration).toBe(declaration);
@@ -1884,10 +1900,12 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   ]) });
 
   await page.reload();
+  await page.getByRole("tab", { name: "Map", exact: true }).click();
   await page.getByText("World routes and travel", { exact: true }).click();
+  await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
+  await page.getByRole("tab", { name: "Story", exact: true }).click();
   await expect(page.getByText(declaration, { exact: true })).toBeVisible();
   await expect(page.getByText(deterministicAdventureNarration, { exact: true })).toBeVisible();
-  await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
   await page.getByText("Character context · 3 references", { exact: true }).click();
   await expect(page.locator(".sent-sheet-context").getByText("Waylamp", { exact: true })).toBeVisible();
   const visibleText = await page.locator("body").innerText();

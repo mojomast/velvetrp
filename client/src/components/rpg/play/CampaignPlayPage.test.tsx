@@ -2,11 +2,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdventureTurnGetResponse } from "@velvet/contracts";
 import { ApiError } from "../../../api";
-import { CampaignPlayPage, type CampaignPlayApi } from "./CampaignPlayPage";
+import { CampaignPlayPage as PlayPage, type CampaignPlayApi, type CampaignPlayPageProps } from "./CampaignPlayPage";
 import { CampaignQuickPanel } from "./CampaignQuickPanel";
 import type { RpgCharacterSheetApi } from "../actor/RpgCharacterSheetPage";
 import type { StudioAuthorization } from "../StudioAuthorization";
 import { resetNarrativeMutationRegistryForTests } from "../narrativeMutationRegistry";
+
+// Retain the legacy presentation assertions while exercising the same durable controller.
+// Story-first interactions have their own integration cases below and real-browser coverage.
+function CampaignPlayPage(props: CampaignPlayPageProps) { return <PlayPage surface="center" {...props} />; }
 
 const bootstrap = { dm: { mode: "human" as const, revision: 0 }, campaignId: "campaign", sessionId: "session", expectedRevision: 7, session: { attached: true as const, attachedAt: "2030-01-01T00:00:00.000Z", active: true, adventureEligible: true }, principal: { role: "player" as const, control: "controlled" as const }, capabilities: { campaignDice: { canView: false, canRoll: false } }, playableActors: [{ actorId: "actor", name: "Aria" }] };
 const sheet = { identity: { actorId: "actor", name: "Aria" }, race: { reference: { kind: "race" as const, packId: "pack", packVersion: "1", definitionId: "human" }, label: "Human" }, background: { reference: { kind: "background" as const, packId: "pack", packVersion: "1", definitionId: "guide" }, label: "Guide" }, classes: [{ reference: { kind: "class" as const, packId: "pack", packVersion: "1", definitionId: "ranger" }, label: "Ranger", level: 1 }], attributes: [], proficiencies: [], choices: [], derived: { maxHp: 10, defenses: { guard: 10, evasion: 11, will: 12 }, initiative: 1, speed: 30, carryingLimit: 100, spellAttack: 2, saveDc: 10, explanations: (["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"] as const).map((statistic) => ({ statistic, formula: "base", inputs: {}, result: 1 })) }, progression: { mode: "xp" as const, level: 1, totalXp: 0, milestoneCount: 0, pendingChoiceCount: 0, updatedAt: "2030-01-01T00:00:00.000Z" }, resources: [], inventory: { capacity: 10, items: [{ entryId: "rope", item: { kind: "item" as const, packId: "pack", packVersion: "1", definitionId: "rope" }, label: "Moonlit rope", quantity: 1, equippedSlot: null }] }, knownPowers: [{ power: { kind: "spell" as const, packId: "pack", packVersion: "1", definitionId: "spent" }, label: "Spent Ward", available: false, unavailableReasons: ["spell-slot-unavailable" as const] }], activeEffects: [] };
@@ -56,6 +60,61 @@ async function settleLiveRefresh(client: CampaignPlayApi) {
 }
 
 describe("CampaignPlayPage", () => {
+  it("defaults to the story table and keeps one map, history and draft through keyboard view changes", async () => {
+    const client = api();
+    render(<PlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const idea = await screen.findByRole("button", { name: "Look around" });
+    await waitFor(() => expect((idea as HTMLButtonElement).disabled).toBe(false));
+    const composer = screen.getByLabelText("What do you do?") as HTMLTextAreaElement;
+    const log = screen.getByRole("log");
+    const map = document.getElementById("table-map");
+    expect(map?.hidden).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Look around" }));
+    expect(composer.value).toBe("I take a moment to look around. What stands out?");
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Story" }), { key: "ArrowRight" });
+    expect(map?.hidden).toBe(false);
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Map" }));
+    expect(screen.getAllByLabelText("What do you do?")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Character" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reference Moonlit rope" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to draft (1)" }));
+    await waitFor(() => expect(document.activeElement).toBe(composer));
+    expect(document.getElementById("table-map")).toBe(map);
+    expect(map?.hidden).toBe(true);
+    expect(screen.getByRole("log")).toBe(log);
+    expect(composer.value).toBe("I take a moment to look around. What stands out?");
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Send action" }));
+    await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledOnce());
+    expect(client.streamAdventureTurn).toHaveBeenCalledWith(expect.objectContaining({ declaration: "I take a moment to look around. What stands out?", sheetReferences: [{ section: "inventory", key: "item:rope" }] }), expect.any(Function));
+  });
+  it("protects existing writing when a first-turn idea is selected", async () => {
+    const client = api();
+    render(<PlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("button", { name: "Look around" });
+    const composer = screen.getByLabelText("What do you do?") as HTMLTextAreaElement;
+    fireEvent.change(composer, { target: { value: "I keep watch." } });
+    fireEvent.click(screen.getByRole("button", { name: "Look around" }));
+    expect(composer.value).toBe("I keep watch.");
+    fireEvent.click(screen.getByRole("button", { name: "Append suggestion" }));
+    expect(composer.value).toBe("I keep watch. I take a moment to look around. What stands out?");
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+  it("keeps Director narration in the main story and closes the tools menu before opening a drawer", async () => {
+    const client = api();
+    vi.mocked(client.dm.getCampaignDmHistory).mockResolvedValue({ control: { campaignId: "campaign", mode: "human", revision: 0 }, runs: [{ runId: "opening", campaignId: "campaign", sessionId: "session", intent: "open", mode: "human", modeRevision: 0, revision: 1, state: "completed", narration: "A bell sounds across the harbor.", receipts: [], blockers: [], createdAt: "2030-01-01T00:00:00.000Z" }] });
+    render(<PlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByText("A bell sounds across the harbor.");
+    expect(screen.getByRole("log").textContent).toContain("A bell sounds across the harbor.");
+    expect(screen.queryByRole("button", { name: "Director" })).toBeNull();
+    const trigger = screen.getByRole("button", { name: "Table tools" });
+    trigger.focus(); fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: "Director" }));
+    expect(screen.queryByRole("dialog", { name: "Table tools" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Director" }).getAttribute("aria-modal")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Close Director" }));
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
   it("keeps the map, draft and player transcript mounted when opening a director scene", async () => {
     const client = api();
     vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({ ...bootstrap, principal: { role: "owner", control: "all" } });
@@ -374,7 +433,7 @@ describe("CampaignPlayPage", () => {
     localStorage.clear();
     const client = api();
     vi.mocked(client.getAdventureTurn).mockResolvedValue(completedReceiptTurn());
-    vi.mocked(client.streamAdventureTurn).mockReturnValue({ turnId: Promise.resolve("turn"), done: Promise.reject(new Error("delivery lost")), cancelDelivery: vi.fn() });
+    vi.mocked(client.streamAdventureTurn).mockImplementation(() => ({ turnId: Promise.resolve("turn"), done: Promise.reject(new Error("delivery lost")), cancelDelivery: vi.fn() }));
     renderPersistedTurn(client, "The archive yields a sealed ledger.");
     await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
     // Losing delivery reconciles the same original turn back to terminal; the attempt set still holds it.
@@ -430,7 +489,7 @@ describe("CampaignPlayPage", () => {
     const client = api();
     vi.mocked(client.getAdventureTurn).mockResolvedValue(completedHeldTurn());
     const rejection = new ApiError(400, "narration rejected");
-    vi.mocked(client.streamAdventureTurn).mockReturnValue({ turnId: Promise.reject(rejection), done: Promise.reject(rejection), cancelDelivery: vi.fn() });
+    vi.mocked(client.streamAdventureTurn).mockImplementation(() => ({ turnId: Promise.reject(rejection), done: Promise.reject(rejection), cancelDelivery: vi.fn() }));
     renderPersistedTurn(client, heldNarration.text);
     await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
     // The failure surfaces once through the existing derivative path and is never replayed.
@@ -742,13 +801,15 @@ describe("CampaignPlayPage", () => {
   });
 });
 
-it("keeps optional voice beside the composer without submitting gameplay", async () => {
+it("keeps optional voice in Table tools without submitting gameplay", async () => {
   const client = api();
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({ enabled: true, voices: [], speakers: [], assignments: [], sources: [] })))));
   try {
-    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    render(<PlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await waitFor(() => expect((screen.getByLabelText("What do you do?") as HTMLTextAreaElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Table tools" }));
     const voice = await screen.findByRole("region", { name: "Voice playback" });
-    expect(voice.closest(".campaign-play-center")).not.toBeNull();
+    expect(voice.closest(".table-session-controls")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cast & Voices" }));
     expect(screen.getByLabelText("What do you do?")).toBeTruthy();
     expect(client.streamAdventureTurn).not.toHaveBeenCalled();

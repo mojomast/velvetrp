@@ -49,11 +49,12 @@ describe("campaign control plane", () => {
     expect(campaignDestinations(null, true, true).some((item) => item.id === "manage")).toBe(false);
   });
 
-  it("defers campaign navigation to the in-room command center while the table is open", () => {
+  it("gives the Adventure Table the full viewport while retaining skip navigation", () => {
     render(<CampaignShell campaignId={campaign.id} view="campaign-play" selection={null} studio combat onNavigate={vi.fn()} onCampaigns={vi.fn()}><main><h1>Adventure room</h1></main></CampaignShell>);
     expect(screen.queryByRole("navigation", { name: "Table tools" })).toBeNull();
-    expect(screen.getByText("Play / Table tools")).toBeTruthy();
-    expect(screen.getByRole("navigation", { name: "Campaign destinations" })).toBeTruthy();
+    expect(screen.queryByText("Play / Table tools")).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Campaign destinations" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Skip to campaign workspace" }).getAttribute("href")).toBe("#campaign-workspace");
   });
 
   it("removes privileged destinations when authoritative role changes", () => {

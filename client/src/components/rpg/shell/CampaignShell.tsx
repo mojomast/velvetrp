@@ -6,6 +6,7 @@ import "./campaign-shell.css";
 export type CampaignDestination = "overview" | "play" | "characters" | "world" | "journal" | "create" | "manage" | "combat" | "cast" | "story" | "history";
 type Identity = Pick<CampaignDetail, "id" | "name" | "actorRole">;
 type ShellContextValue = {
+  identity?: Identity | null;
   report: (identity: Identity | null) => void;
   navigate?: (destination: CampaignDestination) => void;
   generationAvailable?: boolean;
@@ -133,23 +134,23 @@ export function CampaignShell({ campaignId, view, selection, studio, combat, onN
     if (destination === "create" && !combat) return;
     onNavigate(destination);
   };
-  return <ShellContext.Provider value={{ report, navigate, generationAvailable: combat, blockNavigation }}><div className="control-plane">
+  const playing = view === "campaign-play";
+  return <ShellContext.Provider value={{ identity, report, navigate, generationAvailable: combat, blockNavigation }}><div className={`control-plane${playing ? " control-plane-playing" : ""}`}>
     <a className="control-skip" href="#campaign-workspace">Skip to campaign workspace</a>
-    <aside className="control-rail" aria-label="Campaign control plane">
+    {!playing && <aside className="control-rail" aria-label="Campaign control plane">
       <button className="control-brand" disabled={blocked} onClick={onCampaigns}><span className="control-monogram" aria-hidden="true">V</span><span>VELVET<small>Campaigns</small></span></button>
       <div className="control-identity"><span className="control-kicker">Campaign workspace</span><strong>{identity?.name ?? "Your campaign"}</strong><span className="control-role">{role === "owner" ? "DM / Owner" : role === "gm" ? "DM" : role === "observer" ? "Spectator / Read-only" : role === "player" ? "Player" : failed ? "Role unavailable" : "Checking role..."}</span></div>
       <nav className="control-nav" aria-label="Campaign destinations">{campaignDestinations(role, studio, combat).map((item, index) => <button key={item.id} aria-label={`${item.label} workspace`} aria-current={active === item.id ? "page" : undefined} disabled={blocked || !item.enabled} title={item.hint} onClick={() => navigate(item.id)}><span className="control-nav-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><span>{item.label}<small>{item.hint}</small></span></button>)}</nav>
       <div className="control-rail-note"><span className="control-kicker">At your table</span><p>{role === "observer" ? "Follow the story. Read shared material without issuing gameplay commands." : role === "player" ? "Your character, your choices. Available actions are verified by the server." : "Prepare the world. Review AI candidates. Keep the final say."}</p><small>Server-reported role. No role switching or remote sign-in is provided here.</small></div>
-    </aside>
+    </aside>}
     <div className="control-stage">
-      <header className="control-toolbar"><span>{active === "create" ? "Create / Reviewed generation" : active === "play" ? "Play / Table tools" : "Campaign / " + active.charAt(0).toUpperCase() + active.slice(1)}</span>
-        {/* The in-room command center owns campaign navigation while the table is open. */}
-        {view !== "campaign-play" && <nav aria-label="Table tools">
+      {!playing && <header className="control-toolbar"><span>{active === "create" ? "Create / Reviewed generation" : active === "play" ? "Play / Table tools" : "Campaign / " + active.charAt(0).toUpperCase() + active.slice(1)}</span>
+        <nav aria-label="Table tools">
           {combat && <button disabled={blocked} aria-current={view === "campaign-combat" ? "page" : undefined} onClick={() => navigate("combat")}>Combat tracker</button>}
           {studio && <><button disabled={blocked} onClick={() => navigate("world")}>World & routes</button><button disabled={blocked} onClick={() => navigate("cast")}>Browse cast & factions</button></>}
           <button disabled={blocked} onClick={() => navigate("history")}>Read history & recaps</button>
-        </nav>}
-      </header>
+        </nav>
+      </header>}
       <div id="campaign-workspace" tabIndex={-1} ref={content} className="control-workspace"><CampaignWorkspaceBoundary key={`${campaignId}:${view}`} onOverview={() => onNavigate("overview")}>{children}</CampaignWorkspaceBoundary></div>
     </div>
   </div></ShellContext.Provider>;

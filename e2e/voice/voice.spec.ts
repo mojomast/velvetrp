@@ -8,6 +8,7 @@ import { buildApp } from '../../server/src/app.js';
 import { closeRepo } from '../../server/src/repo/index.js';
 import { dmFixture } from '../../server/test/fixtures/dmCampaign.js';
 import { generatedCampaignContentProviderSchema } from '../../packages/contracts/src/index.js';
+import { openTableTools } from '../support/adventure-table.js';
 function tone(){
  const frames=24000*2,b=Buffer.alloc(44+frames*2);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(48000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(frames*2,40);
  for(let i=0;i<frames;i++)b.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*220/24000)*300),44+i*2);return b;
@@ -34,8 +35,8 @@ test('voice crosses browser, HTTP, durable casting, progressive audio and restar
   f.repo.settleDmNarration('local-owner',run.runId,claim,'The lantern shines on the quiet road. '.repeat(18),'ok');f.repo.getDmNarrationWork('local-owner',run.runId);
   const before=f.repo.getCampaignAdministration('local-owner',f.campaign.id)!.revision;
   await app.listen({host:'127.0.0.1',port:18887});
-  const enter=async()=>{await page.goto('/');await page.getByRole('button',{name:`Open campaign ${f.campaign.name}`,exact:true}).click();await page.getByRole('navigation',{name:'Campaign destinations',exact:true}).getByRole('button',{name:'Play workspace',exact:true}).click();await page.getByRole('button',{name:'Check room readiness',exact:true}).click();await page.getByRole('button',{name:'Enter adventure',exact:true}).click();};
-  await enter();const controls=page.getByRole('region',{name:'Voice playback'});await expect(controls).toBeVisible();
+  const enter=async()=>{await page.goto('/');await page.getByRole('button',{name:`Open campaign ${f.campaign.name}`,exact:true}).click();await page.getByRole('navigation',{name:'Campaign destinations',exact:true}).getByRole('button',{name:'Play workspace',exact:true}).click();await page.getByRole('button',{name:'Enter adventure',exact:true}).click();};
+  await enter();const menu=await openTableTools(page);const controls=menu.getByRole('region',{name:'Voice playback'});await expect(controls).toBeVisible();
   expect(generated).toBe(0);await controls.getByRole('button',{name:'Cast & Voices',exact:true}).click();await controls.getByLabel('Voice for Narrator (narrator)',{exact:true}).selectOption('synthetic');
   await expect(controls.getByLabel('Voice for Narrator (narrator)',{exact:true})).toHaveValue('synthetic');
   await controls.getByLabel('Published voice source').selectOption(JSON.stringify(['dm',run.runId]));
@@ -45,7 +46,7 @@ test('voice crosses browser, HTTP, durable casting, progressive audio and restar
   await controls.getByRole('button',{name:'Resume voice',exact:true}).click();await expect.poll(()=>audioRequests.length).toBeGreaterThan(1);
   await controls.getByRole('button',{name:'Stop listening',exact:true}).click();await expect(controls.getByRole('status')).toHaveText('idle');
   expect(received.every(body=>!body.includes('SECRET')&&!body.includes('profile_id'))).toBe(true);expect(f.repo.getCampaignAdministration('local-owner',f.campaign.id)!.revision).toBe(before);
-  await app.close();closeRepo();app=buildApp();await app.listen({host:'127.0.0.1',port:18887});await page.reload();await expect(controls).toBeVisible();await controls.getByRole('button',{name:'Cast & Voices',exact:true}).click();await expect(controls.getByLabel('Voice for Narrator (narrator)',{exact:true})).toHaveValue('synthetic');
+  await app.close();closeRepo();app=buildApp();await app.listen({host:'127.0.0.1',port:18887});await page.reload();await openTableTools(page);await expect(controls).toBeVisible();await controls.getByRole('button',{name:'Cast & Voices',exact:true}).click();await expect(controls.getByLabel('Voice for Narrator (narrator)',{exact:true})).toHaveValue('synthetic');
   await controls.getByLabel('Published voice source').selectOption(JSON.stringify(['dm',run.runId]));await controls.getByRole('button',{name:'Replay voice',exact:true}).click();await expect(controls.getByLabel('Voice caption')).toContainText('lantern');await controls.getByRole('button',{name:'Stop listening',exact:true}).click();
  }finally{await app.close();await backend.close();closeRepo();if(previous.VELVET_DATA_DIR===undefined)delete process.env.VELVET_DATA_DIR;
    if(previous.NODE_ENV===undefined)delete process.env.NODE_ENV;

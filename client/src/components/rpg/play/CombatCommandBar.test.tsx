@@ -38,6 +38,23 @@ describe("CombatCommandBar", () => {
     expect(screen.getByRole("button", { name: "Open combat" })).toBeTruthy();
   });
 
+  it("hands story-table completion to the durable combat tool without issuing a command", async () => {
+    const commandApi = api(), open = vi.fn();
+    render(<CombatCommandBar {...baseProps} reviewInTool onOpenCombat={open} api={commandApi} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Review encounter completion" }));
+    expect(open).toHaveBeenCalledOnce();
+    expect(commandApi.endCombat).not.toHaveBeenCalled();
+    expect(commandApi.resolveEnemyTurn).not.toHaveBeenCalled();
+  });
+
+  it("honors the shared room lock and distinguishes party defeat", async () => {
+    const commandApi = api({ combatants: [{ ...livingActor, hitPoints: 0, status: "defeated" }, { ...defeatedEnemy, hitPoints: 11, status: "active" }] });
+    render(<CombatCommandBar {...baseProps} disabled api={commandApi} />);
+    await screen.findByText(/PARTY DEFEATED/);
+    fireEvent.click(screen.getByRole("button", { name: "Complete encounter" }));
+    expect(commandApi.endCombat).not.toHaveBeenCalled();
+  });
+
   it("runs the enemy turn for an owner/GM when an enemy has the turn", async () => {
     const commandApi = api({ currentCombatant: "c-bandit", combatants: [livingActor, { ...defeatedEnemy, hitPoints: 11, status: "active" }] });
     render(<CombatCommandBar {...baseProps} api={commandApi} />);

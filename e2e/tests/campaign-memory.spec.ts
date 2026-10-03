@@ -125,13 +125,12 @@ test("declaration recalls an old exchange across HTTP without private memory or 
     await page.goto("/");
     await page.getByRole("button", { name: `Open campaign ${f.campaign.name}`, exact: true }).click();
     await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-    await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
     await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
     expect(calls).toEqual([]);
     const declaration = "What did the ferryman say about the silver heron?";
     await page.getByRole("textbox", { name: "What do you do?", exact: true }).fill(declaration);
     const streamed = page.waitForResponse(response => response.url().endsWith("/adventure-turns/stream") && response.request().method() === "POST");
-    await page.getByRole("button", { name: "Declare action", exact: true }).click();
+    await page.getByRole("button", { name: "Send action", exact: true }).click();
     const response = await streamed;
     expect(response.status()).toBe(200);
     await expect(page.getByRole("log")).toContainText(narration);

@@ -8,6 +8,7 @@ import { campaignRoomActivationReadinessSchema, campaignRoomActivationResponseSc
 import { buildApp } from "../../server/src/app.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../../server/src/defaults.js";
 import { closeRepo, createRepository, createSession, SRD_5_1_STARTER_CATALOG } from "../../server/src/repo/index.js";
+import { openTableTools } from "../support/adventure-table.js";
 
 async function http(request: APIRequestContext, url: string, data?: unknown, status = 200) {
   const response = await request.fetch(url, { method: data === undefined ? "GET" : "POST", data });
@@ -131,18 +132,19 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       const enemyCombatant = offTurn.combatants.find((entry) => entry.kind === "enemy")!;
       expect(actorCombatant.combatantId).toBe(combatantId);
       await page.goto("/");
+      const readinessResponse = page.waitForResponse((response) => response.request().method() === "GET" && response.url().endsWith(`/campaigns/${campaignId}/rooms/${roomId}/activation-readiness`));
       await page.getByRole("button", { name: "Open campaign Provider-free Combat Gate", exact: true }).click();
       await page.getByRole("navigation", { name: "Campaign destinations", exact: true }).getByRole("button", { name: "Play workspace", exact: true }).click();
-      const readinessResponse = page.waitForResponse((response) => response.url().endsWith(`/campaigns/${campaignId}/rooms/${roomId}/activation-readiness`));
-      await page.getByRole("button", { name: "Check room readiness", exact: true }).click();
       const browserReadiness = campaignRoomActivationReadinessSchema.parse(await (await readinessResponse).json());
       expect(browserReadiness).toMatchObject({ campaignId, sessionId: roomId, active: true, ready: true, blockers: [], actorIds: [actorId] });
       await expect(page.getByRole("button", { name: "Start room", exact: true })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Enter adventure", exact: true })).toBeVisible();
       expect(activationPosts).toBe(0);
       await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-      await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
-      await expect(page.getByText("CAMPAIGN COMMAND CENTER", { exact: true })).toBeVisible();
+      const table = page.locator("[data-adventure-table]");
+      await expect(table.getByRole("heading", { name: "Provider-free Combat Gate", level: 1, exact: true })).toBeVisible();
+      await expect(table.getByRole("tab", { name: "Story", exact: true })).toHaveAttribute("aria-selected", "true");
+      await expect(table.locator("#table-map")).toBeHidden();
       await expect(page.getByLabel("Acting character")).toHaveValue(actorId);
       // Encounter start generated the authoritative combat map. Verify that
       // automatic map directly: same room, mode, encounter, and both combatant
@@ -157,9 +159,9 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(enemyToken).toMatchObject({ footprint: { width: 1, height: 1 }, disposition: "hostile" });
       expect(enemyToken.label.length).toBeGreaterThan(0);
       expect(actorToken.position).not.toEqual(enemyToken.position);
-      // Focus + Enter is the keyboard activation other specs use for tool buttons
-      // and stays reliable on narrow layouts where the stacked Command Center can
-      // clip this pane's pointer targets.
+      await table.getByRole("tab", { name: "Map", exact: true }).click();
+      await expect(table.getByRole("tabpanel", { name: "Map", exact: true })).toBeVisible();
+      // Keep keyboard activation coverage on both desktop and narrow layouts.
       const combatGrid = page.getByRole("button", { name: "Combat grid", exact: true });
       await expect(combatGrid).toBeEnabled();
       await combatGrid.focus();
@@ -168,7 +170,11 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await page.getByText("Combat readiness", { exact: true }).click();
       await expect(page.getByRole("button", { name: "Refresh combat binding", exact: true })).toBeVisible();
       await expect(page.getByText(`Verified selected combatant: ${combatantId}.`, { exact: false })).toContainText("Another combatant has the turn");
-      await expect(page.getByRole("navigation", { name: "In-room tools", exact: true }).locator('[data-atlas-tool="combat"]')).toBeEnabled();
+      const menu = await openTableTools(page);
+      await expect(menu.getByRole("button", { name: "Combat & rewards", exact: true })).toBeEnabled();
+      await menu.getByRole("button", { name: "Close table tools", exact: true }).click();
+      await expect(menu).toBeHidden();
+      await expect(table.getByRole("button", { name: "Table tools", exact: true })).toBeFocused();
       await expect(page.getByRole("region", { name: "Tactical map", exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Zoom in", exact: true }).click();
       await page.getByText("Camera controls and movement help", { exact: true }).click();

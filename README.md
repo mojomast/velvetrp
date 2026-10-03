@@ -10,9 +10,9 @@ VelvetRP is a local-first AI roleplay and campaign RPG application. Start with a
 
 Velvet pairs expressive AI narration with server-owned rules and durable records of what actually happened. Conversations can flow without a dice roll; travel, purchases, checks, and combat resolve through validated game commands.
 
-![Velvet's adventure room with campaign conversation, world navigation, character resources, and a free-form action composer](docs/images/command-center.png)
+![Velvet's Adventure Table with a shared story, character summary, Story and Map tabs, and one Send action composer](docs/images/adventure-table.png)
 
-*The Living Atlas keeps the conversation, world, and acting character together. Screenshots use fictional, provider-free test campaigns.*
+*The Adventure Table puts the story and your next action first. Shown with a fictional local demonstration campaign; see [screenshot provenance](#screenshots).*
 
 ## Why Velvet
 
@@ -42,7 +42,9 @@ Take over when you want. Player decisions remain yours, private planning stays s
 
 ### A playable tabletop, alongside the story
 
-The **Living Atlas** brings together campaign conversation, world routes, exploration and combat maps, character resources, inventory, journals, and GM tools. Desktop and mobile layouts keep the action composer accessible while drawers expose deeper controls.
+The **Adventure Table** is the default play experience: public Director narration and player turns share one story, **Story / Map** tabs keep both views mounted, and one **Send action** composer carries your next move. **Character**, **Journal**, and **Dice** are directly available; **Table tools** holds Director, travel, combat, and GM controls. The campaign rail and management toolbar give way to the table during play.
+
+First-action ideas prepare editable text. Attach precise character-sheet details to give the DM context, then send when ready. Desktop pairs a reading area and composer with a compact character companion; narrow phones use natural page flow. The legacy Living Atlas remains an optional presentation.
 
 Use server-resolved checks, spells and powers, equipment, rests, vendor commerce, bilateral trades, encounter tools, and rewards. Tactical movement uses an authoritative preview and confirmation; supported attacks account for position, cover, range, and reactions.
 
@@ -116,9 +118,9 @@ See [Provider configuration](docs/provider-configuration.md) for endpoint restri
    > A tidebound coastal town where a lighthouse shines beneath the sea. Rival salvage guilds, missing ferrymen, and a winter festival offer several independent mysteries. Give the inhabitants competing aims and make exploration as useful as combat.
 
 2. **Build and inspect.** Choose **Build world** to authorize the serial generation-and-apply plan. New worlds receive the SRD starter setup. Follow the stage progress, then use **Manage world** to inspect locations, cast, quests, and preparation. Public handouts and scene prompts have separate publication controls.
-3. **Prepare the table.** Choose **Prepare to play**. Create or finalize a campaign character, complete rules and safety preparation, and create or attach a room. The readiness view identifies what is still needed; a prepared world is not yet a running session.
-4. **Enter the adventure.** Activate a ready room and enter the Living Atlas. Use human-DM mode, review an AI suggestion, or explicitly delegate the Director and choose **Open scene**.
-5. **Say what you do.** Write a free-form declaration. Use **Add from character sheet** to attach exact items, spells, skills, resources, or any other sheet detail alongside your words; **Back to draft** returns to your writing. Review or remove references, then **Declare action**. Map suggestions can also prepare a declaration. Reopen saved campaigns from the searchable library to continue.
+3. **Prepare the table.** Choose **Prepare to play**. Create or finalize a campaign character, complete rules and safety preparation, and create or attach a room. Session cards automatically read readiness on arrival and window focus, with links to resolve blockers. A prepared world is not yet a running session.
+4. **Enter the adventure.** Choose **Start room** when ready; activation is followed by another readiness read. Choose **Enter adventure** to open the Adventure Table. **Table tools → Director** provides human-DM mode, reviewed AI suggestions, or explicit AI delegation and **Open scene**. An uncertain room start keeps its exact saved command for recovery.
+5. **Say what you do.** Write a free-form declaration, or use **Look around**, **Introduce myself**, or **Find a lead** for a first-action idea. Suggestions are editable; when a draft exists, choose whether to append or replace it. **Add from character sheet** attaches up to 16 exact items, spells, skills, resources, or other sheet details; **Back to draft** returns to your writing. Review or remove references, then **Send action**. Map suggestions use the same draft flow. Reopen saved campaigns from the searchable library to continue.
 
 For character-only roleplay, start from the **Character library**, create or select your cast, and open a solo or group conversation. A campaign is optional.
 
@@ -129,10 +131,12 @@ The [worldbuilding guide](docs/campaign-generation.md) explains stage minimums, 
 | Area | Available today |
 | --- | --- |
 | **Worldbuilding** | One-prompt staged worlds; Foundation, Full narrative campaign, and Custom / granular drafts; accepted-canon expansion; selective application; exact catalog bindings; explicit player-material publication. |
-| **Library and preparation** | Search, role/lifecycle filters, recent/name sorting, blank campaigns, world/play handoffs, starter rules, safety review, opening designation, character and room readiness. |
+| **Library and preparation** | Search, role/lifecycle filters, recent/name sorting, next-step campaign overview, starter rules, safety review, opening designation, automatic room-readiness reads, explicit activation and exact recovery. |
 | **Character roleplay** | Rich editable profiles, import/export, solo and group rooms, speaker routing, streaming, cancellation, alternate replies, branches, approved/pending memories, scoped lore, summaries, and editable scene canon. |
 | **Campaign continuity** | Durable DM transcript, narration-only variants, source-attributed recall, location-aware NPC presence, witnessed/told/gossip observations, trust-gated disclosure, and private context inspection. |
-| **At-the-table interaction** | Searchable, fully referenceable gameplay sheet; up to 16 exact DM context attachments per action; per-character tab-local drafts; removable previews and persisted transcript context; keyboard-operable drawers, mobile reflow, and light/dark/high-contrast display. |
+| **Adventure Table** | One public story and action composer; mounted Story/Map tabs with keyboard navigation; editable first-action ideas; Character, Journal, and Dice shortcuts; a native Table tools dialog; compact combat status and reviewed completion. |
+| **Character context** | Searchable, fully referenceable gameplay sheet; up to 16 exact DM context attachments per action; per-character tab-local drafts; removable previews and persisted transcript context; modal tool drawers and Back to draft. |
+| **Display and navigation** | Desktop reading/composer layout, natural-flow narrow/mobile play, light/dark/high-contrast display, keyboard region navigation, session replay, and optional legacy Atlas. |
 | **Character mechanics** | Drafts, allocation choices, server rolls and full rerolls, finalization, derived sheets, XP/progression, inventory, equipment, resources, effects, rests, and supported magic-item attunement. |
 | **Tactical play** | Exploration/combat grids, fog, movement previews, terrain, cover, range, supported opportunity and readied reactions, combat logs, encounter building, reviewed encounter generation, and reward workflows. |
 | **World and social systems** | Directed travel, actor placement and camp, NPC placement, factions and reputation, quests and objectives, clues/story graphs, present-vendor commerce, bilateral trade, and companion creation/grant administration. |
@@ -151,7 +155,41 @@ Optional features default off. `FEATURE_VOICE` and `FEATURE_IMAGES` report avail
 
 ## Screenshots
 
-These are real application captures using fictional test data. The worldbuilder capture shows the completed deterministic 11-stage recovery flow; the remaining views use the provider-free Baie-Comeau fixture.
+The four Adventure Table images are real application captures from a **fictional local demonstration campaign**, cloned from the Baie-Comeau fixture with historical narration. The capture script blocks API writes and makes no provider dispatch. See the [design and validation record](docs/adventure-table-design-2026-10-03.md) for research, provenance, and reproduction details.
+
+### Adventure Table — current play experience
+
+<details>
+<summary><strong>Story — public narration, player turns, and your next action</strong></summary>
+
+![Adventure Table Story view with public Director narration and player turns beside a compact character companion](docs/images/adventure-table.png)
+
+</details>
+
+<details>
+<summary><strong>Map — explore without losing your draft</strong></summary>
+
+![Adventure Table Map view with world and tactical context and the same action composer](docs/images/adventure-table-map.png)
+
+</details>
+
+<details>
+<summary><strong>Character — select exact context for the DM</strong></summary>
+
+![Adventure Table character reference sheet with selectable facts and a Back to draft action](docs/images/adventure-table-character.png)
+
+</details>
+
+<details>
+<summary><strong>Mobile — a single flowing story and action layout</strong></summary>
+
+<img src="docs/images/adventure-table-mobile.png" alt="Adventure Table on a narrow mobile viewport with Story and Map tabs, primary character tools, and the action composer in page flow" width="390" />
+
+</details>
+
+### Worldbuilding and supporting tools
+
+These earlier captures illustrate authoring and management workflows, separately from the new play images above. The worldbuilder capture shows the completed deterministic 11-stage recovery flow. At the Adventure Table, Director and combat controls are reached through **Table tools**; inventory and advancement are reached through **Character**.
 
 <details>
 <summary><strong>Worldbuilding — from one premise to all eleven applied stages</strong></summary>
@@ -168,7 +206,7 @@ These are real application captures using fictional test data. The worldbuilder 
 </details>
 
 <details>
-<summary><strong>Character sheet — checks, powers, resources, and equipment</strong></summary>
+<summary><strong>Character mechanics — checks, powers, resources, and equipment</strong></summary>
 
 ![Character sheet with server-owned checks, powers, effects, resources, and equipment](docs/images/character-sheet.png)
 
@@ -281,7 +319,8 @@ Contributions should preserve strict contracts, authoritative mechanics, and exa
 | --- | --- |
 | [Documentation index](docs/README.md) | Complete guide inventory and authority hierarchy |
 | [Campaign generation](docs/campaign-generation.md) | Prompt-to-world workflow, staged plans, review, coverage, and recovery |
-| [Campaign control plane](docs/frontend-control-plane.md) | Preparation, room activation, Living Atlas, and session recovery |
+| [Campaign control plane](docs/frontend-control-plane.md) | Preparation, room activation, Adventure Table, and session recovery |
+| [Adventure Table design audit](docs/adventure-table-design-2026-10-03.md) | Implemented play flow, comparable-product research, accessibility criteria, and screenshot provenance |
 | [AI Dungeon Master](docs/ai-dungeon-master.md) | Director controls, proposals, narration, and scene progression |
 | [Campaign memory](docs/campaign-memory.md) | Recall sources, NPC knowledge, branch continuity, and bounds |
 | [SRD 5.1 coverage](docs/srd-5.1-coverage.md) | Rules, catalog, runtime evidence, and unsupported mechanics |
