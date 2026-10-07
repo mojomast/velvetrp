@@ -1,0 +1,1108 @@
+{
+  "version": "sintermark-v1",
+  "name": "The Sintermark · A Commons of Fire",
+  "premise": "The Sintermark is a cold highland plateau undercut by the Longfire, a slow-burning carbon seam that has heated glassworks, lime kilns, salt pans, and chemosynthetic verge farms for two centuries. Heat and air are a shared public utility, metered and argued over. The seam is turning crosswise toward the deep aquifer, and the draught that steers it is being quietly rigged. Six factions with defensible goals, one physical commons, and no scripted ending: the party can survey, rescue, negotiate, engineer, flood, or re-charter the fire itself.",
+  "opening": "The campaign opens at slake-head in the Slake, on a morning when the street foundation has begun to shift. Injured workers are carried up from the galleries aboveground, a vent-log delivery contradicts yesterday's official reading, and the bell-wardens are arguing about whether to close the street. The party has three immediate choices: go down and rescue the crews, stay up and survey the moving ground, or negotiate with the Register and the union before the district seals itself. All three are true, and each shows a different face of the turning front.",
+  "designSources": [
+    { "title": "Justin Alexander — Don't Prep Plots (situations, not plots)", "url": "https://thealexandrian.net/wordpress/4147/roleplaying-games/dont-prep-plots" },
+    { "title": "Justin Alexander — The Three Clue Rule", "url": "https://thealexandrian.net/wordpress/1118/roleplaying-games/three-clue-rule" },
+    { "title": "Justin Alexander — Node-Based Scenario Design", "url": "https://thealexandrian.net/wordpress/7949/roleplaying-games/node-based-scenario-design-part-1-the-plotted-approach" },
+    { "title": "Justin Alexander — Pointcrawls", "url": "https://thealexandrian.net/wordpress/48666/roleplaying-games/pointcrawls" },
+    { "title": "Blades in the Dark SRD — Progress Clocks (faction pressure)", "url": "https://bladesinthedark.com/progress-clocks" },
+    { "title": "Blades in the Dark SRD — The Faction Game", "url": "https://bladesinthedark.com/faction-game" },
+    { "title": "Dungeons & Dragons SRD 5.1 (Wizards of the Coast, CC-BY-4.0)", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf" }
+  ],
+  "content": {
+    "outlines": [
+      {
+        "key": "outline-sintermark",
+        "opening": "Word reaches slake-head that a furnace cooled in the night without cause, a vent-walker died breathing clean air, and the bell-wardens cannot agree which gauge to trust. The Sintermark's shared fire has begun to move sideways, and nobody with authority will say so first.",
+        "premise": "A whole material civilization is fused to a slow-burning subterranean seam. The fire steers by air, air is metered as a public utility, and the utility is being quietly rigged while the seam turns toward the water everyone drinks. The party are capable outsiders with the skills to measure, rescue, negotiate, engineer, or re-charter the commons, but every fix helps one faction and hurts another.",
+        "startLocationKey": "slake-head",
+        "visibility": "public"
+      }
+    ],
+    "locations": [
+      {
+        "key": "slake-head",
+        "name": "Slake-Head",
+        "description": "The old seam-mouth and the Sintermark's busiest crossing. A stone apron rings a wide subsidence dish where the first galleries were opened; the ground here has shifted enough that doorframes no longer sit true and the bell-post leans on a fresh brace. Public, road-worn, and always loud with carters, surveyors, and rescue crews.",
+        "visibility": "public",
+        "atmosphere": "Warm air rises from the grate even in frost; the smell is wet stone, coal smoke, and boiled wool.",
+        "discoveries": ["The leaning bell-post is newly braced, not old damage.", "Fresh crack-lines run outward from the dish toward the market."],
+        "hazards": ["Loose paving over voids", "Sudden warm updraft and dust"],
+        "hooks": ["Rescue crews are mustering", "A vent-log courier wants a witness"],
+        "factionKeys": ["faction-register", "faction-slack"]
+      },
+      {
+        "key": "the-steps",
+        "name": "The Steps",
+        "description": "Terraced shafthead housing where sinker crews live between jobs. Retaining walls march down toward the seam, and jack-crews keep whole terraces level by increments. This is the political heart of the Slack & Slake and the place to hire people who know exactly what the ground is doing.",
+        "visibility": "public",
+        "atmosphere": "Laundry, pit-boots, and the rhythmic knock of jacks under a row of houses.",
+        "discoveries": ["A crew roster marks two galleries as overdue.", "Someone has been measuring the retaining walls at night."],
+        "hazards": ["Unshored stairwells", "Rolling tools on wet stone"],
+        "hooks": ["The forewoman needs one more pair of hands", "A steward is buying silence"],
+        "factionKeys": ["faction-slack"]
+      },
+      {
+        "key": "gasward-post",
+        "name": "Gasward Post",
+        "description": "The Register's monitoring station at the head of the Slake, hung with alarm bells and paper gas-charts. Wardens sample air at fixed points and ring the bells when a reading crosses a line. The post is public, but its logs are public only in the version the Register chooses to post.",
+        "visibility": "public",
+        "atmosphere": "Ink, brass, and a faint sulfur smell that the wardens insist is normal.",
+        "discoveries": ["One chart has been re-copied in a different hand.", "The newest bells are rung less often than the old ones."],
+        "hazards": ["Pocket gas", "Ringing a false alarm into a crowd"],
+        "hooks": ["A bell-keeper wants a second opinion", "An unreported reading is missing"],
+        "factionKeys": ["faction-register"]
+      },
+      {
+        "key": "cold-kiln",
+        "name": "Cold Kiln",
+        "description": "A retired furnace shell converted into a commons hall and workshop. The old kiln mouth is now a hearth that is kept barely lit on principle. Retired slakers argue here over tea and repair the maps they once drew, making this the best place to find out what the draught used to be before the Register standardized it.",
+        "visibility": "public",
+        "atmosphere": "Lime-washed brick, cold ash, and the scratch of a map being corrected.",
+        "discoveries": ["An old draught map with a route that no longer exists.", "A retired bellwright keeps a private notebook of corrections."],
+        "hazards": ["Unstable roof over the old flue", "A stove that is deliberately underfired"],
+        "hooks": ["An old slaker will trade a correction for a favor", "The hall is sheltering displaced families"],
+        "factionKeys": ["faction-slack", "faction-assemblies"]
+      },
+      {
+        "key": "slake-market",
+        "name": "Slake Market",
+        "description": "The barter market where heat tokens, salvage, glass offcuts, and food change hands. Stalls crowd the safe side of the dish, and the market's mood is the fastest read on the Sintermark's politics. When rationing is announced, this is where it becomes a crowd.",
+        "visibility": "public",
+        "atmosphere": "Frying oil, vinegar, glass chimes, and the particular quiet that precedes an argument.",
+        "discoveries": ["Heat tokens from two districts are being weighed differently.", "A stall sells cave-glass that should not exist."],
+        "hazards": ["Crowd crush", "Kiln-fume headache from nearby stalls"],
+        "hooks": ["A vendor has a stolen ledger page", "A ration notice is about to be read aloud"],
+        "factionKeys": ["faction-register", "faction-concord", "faction-slack"]
+      },
+      {
+        "key": "foundered-row",
+        "name": "Foundered Row",
+        "description": "A half-sunk street of shard-strewn pits and squatters' shanties, abandoned when its foundations gave way. It is officially condemned and unofficially inhabited. Runaways, witnesses, and people the Register would rather not count all end up here, and the ground is still moving.",
+        "visibility": "public",
+        "atmosphere": "Broken glass underfoot, tarpaulins, and a thin whistle of air through cracks.",
+        "discoveries": ["Someone has been living under a collapsed arch.", "An adult worker's hobnailed bootprints lead into a gallery that is off the map."],
+        "hazards": ["Hidden voids", "Glass shards", "Shifting rubble"],
+        "hooks": ["A guide knows a safe way through", "A witness is hiding from the Concord"],
+        "factionKeys": ["faction-bloomwrights", "faction-slack"]
+      },
+      {
+        "key": "the-long-reflectory",
+        "name": "The Long Reflectory",
+        "description": "The mirror hall that catches dawn light and aims it down the heat-road, warming the glassworks and the pipe foundries without spending a token. Thousands of angled glass panes on a slow-turning frame make the whole district bright and slightly wrong, and the reflectory is the Sintermark's proudest public work.",
+        "visibility": "public",
+        "atmosphere": "Blinding bands of moving light, hot metal ticking, and dust turning in the beams.",
+        "discoveries": ["One mirror bank is aimed somewhere new.", "The frame is wearing faster on the north side."],
+        "hazards": ["Focused light and fire", "Turning machinery", "Falling glass"],
+        "hooks": ["The aim-keeper has noticed a drift", "A lens contract is short of glass"],
+        "factionKeys": ["faction-concord", "faction-register"]
+      },
+      {
+        "key": "concord-hall",
+        "name": "Concord Hall",
+        "description": "The Frit Concord's headquarters and assay office, where glass is graded, contracts are signed, and prices are set. The hall is polished and warm, and its hospitality is a negotiation tactic. Everything the Concord wants to be true about the Sintermark is carved above its door.",
+        "visibility": "public",
+        "atmosphere": "Warmth, beeswax, and the click of graded glass on a slate table.",
+        "discoveries": ["A merger clause references heat rights not yet granted.", "An assay room holds a foreign standard weight."],
+        "hazards": ["Social ambush", "A locked assay vault"],
+        "hooks": ["A guildmaster offers a profitable errand", "A foreign factor is waiting for an answer"],
+        "factionKeys": ["faction-concord"]
+      },
+      {
+        "key": "rolling-furnace",
+        "name": "Rolling Furnace",
+        "description": "The largest working furnace in the Sillworks, named for the way its heat rolls down the bench. Slag heaps and clinker fields fan out behind it. This is the furnace that cooled overnight, and the cold oven is now the loudest fact in the district.",
+        "visibility": "public",
+        "atmosphere": "Blast-heat on one side, frost on the other, and a crowd that will not go home.",
+        "discoveries": ["The damper was moved after the last inspection.", "The failure matches a draught the official log denies."],
+        "hazards": ["Burst pipes", "Scalding condensate", "Unstable clinker"],
+        "hooks": ["Guild enforcers are blaming the Register", "Workers want someone to look at the damper"],
+        "factionKeys": ["faction-concord", "faction-slack"]
+      },
+      {
+        "key": "pipeworks",
+        "name": "Pipeworks",
+        "description": "Where ceramic and glass heat-pipes are cast, fitted, and laid. The pipeworks is the Sintermark's circulatory system in miniature: joints, valves, expansion loops, and men who can tell a failing seal by its hum. Whoever holds the pipeworks can move or throttle heat across the whole region.",
+        "visibility": "public",
+        "atmosphere": "Wet clay, hot glass, and a low harmonic hum from the test line.",
+        "discoveries": ["A run of pipe has been re-routed without a survey.", "A cracked sleeve matches the cold-furnace failure."],
+        "hazards": ["Steam", "Hot pipework", "Confined trenches"],
+        "hooks": ["A pipefitter will talk for a price", "A re-route is on tomorrow's docket"],
+        "factionKeys": ["faction-concord", "faction-register"]
+      },
+      {
+        "key": "cold-glass-works",
+        "name": "Cold Glass Works",
+        "description": "A cramped workshop where Tamsin the Cold blows glass from cave-sand, producing work that behaves unlike anything the Concord sells. The works is legally dubious and physically warm despite its name, because the cold caves it draws from are not as cold as they were.",
+        "visibility": "public",
+        "atmosphere": "Sharp mineral smell, cool sand, and a furnace running on a heat token that should not be enough.",
+        "discoveries": ["Cave-sand samples are warm to the touch.", "The kiln needs less fuel than the recipe says."],
+        "hazards": ["Unvented kiln", "Breaking a one-off piece"],
+        "hooks": ["A buyer wants a lens nobody else can make", "The Concord wants the works shut"],
+        "factionKeys": ["faction-bloomwrights", "faction-concord"]
+      },
+      {
+        "key": "sinter-terraces",
+        "name": "Sinter Terraces",
+        "description": "Cascading mineral terraces built by the Longfire's hot water, where salts and silica precipitate into ledges of white, ochre, and rust. The terraces are both a fieldwork site and a living margin: harvesters take crusts, scholars take samples, and the whole structure grows or dissolves with the fire's direction.",
+        "visibility": "public",
+        "atmosphere": "Steam, mineral brightness, and a hush broken by dripping water.",
+        "discoveries": ["Fresh terraces are forming on the wrong side.", "A survey marker has been submerged."],
+        "hazards": ["Scalding water", "Slippery crusts", "Thin ledges"],
+        "hooks": ["A scholar wants samples escorted", "Harvesters have lost a terrace overnight"],
+        "factionKeys": ["faction-assemblies", "faction-bloomwrights"]
+      },
+      {
+        "key": "firemoss-hollow",
+        "name": "Firemoss Hollow",
+        "description": "A warm cavern floored with firemoss and fungal mats that grow on mineral heat rather than sunlight. The hollow smells of yeast and hot stone, and it feeds the Verge: moss, mushrooms, blind insects, and the small creatures that eat them. It is a farm, a larder, and a sacred-ordinary place to the Vergefolk.",
+        "visibility": "public",
+        "atmosphere": "Damp warmth, faint green-gold light, and the tick of water on stone.",
+        "discoveries": ["The moss line has advanced into a dry gallery.", "Something has been harvesting the mats at night."],
+        "hazards": ["Slick moss", "Bad air in side pockets", "Territorial insects"],
+        "hooks": ["A keeper needs the harvest protected", "A new warm passage has opened"],
+        "factionKeys": ["faction-assemblies", "faction-bloomwrights"]
+      },
+      {
+        "key": "smoke-bread-farm",
+        "name": "Smoke-Bread Farm",
+        "description": "Terraced caverns where heat-loving grain and root crops are raised under lamps and warm updrafts, then dried in the smoke of the Longfire. Smoke-bread travels better than anything else in the Verge and is the Assemblies' main trade good with the lowlands.",
+        "visibility": "public",
+        "atmosphere": "Warm flour dust, smoke, and the creak of drying racks.",
+        "discoveries": ["A field is failing on one side of the cavern.", "Storehouse counts do not match the harvest."],
+        "hazards": ["Flour dust and fire", "Unstable gallery roof"],
+        "hooks": ["A farmstead needs hands before the frost", "A store count suggests theft"],
+        "factionKeys": ["faction-assemblies", "faction-bloomwrights"]
+      },
+      {
+        "key": "breathing-caves",
+        "name": "Breathing Caves",
+        "description": "A karst network that reverses its airflow with the season, exhaling warm air in winter and drawing cold air in summer. The Vergefolk schedule planting, firing, and travel around the breath. Wrong airflow is the first warning that the Longfire has changed direction below.",
+        "visibility": "public",
+        "atmosphere": "A standing wind with no weather, cave-cool and cave-warm in the same tunnel.",
+        "discoveries": ["The breath reversed early.", "A map of the old airflow is carved into the entrance."],
+        "hazards": ["Sudden wind", "Disorientation", "Unstable ceiling"],
+        "hooks": ["A guide can read the breath", "A lost survey party went in during the turn"],
+        "factionKeys": ["faction-assemblies", "faction-register"]
+      },
+      {
+        "key": "verge-assembly",
+        "name": "Verge Assembly",
+        "description": "The open council ring where the Warm Verge Assemblies meet under a roof of fitted stone. Elders of the harvest families sit here, and their authority is customary and hard-won. The ring is also where the younger Bloomwrights come to argue that custom alone cannot answer a moving fire.",
+        "visibility": "public",
+        "atmosphere": "Firelight, woven mats, and the patient formality of a meeting that has no written rules.",
+        "discoveries": ["Two factions of the Verge no longer sit together.", "An old oral map is kept in a family, not a hall."],
+        "hazards": ["Political misstep", "A ring that can turn hostile"],
+        "hooks": ["Elders want the register's real survey", "Bloomwrights want outside allies"],
+        "factionKeys": ["faction-assemblies", "faction-bloomwrights"]
+      },
+      {
+        "key": "the-throttle",
+        "name": "The Throttle",
+        "description": "The great sluice and dam that holds the deep aquifer back from the warm galleries. Its gates can drown a seam or keep the wells alive, and everyone downstream knows it. The Throttle is the Sintermark's chokepoint: whoever stands at the gate decides what burns and what drinks.",
+        "visibility": "public",
+        "atmosphere": "Cold mist, roaring water, and the groan of loaded timbers.",
+        "discoveries": ["Fresh undercutting behind the west buttress.", "A gate wheel has been greased for a fast turn."],
+        "hazards": ["Rushing water", "Slick steps", "Collapsing bank"],
+        "hooks": ["The sluice-keeper is planning something", "A gate needs a second pair of hands"],
+        "factionKeys": ["faction-compact", "faction-register"]
+      },
+      {
+        "key": "cistern-commons",
+        "name": "Cistern Commons",
+        "description": "The public reservoirs and wells that feed the lowland towns, roofed and guarded against ash and gas. Water is carried out and grief carried in; the commons also runs the region's only proper infirmary. The air here is the cleanest in the Sintermark and the politics the sharpest.",
+        "visibility": "public",
+        "atmosphere": "Cold stone, wet rope, and the hush of a hospital corridor.",
+        "discoveries": ["Injury patterns do not match the official causes.", "A cistern is silting faster than it should."],
+        "hazards": ["Slippery stone", "Contaminated water"],
+        "hooks": ["A physician wants witness statements", "A well is about to be condemned"],
+        "factionKeys": ["faction-compact"]
+      },
+      {
+        "key": "sweetwater-head",
+        "name": "Sweetwater Head",
+        "description": "The cold spring that feeds the cisterns and the farms below, dressed in old stonework and newer pumps. The Sweetwater Compact holds its water rights and its oath to keep the aquifer clean. The head is quiet, cold, and absolutely non-negotiable as far as the Compact is concerned.",
+        "visibility": "public",
+        "atmosphere": "Cold clear water, moss on stone, and the clatter of a pump that never quite stops.",
+        "discoveries": ["A warm seep has appeared in the spring bed.", "The pump is running longer each week."],
+        "hazards": ["Cold shock", "Slippery weirs"],
+        "hooks": ["The Compact wants the seep investigated", "A farmer will pay for clean water"],
+        "factionKeys": ["faction-compact"]
+      },
+      {
+        "key": "drowned-gallery",
+        "name": "Drowned Gallery",
+        "description": "An old working gallery already flooded when the aquifer was first tapped. Its upper walkways are dry, its lower levels black water, and its pumps keep the flood from spreading. Divers use it to reach the lower seam and to prove where the water is going.",
+        "visibility": "public",
+        "atmosphere": "Cold air, deep echoes, and the flat slap of water against stone.",
+        "discoveries": ["A new passage runs toward the Slake.", "Flood marks are rising on the dry walkway."],
+        "hazards": ["Deep cold water", "Poor air in pockets", "Currents at the sump"],
+        "hooks": ["A crew will guide a dive for pay", "The sump is blocked and nobody knows why"],
+        "factionKeys": ["faction-compact", "faction-slack"]
+      },
+      {
+        "key": "pump-house",
+        "name": "Pump House",
+        "description": "The roaring engine hall that keeps the drowned gallery from rising. Iron, brass, and steam; a place where a broken bearing can flood a district. The pump crews are independent-minded and know their machines better than anyone in the Register does.",
+        "visibility": "public",
+        "atmosphere": "Steam, hot oil, and a rhythm you can feel through the floor.",
+        "discoveries": ["Spare parts are being diverted.", "A bearing has been packed with the wrong grease."],
+        "hazards": ["Steam burns", "Belt drives", "Scalding water"],
+        "hooks": ["The crew needs a part from the Concord", "A gauge has been quietly recalibrated"],
+        "factionKeys": ["faction-slack", "faction-compact"]
+      },
+      {
+        "key": "draughtwarden-hall",
+        "name": "Draughtwarden Hall",
+        "description": "The Register's seat, where vent gates are scheduled, heat tokens are issued, and the official draught logs are kept. The hall is orderly, busy, and built on the premise that the fire can be administered. Its ledgers are the closest thing the Sintermark has to a constitution.",
+        "visibility": "public",
+        "atmosphere": "Paper, lamp oil, and the scratch of a hundred pens on quota books.",
+        "discoveries": ["A page is missing from the survey volume.", "A gate schedule was amended twice in one night."],
+        "hazards": ["Bureaucratic delay", "A locked archive"],
+        "hooks": ["A warden wants a discreet error fixed", "A surveyor's report has been shelved"],
+        "factionKeys": ["faction-register"]
+      },
+      {
+        "key": "crosswind-stacks",
+        "name": "Crosswind Stacks",
+        "description": "The bank of vent stacks that shapes the draught and therefore steers the Longfire. Each stack can be dampered to pull air from one gallery and push it to another, and the setting is changed on the Register's schedule. From the top you can see the whole Sintermark, and the warm haze that should not be where it is.",
+        "visibility": "public",
+        "atmosphere": "Wind, sulfur, and the deep drum of air moving under stone.",
+        "discoveries": ["One stack is pulling against the schedule.", "The haze has crossed the old boundary line."],
+        "hazards": ["Falls", "Sudden downdraft", "Gas at the stack foot"],
+        "hooks": ["The stack-keeper wants a witness", "Someone has been changing settings at night"],
+        "factionKeys": ["faction-register"]
+      },
+      {
+        "key": "kiln-college",
+        "name": "Kiln College",
+        "description": "A small arcane and alchemical college built around a research furnace, where heat, stone, and mineral reactions are studied with spellwork. Its scholars are the only people in the Sintermark who can bind an elemental or read a heat gradient at a distance. The Deep Bore rig stands behind the college, and it has begun to hum.",
+        "visibility": "public",
+        "atmosphere": "Sulfur and ozone, bubbling crucibles, and a hum you feel in your teeth.",
+        "discoveries": ["The bore log has entries in two hands.", "A ward around the rig has been quietly renewed."],
+        "hazards": ["Alchemical fumes", "Unstable wards", "A live bore"],
+        "hooks": ["A scholar needs a field escort", "The bore has moved and nobody will say"],
+        "factionKeys": ["faction-register", "faction-concord"]
+      },
+      {
+        "key": "ash-road",
+        "name": "Ash Road",
+        "description": "The long causeway that carries glass, salt, and smoke-bread down out of the highlands, paved with clinker and ash. It is the Sintermark's trade artery and the Concord's favourite lever: close the ash road and the region starves of coin. Caravans camp along it, and rumors travel faster than carts.",
+        "visibility": "public",
+        "atmosphere": "Grit, cold wind, and the creak of a caravan that has stopped too long.",
+        "discoveries": ["A caravanner is carrying a foreign sealed order.", "A mile-marker has been moved."],
+        "hazards": ["Exposure", "Highway robbery", "Broken axles"],
+        "hooks": ["A caravan master needs an escort", "A sealed order names a local buyer"],
+        "factionKeys": ["faction-concord"]
+      },
+      {
+        "key": "survey-house",
+        "name": "Survey House",
+        "description": "The Register's mapping office, where levelling rods, draught charts, and official ground surveys are stored. It is quieter than Draughtwarden Hall and more dangerous, because the survey is where the lie lives. A missing page here can move a district.",
+        "visibility": "public",
+        "atmosphere": "Dust, ink, rolled charts, and a locked cabinet that everyone has noticed.",
+        "discoveries": ["A ground survey contradicts the posted draught log.", "A cabinet drawer has been forced and re-locked."],
+        "hazards": ["Guarded archive", "A floor that has begun to tilt"],
+        "hooks": ["A junior surveyor will trade access", "A chart is due to be re-drawn"],
+        "factionKeys": ["faction-register"]
+      }
+    ],
+    "connections": [
+      { "key": "conn-slake-head-the-steps", "fromLocationKey": "slake-head", "toLocationKey": "the-steps", "description": "Broad public steps descend from the crossing into the terraced sinker quarter.", "visibility": "public" },
+      { "key": "conn-the-steps-slake-head", "fromLocationKey": "the-steps", "toLocationKey": "slake-head", "description": "Return climb from the Steps up to the Slake-Head crossing.", "visibility": "public" },
+      { "key": "conn-slake-head-gasward-post", "fromLocationKey": "slake-head", "toLocationKey": "gasward-post", "description": "Short walk along the dish rim to the bell-hung gasward post.", "visibility": "public" },
+      { "key": "conn-gasward-post-slake-head", "fromLocationKey": "gasward-post", "toLocationKey": "slake-head", "description": "Return walk from the post to the crossing.", "visibility": "public" },
+      { "key": "conn-slake-head-slake-market", "fromLocationKey": "slake-head", "toLocationKey": "slake-market", "description": "Paved way to the stall line on the safe side of the dish.", "visibility": "public" },
+      { "key": "conn-slake-market-slake-head", "fromLocationKey": "slake-market", "toLocationKey": "slake-head", "description": "Return way from the market to the crossing.", "visibility": "public" },
+      { "key": "conn-the-steps-cold-kiln", "fromLocationKey": "the-steps", "toLocationKey": "cold-kiln", "description": "Climb from the housing terraces to the retired furnace hall.", "visibility": "public" },
+      { "key": "conn-cold-kiln-the-steps", "fromLocationKey": "cold-kiln", "toLocationKey": "the-steps", "description": "Return descent from the Cold Kiln to the Steps.", "visibility": "public" },
+      { "key": "conn-the-steps-foundered-row", "fromLocationKey": "the-steps", "toLocationKey": "foundered-row", "description": "Wary path from the terraces onto the condemned sinking street.", "visibility": "public" },
+      { "key": "conn-foundered-row-the-steps", "fromLocationKey": "foundered-row", "toLocationKey": "the-steps", "description": "Return path from Foundered Row to the Steps.", "visibility": "public" },
+      { "key": "conn-slake-head-the-long-reflectory", "fromLocationKey": "slake-head", "toLocationKey": "the-long-reflectory", "description": "Main public road from the Slake into the Sillworks, under the moving mirror light.", "visibility": "public" },
+      { "key": "conn-the-long-reflectory-slake-head", "fromLocationKey": "the-long-reflectory", "toLocationKey": "slake-head", "description": "Return road from the Sillworks to the Slake.", "visibility": "public" },
+      { "key": "conn-the-long-reflectory-concord-hall", "fromLocationKey": "the-long-reflectory", "toLocationKey": "concord-hall", "description": "Polished company way from the mirror hall to the Concord's door.", "visibility": "public" },
+      { "key": "conn-concord-hall-the-long-reflectory", "fromLocationKey": "concord-hall", "toLocationKey": "the-long-reflectory", "description": "Return way from Concord Hall to the reflectory.", "visibility": "public" },
+      { "key": "conn-the-long-reflectory-rolling-furnace", "fromLocationKey": "the-long-reflectory", "toLocationKey": "rolling-furnace", "description": "Heat-road bench from the mirrors to the district's largest furnace.", "visibility": "public" },
+      { "key": "conn-rolling-furnace-the-long-reflectory", "fromLocationKey": "rolling-furnace", "toLocationKey": "the-long-reflectory", "description": "Return bench along the heat-road to the reflectory.", "visibility": "public" },
+      { "key": "conn-rolling-furnace-pipeworks", "fromLocationKey": "rolling-furnace", "toLocationKey": "pipeworks", "description": "Service track from the furnace to the pipe casting yards.", "visibility": "public" },
+      { "key": "conn-pipeworks-rolling-furnace", "fromLocationKey": "pipeworks", "toLocationKey": "rolling-furnace", "description": "Return service track to the furnace.", "visibility": "public" },
+      { "key": "conn-pipeworks-cold-glass-works", "fromLocationKey": "pipeworks", "toLocationKey": "cold-glass-works", "description": "Back-lane from the pipe yards to the cramped cave-glass workshop.", "visibility": "public" },
+      { "key": "conn-cold-glass-works-pipeworks", "fromLocationKey": "cold-glass-works", "toLocationKey": "pipeworks", "description": "Return back-lane from the cold-glass works.", "visibility": "public" },
+      { "key": "conn-the-long-reflectory-sinter-terraces", "fromLocationKey": "the-long-reflectory", "toLocationKey": "sinter-terraces", "description": "Road out of the Sillworks onto the mineral terraces of the Warm Verge.", "visibility": "public" },
+      { "key": "conn-sinter-terraces-the-long-reflectory", "fromLocationKey": "sinter-terraces", "toLocationKey": "the-long-reflectory", "description": "Return road from the terraces back to the Sillworks.", "visibility": "public" },
+      { "key": "conn-sinter-terraces-firemoss-hollow", "fromLocationKey": "sinter-terraces", "toLocationKey": "firemoss-hollow", "description": "Warm path from the terraces into the firemoss cavern.", "visibility": "public" },
+      { "key": "conn-firemoss-hollow-sinter-terraces", "fromLocationKey": "firemoss-hollow", "toLocationKey": "sinter-terraces", "description": "Return path from the moss hollow to the terraces.", "visibility": "public" },
+      { "key": "conn-sinter-terraces-smoke-bread-farm", "fromLocationKey": "sinter-terraces", "toLocationKey": "smoke-bread-farm", "description": "Track from the terraces to the warm cavern farms.", "visibility": "public" },
+      { "key": "conn-smoke-bread-farm-sinter-terraces", "fromLocationKey": "smoke-bread-farm", "toLocationKey": "sinter-terraces", "description": "Return track from the farms to the terraces.", "visibility": "public" },
+      { "key": "conn-firemoss-hollow-breathing-caves", "fromLocationKey": "firemoss-hollow", "toLocationKey": "breathing-caves", "description": "Passage from the moss hollow into the reversing karst network.", "visibility": "public" },
+      { "key": "conn-breathing-caves-firemoss-hollow", "fromLocationKey": "breathing-caves", "toLocationKey": "firemoss-hollow", "description": "Return passage from the breathing caves to the moss hollow.", "visibility": "public" },
+      { "key": "conn-smoke-bread-farm-breathing-caves", "fromLocationKey": "smoke-bread-farm", "toLocationKey": "breathing-caves", "description": "Second farm route into the breathing caves, used when the wind turns.", "visibility": "public" },
+      { "key": "conn-breathing-caves-smoke-bread-farm", "fromLocationKey": "breathing-caves", "toLocationKey": "smoke-bread-farm", "description": "Return route from the breathing caves to the farms.", "visibility": "public" },
+      { "key": "conn-breathing-caves-verge-assembly", "fromLocationKey": "breathing-caves", "toLocationKey": "verge-assembly", "description": "Wide carved way from the cave mouth up to the council ring.", "visibility": "public" },
+      { "key": "conn-verge-assembly-breathing-caves", "fromLocationKey": "verge-assembly", "toLocationKey": "breathing-caves", "description": "Return way from the council ring down to the caves.", "visibility": "public" },
+      { "key": "conn-sinter-terraces-the-throttle", "fromLocationKey": "sinter-terraces", "toLocationKey": "the-throttle", "description": "Descending road from the terraces to the great water gate.", "visibility": "public" },
+      { "key": "conn-the-throttle-sinter-terraces", "fromLocationKey": "the-throttle", "toLocationKey": "sinter-terraces", "description": "Return climb from the Throttle to the terraces.", "visibility": "public" },
+      { "key": "conn-the-throttle-cistern-commons", "fromLocationKey": "the-throttle", "toLocationKey": "cistern-commons", "description": "Causeway along the sluice to the public reservoirs and infirmary.", "visibility": "public" },
+      { "key": "conn-cistern-commons-the-throttle", "fromLocationKey": "cistern-commons", "toLocationKey": "the-throttle", "description": "Return causeway from the cisterns to the Throttle.", "visibility": "public" },
+      { "key": "conn-cistern-commons-sweetwater-head", "fromLocationKey": "cistern-commons", "toLocationKey": "sweetwater-head", "description": "Cold spring road from the reservoirs to the head.", "visibility": "public" },
+      { "key": "conn-sweetwater-head-cistern-commons", "fromLocationKey": "sweetwater-head", "toLocationKey": "cistern-commons", "description": "Return road from the spring head to the cisterns.", "visibility": "public" },
+      { "key": "conn-cistern-commons-drowned-gallery", "fromLocationKey": "cistern-commons", "toLocationKey": "drowned-gallery", "description": "Stone stair from the commons down to the flooded gallery walkways.", "visibility": "public" },
+      { "key": "conn-drowned-gallery-cistern-commons", "fromLocationKey": "drowned-gallery", "toLocationKey": "cistern-commons", "description": "Return stair from the gallery to the cisterns.", "visibility": "public" },
+      { "key": "conn-drowned-gallery-pump-house", "fromLocationKey": "drowned-gallery", "toLocationKey": "pump-house", "description": "Wet passage from the flooded gallery to the engine hall.", "visibility": "public" },
+      { "key": "conn-pump-house-drowned-gallery", "fromLocationKey": "pump-house", "toLocationKey": "drowned-gallery", "description": "Return passage from the engine hall to the gallery.", "visibility": "public" },
+      { "key": "conn-slake-head-draughtwarden-hall", "fromLocationKey": "slake-head", "toLocationKey": "draughtwarden-hall", "description": "Main civic road from the crossing up to the Register's seat.", "visibility": "public" },
+      { "key": "conn-draughtwarden-hall-slake-head", "fromLocationKey": "draughtwarden-hall", "toLocationKey": "slake-head", "description": "Return civic road from the Register down to the Slake.", "visibility": "public" },
+      { "key": "conn-draughtwarden-hall-crosswind-stacks", "fromLocationKey": "draughtwarden-hall", "toLocationKey": "crosswind-stacks", "description": "Stair and service road from the Register up to the vent stacks.", "visibility": "public" },
+      { "key": "conn-crosswind-stacks-draughtwarden-hall", "fromLocationKey": "crosswind-stacks", "toLocationKey": "draughtwarden-hall", "description": "Return descent from the stacks to the Register.", "visibility": "public" },
+      { "key": "conn-draughtwarden-hall-kiln-college", "fromLocationKey": "draughtwarden-hall", "toLocationKey": "kiln-college", "description": "Lane from the Register to the arcane research college and the Deep Bore rig.", "visibility": "public" },
+      { "key": "conn-kiln-college-draughtwarden-hall", "fromLocationKey": "kiln-college", "toLocationKey": "draughtwarden-hall", "description": "Return lane from the college to the Register.", "visibility": "public" },
+      { "key": "conn-crosswind-stacks-survey-house", "fromLocationKey": "crosswind-stacks", "toLocationKey": "survey-house", "description": "Short back-stair between the stacks and the mapping office.", "visibility": "public" },
+      { "key": "conn-survey-house-crosswind-stacks", "fromLocationKey": "survey-house", "toLocationKey": "crosswind-stacks", "description": "Return back-stair from the survey house.", "visibility": "public" },
+      { "key": "conn-ash-road-crosswind-stacks", "fromLocationKey": "ash-road", "toLocationKey": "crosswind-stacks", "description": "Clinker switchback from the causeway up to the stacks.", "visibility": "public" },
+      { "key": "conn-crosswind-stacks-ash-road", "fromLocationKey": "crosswind-stacks", "toLocationKey": "ash-road", "description": "Return switchback from the stacks down to the causeway.", "visibility": "public" },
+      { "key": "conn-ash-road-kiln-college", "fromLocationKey": "ash-road", "toLocationKey": "kiln-college", "description": "Freight spur from the causeway to the college yard.", "visibility": "public" },
+      { "key": "conn-kiln-college-ash-road", "fromLocationKey": "kiln-college", "toLocationKey": "ash-road", "description": "Return freight spur from the college to the causeway.", "visibility": "public" },
+      { "key": "conn-foundered-row-cold-kiln", "fromLocationKey": "foundered-row", "toLocationKey": "cold-kiln", "description": "Narrow shortcut over the shard pits that skips the Steps.", "visibility": "public" },
+      { "key": "conn-cold-kiln-foundered-row", "fromLocationKey": "cold-kiln", "toLocationKey": "foundered-row", "description": "Return shortcut from the Cold Kiln to Foundered Row.", "visibility": "public" },
+      { "key": "conn-rolling-furnace-sinter-terraces", "fromLocationKey": "rolling-furnace", "toLocationKey": "sinter-terraces", "description": "Old works shortcut from the furnace straight out onto the terraces.", "visibility": "public" },
+      { "key": "conn-sinter-terraces-rolling-furnace", "fromLocationKey": "sinter-terraces", "toLocationKey": "rolling-furnace", "description": "Return works shortcut from the terraces to the furnace.", "visibility": "public" },
+      { "key": "conn-kiln-college-survey-house", "fromLocationKey": "kiln-college", "toLocationKey": "survey-house", "description": "Covered academic path between the college and the mapping office.", "visibility": "public" },
+      { "key": "conn-survey-house-kiln-college", "fromLocationKey": "survey-house", "toLocationKey": "kiln-college", "description": "Return covered path from the survey house to the college.", "visibility": "public" },
+      { "key": "conn-gasward-post-draughtwarden-hall", "fromLocationKey": "gasward-post", "toLocationKey": "draughtwarden-hall", "description": "Courier road from the bell post up to the Register, used to carry readings.", "visibility": "public" },
+      { "key": "conn-draughtwarden-hall-gasward-post", "fromLocationKey": "draughtwarden-hall", "toLocationKey": "gasward-post", "description": "Return courier road from the Register to the bell post.", "visibility": "public" },
+      { "key": "conn-breathing-caves-sweetwater-head", "fromLocationKey": "breathing-caves", "toLocationKey": "sweetwater-head", "description": "Long wild route from the reversing caves to the cold spring, passable only when the breath is right.", "visibility": "public" },
+      { "key": "conn-sweetwater-head-breathing-caves", "fromLocationKey": "sweetwater-head", "toLocationKey": "breathing-caves", "description": "Return wild route from the cold spring to the caves.", "visibility": "public" }
+    ],
+    "factions": [
+      {
+        "key": "faction-register",
+        "name": "The Draughtwardens' Register",
+        "description": "The civic body that meters heat, schedules vent gates, issues heat tokens, and keeps the official draught logs. It presents itself as the only thing standing between the Sintermark and a panic. Its authority is recent, its records are its power, and its officials genuinely believe the fire can be administered.",
+        "visibility": "public",
+        "gmNotes": "GM secret: the Register's official schedule descends from a survey that was quietly corrected decades ago, and the correction favored the district around Draughtwarden Hall. Pell Marrow signed off on a secondary draught under the Sillworks to protect that hall, then lost control of the paperwork. Pressure states to play, as authored story states only: if publicly exposed, Wardens stall, shred, and blame the Concord; if praised, they tighten quotas and claim credit; if ignored, the Archives quietly lose the next page too. The Register's real fear is not the fire but being proved redundant."
+      },
+      {
+        "key": "faction-concord",
+        "name": "The Frit Concord",
+        "description": "The glassmakers' cartel that grades and prices Sintermark glass and carries it down the Ash Road. The Concord funds the reflectory, employs half the Sillworks, and argues that only one strong guild can afford the infrastructure the fire demands. Its merger talks would make it the sole buyer of heat tokens in the district.",
+        "visibility": "public",
+        "gmNotes": "GM secret: the Concord's merger depends on heat rights it has not been granted, and Guildmaster Sera Fenn's family fortune rests on the pre-Register vent map she has kept out of the Archive. She is not lying when she says chaos would be worse; she is omitting that she profits from the current order. Pressure states: if the party threatens the merger, the Concord buys the party's creditors and hires Rennick Voss to make an example; if the party helps, the Concord offers cheap glass and a seat at the assay table; if the party exposes Sera, the Concord splits between those who want her gone and those who want the map kept."
+      },
+      {
+        "key": "faction-slack",
+        "name": "The Slack & Slake",
+        "description": "The union of sinker crews, vent-walkers, pump hands, and rescue workers who go down when the ground moves. The Slack & Slake can shut every vent in the Sintermark in an afternoon, which is both its power and its hostage. It wants heat-share for its district and safety law that names names.",
+        "visibility": "public",
+        "gmNotes": "GM secret: Orl Tace knows the Slake gallery has breached toward the water and has been selling the tip quietly to keep the union's strike fund alive; Dolph Marrow will call a shutdown even if it freezes the lowlands, because he has buried too many crews to compromise again. Pressure states: if the party honours the crews, the union shares its private gallery map; if the party crosses a picket, the union shuts the vents; if the breach becomes public, the union demands the Register's head and the Compact's flood plans at the same table."
+      },
+      {
+        "key": "faction-compact",
+        "name": "The Sweetwater Compact",
+        "description": "The downstream water-users, farmers, and cistern keepers who hold the aquifer rights and the public oath to keep the water clean. The Compact is patient, precise, and willing to drown a seam to save a well. It considers the fire a temporary inconvenience and the water a permanent necessity.",
+        "visibility": "public",
+        "gmNotes": "GM secret: Sluice-Keeper Ivo Bray has already begun undermining the west buttress of the Throttle without authorization, intending a controlled flood before the Register can object. The Compact's oath is sincerely held and genuinely destructive. Pressure states: if the party proves the fire is close to the aquifer, the Compact demands an immediate full release; if the party proposes a staged release, Ivo must be persuaded or bypassed; if the party sides with the Sillworks, the Compact cuts their water and their welcome."
+      },
+      {
+        "key": "faction-assemblies",
+        "name": "The Warm Verge Assemblies",
+        "description": "The elder-led customary council of the Warm Verge harvest families, who farm firemoss, smoke-bread, and mineral terraces along the hot margin. Their legitimacy comes from generations of reading the breath and the terraces, and they argue that the lowland charters have never once asked the Verge what the Verge knows. They want sovereignty and compensation, not charity.",
+        "visibility": "public",
+        "gmNotes": "GM secret: Elder Yara holds an oral map of the pre-Register draught network that is more accurate than the Archive, and she will only share it through a binding reciprocal obligation, never for coin. The Assemblies are not mystical; their authority is ecological knowledge and memory of a displacement that the Register still denies. Pressure states: if the party treats the Verge as a source, the Assemblies close their routes; if the party accepts a reciprocal obligation, Yara discloses one section of the oral map per fulfilled duty; if the fire reaches the terraces, the Assemblies demand a seat at every lowland table or withdraw entirely."
+      },
+      {
+        "key": "faction-bloomwrights",
+        "name": "The Bloomwrights",
+        "description": "The younger Verge generation, who grew up on resettled terrace farms and argue that custom alone cannot answer a moving fire. They want a chartered commons with written shares, technical surveys, and elected stewards, and they are willing to trade with the Sillworks to get it. The Assemblies see them as impatient; the lowlands see them as radicals; both are partly right.",
+        "visibility": "public",
+        "gmNotes": "GM secret: the Bloomwrights' charter would legally dissolve the Assemblies' customary holdings and replace them with transferable shares, which the Concord is quietly happy to buy. Tamsin the Cold and Sosh are Bloomwrights, and their cave-glass works is the movement's proof of concept and its hostage. Pressure states: if the party backs the charter, the Assemblies accuse them of selling the Verge; if the party brokers a two-house settlement, both Verge factions gain and the Concord loses its cheap path to the terraces; if the Bloomwrights are discredited, the Assemblies harden and the Concord buys the terraces anyway."
+      }
+    ],
+    "npcs": [
+      {
+        "key": "npc-pell-marrow",
+        "name": "Warden Pell Marrow",
+        "archetype": "Civic administrator",
+        "description": "Chief Draughtwarden: precise, tired, and fluent in the passive voice. Publicly insists the schedule is the schedule. Speaks in measured clauses and hates being interrupted. Will help only if the alternative is worse for the Register.",
+        "visibility": "public",
+        "locationKey": "draughtwarden-hall",
+        "factionKeys": ["faction-register"],
+        "privateGoals": "GM only: protect the Register and the district around Draughtwarden Hall. Pell approved the secondary draught under the Sillworks years ago as a temporary fix and lost control of it. Wants the party to find the secondary draught and quietly shut it without naming who authorized it. Leverage: access to the Archive, heat tokens, and the ability to close any street. Reactions: offers procedure and deniability to helpers; stonewalls and faults the Concord to accusers; if cornered with documentary proof, offers a scapegoat junior warden and a favor to keep Pell's name out of it."
+      },
+      {
+        "key": "npc-sera-fenn",
+        "name": "Guildmaster Sera Fenn",
+        "archetype": "Guild magnate",
+        "description": "Head of the Frit Concord: warm, quick, and always holding a better offer. Treats every conversation as a negotiation and every guest as a future clause. Publicly frames the merger as stability for workers.",
+        "visibility": "public",
+        "locationKey": "concord-hall",
+        "factionKeys": ["faction-concord"],
+        "privateGoals": "GM only: complete the merger and secure heat rights cheaply. Sera's family built its fortune on a pre-Register vent map she has hidden from the Archive; the map proves the original draught avoided the Sillworks and can be restored. She will trade infrastructure, glass, and escorts for loyalty, and will hire Rennick Voss to discredit anyone who threatens the merger. Reactions: generous to useful allies; ruthless to embarrassment; if shown the original map, privately terrified it devalues Concord holdings."
+      },
+      {
+        "key": "npc-orl-tace",
+        "name": "Orl Ashthumb Tace",
+        "archetype": "Union steward",
+        "description": "Slack & Slake steward: blunt, funny, and missing a fingertip from a jack. Speaks in short sentences and negotiates by naming the dead. Publicly demands heat-share and safer galleries; privately keeps the strike fund in a tin under a loose stair.",
+        "visibility": "public",
+        "locationKey": "the-steps",
+        "factionKeys": ["faction-slack"],
+        "privateGoals": "GM only: knows the Slake gallery has breached toward the drowned gallery and has been selling that tip to fund the strike, which he half-regrets. Wants the party to force the Register to inspect the breach publicly. Leverage: crew rosters, the private gallery map, and the ability to call or stop a picket. Reactions: loyal to crews above all; will trade the breach location for a genuine safety commitment; will burn the party's reputation if they cross a picket."
+      },
+      {
+        "key": "npc-ivo-bray",
+        "name": "Sluice-Keeper Ivo Bray",
+        "archetype": "Water warden",
+        "description": "Sweetwater Compact's keeper of the Throttle: spare, deliberate, and utterly unhurried in a crisis. Speaks about water as if it were a person he is protecting. Publicly recites the Compact's oath at every meeting.",
+        "visibility": "public",
+        "locationKey": "the-throttle",
+        "factionKeys": ["faction-compact"],
+        "privateGoals": "GM only: has already begun undercutting the west buttress for a controlled flood and needs a few more days. Believes a full release is the only permanent answer and will accept temporary political damage to get it. Leverage: the gates, the cistern water supply, and the Compact's farmers. Reactions: cooperates with anyone who brings proof the fire is near the aquifer; obstructs delay; if stopped forcibly, the undermanned gates may still fail on their own."
+      },
+      {
+        "key": "npc-neris-rusk",
+        "name": "Archivist Neris Rusk",
+        "archetype": "Diviner-scholar",
+        "description": "A Kiln College archivist who reads heat and paper with equal suspicion. Dry, watchful, and allergic to being managed. Publicly catalogues mineral samples; privately compares every official chart against the ground.",
+        "visibility": "public",
+        "locationKey": "kiln-college",
+        "factionKeys": [],
+        "privateGoals": "GM only: has divined the Register's falsified survey and copied the proof, but has not decided whether to publish, sell, or sit on it. Wants the party to be the ones who act so the blame is not hers alone. Leverage: divination spells, the bore log, and the falsified-survey copy. Reactions: trades information for credible protection; will not be rushed; if exposed without support, destroys the copy and denies everything."
+      },
+      {
+        "key": "npc-borin-slake",
+        "name": "Master Borin Slake",
+        "archetype": "Thermo-alchemist",
+        "description": "Kiln College's driving researcher: brilliant, expansive, and constitutionally unable to admit a hazard he caused. Publicly describes the Deep Bore as pure science; privately sleeps beside the rig. Speaks in enthusiastic diagrams.",
+        "visibility": "public",
+        "locationKey": "kiln-college",
+        "factionKeys": [],
+        "privateGoals": "GM only: the Deep Bore has tapped a hotter, deeper reservoir and caused the tremors he is concealing. Wants to keep the bore open to study it and will minimize the danger to anyone who asks. Leverage: elemental binding, wards, and the bore itself. Reactions: thrilled by competent help; evasive about tremors; if the bore is threatened, will attempt a hasty deeper seal that risks the whole college."
+      },
+      {
+        "key": "npc-yara-sinter",
+        "name": "Elder Yara of the Sinter",
+        "archetype": "Verge councillor",
+        "description": "Speaker of the Warm Verge Assemblies: slow to speak, impossible to hurry, and precise about obligation. Publicly welcomes visitors and then asks what they owe the Verge. Remembers every promise made in her hearing.",
+        "visibility": "public",
+        "locationKey": "verge-assembly",
+        "factionKeys": ["faction-assemblies"],
+        "privateGoals": "GM only: holds the oral pre-Register vent map and will disclose it only through a binding reciprocal obligation, one section per fulfilled duty. Distrusts the Bloomwright charter because it would dissolve customary holdings. Leverage: the oral map, safe Verge routes, and the food trade. Reactions: tests visitors with small duties; rewards those who return; if the Verge is treated as a resource, closes all routes and never negotiates again."
+      },
+      {
+        "key": "npc-tamsin-cold",
+        "name": "Tamsin the Cold",
+        "archetype": "Independent glassblower",
+        "description": "A cave-glass blower with a chip on one shoulder and a furnace on the other. Blunt, proud, and physically fearless around hot glass. Publicly sells work that the Concord says is impossible and refuses to name her sand source.",
+        "visibility": "public",
+        "locationKey": "cold-glass-works",
+        "factionKeys": ["faction-bloomwrights"],
+        "privateGoals": "GM only: her cold caves are warming because the front is approaching from below, which simultaneously ruins her sand and proves the Bloomwright case. She is hiding the warming to keep the works open. Leverage: unique optics, cave access, and the Bloomwright network. Reactions: allies with anyone who protects the works; panics if the Concord seizes it; if the warming is proven publicly, becomes the Bloomwrights' most credible witness."
+      },
+      {
+        "key": "npc-rennick-voss",
+        "name": "Rennick Voss",
+        "archetype": "Concord enforcer",
+        "description": "Concord enforcer and occasional saboteur: soft-spoken, tidy, and unnervingly polite. Publicly a quality inspector; privately the man who moved the damper. Smiles before he delivers bad news.",
+        "visibility": "public",
+        "locationKey": "rolling-furnace",
+        "factionKeys": ["faction-concord"],
+        "privateGoals": "GM only: rigged the Rolling Furnace damper to manufacture a Register failure on Sera Fenn's instructions, then found the secondary draught and realized the furnace failed for a second, real reason. Wants the party to conclude the Register is at fault and stop looking. Leverage: Concord muscle, forged inspection stamps, and the real damper. Reactions: charming until cornered; will frame a worker if it ends the inquiry; if caught, trades Sera's instructions for immunity."
+      },
+      {
+        "key": "npc-hen",
+        "name": "Bell-Keeper Hen",
+        "archetype": "Gaswarden",
+        "description": "Gasward Post's senior bell-keeper: practical, superstitious about the bells, and honest to a fault. Publicly rings exactly what the gauge says. Has begun to distrust the new gauge.",
+        "visibility": "public",
+        "locationKey": "gasward-post",
+        "factionKeys": ["faction-register"],
+        "privateGoals": "GM only: was ordered to delay alarms during the furnace inspection to avoid a panic, and complied once. Now keeps a private duplicate log of every reading and wants the party to witness it. Leverage: the raw readings and the trust of the Slake. Reactions: cooperates with anyone who treats the bells seriously; freezes if asked to falsify a reading; if the duplicate log is taken by force, will deny it ever existed."
+      },
+      {
+        "key": "npc-dolph-marrow",
+        "name": "Sinker-Captain Dolph Marrow",
+        "archetype": "Rescue crew chief",
+        "description": "Jack-crew chief and Pell Marrow's estranged sibling. Broad, weathered, and quietly furious. Publicly runs the safest crews in the Slake; privately keeps a list of every worker the Register has written off. Speaks plainly and expects the same.",
+        "visibility": "public",
+        "locationKey": "the-steps",
+        "factionKeys": ["faction-slack"],
+        "privateGoals": "GM only: will call a shutdown that freezes the lowlands rather than accept another written-off crew, and wants Pell to be forced to inspect a gallery in person. Leverage: the crews, the jacks, and the foundered-row safe route. Reactions: protects anyone who goes down with a crew; disowns anyone who abandons one; if Pell is endangered, still goes down to rescue Pell, and hates that about himself."
+      },
+      {
+        "key": "npc-aldis-crane",
+        "name": "Factor Aldis Crane",
+        "archetype": "Foreign buyer",
+        "description": "The Saltmarch's agent: immaculate, patient, and never in a hurry, because the Saltmarch can wait. Publicly buying optics and salt; privately purchasing the bore data for a foreign academy. Speaks in offers rather than questions.",
+        "visibility": "public",
+        "locationKey": "concord-hall",
+        "factionKeys": [],
+        "privateGoals": "GM only: wants war-grade lenses and the Deep Bore's readings, and would happily buy the original vent map if it surfaced. Is not loyal to any Sintermark faction and will trade with whichever one looks like winning. Leverage: foreign coin, sealed orders, and the threat to take the glass trade elsewhere. Reactions: pays generously for data; disappears at the first sign of real danger; if the Saltmarch's interest becomes known, all local factions turn on Crane."
+      },
+      {
+        "key": "npc-sosh",
+        "name": "Sosh of the Terraces",
+        "archetype": "Verge guide",
+        "description": "A young Bloomwright guide who knows every warm crack between the terraces and the caves. Quick, wry, and always moving. Publicly sells safe passage; privately looking for a missing sibling last seen in Foundered Row.",
+        "visibility": "public",
+        "locationKey": "foundered-row",
+        "factionKeys": ["faction-bloomwrights"],
+        "privateGoals": "GM only: witnessed Rennick Voss at the Rolling Furnace damper the night before it failed, and a sibling disappeared soon after. Wants the party to find the sibling and the proof. Leverage: Verge routes, the breathing-caves timings, and the Bloomwright network. Reactions: loyal and brave for anyone who helps the search; reckless if the sibling is threatened; will testify if protected."
+      },
+      {
+        "key": "npc-kest",
+        "name": "Old Kest the Bellwright",
+        "archetype": "Retired engineer",
+        "description": "The retired engineer who built the Crosswind Stacks and now spends his days correcting maps in the Cold Kiln. Gruff, exacting, and ashamed of one old decision. Publicly grumbles about modern workmanship; privately keeps the only true draught notebook.",
+        "visibility": "public",
+        "locationKey": "cold-kiln",
+        "factionKeys": ["faction-slack"],
+        "privateGoals": "GM only: designed the stacks around the original vent network and watched the Register standardize it wrong. His notebook is the practical key to restoring the original draught. Wants to atone before he dies and will hand the notebook to whoever proves they will use it for the commons, not a single faction. Reactions: tests engineering competence; refuses to give the notebook to the Concord or the Register; if the party demonstrably acts for the commons, becomes a decisive ally."
+      },
+      {
+        "key": "npc-cael",
+        "name": "Physician Cael",
+        "archetype": "Infirmary healer",
+        "description": "The Cistern Commons' physician: overworked, methodical, and quietly furious. Publicly treats burns, gas injuries, and frostbite without asking which faction sent them. Keeps notes no administrator wants read aloud.",
+        "visibility": "public",
+        "locationKey": "cistern-commons",
+        "factionKeys": [],
+        "privateGoals": "GM only: has noticed that the injury patterns prove at least two gas incidents were concealed, and suspects the Register delayed alarms. Wants a witness who will survive long enough to testify. Leverage: medical records, the infirmary's neutrality, and the trust of every crew's families. Reactions: shares records with anyone who protects patients; refuses to name the dead to politicians; if the infirmary is raided, hides the records and disappears the witnesses."
+      }
+    ],
+    "quests": [
+      {
+        "key": "quest-turned-draught",
+        "title": "The Turned Draught",
+        "description": "The Rolling Furnace cooled overnight for reasons the official log denies. Find out what moved the draught, who moved it, and whether the answer is an accident, a sabotage, or the seam itself turning.",
+        "visibility": "public",
+        "locationKeys": ["rolling-furnace", "draughtwarden-hall", "survey-house", "gasward-post"],
+        "objectives": [
+          { "key": "obj-td-1", "description": "Collect independent draught readings at three separate vents and compare them with the posted log.", "targetProgress": 3, "dependencyObjectiveKeys": [], "visibility": "public" },
+          { "key": "obj-td-2", "description": "Find out why the Rolling Furnace damper moved after the last inspection.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-td-1"], "visibility": "public" },
+          { "key": "obj-td-3", "description": "Determine whether the secondary draught was authorized, accidental, or hidden, and by whom.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-td-2"], "visibility": "gm" }
+        ],
+        "rewards": [
+          { "key": "rew-td-1", "label": "A genuine safety inspection and a heat-token stipend", "kind": "custom", "amount": null, "visibility": "public" }
+        ],
+        "journalText": "The cold oven is the loudest fact in the district. Every faction wants a different culprit; the ground itself may be the only honest witness."
+      },
+      {
+        "key": "quest-throttle",
+        "title": "The Throttle",
+        "description": "The Sweetwater Compact intends to flood a seam to save the aquifer, and the Sluice-Keeper has already begun. Decide what to release, when, and who pays for it, before the Throttle decides for everyone.",
+        "visibility": "public",
+        "locationKeys": ["the-throttle", "cistern-commons", "drowned-gallery", "sweetwater-head"],
+        "objectives": [
+          { "key": "obj-th-1", "description": "Reach the Throttle and learn the state of the gates and the west buttress.", "targetProgress": 1, "dependencyObjectiveKeys": [], "visibility": "public" },
+          { "key": "obj-th-2", "description": "Choose a release: hold, partial, or full, and justify it to the people who will live with the water.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-th-1"], "visibility": "public" },
+          { "key": "obj-th-3", "description": "Make the chosen release stick with both the Compact and the Verge without a war at the gate.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-th-2"], "visibility": "public" }
+        ],
+        "rewards": [
+          { "key": "rew-th-1", "label": "Compact water-rights goodwill and a safe cistern route", "kind": "custom", "amount": null, "visibility": "public" }
+        ],
+        "journalText": "Water and fire are both commons, and both are being decided by people who will not be in the room when it fails."
+      },
+      {
+        "key": "quest-cold-glass",
+        "title": "Cold Glass",
+        "description": "A cave-glass blower sells optics the Concord calls impossible, and the caves are warming. Protect the works, test the glass, and decide whether the trade is a curiosity, a threat, or the key to reading the seam.",
+        "visibility": "public",
+        "locationKeys": ["cold-glass-works", "pipeworks", "sinter-terraces", "concord-hall"],
+        "objectives": [
+          { "key": "obj-cg-1", "description": "Reach the Cold Glass Works and earn Tamsin's trust enough to see the cave sand.", "targetProgress": 1, "dependencyObjectiveKeys": [], "visibility": "public" },
+          { "key": "obj-cg-2", "description": "Test the cave-glass and find out why the caves it comes from are warming.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-cg-1"], "visibility": "gm" },
+          { "key": "obj-cg-3", "description": "Decide the trade's fate among Tamsin, the Concord, and the Bloomwrights.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-cg-2"], "visibility": "public" }
+        ],
+        "rewards": [
+          { "key": "rew-cg-1", "label": "A cave-glass lens and Bloomwright goodwill", "kind": "custom", "amount": null, "visibility": "public" }
+        ],
+        "journalText": "The Concord says the glass cannot exist. Tamsin says the sand comes from caves nobody maps. Both cannot be right."
+      },
+      {
+        "key": "quest-deep-bore",
+        "title": "The Deep Bore",
+        "description": "The Kiln College's bore has begun to hum and the ground with it. Reach the rig, learn what it tapped, and stabilize, disable, or repurpose it before the tremors choose a district.",
+        "visibility": "public",
+        "locationKeys": ["kiln-college", "survey-house", "ash-road"],
+        "objectives": [
+          { "key": "obj-db-1", "description": "Reach the bore head and read the log the college keeps in two hands.", "targetProgress": 1, "dependencyObjectiveKeys": [], "visibility": "public" },
+          { "key": "obj-db-2", "description": "Determine what the bore tapped and why the tremors began.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-db-1"], "visibility": "gm" },
+          { "key": "obj-db-3", "description": "Stabilize, disable, or repurpose the bore with the college and the Register watching.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-db-2"], "visibility": "public" }
+        ],
+        "rewards": [
+          { "key": "rew-db-1", "label": "Kiln College research access and a bound elemental service", "kind": "custom", "amount": null, "visibility": "public" }
+        ],
+        "journalText": "Borin Slake calls the bore pure science. The tremors call it something else."
+      },
+      {
+        "key": "quest-sinkers-contract",
+        "title": "The Sinkers' Contract",
+        "description": "The Slack & Slake will shut every vent in the Sintermark unless it wins heat-share and safety law. A subsidence wave is moving under a crowded row while the union counts its dead and the Register counts its tokens.",
+        "visibility": "public",
+        "locationKeys": ["the-steps", "cold-kiln", "pump-house", "slake-market"],
+        "objectives": [
+          { "key": "obj-sc-1", "description": "Count the crews and buildings in the path of the subsidence wave.", "targetProgress": 3, "dependencyObjectiveKeys": [], "visibility": "public" },
+          { "key": "obj-sc-2", "description": "Win, broker, or refuse the union's heat-share demand without breaking the crews.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-sc-1"], "visibility": "public" },
+          { "key": "obj-sc-3", "description": "Evacuate or jack the threatened row before the ground decides.", "targetProgress": 1, "dependencyObjectiveKeys": ["obj-sc-2"], "visibility": "gm" }
+        ],
+        "rewards": [
+          { "key": "rew-sc-1", "label": "Union rescue allegiance and a jack-crew favor", "kind": "custom", "amount": null, "visibility": "public" }
+        ],
+        "journalText": "The union's leverage is that it can stop the fire. Its grief is that it has had to."
+      }
+    ],
+    "encounters": [
+      {
+        "key": "enc-sill-gasblow",
+        "title": "Gas-Blow in the Sill",
+        "description": "A vent pocket blows inside the Rolling Furnace service gallery, filling the works with bad air and dropping the floor underfoot. The fire is not the enemy; the air and the ground are.",
+        "visibility": "public",
+        "locationKey": "rolling-furnace",
+        "participantNpcKeys": ["npc-rennick-voss", "npc-tamsin-cold", "npc-hen"],
+        "objectives": ["Get the night crew out", "Find and reseal the vent pocket", "Keep the furnace from drawing the blow into the district"],
+        "terrain": ["Blast-heat on the furnace side, cold air on the gallery side", "Heavily obscured pockets and a floor that rings hollow", "Glass shards and hot condensate"],
+        "escalation": ["The pocket spreads along the service run", "The floor gives at the sump", "A second blow opens behind the rescuers"],
+        "resolution": "Resealing the vent, evacuating in time, or deliberately back-drafting the pocket; a fight is possible but the air is the real constraint.",
+        "enemyReferences": [],
+        "monsterConceptKeys": []
+      },
+      {
+        "key": "enc-throttle-dash",
+        "title": "The Throttle Dash",
+        "description": "A gate must be turned before a flood reaches the low gallery, and the only crew at the wheel is arguing about whether to let it. Water, cold, and current do most of the work.",
+        "visibility": "public",
+        "locationKey": "the-throttle",
+        "participantNpcKeys": ["npc-ivo-bray", "npc-orl-tace", "npc-dolph-marrow"],
+        "objectives": ["Reach the gate wheel", "Choose how far to open it", "Get everyone out of the lower gallery"],
+        "terrain": ["Cold rushing water and slick steps", "A failing west buttress", "Fog and noise that hide movement"],
+        "escalation": ["The buttress sheds a section", "A lower gate jams open", "The current pulls a rescue line under"],
+        "resolution": "Negotiate a partial release, jam the gate, or out-engineer the flood; killing the Compact crew ends the argument and starts a feud.",
+        "enemyReferences": [],
+        "monsterConceptKeys": []
+      },
+      {
+        "key": "enc-market-riot",
+        "title": "Ration Riot at Sinter Market",
+        "description": "A ration notice is read aloud at the Slake Market and the crowd turns. No one came to fight; everyone is carrying something that can hurt.",
+        "visibility": "public",
+        "locationKey": "slake-market",
+        "participantNpcKeys": ["npc-orl-tace", "npc-hen", "npc-pell-marrow", "npc-sosh"],
+        "objectives": ["Keep the notice from becoming a massacre", "Identify who is inflaming the crowd", "Get the vulnerable out of the press"],
+        "terrain": ["Dense crowd and cramped stalls", "Kiln fumes and fragile glass stock", "A dish edge that overhangs a void"],
+        "escalation": ["A stall collapses", "The bell is rung as a false alarm", "A faction's enforcers enter the square"],
+        "resolution": "Expose the agitator, de-escalate the announcement, or channel the crowd into a lawful protest; force produces a riot, not an ending.",
+        "enemyReferences": [],
+        "monsterConceptKeys": []
+      }
+    ],
+    "lore": [
+      {
+        "key": "lore-district-slake",
+        "title": "The Slake",
+        "summary": "The old seam-mouth district: slake-head, the-steps, gasward-post, cold-kiln, slake-market, and foundered-row. It is the Sintermark's crossing, its oldest galleries, and its most crowded ground.",
+        "visibility": "public",
+        "details": ["The dish at slake-head is where the first galleries were opened.", "Foundered Row was abandoned when its foundations gave way and is unofficially inhabited."],
+        "locationKeys": ["slake-head", "the-steps", "gasward-post", "cold-kiln", "slake-market", "foundered-row"],
+        "factionKeys": ["faction-register", "faction-slack"],
+        "storyNodeKeys": ["story-front-turns", "story-rescue-duty"]
+      },
+      {
+        "key": "lore-district-sillworks",
+        "title": "The Sillworks",
+        "summary": "The glass and pipe district: the-long-reflectory, concord-hall, rolling-furnace, pipeworks, and cold-glass-works. It is where the Sintermark's heat becomes something it can sell.",
+        "visibility": "public",
+        "details": ["The Long Reflectory aims dawn light down the heat-road.", "The Pipeworks is the region's circulatory system in miniature."],
+        "locationKeys": ["the-long-reflectory", "concord-hall", "rolling-furnace", "pipeworks", "cold-glass-works"],
+        "factionKeys": ["faction-concord", "faction-register"],
+        "storyNodeKeys": ["story-front-turns", "story-concord-merger"]
+      },
+      {
+        "key": "lore-district-verge",
+        "title": "The Warm Verge",
+        "summary": "The hot margin: sinter-terraces, firemoss-hollow, smoke-bread-farm, breathing-caves, and verge-assembly. Its farms grow on mineral heat, and its people govern themselves by custom and by breath.",
+        "visibility": "public",
+        "details": ["The Breathing Caves reverse their airflow with the season.", "Firemoss and smoke-bread feed the Verge and trade with the lowlands."],
+        "locationKeys": ["sinter-terraces", "firemoss-hollow", "smoke-bread-farm", "breathing-caves", "verge-assembly"],
+        "factionKeys": ["faction-assemblies", "faction-bloomwrights"],
+        "storyNodeKeys": ["story-verge-claim", "story-original-network"]
+      },
+      {
+        "key": "lore-district-cisterns",
+        "title": "The Cisterns",
+        "summary": "The water district: the-throttle, cistern-commons, sweetwater-head, drowned-gallery, and pump-house. Cold, clean, and the only thing the Longfire truly fears.",
+        "visibility": "public",
+        "details": ["The Throttle holds the deep aquifer back from the warm galleries.", "The Drowned Gallery was lost to the aquifer and is kept partly dry by the pumps."],
+        "locationKeys": ["the-throttle", "cistern-commons", "sweetwater-head", "drowned-gallery", "pump-house"],
+        "factionKeys": ["faction-compact"],
+        "storyNodeKeys": ["story-water-oath", "story-slake-breach"]
+      },
+      {
+        "key": "lore-district-chimneys",
+        "title": "The Chimneys",
+        "summary": "The high control works: draughtwarden-hall, crosswind-stacks, kiln-college, ash-road, and survey-house. Air, records, research, and the road out all meet here.",
+        "visibility": "public",
+        "details": ["The Crosswind Stacks can pull air from one gallery and push it into another.", "The Ash Road carries glass, salt, and smoke-bread down to the lowlands."],
+        "locationKeys": ["draughtwarden-hall", "crosswind-stacks", "kiln-college", "ash-road", "survey-house"],
+        "factionKeys": ["faction-register", "faction-concord"],
+        "storyNodeKeys": ["story-rigged-draught", "story-deep-bore"]
+      },
+      {
+        "key": "lore-longfire",
+        "title": "The Longfire",
+        "summary": "A carbon seam under the highland has been burning slowly for generations, heating stone, water, and air. It is not a monster and not a god; it is a fire with a direction, and the direction depends on air.",
+        "visibility": "public",
+        "details": ["The fire follows the draught, so vents steer it.", "Its heat drove the growth of glass, lime, salt, and crucible steel.", "The seam's edge migrates; districts that were safe last century may not be."],
+        "locationKeys": ["slake-head", "sinter-terraces", "crosswind-stacks"],
+        "factionKeys": ["faction-register", "faction-assemblies"],
+        "storyNodeKeys": ["story-front-turns", "story-original-network"]
+      },
+      {
+        "key": "lore-draught-rights",
+        "title": "Heat and Air as a Commons",
+        "summary": "The Sintermark meters heat in tokens and assigns air by schedule. The Register issues and audits the tokens; the districts consume them; the Slack & Slake does the work that makes the schedule real.",
+        "visibility": "public",
+        "details": ["A heat token represents a measured share of furnace heat.", "The draught schedule is published daily and enforced with gate keys.", "Quotas have never been audited by anyone outside the Register."],
+        "locationKeys": ["draughtwarden-hall", "slake-market", "pipeworks"],
+        "factionKeys": ["faction-register", "faction-slack", "faction-concord"],
+        "storyNodeKeys": ["story-rigged-draught", "story-commons-idea"]
+      },
+      {
+        "key": "lore-glass-roads",
+        "title": "Glass Roads and Heat Pipes",
+        "summary": "Ceramic and glass conduits move heat from the Longfire to distant benches, while the Long Reflectory concentrates dawn light to warm the Sillworks without spending a token. Glassmakers are the region's infrastructure engineers.",
+        "visibility": "public",
+        "details": ["Pipes are cast in the Pipeworks and laid with expansion loops.", "A failing seal can be heard as a change in the pipe's hum.", "Mirror banks must be re-aimed as the ground shifts."],
+        "locationKeys": ["the-long-reflectory", "pipeworks", "rolling-furnace"],
+        "factionKeys": ["faction-concord", "faction-register"],
+        "storyNodeKeys": ["story-front-turns"]
+      },
+      {
+        "key": "lore-subsidence",
+        "title": "Sinkers and the Moving Ground",
+        "summary": "The Longfire leaves voids behind it, and the ground sinks in slow isobases. Sinker crews jack buildings level by increments and mark the safe side of a street. Subsidence is ordinary until it reaches a school or a cistern.",
+        "visibility": "public",
+        "details": ["Jack-crews raise terrace walls a finger at a time.", "Foundered Row is the region's cautionary example.", "Survey House keeps the official isobase charts."],
+        "locationKeys": ["the-steps", "foundered-row", "survey-house"],
+        "factionKeys": ["faction-slack", "faction-register"],
+        "storyNodeKeys": ["story-front-turns", "story-rescue-duty"]
+      },
+      {
+        "key": "lore-chemosynthesis",
+        "title": "Life on Mineral Heat",
+        "summary": "The Warm Verge's food web is built on mineral heat rather than sunlight: firemoss, fungi, blind insects, and the fish and crustaceans that feed on them. It is an ecology that runs on the fire, and it changes when the fire moves.",
+        "visibility": "public",
+        "details": ["Firemoss grows on warm mineral mats.", "Smoke-bread is a heat-grown grain and root crop dried over the seam.", "The Vergefolk read the moss line as a sign of the fire's direction."],
+        "locationKeys": ["firemoss-hollow", "smoke-bread-farm", "sinter-terraces"],
+        "factionKeys": ["faction-assemblies", "faction-bloomwrights"],
+        "storyNodeKeys": ["story-verge-claim", "story-front-turns"]
+      },
+      {
+        "key": "lore-breathing-caves",
+        "title": "The Breath of the Caves",
+        "summary": "The karst network reverses its airflow with the season, exhaling warm air in winter and drawing cold air in summer. The Vergefolk schedule planting, firing, and travel around the breath, and a wrong breath is the earliest warning of a changed fire.",
+        "visibility": "public",
+        "details": ["The reversal is driven by temperature difference between caves and surface.", "A carved map at the entrance shows the old airflow. It is often right and sometimes wrong."],
+        "locationKeys": ["breathing-caves", "verge-assembly", "firemoss-hollow"],
+        "factionKeys": ["faction-assemblies"],
+        "storyNodeKeys": ["story-front-turns", "story-original-network"]
+      },
+      {
+        "key": "lore-aquifer",
+        "title": "The Deep Aquifer and the Throttle",
+        "summary": "A cold deep aquifer underlies the warm galleries, separated by a thin band of rock and by the Throttle's gates. The aquifer feeds the cisterns and the lowland farms; the fire would poison or boil it if they ever met.",
+        "visibility": "public",
+        "details": ["The Throttle can flood a seam or hold the water back.", "The Drowned Gallery was flooded when the aquifer was first tapped.", "The Compact's oath to keep the water clean is older than the Register."],
+        "locationKeys": ["the-throttle", "sweetwater-head", "drowned-gallery", "pump-house"],
+        "factionKeys": ["faction-compact"],
+        "storyNodeKeys": ["story-water-oath", "story-slake-breach"]
+      },
+      {
+        "key": "lore-firemoss-food",
+        "title": "Smoke-Bread and Firemoss",
+        "summary": "The Verge's staples travel better than anything else in the Sintermark. Smoke-bread is traded down the Ash Road; firemoss is used for medicine, dye, and lamp fuel. The food trade is the Verge's main claim on the lowlands' attention.",
+        "visibility": "public",
+        "details": ["Smoke-bread is dried over the seam until it keeps for a season.", "Firemoss harvest is governed by the Assemblies' rotation, not by the Register."],
+        "locationKeys": ["smoke-bread-farm", "firemoss-hollow", "ash-road"],
+        "factionKeys": ["faction-assemblies", "faction-bloomwrights", "faction-concord"],
+        "storyNodeKeys": ["story-verge-claim"]
+      },
+      {
+        "key": "lore-register-history",
+        "title": "How the Register Began",
+        "summary": "The Draughtwardens' Register was founded within living memory to stop vent-wars from burning whole districts. It standardized the draught, issued the first heat tokens, and wrote the schedule that everyone now depends on.",
+        "visibility": "public",
+        "details": ["The Register's founding charter promised an audited survey every decade.", "Old slakers say the first survey did not match the ground, and were told so.", "The Register's legitimacy is recent enough that its records are its real authority."],
+        "locationKeys": ["draughtwarden-hall", "survey-house", "cold-kiln"],
+        "factionKeys": ["faction-register", "faction-slack"],
+        "storyNodeKeys": ["story-rigged-draught", "story-original-network"]
+      },
+      {
+        "key": "lore-verge-assembly-history",
+        "title": "The Assemblies and the Bloomwright Split",
+        "summary": "The Warm Verge Assemblies formed after a displacement the lowlands still deny, and they govern by customary obligation. The younger Bloomwrights want a chartered commons with written shares, and the disagreement is generational, not mystical.",
+        "visibility": "public",
+        "details": ["The Assemblies' authority rests on ecological knowledge and reciprocal duty.", "The Bloomwrights' charter would replace customary holdings with transferable shares.", "Neither side claims hidden magic; both claim the present and the future."],
+        "locationKeys": ["verge-assembly", "sinter-terraces", "smoke-bread-farm"],
+        "factionKeys": ["faction-assemblies", "faction-bloomwrights"],
+        "storyNodeKeys": ["story-verge-claim", "story-commons-idea"]
+      },
+      {
+        "key": "lore-bore-log",
+        "title": "The Bore Log",
+        "summary": "Private record kept at the Kiln College describing what the Deep Bore has actually touched. Entries alternate between two hands and do not agree.",
+        "visibility": "gm",
+        "details": ["The bore reached a hotter, deeper reservoir than the college predicted.", "Tremors began within a day of the deepest sounding.", "The log names a second, earlier bore that was quietly abandoned."],
+        "locationKeys": ["kiln-college", "survey-house"],
+        "factionKeys": ["faction-register", "faction-concord"],
+        "storyNodeKeys": ["story-deep-bore"]
+      }
+    ],
+    "clues": [
+      { "key": "clue-cold-furnace", "title": "The Cold Oven", "description": "The Rolling Furnace cooled while its damper and its fuel were in order, which means the draught changed underneath it.", "visibility": "public", "locationKey": "rolling-furnace", "revealsStoryNodeKey": "story-front-turns" },
+      { "key": "clue-gas-logs", "title": "Two Sets of Readings", "description": "The Gasward Post's posted chart disagrees with the raw readings kept by the bell-keeper, and the disagreement points toward the Slake.", "visibility": "public", "locationKey": "gasward-post", "revealsStoryNodeKey": "story-front-turns" },
+      { "key": "clue-cold-caves-warm", "title": "Warm Cold Caves", "description": "The sand Tamsin blows comes from caves that have begun to warm from below, which means the front is approaching from the deep side.", "visibility": "public", "locationKey": "cold-glass-works", "revealsStoryNodeKey": "story-front-turns" },
+      { "key": "clue-ledger-damper", "title": "The Damper Entry", "description": "A survey ledger records a damper change the night before the furnace failed, signed by a quality inspector rather than an engineer.", "visibility": "gm", "locationKey": "survey-house", "revealsStoryNodeKey": "story-rigged-draught" },
+      { "key": "clue-rennick-assay", "title": "The Inspector's Route", "description": "Rennick Voss signed into the Rolling Furnace the night before the failure and again after, on a fake quality round.", "visibility": "gm", "locationKey": "rolling-furnace", "revealsStoryNodeKey": "story-rigged-draught" },
+      { "key": "clue-sosh-sighting", "title": "The Witness in the Row", "description": "Sosh saw Voss at the damper and carries a sibling's disappearance as proof the sabotage reached beyond the furnace.", "visibility": "gm", "locationKey": "foundered-row", "revealsStoryNodeKey": "story-rigged-draught" },
+      { "key": "clue-orl-tip", "title": "The Steward's Tip", "description": "Orl Tace knows the Slake gallery has breached toward the drowned gallery and will trade the location for a real safety commitment.", "visibility": "gm", "locationKey": "the-steps", "revealsStoryNodeKey": "story-slake-breach" },
+      { "key": "clue-drowned-depth", "title": "Rising Flood Marks", "description": "Flood marks in the Drowned Gallery are rising on the dry walkway, and a new passage runs toward the Slake.", "visibility": "public", "locationKey": "drowned-gallery", "revealsStoryNodeKey": "story-slake-breach" },
+      { "key": "clue-bore-tremor", "title": "The Hum in the Stone", "description": "The ground near the Kiln College hums and shivers in time with the Deep Bore, not with the draught schedule.", "visibility": "public", "locationKey": "kiln-college", "revealsStoryNodeKey": "story-deep-bore" },
+      { "key": "clue-bore-data", "title": "The Buyer's Copies", "description": "Aldis Crane is paying for copies of the bore log, which means the readings are worth selling and worth suppressing.", "visibility": "gm", "locationKey": "concord-hall", "revealsStoryNodeKey": "story-deep-bore" },
+      { "key": "clue-kest-map", "title": "The Bellwright's Notebook", "description": "Old Kest keeps the only true drawing of the original crosswind draught, and it does not match the Register's schedule.", "visibility": "gm", "locationKey": "cold-kiln", "revealsStoryNodeKey": "story-original-network" },
+      { "key": "clue-yara-oral-map", "title": "The Oral Map", "description": "Elder Yara can recite the pre-Register vent network from memory, section by section, in exchange for reciprocal obligation rather than coin.", "visibility": "public", "locationKey": "verge-assembly", "revealsStoryNodeKey": "story-original-network" }
+    ],
+    "story": [
+      { "key": "story-front-turns", "title": "The Front Turns", "description": "The Longfire has begun to move crosswise against its long direction, and the change is observable in furnaces, gas logs, cold caves, and the breath of the caves. This is the public fact the campaign turns on.", "visibility": "public" },
+      { "key": "story-rigged-draught", "title": "The Rigged Draught", "description": "A secondary draught under the Sillworks was authorized quietly to protect a favoured district, and it is bending the fire toward the aquifer and the Slake.", "visibility": "gm" },
+      { "key": "story-slake-breach", "title": "The Slake Breach", "description": "The old Slake gallery has breached toward the Drowned Gallery, opening a path between the fire and the water that nobody with authority has publicly admitted.", "visibility": "gm" },
+      { "key": "story-deep-bore", "title": "The Deep Bore", "description": "The Kiln College's bore has tapped a hotter, deeper reservoir and triggered tremors, changing the seam's behaviour from below.", "visibility": "gm" },
+      { "key": "story-original-network", "title": "The Original Vent Network", "description": "The pre-Register slakers dug and maintained a draught network that avoided the Sillworks and protected the aquifer. Its knowledge survives in a notebook, an oral map, and a censored archive page.", "visibility": "gm" },
+      { "key": "story-verge-claim", "title": "The Verge Claim", "description": "The Warm Verge claims sovereignty and compensation for a hot margin the lowlands have treated as a resource, and the claim splits along generational lines between the Assemblies and the Bloomwrights.", "visibility": "public" },
+      { "key": "story-water-oath", "title": "The Water Oath", "description": "The Sweetwater Compact has publicly promised to keep the aquifer clean and has privately prepared to flood a seam to do it.", "visibility": "public" },
+      { "key": "story-concord-merger", "title": "The Concord Merger", "description": "The Frit Concord is consolidating the glass trade and needs heat rights it has not been granted, which makes the turning front an opportunity as much as a crisis.", "visibility": "public" },
+      { "key": "story-commons-idea", "title": "A Re-Chartered Commons", "description": "A durable answer would re-charter the fire and air as a genuine commons, with audited surveys, elected stewards, and written obligations shared by lowland and Verge alike. No faction owns this idea yet.", "visibility": "public" },
+      { "key": "story-rescue-duty", "title": "The Duty to Go Down", "description": "Whatever else is true, crews are below and the Sintermark's factions all depend on the people who go down after them. The rescue duty is the one value the region will not openly deny.", "visibility": "public" }
+    ],
+    "relationships": [
+      { "key": "rel-front-rigged", "fromStoryNodeKey": "story-front-turns", "toStoryNodeKey": "story-rigged-draught", "description": "The rigged draught is one reason the front is turning, and the turning is what made the rigging visible.", "visibility": "gm" },
+      { "key": "rel-front-breach", "fromStoryNodeKey": "story-front-turns", "toStoryNodeKey": "story-slake-breach", "description": "The turning front is what pushes heat and pressure toward the old Slake breach.", "visibility": "gm" },
+      { "key": "rel-front-bore", "fromStoryNodeKey": "story-front-turns", "toStoryNodeKey": "story-deep-bore", "description": "The Deep Bore changed the seam from below, and the change is part of the front's turn.", "visibility": "gm" },
+      { "key": "rel-breach-water", "fromStoryNodeKey": "story-slake-breach", "toStoryNodeKey": "story-water-oath", "description": "The Slake breach is why the Compact's water oath has become an operational plan rather than a promise.", "visibility": "gm" },
+      { "key": "rel-bore-concord", "fromStoryNodeKey": "story-deep-bore", "toStoryNodeKey": "story-concord-merger", "description": "The bore's readings are a commodity, and the Concord's merger would control who can buy them.", "visibility": "gm" },
+      { "key": "rel-front-verge", "fromStoryNodeKey": "story-front-turns", "toStoryNodeKey": "story-verge-claim", "description": "The Verge is where the fire's movement is felt first, which sharpens every question of who owns the margin.", "visibility": "public" },
+      { "key": "rel-network-commons", "fromStoryNodeKey": "story-original-network", "toStoryNodeKey": "story-commons-idea", "description": "The original vent network is the practical proof that the fire can be governed as a commons rather than a monopoly.", "visibility": "gm" },
+      { "key": "rel-front-duty", "fromStoryNodeKey": "story-front-turns", "toStoryNodeKey": "story-rescue-duty", "description": "A moving front means more crews in more bad ground, which makes the rescue duty the first live consequence.", "visibility": "public" },
+      { "key": "rel-verge-commons", "fromStoryNodeKey": "story-verge-claim", "toStoryNodeKey": "story-commons-idea", "description": "The Verge claim is the strongest outside pressure for a re-chartered commons, and also the hardest to reconcile.", "visibility": "public" },
+      { "key": "rel-concord-network", "fromStoryNodeKey": "story-concord-merger", "toStoryNodeKey": "story-original-network", "description": "The original network threatens the Concord's holdings, which is why the Concord hides the map its own guildmaster inherited.", "visibility": "gm" },
+      { "key": "rel-water-commons", "fromStoryNodeKey": "story-water-oath", "toStoryNodeKey": "story-commons-idea", "description": "Any commons must reconcile fire and water, and the Compact's oath is the water half of that bargain.", "visibility": "public" },
+      { "key": "rel-duty-breach", "fromStoryNodeKey": "story-rescue-duty", "toStoryNodeKey": "story-slake-breach", "description": "The breach turns the rescue duty from an obligation into a race, and the crews know it first.", "visibility": "gm" }
+    ],
+    "rumors": [
+      { "key": "rumor-quota-loophole", "title": "The Missing Page", "description": "Market talk says a page is missing from the Register's quota book and the Concord has a copy of it.", "visibility": "public", "locationKey": "slake-market", "speakerNpcKey": "npc-orl-tace" },
+      { "key": "rumor-cold-oven", "title": "The Oven That Would Not Light", "description": "Sillworks hands say the Rolling Furnace was cold before anyone touched the damper, and the inspectors are arguing about the wrong thing.", "visibility": "public", "locationKey": "rolling-furnace", "speakerNpcKey": "npc-rennick-voss" },
+      { "key": "rumor-dead-of-clean-air", "title": "Dead of Clean Air", "description": "A vent-walker was carried out of a gallery that tested clean, and the bell-keeper has stopped trusting the new gauge.", "visibility": "gm", "locationKey": "gasward-post", "speakerNpcKey": "npc-hen", "revealsStoryNodeKey": "story-slake-breach" },
+      { "key": "rumor-sluice-midnight", "title": "The Keeper's Midnight Walk", "description": "The Sluice-Keeper has been seen at the west buttress with a lamp and no crew, three nights running.", "visibility": "public", "locationKey": "the-throttle", "speakerNpcKey": "npc-ivo-bray" },
+      { "key": "rumor-bore-hum", "title": "The Hum Under the College", "description": "The Kiln College rig hums at night and the crockery in the refectory has begun to walk off the shelf.", "visibility": "public", "locationKey": "kiln-college", "speakerNpcKey": "npc-borin-slake", "revealsStoryNodeKey": "story-deep-bore" },
+      { "key": "rumor-archivist-divination", "title": "The Archivist's Second Copy", "description": "Neris Rusk keeps a copy of something she will not name, and she has started locking her door.", "visibility": "gm", "locationKey": "kiln-college", "speakerNpcKey": "npc-neris-rusk", "revealsStoryNodeKey": "story-rigged-draught" },
+      { "key": "rumor-oral-map", "title": "The Map in the Voice", "description": "The Verge elders can recite the old vents from memory, and they will not write them down where the lowlands can read them.", "visibility": "public", "locationKey": "verge-assembly", "speakerNpcKey": "npc-yara-sinter", "revealsStoryNodeKey": "story-original-network" },
+      { "key": "rumor-cold-glass-buyer", "title": "The Buyer from the Saltmarch", "description": "A foreign factor is paying well for optics nobody local can make, and intends to leave with more than glass.", "visibility": "public", "locationKey": "cold-glass-works", "speakerNpcKey": "npc-tamsin-cold" },
+      { "key": "rumor-saltmarch-contract", "title": "The Sealed Order", "description": "A sealed order on the Ash Road names a local buyer and a quantity of lens glass that does not yet exist.", "visibility": "public", "locationKey": "concord-hall", "speakerNpcKey": "npc-aldis-crane" },
+      { "key": "rumor-sinker-list", "title": "The Captain's List", "description": "Dolph Marrow keeps a list of every crew the Register has written off, and he reads it aloud at meetings.", "visibility": "public", "locationKey": "the-steps", "speakerNpcKey": "npc-dolph-marrow" },
+      { "key": "rumor-foundered-witness", "title": "The Child Who Saw", "description": "A Verge guide saw something at the furnace the night it failed and has not been seen since their sibling vanished.", "visibility": "gm", "locationKey": "foundered-row", "speakerNpcKey": "npc-sosh", "revealsStoryNodeKey": "story-rigged-draught" },
+      { "key": "rumor-old-bellwright", "title": "The Bellwright's Notebook", "description": "Old Kest keeps a notebook that he says corrects the Register's schedule, and he will not show it to a guild man.", "visibility": "public", "locationKey": "cold-kiln", "speakerNpcKey": "npc-kest", "revealsStoryNodeKey": "story-original-network" },
+      { "key": "rumor-physician-pattern", "title": "The Pattern of Burns", "description": "The physician at Cistern Commons says the injuries do not match the incidents in the official notices, twice over.", "visibility": "gm", "locationKey": "cistern-commons", "speakerNpcKey": "npc-cael", "revealsStoryNodeKey": "story-slake-breach" },
+      { "key": "rumor-verge-split", "title": "Two Chairs, One Ring", "description": "The Verge council no longer sits as one body, and the young have begun meeting on the terraces instead.", "visibility": "public", "locationKey": "verge-assembly", "speakerNpcKey": "npc-sosh" },
+      { "key": "rumor-commons-charter", "title": "The Charter Talk", "description": "There is talk of re-chartering the fire as a commons with audited surveys and elected stewards, and the Register has started asking who is behind it.", "visibility": "public", "locationKey": "slake-head", "speakerNpcKey": "npc-yara-sinter", "revealsStoryNodeKey": "story-commons-idea" },
+      { "key": "rumor-bloomwright-plan", "title": "The Bloomwright Petition", "description": "The Bloomwrights are drafting a charter that would replace customary holdings with transferable shares, and the Concord is quietly interested.", "visibility": "public", "locationKey": "verge-assembly", "speakerNpcKey": "npc-sosh", "revealsStoryNodeKey": "story-verge-claim" },
+      { "key": "rumor-merger-price", "title": "The Price of Stability", "description": "The Concord will finish its merger soon, and the price of a stable Sintermark may be one buyer for every heat token.", "visibility": "public", "locationKey": "concord-hall", "speakerNpcKey": "npc-sera-fenn", "revealsStoryNodeKey": "story-concord-merger" },
+      { "key": "rumor-aquifer-oath", "title": "The Oath and the Flood", "description": "The Compact's oath to keep the water clean is sincere, and some of its keepers think the only clean water is water that has drowned a seam.", "visibility": "public", "locationKey": "sweetwater-head", "speakerNpcKey": "npc-ivo-bray", "revealsStoryNodeKey": "story-water-oath" },
+      { "key": "rumor-rescue-roster", "title": "The Overdue Crew", "description": "Two galleries are marked overdue on the crew roster, and the Register's notice does not mention them.", "visibility": "public", "locationKey": "the-steps", "speakerNpcKey": "npc-orl-tace", "revealsStoryNodeKey": "story-rescue-duty" },
+      { "key": "rumor-front-turn", "title": "The Moss Line Moves", "description": "The firemoss line has advanced into a gallery that was dry last season, and the Verge says the fire is walking sideways.", "visibility": "public", "locationKey": "sinter-terraces", "speakerNpcKey": "npc-yara-sinter", "revealsStoryNodeKey": "story-front-turns" }
+    ],
+    "handouts": [
+      {
+        "key": "handout-field-guide",
+        "title": "A Practical Field Guide to the Sintermark",
+        "content": "THE SINTERMARK: A PRACTICAL FIELD GUIDE\n\n1. THE FIRE MOVES BY AIR. Vents and stacks steer it. If you want to know where the fire is going, read the draught, not the map.\n2. HEAT IS METERED. A heat token is a measured share of furnace heat. Do not lose yours.\n3. THE GROUND SINKS. Step where the sinkers have marked, and do not trust a doorframe that sits true.\n4. BAD AIR HAS NO SMELL. A clean reading is not a promise. Carry a flame.\n5. WATER ENDS FIRE. The Throttle is not scenery. Neither is a gate you open by accident.\n6. THE VERGE KEEPS ITS OWN TIME. Ask before you harvest, and expect to owe a duty back.\n7. THE ASH ROAD IS THE ONLY WAY OUT. Keep it open.",
+        "visibility": "public"
+      },
+      {
+        "key": "handout-travel-map",
+        "title": "Traveler's Map of the Sintermark",
+        "content": "TRAVELER'S MAP (schematic)\n\nTHE SLAKE: Slake-Head (crossing) — The Steps (sinkers) — Gasward Post — Cold Kiln — Slake Market — Foundered Row (condemned; inhabited).\nTHE SILLWORKS: Long Reflectory — Concord Hall — Rolling Furnace — Pipeworks — Cold Glass Works.\nTHE WARM VERGE: Sinter Terraces — Firemoss Hollow — Smoke-Bread Farm — Breathing Caves — Verge Assembly.\nTHE CISTERNS: The Throttle — Cistern Commons — Sweetwater Head — Drowned Gallery — Pump House.\nTHE CHIMNEYS: Draughtwarden Hall — Crosswind Stacks — Kiln College — Ash Road — Survey House.\n\nROUTES: The Ash Road leaves the highlands from the Chimneys. The Breathing Caves change direction with the season, so allow time. Foundered Row is a shortcut and a hazard. Ask a Verge guide before the long cross to the cold spring.",
+        "visibility": "public"
+      },
+      {
+        "key": "handout-leads-turned-draught",
+        "title": "Field Notes: The Turned Draught",
+        "content": "THREE LEADS FOR A COLD OVEN\n1. The damper at the Rolling Furnace was moved after the last inspection. Ask who signed the inspection.\n2. The Gasward Post has two sets of readings. Ask the bell-keeper for the raw ones.\n3. The cold caves that make cave-glass have warmed from below. Ask Tamsin when she first noticed, and do not tell the Concord you asked.",
+        "visibility": "public"
+      },
+      {
+        "key": "handout-leads-throttle",
+        "title": "Field Notes: The Throttle",
+        "content": "THREE LEADS FOR THE WATER GATE\n1. The Sluice-Keeper has been at the west buttress at night. Ask what a controlled flood would cost downstream.\n2. The Drowned Gallery's flood marks are rising and a new passage runs toward the Slake. Ask a pump crew to show you.\n3. The Compact's oath is older than the Register. Ask the Compact what it would demand in exchange for a staged release.",
+        "visibility": "public"
+      },
+      {
+        "key": "handout-leads-cold-glass",
+        "title": "Field Notes: Cold Glass",
+        "content": "THREE LEADS FOR THE CAVE-GLASS\n1. The Concord says the glass is impossible. Ask the Concord assay office what standard it fails.\n2. Tamsin will not name her sand source. Ask the Verge assemblies who owns the cold caves.\n3. The caves are warming. Ask a surveyor whether that matches the official draught chart.",
+        "visibility": "public"
+      },
+      {
+        "key": "handout-leads-deep-bore",
+        "title": "Field Notes: The Deep Bore",
+        "content": "THREE LEADS FOR THE BORE\n1. The Kiln College's bore has begun to hum. Ask Master Slake what it tapped, then ask again when he draws a diagram.\n2. The Survey House has an abandoned earlier bore on its charts. Ask why it was abandoned.\n3. A foreign factor is buying bore readings. Ask the Archivist who else has copies.",
+        "visibility": "public"
+      },
+      {
+        "key": "handout-leads-sinkers",
+        "title": "Field Notes: The Sinkers' Contract",
+        "content": "THREE LEADS FOR THE CREWS\n1. Two galleries are overdue on the crew roster. Ask the union where they were working.\n2. The union wants heat-share in writing. Ask the Register what it can actually grant.\n3. A subsidence wave is moving under a crowded row. Ask the sinkers which buildings they can still jack and which they would evacuate.",
+        "visibility": "public"
+      },
+      {
+        "key": "handout-party-controls",
+        "title": "Tessel & Orra: Playable Toys and Controls",
+        "content": "YOUR TWO HEROES\nTessel Venn: high-elf Evocation wizard, level 3, Intelligence 20, Dexterity 20. Orra Staple: hill-dwarf Life cleric, level 3, Strength 20, Wisdom 20. Both have 1000 health, 100 focus and 100 first-level plus 100 second-level spell slots. These are deliberate GM boosts over the supported D&D build.\n\nWORKING MAGIC\nTessel: Fire Bolt and Ray of Frost are combat attack cantrips; Magic Missile spends a slot for automatic-hit force darts; False Life grants temporary HP in combat; Shield is a combat reaction. Orra: Cure Wounds is action healing; Healing Word is bonus-action healing; Bless works through the out-of-combat party-power lane and is not offered by the current single-target combat-power lane. The pinned Magic Missile catalog incorrectly asks for a material component, although the official SRD spell is verbal/somatic only; use the engine's component flags where required.\n\nEQUIPMENT\nTessel starts with quarterstaff and studded leather, with dagger, light crossbow, sling, ammunition, survey tools and climbing supplies. Orra starts with plate, warhammer and shield, with spare maul, greatsword, longbow and arrows. Unequip conflicting hand gear before switching to a two-handed weapon. Both carry ten each of greater, superior and supreme healing potions: use their combat consumable action to apply healing. Out-of-combat inventory consumption does not apply potion healing.\n\nCARRIED REFERENCE MAGIC\nBag of Holding, Wand of Magic Missiles, Ring of Protection, Boots of Speed, Staff of Healing, Cloak of Protection, Ring of Free Action and Immovable Rod are carried SRD references. Their charges, passive bonuses and special uses are not executed by this build; keep them unequipped.\n\nGET STARTED\nChoose a hero in the Adventure Table; use the sheet and exact legal actions to inspect equipment, resources and powers. Try 'I move to Gasward Post', then investigate the conflicting readings. 'Continue journey' resumes an interrupted trip. A gas-blow encounter is prepared for GM start; the other two encounter scenarios can be prepared later. Tactical actions and healing supplies are available once combat starts. Powerful characters make the physical tasks easier; whom you help and what you promise remain your choices.",
+        "visibility": "public"
+      }
+    ],
+    "scenePrompts": [
+      {
+        "key": "scene-slakemouth-bell",
+        "title": "The Bell at Slake-Head",
+        "prompt": "Opening read-aloud: The street at Slake-Head is not flat this morning. Doorframes sit crooked, a bell-post leans on a fresh brace, and warm air climbs out of the grate in the middle of the crossing. Aboveground, crews carry two injured workers past you on a shutter, and a courier is shouting that the vent-log contradicts yesterday's reading. A forewoman with a jack-hook looks at the two of you and asks, plainly, whether you are going down, staying up, or talking first.",
+        "visibility": "public",
+        "locationKey": "slake-head",
+        "npcKeys": ["npc-dolph-marrow", "npc-orl-tace"]
+      },
+      {
+        "key": "scene-sill-gasblow",
+        "title": "GM Scene — The Gas-Blow in the Sill",
+        "prompt": "ENTRY: the party is on the Rolling Furnace bench when the service gallery blows. FRAMING: blast-heat on one side, cold bad air on the other, a floor that rings hollow. PORTRAYAL: Rennick Voss stays calm and helpful; Hen refuses to leave the gauge; Tamsin arrives because the blow is evidence. APPROACHES: reseal the vent, back-draft the pocket, evacuate, or find who moved the damper. ESCALATION: the pocket spreads along the run and the floor gives at the sump. CLUE RECOVERY: a forged inspection stamp survives in the sump locker. REVEAL: the furnace failed for two reasons at once. EXIT: if resealed and witnesses protected, the party can carry proof of both; if not, the Concord blames the Register and the inquiry closes.",
+        "visibility": "gm",
+        "locationKey": "rolling-furnace",
+        "npcKeys": ["npc-rennick-voss", "npc-tamsin-cold", "npc-hen"]
+      },
+      {
+        "key": "scene-throttle-standoff",
+        "title": "GM Scene — Standoff at the Throttle",
+        "prompt": "ENTRY: the party reaches the gate as the sluice crew prepares a turn. FRAMING: cold mist, roaring water, loaded timbers, a west buttress that is already undercut. PORTRAYAL: Ivo Bray recites the oath and will not stop; Orl Tace wants the Register named; Dolph Marrow has crews below. APPROACHES: inspect the buttress, negotiate a partial release, jam the wheel, or evacuate the low gallery. ESCALATION: the buttress sheds a section. CLUE RECOVERY: the sluice log shows unauthorized night work for weeks. REVEAL: the flood is not a threat but a partly finished plan. EXIT: the party's chosen release sets the water politics for the rest of the campaign.",
+        "visibility": "gm",
+        "locationKey": "the-throttle",
+        "npcKeys": ["npc-ivo-bray", "npc-orl-tace", "npc-dolph-marrow"]
+      },
+      {
+        "key": "scene-market-ration",
+        "title": "GM Scene — The Ration Notice",
+        "prompt": "ENTRY: a crier mounts a crate to read the new heat quota. FRAMING: dense stalls, kiln fumes, glass stock, a dish edge over a void. PORTRAYAL: Hen reads only what the gauge says; Orl Tace names the dead; Pell Marrow uses procedure as a shield; Sosh watches the rooftops. APPROACHES: verify the quota, expose the agitator, channel the crowd into a lawful protest, or get the vulnerable out. ESCALATION: a stall collapses and a bell is rung falsely. CLUE RECOVERY: the crier carries an unposted amendment. REVEAL: the quota was changed to protect one district. EXIT: a peaceful protest creates leverage; a brawl creates a precedent.",
+        "visibility": "gm",
+        "locationKey": "slake-market",
+        "npcKeys": ["npc-orl-tace", "npc-hen", "npc-pell-marrow", "npc-sosh"]
+      },
+      {
+        "key": "scene-bore-descend",
+        "title": "GM Scene — Down the Deep Bore",
+        "prompt": "ENTRY: the party descends the Kiln College rig shaft past wards that are humming. FRAMING: sulfur and ozone, a live bore, a tremor that arrives on a rhythm. PORTRAYAL: Borin Slake is thrilled and evasive; Neris Rusk has the second copy of the log; a bound elemental strains at its ward. APPROACHES: read the log, test the tremor, stabilize the bore, disable the ward, or repurpose the heat. ESCALATION: a tremor shears a brace and the ward loses a corner. CLUE RECOVERY: the abandoned earlier bore is marked on the shaft wall. REVEAL: the bore reached a reservoir and the college knew. EXIT: the party's handling of the bore determines whether the tremors spread to a district.",
+        "visibility": "gm",
+        "locationKey": "kiln-college",
+        "npcKeys": ["npc-borin-slake", "npc-neris-rusk"]
+      }
+    ]
+  },
+  "routeProfiles": [
+    { "key": "conn-slake-head-the-steps", "environment": "urban", "risk": "safe", "chancePercent": 0 },
+    { "key": "conn-slake-head-slake-market", "environment": "urban", "risk": "safe", "chancePercent": 0 },
+    { "key": "conn-slake-head-the-long-reflectory", "environment": "urban", "risk": "watched", "chancePercent": 10 },
+    { "key": "conn-slake-head-draughtwarden-hall", "environment": "urban", "risk": "safe", "chancePercent": 0 },
+    { "key": "conn-gasward-post-draughtwarden-hall", "environment": "urban", "risk": "safe", "chancePercent": 0 },
+    { "key": "conn-the-long-reflectory-sinter-terraces", "environment": "road", "risk": "watched", "chancePercent": 10 },
+    { "key": "conn-rolling-furnace-sinter-terraces", "environment": "road", "risk": "dangerous", "chancePercent": 20 },
+    { "key": "conn-sinter-terraces-the-throttle", "environment": "road", "risk": "watched", "chancePercent": 10 },
+    { "key": "conn-sinter-terraces-firemoss-hollow", "environment": "wilderness", "risk": "watched", "chancePercent": 10 },
+    { "key": "conn-breathing-caves-sweetwater-head", "environment": "wilderness", "risk": "dangerous", "chancePercent": 20 },
+    { "key": "conn-the-throttle-cistern-commons", "environment": "water", "risk": "watched", "chancePercent": 10 },
+    { "key": "conn-drowned-gallery-pump-house", "environment": "water", "risk": "dangerous", "chancePercent": 20 },
+    { "key": "conn-ash-road-crosswind-stacks", "environment": "urban", "risk": "watched", "chancePercent": 10 }
+  ],
+  "routeLocks": [
+    { "key": "conn-the-throttle-cistern-commons", "state": "closed", "factionKey": "faction-compact", "minimumReputation": 0 },
+    { "key": "conn-draughtwarden-hall-crosswind-stacks", "state": "closed", "factionKey": "faction-register", "minimumReputation": 2 },
+    { "key": "conn-sinter-terraces-the-throttle", "state": "closed", "factionKey": "faction-compact" },
+    { "key": "conn-ash-road-kiln-college", "state": "closed", "factionKey": "faction-register" },
+    { "key": "conn-kiln-college-survey-house", "state": "open", "factionKey": "faction-register", "minimumReputation": 2 }
+  ],
+  "operationalQuests": [
+    {
+      "key": "quest-turned-draught",
+      "title": "The Turned Draught",
+      "description": "Field objectives for finding out why the Rolling Furnace cooled and who changed the draught.",
+      "objectives": [
+        { "key": "op-td-1", "description": "Take independent draught readings at three vents and compare them with the posted log.", "target": 3, "dependencyObjectiveKeys": [] },
+        { "key": "op-td-2", "description": "Find who moved the Rolling Furnace damper after the last inspection.", "target": 1, "dependencyObjectiveKeys": ["op-td-1"] },
+        { "key": "op-td-3", "description": "Establish whether the secondary draught was authorized, accidental, or hidden, and by whom.", "target": 1, "dependencyObjectiveKeys": ["op-td-2"] }
+      ]
+    },
+    {
+      "key": "quest-throttle",
+      "title": "The Throttle",
+      "description": "Field objectives for the flood decision at the great water gate.",
+      "objectives": [
+        { "key": "op-th-1", "description": "Reach the Throttle and assess the gates and the west buttress.", "target": 1, "dependencyObjectiveKeys": [] },
+        { "key": "op-th-2", "description": "Choose and justify a release: hold, partial, or full.", "target": 1, "dependencyObjectiveKeys": ["op-th-1"] },
+        { "key": "op-th-3", "description": "Secure the chosen release with the Compact and the Verge.", "target": 1, "dependencyObjectiveKeys": ["op-th-2"] }
+      ]
+    },
+    {
+      "key": "quest-cold-glass",
+      "title": "Cold Glass",
+      "description": "Field objectives for the cave-glass trade and the warming caves.",
+      "objectives": [
+        { "key": "op-cg-1", "description": "Reach the Cold Glass Works and earn Tamsin's trust.", "target": 1, "dependencyObjectiveKeys": [] },
+        { "key": "op-cg-2", "description": "Test the cave-glass and learn why the source caves are warming.", "target": 1, "dependencyObjectiveKeys": ["op-cg-1"] },
+        { "key": "op-cg-3", "description": "Settle the trade's fate among Tamsin, the Concord, and the Bloomwrights.", "target": 1, "dependencyObjectiveKeys": ["op-cg-2"] }
+      ]
+    },
+    {
+      "key": "quest-deep-bore",
+      "title": "The Deep Bore",
+      "description": "Field objectives for the Kiln College bore and the tremors.",
+      "objectives": [
+        { "key": "op-db-1", "description": "Reach the bore head and read the college log in both hands.", "target": 1, "dependencyObjectiveKeys": [] },
+        { "key": "op-db-2", "description": "Determine what the bore tapped and why the tremors began.", "target": 1, "dependencyObjectiveKeys": ["op-db-1"] },
+        { "key": "op-db-3", "description": "Stabilize, disable, or repurpose the bore under observation.", "target": 1, "dependencyObjectiveKeys": ["op-db-2"] }
+      ]
+    },
+    {
+      "key": "quest-sinkers-contract",
+      "title": "The Sinkers' Contract",
+      "description": "Field objectives for the union's heat-share demand and the subsidence wave.",
+      "objectives": [
+        { "key": "op-sc-1", "description": "Count the crews and buildings in the path of the wave.", "target": 3, "dependencyObjectiveKeys": [] },
+        { "key": "op-sc-2", "description": "Win, broker, or refuse the heat-share demand without breaking the crews.", "target": 1, "dependencyObjectiveKeys": ["op-sc-1"] },
+        { "key": "op-sc-3", "description": "Evacuate or jack the threatened row before the ground decides.", "target": 1, "dependencyObjectiveKeys": ["op-sc-2"] }
+      ]
+    }
+  ],
+  "heroes": [
+    {
+      "key": "hero-tessel-venn",
+      "name": "Tessel Venn",
+      "archetype": "Arcane surveyor (high-elf Evocation wizard)",
+      "description": "Tessel grew up on the Warm Verge, was taken into the Kiln College for an aptitude with heat and stone, and spent years as a Register adjuster before walking out with a copy of a survey that did not match the ground. Tessel reads temperature, stress, and airflow the way other people read faces, keeps a level and a prism in the same satchel as spell components, and speaks in measured measurements even when furious. Public face: the most competent person in any gallery. Real agenda: prove the front's true path and publish it, whatever it costs the Register and the Concord, because a commons that cannot survey itself is not a commons. Thermal-engineering flavour; a supported level-three SRD wizard with explicitly boosted GM attributes and resources.",
+      "boundaries": "Tessel will not falsify a reading, will not spend a person's safety to protect a theory, and will not pretend to a certainty the instruments do not support. Flaw: treats every crisis as a measurement problem, including grief, and can be cold without meaning to be. Tessel's arc is learning that some things must be decided, not measured."
+    },
+    {
+      "key": "hero-orra-staple",
+      "name": "Orra Staple",
+      "archetype": "Union rescue forewoman (hill-dwarf Life cleric)",
+      "description": "Orra runs the jack-and-rescue crews out of the Steps and keeps a small maintenance faith that treats repair, shared fire, and going back for the trapped as duties rather than doctrines. She is broad, plain-spoken, and unhurried under a settling ceiling; she calls everyone by name and expects the same in return. Public face: the person who goes down last and comes up last. Real agenda: force heat-share and safety law out of the Register and the Concord, by strike if she must, so that no crew is written off again. Maintenance-faith flavour; a supported level-three SRD cleric with explicitly boosted GM attributes and resources.",
+      "boundaries": "Orra will not leave a trapped worker behind, will not spend a crew to win an argument, and will not ask anyone to take a risk she has not taken. Flaw: she cannot abandon a rescue even when the strategic cost is catastrophic, and she has buried enough people to mistake stubbornness for duty. Orra's arc is learning when going down is courage and when it is penance."
+    }
+  ]
+}
