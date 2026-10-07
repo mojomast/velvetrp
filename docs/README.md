@@ -37,6 +37,10 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Adventure Table design audit (2026-10-03)](adventure-table-design-2026-10-03.md) - Comparable-product research, implemented interaction model, accessibility criteria, new gameplay screenshots, and serialized validation.
 - [Play surface and character context audit (2026-10-02)](play-sheet-context-audit-2026-10-02.md) - Complete sheet-reference coverage, exact DM attachments, accessible drawer/composer interaction, October 2026 research, and focused validation.
 - [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.
+- [SRD 5.1 hydration review](srd-5.1-hydration.md) - Source-checked equipment, composite ancestry and spell additions, compatible campaign hydration, and remaining source gaps.
+- [The Sintermark campaign](sintermark-campaign.md) - Original D&D industrial-ecology sandbox, two overpowered heroes, reviewed hydration, playable toys and research basis.
+- [Baie-Comeau realism enrichment](baie-comeau-realism.md) - Local geography/history sources, directed routes, published guides, and preservation of the playable demo party.
+- [Destination travel and interruptions](travel-journeys.md) - Legal multi-hop journeys, authored situational events, explicit continuation, durable receipts and research basis.
 - [DM evaluation](dm-evaluation.md) - Deterministic and live DM behavior evaluation guidance.
 - [Campaign generation and expansion](campaign-generation.md) - Prompt-to-world walkthrough, all-14-section coverage, staged and reviewed generation, dependency-aware apply, recovery, planning and explicit material delivery; subordinate to the API reference for HTTP contracts.
 - [Campaign startup](campaign-startup.md) - The owner/GM startup command: AI delegation, public-material publication, the gated opening beat, per-location scene images, deterministic replay, hydration startup/retry, and preparation-only browser handoffs.

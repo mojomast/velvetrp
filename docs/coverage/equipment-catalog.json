@@ -12,6 +12,9 @@
   "capabilityEvidence": [],
   "runtimeEvidence": [
     "server/src/content/srdStarterCatalog.ts",
+    "server/src/content/srdStarter/additionalGear.ts",
+    "server/src/content/srdStarter/additionalWeapons.ts",
+    "server/test/srd-source-hydration.test.ts",
     "server/src/repo/srdEquipmentRuntime.ts",
     "server/src/repo/encounter/magicItem/index.ts",
     "server/test/srd-equipment-runtime.test.ts",

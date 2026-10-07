@@ -20,6 +20,8 @@
   "capabilityEvidence": [],
   "runtimeEvidence": [
     "server/src/content/srdStarterCatalog.ts",
+    "server/src/content/srdStarter/additionalAncestries.ts",
+    "server/test/srd-source-hydration.test.ts",
     "server/src/repo/characterBuilder/characterBuilderReadRepo.ts",
     "server/src/repo/characterProgressionPersistence.ts",
     "server/test/character-builder.test.ts",

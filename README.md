@@ -333,6 +333,6 @@ Contributions should preserve strict contracts, authoritative mechanics, and exa
 
 ## SRD attribution
 
-The `dnd-5e@1.0.0` development ruleset adapts material from Wizards of the Coast LLC's **System Reference Document 5.1 (2014 Fifth Edition)**. The current starter publication is `srd-5.1:starter@1.6.0+c1b2d4fd32d6`; exact campaign pins preserve earlier publications.
+The `dnd-5e@1.0.0` development ruleset adapts material from Wizards of the Coast LLC's **System Reference Document 5.1 (2014 Fifth Edition)**. The current starter publication is `srd-5.1:starter@1.7.0+a870b31918ec`; exact campaign pins preserve earlier publications.
 
 The [official SRD source page](https://www.dndbeyond.com/srd) provides the [SRD 5.1 Creative Commons PDF](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode). Velvet adapts and modifies this material into bounded software mechanics; Wizards of the Coast LLC has not endorsed those modifications. See [NOTICE.md](NOTICE.md) for attribution and [the coverage inventory](docs/srd-5.1-coverage.md) for the implementation boundary.

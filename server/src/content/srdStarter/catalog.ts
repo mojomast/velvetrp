@@ -16,14 +16,19 @@ import { buildCurrencies } from "./currencies.js";
 import { buildEnemies } from "./enemies.js";
 import { buildMonsterAbilities, buildMonsterEnemies } from "./monsters/index.js";
 import { buildFeats } from "./feats.js";
+import { buildAdditionalGear } from "./additionalGear.js";
+import { buildAdditionalWeapons } from "./additionalWeapons.js";
+import { buildAdditionalAncestries } from "./additionalAncestries.js";
+import { buildAdditionalSpellReferences } from "./additionalSpellReferences.js";
 
 export function buildStarterCatalog(catalogVersion: string, digest: string): PublishContentCatalogInput {
   const refs = createStarterReferences(catalogVersion);
   return publishContentCatalogInputSchema.parse({
-    idempotencyKey: "srd-5.1-starter-publication-v5",
+    idempotencyKey: "srd-5.1-starter-publication-v6",
     manifest: buildManifest(catalogVersion, digest),
     definitions: [
       ...buildRaces(refs),
+      ...buildAdditionalAncestries(refs),
       ...buildBackgrounds(refs),
       ...buildClasses(refs),
       ...buildClassLevels(refs),
@@ -32,7 +37,10 @@ export function buildStarterCatalog(catalogVersion: string, digest: string): Pub
       ...buildAbilities(refs),
       ...buildMonsterAbilities(refs),
       ...buildSpells(refs),
+      ...buildAdditionalSpellReferences(refs),
       ...buildItems(refs),
+      ...buildAdditionalGear(refs),
+      ...buildAdditionalWeapons(refs),
       ...buildMagicItems(refs),
       ...buildCurrencies(refs),
       ...buildEnemies(refs),

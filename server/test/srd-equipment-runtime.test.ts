@@ -69,6 +69,20 @@ describe("bounded authoritative SRD equipment resolver", () => {
     expect(resolve().armorClass).toBe(14);
   });
 
+  it.each(["greatsword", "maul"])("resolves source-correct %s with two damage dice", item => {
+    equip(item, "hand", "main", "two-handed");
+    expect(resolve().weapon).toMatchObject({ grip: "two-handed", damage: { die: { count: 2, sides: 6 } } });
+  });
+
+  it("permits low-Strength Ring Mail and caps Half Plate Dexterity", () => {
+    db.prepare("UPDATE rpg_character_attributes SET value=8 WHERE attribute_id='strength'").run();
+    equip("ring-mail");
+    expect(resolve().armorClass).toBe(14);
+    db.exec("UPDATE rpg_inventory_entries_v25 SET equipped=0");
+    equip("half-plate");
+    expect(resolve()).toMatchObject({ armorClass: 17, stealthDisadvantage: true });
+  });
+
   it("derives armor stealth and carrying state from pinned item weight", () => {
     equip("chain-mail");
     const result = resolve() as typeof resolve extends () => infer Value ? Value & {

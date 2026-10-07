@@ -2,9 +2,9 @@ import type { StarterReferences } from "./references.js";
 
 export function buildItems(refs: StarterReferences) {
   const { ref, currency, sword, pack, acolyteEquipment } = refs;
-  const weapon = (id: string, name: string, description: string, price: number, weightPounds: number, proficiency: "simple" | "martial", attackType: "melee" | "ranged", damageType: "bludgeoning" | "piercing" | "slashing", sides: 4 | 6 | 8 | 10 | 12, properties: unknown[]) => ({
+  const weapon = (id: string, name: string, description: string, price: number, weightPounds: number, proficiency: "simple" | "martial", attackType: "melee" | "ranged", damageType: "bludgeoning" | "piercing" | "slashing", sides: 4 | 6 | 8 | 10 | 12, properties: unknown[], count: 1 | 2 = 1) => ({
     reference: ref("item", `srd-5.1:item:${id}`), name, description, tags: ["srd-5.1", "equipment"],
-    mechanics: { category: "weapon", stackable: false, slot: "hand", price: { currency, amount: price }, effects: [], engineDetails: { rulesEngine: "dnd-5e", weightPounds, equipmentProfile: { kind: "weapon", proficiency, attackType, damage: { type: damageType, die: { count: 1, sides } }, properties } } },
+    mechanics: { category: "weapon", stackable: false, slot: "hand", price: { currency, amount: price }, effects: [], engineDetails: { rulesEngine: "dnd-5e", weightPounds, equipmentProfile: { kind: "weapon", proficiency, attackType, damage: { type: damageType, die: { count, sides } }, properties } } },
   });
   const armor = (id: string, name: string, description: string, price: number, weightPounds: number, category: "light" | "medium" | "heavy", baseArmorClass: number, dexterity: unknown, strengthRequirement: number | null, stealthDisadvantage: boolean) => ({
     reference: ref("item", `srd-5.1:item:${id}`), name, description, tags: ["srd-5.1", "equipment"],
@@ -44,11 +44,11 @@ export function buildItems(refs: StarterReferences) {
     weapon("light-crossbow", "Light Crossbow", "A simple loading ranged piercing weapon.", 25, 5, "simple", "ranged", "piercing", 8, [{ property: "ammunition", range: { normalFeet: 80, longFeet: 320 } }, { property: "loading" }, { property: "two-handed" }]),
     weapon("rapier", "Rapier", "A martial finesse piercing weapon.", 25, 2, "martial", "melee", "piercing", 8, [{ property: "finesse" }]),
     weapon("battleaxe", "Battleaxe", "A martial versatile slashing weapon.", 10, 4, "martial", "melee", "slashing", 8, [{ property: "versatile", damageDie: { count: 1, sides: 10 } }]),
-    weapon("greatsword", "Greatsword", "A martial heavy two-handed slashing weapon.", 50, 6, "martial", "melee", "slashing", 6, [{ property: "heavy" }, { property: "two-handed" }]),
+    weapon("greatsword", "Greatsword", "A martial heavy two-handed slashing weapon dealing 2d6 damage.", 50, 6, "martial", "melee", "slashing", 6, [{ property: "heavy" }, { property: "two-handed" }], 2),
     armor("padded-armor", "Padded Armor", "Light armor with base AC 11 and stealth disadvantage.", 5, 8, "light", 11, { policy: "full" }, null, true),
     armor("studded-leather-armor", "Studded Leather Armor", "Light armor with base AC 12 and full Dexterity contribution.", 45, 13, "light", 12, { policy: "full" }, null, false),
     armor("splint", "Splint", "Heavy armor with AC 17, Strength 15 requirement, and stealth disadvantage.", 200, 60, "heavy", 17, { policy: "none" }, 15, true),
-    armor("ring-mail", "Ring Mail", "Heavy armor with AC 14, Strength 13 requirement, and stealth disadvantage.", 30, 40, "heavy", 14, { policy: "none" }, 13, true),
+    armor("ring-mail", "Ring Mail", "Heavy armor with AC 14 and stealth disadvantage, with no Strength requirement.", 30, 40, "heavy", 14, { policy: "none" }, null, true),
     tool("artisans-tools-alchemists", "Alchemist's Supplies", "Artisan's tools for crafting alchemical items and identifying potions.", 50, 8, "Alchemist's supplies"),
     tool("artisans-tools-brewers", "Brewer's Supplies", "Artisan's tools for brewing beer, wine, and spirits.", 20, 9, "Brewer's supplies"),
     tool("artisans-tools-calligraphers", "Calligrapher's Supplies", "Artisan's tools for fine writing and illumination.", 10, 5, "Calligrapher's supplies"),

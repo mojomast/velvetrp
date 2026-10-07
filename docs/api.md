@@ -326,6 +326,20 @@ All four operations require campaign and mechanics features, use fixed trusted-l
 
 `POST .../:mode/previews` is a non-mutating authoritative preview with actor, destination, and exact map/token revisions. It persists and returns a preview ID, path cost, server path, and reachable overlay. `POST .../:mode/move-commands` requires that exact preview, destination, revisions, and a new idempotency key. It atomically moves one token, advances token revisions, persists exploration and combat movement usage, and returns a receipt plus fresh projection. Stale and illegal state are typed 409s. Unexpected write outcomes are ambiguous: GET refresh only, never automatic POST retry, and a fresh preview is required.
 
+### Destination journeys through adventure declarations
+
+The existing adventure-turn stream accepts an explicit `Travel to <known location>`
+or `I move to <known location>` declaration. The server resolves and settles a
+legal multi-hop directed journey before provider planning. `Continue journey`
+or a repeated destination in a new turn resumes an interrupted journey. The
+command-receipt GET can return a strict `kind: "journey"` receipt with `status`,
+`origin`, `destination`, `currentLocation`, `legs`, `elapsedMinutes`, nullable
+`interruption: { kind, summary }`, revisions and `occurredAt`. Names and public
+results cross this boundary; graph IDs, event profiles and RNG draws do not.
+World GET omits closed connections. The manual party travel endpoint continues
+to accept its exact outgoing connection intent. Details and pacing are in
+[Destination travel and interruptions](travel-journeys.md).
+
 **Historical Slice 98 checkpoint:** exactly 98 M0 slices were complete at v14r1 and exactly 13 campaign HTTP operations. Slice 98 was documentation-only closeout and added no feature, code, test, contract, route, operation, schema, migration, dependency, backup, or commit. Its gate passed typecheck, build, 1,993 unit tests plus 1 skip, and 1 deterministic E2E; live E2E was not run. This preserved ledger describes that checkpoint, not current persistence.
 
 When `FEATURE_RPG_CAMPAIGN=true`, `GET /rpg/v1/campaigns` returns the strict shape `{ "campaigns": CampaignAccess[] }` in repository order. It accepts no query parameters; supplied parameters receive structured `RPG_INVALID_REQUEST`. Repository authorization first requires valid principal/campaign parents and a canonical recognized-role membership; a purported owner must also match `campaign.owner_principal_id`. Once authorized, every role requires exactly one strict owner membership matching that pointer and an intact owner-principal parent. Missing, duplicate, mismatched, malformed, or orphaned owner state fails loudly for authorized owner/GM/player/observer callers. Stale purported owners, missing authorization parents, and outsiders remain non-disclosing. Repository exceptions, repository-open failures, and response-schema failures return a redacted structured `RPG_INTERNAL_ERROR` 500 with the request ID. A failed repository initialization is cached and is not retried until a new server/plugin instance is constructed.
