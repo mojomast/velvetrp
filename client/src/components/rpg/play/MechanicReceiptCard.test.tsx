@@ -95,6 +95,34 @@ describe("MechanicReceiptCard", () => {
     await screen.findByText("Travel completed");expect(screen.getByText("Glass Harbor")).toBeTruthy();expect(screen.getByText("World travel revision")).toBeTruthy();expect(screen.getByText("7 → 8")).toBeTruthy();
     expect(getCampaignCommandReceipt).toHaveBeenCalledTimes(1);
   });
+  it("renders a completed journey with origin, destination, legs, and elapsed time", async () => {
+    const response = { receipt: { kind: "journey", status: "completed", origin: "Old Gate", destination: "Silver Harbor",
+      currentLocation: "Silver Harbor", legs: 2, elapsedMinutes: 120, interruption: null,
+      revisionBefore: 0, revisionAfter: 2, occurredAt: "2030-01-01T00:00:00.000Z" } } satisfies CampaignHistoryHttpPublicReceiptResponse;
+    const getCampaignCommandReceipt = vi.fn().mockResolvedValue(response);
+    render(<MechanicReceiptCard campaignId="campaign" links={[{ commandId: "journey-command", proposalId: null,
+      linkedAt: "2030-01-01T00:00:00.000Z" }]} api={{ getCampaignCommandReceipt }} />);
+    await screen.findByText("Travel → Silver Harbor");
+    expect(screen.getByText("Old Gate")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getByText("120 min")).toBeTruthy();
+    expect(screen.queryByText("Pending destination")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/journey-command|locationId|connectionId|triggerRoll|eventRoll|weight/);
+  });
+  it("renders an interrupted journey as stopped at the current location with the destination pending", async () => {
+    const response = { receipt: { kind: "journey", status: "interrupted", origin: "Old Gate", destination: "Silver Harbor",
+      currentLocation: "Waystation", legs: 1, elapsedMinutes: 60,
+      interruption: { kind: "weather", summary: "A cold squall crosses the route." },
+      revisionBefore: 0, revisionAfter: 1, occurredAt: "2030-01-01T00:00:00.000Z" } } satisfies CampaignHistoryHttpPublicReceiptResponse;
+    const getCampaignCommandReceipt = vi.fn().mockResolvedValue(response);
+    render(<MechanicReceiptCard campaignId="campaign" links={[{ commandId: "journey-command", proposalId: null,
+      linkedAt: "2030-01-01T00:00:00.000Z" }]} api={{ getCampaignCommandReceipt }} />);
+    await screen.findByText("Travel interrupted at Waystation");
+    expect(screen.getByText("A cold squall crosses the route.")).toBeTruthy();
+    expect(screen.getByText("Pending destination")).toBeTruthy();
+    expect(screen.getByText("Resume the journey to Silver Harbor.")).toBeTruthy();
+    expect(screen.getByText("60 min")).toBeTruthy();
+  });
   it("renders public quest progress and completion without private IDs", async () => {
     const response = { receipt: { kind: "quest", title: "The Sealed Gate", objectiveDescription: "Break the final seal",
       progressBefore: 2, progressAfter: 3, target: 3, objectiveCompleted: true, questCompleted: true,

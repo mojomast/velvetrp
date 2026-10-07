@@ -92,7 +92,7 @@ export function createWorldReadRepository(
       .all(campaignId) as any[]).filter((row)=>isGm||(row.visibility!=="gm"&&known.has(row.location_id)));
     const visibleIds=new Set(locations.map((row)=>row.location_id));
     const connections=(db.prepare("SELECT * FROM campaign_location_connections_v28 WHERE campaign_id=? ORDER BY connection_id")
-      .all(campaignId) as any[]).filter((row)=>isGm||(row.visibility!=="gm"&&visibleIds.has(row.from_location_id)&&visibleIds.has(row.to_location_id)));
+      .all(campaignId) as any[]).filter((row)=>row.route_state==="open"&&(isGm||(row.visibility!=="gm"&&visibleIds.has(row.from_location_id)&&visibleIds.has(row.to_location_id))));
     const actorRows=db.prepare(`SELECT location.* FROM campaign_actor_locations_v28 location
       WHERE location.campaign_id=? AND location.session_id=?${isGm?"":" AND location.actor_id IN (SELECT actor_id FROM campaign_actor_private_state WHERE campaign_id=? AND controller_principal_id=?)"}
       ORDER BY location.actor_id`).all(...(isGm?[campaignId,sessionId]:[campaignId,sessionId,campaignId,principalId])) as any[];

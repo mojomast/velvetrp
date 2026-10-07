@@ -26,6 +26,10 @@ const reviewedDiceRng: RandomNumberGenerator = {
     if (minInclusive === 1 && maxExclusive === 3) return 2;
     if (minInclusive === 1 && maxExclusive === 5) return 1;
     if (minInclusive === 1 && maxExclusive === 21) return 10;
+    // Journey trigger and event selection both roll 1..100. Returning the
+    // minimum makes any risky route interrupt with its first eligible event,
+    // which is the explicit deterministic event check.
+    if (minInclusive === 1 && maxExclusive === 101) return 1;
     if (minInclusive === 0 && maxExclusive === 1000001) return 0;
     throw new Error(`unexpected E2E RNG range [${minInclusive}, ${maxExclusive})`);
   },
@@ -98,6 +102,74 @@ const campaignLocationFixtureBodySchema = worldVisibleLocationHttpSchema.extend(
 const travelFixtureBodySchema=z.object({campaignId:resourceIdSchema,sessionId:resourceIdSchema,actorId:resourceIdSchema,
   originLocationId:resourceIdSchema,destinationLocationId:resourceIdSchema,connectionId:resourceIdSchema,
   originName:z.string().trim().min(1).max(200),destinationName:z.string().trim().min(1).max(200)}).strict();
+const journeyFixtureBodySchema=travelFixtureBodySchema.extend({finalLocationId:resourceIdSchema,
+  finalName:z.string().trim().min(1).max(200),finalConnectionId:resourceIdSchema,riskyFinalLeg:z.boolean()});
+
+// The same timestamp the owned-repository travel fixture uses, so a replayed
+// journey fixture is byte-for-byte identical to the base prerequisite writes.
+const JOURNEY_FIXTURE_TIME="2000-01-01T00:00:00.000Z";
+
+/** Minimal exact-compatibility check shared by the isolated journey writes. */
+function sameFixtureRow(row:Record<string,unknown>|undefined,expected:Record<string,unknown>):boolean{
+  return row!==undefined&&Object.entries(expected).every(([key,value])=>row[key]===value);
+}
+
+/**
+ * Adds only the second leg (intermediate -> final) and, when requested, the
+ * risky route profile. Every write is exact-compatibility idempotent and the
+ * whole extra set runs in one transaction with foreign keys enforced. The
+ * owned campaign/session/actor scope is re-proven here before any write.
+ */
+function materializeJourneyFinal(input:{campaignId:string;sessionId:string;actorId:string;intermediateLocationId:string;
+  finalLocationId:string;finalName:string;finalConnectionId:string;riskyFinalLeg:boolean}):void{
+  const databaseDirectory=dataDir;
+  if(!databaseDirectory)throw new Error("VELVET_DATA_DIR is required for deterministic E2E");
+  const db=new DatabaseDriver(path.join(databaseDirectory,"velvet.sqlite"));
+  try{
+    db.pragma("foreign_keys = ON");
+    db.transaction(()=>{
+      const owned=db.prepare(`SELECT 1 FROM campaigns campaign JOIN campaign_memberships membership
+        ON membership.campaign_id=campaign.id AND membership.principal_id='local-owner' AND membership.role='owner'
+        JOIN campaign_actors actor ON actor.campaign_id=campaign.id AND actor.id=?
+        JOIN campaign_sessions attached ON attached.campaign_id=campaign.id AND attached.session_id=?
+        JOIN sessions session ON session.id=attached.session_id AND session.state IN('setup','active') AND session.stopped_at IS NULL
+        WHERE campaign.id=? AND campaign.owner_principal_id='local-owner'`)
+        .get(input.actorId,input.sessionId,input.campaignId);
+      if(!owned)throw new DeterministicE2EFixtureAuthorizationError("deterministic journey fixture target is unavailable");
+      const existingFinal=db.prepare(`SELECT location_id id,campaign_id campaignId,parent_location_id parentId,
+        public_name name,public_description description,visibility,created_at createdAt
+        FROM campaign_locations_v28 WHERE location_id=?`).get(input.finalLocationId) as Record<string,unknown>|undefined;
+      const exactFinal={id:input.finalLocationId,campaignId:input.campaignId,parentId:null,name:input.finalName,
+        description:"",visibility:"public",createdAt:JOURNEY_FIXTURE_TIME};
+      if(existingFinal&&!sameFixtureRow(existingFinal,exactFinal))
+        throw new DeterministicE2EFixtureConflictError("journey fixture final location already has different state");
+      if(!existingFinal)db.prepare("INSERT INTO campaign_locations_v28 VALUES(?,?,NULL,?,'','public',?)")
+        .run(input.finalLocationId,input.campaignId,input.finalName,JOURNEY_FIXTURE_TIME);
+      const existingConnection=db.prepare(`SELECT connection_id connectionId,campaign_id campaignId,from_location_id fromId,
+        to_location_id toId,visibility,route_state state,requirement_kind requirementKind,required_faction_id factionId,
+        minimum_reputation minimum,created_at createdAt FROM campaign_location_connections_v28 WHERE connection_id=?`)
+        .get(input.finalConnectionId) as Record<string,unknown>|undefined;
+      const exactConnection={connectionId:input.finalConnectionId,campaignId:input.campaignId,
+        fromId:input.intermediateLocationId,toId:input.finalLocationId,visibility:"public",state:"open",
+        requirementKind:"none",factionId:null,minimum:null,createdAt:JOURNEY_FIXTURE_TIME};
+      if(existingConnection&&!sameFixtureRow(existingConnection,exactConnection))
+        throw new DeterministicE2EFixtureConflictError("journey fixture final connection already has different state");
+      if(!existingConnection)db.prepare("INSERT INTO campaign_location_connections_v28 VALUES(?,?,?,?,'public','open','none',NULL,NULL,?)")
+        .run(input.finalConnectionId,input.campaignId,input.intermediateLocationId,input.finalLocationId,JOURNEY_FIXTURE_TIME);
+      if(input.riskyFinalLeg){
+        const existingProfile=db.prepare(`SELECT campaign_id campaignId,connection_id connectionId,environment,risk,
+          chance_percent chancePercent FROM world_route_event_profiles_v1 WHERE campaign_id=? AND connection_id=?`)
+          .get(input.campaignId,input.finalConnectionId) as Record<string,unknown>|undefined;
+        const exactProfile={campaignId:input.campaignId,connectionId:input.finalConnectionId,
+          environment:"wilderness",risk:"dangerous",chancePercent:100};
+        if(existingProfile&&!sameFixtureRow(existingProfile,exactProfile))
+          throw new DeterministicE2EFixtureConflictError("journey fixture route profile already has different state");
+        if(!existingProfile)db.prepare("INSERT INTO world_route_event_profiles_v1(campaign_id,connection_id,environment,risk,chance_percent) VALUES(?,?,?,?,?)")
+          .run(input.campaignId,input.finalConnectionId,"wilderness","dangerous",100);
+      }
+    }).immediate();
+  }finally{db.close();}
+}
 
 // This route exposes the one internal linkage fixture adapters need without
 // widening the public finalization response.
@@ -230,6 +302,20 @@ app.post("/api/__e2e/materialize-travel-prerequisite",async(request,reply)=>{
   const body=travelFixtureBodySchema.safeParse(request.body);
   if(!body.success||Object.keys(request.query as Record<string,unknown>).length>0)return reply.code(400).send({error:"invalid E2E travel prerequisite"});
   return materialize(reply,()=>fixtures.materializeTravelPrerequisite(body.data));
+});
+
+// Creates only the two-leg prerequisite: the base A->B travel fixture, then the
+// public final C plus the B->C connection (and an optional risky route profile)
+// through a separate transaction. No direct A->C shortcut is ever written.
+app.post("/api/__e2e/materialize-journey-prerequisite",async(request,reply)=>{
+  const body=journeyFixtureBodySchema.safeParse(request.body);
+  if(!body.success||Object.keys(request.query as Record<string,unknown>).length>0)return reply.code(400).send({error:"invalid E2E journey prerequisite"});
+  const {finalLocationId,finalName,finalConnectionId,riskyFinalLeg,...base}=body.data;
+  return materialize(reply,()=>{
+    fixtures.materializeTravelPrerequisite(base);
+    materializeJourneyFinal({campaignId:base.campaignId,sessionId:base.sessionId,actorId:base.actorId,
+      intermediateLocationId:base.destinationLocationId,finalLocationId,finalName,finalConnectionId,riskyFinalLeg});
+  });
 });
 
 // Read-only, disposable evidence for exact-once assertions. All three known

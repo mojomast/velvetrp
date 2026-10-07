@@ -76,6 +76,7 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
     .all(campaignId,root)as any[]).map(row=>({linkId:`action-${createHash("sha256").update(`${campaignId}\0${root}\0${row.command_id}`).digest("hex").slice(0,40)}`,
       campaignId,commandId:row.command_id,proposalId:row.proposal_id,sourceTurnId:root,linkedAt:row.occurred_at}));
   const commerce=(db.prepare("SELECT command_id,proposal_id,occurred_at FROM adventure_commerce_executions_v57 WHERE campaign_id=? AND turn_id=? ORDER BY occurred_at,execution_id").all(campaignId,root)as any[]).map(row=>({linkId:`commerce-${createHash("sha256").update(`${campaignId}\0${root}\0${row.command_id}`).digest("hex").slice(0,40)}`,campaignId,commandId:row.command_id,proposalId:row.proposal_id,sourceTurnId:root,linkedAt:row.occurred_at}));
+  const journeys=(db.prepare("SELECT command_id,occurred_at FROM world_actor_journey_executions_v1 WHERE campaign_id=? AND turn_id=? ORDER BY occurred_at,command_id").all(campaignId,root)as Array<{command_id:string;occurred_at:string}>).map((row)=>({linkId:`journey-${row.command_id}`,campaignId,commandId:row.command_id,proposalId:null,sourceTurnId:root,linkedAt:row.occurred_at}));
   const rootRow = db.prepare("SELECT timeline_id,actor_id FROM adventure_turns WHERE campaign_id=? AND id=?")
     .get(campaignId, root) as { timeline_id: string; actor_id: string } | undefined;
   if (!rootRow) throw new Error("adventure turn receipt root is unavailable");
@@ -114,8 +115,8 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
     return { linkId: `recoverable-${createHash("sha256").update(`${campaignId}\0${root}\0${proposal.proposal_id}\0${entry.command_id}`).digest("hex").slice(0, 40)}`,
       campaignId, commandId: entry.command_id, proposalId: proposal.proposal_id, sourceTurnId: root, linkedAt: entry.occurred_at };
   });
-  return { links: [...linked, ...recoverable, ...generalized,...exactTravel,...questProgress,...checks,...inventory,...exactActions,...commerce].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
-    recoverableCount: recoverable.length, approvedCount: proposals.length, generalizedCount: generalized.length+exactTravel.length+questProgress.length+checks.length+inventory.length+exactActions.length+commerce.length };
+  return { links: [...linked, ...recoverable, ...generalized,...exactTravel,...questProgress,...checks,...inventory,...exactActions,...commerce,...journeys].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
+    recoverableCount: recoverable.length, approvedCount: proposals.length, generalizedCount: generalized.length+exactTravel.length+questProgress.length+checks.length+inventory.length+exactActions.length+commerce.length+journeys.length };
 };
 
 /** Creates principal-sensitive, non-mutating turn and draft projections. */

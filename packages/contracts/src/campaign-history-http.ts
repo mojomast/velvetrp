@@ -179,6 +179,32 @@ export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind
   }).strict().refine((value) => value.revisionAfter === value.revisionBefore + 1,
     "receipt revision must advance once"),
   z.object({
+    kind: z.literal("journey"),
+    status: z.enum(["completed", "interrupted"]),
+    origin: z.string().trim().min(1).max(200),
+    destination: z.string().trim().min(1).max(200),
+    currentLocation: z.string().trim().min(1).max(200),
+    legs: z.number().int().min(0).max(32),
+    elapsedMinutes: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    interruption: z.object({
+      kind: z.enum(["weather", "obstacle", "social", "discovery", "encounter"]),
+      summary: z.string().trim().min(1).max(1_000),
+    }).strict().nullable(),
+    revisionBefore: revisionSchema,
+    revisionAfter: revisionSchema,
+    occurredAt: z.string().datetime({ offset: false, precision: 3 }),
+  }).strict().superRefine((value, context) => {
+    if (value.revisionAfter !== value.revisionBefore + value.legs) {
+      context.addIssue({ code: "custom", message: "journey revision must advance once per leg", path: ["revisionAfter"] });
+    }
+    if (value.status === "completed" && value.interruption !== null) {
+      context.addIssue({ code: "custom", message: "a completed journey cannot be interrupted", path: ["interruption"] });
+    }
+    if (value.status === "interrupted" && value.interruption === null) {
+      context.addIssue({ code: "custom", message: "an interrupted journey requires an interruption", path: ["interruption"] });
+    }
+  }),
+  z.object({
     kind: z.literal("quest"),
     title: z.string().trim().min(1).max(200),
     objectiveDescription: z.string().trim().min(1).max(2_000),

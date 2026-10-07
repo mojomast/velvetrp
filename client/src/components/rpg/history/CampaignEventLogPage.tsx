@@ -31,6 +31,9 @@ function receiptDetail(receipt: CampaignHistoryHttpPublicReceipt): string {
   if (receipt.kind === "administration") return `${receipt.type.replaceAll("_", " ")} committed revision ${receipt.revisionAfter}.`;
   if(receipt.kind==="combat")return `Combat advanced from round ${receipt.roundBefore} to ${receipt.roundAfter}.`;
   if(receipt.kind==="travel")return `Travel completed to ${receipt.destination}.`;
+  if(receipt.kind==="journey")return receipt.status==="completed"
+    ? `Travel → ${receipt.destination}.`
+    : `Travel interrupted at ${receipt.currentLocation}; continue to ${receipt.destination}.`;
   if(receipt.kind==="quest")return `${receipt.title}: ${receipt.objectiveDescription} advanced from ${receipt.progressBefore} to ${receipt.progressAfter} of ${receipt.target}${receipt.questCompleted ? "; quest completed" : receipt.objectiveCompleted ? "; objective completed" : ""}.`;
   if(receipt.kind==="check")return `${receipt.skill??receipt.ability} check totaled ${receipt.total} against DC ${receipt.dc}: ${receipt.outcome}.`;
   if(receipt.kind==="inventory")return `${receipt.action} ${receipt.quantity} ${receipt.itemLabel}${receipt.recipient?` to ${receipt.recipient}`:""}${receipt.slot?` in ${receipt.slot}`:""}.`;

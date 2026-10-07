@@ -326,7 +326,8 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     || db.prepare("SELECT 1 FROM adventure_check_executions_v54 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
     || db.prepare("SELECT 1 FROM adventure_inventory_executions_v55 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
     || db.prepare("SELECT 1 FROM adventure_exact_action_executions_v56 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
-    || db.prepare("SELECT 1 FROM adventure_commerce_executions_v57 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
+    || db.prepare("SELECT 1 FROM adventure_commerce_executions_v57 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
+    || db.prepare("SELECT 1 FROM world_actor_journey_executions_v1 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
 
   // Self-reference lets the lane-origin rest proposal delegate to the single shared
   // appendToolProposal implementation instead of forking the proposal rules.

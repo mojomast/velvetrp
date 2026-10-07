@@ -49,6 +49,18 @@ type CampaignHistoryRepository = Pick<CampaignAdministrationRepository,
       revisionAfter: number;
       occurredAt: string;
     } | null;
+    getActorJourneyPublicReceipt?: (principalId: string, campaignId: string, commandId: string) => {
+      status: "completed" | "interrupted";
+      origin: string;
+      destination: string;
+      currentLocation: string;
+      path: readonly unknown[];
+      elapsedMinutes: number;
+      interruption: { event: { kind: "weather" | "obstacle" | "social" | "discovery" | "encounter"; summary: string } } | null;
+      revisionBefore: number;
+      revisionAfter: number;
+      occurredAt: string;
+    } | null;
   };
 
 export interface CampaignHistoryHttpOptions {
@@ -238,6 +250,16 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
           :outcome?.kind==="stand-up"?{kind:"stand-up",movementCostFeet:outcome.movementCostFeet}:{kind:"none"},roundBefore:resolution.roundBefore,roundAfter:resolution.roundAfter}}));}
       const travel=repository.getExactCandidateTravelPublicReceipt(LOCAL_OWNER,campaignId,request.params.commandId);
       if(travel)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"travel",...travel}}));
+      // A declared actor journey is a distinct public projection: only names,
+      // leg count, elapsed time and the reviewed interruption summary cross the
+      // boundary. Location/connection IDs, path bindings and raw rolls stay in
+      // the repository.
+      const journey=repository.getActorJourneyPublicReceipt?.(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(journey)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"journey",status:journey.status,
+        origin:journey.origin,destination:journey.destination,currentLocation:journey.currentLocation,legs:journey.path.length,
+        elapsedMinutes:journey.elapsedMinutes,interruption:journey.interruption?{kind:journey.interruption.event.kind,
+          summary:journey.interruption.event.summary}:null,revisionBefore:journey.revisionBefore,revisionAfter:journey.revisionAfter,
+        occurredAt:journey.occurredAt}}));
       const administration = repository.getCampaignAdministrationReceipt(LOCAL_OWNER, campaignId, request.params.commandId);
       if (administration === null) return unavailable(request, reply);
       const safe = publicReceipt(administration, campaignId, request.params.commandId);

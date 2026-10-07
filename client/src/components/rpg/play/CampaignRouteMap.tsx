@@ -58,9 +58,28 @@ export function CampaignRouteMap({ world, selectedActorId, onPrefillDeclaration,
   }, [world.visibleLocations]);
 
   const currentLocationId = world.currentLocations.find((entry) => entry.actorId === selectedActorId)?.locationId;
-  const outgoing = currentLocationId === undefined ? [] : world.visibleConnections.filter((connection) =>
-    connection.fromLocationId === currentLocationId && positions.has(connection.fromLocationId) && positions.has(connection.toLocationId));
-  const reachableIds = new Set(outgoing.map((connection) => connection.toLocationId));
+  // Presentation-only reachability; authoritative route conditions and interruptions
+  // are evaluated by the server when the declaration is submitted.
+  const distances = new Map<string, number>();
+  const outgoingByLocation = new Map<string, string[]>();
+  for (const connection of world.visibleConnections) {
+    const destinations = outgoingByLocation.get(connection.fromLocationId) ?? [];
+    destinations.push(connection.toLocationId);
+    outgoingByLocation.set(connection.fromLocationId, destinations);
+  }
+  const queue = currentLocationId && positions.has(currentLocationId) ? [currentLocationId] : [];
+  if (currentLocationId) distances.set(currentLocationId, 0);
+  for (const from of queue) {
+    if (distances.get(from)! >= 32) continue;
+    for (const to of outgoingByLocation.get(from) ?? []) {
+      if (!positions.has(to) || distances.has(to)) continue;
+      distances.set(to, distances.get(from)! + 1);
+      queue.push(to);
+    }
+  }
+  const destinations = [...distances].filter(([locationId]) => locationId !== currentLocationId)
+    .sort(([a, da], [b, db]) => da - db || a.localeCompare(b));
+  const reachableIds = new Set(destinations.map(([locationId]) => locationId));
 
   return <section className="campaign-route-map" aria-labelledby={headingId}>
     <header className="campaign-route-map-header">
@@ -92,7 +111,7 @@ export function CampaignRouteMap({ world, selectedActorId, onPrefillDeclaration,
         const isReachable = reachableIds.has(location.locationId);
         return <g className={`route-map-location${isCurrent ? " is-current" : ""}${isReachable ? " is-reachable" : ""}`}
           data-location-id={location.locationId} data-depth={depth} transform={`translate(${x} ${y})`} key={`${location.locationId}-${index}`}>
-          <title>{location.name}{isCurrent ? ", current location" : isReachable ? ", outgoing route destination" : ""}</title>
+          <title>{location.name}{isCurrent ? ", current location" : isReachable ? ", reachable destination" : ""}</title>
           <circle r={isCurrent ? 22 : 18} fill={isCurrent ? "currentColor" : "Canvas"} stroke="currentColor" strokeWidth={isReachable ? 4 : 2} />
           {isCurrent && <circle r="7" fill="Canvas" />}
           <text y="35" textAnchor="middle" fill="currentColor"><tspan>{location.name}</tspan></text>
@@ -100,15 +119,15 @@ export function CampaignRouteMap({ world, selectedActorId, onPrefillDeclaration,
       })}
     </svg>}
     <section className="route-map-destinations" aria-labelledby={`${headingId}-destinations`}>
-      <h3 id={`${headingId}-destinations`}>Outgoing route destinations</h3>
-      {outgoing.length > 0 ? <ul>{outgoing.map((connection, index) => {
-        const destination = positions.get(connection.toLocationId)!.location;
-        return <li key={`${connection.connectionId}-${index}`}><button type="button" className="ghost"
+      <h3 id={`${headingId}-destinations`}>Reachable destinations</h3>
+      {destinations.length > 0 ? <ul>{destinations.map(([locationId, legs]) => {
+        const destination = positions.get(locationId)!.location;
+        return <li key={locationId}><button type="button" className="ghost"
           disabled={!canPrefill} onClick={() => onPrefillDeclaration(`Travel to ${destination.name}.`)}>
           Prefill travel to <bdi dir="auto">{destination.name}</bdi>
-        </button></li>;
-      })}</ul> : <p className="quick-empty">No server-visible outgoing routes for the selected actor.</p>}
+        </button> <small>{legs} {legs === 1 ? "leg" : "legs"}</small></li>;
+      })}</ul> : <p className="quick-empty">No server-visible reachable destinations for the selected actor.</p>}
     </section>
-    <p className="route-map-note">An outgoing route does not guarantee legal travel. Travel buttons only prepare a declaration. Submit it in play, or open World for authoritative travel controls.</p>
+    <p className="route-map-note">A visible path does not guarantee legal travel. Travel buttons only prepare a declaration. The server follows an available path to your destination; events may interrupt the journey before arrival. Submit it in play, or open World for authoritative travel controls.</p>
   </section>;
 }

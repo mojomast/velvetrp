@@ -148,6 +148,21 @@ function ReceiptBody({ receipt }: { receipt: Receipt }) {
     <div><dt>World travel revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div>
     <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div>
   </dl>;
+  if (receipt.kind === "journey") {
+    const completed = receipt.status === "completed";
+    return <dl>
+      <div><dt>Journey</dt><dd>{completed ? `Travel → ${receipt.destination}` : `Travel interrupted at ${receipt.currentLocation}`}</dd></div>
+      <div><dt>Origin</dt><dd>{receipt.origin}</dd></div>
+      <div><dt>{completed ? "Destination" : "Current location"}</dt><dd>{completed ? receipt.destination : receipt.currentLocation}</dd></div>
+      <div><dt>Legs traveled</dt><dd>{receipt.legs}</dd></div>
+      <div><dt>Elapsed time</dt><dd>{receipt.elapsedMinutes} min</dd></div>
+      {receipt.interruption && <div><dt>Event</dt><dd>{receipt.interruption.summary}</dd></div>}
+      {!completed && <div><dt>Pending destination</dt><dd>{receipt.destination}</dd></div>}
+      {!completed && <div><dt>Continue</dt><dd>Resume the journey to {receipt.destination}.</dd></div>}
+      <div><dt>World travel revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div>
+      <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div>
+    </dl>;
+  }
   if (receipt.kind === "combat") return <dl>
     <div><dt>Combat update</dt><dd>{combatActionLabel(receipt.action)}</dd></div>
     <CombatOutcome outcome={receipt.outcome} />
@@ -211,6 +226,9 @@ function compactReceiptLine(receipt: Receipt): string {
   }
   if (receipt.kind === "quest") return `Quest ${receipt.title} · ${receipt.objectiveDescription} ${receipt.progressBefore}→${receipt.progressAfter}/${receipt.target}${receipt.objectiveCompleted ? " · objective complete" : ""}${receipt.questCompleted ? " · quest complete" : ""}`;
   if (receipt.kind === "travel") return `Travel → ${receipt.destination}`;
+  if (receipt.kind === "journey") return receipt.status === "completed"
+    ? `Travel → ${receipt.destination}`
+    : `Travel interrupted at ${receipt.currentLocation}`;
   if (receipt.kind === "combat") { const outcome = combatOutcomeLine(receipt.outcome); return `Combat ${combatActionLabel(receipt.action)}${outcome ? ` · ${outcome}` : ""} · round ${receipt.roundBefore}→${receipt.roundAfter}`; }
   if (receipt.kind === "administration") return "Campaign administration metadata.";
   const event = receipt.event;

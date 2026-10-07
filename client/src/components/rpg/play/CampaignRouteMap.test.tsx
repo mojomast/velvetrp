@@ -20,17 +20,18 @@ const world: CampaignWorldHttpResponse = {
 describe("CampaignRouteMap", () => {
   afterEach(cleanup);
 
-  it("highlights the selected actor location and only exact outgoing destinations", () => {
+  it("offers indirect reachable destinations without requiring separate hop declarations", () => {
     const prefill = vi.fn();
     const { container } = render(<CampaignRouteMap world={world} selectedActorId="actor" onPrefillDeclaration={prefill} onOpenWorld={vi.fn()} />);
     expect(screen.getByText(/Topological route map, not to scale/)).toBeTruthy();
     expect(container.querySelector('[data-location-id="town"]')?.classList.contains("is-current")).toBe(true);
     expect(container.querySelector('[data-location-id="wood"]')?.classList.contains("is-reachable")).toBe(true);
-    expect(container.querySelector('[data-location-id="tower"]')?.classList.contains("is-reachable")).toBe(false);
-    const destinations = screen.getByRole("region", { name: "Outgoing route destinations" });
-    expect(within(destinations).getAllByRole("button")).toHaveLength(1);
-    fireEvent.click(within(destinations).getByRole("button", { name: "Prefill travel to Whisper Wood" }));
-    expect(prefill).toHaveBeenCalledWith("Travel to Whisper Wood.");
+    expect(container.querySelector('[data-location-id="tower"]')?.classList.contains("is-reachable")).toBe(true);
+    const destinations = screen.getByRole("region", { name: "Reachable destinations" });
+    expect(within(destinations).getAllByRole("button")).toHaveLength(2);
+    expect(within(destinations).getByText("2 legs")).toBeTruthy();
+    fireEvent.click(within(destinations).getByRole("button", { name: "Prefill travel to Glass Tower" }));
+    expect(prefill).toHaveBeenCalledWith("Travel to Glass Tower.");
   });
 
   it("does not infer a reverse route or render connections with unprojected endpoints", () => {
@@ -43,7 +44,7 @@ describe("CampaignRouteMap", () => {
       ],
     };
     const { container } = render(<CampaignRouteMap world={projection} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
-    expect(screen.getByText("No server-visible outgoing routes for the selected actor.")).toBeTruthy();
+    expect(screen.getByText("No server-visible reachable destinations for the selected actor.")).toBeTruthy();
     expect(container.querySelectorAll(".route-map-connection")).toHaveLength(1);
     expect(screen.queryByText(/secret/i)).toBeNull();
   });

@@ -71,6 +71,7 @@ const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve
     |{kind:"contest";contest:"grapple"|"escape-grapple"|"shove";attackerRoll:number;defenderRoll:number;success:boolean;condition:"grappled"|"prone"|null}
     |{kind:"stand-up";movementCostFeet:number}|{kind:"none"};roundBefore: number; roundAfter: number }
   | {kind:"travel";destination:string}
+  | {kind:"journey";destination:string;currentLocation:string;status:"completed"|"interrupted";interruption:string|null;legs:number;elapsedMinutes:number}
   | {kind:"inventory";itemLabel:string;action:"equip"|"unequip"|"drop"|"gift"|"consume";quantity:number;slot:string|null;recipient:string|null}
   | {kind:"commerce";action:"buy"|"sell"|"give";vendorLabel:string;shopLabel:string;itemLabel:string;quantity:number;currencyLabel:string;priceMinorUnits:number;balanceBefore:number;balanceAfter:number}
   | {kind:"quest";questTitle:string;objectiveDescription:string;progressBefore:number;progressAfter:number;targetProgress:number;
@@ -145,6 +146,9 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
     }
     const travel=repo.getExactCandidateTravelNarrationReceipt(OWNER,turn.turnId,link.commandId);
     if(travel){values.push({kind:"travel",destination:travel.destination});continue;}
+    const journey=repo.getActorJourneyNarrationReceipt(OWNER,turn.turnId,link.commandId);
+    if(journey){values.push({kind:"journey",destination:journey.destination,currentLocation:journey.currentLocation,status:journey.status,
+      interruption:journey.interruption?journey.interruption.event.summary:null,legs:journey.path.length,elapsedMinutes:journey.elapsedMinutes});continue;}
     const inventory=repo.getAdventureInventoryNarrationReceipt(OWNER,turn.turnId,link.commandId);
     if(inventory){values.push({kind:"inventory",itemLabel:inventory.itemLabel,action:inventory.action,quantity:inventory.quantity,
       slot:inventory.slot,recipient:inventory.recipient});continue;}
@@ -284,6 +288,10 @@ function composeNarration(values: readonly NarrationReceipt[]): string {
   if (values.length === 0) return NARRATION_HOLD_TEXT;
   const facts = values.map((value) => {
     if (value.kind === "travel") return `You arrive at ${value.destination}.`;
+    if(value.kind==="journey"){
+      if(value.status==="interrupted")return `The journey stops at ${value.currentLocation}; ${value.destination} remains pending.${value.interruption?` ${value.interruption}`:""} Continue the journey when you are ready.`;
+      return `You arrive at ${value.currentLocation} after ${value.legs} leg${value.legs===1?"":"s"} of travel (${value.elapsedMinutes} minutes).`;
+    }
     if(value.kind==="inventory"){
       if(value.action==="equip")return `You equip ${value.quantity} ${value.itemLabel} in the ${value.slot} slot.`;
       if(value.action==="unequip")return `You unequip ${value.quantity} ${value.itemLabel} from the ${value.slot} slot.`;
@@ -391,6 +399,7 @@ function receiptNarrationFacts(value:NarrationReceipt):{labels:string[];numbers:
   const present=(...entries:Array<string|null|undefined>):string[]=>entries.filter((entry):entry is string=>typeof entry==="string"&&entry.length>0);
   switch(value.kind){
     case "travel":return{labels:present(value.destination),numbers:[]};
+    case "journey":return{labels:present(value.currentLocation,value.destination,value.interruption),numbers:[value.legs,value.elapsedMinutes]};
     case "inventory":return{labels:present(value.itemLabel,value.slot,value.recipient),numbers:[value.quantity]};
     case "commerce":return{labels:present(value.itemLabel,value.vendorLabel,value.shopLabel,value.currencyLabel),numbers:[value.quantity,value.balanceBefore,value.balanceAfter]};
     case "quest":return{labels:present(value.questTitle,value.objectiveDescription),numbers:[value.progressBefore,value.progressAfter,value.targetProgress]};
@@ -487,7 +496,7 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
   const allowedHealing=values.flatMap(value=>value.kind==="combat-consumable"||value.kind==="combat-power"
     ?value.outcomes.flatMap(outcome=>outcome.kind==="healing"?[outcome.applied]:[]):[]);
   if(damageClaims.some(amount=>!allowedDamage.includes(amount))||healingClaims.some(amount=>!allowedHealing.includes(amount)))return false;
-  const unsupportedTravel=!hasKind("travel")&&text.split(/[.!?;:\n]+/).some(clause=>travelClaimPattern.test(normalizedNarration(clause)));
+  const unsupportedTravel=!hasKind("travel","journey")&&text.split(/[.!?;:\n]+/).some(clause=>travelClaimPattern.test(normalizedNarration(clause)));
   const unsupportedInventory=!hasKind("inventory","commerce","quest-lifecycle")&&/\b(?:you|they|the party|the group)\s+(?:gain|gains|gained|receive|receives|received|obtain|obtains|obtained|acquire|acquires|acquired|lose|loses|lost|drop|drops|dropped|consume|consumes|consumed|equip|equips|equipped|unequip|unequips|unequipped|buy|buys|bought|sell|sells|sold)\b.{0,80}\b(?:gold|coins?|currency|credits?|potion|weapon|armor|item|inventory|reward|sword|shield|bow|dagger|ring|amulet|scroll)\b/.test(normalized);
   const unsupportedCurrency=!hasKind("commerce","quest-lifecycle")&&/(?:\b(?:gain|gains|gained|receive|receives|received|lose|loses|lost|spend|spends|spent|pay|pays|paid|earn|earns|earned)\b.{0,40}\b(?:gold|coins?|currency|credits?)\b|\b\d+\s+(?:gold|coins?|credits?)\b)/.test(normalized);
   const unsupportedQuest=!hasKind("quest","quest-lifecycle")&&/(?:\bquest\b.{0,50}\b(?:accept|accepted|abandon|abandoned|advance|advanced|progress|complete|completed|reward|claimed)\b|\b(?:accept|accepted|abandon|abandoned|advance|advanced|complete|completed|claim|claimed)\b.{0,50}\bquest\b)/.test(normalized);
@@ -508,6 +517,17 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
     .test(normalized)||/(pending|unresolved|uncertain|unknown|not established|not committed|did not happen|has not happened|awaiting confirmation).{0,48}(movement|arrival|travel|result|outcome|action|change|damage|healing|purchase|sale|quest|progression|rest|check|attack)/.test(normalized);
   if(contradiction)return false;
   return values.every(value=>{
+    if(value.kind==="journey"){
+      // Travel claims name the committed current location. A completed journey may name the
+      // location it reached; an interrupted one must never assert the requested destination was
+      // reached or that the journey finished.
+      if(!mentionsFact(text,value.currentLocation))return false;
+      const arrivalTargets=[...text.matchAll(ARRIVAL_TARGET_PATTERN)].map(match=>match[1]!);
+      if(value.status==="completed")return arrivalTargets.every(target=>mentionsFact(target,value.currentLocation));
+       if(arrivalTargets.some(target=>!mentionsFact(target,value.currentLocation)||mentionsFact(target,value.destination)))return false;
+       if(!mentionsFact(text,value.destination))return false;
+      return !/\b(?:journey|travel|trip|road)\b[^.!?]{0,40}\b(?:complete|completed|finishes|finished|ends|ended|done)\b|\b(?:complete|completed|finishes|finished|done)\b[^.!?]{0,40}\b(?:journey|travel|trip)\b/.test(normalized);
+    }
     if(value.kind==="travel"){
       // Tolerance: the label is matched fuzzily (internal markers and inflection folded), and naming
       // the destination is enough. Safety: any explicit arrival target in the prose must still be the

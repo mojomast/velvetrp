@@ -1538,6 +1538,17 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   catch { return { turn, outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS }; }
   let snapshot = selectedContext.snapshot;
   if(!snapshot.ruleset)return {turn,outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};
+  // Explicit named journeys are server-resolved, including nonadjacent destinations.
+  // A durable tranche links every leg and any stop before narration is attempted.
+  if (snapshot.audience.kind === "player" && snapshot.audience.actorId === turn.actorId
+    && snapshot.authority.control !== "none" && !snapshot.encounter && turn.toolCalls.length === 0 && turn.receiptLinks.length === 0) {
+    try {
+      const journey = repository.executeDeclaredActorJourney(OWNER, turn.turnId);
+      if (journey) return { turn: privateTurn(repository, turn.turnId), outcome: "mechanics-committed", limitations: ADVENTURE_TOOL_LIMITATIONS };
+    } catch {
+      return { turn: privateTurn(repository, turn.turnId), outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS };
+    }
+  }
   // Player-initiated combat runs before provider planning: an original player declaration that
   // attacks a visible target while no encounter is active materializes and starts the encounter
   // through the existing lifecycle service. On success the snapshot is re-read so the rest of
