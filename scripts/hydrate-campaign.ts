@@ -53,7 +53,7 @@ const FIELD_SECTIONS: Record<string, Section> = {
 const STARTERS = {
   original: { path: "starter-setup", starterId: "velvet:original-starter@1.0.0+d15042935818" },
   mechanics: { path: "mechanics-starter-setup", starterId: "velvet:mechanics-starter@1.1.0+2f9199b5696d" },
-  "srd-5.1": { path: "mechanics-starter-setup", starterId: "srd-5.1:starter@1.6.0+c1b2d4fd32d6" },
+  "srd-5.1": { path: "mechanics-starter-setup", starterId: "srd-5.1:starter@1.7.0+a870b31918ec" },
 } as const;
 
 function canonical(value: unknown): string {
