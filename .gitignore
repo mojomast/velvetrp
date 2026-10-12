@@ -1,8 +1,17 @@
 node_modules/
 dist/
 .env
-# `data/*` rather than `data/` so the benchmark harness below can be re-included.
-# Models, GGUF weights, the llama.cpp runtime and the VelvetRP sqlite DB stay ignored.
+# `data/` used to be ignored wholesale because it holds ~12 GB of GGUF weights, the
+# llama.cpp CUDA runtime and a live VelvetRP sqlite DB. That is still true of those
+# three things. What now lives under data/ is the evaluation harness, which is the
+# *evidence* for every number in the findings documents -- if it is not tracked, the
+# results cannot be reproduced or audited and the findings are just claims.
+#
+# So the directory is re-included selectively rather than wholesale. Each exception
+# below is explicit; anything not named stays ignored, which means a stray 5 GB GGUF or
+# a WAL file cannot be committed by accident. `git check-ignore -v <path>` shows which
+# rule matched. Keep this block after the `data/*` line -- gitignore has no notion of
+# order-independent re-inclusion, and a later `data/` would silently win.
 data/*
 server/data/
 *.log
