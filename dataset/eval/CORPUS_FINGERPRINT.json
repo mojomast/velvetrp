@@ -13,7 +13,8 @@
     "dev-cases/receipt-grounded-narration.json": "6d5894d2dc422f6d57aced2c44d8cf0a9bf33d2e437deb30c50cafb2698c9915",
     "dev-cases/tool-selection.json": "b77557e86cc46cc093d15fb25f17341387a01689ee280a39f769ad49cae9d681"
   },
-  "devCaseIdListDigest": "d3baa542c0a0e4b666d6e1f52641803e0b44b68224f3ed74fca3db411ab194f9",
+  "devCaseIdListDigest": "f904ab27ba3a3a93581251d88522d0ada79ae55e741e48972334fed638b945e4",
   "devCaseCount": 106,
-  "foundryCorpusDigest": "22eb78976caa9ca91102f75576ea19eeb8cef8d594435275630542b7ddef8e58"
+  "foundryCorpusDigest": "22eb78976caa9ca91102f75576ea19eeb8cef8d594435275630542b7ddef8e58",
+  "digestAlgorithm": "sha256 over newline-joined case ids, sorted globally, dev partition only"
 }

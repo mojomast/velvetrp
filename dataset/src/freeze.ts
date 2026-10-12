@@ -318,7 +318,13 @@ export function verifyFreeze(
   for (const file of freeze.files) {
     const full = join(rootPath, file.path);
     if (file.split === "sealed-test") {
-      const external = options.sealedSource ? join(resolve(options.sealedSource), file.path.replace(/^sealed-cases\//, "")) : null;
+      if (!options.sealedSource) {
+        // Sealed content is deliberately outside the repository. Its absence is
+        // expected and must NOT be reported as corpus drift, or a routine
+        // dev-only verification would always fail.
+        continue;
+      }
+      const external = join(resolve(options.sealedSource), file.path.replace(/^sealed-cases\//, ""));
       if (!external || !existsSync(external)) {
         problems.push(`sealed case file is not available for verification: ${file.path}`);
         continue;

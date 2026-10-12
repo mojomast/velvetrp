@@ -34,6 +34,58 @@ Caveat carried forward: this is **not a controlled pair** — 8B vs 9B, Q4_K_M v
 vs hybrid attention. Model age, quant quality and architecture are confounded. The conclusion
 "Qwen3.5-9B is worse *here*" is supported; "Qwen3-8B is better *in general*" is not established.
 
+## Corrected: grounding is 3/6 where the model spoke, not 0/11
+
+I recorded 0/11 and called grounding thin. The benchmarking agent called that lazy; it was.
+Decomposed, Qwen3-8B `receipt-grounded-narration` n=11:
+
+| n | cases | |
+|---|---|---|
+| 5 | -02, -05, -06, -08, -11 | abstained, emitted nothing |
+| 3 | -01, -03, -04 | binding / fabrication violation |
+| 3 | -07, -09, -10 | omission only (2220, Mrs Bramley; The Bleeding Ledger; Tallow Street) |
+
+Across all 19 receipt-bearing cases, 14 produced gradeable narration and 11 had no binding
+violation; `narration-envelope` alone is 6/8. **The real grounded-invention rate is 3/6 of the cases
+where it spoke.** Three of those six failed only by not stating the receipt's contents.
+
+**Consequence: grounded-narration and carry-over are largely the same deficit.** Funding them as two
+independent families double-counts. Grounded-narration stays MEDIUM-HIGH but as a second *evaluation*
+of the carry-over fix, not a second tranche.
+
+## Corrected: carry-over is entity-and-value, not name-dropping
+
+I proposed required proper-noun anchors. That was an error: I generalised from the visible examples
+rather than the distribution, and proper nouns are the model's BEST anchor class.
+
+| class | anchors | Qwen3-8B missed | rate |
+|---|---:|---:|---:|
+| numeric (22, 15, 2220, 17) | 14 | 13 | **92.9%** |
+| generic | 72 | 57 | 79.2% |
+| named (Haug, Ailsa, Oswin) | 38 | 28 | 73.7% |
+
+Numeric anchors are the receipt values, which *are* the grounding defect. Required proper-noun
+anchors would have targeted the easiest class and left the hardest untouched.
+
+Named anchors are concentrated, not cross-cutting (9/38 in `npc-knowledge-boundary`, 7 in
+`receipt-grounded`, 6 in `player-agency`), and the most-missed single name is Haug — one NPC in one
+category.
+
+### Anchor design
+
+- **2-3 per case, not 3-5.** The corpus sits at 0.69 anchors/case. 3-5 is a large intensification of
+  a metric already failing 40 times; at that density the cheapest available optimisation becomes
+  stuffing capitalised nouns until the substring check passes.
+- **Span all three classes** in roughly corpus proportions (named ~55%, numeric 20%, concrete object
+  ~25%) with the **numeric share weighted up**. All 14 numeric anchors already sit in the two receipt
+  categories.
+- **Cross-cutting, not a new family.** Every family carries them; this also avoids double-counting
+  with grounded-narration.
+- **Regression gate: `prose-quality` must not fall below its stock rate (4/8).** Substring anchors
+  catch objective failures only and no prose-quality auto-score exists, so the anchor work must be
+  verified not to have traded prose for substring compliance. This is the suite's only latent
+  regression risk.
+
 ## What Qwen3.5-9B's numbers cannot tell us
 
 It produced gradeable narration on **6/19** receipt cases and **0/10** boundary cases. Its
