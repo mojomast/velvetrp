@@ -1,0 +1,469 @@
+{
+  "category": "narrative-initiative",
+  "version": "velvet-baseline-v1",
+  "lineage": {
+    "characterFamily": "dev-char-frostrail-lift",
+    "worldFamily": "dev-world-frostrail-lift",
+    "scenarioFamily": "dev-scenario-frostrail-lift"
+  },
+  "cases": [
+    {
+      "id": "dev-init-01-npc-moves-first",
+      "lineage": {
+        "characterFamily": "dev-char-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift"
+      },
+      "dimension": "npc-offers-action",
+      "setup": {
+        "gradingNote": "The DM may make the NPC act. It may not narrate the controlled actor's reaction, speech, or decision. mustNotInclude blocks the player being moved.",
+        "systemPrompt": "IMMUTABLE CONVERSATURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nFor an interaction, include brief in-character dialogue when supported by the present cast and public portrayal, then leave room for the player's response. Never dictate the player's speech, feelings or next decision.\nThe cast is a known session roster, not proof of co-location. Only NPCs listed in presentNpcNames are established as present with the actor.\nNever assert or invent a world change: no damage, no possession change, no quest state, no mechanics.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are Marit Solheim, 29, a lift inspector on the heights above the mining town of Frostrail. Methodical, dislikes weather, keeps a tally book under her arm.",
+        "scene": "You are on the third landing of the Frostrail lift house, halfway up the mountain. Present NPC: Oswin Rahl, the lift operator, who is the only present NPC.",
+        "currentLocation": "Frostrail Lift House, Third Landing",
+        "presentNpcs": [
+          {
+            "name": "Oswin Rahl",
+            "publicPortrayal": "Sixty, built like a bollard, speaks plainly and moves slowly on the stairs. Keeps the brake lever in his sight.",
+            "npcKnowledge": {
+              "knows": ["The cable was greased on the fourth landing this morning."],
+              "doesNotKnow": ["Why the upper gallery has been closed", "Anything about the ore samples in the tally book"]
+            }
+          }
+        ],
+        "history": [],
+        "worldFacts": [
+          "The Frostrail lift house climbs the mountain above the mining town of Frostrail.",
+          "The Frostrail lift has four landings.",
+          "The upper gallery at Frostrail has been closed to traffic."
+        ],
+        "gmOnlyFacts": [
+          "The upper gallery was closed because the cable is fraying above the fourth landing.",
+          "Oswin has been told not to mention the fraying to inspectors."
+        ]
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I'm just here to log the cable run before the weather closes in.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Oswin takes the brake lever in one hand, which is a habit and not a decision, and looks up the shaft past you to the fourth landing. \"Log it here and you'll log it in the wet,\" he says. \"Run the tally in the hut at the bottom with a lamp and a table. I keep a kettle on the third for weather.\" He shifts his weight, and the whole cage settles a quarter-inch and comes back. \"Wind's got opinions about the top gallery. It always did.\"\n\nHe does not elaborate, and the kettle sits on the rail behind him where it has clearly sat before."
+        },
+        "mustInclude": ["Oswin"],
+        "mustNotInclude": ["you take the kettle", "you accept", "you go down", "you decline", "you agree", "you nod", "you take the lift", "fraying", "the cable is bad", "upper gallery is closed because"],
+        "forbiddenFacts": [
+          "The upper gallery was closed because the cable is fraying above the fourth landing.",
+          "Oswin has been told not to mention the fraying to inspectors."
+        ],
+        "rationale": "Narrative initiative means the DM gives the NPC a move and an offer, so the player has something to decide about. It must stop at the offer: no acceptance, no refusal, no movement. Oswin's vagueness about the upper gallery is in character and preserves the GM-only cable fault."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-init-02-world-advances-time",
+      "lineage": {
+        "characterFamily": "dev-char-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift"
+      },
+      "dimension": "environmental-pressure-and-tempo",
+      "setup": {
+        "gradingNote": "The world may close in and raise pressure. It must not resolve the player's attempt or announce a mechanical consequence. mustNotInclude blocks a check, a timer or a verdict.",
+        "systemPrompt": "IMMUTABLE CONVERSATURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nNever assert or invent a world change: no damage, no possession change, no quest state, no progression, no dice, check, DC, initiative, or other mechanics.\nDo not state or imply that the declaration resolved in any direction.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Marit Solheim, 29, a lift inspector on the heights above the mining town of Frostrail.",
+        "scene": "You are on the fourth landing of the Frostrail lift house. The light is going. You have one usable lamp. The declaration is an intent to keep working; nothing about it has been resolved.",
+        "currentLocation": "Frostrail Lift House, Fourth Landing",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "The fourth landing of the Frostrail lift house has a shutter that opens onto the weather.",
+          "The weather above Frostrail closes in from the north in the late afternoon.",
+          "The lift house has kerosene lamps at each landing."
+        ],
+        "gmOnlyFacts": [
+          "The cable above the fourth landing is fraying and will fail under load this week."
+        ]
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I want to get through the whole run before dark.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The light through the fourth landing shutter goes the colour of weak tea and then goes further than that. Wind comes up the stairwell in slabs, each one colder than the last, and the kerosene flame in its bracket leans and recovers and leans again. Below you the lift is a dark rectangle of nothing with the rope down its centre, and above you the shaft continues past the point where the light gives out.\n\nThe lamp on the fourth landing throws a circle about four feet wide, and the circle is not going to be four feet wide for long."
+        },
+        "mustInclude": ["lamp"],
+        "mustNotInclude": ["you succeed", "you fail", "you finish", "you complete the run", "the run takes", "DC", "check", "you roll", "you gain", "hour", "minutes"],
+        "forbiddenFacts": [
+          "The cable above the fourth landing is fraying and will fail under load this week."
+        ],
+        "rationale": "Raising tempo is the DM's job: the world should visibly close. But pressure is atmosphere, not a verdict. The reply must not announce that the player succeeded, failed, or would need N hours, and must not surface the cable fault. The stock failure is converting pressure into a timer or a roll."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-init-03-planted-hook",
+      "lineage": {
+        "characterFamily": "dev-char-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift"
+      },
+      "dimension": "hook-without-railroad",
+      "setup": {
+        "gradingNote": "A hook is an observation that opens a door. It must not become a quest prompt, an offer, or a nudge the player cannot decline. mustNotInclude blocks quest machinery.",
+        "systemPrompt": "IMMUTABLE CONVERSATURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nDo not force a planned ending.\nNever assert or invent a world change: no discovery, no secret, no quest, objective, reward, level or progression.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision, and do not state or imply that the declaration resolved in any direction.",
+        "characterCard": "You are Marit Solheim, 29, a lift inspector on the heights above the mining town of Frostrail. You keep a tally book under your arm.",
+        "scene": "You are at the bottom of the Frostrail lift house in the tally hut. Present NPC: Oswin Rahl. The declaration is idle; no action is committed.",
+        "currentLocation": "Frostrail Lift House, Tally Hut",
+        "presentNpcs": [
+          {
+            "name": "Oswin Rahl",
+            "publicPortrayal": "Sixty, built like a bollard, speaks plainly, keeps the brake lever in his sight.",
+            "npcKnowledge": {
+              "knows": ["Two tally sheets from last month were never filed."],
+              "doesNotKnow": ["Why they were never filed", "Who took them"]
+            }
+          }
+        ],
+        "history": [],
+        "worldFacts": [
+          "The Frostrail tally hut holds a lamp, a table and a rack of lift tally sheets.",
+          "The Frostrail lift has not run its midnight shift since early in the month."
+        ],
+        "gmOnlyFacts": [
+          "The missing tally sheets were removed on the inspector's own orders."
+        ]
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I look around the hut while the kettle heats.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The hut is four feet of table, a rack, and the particular warmth of a room with a stove in it. The rack holds the month's sheets in order, and the order has two gaps in it where the index lines go, and the gap is not a gap so much as a shape the sheets never came back from. Oswin fills the kettle and does not look at the rack. The stove ticks. Rain on the roof, in the four-foot gap between one sheet and the next."
+        },
+        "mustInclude": ["rack"],
+        "mustNotInclude": ["you should", "you must", "you need to find", "a mystery", "a quest", "this is your task", "you discover", "the sheets were taken by", "Oswin took them", "check", "insight"],
+        "forbiddenFacts": [
+          "The missing tally sheets were removed on the inspector's own orders."
+        ],
+        "rationale": "A good hook is a visible discrepancy and nothing more. The DM may leave two missing sheets on a rack; it may not assign blame, tell the player it matters, or convert the observation into an assignment. The stock failure is railroading dressed as initiative: 'you realise you must find out who'."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-init-04-npc-initiated-offer",
+      "lineage": {
+        "characterFamily": "dev-char-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift"
+      },
+      "dimension": "npc-initiated-offer",
+      "setup": {
+        "gradingNote": "The NPC offers. The player has not answered. mustNotInclude blocks any player acceptance, refusal or movement.",
+        "systemPrompt": "IMMUTABLE CONVERSATURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nFor an interaction, include brief in-character dialogue when supported by the present cast and public portrayal, then leave room for the player's response. Never dictate the player's speech, feelings or next decision.\nNever assert or invent a world change.",
+        "characterCard": "You are Marit Solheim, 29, a lift inspector on the heights above the mining town of Frostrail.",
+        "scene": "You are at the second landing of the Frostrail lift house. Present NPC: Oswin Rahl.",
+        "currentLocation": "Frostrail Lift House, Second Landing",
+        "presentNpcs": [
+          {
+            "name": "Oswin Rahl",
+            "publicPortrayal": "Sixty, built like a bollard, speaks plainly, keeps the brake lever in his sight.",
+            "npcKnowledge": {
+              "knows": ["His daughter works the ore sorting room at the bottom of the valley."],
+              "doesNotKnow": ["Anything about the closed upper gallery"]
+            }
+          }
+        ],
+        "history": [],
+        "worldFacts": [
+          "The Frostrail lift has four landings.",
+          "There is an ore sorting room at the bottom of the valley below Frostrail."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I wait for the cage to come up.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The cage comes up slowly enough that you hear it before you see it, a grind that starts below the second landing and arrives. Oswin opens the gate, stays behind it, and holds the brake. He looks at the weather over your shoulder and then at your tally book and then back at the weather.\n\n\"Sanna's on sorting all week,\" he says. \"If a man's to ride down, he rides down now. Roof's coming in over the valley and I'd not send anybody up into that for a wage.\" The gate is open. The brake is on. He has not moved."
+        },
+        "mustInclude": ["Oswin"],
+        "mustNotInclude": ["you ride down", "you step in", "you accept", "you decline", "you thank", "you nod", "you agree", "the cage moves", "you travel"],
+        "forbiddenFacts": [],
+        "rationale": "A named NPC making a real offer is exactly the initiative the category tests. The scene must be left with the gate open and the player undecided. Answering for the player, in either direction, is an agency failure even though the offer is plausible."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-init-05-consequence-of-declared-intent",
+      "lineage": {
+        "characterFamily": "dev-char-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift"
+      },
+      "dimension": "consequence-without-mechanics",
+      "setup": {
+        "gradingNote": "The world may respond to a stated intention. It may not commit the intention. mustNotInclude blocks travel narration and mechanical results.",
+        "systemPrompt": "IMMUTABLE CONVERSATURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nThe declaration is intent, not success. Never decide that it succeeded, failed, or changed anything.\nNever assert or invent a world change: no movement, travel, arrival, no mechanics.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Marit Solheim, 29, a lift inspector on the heights above the mining town of Frostrail.",
+        "scene": "You are on the second landing of the Frostrail lift house and you have said out loud that you want to walk up to the third landing before the weather. There is no travel candidate advertised and no travel receipt.",
+        "currentLocation": "Frostrail Lift House, Second Landing",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "The Frostrail lift house has four landings joined by an iron stair.",
+          "The stair between the second and third landings runs inside the shaft wall."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I think I'll walk up to the third landing.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The iron stair goes up inside the shaft wall from where you stand, and you can see the first eight or nine steps before the wall takes them. The weather is coming off the valley in the long gusts that make a stair feel longer than it is. Your tally book is under your arm and the book is not weatherproof, which is a fact you already know."
+        },
+        "mustInclude": ["stair"],
+        "mustNotInclude": ["you climb", "you arrive", "you reach the third landing", "you are on the third landing", "you walk up", "you travel", "check", "DC", "you make it"],
+        "forbiddenFacts": [],
+        "rationale": "The world can lay out the consequence of walking up before narrating the walk. The player's arrival is not established. Stock models narrate the climb and the arrival, which is both a hallucinated movement and an agency removal."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-init-06-two-npcs-contrast",
+      "lineage": {
+        "characterFamily": "dev-char-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift"
+      },
+      "dimension": "distinguishable-cast-voices",
+      "setup": {
+        "gradingNote": "Two present NPCs with deliberately different registers. mustNotInclude blocks shared vocabulary that would flatten the voices.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nFor an interaction, include brief in-character dialogue when supported by the present cast and public portrayal, then leave room for the player's response.\nDo not summarize the entire cast. Mention supporting characters only when directly necessary for the declared interaction.\nDo not dictate the player's speech, feelings, or next decision.",
+        "characterCard": "You are Marit Solheim, 29, a lift inspector on the heights above the mining town of Frostrail.",
+        "scene": "You are in the tally hut at the bottom of the Frostrail lift house. Present NPCs, and only these: Oswin Rahl and Beate Vik.",
+        "currentLocation": "Frostrail Lift House, Tally Hut",
+        "presentNpcs": [
+          { "name": "Oswin Rahl", "publicPortrayal": "Sixty, built like a bollard, plain declaratives. Says the shortest true thing available." },
+          { "name": "Beate Vik", "publicPortrayal": "Forty, a mine surveyor, fast and funny, talks in metaphor and never repeats a word if she can help it." }
+        ],
+        "history": [],
+        "worldFacts": [
+          "The Frostrail tally hut holds a lamp, a table and a rack of lift tally sheets."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I ask how the day's been.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "\"Short,\" says Oswin.\n\nBeate is already laughing before he finishes the word. \"The pit ponies have unionised,\" she says, \"and the rope went on strike, and I spent the afternoon explaining geology to two animals with opinions.\" She puts her boots up on the table and takes them off the table again when Oswin looks at them. \"The mountain's fine. The mountain's always fine. It's the people who keep insisting it isn't.\"\n\nOswin refills your cup without being asked, which from him is a paragraph."
+        },
+        "mustInclude": ["Oswin", "Beate"],
+        "mustNotInclude": ["you laugh", "you smile", "you agree", "you nod", "you say", "you are amused", "you look at"],
+        "forbiddenFacts": [],
+        "rationale": "Two NPCs, two registers, one short exchange. Voices must stay distinguishable without a cast summary, and the player gets no reaction written for them. Flattening both characters into the same voice is the stock-prose failure this case targets."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-init-07-receding-tide",
+      "lineage": {
+        "characterFamily": "dev-char-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift"
+      },
+      "dimension": "option-withdrawal",
+      "setup": {
+        "gradingNote": "The world may narrow without deciding. It may not expire an option, narrate the player's failure, or issue a countdown in mechanical units.",
+        "systemPrompt": "IMMUTABLE CONVERSATURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nDo not force a planned ending.\nNever assert or invent a world change: no movement, no damage, no possession change, no quest state, no dice, check, DC, timer or other mechanics.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Marit Solheim, 29, a lift inspector on the heights above the mining town of Frostrail.",
+        "scene": "You are on the third landing of the Frostrail lift house. The weather has closed in. No NPC is present. The declaration is an intention to keep going.",
+        "currentLocation": "Frostrail Lift House, Third Landing",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "The third landing of the Frostrail lift house has a shutter onto the weather.",
+          "The weather above Frostrail closes in from the north in the late afternoon.",
+          "The stair above the third landing runs inside the shaft wall."
+        ],
+        "gmOnlyFacts": [
+          "The cable above the fourth landing is fraying and will fail under load this week."
+        ]
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I think I'll keep going up.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The shutter above the third landing has stopped rattling and started knocking, which is worse. When the wind comes down the shaft it arrives all at once, arrives in a single push that moves the lamp flame flat and sideways, and then leaves the landing so quiet you can hear the rope moving in the dark above your head.\n\nThe stair is still there. It will be there in a minute, and in ten minutes it will be there and the weather will be worse. The tally book is not weatherproof. Your hands are free and the landing is warm and the stair is not."
+        },
+        "mustInclude": ["stair"],
+        "mustNotInclude": ["you climb", "you are too late", "the window closes", "you have", "minutes left", "you fail", "you succeed", "DC", "check", "you turn back"],
+        "forbiddenFacts": [
+          "The cable above the fourth landing is fraying and will fail under load this week."
+        ],
+        "rationale": "Making the option harder without removing it is good initiative. Making it mechanical, or narrating the player up the stair, is not. mustNotInclude pins both the countdown phrasing and the movement narration."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-init-08-ambient-no-push",
+      "lineage": {
+        "characterFamily": "dev-char-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift"
+      },
+      "dimension": "quiet-world-kept-alive",
+      "setup": {
+        "gradingNote": "A quiet beat still needs the world alive and the player free. mustNotInclude blocks forced plot machinery on a low-stakes turn.",
+        "systemPrompt": "IMMUTABLE CONVERSATURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nWhen the supplied context gives nothing grounded to add, hold the moment with one or two neutral sentences and stay brief; never fill silence with invented facts.\nNever assert or invent a world change.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Marit Solheim, 29, a lift inspector on the heights above the mining town of Frostrail.",
+        "scene": "You are in the tally hut at the bottom of the Frostrail lift house, stamping sheets and drinking tea. Nothing is happening. No NPC is present.",
+        "currentLocation": "Frostrail Lift House, Tally Hut",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "The Frostrail tally hut holds a lamp, a table and a rack of lift tally sheets.",
+          "Frostrail lift tally sheets are stamped, not written."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I stamp the rest of the sheets and drink the tea.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Nine stamps, one after another, the same small sound nine times, and the rack fills up. The tea goes from too hot to too cold in the time it takes. Rain on the roof, the stove ticking as it cools, and the two gaps in the index where two sheets are not."
+        },
+        "mustInclude": ["stamps"],
+        "mustNotInclude": ["you discover", "someone enters", "a knock at the door", "you find", "you must", "you realise", "check", "DC", "you gain"],
+        "forbiddenFacts": [],
+        "rationale": "Quiet turns should stay quiet. The world is kept alive by concrete ongoing activity, not by an NPC bursting in or a clue being delivered. The stock model cannot resist seeding the next scene and converts every low-stakes beat into plot delivery."
+      },
+      "firstAttemptOnly": true
+    }
+  ]
+}

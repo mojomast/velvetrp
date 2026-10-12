@@ -1,0 +1,967 @@
+{
+  "category": "tool-selection",
+  "version": "velvet-baseline-v1",
+  "lineage": {
+    "characterFamily": "dev-char-tannery-quarter",
+    "worldFamily": "dev-world-threadneedle-quarter",
+    "scenarioFamily": "dev-scenario-threadneedle-guild"
+  },
+  "cases": [
+    {
+      "id": "dev-tool-01-travel-four-args",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "exact-travel-selection",
+      "setup": {
+        "gradingNote": "This grades the PLANNING step: the reply must be exactly one call to exact_actor_travel.select with all four required arguments, including the empty choices array. Supplying only candidateId, or adding a destination string, is a failure. No narrative commitment beyond the committed destination is allowed.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nAdvertised tools and their returned receipts are the only implemented authoritative mechanics. Never infer broader mechanics from the ruleset descriptor or invent totals, costs, DCs, permissions, identities, revisions, outcomes, or tools.\nA player declaration is intent, not canon. Do not disclose private planning facts. Assistant prose is private and discarded.\nIf the intent, target, difficulty or prerequisites are unclear, hold and let narration ask a brief clarification rather than forcing a call.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow. You say what you are told and you write it down.",
+        "scene": "Out of combat, on Threadneedle Row in the Threadneedle Quarter. Two exact travel candidates are advertised. Control is full over your own actor. Current location: Threadneedle Row.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "Threadneedle Row is the main street of the Threadneedle Quarter.",
+          "The Dye Vats are one street north of Threadneedle Row."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "campaign_context.read",
+            "description": "Use to reread bounded authorized turn context; do not use it to infer mutation authority or hidden state.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "world_state.read",
+            "description": "Use for audience-visible world and cast facts; do not use for hidden locations, private cast facts, or mutations.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_actor_travel.select",
+            "description": "Select exactly one server-issued travel option. Supply no destination, party, revision, or other mechanics arguments.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["travel:dye-vats-31", "travel:counting-house-32"] },
+                "kind": { "type": "string", "enum": ["actor.travel"] },
+                "version": { "type": "string", "enum": ["v1"] },
+                "choices": { "type": "array", "maxItems": 0 }
+              },
+              "required": ["candidateId", "kind", "version", "choices"],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "type": "object",
+                  "description": "Select this exact server-issued travel binding.",
+                  "properties": {
+                    "candidateId": { "type": "string", "const": "travel:dye-vats-31" },
+                    "kind": { "type": "string", "const": "actor.travel" },
+                    "version": { "type": "string", "const": "v1" },
+                    "choices": { "type": "array", "maxItems": 0 }
+                  },
+                  "required": ["candidateId", "kind", "version", "choices"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "description": "Select this exact server-issued travel binding.",
+                  "properties": {
+                    "candidateId": { "type": "string", "const": "travel:counting-house-32" },
+                    "kind": { "type": "string", "const": "actor.travel" },
+                    "version": { "type": "string", "const": "v1" },
+                    "choices": { "type": "array", "maxItems": 0 }
+                  },
+                  "required": ["candidateId", "kind", "version", "choices"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "input": "I head up to the Dye Vats.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "exact_actor_travel.select",
+        "arguments": { "candidateId": "travel:dye-vats-31", "kind": "actor.travel", "version": "v1", "choices": [] },
+        "mustInclude": [],
+        "mustNotInclude": ["destination", "party", "you arrive at the Counting House", "revision"],
+        "forbiddenFacts": [],
+        "rationale": "The declaration names one advertised destination, so the correct behaviour is to commit it rather than refuse to call a tool. Travel takes four required arguments, and the server owns the destination string: a model that omits choices, invents a destination field, or picks the other candidate has failed on both selection and argument fidelity."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-02-check-not-travel",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "check-versus-adjacent-travel",
+      "setup": {
+        "gradingNote": "A travel candidate and a check candidate are both advertised. The declaration is an attempt, not a movement. Correct answer is exact_srd_check.select with exactly two arguments.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nWhen an attempted action's success is uncertain and an exact check candidate is advertised, prefer that check because it establishes success or failure.\nA player declaration is intent, not canon. Do not disclose private planning facts. Assistant prose is private and discarded.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, at the locked end of Threadneedle Row. Control is full over your own actor. One travel candidate and one check candidate are advertised.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "Threadneedle Row is the main street of the Threadneedle Quarter."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_actor_travel.select",
+            "description": "Select exactly one server-issued travel option. Supply no destination, party, revision, or other mechanics arguments.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["travel:counting-house-32"] },
+                "kind": { "type": "string", "enum": ["actor.travel"] },
+                "version": { "type": "string", "enum": ["v1"] },
+                "choices": { "type": "array", "maxItems": 0 }
+              },
+              "required": ["candidateId", "kind", "version", "choices"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_srd_check.select",
+            "description": "Select exactly one advertised SRD 5.1 ability or skill check. Supply only its opaque candidate ID and digest; the server owns actor identity, scores, modifiers, DC, mode, revisions, roll, and outcome.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["check:rye-sack-hoist-33"] },
+                "digest": { "type": "string", "enum": ["58a2948f312e846ed18c4acde4ea7e4f94aa60fb8f209dc9fb5533789763f04d"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "type": "object",
+                  "description": "Select this exact server-issued candidate binding.",
+                  "properties": {
+                    "candidateId": { "type": "string", "const": "check:rye-sack-hoist-33" },
+                    "digest": { "type": "string", "const": "58a2948f312e846ed18c4acde4ea7e4f94aa60fb8f209dc9fb5533789763f04d" }
+                  },
+                  "required": ["candidateId", "digest"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "input": "I get my shoulder under the rye sack and try to shove it up onto the cart.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "exact_srd_check.select",
+        "arguments": { "candidateId": "check:rye-sack-hoist-33", "digest": "58a2948f312e846ed18c4acde4ea7e4f94aa60fb8f209dc9fb5533789763f04d" },
+        "mustInclude": [],
+        "mustNotInclude": ["strength", "modifier", "dc", "roll", "outcome", "total"],
+        "forbiddenFacts": [],
+        "rationale": "Force-feeding a sack onto a cart is an attempt with uncertain success, and the check is the only advertised candidate that establishes an outcome. The travel candidate is the confident wrong pick. Supplying a skill name, DC, modifier or roll in the arguments violates the server-owns-everything contract."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-03-no-tool-chitchat",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "spurious-tool-call-penalty",
+      "setup": {
+        "gradingNote": "Grades the PLANNING step. The correct plan is no adventure tool call at all. mustInclude/mustNotInclude apply to the narration that follows.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nRoutine observation and conversation do not automatically require rolls. A keyword, question about an action, quoted speech, negated action, past report or hypothetical plan is not an instruction to execute that action.\nA player declaration is intent, not canon. Do not disclose private planning facts. Assistant prose is private and discarded.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, on Threadneedle Row. Five tools are advertised, including two mutations. Present NPC: Oren Vask, the guild factor. Control is full over your own actor.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [
+          { "name": "Oren Vask", "publicPortrayal": "A thin man of fifty with a clerk's stoop and a factor's patience." }
+        ],
+        "history": [],
+        "worldFacts": [
+          "Threadneedle Row is the main street of the Threadneedle Quarter."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "world_state.read",
+            "description": "Use for audience-visible world and cast facts; do not use for hidden locations, private cast facts, or mutations.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "actor_inventory.read",
+            "description": "Use to inspect labeled source-actor possessions; do not use as authority to equip, consume, gift, or drop items.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_srd_check.select",
+            "description": "Select exactly one advertised SRD 5.1 ability or skill check. Supply only its opaque candidate ID and digest; the server owns actor identity, scores, modifiers, DC, mode, revisions, roll, and outcome.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["check:small-talk-read-34"] },
+                "digest": { "type": "string", "enum": ["8b097189d9abc71c24a2d93d599f7618421cd9525e3ec90d0678da9d57aeeabc"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_quest_lifecycle.select",
+            "description": "Select one exact advertised quest accept, abandon, or reward claim. Supply only opaque candidate ID and digest; the server owns quest, reward, recipient, dependencies, values, and revisions.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["quest:accept-ledger-walk-35"] },
+                "digest": { "type": "string", "enum": ["5a7b1b18ec7ab4945db020288d316faff157b9bc12e3f48b573b1bf868ae566c"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "Morning, factor. Lovely weather for the dye season.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": [],
+        "mustNotInclude": ["you accept", "the quest is accepted", "you roll", "you read your inventory", "you gain insight", "you learn"],
+        "forbiddenFacts": [],
+        "rationale": "A greeting with no action commits nothing. The menu deliberately includes a check candidate and a quest candidate so that an 8B model's known 67% tool-hallucination rate has somewhere to fire. The correct plan is silence from the registry and ordinary conversational prose."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-04-clarify-ambiguous-purchase",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "clarify-when-target-is-unspecified",
+      "setup": {
+        "gradingNote": "Two equally advertised purchase candidates and a declaration that matches both. Graded as: no exact_* mutation call is emitted, and the narration is under 60 words and asks one short question. mustNotInclude pins the two committing calls.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nIf the intent, target, difficulty or prerequisites are unclear, hold and let narration ask a brief clarification rather than forcing a call.\nA player declaration is intent, not canon. Do not disclose private planning facts.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, at Merrinow's stall on Threadneedle Row. Present NPC: Merrinow the stallholder. Two exact vendor commerce candidates are advertised and both are on the table in front of the player.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [{ "name": "Merrinow", "publicPortrayal": "A stallholder who lays out four goods and lets the buyer do the choosing." }],
+        "history": [],
+        "worldFacts": [
+          "Merrinow's stall is on Threadneedle Row in the Threadneedle Quarter."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_vendor_commerce.select",
+            "description": "Select one exact advertised vendor purchase, sale, or free transfer by opaque candidate ID and digest. Supply no price, quantity, vendor, shop, item, recipient, revision, or outcome.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["shop:buy-dyed-wool-36", "shop:buy-undyed-flax-37"] },
+                "digest": { "type": "string", "enum": ["37b42e063b6cadc55f8bf62cba7fc74467f609ecdc772e3502648a8726c1b9ee", "6a83a0677381be0384df650f126e1dcf7caaaba359c2c2ec573d95daa55be9a1"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": { "candidateId": { "type": "string", "const": "shop:buy-dyed-wool-36" }, "digest": { "type": "string", "const": "37b42e063b6cadc55f8bf62cba7fc74467f609ecdc772e3502648a8726c1b9ee" } },
+                  "required": ["candidateId", "digest"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": { "candidateId": { "type": "string", "const": "shop:buy-undyed-flax-37" }, "digest": { "type": "string", "const": "6a83a0677381be0384df650f126e1dcf7caaaba359c2c2ec573d95daa55be9a1" } },
+                  "required": ["candidateId", "digest"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "Right, I'll take one of those.",
+      "expected": {
+        "outcome": "clarify",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["?"],
+        "mustNotInclude": ["you buy", "shop:buy-dyed-wool-36", "shop:buy-undyed-flax-37", "your balance", "Merrinow hands you", "she wraps it"],
+        "forbiddenFacts": [],
+        "rationale": "Two advertised candidates, a declaration that fits both equally, and no disambiguator. Committing either is an unearned coin-flip on the player's money. The correct behaviour is to hold and let the narration ask one short question, which is the documented 'hold and clarify' path rather than a forced call."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-05-quest-objective",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "quest-objective-progress-only",
+      "setup": {
+        "gradingNote": "Two quest objectives from the same quest are advertised. Only one matches the declaration. Progress must not be inferred beyond the candidate.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nA player declaration is intent, not canon. Do not disclose private planning facts. Assistant prose is private and discarded.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, on Ledger Walk in the Threadneedle Quarter. Two exact quest objective candidates are advertised from the active quest. Control is full over your own actor.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Ledger Walk",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "Ledger Walk is the guild record street of the Threadneedle Quarter."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "quest_state.read",
+            "description": "Use for visible quest facts and status; do not use it to advance, accept, abandon, or claim rewards.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_quest_objective.select",
+            "description": "Advance one exact currently legal public quest objective only when the player's declaration clearly describes completing that objective. Select an advertised candidate; do not infer extra progress.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["objective:copy-the-dyer-ledger-38", "objective:confront-the-factor-39"] },
+                "digest": { "type": "string", "enum": ["69726709e199704f465293daeba2efd949e32e14764cdeb248b584d2bccd067b", "912de9221178532a8014834808d3788111f57cac856e253553f88737dcd4e371"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": { "candidateId": { "type": "string", "const": "objective:copy-the-dyer-ledger-38" }, "digest": { "type": "string", "const": "69726709e199704f465293daeba2efd949e32e14764cdeb248b584d2bccd067b" } },
+                  "required": ["candidateId", "digest"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": { "candidateId": { "type": "string", "const": "objective:confront-the-factor-39" }, "digest": { "type": "string", "const": "912de9221178532a8014834808d3788111f57cac856e253553f88737dcd4e371" } },
+                  "required": ["candidateId", "digest"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I copy the dyer's ledger entry for the twelfth into the factorage book.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "exact_quest_objective.select",
+        "arguments": { "candidateId": "objective:copy-the-dyer-ledger-38", "digest": "69726709e199704f465293daeba2efd949e32e14764cdeb248b584d2bccd067b" },
+        "mustInclude": [],
+        "mustNotInclude": ["objective:confront-the-factor-39", "the quest is complete", "you advance twice", "progress", "the factor is confronted"],
+        "forbiddenFacts": [],
+        "rationale": "One objective candidate matches the declaration clearly. The sibling objective is the confident wrong pick, and advancing it would put narrative content into the campaign the player never declared. Selecting two candidates, or selecting none, are both failures."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-06-combat-legal-action",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "combat-action-exact-binding",
+      "setup": {
+        "gradingNote": "During combat no travel, check, rest, attribute or dice tool is advertised. legalActionId and legalActionDigest must both be sent and must be a matching advertised pair.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nWhen the declaration describes a concrete combat action and an advertised legal combat action matches it, commit that exact action with combat_action.execute instead of only describing it; never narrate a mechanical action you did not commit.\nA player declaration is intent, not canon. Do not disclose private planning facts.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow. You are in an encounter in the guild dye cellar.",
+        "scene": "Encounter active. It is your turn. One legal combat action candidate is advertised for your boning knife. The generic actor mutation tools are deliberately absent during combat.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Quarter, Guild Dye Cellar",
+        "presentNpcs": [{ "name": "The factor's man", "publicPortrayal": "Big, unhurried, standing between you and the cellar stair." }],
+        "history": [],
+        "worldFacts": [
+          "The guild dye cellar is below the Threadneedle Quarter counting house."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "combat_state.read",
+            "description": "Use during combat to inspect public state and labeled exact legal actions; do not use outside combat or invent targets.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "actor_inventory.read",
+            "description": "Use to inspect labeled source-actor possessions; do not use as authority to equip, consume, gift, or drop items.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "combat_action.execute",
+            "description": "Use for one labeled legal combat action candidate (basic attack, grapple, shove, help, stabilize, stand up, dash, disengage, hide, ready, flee, or end turn); do not use for powers, consumables, or invented targets.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "legalActionId": { "type": "string", "enum": ["combat:basic-attack:boning-knife"] },
+                "legalActionDigest": { "type": "string", "enum": ["0852c25b8c4f262d58d1d500b9ee002c270322d29ea004ec46351bddff625f7e"] }
+              },
+              "required": ["legalActionId", "legalActionDigest"],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "type": "object",
+                  "description": "Select this exact server-issued combat action binding.",
+                  "properties": {
+                    "legalActionId": { "type": "string", "const": "combat:basic-attack:boning-knife" },
+                    "legalActionDigest": { "type": "string", "const": "0852c25b8c4f262d58d1d500b9ee002c270322d29ea004ec46351bddff625f7e" }
+                  },
+                  "required": ["legalActionId", "legalActionDigest"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "input": "I go for him with the boning knife.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "combat_action.execute",
+        "arguments": { "legalActionId": "combat:basic-attack:boning-knife", "legalActionDigest": "0852c25b8c4f262d58d1d500b9ee002c270322d29ea004ec46351bddff625f7e" },
+        "mustInclude": [],
+        "mustNotInclude": ["damage", "hit", "crit", "he hits", "attack roll", "d20", "target", "strength"],
+        "forbiddenFacts": [],
+        "rationale": "The declared action maps to exactly one advertised legal action, so the correct plan is to commit it rather than merely describe it. The digest must accompany the id, and the model must not invent the target or the roll: the server computes outcome. Refusing to call here is the 'missed-action' failure."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-07-read-with-empty-arguments",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "read-tool-empty-arguments",
+      "setup": {
+        "gradingNote": "The read tools take zero arguments and the schema is additionalProperties:false. Any argument at all is a schema violation.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nUse labeled reads to interpret the declaration. Reads grant no mutation authority.\nA player declaration is intent, not canon. Do not disclose private planning facts.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, on Threadneedle Row, at the start of a shift. The player asks a factual question about their own possessions. Control is full over your own actor.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "actor_inventory.read",
+            "description": "Use to inspect labeled source-actor possessions; do not use as authority to equip, consume, gift, or drop items.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "actor_resources.read",
+            "description": "Use to inspect labeled current/capacity resources; do not use to initialize, spend, or mutate them.",
+            "parameters": { "type": "object", "properties": {}, "required": [], "additionalProperties": false }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "What have I actually got on me?",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "actor_inventory.read",
+        "arguments": {},
+        "mustInclude": [],
+        "mustNotInclude": ["you equip", "you drop", "you consume", "you are carrying a legendary", "a sword", "potion"],
+        "forbiddenFacts": [],
+        "rationale": "A question about own possessions is answered by the labelled read, not by invention. The arguments object must be empty: read tools have an empty strict schema, and inventing an actorId, item or filter argument is argument drift. mustNotInclude blocks the very common failure of answering from imagination instead of reading."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-08-unadvertised-bribe",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "unadvertised-action-holds",
+      "setup": {
+        "gradingNote": "Grades the PLANNING step. No candidate offers bribery or influence over a guild officer. The plan is no adventure tool call. mustNotInclude blocks fabricating the bribe.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nVendor commerce exists only through present, visible, associated vendors and exact server-priced candidates; unsupported transfers, story changes, and GM override remain unavailable.\nA player declaration is intent, not canon. Do not disclose private planning facts.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, on Threadneedle Row. Present NPC: Oren Vask, the guild factor, who is not a vendor and has no shop. Two commerce candidates are advertised, both for a different vendor.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [{ "name": "Oren Vask", "publicPortrayal": "A thin man of fifty with a clerk's stoop and a factor's patience." }],
+        "history": [],
+        "worldFacts": [
+          "Oren Vask is a guild factor, not a vendor, and has no associated shop."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_vendor_commerce.select",
+            "description": "Select one exact advertised vendor purchase, sale, or free transfer by opaque candidate ID and digest. Supply no price, quantity, vendor, shop, item, recipient, revision, or outcome.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["shop:buy-dyed-wool-36", "shop:buy-undyed-flax-37"] },
+                "digest": { "type": "string", "enum": ["37b42e063b6cadc55f8bf62cba7fc74467f609ecdc772e3502648a8726c1b9ee", "6a83a0677381be0384df650f126e1dcf7caaaba359c2c2ec573d95daa55be9a1"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I slip the factor forty silver and tell him his ledger is wrong.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": [],
+        "mustNotInclude": ["you give", "your balance", "he takes the money", "he agrees", "he changes the ledger", "you buy", "shop:buy-dyed-wool-36", "shop:buy-undyed-flax-37"],
+        "forbiddenFacts": [],
+        "rationale": "The action is unsupported: the factor is not a vendor, no candidate prices a bribe, and the server has no authority model for influence. Bending an adjacent commerce candidate onto a bribe is exactly the failure the precedent corpus labels unadvertised. The turn holds with receipt-free prose."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-09-commerce-buy",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "commerce-exact-selection",
+      "setup": {
+        "gradingNote": "Two buy candidates and one sell candidate are advertised. Only the buy candidate matches. Supply no price, quantity, vendor or item in the arguments.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nAdvertised tools and their returned receipts are the only implemented authoritative mechanics. Never infer totals, costs, prices or outcomes.\nA player declaration is intent, not canon. Do not disclose private planning facts.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, at Merrinow's stall on Threadneedle Row. Present NPC: Merrinow. Three exact vendor commerce candidates are advertised.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [{ "name": "Merrinow", "publicPortrayal": "A stallholder who lays out four goods and lets the buyer do the choosing." }],
+        "history": [],
+        "worldFacts": [
+          "Merrinow's stall is on Threadneedle Row in the Threadneedle Quarter."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_vendor_commerce.select",
+            "description": "Select one exact advertised vendor purchase, sale, or free transfer by opaque candidate ID and digest. Supply no price, quantity, vendor, shop, item, recipient, revision, or outcome.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["shop:buy-dyed-wool-36", "shop:buy-undyed-flax-37", "shop:sell-ledger-key-40"] },
+                "digest": { "type": "string", "enum": ["37b42e063b6cadc55f8bf62cba7fc74467f609ecdc772e3502648a8726c1b9ee", "6a83a0677381be0384df650f126e1dcf7caaaba359c2c2ec573d95daa55be9a1", "7fb1926248bee9d263cb538869e8c19d5d04a27558826b093bce5dba01df26cf"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I count out the silver for two hanks of the dyed wool from Merrinow.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "exact_vendor_commerce.select",
+        "arguments": { "candidateId": "shop:buy-dyed-wool-36", "digest": "37b42e063b6cadc55f8bf62cba7fc74467f609ecdc772e3502648a8726c1b9ee" },
+        "mustInclude": [],
+        "mustNotInclude": ["price", "quantity", "balance", "GP", "silver", "your wallet", "she hands you", "you own it"],
+        "forbiddenFacts": [],
+        "rationale": "The declaration names one advertised purchase unambiguously, and the player said 'two hanks' while the candidate is the whole priced lot. The server owns quantity and price; restating them in the arguments is an authority violation even though it sounds helpful."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-10-clarify-rest-versus-travel",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "clarify-across-tool-families",
+      "setup": {
+        "gradingNote": "A rest candidate and a travel candidate are advertised and the declaration fits both. Graded as: no exact_* mutation call, and a short narration asking which. mustNotInclude pins both committing calls.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nIf the intent, target, difficulty or prerequisites are unclear, hold and let narration ask a brief clarification rather than forcing a call.\nA player declaration is intent, not canon. Do not disclose private planning facts.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, on Threadneedle Row at the end of a long shift. One long-rest candidate and one travel candidate are advertised. Control is full over your own actor.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "There is an apprentice loft above Merrinow's stall on Threadneedle Row."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_rest.select",
+            "description": "Use for one labeled advertised rest recovery preview; do not use for arbitrary healing, waiting, or when no rest candidate exists.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["rest:long-loft-41"] },
+                "digest": { "type": "string", "enum": ["a36d4b00a31355a52ee90592617da46f3adf5fd0127060be73c452cc44d7c43c"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_actor_travel.select",
+            "description": "Select exactly one server-issued travel option. Supply no destination, party, revision, or other mechanics arguments.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["travel:counting-house-32"] },
+                "kind": { "type": "string", "enum": ["actor.travel"] },
+                "version": { "type": "string", "enum": ["v1"] },
+                "choices": { "type": "array", "maxItems": 0 }
+              },
+              "required": ["candidateId", "kind", "version", "choices"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I'll head in for the night.",
+      "expected": {
+        "outcome": "clarify",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["?"],
+        "mustNotInclude": ["rest:long-loft-41", "travel:counting-house-32", "you sleep", "you recover", "you arrive", "you go in", "a long rest is completed"],
+        "forbiddenFacts": [],
+        "rationale": "'Head in' matches a rest and a travel equally well. Family confusion is a specific stock failure: small models collapse 'go in' into 'go somewhere'. Holding and asking one short question is the correct behaviour when the cross-family target is unresolved."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-11-attribute-set-confirmation",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "confirmation-required-mutation",
+      "setup": {
+        "gradingNote": "actor_attribute.set requires three arguments with the exact registered key names attributeCandidateId and attributeCandidateDigest. It is a proposal: the server holds it for human confirmation. The narration must not claim the value was committed.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nPropose setting one existing source-actor attribute; human confirmation is required.\nA player declaration is intent, not canon. Do not disclose private planning facts. Assistant prose is private and discarded.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, on Threadneedle Row. One attribute candidate is advertised. Control is full over your own actor. Human confirmation is required for this mutation.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "Guild apprentices record training adjustments on their own sheet before the start of a season."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "actor_attribute.set",
+            "description": "Propose setting one existing source-actor attribute; human confirmation is required.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "attributeCandidateId": { "type": "string", "enum": ["attribute:street-wits-42"] },
+                "attributeCandidateDigest": { "type": "string", "enum": ["7f0dda5f41e4a99ac23ae12a94cbf0c99f23a962b024a75369176b571446ff6c"] },
+                "value": { "type": "integer", "minimum": -1000, "maximum": 1000 }
+              },
+              "required": ["attributeCandidateId", "attributeCandidateDigest", "value"],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "type": "object",
+                  "description": "Set this exact server-issued attribute binding to the supplied value.",
+                  "properties": {
+                    "attributeCandidateId": { "type": "string", "const": "attribute:street-wits-42" },
+                    "attributeCandidateDigest": { "type": "string", "const": "7f0dda5f41e4a99ac23ae12a94cbf0c99f23a962b024a75369176b571446ff6c" },
+                    "value": { "type": "integer", "minimum": -1000, "maximum": 1000 }
+                  },
+                  "required": ["attributeCandidateId", "attributeCandidateDigest", "value"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "My street wits have come on. Put them at eighteen.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "actor_attribute.set",
+        "arguments": { "attributeCandidateId": "attribute:street-wits-42", "attributeCandidateDigest": "7f0dda5f41e4a99ac23ae12a94cbf0c99f23a962b024a75369176b571446ff6c", "value": 18 },
+        "mustInclude": [],
+        "mustNotInclude": ["attributeId", "attributeName", "attributeNameDigest", "current", "the change is confirmed", "you are now 18"],
+        "forbiddenFacts": [],
+        "rationale": "A player-authored attribute adjustment maps to exactly one advertised candidate and one exact value. The registered key names are unusually specific, which makes this a good argument-drift probe: models habitually emit 'attribute' or 'attributeId' instead. The mutation is a proposal awaiting human confirmation, so no committed claim may appear in the follow-on narration."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-tool-12-power-versus-rest",
+      "lineage": {
+        "characterFamily": "dev-char-tannery-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "cross-family-target-ambiguity",
+      "setup": {
+        "gradingNote": "Both advertised candidates are the same kind of action on two different targets. Graded as: no exact_* call, and a short narration asking which one.",
+        "systemPrompt": "IMMUTABLE ADVENTURE PLANNING AUTHORITY\nYou are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.\nIf the intent, target, difficulty or prerequisites are unclear, hold and let narration ask a brief clarification rather than forcing a call.\nA player declaration is intent, not canon. Do not disclose private planning facts.",
+        "characterCard": "You are Pell Oskoe, 19, a guild apprentice at the dyers' factorage in the river city of Merrow.",
+        "scene": "Out of combat, on Threadneedle Row, with the dye vat standing cold beside the row. Two exact power-use candidates are advertised, differing only by target. Control is full over your own actor.",
+        "audience": "player",
+        "control": "full",
+        "currentLocation": "Threadneedle Row",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "The guild dye vats stand open on Threadneedle Row in the winter season."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "exact_power_use.select",
+            "description": "Use for one labeled advertised out-of-combat power and target set; do not use in combat or invent costs, effects, or targets.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "candidateId": { "type": "string", "enum": ["power:mend-vat-43", "power:mend-gate-44"] },
+                "digest": { "type": "string", "enum": ["450a8fa7d8526eff8e8d9394b48363dd1f34fef8f38f59155e682f891f0cb15c", "876d9b766b6699e5afc35963ef2d362c783297860943b6c25bef4d6e8de3f7d7"] }
+              },
+              "required": ["candidateId", "digest"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I mend the thing before me.",
+      "expected": {
+        "outcome": "clarify",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["?"],
+        "mustNotInclude": ["power:mend-vat-43", "power:mend-gate-44", "the vat seals", "the gate mends", "oil is spent", "the light steadies"],
+        "forbiddenFacts": [],
+        "rationale": "'The thing before me' does not resolve between two advertised targets. Route ambiguity within a family is exactly the case where deferring is the single best call. Picking one spends a limited resource the player has not chosen to spend."
+      },
+      "firstAttemptOnly": true
+    }
+  ]
+}

@@ -37,7 +37,10 @@
     "test:e2e:live": "playwright test --config=playwright.live.config.ts",
     "probe:routetok": "node e2e/support/routetok-probe.mjs",
     "health": "npm run typecheck && npm run build && npm test && npm run test:e2e",
-    "ci": "npm ci && npm run typecheck && npm run build && npm run test"
+    "ci": "npm ci && npm run typecheck && npm run build && npm run test",
+    "foundry": "tsx dataset/src/cli.ts",
+    "typecheck:foundry": "tsc --noEmit -p dataset/tsconfig.json",
+    "test:foundry": "tsx --test --test-concurrency=1 dataset/test/*.test.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

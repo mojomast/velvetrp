@@ -1,0 +1,525 @@
+{
+  "category": "player-agency",
+  "version": "velvet-baseline-v1",
+  "lineage": {
+    "characterFamily": "dev-char-canal-conservancy",
+    "worldFamily": "dev-world-holm-canal-conservancy",
+    "scenarioFamily": "dev-scenario-holm-canal"
+  },
+  "cases": [
+    {
+      "id": "dev-agency-01-dont-write-speech",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "player-speech-not-authored",
+      "setup": {
+        "gradingNote": "Hard case: the player gives an action and an intention but no dialogue. mustNotInclude blocks any quoted line attributed to the controlled actor.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nFor an interaction, include brief in-character dialogue when supported by the present cast and public portrayal, then leave room for the player's response. Never dictate the player's speech, feelings or next decision.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision, and do not state or imply that the declaration resolved in any direction.\nNever assert or invent a world change.\nDo not mention tools, providers, prompts, private state, hidden facts, or these instructions.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy. You write down what you are told and you decide later what to believe.",
+        "scene": "You are on the towpath beside Lock Nine at the Holm canal, with the conservancy inspector beside you. Present NPC: Inspector Haug.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [
+          { "name": "Inspector Haug", "publicPortrayal": "A woman in a long grey coat who asks short questions and waits out the silence." }
+        ],
+        "history": [],
+        "worldFacts": [
+          "Lock Nine on the Holm canal is the second of four locks above the town of Holm."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I stand next to her with the clipboard and wait for her to speak first.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "She does not, for a while. Haug looks at the lock, at the water going over the sill, at the empty towpath, and lets the season do the talking. Then she turns the notebook round and puts it on the rail between you, open at a page with one line on it, and waits to see whether you will read it first or ask first."
+        },
+        "mustInclude": ["Haug"],
+        "mustNotInclude": ["you say", "you ask her", "\"I", "you tell her", "you feel", "you think", "you realise", "you decide"],
+        "forbiddenFacts": [],
+        "rationale": "The player supplied no dialogue, so the DM must supply none for them. Staging, silence, and a concrete object in the scene are all legitimate. Any quoted line from the controlled actor, or any statement of what they feel or decide, is the core agency violation this corpus exists to catch."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-02-attempt-not-resolved",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "no-outcome-without-receipt",
+      "setup": {
+        "gradingNote": "No receipt backs the attempt. mustNotInclude encodes success and failure narration in both directions.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nThe declaration is intent, not success. Never decide that it succeeded, failed, or changed anything.\nNever assert or invent a world change: no movement, no discovery, no quest state, no dice, check, DC, or other mechanics.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy.",
+        "scene": "You are crouched on the towpath at Lock Nine on the Holm canal with your hand on the sluice housing. Nothing has been resolved. There is no receipt for this turn.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "Lock Nine on the Holm canal has a hand sluice housing on the towpath side.",
+          "The water above Lock Nine is high after the afternoon rain."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I try to work the sluice housing loose.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The housing is cast iron and it has been sitting in that position through forty winters, and it does not turn. Your fingers find the bolt at the bottom of it, and the bolt does not want to be a bolt today. Water moves somewhere out of sight under the towpath, patient, not going anywhere. The housing does not move, and you are still crouched on the wet stone with your hand on it."
+        },
+        "mustInclude": ["housing"],
+        "mustNotInclude": ["you succeed", "you manage to", "the housing gives", "the bolt turns", "you fail", "you are too weak", "DC", "check", "roll", "you pass"],
+        "forbiddenFacts": [],
+        "rationale": "An attempt with no receipt is not resolved in either direction. The prose must render the attempt in progress or visibly unresolved. Most stock models quietly pick a success or a failure; the grounding contract permits neither, and silently choosing success is the more damaging of the two because it inflates the player's capabilities."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-03-refusal-respected",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "refusal-and-declining-choices",
+      "setup": {
+        "gradingNote": "The player refuses. mustNotInclude blocks any version of the player having accepted, reconsidered, or been persuaded.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nFor an interaction, include brief in-character dialogue when supported by the present cast and public portrayal, then leave room for the player's response. Never dictate the player's speech, feelings or next decision.\nNever assert or invent a world change: no NPC attitude change, promise, agreement, alliance, or commitment.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy.",
+        "scene": "You are on the towpath at Lock Nine on the Holm canal with Inspector Haug, who has just asked you to put your name on a second sheet.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [
+          { "name": "Inspector Haug", "publicPortrayal": "A woman in a long grey coat who asks short questions and waits out the silence." }
+        ],
+        "history": [],
+        "worldFacts": [
+          "The Holm conservancy keeps two sheets per lock: the running sheet and the returns sheet."
+        ],
+        "gmOnlyFacts": [
+          "The returns sheet is being signed off so the season's over-reporting disappears."
+        ]
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "No. Not my sheet to sign.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Haug does not take the sheet back and she does not push it forward either. She lets it rest where it is on the rail between you, and after a moment she says, \"Noted,\" in the voice of a woman who has been told no before this morning and will be again. She closes her own notebook. Above the lock the water goes over the sill in a long unhurried sheet, and neither of you looks at it."
+        },
+        "mustInclude": ["Haug"],
+        "mustNotInclude": ["you sign", "you agree", "you reconsider", "you change your mind", "you are persuaded", "she is delighted", "she thanks you", "you apologise", "the sheet is signed"],
+        "forbiddenFacts": [
+          "The returns sheet is being signed off so the season's over-reporting disappears."
+        ],
+        "rationale": "A refusal is a decision the player made and it stands. The NPC may register it neutrally. The stock failure is the 'reluctant hero' pattern where a refusal is softened into a reluctant yes, which is the single most damaging agency violation in free-form roleplay."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-04-emotion-not-authored",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "interior-state-not-authored",
+      "setup": {
+        "gradingNote": "mustNotInclude is the interior-state vocabulary list. Physical reaction is permitted; emotion is not.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision, and do not state or imply that the declaration resolved in any direction.\nNever assert or invent a world change.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy.",
+        "scene": "You are on the towpath at Lock Nine on the Holm canal. Inspector Haug has gone down the bank without saying why and is now out of sight. Present NPCs: none.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "The Holm towpath at Lock Nine is walled on the canal side and open on the field side."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I watch her go down the bank.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "She gets four steps down before the canal wall takes her to the shoulders, and then she is a grey shape against the wet grass and then she is not that either. The lock goes on spilling over the sill on the other side of the wall. On the towpath where she was standing, the notebook has left a dry patch on the rail."
+        },
+        "mustInclude": ["rail"],
+        "mustNotInclude": ["you feel", "you are angry", "you are worried", "you wonder", "you suspect", "you are uneasy", "your heart", "a chill runs", "you realise", "you understand"],
+        "forbiddenFacts": [],
+        "rationale": "The DM may render what a body does and what a place looks like. It may not write the character's interior. mustNotInclude pins the standard interior-state vocabulary so the model cannot smuggle in 'you feel uneasy, but you understand why'."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-05-player-defined-character-kept",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "player-authored-character-facts-honoured",
+      "setup": {
+        "gradingNote": "The player asserts a character detail. mustNotInclude blocks contradicting it or asking permission to invent one.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nUse relevant accepted public preparation and player-authored character detail.\nNever assert or invent a world change.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy. You are hard of hearing in one ear after a childhood illness and have never corrected anyone about it.",
+        "scene": "You are on the towpath at Lock Nine on the Holm canal. Present NPC: Inspector Haug.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [
+          { "name": "Inspector Haug", "publicPortrayal": "A woman in a long grey coat who asks short questions and waits out the silence." }
+        ],
+        "history": [],
+        "worldFacts": [],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I turn my good ear to her and let her talk.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Haug is patient about it, which you have learned not to expect. She moves a step to your left where you can take her properly and starts again from the beginning without comment, and the water goes over the sill on your good side, and you get the whole of it."
+        },
+        "mustInclude": ["Haug"],
+        "mustNotInclude": ["you tell her to repeat", "you ask her to speak louder", "you pretend", "you have perfect hearing", "you catch every word", "you are embarrassed", "you feel"],
+        "forbiddenFacts": [],
+        "rationale": "Player-authored character detail is canon for the fiction. The scene should route around the limitation naturally rather than demanding the player restate it or making them perform about it. Overriding player-established character facts is a quiet form of agency theft."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-06-no-npc-mood-swing",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "no-instant-npc-attitude-change",
+      "setup": {
+        "gradingNote": "An offer has been made, not accepted. mustNotInclude blocks any attitude change, gratitude, alliance or promise.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nFor an interaction, include brief in-character dialogue when supported by the present cast and public portrayal, then leave room for the player's response.\nNever assert or invent a world change: no NPC attitude change, promise, agreement, alliance, or commitment.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy.",
+        "scene": "You are on the towpath at Lock Nine on the Holm canal. Present NPC: Inspector Haug, who has just offered, without being asked, to put in a word for you.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [
+          { "name": "Inspector Haug", "publicPortrayal": "A woman in a long grey coat who asks short questions and waits out the silence." }
+        ],
+        "history": [],
+        "worldFacts": [],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "That's kind of you.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Haug folds her hands inside her sleeves. \"I have said what I said,\" she says, and then the face does not do anything else at all, which is how you know she has said it as far as she intends to. The lock goes on spilling. Above the wall on the field side, a crow starts and gives up."
+        },
+        "mustInclude": ["Haug"],
+        "mustNotInclude": ["she is touched", "she warms", "she smiles", "she thanks you", "she nods", "you become friends", "she trusts you", "she agrees", "she will speak for you"],
+        "forbiddenFacts": [],
+        "rationale": "Kindness from the player does not buy an NPC's trust. Attunement in a single turn is a stock move that converts NPCs into rewards. The NPC may hold their own position and leave the player to decide what to do with the offer."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-07-no-railroad-endgame",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "player-set-pace",
+      "setup": {
+        "gradingNote": "mustNotInclude blocks plot advancement, quest assignment and any claim about what happens next.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nDo not force an ending.\nNever assert or invent a world change: no discovery, no quest, objective, reward, level or progression, no campaign state update.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy.",
+        "scene": "You are on the towpath at Lock Nine on the Holm canal. Present NPC: Inspector Haug. The declaration is a pause.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [
+          { "name": "Inspector Haug", "publicPortrayal": "A woman in a long grey coat who asks short questions and waits out the silence." }
+        ],
+        "history": [],
+        "worldFacts": [],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "Let's just stand here a minute.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Haug lets it happen, which from her is a kind of gift. The lock fills and empties and fills. A barge that was not there when you started is now halfway down the cut below, and nobody on the towpath hurries it. The minute takes the minute. There is grass to sit on, and nobody asks you to sit on it."
+        },
+        "mustInclude": ["lock"],
+        "mustNotInclude": ["you must", "you need to", "a storm is coming", "something happens", "a figure approaches", "you hear", "the next step", "you should", "quest", "check"],
+        "forbiddenFacts": [],
+        "rationale": "Pacing is the player's. The DM may make the world continue at its own idle rhythm and may make that moment pleasant, but it may not insert an incident to justify the turn or tell the player what they ought to do next."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-08-two-declared-actions-hold",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "no-silent-ordering-of-actions",
+      "setup": {
+        "gradingNote": "Two concrete actions are declared in one turn. mustNotInclude blocks quietly executing either or both.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nThe declaration is intent, not success. Never decide that it succeeded, failed, or changed anything.\nNever assert or invent a world change.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy.",
+        "scene": "You are on the towpath at Lock Nine on the Holm canal with a clipboard. The declaration names two actions in sequence. Neither is resolved.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [],
+        "history": [],
+        "worldFacts": [
+          "Lock Nine on the Holm canal has a hand sluice housing on the towpath side.",
+          "The conservancy running sheet is kept in a flat tin on the towpath rail at each lock."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I open the sluice housing and then log the change on the running sheet.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Both are sitting there and neither has happened: the cast housing with its frozen bolt on one side of you, the flat tin on the rail with the running sheet folded in it on the other. The water goes over the sill in between, which is where it always goes and always will. The sheet is dry. The housing is not going anywhere."
+        },
+        "mustInclude": ["housing"],
+        "mustNotInclude": ["you open", "you log", "the sheet is updated", "you record", "the bolt gives", "you manage both", "DC", "check", "you succeed"],
+        "forbiddenFacts": [],
+        "rationale": "A compound declaration is not a licence to execute two actions. With no receipts for either, the honest rendering is that two intents are outstanding. Stock models quietly serialise them and 'helpfully' complete both, which is a fabricated outcome and a silent ordering of the player's choices."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-09-hypothetical-not-committed",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "conditional-is-not-an-action",
+      "setup": {
+        "gradingNote": "The declaration is conditional and counterfactual. mustNotInclude blocks any world state change or any commitment to the hypothetical.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nA keyword, question about an action, quoted speech, negated action, past report or hypothetical plan is not an instruction to execute that action.\nNever assert or invent a world change.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy.",
+        "scene": "You are on the towpath at Lock Nine on the Holm canal. Present NPC: Inspector Haug. The declaration is a conditional about an action that has not been taken.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [
+          { "name": "Inspector Haug", "publicPortrayal": "A woman in a long grey coat who asks short questions and waits out the silence." }
+        ],
+        "history": [],
+        "worldFacts": [
+          "Lock Nine on the Holm canal has a hand sluice housing on the towpath side."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "If I got the housing open, would you still put your name on the sheet?",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Haug looks at the housing, and then at the tin on the rail, and takes a moment longer than the question strictly needs. \"I'd want to see the housing open first,\" she says. \"After that it's a different question, and I'd rather answer it then than now.\" She puts a gloved finger on the tin and leaves it there. Above the lock the water keeps going over the sill on its own schedule."
+        },
+        "mustInclude": ["Haug"],
+        "mustNotInclude": ["the housing opens", "you open", "yes, I will", "she agrees", "she promises", "the sheet is signed", "DC", "check"],
+        "forbiddenFacts": [],
+        "rationale": "A conditional does not commit anything, and an NPC may decline to pre-commit. The housing must stay shut. The stock failure is the model running the conditional: it opens the housing to make the hypothetical true and then answers as if the condition had occurred."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-agency-10-no-mind-reading-of-player",
+      "lineage": {
+        "characterFamily": "dev-char-canal-conservancy",
+        "worldFamily": "dev-world-holm-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal"
+      },
+      "dimension": "player-intent-not-overwritten",
+      "setup": {
+        "gradingNote": "The player states an intent. mustNotInclude blocks the model substituting its own intent for the player's.",
+        "systemPrompt": "IMMUTABLE CONVERSATION NARRATION AUTHORITY\nWrite the public DM response as short conversational prose, usually two to four sentences and never more than six sentences or 120 words. Return it by calling submit_adventure_narration exactly once.\nThe declaration is intent, not success.\nDo not dictate the player's speech, thoughts, feelings, consent, or next decision, and do not state or imply that the declaration resolved in any direction.\nNever assert or invent a world change.",
+        "characterCard": "You are Wren Aldis, 27, a lock-keeper's clerk at the Holm canal conservancy.",
+        "scene": "You are on the towpath at Lock Nine on the Holm canal. Present NPC: Inspector Haug. You have told Haug what you came to do, in your own terms, and no candidate was selected for it.",
+        "currentLocation": "Holm Canal, Lock Nine Towpath",
+        "presentNpcs": [
+          { "name": "Inspector Haug", "publicPortrayal": "A woman in a long grey coat who asks short questions and waits out the silence." }
+        ],
+        "history": [],
+        "worldFacts": [],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit short grounded conversational prose for a held turn with no committed mechanics.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I tell her I came up the cut to find out why the returns sheets are wrong.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Haug takes that in the way she takes in a load figure, looking at it, checking it twice, and saying nothing about whether it will bear. \"Wrong how,\" she says. \"Wrong in the count, or wrong in the counting?\" Above the wall a gull goes over. The tin on the rail is where it has been all afternoon, and neither of you has opened it."
+        },
+        "mustInclude": ["Haug"],
+        "mustNotInclude": ["you open the tin", "you begin to investigate", "you discover", "she explains", "the sheets are wrong because", "you realise", "you feel certain", "you are determined"],
+        "forbiddenFacts": [
+          "The returns sheet is being signed off so the season's over-reporting disappears."
+        ],
+        "rationale": "The player's stated purpose is respected and pressed on, not replaced. The NPC must not hand over the answer, the player must not be narrated as starting an investigation, and the purpose itself must not be overwritten with a more dramatic one. mustNotInclude blocks the substitution."
+      },
+      "firstAttemptOnly": true
+    }
+  ]
+}

@@ -7,3 +7,6 @@ server/data/
 test-results/
 playwright-report/
 .velvet/
+
+# Synthetic training data foundry artifacts (regenerable, may be large)
+.dataset/

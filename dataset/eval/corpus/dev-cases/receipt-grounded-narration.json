@@ -1,0 +1,700 @@
+{
+  "category": "receipt-grounded-narration",
+  "version": "velvet-baseline-v1",
+  "lineage": {
+    "characterFamily": "dev-char-nightwatch-precinct",
+    "worldFamily": "dev-world-candlewick-nightwatch",
+    "scenarioFamily": "dev-scenario-candlewick-precinct"
+  },
+  "cases": [
+    {
+      "id": "dev-ground-01-check-success",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "check-receipt-exact-values",
+      "setup": {
+        "gradingNote": "committedReceipts is the ground truth. The narration must name the skill, the total, the DC and the literal word 'success'. The NPC reply is a separate fact source and must not contradict the receipt.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Use fewer sentences for a simple action. Return it by calling submit_adventure_narration exactly once; do not answer with content alone or call any other tool.\nExisting verified receipts are the only implemented authoritative mechanics. Mechanics, success, failure, movement, damage, possessions, rewards, conditions, and campaign changes exist only when established by verified receipts in the labeled turn data.\nWhen verified receipts are present, explicitly narrate each receipt's core committed result and public labels. Never call a committed result pending, unresolved, uncertain, or unestablished, and never substitute a different destination or outcome.\nRestate the exact values and labels a receipt records so the committed result stays verifiable. For a check, name the exact skill or ability and then state its total, its DC, and the literal words success or failure.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow. You write down everything, including the parts that make you look bad.",
+        "scene": "You are at the sergeant's desk in the Candlewick precinct, going through the standing night ledger. The declaration committed exactly one SRD check and nothing else.",
+        "currentLocation": "Candlewick Precinct, Sergeant's Desk",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "check",
+            "checkKind": "skill",
+            "ability": "Intelligence",
+            "skill": "Investigation",
+            "mode": "normal",
+            "difficulty": "Medium",
+            "rolls": [{ "value": 17, "kept": true }],
+            "abilityModifier": 3,
+            "proficiencyBonus": 2,
+            "modifier": 5,
+            "total": 22,
+            "dc": 15,
+            "outcome": "success"
+          }
+        ],
+        "worldFacts": [
+          "The Candlewick precinct keeps a standing night ledger for the winter season."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I go through the night ledger for the fourteenth.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Your Investigation check comes to 22 against a Medium DC of 15: success.\n\nThe fourteenth is the night the page goes wrong, and it goes wrong quietly. Two entries share the same hand and one of them is written with a pen somebody bought in a hurry. The rest of the night is ordinary ordinary ordinary, which is what makes the other thing worth stopping on. You read it twice and the second reading does not improve it. The lamp is low. Somewhere below, the river lock is being turned over for the night."
+        },
+        "mustInclude": ["Investigation", "22", "15", "success"],
+        "mustNotInclude": ["failure", "you find the name", "the name is revealed", "you learn who", "damage", "healing", "DC 14", "DC 16", "critical"],
+        "forbiddenFacts": [],
+        "rationale": "A committed check is the only authoritative outcome and its four parts must all survive into prose: the skill name, the total, the DC and the literal verdict word. A check success does not reveal what was found, so mustNotInclude blocks the 'you learn who' leap that stock models make, and blocks rounding or substituting the DC."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-02-check-failure-no-side-effects",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "check-failure-boundaries",
+      "setup": {
+        "gradingNote": "The receipt records a failure. mustNotInclude blocks any claim that the attempt opened, moved, revealed or damaged anything.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nExisting verified receipts are the only implemented authoritative mechanics. Mechanics, success, failure, movement, damage, possessions, rewards, conditions, and campaign changes exist only when established by verified receipts in the labeled turn data.\nWhen verified receipts are present, explicitly narrate each receipt's core committed result and public labels. Never call a committed result pending, unresolved, uncertain, or unestablished.\nRestate the exact values and labels a receipt records. For a check, name the exact skill or ability and then state its total, its DC, and the literal words success or failure.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "You are on the cellar stair at the Candlewick precinct. The declaration committed exactly one SRD check and nothing else.",
+        "currentLocation": "Candlewick Precinct, Cellar Stair",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "check",
+            "checkKind": "skill",
+            "ability": "Strength",
+            "skill": "Athletics",
+            "mode": "normal",
+            "difficulty": "Hard",
+            "rolls": [{ "value": 4, "kept": true }],
+            "abilityModifier": 2,
+            "proficiencyBonus": 1,
+            "modifier": 3,
+            "total": 7,
+            "dc": 14,
+            "outcome": "failure"
+          }
+        ],
+        "worldFacts": [
+          "The Candlewick precinct keeps records in a cellar under a heavy stair door."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I put my shoulder to the cellar stair door and try to force it.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Your Athletics check comes to 7 against a Hard DC of 14: failure.\n\nThe door does not give you an inch, and it tells you why: it is not a door that opens. The frame is set into stone at the top and the hinges are on the wrong side for a shoulder, and the whole thing was built by somebody who wanted a cellar to stay a cellar. You take your weight off it and the stair door sits there, unimpressed, with its little brass catch still holding. Nothing about it has changed."
+        },
+        "mustInclude": ["Athletics", "7", "14", "failure"],
+        "mustNotInclude": ["success", "you get it open", "the door opens", "you pry it", "the cellar is open", "you find", "damage", "you break"],
+        "forbiddenFacts": [],
+        "rationale": "Failure is the committed result and must be stated as failure. A failed Strength check opens nothing, so mustNotInclude blocks every downstream claim about the cellar, plus any damage. Small models reliably convert a low roll into 'you manage to force it'."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-03-bare-dice-roll",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "raw-dice-has-no-outcome",
+      "setup": {
+        "gradingNote": "A raw dice receipt establishes only the total. mustNotInclude blocks success, failure, DC and any skill attribution.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nA bare dice roll establishes only its total and never success or failure. State the total naturally, react to the moment, and leave the outcome undecided for the player rather than narrating that it succeeded or failed.\nRestate the exact values and labels a receipt records. Do not round, soften, rephrase away, or omit these values.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "You are on the quay at Candlewick watching the river. The player explicitly asked for a bare roll; no check candidate was advertised or selected.",
+        "currentLocation": "Candlewick Quay",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          { "kind": "mechanic", "event": { "type": "actor_dice_rolled", "data": { "total": 12, "modifier": 3 } } }
+        ],
+        "worldFacts": [
+          "The Candlewick quay is below the precinct and above the river lock."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "Roll me a d20, no check, just the number.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The dice come up 12. The moment is still open and you have nothing to attach it to yet, which is a strange sort of freedom. The river goes brown past the quay wall. The lock turns over below you, unhurried, and somewhere up the steps a door lets in cold air and lets it out again. You are still holding the dice."
+        },
+        "mustInclude": ["12"],
+        "mustNotInclude": ["success", "failure", "DC", "check", "Investigation", "Athletics", "you succeed", "you fail", "you find", "you roll a"],
+        "forbiddenFacts": [],
+        "rationale": "A raw roll commits exactly one number and nothing else. mustNotInclude pins the three ways models over-reach: attributing a skill, inventing a DC, and declaring an outcome. Reacting to the moment while leaving it undecided is the whole point."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-04-combat-damage",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "combat-damage-exact-values",
+      "setup": {
+        "gradingNote": "applied is 9 and hitPointsAfter is 5; both must appear. mustNotInclude blocks the model's common upgrades: kills, drops, defeated, unconscious.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nFor a combat action, name the action and weapon or power and state the exact damage dealt and the target's resulting hit points and status.\nRestate the exact values and labels a receipt records. Do not round, soften, rephrase away, or omit these values, and never substitute a different outcome.\nExisting verified receipts are the only implemented authoritative mechanics.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "You are in the yard at the Candlewick precinct. The declaration committed exactly one combat action against exactly one target.",
+        "currentLocation": "Candlewick Precinct, Back Yard",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "combat",
+            "action": "attack",
+            "outcome": {
+              "kind": "damage",
+              "damageType": "slashing",
+              "requested": 11,
+              "applied": 9,
+              "hit": true,
+              "critical": false,
+              "hitPointsBefore": 14,
+              "hitPointsAfter": 5,
+              "statusAfter": "active"
+            },
+            "roundBefore": 2,
+            "roundAfter": 3
+          }
+        ],
+        "worldFacts": [
+          "The Candlewick precinct has a back yard used for drills and for lockers."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I swing the truncheon at the man in the yard.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The attack lands: your truncheon deals 9 slashing damage, and the man is down to 5 hit points and still active. Round 3 begins. He has not stopped. He is standing there in the yard with five hit points and a great deal still to say about it, and the rain has started again on the lockers."
+        },
+        "mustInclude": ["9", "5"],
+        "mustNotInclude": ["11 slashing", "12 damage", "10 damage", "kills", "he dies", "defeated", "unconscious", "down to 0", "he falls", "he drops"],
+        "forbiddenFacts": [],
+        "rationale": "Damage narration must carry the applied value and the target's resulting hit points, not the requested damage and not a rounded number. mustNotInclude blocks both the requested/applied confusion and the extremely common 'he drops' upgrade, since statusAfter is 'active' and 5 HP is not 0."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-05-combat-miss",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "zero-damage-is-not-damage",
+      "setup": {
+        "gradingNote": "applied is 0. The narration must not claim any damage number other than zero and must keep the target at 22.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nFor a combat action, name the action and weapon or power and state the exact damage dealt and the target's resulting hit points and status.\nRestate the exact values and labels a receipt records. Never substitute a different outcome.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "You are in the yard at the Candlewick precinct. The declaration committed exactly one combat action, which missed.",
+        "currentLocation": "Candlewick Precinct, Back Yard",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "combat",
+            "action": "attack",
+            "outcome": {
+              "kind": "damage",
+              "damageType": "slashing",
+              "requested": 11,
+              "applied": 0,
+              "hit": false,
+              "critical": false,
+              "hitPointsBefore": 22,
+              "hitPointsAfter": 22,
+              "statusAfter": "active"
+            },
+            "roundBefore": 3,
+            "roundAfter": 3
+          }
+        ],
+        "worldFacts": [
+          "The Candlewick precinct has a back yard used for drills and for lockers."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I swing the truncheon at him again.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The attack misses: no damage is applied and the man stays at 22 hit points. The truncheon goes through the place he was and hits the locker behind him, which takes it well. He is still there, still upright, and the round has not changed hands. The rain is doing what the rain does on the lockers, which is nothing you can help."
+        },
+        "mustInclude": ["misses", "22"],
+        "mustNotInclude": ["9 slashing", "11 damage", "deals damage", "he drops", "he falls", "defeated", "damage for 3", "blood"],
+        "forbiddenFacts": [],
+        "rationale": "A committed miss is a committed miss: zero damage and unchanged hit points. The most common stock failure is narrating the requested damage as if it landed, or quietly re-rolling the outcome into a hit because the fiction wanted one."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-06-travel-destination",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "travel-destination-exact",
+      "setup": {
+        "gradingNote": "One committed travel receipt. Any explicit arrival target in the narration must be Tallow Street.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nWhen verified receipts are present, explicitly narrate each receipt's core committed result and public labels. Never substitute a different destination or outcome.\nRestate the exact values and labels a receipt records.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "The declaration committed exactly one travel option.",
+        "currentLocation": "Tallow Street",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [{ "kind": "travel", "destination": "Tallow Street" }],
+        "worldFacts": [
+          "Tallow Street runs down from the precinct to the tannery in Merrow.",
+          "Quay Lane runs parallel to Tallow Street, one block west."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I go down to Tallow Street.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "You arrive at Tallow Street. The slope is steeper than it looks from the top, which is most of Merrow's opinion about its own hills, and the tannery smell comes up to meet you somewhere around the third lamp. There is nobody waiting at the bottom of it. The street is doing what Tallow Street does after midnight, which is being empty and lit."
+        },
+        "mustInclude": ["Tallow Street"],
+        "mustNotInclude": ["Quay Lane", "the tannery gate", "you arrive at the tannery", "you arrive at the precinct", "the river", "you reach the docks"],
+        "forbiddenFacts": [],
+        "rationale": "The committed destination is Tallow Street and it must be named, and any arrival phrasing in the prose must point at that same place. A plausible neighbouring street in mustNotInclude catches the classic substitution where the model paraphrases the destination into somewhere more evocative."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-07-commerce-receipt",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "commerce-receipt-values",
+      "setup": {
+        "gradingNote": "The narration must name the item and the vendor and carry the post-transaction balance. mustNotInclude pins the pre-transaction balance as a wrong value only if presented as the result.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nWhen verified receipts are present, explicitly narrate each receipt's core committed result and public labels. Never call a committed result pending or unresolved, and never substitute a different outcome.\nRestate the exact values and labels a receipt records. Do not round, soften, rephrase away, or omit these values.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "The declaration committed exactly one purchase. Mrs Bramley and her shop are present in the scene and are the vendor of record.",
+        "currentLocation": "Merrow, Bramley's Haberdashery",
+        "presentNpcs": [
+          { "name": "Mrs Bramley", "publicPortrayal": "Sixty, exact, folds everything twice and prices everything once." }
+        ],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "commerce",
+            "action": "buy",
+            "vendorLabel": "Mrs Bramley",
+            "shopLabel": "Bramley's Haberdashery",
+            "itemLabel": "wool overcoat",
+            "quantity": 1,
+            "currencyLabel": "GP",
+            "priceMinorUnits": 180,
+            "balanceBefore": 2400,
+            "balanceAfter": 2220
+          }
+        ],
+        "worldFacts": [
+          "Bramley's Haberdashery is on Tallow Street in Merrow."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I buy the wool overcoat from Mrs Bramley.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "You buy 1 wool overcoat from Mrs Bramley at Bramley's Haberdashery for 180 GP. Your balance changes from 2400 to 2220.\n\nShe folds the old one into a paper sleeve without being asked and ties it with string, and hands you the sleeve, and does not say anything about the money, because saying anything about the money is how people get told the price. The shop smells of pressed cloth. Outside, Tallow Street has gone quiet in the way it goes quiet when it starts to rain."
+        },
+        "mustInclude": ["2220", "Mrs Bramley", "wool overcoat"],
+        "mustNotInclude": ["pending", "awaiting confirmation", "you have not yet", "the shopkeeper agrees", "she gives it to you free", "balance changes from 2220 to 2400", "3000"],
+        "forbiddenFacts": [],
+        "rationale": "The transaction is committed, not proposed. mustNotInclude blocks the model's most damaging habit here: treating a committed purchase as still awaiting the player, which the grounding gate explicitly rejects, and restating the balance backwards."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-08-rest-recovery",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "rest-recovery-values",
+      "setup": {
+        "gradingNote": "Hit points 7 to 17. The narration must name the rest and both numbers. mustNotInclude blocks upgrading a short rest to a full heal or claiming a long rest.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nWhen verified receipts are present, explicitly narrate each receipt's core committed result and public labels.\nRestate the exact values and labels a receipt records. Do not round, soften, rephrase away, or omit these values.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "The declaration committed exactly one rest preview at the watch room stove. Nothing else committed.",
+        "currentLocation": "Candlewick Precinct, Watch Room",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "rest",
+            "restKind": "short",
+            "restName": "Short rest",
+            "recovery": [{ "label": "Hit points", "before": 7, "after": 17 }]
+          }
+        ],
+        "worldFacts": [
+          "The Candlewick precinct watch room has a stove and two chairs and a kettle on the hob."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I sit by the stove and take a short rest.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Short rest completed. Hit points recover from 7 to 17.\n\nAn hour, near enough, on a chair by a stove that somebody has kept in. The kettle goes through its whole performance twice. Outside the window the rain moves along the yard wall in one long gust and then stops, the way it does when it is deciding to start again. The watch room is the warmest room in Merrow and you are the only person in it."
+        },
+        "mustInclude": ["Short rest", "17"],
+        "mustNotInclude": ["Long rest", "full heal", "fully healed", "completely restored", "all your damage", "recover from 7 to 22", "level up"],
+        "forbiddenFacts": [],
+        "rationale": "A short rest is named as a short rest and recovers exactly what the receipt records. The stock upgrade is a small-magnitude recovery narrated as 'all of it' or a short rest narrated as a long rest, both of which are fabricated outcomes."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-09-quest-progress",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "quest-progress-exact",
+      "setup": {
+        "gradingNote": "1 of 3, objective not complete and quest not complete. mustNotInclude blocks completion claims.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nWhen verified receipts are present, explicitly narrate each receipt's core committed result and public labels.\nRestate the exact values and labels a receipt records. Do not round, soften, rephrase away, or omit these values.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "The declaration committed exactly one quest objective advance and nothing else.",
+        "currentLocation": "Candlewick Precinct, Sergeant's Desk",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "quest",
+            "questTitle": "The Bleeding Ledger",
+            "objectiveDescription": "Search the precinct ledger for the night of the fourteenth",
+            "progressBefore": 0,
+            "progressAfter": 1,
+            "targetProgress": 3,
+            "objectiveCompleted": false,
+            "questCompleted": false
+          }
+        ],
+        "worldFacts": [
+          "The Candlewick precinct keeps a standing night ledger for the winter season."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I go through the night ledger for the fourteenth.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "Quest objective advanced for The Bleeding Ledger: search the precinct ledger for the night of the fourteenth, now 1 of 3.\n\nThe objective is not finished and neither is the case, and the ledger agrees: one night's entry is now out in the open and two are still folded shut behind it in the same hand. The lamp is low. The rain has found the yard again. There is more of the fourteenth to account for, and it is keeping itself folded."
+        },
+        "mustInclude": ["The Bleeding Ledger", "1"],
+        "mustNotInclude": ["the quest is complete", "objective complete", "you have solved", "case closed", "reward", "2 of 3", "3 of 3", "level"],
+        "forbiddenFacts": [],
+        "rationale": "Quest narration must carry the committed progress number and must not upgrade a single step into a completed objective or a finished quest. Stock models treat any quest advancement as narrative closure, which is the exact failure mode the receipt exists to prevent."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-10-journey-interrupted",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "interrupted-journey",
+      "setup": {
+        "gradingNote": "Status is interrupted. The narration must name the current location as where the journey stopped, must name the intended destination as still pending, and must not narrate arrival.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nWhen verified receipts are present, explicitly narrate each receipt's core committed result and public labels. Never call a committed result pending when it is committed, and never substitute a different destination or outcome.\nRestate the exact values and labels a receipt records.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "The declaration committed exactly one journey, which did not complete.",
+        "currentLocation": "Tallow Street",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "journey",
+            "destination": "Coldharbour Row",
+            "currentLocation": "Tallow Street",
+            "status": "interrupted",
+            "interruption": "The bridge at Tanner's Lock is down.",
+            "legs": 2,
+            "elapsedMinutes": 26
+          }
+        ],
+        "worldFacts": [
+          "The bridge at Tanner's Lock carries the road to Coldharbour Row.",
+          "Coldharbour Row is two miles east of Tallow Street."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I take the road east to Coldharbour Row.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "The journey stops at Tallow Street; Coldharbour Row remains pending. The bridge at Tanner's Lock is down.\n\nTwo legs and twenty-six minutes of wet road for it: past the tannery, round the second lamp, and then the river in front of you where there should be a bridge and is not. There is a board nailed to the parapet saying so in three languages, and the river underneath doing the only thing it has ever done. Coldharbour Row is still out there past the water, and the road is closed, and the night is getting on."
+        },
+        "mustInclude": ["Tallow Street", "Coldharbour Row"],
+        "mustNotInclude": ["you arrive at Coldharbour", "you reach Coldharbour", "you cross", "the journey is complete", "you make it across", "the trip finishes"],
+        "forbiddenFacts": [],
+        "rationale": "An interrupted journey commits the stop, not the arrival. The narration must name where the journey actually ended, name the destination as still outstanding, and must not describe crossing. mustNotInclude catches the very common rescue where the model solves the blockage narratively."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-ground-11-two-receipts",
+      "lineage": {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch",
+        "scenarioFamily": "dev-scenario-candlewick-precinct"
+      },
+      "dimension": "multiple-receipts-complete-coverage",
+      "setup": {
+        "gradingNote": "Two committed receipts. mustInclude pins facts from BOTH. A reply that covers only the exciting one is a failure.",
+        "systemPrompt": "IMMUTABLE ADVENTURE NARRATION AUTHORITY\nWrite a bounded second-person DM response: usually 1 to 3 short paragraphs, at most 8 sentences and 180 words. Return it by calling submit_adventure_narration exactly once.\nWhen verified receipts are present, explicitly narrate each receipt's core committed result and public labels. Never call a committed result pending, unresolved, uncertain, or unestablished.\nRestate the exact values and labels a receipt records. Do not round, soften, rephrase away, or omit these values.\nExpress committed outcomes as natural fiction. Never use implementation language such as receipt, tool call, provider, or prompt.",
+        "characterCard": "You are WPC Neve Ardley, 28, on the night watch at the Candlewick precinct in the river city of Merrow.",
+        "scene": "Two separate mechanics committed this turn. Both must appear in the narration.",
+        "currentLocation": "Candlewick Precinct, Watch Room",
+        "presentNpcs": [],
+        "history": [],
+        "committedReceipts": [
+          {
+            "kind": "inventory",
+            "itemLabel": "brass whistle",
+            "action": "equip",
+            "quantity": 1,
+            "slot": "belt",
+            "recipient": null
+          },
+          {
+            "kind": "mechanic",
+            "event": { "type": "actor_attribute_set", "data": { "valueBefore": 12, "valueAfter": 14 } }
+          }
+        ],
+        "worldFacts": [
+          "The Candlewick precinct watch room has a stove and two chairs and a locker with a whistle in it."
+        ],
+        "gmOnlyFacts": []
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "submit_adventure_narration",
+            "description": "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+            "parameters": {
+              "type": "object",
+              "properties": { "narration": { "type": "string", "minLength": 1, "maxLength": 8000 } },
+              "required": ["narration"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "input": "I take the whistle from the locker and fasten it on my belt.",
+      "expected": {
+        "outcome": "tool-call",
+        "toolName": "submit_adventure_narration",
+        "arguments": {
+          "narration": "You equip 1 brass whistle in the belt slot. The committed attribute changes from 12 to 14.\n\nThe whistle is heavier than it looks and colder, and it sits on your hip at the exact angle where you keep putting your hand when you are thinking. The locker door is still open. The stove has gone to coals and the watch room has that particular stillness it gets at the small hours, and somewhere below, the river lock turns over again for the third time since you sat down."
+        },
+        "mustInclude": ["brass whistle", "12", "14"],
+        "mustNotInclude": ["pending", "awaiting confirmation", "you also find", "a secret", "the lock contains", "you gain insight", "you discover"],
+        "forbiddenFacts": [],
+        "rationale": "Every committed receipt must be narrated, not just the narratively interesting one. The attribute change is as committed as the equip, so it gets stated with both values. Dropping the quieter receipt is the characteristic partial-grounding failure."
+      },
+      "firstAttemptOnly": true
+    }
+  ]
+}

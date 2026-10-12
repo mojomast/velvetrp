@@ -1,0 +1,1650 @@
+{
+  "category": "json-schema-generation",
+  "version": "velvet-baseline-v1",
+  "lineage": {
+    "characterFamily": "dev-char-threadneedle-quarter",
+    "worldFamily": "dev-world-threadneedle-quarter",
+    "scenarioFamily": "dev-scenario-threadneedle-guild"
+  },
+  "cases": [
+    {
+      "id": "dev-schema-01-npcs",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-npcs",
+      "setup": {
+        "gradingNote": "The reply is raw JSON, not a tool call. Grade: parse succeeds, the envelope is exactly the 16 declared array fields with additionalProperties rejected, every array not requested is empty, and every requested npc validates against the item schema. schemaConstraints is the machine-checkable contract; referenceOutput is one valid instance.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth, and an apprentice is caught between a factor who wants quiet and a clerk who wants the numbers.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic", "children as protagonists"],
+          "sections": ["npcs"],
+          "desiredCounts": { "npcs": 4 },
+          "existingCanonKeys": ["location-threadneedle-row", "location-dye-vats", "faction-dyers-guild"]
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "npcs": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "name", "archetype", "description", "visibility"],
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "archetype": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "description": { "type": "string", "minLength": 1, "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] },
+                "locationKey": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "factionKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" } },
+                "privateGoals": { "type": "string", "maxLength": 4000 }
+              }
+            }
+          },
+          "sharedRules": {
+            "keyPattern": "lower-case kebab-case, must start with a letter, max 64 characters",
+            "nameMaxLength": 200,
+            "textMaxLength": 4000,
+            "detailList": "arrays of short strings are capped at 8 items",
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true,
+            "optionalFieldsMayBeOmitted": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the npcs section for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"npcs\"", "\"key\"", "\"visibility\"", "\"name\"", "\"archetype\""],
+        "mustNotInclude": ["```", "\"notes\"", "\"stats\"", "\"health\"", "\"level\"", "\"gmNotes\"", "\"dialogue\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "npcs": {
+            "maxItems": 16,
+            "requiredFields": ["key", "name", "archetype", "description", "visibility"],
+            "optionalFields": ["locationKey", "factionKeys", "privateGoals"],
+            "fieldRules": {
+              "key": "matches ^[a-z][a-z0-9-]*$, max 64 chars",
+              "name": "1..200 chars",
+              "archetype": "1..200 chars",
+              "description": "1..4000 chars",
+              "visibility": ["public", "gm"],
+              "factionKeys": "max 8 items, each a valid artifact key"
+            },
+            "forbiddenFields": ["stats", "health", "level", "notes", "gmNotes", "dialogue", "personality"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [],
+          "npcs": [
+            {
+              "key": "npc-oren-vask",
+              "name": "Oren Vask",
+              "archetype": "Guild factor",
+              "description": "A thin man of fifty with a clerk's stoop who speaks in totals and never repeats one.",
+              "visibility": "gm",
+              "locationKey": "location-threadneedle-row",
+              "factionKeys": ["faction-dyers-guild"],
+              "privateGoals": "He has known about the returns discrepancy since midsummer and intends to let it stand for one more season, because the alternative costs him the guild."
+            },
+            {
+              "key": "npc-merrinow",
+              "name": "Merrinow",
+              "archetype": "Stallholder",
+              "description": "Lays out four goods and lets the buyer do the choosing; prices once and does not move.",
+              "visibility": "public",
+              "locationKey": "location-threadneedle-row",
+              "factionKeys": []
+            }
+          ],
+          "quests": [],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [],
+          "questItems": [],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "Section generation is a contract, not a writing exercise. The envelope must be complete and sparse, the key pattern must be honoured, and gameplay attributes such as stats, health and level are not part of this contract at all. A generator that adds an undeclared key has produced an invalid draft even when the prose is excellent."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-02-lore",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-lore",
+      "setup": {
+        "gradingNote": "Grade: strict envelope, three reference arrays each capped at 8, details array capped at 8 strings of at most 500 characters.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic"],
+          "sections": ["lore"],
+          "desiredCounts": { "lore": 3 },
+          "existingCanonKeys": ["location-threadneedle-row", "location-dye-vats", "faction-dyers-guild"]
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "lore": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "title", "summary", "visibility"],
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "summary": { "type": "string", "minLength": 1, "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] },
+                "details": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+                "locationKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } },
+                "factionKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } },
+                "storyNodeKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } }
+              }
+            }
+          },
+          "sharedRules": {
+            "keyPattern": "lower-case kebab-case, must start with a letter, max 64 characters",
+            "detailListMaxItems": 8,
+            "detailItemMaxLength": 500,
+            "referenceArraysMaxItems": 8,
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the lore section for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"lore\"", "\"summary\"", "\"details\"", "\"visibility\""],
+        "mustNotInclude": ["```", "\"body\"", "\"text\"", "\"author\"", "\"tags\"", "\"paragraphs\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "lore": {
+            "maxItems": 24,
+            "requiredFields": ["key", "title", "summary", "visibility"],
+            "optionalFields": ["details", "locationKeys", "factionKeys", "storyNodeKeys"],
+            "fieldRules": {
+              "title": "1..200 chars",
+              "summary": "1..4000 chars",
+              "details": "max 8 items, each 1..500 chars",
+              "locationKeys": "max 8 items",
+              "factionKeys": "max 8 items",
+              "storyNodeKeys": "max 8 items"
+            },
+            "forbiddenFields": ["body", "text", "author", "tags", "paragraphs", "content"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [],
+          "npcs": [],
+          "quests": [],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [
+            {
+              "key": "lore-the-two-ledgers",
+              "title": "The Two Ledgers",
+              "summary": "The guild keeps a running sheet and a returns sheet, and the returns sheet has never agreed with the running sheet in living memory.",
+              "visibility": "public",
+              "details": [
+                "Every apprentice is taught to copy the running sheet into the returns sheet before the week closes.",
+                "The copying is done by hand and has never been checked by a second hand."
+              ],
+              "locationKeys": ["location-threadneedle-row"],
+              "factionKeys": ["faction-dyers-guild"],
+              "storyNodeKeys": []
+            }
+          ],
+          "questItems": [],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "Lore has three separate 8-item reference caps and an 8-item details cap, plus a 4000-character summary. Models routinely emit a 'body' or 'content' field instead of 'summary', or a details array with forty items, and both are contract failures even when the writing is good."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-03-locations-and-connections",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-locations",
+      "setup": {
+        "gradingNote": "Two fields requested: locations (max 16) and connections (max 24). atmosphere has its own tighter 1000-character cap and is optional. discoveries/hazards/hooks are each capped at 8.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic"],
+          "sections": ["locations"],
+          "desiredCounts": { "locations": 3, "connections": 4 },
+          "existingCanonKeys": ["faction-dyers-guild"]
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "locations": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "name", "description", "visibility"],
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "description": { "type": "string", "minLength": 1, "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] },
+                "atmosphere": { "type": "string", "maxLength": 1000 },
+                "discoveries": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 500 } },
+                "hazards": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 500 } },
+                "hooks": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 500 } },
+                "factionKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } }
+              }
+            },
+            "connections": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "fromLocationKey", "toLocationKey", "description", "visibility"],
+              "properties": {
+                "key": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "fromLocationKey": { "type": "string", "maxLength": 64 },
+                "toLocationKey": { "type": "string", "maxLength": 64 },
+                "description": { "type": "string", "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] }
+              }
+            }
+          },
+          "sharedRules": {
+            "detailListMaxItems": 8,
+            "detailItemMaxLength": 500,
+            "atmosphereMaxLength": 1000,
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the locations section (locations and connections) for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"locations\"", "\"connections\"", "\"fromLocationKey\"", "\"toLocationKey\""],
+        "mustNotInclude": ["```", "\"exits\"", "\"neighbors\"", "\"map\"", "\"coordinates\"", "\"parent\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "locations": {
+            "maxItems": 16,
+            "requiredFields": ["key", "name", "description", "visibility"],
+            "optionalFields": ["atmosphere", "discoveries", "hazards", "hooks", "factionKeys"],
+            "fieldRules": {
+              "atmosphere": "optional and capped at 1000 chars, shorter than description",
+              "discoveries": "max 8 items",
+              "hazards": "max 8 items",
+              "hooks": "max 8 items",
+              "factionKeys": "max 8 items"
+            },
+            "forbiddenFields": ["exits", "neighbors", "map", "coordinates", "parent", "district"]
+          },
+          "connections": {
+            "maxItems": 24,
+            "requiredFields": ["key", "fromLocationKey", "toLocationKey", "description", "visibility"],
+            "fromAndToMustBeDirected": true,
+            "fromAndToMustResolveInsideThisSection": true,
+            "forbiddenFields": ["twoWay", "cost", "travelTime"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [
+            {
+              "key": "location-threadneedle-row",
+              "name": "Threadneedle Row",
+              "description": "The guild's main street, four hundred yards of trade stalls and one counting house at the top, with the dye vats one street north.",
+              "visibility": "public",
+              "atmosphere": "Wet stone, indigo run-off in the gutters, and the particular noise of forty people trying not to be responsible for anything.",
+              "discoveries": [],
+              "hazards": ["The gutter grates are set two inches proud of the stone and have been the end of one apprentice's wrist."],
+              "hooks": [],
+              "factionKeys": ["faction-dyers-guild"]
+            }
+          ],
+          "connections": [
+            {
+              "key": "connection-threadneedle-row-to-dye-vats",
+              "fromLocationKey": "location-threadneedle-row",
+              "toLocationKey": "location-dye-vats",
+              "description": "One street north through the cooper's arch; the whole of it in the open and visible from the row.",
+              "visibility": "public"
+            }
+          ],
+          "factions": [],
+          "npcs": [],
+          "quests": [],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [],
+          "questItems": [],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "The locations section owns two arrays with different caps, and a connection is a directed pair, not an adjacency list. Models habitually add convenience fields (exits, neighbors, cost, twoWay) that are not declared, and those make the whole draft unreviewable because every object is strict."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-04-factions-gm-notes",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-factions",
+      "setup": {
+        "gradingNote": "gmNotes is an optional GM-only field that is stripped from the public faction view. Grade that the generated faction carries gmNotes under visibility 'gm' and that the field is named exactly gmNotes.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic"],
+          "sections": ["factions"],
+          "desiredCounts": { "factions": 3 },
+          "existingCanonKeys": []
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "factions": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "name", "description", "visibility"],
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "description": { "type": "string", "minLength": 1, "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] },
+                "gmNotes": { "type": "string", "maxLength": 4000 }
+              }
+            }
+          },
+          "sharedRules": {
+            "publicFactionViewOmits": ["gmNotes"],
+            "gmNotesIsNeverPlayerVisible": true,
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the factions section for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"factions\"", "\"gmNotes\"", "\"visibility\""],
+        "mustNotInclude": ["```", "\"secrets\"", "\"motives\"", "\"publicNotes\"", "\"goals\"", "\"insiderNotes\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "factions": {
+            "maxItems": 12,
+            "requiredFields": ["key", "name", "description", "visibility"],
+            "optionalFields": ["gmNotes"],
+            "gmNotesVisibilityRule": "gmNotes may only appear on a faction whose visibility is 'gm'; the public faction projection omits gmNotes entirely",
+            "forbiddenFields": ["secrets", "motives", "publicNotes", "goals", "insiderNotes", "leaderKey"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [
+            {
+              "key": "faction-dyers-guild",
+              "name": "The Dyers' Guild",
+              "description": "Forty years of controlling every bolt of dyed cloth that leaves Merrow, exercised through a counting house nobody is allowed to walk into without a reason.",
+              "visibility": "gm",
+              "gmNotes": "The guild is not the antagonist. It is a bookkeeping machine that keeps running when the people inside it stop being honest, and the discrepancy is cheaper to let stand than to explain."
+            }
+          ],
+          "npcs": [],
+          "quests": [],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [],
+          "questItems": [],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "The one field that makes a faction GM-only is named exactly gmNotes. A generator that invents 'secrets' or 'motives' produces a draft where the private content cannot be automatically separated from the public content, which is the single most expensive schema failure in this pipeline."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-05-quests",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-quests",
+      "setup": {
+        "gradingNote": "Quests nest objectives (max 32) and rewards (max 16). Objective targetProgress is an integer 1..1000000 defaulting to 1. reward.amount is a nullable integer.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic"],
+          "sections": ["quests"],
+          "desiredCounts": { "quests": 3 },
+          "existingCanonKeys": ["location-threadneedle-row", "location-dye-vats", "faction-dyers-guild", "npc-oren-vask", "npc-merrinow"]
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "quests": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "title", "description", "visibility"],
+              "properties": {
+                "key": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "description": { "type": "string", "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] },
+                "arcKey": { "type": "string", "maxLength": 64 },
+                "locationKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } },
+                "objectives": { "type": "array", "maxItems": 32, "items": { "$ref": "objective" } },
+                "rewards": { "type": "array", "maxItems": 16, "items": { "$ref": "reward" } },
+                "journalText": { "type": "string", "maxLength": 4000 }
+              },
+              "objective": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "description", "visibility"],
+                "properties": {
+                  "key": { "type": "string", "maxLength": 64 },
+                  "description": { "type": "string", "maxLength": 4000 },
+                  "targetProgress": { "type": "integer", "minimum": 1, "maximum": 1000000, "default": 1 },
+                  "dependencyObjectiveKeys": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 64 } },
+                  "visibility": { "enum": ["public", "gm"] }
+                }
+              },
+              "reward": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "label", "kind", "visibility"],
+                "properties": {
+                  "key": { "type": "string", "maxLength": 64 },
+                  "label": { "type": "string", "maxLength": 200 },
+                  "kind": { "enum": ["xp", "currency", "custom"] },
+                  "amount": { "type": ["integer", "null"], "default": null },
+                  "visibility": { "enum": ["public", "gm"] }
+                }
+              }
+            }
+          },
+          "sharedRules": { "visibilityValues": ["public", "gm"], "unknownKeysAreRejected": true }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the quests section for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"quests\"", "\"objectives\"", "\"targetProgress\"", "\"rewards\"", "\"kind\""],
+        "mustNotInclude": ["```", "\"stages\"", "\"steps\"", "\"reward\"", "\"xpReward\"", "\"objectivesCount\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "quests": {
+            "maxItems": 16,
+            "requiredFields": ["key", "title", "description", "visibility"],
+            "optionalFields": ["arcKey", "locationKeys", "objectives", "rewards", "journalText"],
+            "fieldRules": {
+              "locationKeys": "max 8 items",
+              "objectives": "max 32 items, each with key/description/visibility required, targetProgress integer 1..1000000, dependencyObjectiveKeys max 32 items",
+              "rewards": "max 16 items, each with key/label/kind/visibility required, kind in xp|currency|custom, amount nullable integer",
+              "referencesMustResolveInsideSectionOrAcceptedCanon": true
+            },
+            "forbiddenFields": ["stages", "steps", "reward", "xpReward", "objectivesCount", "trigger"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [],
+          "npcs": [],
+          "quests": [
+            {
+              "key": "quest-the-two-ledgers",
+              "title": "The Two Ledgers",
+              "description": "The returns sheet and the running sheet disagree by eleven bolts a week, and somebody has to establish which of them is a copy of the other.",
+              "visibility": "public",
+              "locationKeys": ["location-threadneedle-row"],
+              "objectives": [
+                {
+                  "key": "objective-recover-the-scratch-ledger",
+                  "description": "Recover the scratch ledger from the dye vat records store",
+                  "targetProgress": 1,
+                  "dependencyObjectiveKeys": [],
+                  "visibility": "public"
+                }
+              ],
+              "rewards": [
+                {
+                  "key": "reward-guild-standing",
+                  "label": "Standing in the quarter",
+                  "kind": "custom",
+                  "amount": null,
+                  "visibility": "public"
+                }
+              ],
+              "journalText": "Eleven bolts a week, and nobody can say who signed for them."
+            }
+          ],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [],
+          "questItems": [],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "Quest generation has three nested structures with their own caps and a discriminated reward kind. The likeliest failures are flattening objectives into prose stages, inventing an xpReward field, and emitting reward.amount as a string. All three are silent contract breaks."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-06-encounters",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-encounters",
+      "setup": {
+        "gradingNote": "Encounters are inert plans, not combat encounters. resolution is capped at 1000 characters. enemyReferences must be full catalog references.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic", "open combat as the primary threat"],
+          "sections": ["encounters"],
+          "desiredCounts": { "encounters": 2 },
+          "existingCanonKeys": ["location-threadneedle-row", "npc-oren-vask", "npc-merrinow"]
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "encounters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "title", "description", "visibility"],
+              "properties": {
+                "key": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "description": { "type": "string", "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] },
+                "locationKey": { "type": "string", "maxLength": 64 },
+                "participantNpcKeys": { "type": "array", "maxItems": 16, "items": { "type": "string", "maxLength": 64 } },
+                "objectives": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 500 } },
+                "terrain": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 500 } },
+                "escalation": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 500 } },
+                "resolution": { "type": "string", "maxLength": 1000 },
+                "enemyReferences": { "type": "array", "maxItems": 16, "items": { "$ref": "enemyTemplateReference" } },
+                "monsterConceptKeys": { "type": "array", "maxItems": 16, "items": { "type": "string", "maxLength": 64 } }
+              },
+              "enemyTemplateReference": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["packId", "packVersion", "kind", "definitionId"],
+                "properties": {
+                  "packId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+                  "packVersion": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$" },
+                  "kind": { "const": "enemy-template" },
+                  "definitionId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" }
+                }
+              }
+            }
+          },
+          "sharedRules": {
+            "detailListMaxItems": 8,
+            "detailItemMaxLength": 500,
+            "resolutionMaxLength": 1000,
+            "encountersAreInertPlans": true,
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the encounters section for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"encounters\"", "\"participantNpcKeys\"", "\"escalation\"", "\"resolution\""],
+        "mustNotInclude": ["```", "\"enemies\"", "\"initiative\"", "\"rounds\"", "\"hp\"", "\"attacks\"", "\"loot\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "encounters": {
+            "maxItems": 16,
+            "requiredFields": ["key", "title", "description", "visibility"],
+            "optionalFields": ["locationKey", "participantNpcKeys", "objectives", "terrain", "escalation", "resolution", "enemyReferences", "monsterConceptKeys"],
+            "fieldRules": {
+              "participantNpcKeys": "max 16 items",
+              "objectives": "max 8 items of 1..500 chars",
+              "terrain": "max 8 items",
+              "escalation": "max 8 items",
+              "resolution": "max 1000 chars",
+              "enemyReferences": "max 16 items, each strictly {packId, packVersion, kind:'enemy-template', definitionId}",
+              "monsterConceptKeys": "max 16 items"
+            },
+            "forbiddenFields": ["enemies", "initiative", "rounds", "hp", "attacks", "loot", "difficulty", "reward"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [],
+          "npcs": [],
+          "quests": [],
+          "encounters": [
+            {
+              "key": "encounter-the-quay-count",
+              "title": "The Quay Count",
+              "description": "An afternoon bollard count that turns into an argument about eleven bolts of cloth and ends with both parties standing in the rain holding the same sheet of paper.",
+              "visibility": "gm",
+              "locationKey": "location-threadneedle-row",
+              "participantNpcKeys": ["npc-oren-vask", "npc-merrinow"],
+              "objectives": ["Establish which of the two sheets is a copy."],
+              "terrain": ["Wet stone underfoot.", "Forty stalls within earshot."],
+              "escalation": ["The crowd begins repeating the number.", "A second factor arrives."],
+              "resolution": "Nobody wins and both sheets go into the counting house drawer, which is its own kind of answer.",
+              "enemyReferences": [],
+              "monsterConceptKeys": []
+            }
+          ],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [],
+          "questItems": [],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "Encounters are planning material, not combat encounters, so gameplay fields like initiative, hp and difficulty are not merely out of style, they are undeclared and make the object invalid. The category also exercises the nested strict catalog reference shape, where an extra or missing field inside enemyReferences fails the whole draft."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-07-scene-prompts",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-scene-prompts",
+      "setup": {
+        "gradingNote": "Public scene prompts contain only spoiler-free read-aloud prose and require publication before delivery. GM scene prompts carry planning. Grade that the visibility field matches the content class.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic"],
+          "sections": ["scene-prompts"],
+          "desiredCounts": { "scenePrompts": 3 },
+          "existingCanonKeys": ["location-threadneedle-row", "location-dye-vats", "npc-oren-vask", "npc-merrinow"]
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "scenePrompts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "title", "prompt", "visibility"],
+              "properties": {
+                "key": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "prompt": { "type": "string", "minLength": 1, "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] },
+                "locationKey": { "type": "string", "maxLength": 64 },
+                "npcKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } }
+              }
+            }
+          },
+          "sharedRules": {
+            "publicSceneRule": "a public scene prompt contains only spoiler-free read-aloud prose and is not delivered until it is published",
+            "gmSceneRule": "a gm scene prompt carries entry, framing, portrayal, approaches, escalation, clue recovery, reveal conditions and exit hooks",
+            "npcKeysMaxItems": 8,
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the scene-prompts section for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"scenePrompts\"", "\"prompt\"", "\"visibility\"", "\"npcKeys\""],
+        "mustNotInclude": ["```", "\"readAloud\"", "\"trigger\"", "\"whenToUse\"", "\"imagePrompt\"", "\"music\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "scenePrompts": {
+            "maxItems": 16,
+            "requiredFields": ["key", "title", "prompt", "visibility"],
+            "optionalFields": ["locationKey", "npcKeys"],
+            "fieldRules": {
+              "prompt": "1..4000 chars",
+              "npcKeys": "max 8 items"
+            },
+            "visibilitySemantics": "public prompts carry no spoiler material and require publication before delivery; gm prompts carry reveal conditions and clue recovery",
+            "forbiddenFields": ["readAloud", "trigger", "whenToUse", "imagePrompt", "music", "notes"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [],
+          "npcs": [],
+          "quests": [],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [],
+          "questItems": [],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": [
+            {
+              "key": "scene-the-row-in-the-rain",
+              "title": "Threadneedle Row in the Rain",
+              "prompt": "Four hundred yards of wet stone, indigo in the gutters, forty people not looking at each other across the width of the street. The counting house door is shut and has been shut since noon. Somebody near the third lamp is holding a folded sheet of paper and holding it badly.",
+              "visibility": "public",
+              "locationKey": "location-threadneedle-row",
+              "npcKeys": ["npc-merrinow"]
+            }
+          ]
+        },
+        "rationale": "The prompt field carries everything, and the visibility value is the only thing separating spoiler-free read-aloud material from GM planning. Getting that mapping wrong leaks a reveal into a public handout, which is the highest-severity output defect in this section."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-08-quest-items-mechanics-union",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-quest-items",
+      "setup": {
+        "gradingNote": "mechanics is a discriminated union on 'state'. Exactly one of catalog-bound or inert, with no extra fields and no hybrid.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic"],
+          "sections": ["quest-items"],
+          "desiredCounts": { "questItems": 3 },
+          "existingCanonKeys": ["location-threadneedle-row", "quest-the-two-ledgers"]
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "questItems": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "name", "description", "visibility", "mechanics"],
+              "properties": {
+                "key": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "description": { "type": "string", "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] },
+                "questKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } },
+                "locationKeys": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } },
+                "mechanics": {
+                  "discriminator": "state",
+                  "variants": [
+                    {
+                      "state": "catalog-bound",
+                      "additionalProperties": false,
+                      "required": ["state", "reference"],
+                      "properties": {
+                        "state": { "const": "catalog-bound" },
+                        "reference": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["packId", "packVersion", "kind", "definitionId"],
+                          "properties": {
+                            "packId": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+                            "packVersion": { "type": "string", "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$" },
+                            "kind": { "const": "item" },
+                            "definitionId": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "state": "inert",
+                      "additionalProperties": false,
+                      "required": ["state", "reason"],
+                      "properties": {
+                        "state": { "const": "inert" },
+                        "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "sharedRules": {
+            "questKeysMaxItems": 8,
+            "locationKeysMaxItems": 8,
+            "inertReasonMaxLength": 500,
+            "mechanicsIsDiscriminatedOnState": true,
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the quest-items section for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"questItems\"", "\"mechanics\"", "\"state\"", "\"visibility\""],
+        "mustNotInclude": ["```", "\"effect\"", "\"uses\"", "\"weight\"", "\"rarity\"", "\"bonus\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "questItems": {
+            "maxItems": 16,
+            "requiredFields": ["key", "name", "description", "visibility", "mechanics"],
+            "optionalFields": ["questKeys", "locationKeys"],
+            "fieldRules": {
+              "questKeys": "max 8 items",
+              "locationKeys": "max 8 items"
+            },
+            "mechanicsUnion": {
+              "discriminator": "state",
+              "catalog-bound": "requires exactly {state:'catalog-bound', reference:{packId, packVersion, kind:'item', definitionId}}",
+              "inert": "requires exactly {state:'inert', reason} with reason 1..500 chars",
+              "hybridVariantsAllowed": false
+            },
+            "forbiddenFields": ["effect", "uses", "weight", "rarity", "bonus", "damage", "acquired"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [],
+          "npcs": [],
+          "quests": [],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [],
+          "questItems": [
+            {
+              "key": "quest-item-the-scratch-ledger",
+              "name": "The Scratch Ledger",
+              "description": "A guild record kept in pencil on the back of requisition slips because the proper book was already full that season.",
+              "visibility": "public",
+              "questKeys": ["quest-the-two-ledgers"],
+              "locationKeys": ["location-threadneedle-row"],
+              "mechanics": { "state": "inert", "reason": "A document with no gameplay effect; it exists to be read." }
+            }
+          ],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "A discriminated union is the hardest shape in this contract to generate correctly: models routinely emit both reference and reason, or wrap the union in an extra object, or invent gameplay fields to fill the gap. A single extra key anywhere inside mechanics invalidates the item."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-09-monster-concepts",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-monster-concepts",
+      "setup": {
+        "gradingNote": "monsterConcepts share the same mechanics discriminated union as questItems but with kind 'enemy-template'. tactics is a detail list capped at 8; role is a short name field capped at 200.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth. Something is coming out of the vats at night and it is not a person.",
+          "tone": "Grounded industrial body horror, no magic",
+          "exclusions": ["nobility", "spellcasters"],
+          "sections": ["monster-concepts"],
+          "desiredCounts": { "monsterConcepts": 2 },
+          "existingCanonKeys": ["location-dye-vats"]
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "monsterConcepts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "name", "description", "role", "visibility", "mechanics"],
+              "properties": {
+                "key": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "description": { "type": "string", "maxLength": 4000 },
+                "role": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "visibility": { "enum": ["public", "gm"] },
+                "tactics": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 500 } },
+                "mechanics": {
+                  "discriminator": "state",
+                  "variants": [
+                    {
+                      "state": "catalog-bound",
+                      "properties": {
+                        "state": { "const": "catalog-bound" },
+                        "reference": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["packId", "packVersion", "kind", "definitionId"],
+                          "properties": {
+                            "packId": { "type": "string", "maxLength": 128 },
+                            "packVersion": { "type": "string", "maxLength": 64 },
+                            "kind": { "const": "enemy-template" },
+                            "definitionId": { "type": "string", "maxLength": 128 }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "state": "inert",
+                      "properties": { "state": { "const": "inert" }, "reason": { "type": "string", "maxLength": 500 } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "sharedRules": {
+            "tacticsMaxItems": 8,
+            "mechanicsIsDiscriminatedOnState": true,
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the monster-concepts section for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"monsterConcepts\"", "\"role\"", "\"tactics\"", "\"mechanics\"", "\"state\""],
+        "mustNotInclude": ["```", "\"hp\"", "\"ac\"", "\"cr\"", "\"speed\"", "\"attacks\"", "\"abilities\"", "\"challengeRating\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "monsterConcepts": {
+            "maxItems": 16,
+            "requiredFields": ["key", "name", "description", "role", "visibility", "mechanics"],
+            "optionalFields": ["tactics"],
+            "fieldRules": {
+              "role": "1..200 chars, a short named role rather than prose",
+              "tactics": "max 8 items of 1..500 chars"
+            },
+            "mechanicsUnion": {
+              "discriminator": "state",
+              "catalog-bound": "requires exactly {state:'catalog-bound', reference:{packId, packVersion, kind:'enemy-template', definitionId}}",
+              "inert": "requires exactly {state:'inert', reason}"
+            },
+            "forbiddenFields": ["hp", "ac", "cr", "speed", "attacks", "abilities", "challengeRating", "immunities", "resistances"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [],
+          "npcs": [],
+          "quests": [],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [],
+          "storyRelationships": [],
+          "lore": [],
+          "questItems": [],
+          "monsterConcepts": [
+            {
+              "key": "monster-concept-the-vat-thing",
+              "name": "The Vat Thing",
+              "description": "What is left of an apprentice who went into the third vat to check a leak and came out the other side wrong, wet through and not wet, and does not speak.",
+              "role": "Persistent consequence",
+              "visibility": "gm",
+              "tactics": [
+                "It stays in standing dye and only moves when the level drops.",
+                "It does not attack until somebody opens a sluice."
+              ],
+              "mechanics": { "state": "inert", "reason": "Concept only. No catalog-bound enemy template is agreed for this campaign yet, so no reference is invented." }
+            }
+          ],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "This section is where schema discipline and hallucination pull hardest in opposite directions: the brief invites combat statistics and the contract forbids them. The inert variant exists precisely so the generator has an honest way to say 'no stat block yet' instead of inventing a catalog reference that resolves to nothing."
+      },
+      "firstAttemptOnly": true
+    },
+    {
+      "id": "dev-schema-10-story-graph",
+      "lineage": {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "worldFamily": "dev-world-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild"
+      },
+      "dimension": "section-story",
+      "setup": {
+        "gradingNote": "The story section owns two arrays with different caps: storyNodes max 24 and storyRelationships max 32. Every relationship's from and to must resolve to a node key present in this section.",
+        "systemPrompt": "You generate sparse campaign content as strict JSON. Emit only the requested sections. Arrays outside the requested sections must be present and empty. Never emit markdown, comments, or code fences. Never emit keys the schema does not declare.",
+        "characterCard": "You are a campaign content generator for the Threadneedle Quarter, a guild craft district of the river city of Merrow.",
+        "generationRequest": {
+          "campaignId": "camp-threadneedle-dev-01",
+          "brief": "A dyers' guild quarter where the season's returns sheets do not match the season's cloth.",
+          "tone": "Grounded industrial mystery",
+          "exclusions": ["nobility", "magic"],
+          "sections": ["story"],
+          "desiredCounts": { "storyNodes": 4, "storyRelationships": 5 },
+          "existingCanonKeys": []
+        },
+        "outputContract": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outlines": { "type": "array", "maxItems": 1 },
+              "arcs": { "type": "array", "maxItems": 8 },
+              "locations": { "type": "array", "maxItems": 16 },
+              "connections": { "type": "array", "maxItems": 24 },
+              "factions": { "type": "array", "maxItems": 12 },
+              "npcs": { "type": "array", "maxItems": 16 },
+              "quests": { "type": "array", "maxItems": 16 },
+              "encounters": { "type": "array", "maxItems": 16 },
+              "clues": { "type": "array", "maxItems": 24 },
+              "storyNodes": { "type": "array", "maxItems": 24 },
+              "storyRelationships": { "type": "array", "maxItems": 32 },
+              "lore": { "type": "array", "maxItems": 24 },
+              "questItems": { "type": "array", "maxItems": 16 },
+              "monsterConcepts": { "type": "array", "maxItems": 16 },
+              "handouts": { "type": "array", "maxItems": 12 },
+              "scenePrompts": { "type": "array", "maxItems": 16 }
+            }
+          },
+          "requestedSectionSchema": {
+            "storyNodes": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "title", "description", "visibility"],
+              "properties": {
+                "key": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "description": { "type": "string", "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] }
+              }
+            },
+            "storyRelationships": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "fromStoryNodeKey", "toStoryNodeKey", "description", "visibility"],
+              "properties": {
+                "key": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9-]*$" },
+                "fromStoryNodeKey": { "type": "string", "maxLength": 64 },
+                "toStoryNodeKey": { "type": "string", "maxLength": 64 },
+                "description": { "type": "string", "maxLength": 4000 },
+                "visibility": { "enum": ["public", "gm"] }
+              }
+            }
+          },
+          "sharedRules": {
+            "referentialIntegrityRequired": true,
+            "fromAndToMustResolveToStoryNodesInThisSection": true,
+            "visibilityValues": ["public", "gm"],
+            "unknownKeysAreRejected": true
+          }
+        },
+        "gmOnlyFacts": []
+      },
+      "tools": [],
+      "input": "Generate the story section (storyNodes and storyRelationships) for this campaign request as strict JSON.",
+      "expected": {
+        "outcome": "no-tool",
+        "toolName": null,
+        "arguments": null,
+        "mustInclude": ["\"storyNodes\"", "\"storyRelationships\"", "\"fromStoryNodeKey\"", "\"toStoryNodeKey\""],
+        "mustNotInclude": ["```", "\"edges\"", "\"links\"", "\"order\"", "\"graph\"", "\"parent\""],
+        "forbiddenFacts": [],
+        "schemaConstraints": {
+          "topLevelKeys": [
+            "outlines",
+            "arcs",
+            "locations",
+            "connections",
+            "factions",
+            "npcs",
+            "quests",
+            "encounters",
+            "clues",
+            "storyNodes",
+            "storyRelationships",
+            "lore",
+            "questItems",
+            "monsterConcepts",
+            "handouts",
+            "scenePrompts"
+          ],
+          "additionalTopLevelKeysAllowed": false,
+          "nonRequestedArraysMustBeEmpty": true,
+          "storyNodes": {
+            "maxItems": 24,
+            "requiredFields": ["key", "title", "description", "visibility"],
+            "forbiddenFields": ["order", "stage", "parent", "children", "graph"]
+          },
+          "storyRelationships": {
+            "maxItems": 32,
+            "requiredFields": ["key", "fromStoryNodeKey", "toStoryNodeKey", "description", "visibility"],
+            "referentialIntegrityRequired": true,
+            "forbiddenFields": ["edges", "links", "graph", "weight", "bidirectional"]
+          }
+        },
+        "referenceOutput": {
+          "outlines": [],
+          "arcs": [],
+          "locations": [],
+          "connections": [],
+          "factions": [],
+          "npcs": [],
+          "quests": [],
+          "encounters": [],
+          "clues": [],
+          "storyNodes": [
+            {
+              "key": "story-node-the-eleven-bolts",
+              "title": "The Eleven Bolts",
+              "description": "Somebody has been writing up returns that no cloth was ever dyed for, eleven bolts a week since midsummer.",
+              "visibility": "gm"
+            },
+            {
+              "key": "story-node-the-scratch-ledger",
+              "title": "The Scratch Ledger",
+              "description": "The pencil record on the backs of requisition slips that actually matches the bolts.",
+              "visibility": "gm"
+            }
+          ],
+          "storyRelationships": [
+            {
+              "key": "story-rel-scratch-counteracts-eleven",
+              "fromStoryNodeKey": "story-node-the-scratch-ledger",
+              "toStoryNodeKey": "story-node-the-eleven-bolts",
+              "description": "Producing the scratch ledger makes the returns discrepancy legible, and legible is dangerous.",
+              "visibility": "gm"
+            }
+          ],
+          "lore": [],
+          "questItems": [],
+          "monsterConcepts": [],
+          "handouts": [],
+          "scenePrompts": []
+        },
+        "rationale": "Two arrays with different caps under one section name, plus a hard referential-integrity requirement. The characteristic failure is a relationship pointing at a node key that was never emitted, which produces a draft that reads well and cannot be applied."
+      },
+      "firstAttemptOnly": true
+    }
+  ]
+}
