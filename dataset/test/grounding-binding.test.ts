@@ -321,3 +321,60 @@ test("ambiguous receipts cannot be chosen merely because their numbers match", (
   ];
   assert.equal(evaluateGroundedNarration("The attack deals 30; the target has 5 HP remaining.", receipts).verdict, "adjudication-required");
 });
+
+/**
+ * Regression: the article before a DC label must accept "an".
+ *
+ * `CHECK_NUMBERS` spelled the article `(?:a\s+)?`, so the ordinary phrasing
+ * "against an Easy DC" failed to parse. The clause then fell through to a
+ * subject-less outcome-only claim, which `bindFact` resolved by inheriting the
+ * PREVIOUSLY bound receipt. The observable damage, all reproduced below:
+ *
+ *   1. the second receipt was never bound, so a misstated second receipt
+ *      (total 9 narrated as 14) went undetected;
+ *   2. a FALSE `check-outcome-contradicted` was charged to the first receipt;
+ *   3. `bindingsChecked` under-reported, hiding the gap from any caller.
+ *
+ * This is the exact fixture the counterfactual-twin module found; see
+ * dataset/CORRECTIONS_LOG.md.
+ */
+test("a check DC introduced by \"an\" still binds to its own receipt", () => {
+  const receipts: GroundingReceipt[] = [
+    { kind: "check", receiptId: "ledger-check", skill: "Investigation", total: 22, dc: 15, outcome: "success" },
+    { kind: "check", receiptId: "door-check", skill: "Arcana", total: 9, dc: 10, outcome: "failure" },
+  ];
+  const narration = "Your Investigation check comes to 22 against a Medium DC of 15: success."
+    + " Your Arcana check comes to 9 against an Easy DC of 10: failure.";
+
+  const verdict = evaluateGroundedNarration(narration, receipts);
+  const bound = new Set(verdict.bindings.map((binding) => binding.receiptId));
+
+  assert.equal(verdict.verdict, "verified", JSON.stringify(verdict));
+  assert.equal(bound.has("ledger-check"), true);
+  assert.equal(bound.has("door-check"), true, "the second receipt was never bound");
+  assert.equal(verdict.bindingsChecked, 2);
+});
+
+test("a misstated second receipt is reported against that receipt, not the first", () => {
+  const receipts: GroundingReceipt[] = [
+    { kind: "check", receiptId: "ledger-check", skill: "Investigation", total: 22, dc: 15, outcome: "success" },
+    { kind: "check", receiptId: "door-check", skill: "Arcana", total: 9, dc: 10, outcome: "failure" },
+  ];
+  // `door-check` commits total 9; the narration asserts 14.
+  const narration = "Your Investigation check comes to 22 against a Medium DC of 15: success."
+    + " Your Arcana check comes to 14 against an Easy DC of 10: failure.";
+
+  const verdict = evaluateGroundedNarration(narration, receipts);
+  assert.equal(verdict.verdict, "rejected");
+  if (verdict.verdict !== "rejected") throw new Error("unreachable");
+
+  assert.ok(
+    verdict.violations.some((violation) => violation.receiptId === "door-check" && violation.code === "value-binding-mismatch"),
+    `expected the real value mismatch on door-check, got ${JSON.stringify(verdict.violations)}`,
+  );
+  assert.equal(
+    verdict.violations.some((violation) => violation.receiptId === "ledger-check" && violation.code === "check-outcome-contradicted"),
+    false,
+    "a correct first receipt was charged with a contradiction it does not contain",
+  );
+});

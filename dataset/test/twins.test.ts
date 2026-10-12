@@ -379,68 +379,46 @@ test("REJECT failed lengthRatio: the declared guard field is not a measured numb
 });
 
 /**
- * KNOWN LIMITATION, pinned deliberately.
+ * `multi-fact-divergence` is derived from grounding violations bound to a
+ * receipt other than the flipped one, so it is only as strong as grounding's
+ * clause-to-receipt binding.
  *
- * `multi-fact-divergence` is derived from grounding violations that are not
- * attributable to the flipped fact, so it is only as reliable as grounding's
- * clause-to-receipt binding. That binding currently under-reaches: given two
- * check receipts, `bindFact` inherits the previously bound receipt rather than
- * resolving the second clause to its own, so the second receipt is never bound
- * and a misstatement of it is never detected.
- *
- * This test asserts the CURRENT behaviour and therefore fails the moment
- * grounding is fixed. That is intended: it is the tripwire for the defect
- * reproduced below, which is tracked in CORRECTIONS_LOG.md.
+ * This case was originally written as a KNOWN LIMITATION: the article before a
+ * DC label was `(?:a\s+)?`, so "against an Easy DC" did not parse, the clause
+ * fell through to a subject-less claim, and `bindFact` inherited the previously
+ * bound receipt. The second receipt was therefore never bound, its divergence
+ * was invisible here, and a false violation was charged to the first receipt.
+ * grounding.ts is fixed; the second receipt now binds and the divergence is
+ * caught. See the regression tests in grounding-binding.test.ts.
  */
-test("KNOWN LIMITATION: a second receipt is never bound, so its divergence is invisible", () => {
+test("REJECT a divergence bound to a receipt other than the flipped one", () => {
   const facts = authoritativeFacts(LEDGER_AND_DOOR);
   const anchors = selectAnchors(facts, "d3").anchors;
   const flip: FactFlip = { op: "set-value", factId: "ledger-check", role: "dc", value: 17 };
   const flipAnchor = anchors.find((anchor) => flipTouches(flip, anchor));
-  assert.ok(flipAnchor);
+  assert.ok(flipAnchor, `selection lacks the flipped anchor: ${JSON.stringify(anchors.map((anchor) => anchor.value))}`);
 
-  // `door-check` commits total 9. The narration says 14 and names the skill.
-  const prose = "Your Investigation check comes to 22 against a Medium DC of 17: success."
-    + " Your Arcana check comes to 14 against an Easy DC of 12: failure.";
+  // Both clauses name their own check skill, which is what lets `bindFact`
+  // resolve a unique referent instead of inheriting the previous receipt.
+  const chosen = "Your Investigation check comes to 22 against a Medium DC of 15: success."
+    + " Your Arcana check comes to 9 against an Easy DC of 12: failure.";
+  const minimal = "Your Investigation check comes to 22 against a Medium DC of 17: success."
+    + " Your Arcana check comes to 9 against an Easy DC of 12: failure, and the ledger does not care.";
+  const caseSpec = spec({ receipts: LEDGER_AND_DOOR, faithfulNarration: chosen, counterfactualNarration: minimal, flip, flipAnchor });
+  const good = buildTwinPair(caseSpec, anchors, "divergence-seed");
+  const goodResult = verifyTwinPair({ pair: good.pair, spec: caseSpec, instrumentation: good.instrumentation });
+  assert.equal(goodResult.ok, true, JSON.stringify(goodResult.reasons));
 
-  const verdict = evaluateGroundedNarration(prose, LEDGER_AND_DOOR);
-  const bound = new Set(verdict.bindings.map((binding) => binding.receiptId));
-
-  // The defect: the second receipt is never bound at all.
-  assert.equal(bound.has("door-check"), false, "grounding now binds the second receipt; update this limitation test");
-  assert.equal(verdict.bindingsChecked, 1, "grounding now checks both receipts; update this limitation test");
-  // And the misstatement of it is therefore not reported against door-check.
-  // `GroundingVerdict` is a discriminated union: violations exist only on the
-  // rejected branch, so narrow before reading them rather than casting.
-  assert.equal(verdict.verdict, "rejected", "this repro relied on the rejected branch");
-  if (verdict.verdict !== "rejected") throw new Error("unreachable");
-  assert.equal(
-    verdict.violations.some((violation: BindingViolation) => violation.receiptId === "door-check"),
-    false,
-    "grounding now reports the second receipt; update this limitation test",
-  );
-  // A false violation is charged to the WRONG receipt instead.
-  assert.ok(
-    verdict.violations.some(
-      (violation: BindingViolation) => violation.receiptId === "ledger-check" && violation.code === "check-outcome-contradicted",
-    ),
-    "the misattributed violation changed shape; re-derive this expectation",
-  );
-
-  // Consequence for the twin check: the second-receipt divergence is NOT
-  // surfaced as `multi-fact-divergence`, because that code is derived from
-  // grounding violations bound to a receipt other than the flipped one, and no
-  // such binding exists. The pair is still rejected for an unrelated reason,
-  // which is exactly what makes the gap easy to miss.
-  const chosen = "Your Investigation check comes to 22 against a Medium DC of 15: success. Your Arcana check comes to 9 against an Easy DC of 12: failure.";
-  const badSpec = spec({ receipts: LEDGER_AND_DOOR, faithfulNarration: chosen, counterfactualNarration: prose, flip, flipAnchor });
-  const pair = buildTwinPair(badSpec, anchors, "divergence-seed");
-  const result = verifyTwinPair({ pair: pair.pair, spec: badSpec, instrumentation: pair.instrumentation });
-  assert.equal(
-    codes(result).includes("multi-fact-divergence"),
-    false,
-    "multi-fact divergence became detectable; fold this case back into a positive rejection test",
-  );
+  // The rejected arm ALSO misstates the second receipt. That divergence binds to
+  // `door-check`, which is not the flipped fact, so it must be rejected.
+  const extra = "Your Investigation check comes to 22 against a Medium DC of 17: success."
+    + " Your Arcana check comes to 14 against an Easy DC of 12: failure, and the ledger does not care at all.";
+  const badSpec = { ...caseSpec, counterfactualNarration: extra };
+  const bad = buildTwinPair(badSpec, anchors, "divergence-seed");
+  const result = verifyTwinPair({ pair: bad.pair, spec: badSpec, instrumentation: bad.instrumentation });
+  assert.equal(result.ok, false, "a second, unrelated receipt divergence must be rejected");
+  assert.ok(codes(result).includes("multi-fact-divergence"), JSON.stringify(result.reasons));
+  assert.ok(result.reasons.some((reason) => /door-check/.test(reason.detail)), JSON.stringify(result.reasons));
 });
 
 /* -------------------------------------------------------------------------- */

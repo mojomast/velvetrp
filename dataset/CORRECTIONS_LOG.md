@@ -131,6 +131,59 @@ Enforcement is real, not decorative.
 
 ---
 
+## Grounding: "an Easy DC" silently unbound the second receipt
+
+Found while testing the counterfactual-twin module, which asserted a
+`multi-fact-divergence` rejection that never fired. I treated the failing
+assertion as a bad fixture and nearly rewrote the test to match reality. Probing
+`evaluateGroundedNarration` directly instead showed the test was right and the
+gate was wrong.
+
+**Root cause.** `CHECK_NUMBERS` spelled the article before a DC label as
+`(?:a\s+)?`. The ordinary phrasing "against an Easy DC" therefore did not match,
+so `parseClause` returned null for the whole clause. The fallback at
+`grounding.ts:376` builds a subject-less, outcome-only claim, and `bindFact`
+resolved its referent by inheriting the *previously bound* receipt.
+
+**Observable damage**, all three reproduced against the live gate:
+
+1. The second check receipt was never bound, so a misstated second receipt
+   (total 9 narrated as 14) passed grounding undetected.
+2. A false `check-outcome-contradicted` was charged to the **first** receipt.
+3. `bindingsChecked` under-reported, so the gap was invisible to any caller.
+
+This is the worst failure shape available here: a validator that silently
+under-validates while reporting a confident, specific, wrong reason.
+
+```
+receipts  ledger-check Investigation 22 vs DC 15 success
+          door-check   Arcana       9 vs DC 12 failure
+text      "Your Investigation check comes to 22 against a Medium DC of 15: success.
+           Your Arcana check comes to 14 against an Easy DC of 12: failure."
+
+before    verdict rejected, bindingsChecked 1, door-check never bound
+          no value-binding-mismatch on door-check
+          ledger-check falsely charged with check-outcome-contradicted
+
+after     verdict rejected, bindingsChecked 2
+          door-check value-binding-mismatch: total is 9 check-points, not 14
+          no violation charged to ledger-check
+```
+
+**Fix.** One character class: `(?:a\s+)?` -> `(?:an?\s+)?`.
+
+Note the lesson, which I have recorded before and violated again: I nearly
+"fixed" a failing test by rewriting its expectation instead of checking whether
+the failure was real. The twins test was right; the gate was wrong. Run the
+probe before believing the assertion.
+
+**Coverage.** Two regression tests in `dataset/test/grounding-binding.test.ts`,
+plus the `multi-fact-divergence` case in `dataset/test/twins.test.ts`, which was
+first committed as a deliberate KNOWN LIMITATION tripwire so the fix could not
+land silently.
+
+---
+
 ## Corpus identity
 
 ```

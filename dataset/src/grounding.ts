@@ -202,7 +202,13 @@ function damageTarget(head: string): string | null {
 }
 
 const NUMBER = "(-?\\d+(?:\\.\\d+)?)";
-const CHECK_NUMBERS = new RegExp(`^(.+?)\\s+(?:check\\s+)?(?:comes to|totals?|has a total of)\\s+${NUMBER}\\s+against\\s+(?:a\\s+)?(?:(very easy|easy|medium|hard|very hard|nearly impossible)\\s+)?DC\\s+(?:of\\s+)?${NUMBER}$`, "i");
+// The article before the DC label must accept "an" as well as "a": "an Easy DC"
+// is the ordinary phrasing, and rejecting it made the whole clause unparseable.
+// An unparsed clause falls through to a subject-less outcome claim, which then
+// inherits the PREVIOUSLY bound receipt -- so the second check in a narration was
+// never bound to its own receipt, a misstated second receipt went undetected, and
+// a false violation was charged to the first receipt instead.
+const CHECK_NUMBERS = new RegExp(`^(.+?)\\s+(?:check\\s+)?(?:comes to|totals?|has a total of)\\s+${NUMBER}\\s+against\\s+(?:an?\\s+)?(?:(very easy|easy|medium|hard|very hard|nearly impossible)\\s+)?DC\\s+(?:of\\s+)?${NUMBER}$`, "i");
 const CHECK_TOTAL = new RegExp(`^(?:(.*?)\\s+)?(?:total|totals|comes to)\\s+${NUMBER}$`, "i");
 const DC = new RegExp(`^DC\\s+(?:of\\s+)?${NUMBER}$`, "i");
 const OUTCOME = "(?:(?:is|was)\\s+)?(?:(?:no|not|never|did not|does not|do not)\\s+)?(?:a\\s+)?(?:success|failure|successful|unsuccessful|succeeds?|succeeded|fails?|failed)";
