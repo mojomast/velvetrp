@@ -1,0 +1,12 @@
+{
+  "model": "rpimax-8b",
+  "max_tokens": 512,
+  "temperature": 0,
+  "messages": [
+    { "role": "user", "content": "Return the exact marker velvet-capability-v1." }
+  ],
+  "tools": [
+    { "type": "function", "function": { "name": "velvet_capability_probe", "parameters": { "type": "object", "properties": { "marker": { "type": "string", "const": "velvet-capability-v1" } }, "required": ["marker"], "additionalProperties": false } } }
+  ],
+  "tool_choice": "required"
+}

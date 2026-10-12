@@ -1,0 +1,29 @@
+{
+    "viaGateway":  true,
+    "elapsedMs":  1485,
+    "result":  {
+                   "model":  "rpimax-8b",
+                   "dmPlayCompatible":  false,
+                   "campaignGenerationCompatible":  true,
+                   "ok":  false,
+                   "capabilities":  [
+                                        {
+                                            "capability":  "function-tools",
+                                            "status":  "unsupported",
+                                            "failure":  {
+                                                            "permanence":  "permanent",
+                                                            "code":  "protocol",
+                                                            "httpStatus":  null
+                                                        }
+                                        },
+                                        {
+                                            "capability":  "strict-json-schema",
+                                            "status":  "supported"
+                                        }
+                                    ]
+               },
+    "alias":  "rpimax-8b",
+    "baseUrl":  "http://127.0.0.1:8081/v1",
+    "model":  "rpimax-8b",
+    "capturedUtc":  "2026-10-12T20:43:53.9146692Z"
+}

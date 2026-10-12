@@ -1,0 +1,155 @@
+{
+  "model": "qwen3-8b",
+  "alias": "qwen3-8b",
+  "file": "Qwen3-8B-Q4_K_M.gguf",
+  "endpoint": "http://127.0.0.1:8081/v1",
+  "viaGateway": true,
+  "capturedUtc": "2026-10-12T19:54:56.939Z",
+  "velvetCommit": "4447d2cdb0260174bb2c2461f76600d11980c427",
+  "passed": 8,
+  "total": 9,
+  "allPassed": false,
+  "probes": [
+    {
+      "id": "basic-chat",
+      "requirement": "OpenAI-compatible chat completion returns assistant content",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "content": "",
+        "ms": 702
+      }
+    },
+    {
+      "id": "streaming",
+      "requirement": "Streaming yields incremental deltas and a measurable TTFT",
+      "passed": true,
+      "evidence": {
+        "chunks": 48,
+        "ttftMs": 76,
+        "totalMs": 1068,
+        "finishReason": "length"
+      }
+    },
+    {
+      "id": "forced-tool-call",
+      "requirement": "tool_choice 'required' yields exactly one schema-bound tool call",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "callCount": 1,
+        "name": "velvet_capability_probe",
+        "args": {
+          "marker": "velvet-capability-v1"
+        },
+        "rawToolCalls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "velvet_capability_probe",
+              "arguments": "{\"marker\": \"velvet-capability-v1\"}"
+            },
+            "id": "WSg5DLGZZkRbpD8DALZ8t5yT403UlgqM"
+          }
+        ],
+        "raw": "{\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"Okay, the user is asking me to return the exact marker 'velvet-capability-v1'. Let me check the tools provided. There's a function called velvet_capability_probe with a parameter 'marker' that has a const of 'velvet-capability-v1'. So the function requires that exact marker. I need to call this function with the marker parameter set to 'velvet-capability-v1'. Since the user wants t"
+      }
+    },
+    {
+      "id": "named-tool-call-narration",
+      "requirement": "Named tool_choice is honoured: exactly one submit_adventure_narration call whose arguments are a one-key {narration:string}",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "callCount": 1,
+        "name": "submit_adventure_narration",
+        "argumentKeys": [
+          "narration"
+        ],
+        "narrationChars": 371,
+        "finishReason": "tool_calls",
+        "rawToolCalls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "submit_adventure_narration",
+              "arguments": "{\"narration\": \"The harbour market is a bustling hub of activity, with merchants hawking their wares from stalls lined along the docks. The scent of fresh seafood and spices mingles in the air, and the sounds of bartering and laughter echo through the crowded thoroughfare. You spot a variety of goods, from shimmering trinkets to sturdy tools, and the occasional exotic animal for sale.\"}"
+            },
+            "id": "8XQ0zuoQ9BLRUS5njljBMMbLI1tSQTR9"
+          }
+        ],
+        "raw": "{\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"submit_adventure_narration\",\"arguments\":\"{\\\"narration\\\": \\\"The harbour market is a bustling hub of activity, with merchants hawking their wares from stalls lined along the docks. The scent of fresh seafood and spices mingles in the air, and the sounds of bartering and laughter echo through the crowded thoroughfare. You spot a variety of goods, from s"
+      }
+    },
+    {
+      "id": "tool-selection-exact-candidate",
+      "requirement": "With several tools and tool_choice 'auto', the model selects propose_travel and the exact enumerated candidate",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "callCount": 1,
+        "name": "propose_travel",
+        "destination": "docks",
+        "argumentKeys": [
+          "destination"
+        ]
+      }
+    },
+    {
+      "id": "tool-result-replay",
+      "requirement": "A tool-result transcript is accepted and the next forced narration call still succeeds",
+      "passed": false,
+      "evidence": {
+        "firstOk": true,
+        "replayStatus": 200,
+        "raw": "{\"choices\":[{\"finish_reason\":\"length\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The adventurer steps onto the creaking wooden planks of the docks, the salty sea breeze brushing against their skin. The sound of waves crashing against the shore echoes in the distance, while the distant calls "
+      }
+    },
+    {
+      "id": "strict-json-schema",
+      "requirement": "response_format json_schema returns exactly one conforming object and no tool calls",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "content": "{\n  \"marker\": \"velvet-capability-v1\"\n}",
+        "parsed": {
+          "marker": "velvet-capability-v1"
+        },
+        "strayToolCalls": 0,
+        "raw": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"{\\n  \\\"marker\\\": \\\"velvet-capability-v1\\\"\\n}\",\"reasoning_content\":\"Okay, the user is asking for the exact marker \\\"velvet-capability-v1.\\\" First, I need to figure out what this marker refers to. It sounds like it "
+      }
+    },
+    {
+      "id": "abstention-no-mutation",
+      "requirement": "A purely social declaration does not select a world-mutation tool",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "toolCalls": [],
+        "raw": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The player's action of smiling at the vendor and saying good morning does not propose any supported mechanical change. Therefore, I will call NO tool.\"}}],\"created\":1791834895,\"model\":\"qwen3-8b\",\"system_fingerprin"
+      }
+    },
+    {
+      "id": "narration-no-fabrication",
+      "requirement": "Narration for a mechanic-free turn asserts no unearned mechanical outcome",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "chars": 264,
+        "matchedFabrication": false,
+        "sample": "You are in a dimly lit room with stone walls that seem to stretch endlessly. A faint glow emanates from a single lantern hanging from the ceiling, casting long shadows across the floor. There are no visible exits, and the air is thick with ",
+        "rawToolCalls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "submit_adventure_narration",
+              "arguments": "{\"narration\": \"You are in a dimly lit room with stone walls that seem to stretch endlessly. A faint glow emanates from a single lantern hanging from the ceiling, casting long shadows across the floor. There are no visible exits, and the air is thick with an ancient, musty scent.\"}"
+            },
+            "id": "pjoQT4yji9pykzpLZaNymMZER5KsL4ZC"
+          }
+        ],
+        "raw": "{\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"submit_adventure_narration\",\"arguments\":\"{\\\"narration\\\": \\\"You are in a dimly lit room with stone walls that seem to stretch endlessly. A faint glow emanates from a single lantern hanging from the ceiling, casting long shadows across the floor. There are no visible exits, and the air is thick with an ancient, musty scent.\\\"}\"},\"id\":\"pjoQT4yji9pykzpLZ"
+      }
+    }
+  ]
+}

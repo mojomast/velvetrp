@@ -1,0 +1,115 @@
+{
+  "model": "rpimax-8b",
+  "alias": "rpimax-8b",
+  "file": "RPMax-v1.3-Llama-3.1-8B-Q4_K_M.gguf",
+  "endpoint": "http://127.0.0.1:8081/v1",
+  "viaGateway": true,
+  "capturedUtc": "2026-10-12T20:47:50.485Z",
+  "velvetCommit": "4447d2cdb0260174bb2c2461f76600d11980c427",
+  "passed": 4,
+  "total": 9,
+  "allPassed": false,
+  "probes": [
+    {
+      "id": "basic-chat",
+      "requirement": "OpenAI-compatible chat completion returns assistant content",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "content": "READY",
+        "ms": 176
+      }
+    },
+    {
+      "id": "streaming",
+      "requirement": "Streaming yields incremental deltas and a measurable TTFT",
+      "passed": true,
+      "evidence": {
+        "chunks": 11,
+        "ttftMs": 47,
+        "totalMs": 300,
+        "finishReason": "stop"
+      }
+    },
+    {
+      "id": "forced-tool-call",
+      "requirement": "tool_choice 'required' yields exactly one schema-bound tool call",
+      "passed": false,
+      "evidence": {
+        "status": 200,
+        "rawToolCalls": null,
+        "raw": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The exact marker velvet-capability-v1 is not available.\"}}],\"created\":1791838054,\"model\":\"rpimax-8b\",\"system_fingerprint\":\"b11574-8bb3cf0d2\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":13,\"prompt_tokens\":20,\"total_tokens\":33,\"prompt_tokens_details\":{\"cached_tokens\":19}},\"id\":\"chatcmpl-UNBkoqNUDflpCRcpt2QcWW7qgzFJ0gL2\",\"timings\":{\"cache_n\":19,\"prompt_n\":1,\"prompt_ms\":28.512,\"prompt_per_token_ms\":28."
+      }
+    },
+    {
+      "id": "named-tool-call-narration",
+      "requirement": "Named tool_choice is honoured: exactly one submit_adventure_narration call whose arguments are a one-key {narration:string}",
+      "passed": false,
+      "evidence": {
+        "status": 200,
+        "argumentKeys": [],
+        "narrationChars": null,
+        "finishReason": "stop",
+        "error": "callCount=0",
+        "rawToolCalls": null,
+        "raw": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The harbour market bustles with activity, a cacophony of sounds and colors. Merchants hawk their wares, from fresh seafood to exotic spices. Sailors and travelers mingle, eager to make deals or simply take in the sights and sounds. A few performers entertain the crowds, juggling, playing music, or performing acrobatics. The smell of food and the tang of saltwater hang in the air.\\n\\nYou notice several shops an"
+      }
+    },
+    {
+      "id": "tool-selection-exact-candidate",
+      "requirement": "With several tools and tool_choice 'auto', the model selects propose_travel and the exact enumerated candidate",
+      "passed": false,
+      "evidence": {
+        "status": 200,
+        "destination": null,
+        "error": "callCount=0",
+        "argumentKeys": null
+      }
+    },
+    {
+      "id": "tool-result-replay",
+      "requirement": "A tool-result transcript is accepted and the next forced narration call still succeeds",
+      "passed": false,
+      "evidence": {
+        "firstOk": true
+      }
+    },
+    {
+      "id": "strict-json-schema",
+      "requirement": "response_format json_schema returns exactly one conforming object and no tool calls",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "content": "{\n  \"marker\": \"velvet-capability-v1\"\n}",
+        "parsed": {
+          "marker": "velvet-capability-v1"
+        },
+        "strayToolCalls": 0,
+        "raw": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"{\\n  \\\"marker\\\": \\\"velvet-capability-v1\\\"\\n}\"}}],\"created\":1791838064,\"model\":\"rpimax-8b\",\"system_fingerprint\":\"b11574-8bb3cf0d2\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":15,\"prompt_tokens\":20,\"tota"
+      }
+    },
+    {
+      "id": "abstention-no-mutation",
+      "requirement": "A purely social declaration does not select a world-mutation tool",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "toolCalls": [],
+        "raw": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The vendor smiles back and says, \\\"Good morning! What can I do for you today?\\\"\"}}],\"created\":1791838064,\"model\":\"rpimax-8b\",\"system_fingerprint\":\"b11574-8bb3cf0d2\",\"object\":\"chat.completion\",\"usage\":{\"completion_"
+      }
+    },
+    {
+      "id": "narration-no-fabrication",
+      "requirement": "Narration for a mechanic-free turn asserts no unearned mechanical outcome",
+      "passed": false,
+      "evidence": {
+        "status": 200,
+        "chars": 0,
+        "matchedFabrication": false,
+        "sample": "",
+        "rawToolCalls": null,
+        "raw": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"You find yourself in a large, open room with a high, vaulted ceiling. The walls are made of rough-hewn stone blocks, and the floor is covered in a layer of dust and debris. In the center of the room is a large stone altar, and scattered around the perimeter are several stone pedestals.\\n\\nThe room is dimly lit by a few flickering torches set into the walls, casting long shadows across the space. The air is mus"
+      }
+    }
+  ]
+}

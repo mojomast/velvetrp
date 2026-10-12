@@ -1,9 +1,45 @@
 node_modules/
 dist/
 .env
-data/
+# `data/*` rather than `data/` so the benchmark harness below can be re-included.
+# Models, GGUF weights, the llama.cpp runtime and the VelvetRP sqlite DB stay ignored.
+data/*
 server/data/
 *.log
 test-results/
 playwright-report/
 .velvet/
+
+# --- local inference + evaluation harness (tracked on purpose: it is the evidence) ---
+!data/velvet-bench/
+data/velvet-bench/*
+!data/velvet-bench/README.md
+!data/velvet-bench/scripts/
+!data/velvet-bench/gateway/
+!data/velvet-bench/conformance/
+!data/velvet-bench/eval/
+!data/velvet-bench/bench.config.json
+!data/velvet-bench/tool-render-check.mjs
+!data/velvet-bench/repeat-probe.mjs
+!data/velvet-bench/probe.mjs
+!data/velvet-bench/probe-*.json
+!data/velvet-bench/reports/
+data/velvet-bench/reports/*
+!data/velvet-bench/reports/*.json
+!data/velvet-bench/reports/*.txt
+!data/velvet-bench/reports/freeform-run/
+data/velvet-bench/reports/freeform-run/*
+!data/velvet-bench/reports/freeform-run/*.json
+!data/velvet-bench/reports/freeform-run/*.md
+
+# The authoritative dev corpus and the vendored foundry sources live on
+# origin/feat/training-data-foundry. fetch-and-verify.mjs pulls them byte-exactly;
+# committing a second copy here would let the two drift apart silently.
+data/velvet-bench/eval/dev-cases/
+data/velvet-bench/eval/src/*
+!data/velvet-bench/eval/src/grounding.oracle.ts
+
+# Superseded: data/velvet-bench/corpus/ was a locally authored asset corpus with no
+# cases. It is replaced by the foundry corpus and was the source of the digest
+# confusion documented in DEV_CORPUS_GROUNDING_BOUNDARY.md section 1.
+data/velvet-bench/corpus/

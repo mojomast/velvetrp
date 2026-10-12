@@ -1,0 +1,24 @@
+{
+    "viaGateway":  true,
+    "elapsedMs":  17713,
+    "result":  {
+                   "model":  "qwen3-8b",
+                   "dmPlayCompatible":  true,
+                   "campaignGenerationCompatible":  true,
+                   "ok":  true,
+                   "capabilities":  [
+                                        {
+                                            "capability":  "function-tools",
+                                            "status":  "supported"
+                                        },
+                                        {
+                                            "capability":  "strict-json-schema",
+                                            "status":  "supported"
+                                        }
+                                    ]
+               },
+    "alias":  "qwen3-8b",
+    "baseUrl":  "http://127.0.0.1:8081/v1",
+    "model":  "qwen3-8b",
+    "capturedUtc":  "2026-10-12T19:34:12.6620209Z"
+}

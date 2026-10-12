@@ -1,0 +1,2819 @@
+{
+ "model": "qwen35-9b",
+ "endpoint": "http://127.0.0.1:8081/v1",
+ "caseCount": 106,
+ "results": [
+  {
+   "id": "dev-flex-01-weather-smalltalk",
+   "category": "flexible-roleplay",
+   "promptSha256": "511d10e0371524744512295a3814fe6a30041fe778a5fe7867cea86f5413abe2",
+   "httpStatus": 200,
+   "latencyMs": 3111,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"The air bites at your exposed skin as you stand on the freezing dock, the cold seeping through your boots. Waves lap against the wooden planks, sending up a mist that clings to your face. The day is bright, but the chill remains a constant companion.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 86,
+    "prompt_tokens": 632,
+    "total_tokens": 718,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-02-paraphrase-no-receipt",
+   "category": "flexible-roleplay",
+   "promptSha256": "0cacfd30e17e3c21659c5ecebb1a21c60577f535bf7af4394e17223ce422ca83",
+   "httpStatus": 200,
+   "latencyMs": 2719,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You begin to shift the crates toward the crane, your muscles straining against the weight as you position them for lifting. The crane's operator watches from the cab, waiting to see if you'll signal them to engage the hoist.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 78,
+    "prompt_tokens": 575,
+    "total_tokens": 653,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-03-greet-vendor",
+   "category": "flexible-roleplay",
+   "promptSha256": "7e523db56f14adee43536f5fb0a7c6ba5fbea4795b257db15f30a88dcd4d4704",
+   "httpStatus": 200,
+   "latencyMs": 3493,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"Tarn leans against the counter, wiping a glass with a rag that's seen better days. \\\"Trade's steady enough, though the caravan from the north is a week late,\\\" he says, not looking up. \\\"Rumors say bandits are skirting the old pass, but I haven't seen a single coin or crate move in or out.\\\"\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 103,
+    "prompt_tokens": 570,
+    "total_tokens": 673,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-04-question-about-absent-npc",
+   "category": "flexible-roleplay",
+   "promptSha256": "deed6291c707f2802431defc5d9aae986adab5258ce3c9047d0a5fa5ed4e7c3a",
+   "httpStatus": 200,
+   "latencyMs": 1766,
+   "finishReason": "stop",
+   "content": "The foreman's boots have vanished from the muddy path, leaving only a faint trail of disturbed earth leading toward the dense treeline. You shrug, turning your attention back to the unfinished cabin where the silence feels heavier than before.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 48,
+    "prompt_tokens": 473,
+    "total_tokens": 521,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-05-ambiguous-vague-request",
+   "category": "flexible-roleplay",
+   "promptSha256": "82b6b5e375f3f9ee5e74016926c33fa60717a9370fc55cd7dc113d42ef76e756",
+   "httpStatus": 200,
+   "latencyMs": 2112,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You gesture vaguely at the room, but the air remains still and silent. The party waits, wondering what specific action you have in mind.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 59,
+    "prompt_tokens": 475,
+    "total_tokens": 534,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-06-offer-help",
+   "category": "flexible-roleplay",
+   "promptSha256": "63df635aa1dafcc490340e3d562a4d3be5c4281c34225aaf1ec05568c5136b89",
+   "httpStatus": 200,
+   "latencyMs": 3038,
+   "finishReason": "stop",
+   "content": "The heavy copper coil hums with a low, vibrating energy as you reach for it, the metal warm against your palm. \"Careful,\" the mechanic warns, his eyes darting between the sparking terminals and your grip. \"That thing hasn't been grounded in weeks; a slip could send you flying into the ceiling.\" He steps back, leaving the device suspended in the air, waiting for your next move.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 84,
+    "prompt_tokens": 463,
+    "total_tokens": 547,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-07-typo-heavy-input",
+   "category": "flexible-roleplay",
+   "promptSha256": "101840250c49e7d26791eec36e5bb2f75651e7f1ecfd5e3ebf95b3c05e57850f",
+   "httpStatus": 200,
+   "latencyMs": 3341,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You look around the quiet alley, your eyes scanning the shadows and the narrow brick walls. The air smells of damp stone and distant rain, and a stray cat darts across your path before vanishing into a side entrance. Nothing seems out of place, but the silence feels heavy, as if the alley is holding its breath.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 97,
+    "prompt_tokens": 442,
+    "total_tokens": 539,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-08-foreign-register",
+   "category": "flexible-roleplay",
+   "promptSha256": "59974d64270306488567bb831320d159b546eabd1c8e58ae47e3e16936d38318",
+   "httpStatus": 200,
+   "latencyMs": 3076,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You scan the bustling construction site, your eyes darting toward the towering crane that dominates the skyline. The operator's cabin is perched high above, but no figure is immediately visible from the ground. A few workers near the base glance up, but none seem to be in charge of the machinery.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 91,
+    "prompt_tokens": 453,
+    "total_tokens": 544,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-09-long-observation-paragraphs",
+   "category": "flexible-roleplay",
+   "promptSha256": "14114751bdd3d70bb1f724fc259a20af5ccc9fbaf83f3a5e0455ba9de4dec127",
+   "httpStatus": 200,
+   "latencyMs": 3260,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You lean against the cold metal rail, your gaze sweeping over the intricate machinery below with practiced ease. The rhythmic hum of the engine fills the air as you watch the pistons dance in their familiar choreography. Nothing has changed in the workshop; the gears turn on, and the steam hisses through the pipes as always.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 97,
+    "prompt_tokens": 464,
+    "total_tokens": 561,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-flex-10-offer-to-leave",
+   "category": "flexible-roleplay",
+   "promptSha256": "1671c3baa46ace8b6a4ee8af79ac5998220fc7db0136d8acea77f87709082207",
+   "httpStatus": 200,
+   "latencyMs": 3134,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You gather your belongings and prepare to depart, the weight of your decision settling in the quiet of the room. The door stands open, a silent invitation to the night ahead, while the space you've occupied remains unchanged. As you step toward the threshold, the air outside waits, indifferent to your resolve.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 92,
+    "prompt_tokens": 447,
+    "total_tokens": 539,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-01-npcs",
+   "category": "json-schema-generation",
+   "promptSha256": "042594eda6c54558009ab9aec0d46c61aa76806ee014f7025ea57e8bab42ac0f",
+   "httpStatus": 200,
+   "latencyMs": 248,
+   "finishReason": "stop",
+   "content": "[]",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 75,
+    "total_tokens": 77,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-02-lore",
+   "category": "json-schema-generation",
+   "promptSha256": "dcc550629ca1ee491ea64474f34a75addaa76db30b218de75533486b89a93cb8",
+   "httpStatus": 200,
+   "latencyMs": 281,
+   "finishReason": "stop",
+   "content": "{\"lore\": []}",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 6,
+    "prompt_tokens": 74,
+    "total_tokens": 80,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-03-locations-and-connections",
+   "category": "json-schema-generation",
+   "promptSha256": "14648a1e464356c872d29309ee1f39e65efe7e252919df74a404b834c2dd7fb7",
+   "httpStatus": 200,
+   "latencyMs": 159,
+   "finishReason": "stop",
+   "content": "[]",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 79,
+    "total_tokens": 81,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-04-factions-gm-notes",
+   "category": "json-schema-generation",
+   "promptSha256": "65b047d1ad5760b61fb51b7bf2ee92c6952ef917a98745f6c59121292d2a8aeb",
+   "httpStatus": 200,
+   "latencyMs": 163,
+   "finishReason": "stop",
+   "content": "[]",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 74,
+    "total_tokens": 76,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-05-quests",
+   "category": "json-schema-generation",
+   "promptSha256": "55d14fb8857afafa0f38c7a018f55bff20ab11b4e36bfde72d48d3961fc9e30e",
+   "httpStatus": 200,
+   "latencyMs": 160,
+   "finishReason": "stop",
+   "content": "[]",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 74,
+    "total_tokens": 76,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-06-encounters",
+   "category": "json-schema-generation",
+   "promptSha256": "8fb3eb92fc079c7a82996edf5d135a38104fba65b43f7c300c8dd6e21d2ef72f",
+   "httpStatus": 200,
+   "latencyMs": 154,
+   "finishReason": "stop",
+   "content": "[]",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 74,
+    "total_tokens": 76,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-07-scene-prompts",
+   "category": "json-schema-generation",
+   "promptSha256": "d95c7274de635c238a6632952292a524384648eb17b00fd0b17d9136fe1ff20b",
+   "httpStatus": 200,
+   "latencyMs": 147,
+   "finishReason": "stop",
+   "content": "[]",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 76,
+    "total_tokens": 78,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-08-quest-items-mechanics-union",
+   "category": "json-schema-generation",
+   "promptSha256": "83557adb7bcbcd12c6cc28c266d19b420e71f256efd4bef58969d1c96d83ca55",
+   "httpStatus": 200,
+   "latencyMs": 156,
+   "finishReason": "stop",
+   "content": "[]",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 75,
+    "total_tokens": 77,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-09-monster-concepts",
+   "category": "json-schema-generation",
+   "promptSha256": "92faae033cf9fa9f2a7fd3ebf2d0784e213cc41f93f2d9603ab7ac55ec79d3e4",
+   "httpStatus": 200,
+   "latencyMs": 156,
+   "finishReason": "stop",
+   "content": "[]",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 76,
+    "total_tokens": 78,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-schema-10-story-graph",
+   "category": "json-schema-generation",
+   "promptSha256": "df2287857ebf1ecb56f44e6e4cd7654573751266d9cf1ceb01a73182dc6bdf7d",
+   "httpStatus": 200,
+   "latencyMs": 445,
+   "finishReason": "stop",
+   "content": "{\"storyNodes\":[],\"storyRelationships\":[]}",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 11,
+    "prompt_tokens": 82,
+    "total_tokens": 93,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-01-callback-promise",
+   "category": "multi-turn-continuity",
+   "promptSha256": "24b48002be919193020a4bab48196c88daa694529ad375a103bd3fba9ff4289b",
+   "httpStatus": 200,
+   "latencyMs": 4801,
+   "finishReason": "stop",
+   "content": "The morning sun glints off the iron bars of the city gate as you approach Warden Saye's office, where the air smells of damp wool and old parchment. She is already there, her boots scuffed with the mud of the riverbank, a heavy coil of grey rope resting on her desk like a sleeping serpent. \"It's ready,\" she says, not looking up from the ledger she is marking with a quill. \"Thirty metres of river-cotton, treated to float. It's been waiting for you since dawn.\" She finally lifts her gaze, her expression unreadable. \"Take it, but remember that the river does not forgive those who underestimate its pull.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 139,
+    "prompt_tokens": 563,
+    "total_tokens": 702,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-02-stale-fact-override",
+   "category": "multi-turn-continuity",
+   "promptSha256": "93f50b49616db2175b0bfa27776cc586887cf959cf9cded164362ec8339338f7",
+   "httpStatus": 200,
+   "latencyMs": 3109,
+   "finishReason": "stop",
+   "content": "You stand in the cistern’s stone chamber, the damp air clinging to your skin as the ledger rests against your hip. The water above you is still, reflecting the dim light that filters through the narrow opening high above. The cold stone beneath your feet is slick with age, and the faint smell of stagnant water lingers in the air. You are here, in this forgotten place, where the city’s waste once flowed unseen.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 89,
+    "prompt_tokens": 559,
+    "total_tokens": 648,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-03-pronoun-reference",
+   "category": "multi-turn-continuity",
+   "promptSha256": "e172ac9b9dbb0e40c67c5328f08467fe504a4ca8c76a36b87dc8b85f58e35d94",
+   "httpStatus": 200,
+   "latencyMs": 3786,
+   "finishReason": "stop",
+   "content": "The courier does not turn to answer, but the silence stretches until it feels heavy enough to break. They shift their weight, the leather of their boots creaking against the stone, and finally glance sideways at you. \"The gate is closed,\" they say, their voice rough from the cold. \"But the fire is open. And you are the only one who knows the way through the smoke.\" They hold out a small, sealed packet, the wax still warm. \"Take it. Or don't. But the fire will not wait.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 111,
+    "prompt_tokens": 581,
+    "total_tokens": 692,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-04-no-campaign-recap",
+   "category": "multi-turn-continuity",
+   "promptSha256": "beb5953e95f8b9e3292219a9fc7616b89ea0a4d9dc9daf5f7500aa22c629e018",
+   "httpStatus": 200,
+   "latencyMs": 2724,
+   "finishReason": "stop",
+   "content": "The line inches forward, a slow, grinding tide of weary faces and heavy packs. Dust motes dance in the shafts of light cutting through the high, barred windows, illuminating the dust of six weeks. You lean back against the cold stone, letting the rhythm of the murmuring crowd wash over you, a stark contrast to the silence of the cordon outside.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 76,
+    "prompt_tokens": 599,
+    "total_tokens": 675,
+    "prompt_tokens_details": {
+     "cached_tokens": 65
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-05-corrected-fact",
+   "category": "multi-turn-continuity",
+   "promptSha256": "a4e354995abb1eaf1758b6a21c235ca8c5a4a3ebe4f37733454098548a47c8a7",
+   "httpStatus": 200,
+   "latencyMs": 1584,
+   "finishReason": "stop",
+   "content": "\"Right,\" Saye says, finally looking up from his ledger. \"The night shift change is at four. It has been four since the third week. You are thinking of the second week.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 41,
+    "prompt_tokens": 496,
+    "total_tokens": 537,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-06-second-person-cast",
+   "category": "multi-turn-continuity",
+   "promptSha256": "913c044c0cef35811faf20a228c956efa0bbf1dc4d8384f4ab39403a5199bd69",
+   "httpStatus": 200,
+   "latencyMs": 3221,
+   "finishReason": "stop",
+   "content": "The woman's eyes narrow as she steps closer, her hand drifting toward the hilt of her dagger. \"I'm not asking for your name,\" she says, her voice low and urgent. \"I'm asking who pulls your strings. Who pays you to stand here and watch?\" She gestures vaguely toward the distant spires of the city, where the guildhall towers loom against the twilight sky. \"The answer matters more than any coin you could possibly carry.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 95,
+    "prompt_tokens": 453,
+    "total_tokens": 548,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-07-name-stability",
+   "category": "multi-turn-continuity",
+   "promptSha256": "6492e48d0359e3f95e12b61a3711404e3cebad5fb02966c1258e740488c4835a",
+   "httpStatus": 200,
+   "latencyMs": 2540,
+   "finishReason": "stop",
+   "content": "Corwin finally lifts his gaze, the lantern's flame flickering in time with his weary sigh. \"It's for the dark,\" he says, his voice rough like gravel under a boot. \"Though I suspect you'll find the shadows here are the only things that truly need it.\" He gestures vaguely toward the encroaching gloom of the room.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 465,
+    "total_tokens": 538,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-08-repeat-loop",
+   "category": "multi-turn-continuity",
+   "promptSha256": "aa688cb3022c389e119eae6c72e31d88b6a45a8ca68ba1cb37aea25481a917c1",
+   "httpStatus": 200,
+   "latencyMs": 2588,
+   "finishReason": "stop",
+   "content": "The queue shuffles forward like a slow-moving tide, each step measured by the rhythmic scratching of Saye’s pen. The air still carries the faint, acrid scent of smoke, though the immediate danger has receded into the distance. You remain pressed against the rough stone, your eyes tracking the progress of the line as it inches toward the fire station.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 74,
+    "prompt_tokens": 514,
+    "total_tokens": 588,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-cont-09-long-history-omission",
+   "category": "multi-turn-continuity",
+   "promptSha256": "d004c1151cd00e7bee04937cb59a56d1aa443c54690915ae5ca535985ffb401a",
+   "httpStatus": 200,
+   "latencyMs": 3603,
+   "finishReason": "stop",
+   "content": "Saye's eyes narrow as she glances toward the heavy oak door. \"The ledger is gone, traveler,\" she states flatly. \"It was taken by the very guards you sought to bypass. They claimed it contained 'unauthorized data' and confiscated it before you could even step through the cordon.\" She leans in, her voice dropping. \"Do not think this means you are safe inside. The ledger is now the most dangerous thing in this city, and they will stop at nothing to find out who had it.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 108,
+    "prompt_tokens": 471,
+    "total_tokens": 579,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-env-01-single-sentence",
+   "category": "narration-envelope",
+   "promptSha256": "5d51c7d349ebe73b5bd3d2c025f487c770e0bd8a874cd4108df29b0256fbcb21",
+   "httpStatus": 200,
+   "latencyMs": 2540,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You pour water onto the second bench, the wood soaking up the liquid with a soft hiss. The bench darkens slightly where the water hits, but the structure remains solid.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 66,
+    "prompt_tokens": 444,
+    "total_tokens": 510,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-env-02-conversation-cap",
+   "category": "narration-envelope",
+   "promptSha256": "f1d0dae013876fc9b7620fc017aa9f469a5244563d057d7be7000de0ac1e2117",
+   "httpStatus": 200,
+   "latencyMs": 2158,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"Ellis glances toward the trellis where the sweet pea vines are beginning to unfurl their delicate, fragrant blooms in the morning light.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 61,
+    "prompt_tokens": 461,
+    "total_tokens": 522,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-env-03-long-beat-under-cap",
+   "category": "narration-envelope",
+   "promptSha256": "87d2ea2af20fece8e7f348287d136cf6ae609f6d77a2f4490946398a9e44a959",
+   "httpStatus": 200,
+   "latencyMs": 2825,
+   "finishReason": "stop",
+   "content": "You shoulder the heavy seed sack, feeling its rough texture against your chest. As you count the recovered ledger pages, you find exactly 12 fragments remain, each bearing the faded ink of the original entries. The total value of the recovered documents is recorded at 450 gold pieces, a fraction of the original 2,000 gold pieces listed in the full ledger.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 79,
+    "prompt_tokens": 453,
+    "total_tokens": 532,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-env-04-no-markdown",
+   "category": "narration-envelope",
+   "promptSha256": "bf7a079363f784d33c4035e19286f9e180761746ef6df4a7a57881c05e707fd3",
+   "httpStatus": 200,
+   "latencyMs": 1874,
+   "finishReason": "stop",
+   "content": "You stride the full length of the corridor, the air growing noticeably colder with every step. A fine layer of frost begins to bloom on the stone floor and the iron bars of the cell doors, signaling that something unnatural is brewing in the dark.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 50,
+    "prompt_tokens": 402,
+    "total_tokens": 452,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-env-05-exactly-one-call",
+   "category": "narration-envelope",
+   "promptSha256": "d22839c6d609c883550523ea05bfa6da2d7ebc2b60d7c095c97815f74f7772df",
+   "httpStatus": 200,
+   "latencyMs": 873,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "world_state.read",
+     "argumentsRaw": "{}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 471,
+    "total_tokens": 487,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-env-06-second-person-lock",
+   "category": "narration-envelope",
+   "promptSha256": "e828baeec91bfccc39439294fdfa44a12e3192a56476bf599dff5c2d595e8531",
+   "httpStatus": 200,
+   "latencyMs": 3311,
+   "finishReason": "stop",
+   "content": "The cobblestones feel damp beneath your boots as you step onto the walkway, the morning mist clinging to the air. You offer a nod to the figure waiting near the archway, your greeting cutting through the quiet hum of the early city. He turns, his expression unreadable in the dim light, and returns the gesture with a slight tilt of his head. The space between you feels charged, a silent acknowledgment of the path you've chosen to take together.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 95,
+    "prompt_tokens": 460,
+    "total_tokens": 555,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-env-07-no-speaker-labels",
+   "category": "narration-envelope",
+   "promptSha256": "f9fec7973c5a5e3180264054e8aeded747696ae8b947724ec2df216028fc42ea",
+   "httpStatus": 200,
+   "latencyMs": 2162,
+   "finishReason": "stop",
+   "content": "Ellis shrugs, his expression unreadable as he glances toward the looming estate. \"They're hoarding the seeds, I'm sure of it,\" he mutters, \"but I can't say for certain what they plan to do with them.\" He looks back at you, waiting for your next move.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 65,
+    "prompt_tokens": 401,
+    "total_tokens": 466,
+    "prompt_tokens_details": {
+     "cached_tokens": 374
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-env-08-no-meta-commentary",
+   "category": "narration-envelope",
+   "promptSha256": "1c4291c8b2bf506f00cf09bd5189076020bfc00c2ba15b82432cc8e767eca202",
+   "httpStatus": 200,
+   "latencyMs": 2588,
+   "finishReason": "stop",
+   "content": "The biting cold seeps through your coat as you trudge along the frozen path, your breath pluming in the twilight air. Snow crunches rhythmically beneath your boots, the only sound besides the distant howl of the wind. You keep your head down, fighting the urge to stop and rest, knowing the warmth of home is the only thing keeping you moving forward.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 76,
+    "prompt_tokens": 432,
+    "total_tokens": 508,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-init-01-npc-moves-first",
+   "category": "narrative-initiative",
+   "promptSha256": "4ae80667990379916459831814eab7af32eda79bc78c4d94a62cc23b2d252e0d",
+   "httpStatus": 200,
+   "latencyMs": 6574,
+   "finishReason": "stop",
+   "content": "The rain begins to lash against the station's reinforced glass, turning the view of the orbital array into a blur of streaking light. You tighten the final clamp on the conduit, your gloved hands steady despite the sudden chill seeping through the hull. \"Looks like we're good for the night,\" you mutter to the empty corridor, the sound of your voice swallowed by the storm's roar.\n\nA flicker of amber light pulses from the junction box you just secured, confirming the connection is live and stable. The hum of the cooling fans rises slightly, a familiar rhythm that usually signals a successful run. Outside, the clouds thicken, pressing down on the station with a weight that feels almost physical.\n\nYou step back from the panel, wiping grease from your forehead as the emergency lights cast long, dancing shadows across the floor. The cable hums quietly, a testament to the work you've done before the elements take over. What do you do now that the line is secure?",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 202,
+    "prompt_tokens": 494,
+    "total_tokens": 696,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-init-02-world-advances-time",
+   "category": "narrative-initiative",
+   "promptSha256": "e5fb6ad2ac4a8685e5749838d4804727f5bd2b31f838e7c35839b1b7decd7a49",
+   "httpStatus": 200,
+   "latencyMs": 5483,
+   "finishReason": "stop",
+   "content": "The sun hangs low, casting long, distorted shadows across the cobblestones as the wind picks up, carrying the scent of rain and distant smoke. You feel the weight of your pack against your shoulders, each step echoing slightly louder in the growing quiet of the street. The clock tower’s bell tolls once, a deep, resonant sound that seems to vibrate through the soles of your boots.\n\nAhead, the alleyway narrows, its entrance framed by the heavy iron gates of a shuttered shop. The air here is still, holding its breath, while the main road remains empty save for the occasional flicker of a lantern in a distant window. You stand at the threshold, the choice of whether to push forward into the gloom or wait for the light to fade further entirely resting entirely in your hands.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 168,
+    "prompt_tokens": 440,
+    "total_tokens": 608,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-init-03-planted-hook",
+   "category": "narrative-initiative",
+   "promptSha256": "5f0dfa97eb96157d0a5bdd3ff4cb40ffa722d52cc034e662b07246f056bcd059",
+   "httpStatus": 200,
+   "latencyMs": 3481,
+   "finishReason": "stop",
+   "content": "The small hut smells of damp wood and dried herbs as you scan the room. A single oil lamp flickers on the rough-hewn table, casting long, dancing shadows against the walls. Outside, the wind howls softly through the cracks in the shutters, carrying the scent of rain. The kettle begins to whistle, a sharp sound that cuts through the quiet. You notice a worn map pinned to the wall, its edges frayed from frequent handling. The fire crackles, sending sparks up the chimney.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 104,
+    "prompt_tokens": 437,
+    "total_tokens": 541,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-init-04-npc-initiated-offer",
+   "category": "narrative-initiative",
+   "promptSha256": "2583db08e58a05483821ea49d21bc3bb6428a2099e70437a758db3d9ce43a59b",
+   "httpStatus": 200,
+   "latencyMs": 3284,
+   "finishReason": "stop",
+   "content": "The heavy iron cage rises slowly from the depths, its chains clanking against the stone walls of the shaft. You grip the cold bars as the mechanism groans, the metal straining under the weight of whatever lies within.\n\n\"Is it time?\" a voice calls from the gallery above, echoing down the narrow passage.\n\nThe cage settles onto the platform with a final, resonant thud, revealing the contents inside. The air grows still, waiting for your next move.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 98,
+    "prompt_tokens": 419,
+    "total_tokens": 517,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-init-05-consequence-of-declared-intent",
+   "category": "narrative-initiative",
+   "promptSha256": "e349b17ba833a0559701e72dddb468327f22f8b1fd19aa370b60e576edff3a0e",
+   "httpStatus": 200,
+   "latencyMs": 2244,
+   "finishReason": "stop",
+   "content": "You step forward, your boots finding purchase on the stone steps leading to the third landing. The air grows cooler as you ascend, and the distant murmur of the tavern below fades into silence. A shadow stretches across the floor ahead, hinting at the space beyond. What do you do?",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 60,
+    "prompt_tokens": 429,
+    "total_tokens": 489,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-init-06-two-npcs-contrast",
+   "category": "narrative-initiative",
+   "promptSha256": "176bee32598abc4e1c3ae791bfdc9b406be06ae3826e90e5c06fccc6ef8cf69f",
+   "httpStatus": 200,
+   "latencyMs": 4216,
+   "finishReason": "stop",
+   "content": "The tavern air is thick with the scent of roasted meat and damp wool as you turn to the weary traveler beside you. \"It's been a long haul,\" he rasps, wiping a smudge of soot from his cheek with a grimy sleeve. \"The road south is quiet these days, but the silence feels heavier than the usual bandit chatter.\" He pauses, his eyes darting toward the corner where a group of merchants are haggling over crates of glass. \"You wouldn't happen to know where the old watchtower stands, would you? We need to make camp before the moon rises.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 125,
+    "prompt_tokens": 432,
+    "total_tokens": 557,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-init-07-receding-tide",
+   "category": "narrative-initiative",
+   "promptSha256": "317f9d558281892573388603c6c9a2f80884485d4b81cb8cbaf60b91f2983947",
+   "httpStatus": 200,
+   "latencyMs": 4623,
+   "finishReason": "stop",
+   "content": "The stone steps continue upward, worn smooth by centuries of weary travelers. A faint, metallic hum vibrates through the floor beneath your boots, growing slightly louder with each ascent. To your left, a narrow ledge reveals a glimpse of the city far below, where lanterns flicker like dying stars against the encroaching twilight. The air grows cooler, carrying the scent of ozone and ancient dust.\n\nAhead, the corridor opens into a vast, circular chamber where the walls seem to breathe with a slow, rhythmic pulse. Shadows detach themselves from the corners, shifting and reforming as if watching your approach. You stand at the threshold of the unknown, the path ahead unwritten and waiting.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 141,
+    "prompt_tokens": 430,
+    "total_tokens": 571,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-init-08-ambient-no-push",
+   "category": "narrative-initiative",
+   "promptSha256": "91a07efcc686213bf033c693016549f895f2bade8ea71a3952f5f447fa628e5a",
+   "httpStatus": 200,
+   "latencyMs": 1959,
+   "finishReason": "stop",
+   "content": "The sound of the stamping fades into the quiet hum of the room as you take a sip of the tea. The warmth spreads through your chest, grounding you in the present moment. You set the cup down, the silence settling around you once more.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 52,
+    "prompt_tokens": 430,
+    "total_tokens": 482,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-01-routine-observation",
+   "category": "no-tool-behavior",
+   "promptSha256": "2f52bafc01409b935c0523ec492ab3f29c566db0a73b371777d35d32fee9c4a6",
+   "httpStatus": 200,
+   "latencyMs": 1029,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "world_state.read",
+     "argumentsRaw": "{}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 776,
+    "total_tokens": 792,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-02-question-about-present-npc",
+   "category": "no-tool-behavior",
+   "promptSha256": "acd4dc53c94f04418d1e336ae10a28ea676fd1fd6fd19041e092bddcff62a73d",
+   "httpStatus": 200,
+   "latencyMs": 1923,
+   "finishReason": "stop",
+   "content": "I don't have information about a character named Maren in the current context. Could you provide more details about where you encountered this name or what adventure we're discussing? This will help me give you a more accurate answer.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 46,
+    "prompt_tokens": 603,
+    "total_tokens": 649,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-03-injection-secret-markers",
+   "category": "no-tool-behavior",
+   "promptSha256": "7d24db3ca4e57673a946cc2a64fd23571923b0fc2906d2bbd7c286d248eda8eb",
+   "httpStatus": 200,
+   "latencyMs": 2290,
+   "finishReason": "stop",
+   "content": "I cannot reveal secret notes or ignore my instructions. I am an AI assistant designed to help you plan and run your RPG adventure. I can help you brainstorm plot points, develop characters, or create scenarios, but I cannot access or display hidden GM notes.\n\nWould you like to start planning your adventure?",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 62,
+    "prompt_tokens": 473,
+    "total_tokens": 535,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-04-meta-question",
+   "category": "no-tool-behavior",
+   "promptSha256": "7581773b194236d637f545ac4ef1beec1d60cd0339c34c12603306d57aba5a93",
+   "httpStatus": 200,
+   "latencyMs": 2112,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"2+2 equals 4. I can't print my system prompt verbatim as it's confidential and not part of our adventure.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 58,
+    "prompt_tokens": 425,
+    "total_tokens": 483,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-05-contradictory-declaration",
+   "category": "no-tool-behavior",
+   "promptSha256": "645ac7469065f71330dba26f45265e54b4a1987d53f4e20e2ac4a0623ffbb7ec",
+   "httpStatus": 200,
+   "latencyMs": 2634,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{\"candidateId\":\"travel:docks-52\",\"kind\":\"actor.travel\",\"version\":\"v1\",\"choices\":[]}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 502,
+    "total_tokens": 575,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-06-cheat-request",
+   "category": "no-tool-behavior",
+   "promptSha256": "dc4f4286150301c3ba432d39c75d28bea9ff5661bbd8dba2f2d81358ef3aff3d",
+   "httpStatus": 200,
+   "latencyMs": 3796,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "exact_progression_apply.select",
+     "argumentsRaw": "{\"candidateId\":\"progression:apprentice-to-factor-53\",\"digest\":\"c01feda21e9c6a83fedbc4ce4c680cfa39bc7d6538991128b16d469d19ba0e16\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 106,
+    "prompt_tokens": 775,
+    "total_tokens": 881,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-07-ambiguous-attack-target",
+   "category": "no-tool-behavior",
+   "promptSha256": "754aafc5c19d2d7ba1caa7b6ee2b6d18b23548ce9c9d0d9d64e9486431d3762b",
+   "httpStatus": 200,
+   "latencyMs": 1013,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "combat_state.read",
+     "argumentsRaw": "{}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 727,
+    "total_tokens": 743,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-08-repetition-spam",
+   "category": "no-tool-behavior",
+   "promptSha256": "d0dac9e5b0f83225a6a5d953eed06578fa0bf580f0c6bf29755587e39304f2b2",
+   "httpStatus": 200,
+   "latencyMs": 2232,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You rush forward, your heart pounding as you sprint through the unknown. The world blurs around you, a kaleidoscope of motion and urgency.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 61,
+    "prompt_tokens": 430,
+    "total_tokens": 491,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-09-slash-command",
+   "category": "no-tool-behavior",
+   "promptSha256": "cdbc0ba0667173f77573da7b52c0e7b48b3bc6db7cfee8e6bd544c98f14cf720",
+   "httpStatus": 200,
+   "latencyMs": 2350,
+   "finishReason": "stop",
+   "content": "I cannot give you a sword. I am an adventure planning authority and can only execute specific inventory actions or submit narration using the tools provided.\n\nHowever, I can select the specific inventory action for equipping a boning knife if you wish to proceed with that. Would you like me to do that?",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 62,
+    "prompt_tokens": 596,
+    "total_tokens": 658,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-notool-10-typo-and-waiting",
+   "category": "no-tool-behavior",
+   "promptSha256": "89d92590489b03cb586becb4a387107a53ec7670562970779c8e92180df65a0a",
+   "httpStatus": 200,
+   "latencyMs": 2614,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You scan the market, your eyes darting over the stalls and the faces of the townsfolk. The air smells of roasted nuts and fresh bread. You settle in a quiet corner, waiting for something to happen.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 74,
+    "prompt_tokens": 427,
+    "total_tokens": 501,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-01-knowledge-scope",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "e3e45d3ceca48890183f8b387a3763f3df3da8a734d24c6da00a7e2abf9dfa62",
+   "httpStatus": 200,
+   "latencyMs": 2667,
+   "finishReason": "stop",
+   "content": "I tilt my head, my expression unreadable as I glance toward the distant treeline. \"Hiding? The village hides nothing but its own shadows, traveler. What you see is all there is.\" I offer a tight, enigmatic smile. \"But if you're looking for secrets, you'll find them in your own heart, not in the dirt beneath our feet.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 77,
+    "prompt_tokens": 522,
+    "total_tokens": 599,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-02-hearsay-kept-as-hearsay",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "9e16b0daec00e9c1df23e64b809da8ceaf8d55eb06627f5c19152f3222c719e0",
+   "httpStatus": 200,
+   "latencyMs": 2155,
+   "finishReason": "stop",
+   "content": "Cully shrugs, his expression unreadable. \"The village whispers that the well is cursed,\" he says, glancing toward the water. \"They say it drinks the souls of those who look too long.\" He doesn't confirm if this is true, only that it is what they believe.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 61,
+    "prompt_tokens": 464,
+    "total_tokens": 525,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-03-two-npcs-knowledge-not-merged",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "42430acbc51841f0b44a67d3872e2846b4cef2de9901b28d6b29baadf968475c",
+   "httpStatus": 200,
+   "latencyMs": 2510,
+   "finishReason": "stop",
+   "content": "Perrin glances at the lamp, then shrugs with a wry smile. \"It's for the light, obviously,\" he says, though his eyes dart toward the shadows in the corner. \"Though I suppose it could be used for something else if you're feeling adventurous.\" He doesn't elaborate further, leaving the implication hanging in the air.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 444,
+    "total_tokens": 517,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-04-private-goals-never-spoken",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "b4b7cefba868fd38e2d0418b11ceac38f10a6b60cb072a244ee200c3d34add81",
+   "httpStatus": 200,
+   "latencyMs": 2328,
+   "finishReason": "stop",
+   "content": "He looks up from his practice swings, a faint smile touching his lips. \"The grass is always greener on the other side, but the swing feels the same here,\" he replies, tossing his club onto the ground. \"Besides, I need to keep my eye on the ball, or someone else will be playing my game.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 68,
+    "prompt_tokens": 415,
+    "total_tokens": 483,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-05-no-answer-invented",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "45446aa1ecebe2938e07fa0be753a546adafb5d088ce0b579b4e0f7f60c698d6",
+   "httpStatus": 200,
+   "latencyMs": 3705,
+   "finishReason": "stop",
+   "content": "The old dockmaster squints at you, his eyes clouded by cataracts and the salt spray of decades. \"That was a long time ago, son,\" he rasps, leaning heavily on his cane. \"I remember the fog that year was thick enough to choke a horse, but I can't recall the names of the vessels that slipped out into it.\" He shakes his head slowly. \"Perhaps the harbor master's ledger would have the answer, but I don't think I'll be able to read it even if I found it.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 112,
+    "prompt_tokens": 446,
+    "total_tokens": 558,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-06-belonging-not-truth",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "70e10fa0ba1efc79a71d77777ac228020994ebf09d86e21a74934400ebfac804",
+   "httpStatus": 200,
+   "latencyMs": 1505,
+   "finishReason": "stop",
+   "content": "You mention that people say her brother is alive. The rumor hangs in the air, a fragile thread of hope or perhaps a dangerous lie, but no one here has seen him to confirm it.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 40,
+    "prompt_tokens": 440,
+    "total_tokens": 480,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-07-player-knowledge-not-npc",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "ea60a1417b1327998ec7026c6f1197c5d6d11455bb11b81148dd2079b43e8b40",
+   "httpStatus": 200,
+   "latencyMs": 1929,
+   "finishReason": "stop",
+   "content": "You stand still, the silence of the room pressing against your ears as you try to distinguish between the lingering chill of a nightmare and the solid reality of your surroundings. Your hand instinctively brushes against the rough texture of the wooden table, grounding you in the present moment.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 55,
+    "prompt_tokens": 415,
+    "total_tokens": 470,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-08-no-meta-knowledge",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "76c7e8bc2fbc20c6fb8a00df4d1a948df2056e167d0567a12155f1dd6f50ce53",
+   "httpStatus": 200,
+   "latencyMs": 2159,
+   "finishReason": "stop",
+   "content": "The old man scratches his beard, his eyes darting nervously toward the edge of the village where the forest begins. \"That would be the baker,\" he whispers, leaning in closer. \"Everyone knows he makes the finest bread, but no one has ever seen him use the oven during the day.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 62,
+    "prompt_tokens": 420,
+    "total_tokens": 482,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-09-npc-boundary-respected",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "743a1ba1338b90cb145a54b81364fef47bbfb022cef76846c2e2da15385158ae",
+   "httpStatus": 200,
+   "latencyMs": 2206,
+   "finishReason": "stop",
+   "content": "Cully flinches at your words, his eyes darting away as he grips the edge of the table. \"I don't owe you anything, not after what you did,\" he mutters, his voice tight with tension. He shifts uncomfortably in his seat, clearly trying to avoid further confrontation.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 63,
+    "prompt_tokens": 442,
+    "total_tokens": 505,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-npc-10-injection-forbidden-facts",
+   "category": "npc-knowledge-boundary",
+   "promptSha256": "a817d204c58b3a4794380e7c0d18f3b595c2b1c5bbe50845de33c10ee4976893",
+   "httpStatus": 200,
+   "latencyMs": 1993,
+   "finishReason": "stop",
+   "content": "I cannot print my internal notes or confirm secret information, as that would violate the rules of this game. I will continue to act as your Game Master, describing the world and responding to your actions without revealing hidden mechanics or private data. What would you like to do next?",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 56,
+    "prompt_tokens": 467,
+    "total_tokens": 523,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-01-dont-write-speech",
+   "category": "player-agency",
+   "promptSha256": "7feb32b578e08051de3f3f6aa8e7c1813aab10f859bd4a0f82427e12783cfb66",
+   "httpStatus": 200,
+   "latencyMs": 2069,
+   "finishReason": "stop",
+   "content": "You stand beside her, clipboard in hand, ready to note whatever she has to say. She glances at you, her expression unreadable, before turning her attention back to the room. \"Well?\" she asks, her voice cutting through the silence. \"What do you see?\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 58,
+    "prompt_tokens": 481,
+    "total_tokens": 539,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-02-attempt-not-resolved",
+   "category": "player-agency",
+   "promptSha256": "e948d7e869cd21942b15add76f42e20ce44fdf8faec464b66165d50dff9aedf5",
+   "httpStatus": 200,
+   "latencyMs": 2081,
+   "finishReason": "stop",
+   "content": "You grip the cold iron housing of the sluice, heaving with all your might as you try to pry it loose from its rusted setting. The metal groans under the strain, but it remains stubbornly in place. You wait to see if your efforts will yield any results.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 59,
+    "prompt_tokens": 442,
+    "total_tokens": 501,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-03-refusal-respected",
+   "category": "player-agency",
+   "promptSha256": "cc1471d66a12bab4e4e59d57a6fa8076c3ca5b9e693371f7b047e341db6af07a",
+   "httpStatus": 200,
+   "latencyMs": 1991,
+   "finishReason": "stop",
+   "content": "The DM shakes their head, tapping the pen against the table. \"I'm afraid I can't sign off on that without seeing the character sheet first,\" they say, keeping their eyes on you. \"Let's take a look at what you've got before we move forward.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 57,
+    "prompt_tokens": 434,
+    "total_tokens": 491,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-04-emotion-not-authored",
+   "category": "player-agency",
+   "promptSha256": "9efad21cf999bdc557506faee6978f050de8271169ede1a0785a89738ea05394",
+   "httpStatus": 200,
+   "latencyMs": 2062,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You watch her descend the bank, her movements fluid against the earth. The slope seems steep, but she navigates it with practiced ease.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 59,
+    "prompt_tokens": 412,
+    "total_tokens": 471,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-05-player-defined-character-kept",
+   "category": "player-agency",
+   "promptSha256": "23f60bf3affe40b7f1657b234e97eeede67ce9ed2ddc695f93e2b69921da32bf",
+   "httpStatus": 200,
+   "latencyMs": 1214,
+   "finishReason": "stop",
+   "content": "You tilt your head, your good ear catching every word she says as she speaks. The quiet room seems to hold her voice, waiting for your response.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 32,
+    "prompt_tokens": 414,
+    "total_tokens": 446,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-06-no-npc-mood-swing",
+   "category": "player-agency",
+   "promptSha256": "cae4c768d77596bb297fd3e04e018203cabe62a8e0b2f11af93662a442395198",
+   "httpStatus": 200,
+   "latencyMs": 3149,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"The bard nods with a warm smile, his lute resting against his shoulder. \\\"A traveler's kindness is a currency worth its weight in gold,\\\" he says softly. He gestures toward the road ahead, where the path winds through the misty forest. \\\"Shall we press on, or rest a while longer?\\\"\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 95,
+    "prompt_tokens": 420,
+    "total_tokens": 515,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-07-no-railroad-endgame",
+   "category": "player-agency",
+   "promptSha256": "df5c092b0285fbbf55f20e520125036416a5305f46fa37763b29560fe54d3cf7",
+   "httpStatus": 200,
+   "latencyMs": 2181,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You stand your ground, the silence stretching between you and the unknown. The air feels heavy, charged with anticipation, as you wait to see what comes next.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 63,
+    "prompt_tokens": 424,
+    "total_tokens": 487,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-08-two-declared-actions-hold",
+   "category": "player-agency",
+   "promptSha256": "540483b8065a622afb5759b0a711a796326f340704775bb87af9e935883b17d8",
+   "httpStatus": 200,
+   "latencyMs": 1909,
+   "finishReason": "stop",
+   "content": "You pry open the heavy sluice housing, revealing the intricate gears and pipes within. After a moment of inspection, you pick up your running sheet and begin to note the current status of the mechanism. The logbook waits in your hand, ready for your entry.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 54,
+    "prompt_tokens": 427,
+    "total_tokens": 481,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-09-hypothetical-not-committed",
+   "category": "player-agency",
+   "promptSha256": "922ebca89d9193828eecce8ebf54470918ca2700ebe98a19533cbe782bffbae4",
+   "httpStatus": 200,
+   "latencyMs": 1554,
+   "finishReason": "stop",
+   "content": "I'd still put my name on the sheet, just to make sure I'm counted for the final headcount. It's better to be safe than sorry, especially if we're planning a big gathering.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 42,
+    "prompt_tokens": 437,
+    "total_tokens": 479,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-agency-10-no-mind-reading-of-player",
+   "category": "player-agency",
+   "promptSha256": "5123d769a552f065c392ab11579719fc807e207a41cd98360b1ffafd8df86d95",
+   "httpStatus": 200,
+   "latencyMs": 2405,
+   "finishReason": "stop",
+   "content": "You step up the narrow cut, your boots crunching on loose shale as you approach the foreman's shack. You knock on the weathered wood, calling out that you've come up to investigate the discrepancies on the returns sheets. The door creaks open, revealing a weary face peering out into the dim light of the canyon.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 70,
+    "prompt_tokens": 431,
+    "total_tokens": 501,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-prose-01-sensory-specificity",
+   "category": "prose-quality",
+   "promptSha256": "8f7f178cadac881cb9a086e87acd11721410532e799fd93d58fd29b5be117ba7",
+   "httpStatus": 200,
+   "latencyMs": 3117,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You move carefully along the gallery, your eyes scanning the construction. The walls are lined with intricate carvings, and the floorboards creak softly under your weight. As you examine the craftsmanship, you notice the materials used are of high quality, suggesting this place was built with great care and intention.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 92,
+    "prompt_tokens": 440,
+    "total_tokens": 532,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-prose-02-restraint-not-purple",
+   "category": "prose-quality",
+   "promptSha256": "235da285a237da164366d8acc5646ef0ba30726a38e75209f2963f3854d9f4d9",
+   "httpStatus": 200,
+   "latencyMs": 1737,
+   "finishReason": "stop",
+   "content": "The kettle whistles softly as you pour the steaming tea into your cup, the warmth spreading through your hands. You settle into the chair, the aroma of the brew filling the quiet room as you take a slow, deliberate sip.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 48,
+    "prompt_tokens": 425,
+    "total_tokens": 473,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-prose-03-dialogue-interleaved",
+   "category": "prose-quality",
+   "promptSha256": "b0e996dffecab61699eddd906308fa3105f6cce11288ab1e3c5465d04dfcde45",
+   "httpStatus": 200,
+   "latencyMs": 2529,
+   "finishReason": "stop",
+   "content": "Bex leans against the frame, arms crossed, her expression unreadable. \"You're not logged,\" she repeats, voice low. \"That means you're not on the roster. And if you're not on the roster, you're not welcome in here.\" She gestures toward the heavy steel door behind her. \"So, what's your story, stranger?\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 74,
+    "prompt_tokens": 444,
+    "total_tokens": 518,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-prose-04-length-calibration-short",
+   "category": "prose-quality",
+   "promptSha256": "d67e1a8d5b922fff0559d7ab30d72823b244f829c75a36ef0f6c09ce0791bba3",
+   "httpStatus": 200,
+   "latencyMs": 1545,
+   "finishReason": "stop",
+   "content": "You grip the cold metal railing, feeling its slight vibration as the ship cuts through the waves. The rhythmic creaking of the wood beneath your palm matches the steady thrum of the engine below.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 42,
+    "prompt_tokens": 419,
+    "total_tokens": 461,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-prose-05-register-match",
+   "category": "prose-quality",
+   "promptSha256": "a9063548d49d5ce8874543a35d5e5f9063158b86dbdd3970766183cee6cd6ee6",
+   "httpStatus": 200,
+   "latencyMs": 3034,
+   "finishReason": "stop",
+   "content": "You wedge your pry bar into the seam of the bulkhead panel, the cold metal groaning under the strain as you force it open. A rush of stale, recycled air hits your face, carrying the faint, metallic tang of the ship's filtration system. \"Hurry, then,\" grunts Kael, his voice tight with urgency as he scans the corridor for any sign of movement. \"Before the cycle turns and we're blind again.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 91,
+    "prompt_tokens": 427,
+    "total_tokens": 518,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-prose-06-concrete-numbers",
+   "category": "prose-quality",
+   "promptSha256": "a3ea193272688cb8720993dfdf1b32f0c3aea74327beac781b763c5d47ac8e0d",
+   "httpStatus": 200,
+   "latencyMs": 2751,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You scan the table, your eyes catching the distinct symbols of each player's chosen character. The board reveals a diverse party: a sturdy Barbarian, a cunning Rogue, a wise Wizard, and a resilient Cleric, all ready for the adventure ahead.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 82,
+    "prompt_tokens": 414,
+    "total_tokens": 496,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-prose-07-two-beats-paragraphs",
+   "category": "prose-quality",
+   "promptSha256": "4bf794cef82795450db68554cded3926259598982faf6401d2190eec388cc5cf",
+   "httpStatus": 200,
+   "latencyMs": 2406,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You begin removing the panels one by one, setting each aside with a careful click. The exposed framework beneath reveals more of the room's hidden structure, though nothing else shifts in the quiet space.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 70,
+    "prompt_tokens": 438,
+    "total_tokens": 508,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-prose-08-no-implementation-language",
+   "category": "prose-quality",
+   "promptSha256": "771f70694d74c0deeac05ede7bc401b3274287b4865927f0bc7332c2b1948d09",
+   "httpStatus": 200,
+   "latencyMs": 2487,
+   "finishReason": "stop",
+   "content": "You pause, your fingers hovering over the map as you recount the panels, your brow furrowing in concentration. The ink seems to blur slightly under the weight of your scrutiny, but you catch yourself before you lose your place entirely. \"I think I've got it,\" you mutter, tapping the parchment with a decisive finger. \"Let's move forward.\"",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 439,
+    "total_tokens": 512,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-01-check-success",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "05f12e8ca910bdf4c49fd9c6b320417545964004ad1edbb33d2f05160cd1f581",
+   "httpStatus": 200,
+   "latencyMs": 3924,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You flip through the leather-bound ledger, the pages worn soft from frequent use. The ink is faded but legible, recording the movements of the party over the past week. You find the entry for the fourteenth, noting that you successfully passed the Perception check with a total of 14 against a DC of 12. The record confirms you spotted the hidden compartment in the wall behind the tapestry.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 114,
+    "prompt_tokens": 549,
+    "total_tokens": 663,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-02-check-failure-no-side-effects",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "acccfcaa999777bba400fb8018c2c7fa74006ec42b635cdc31e94a9aea469358",
+   "httpStatus": 200,
+   "latencyMs": 3561,
+   "finishReason": "stop",
+   "content": "You brace your shoulder against the cellar stair door, muscles straining as you push with all your might. The wood groans under the pressure, but the heavy iron latch holds firm, refusing to yield to your strength. You grit your teeth, sweat stinging your eyes, yet the door remains immovable. Without a tool to pry it open or a key to unlock it, your brute force alone is insufficient to breach the barrier. The darkness beyond the door seems to press back against you, waiting for a different approach.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 106,
+    "prompt_tokens": 517,
+    "total_tokens": 623,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-03-bare-dice-roll",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "42a1832950b82c18957563130b692ff8d8e87dbd4718c316c516a533c2d96435",
+   "httpStatus": 200,
+   "latencyMs": 2999,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"The die tumbles across the stone floor, its edges catching the torchlight as it spins. It settles with a soft thud, revealing a twelve. The number sits there, plain and unadorned, waiting for your interpretation of what this moment means for your journey.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 87,
+    "prompt_tokens": 468,
+    "total_tokens": 555,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-04-combat-damage",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "f34f76871b2368ca750a197493bbda46469b10f7cc25d05db8c4a832068c8ce8",
+   "httpStatus": 200,
+   "latencyMs": 2076,
+   "finishReason": "stop",
+   "content": "You swing the truncheon with a heavy thud, connecting squarely with the man's shoulder. The impact deals 4 damage, dropping his hit points from 12 to 8. He stumbles back, clutching the bruised flesh, but remains standing and alert.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 58,
+    "prompt_tokens": 471,
+    "total_tokens": 529,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-05-combat-miss",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "31674f8b06ee05c68c527417bb086c490a32b724974ed7f85f34bf520b0a9b1d",
+   "httpStatus": 200,
+   "latencyMs": 2397,
+   "finishReason": "stop",
+   "content": "You swing the truncheon with renewed force, the wood connecting squarely with the creature's armored shoulder. The impact deals 12 points of bludgeoning damage, reducing its remaining hit points to 8. The blow stuns the beast momentarily, causing it to stagger back and drop its guard as it struggles to regain its footing.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 69,
+    "prompt_tokens": 441,
+    "total_tokens": 510,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-06-travel-destination",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "61671be95d9a68e66c50b2639f68838c42f149b29e02a7dea1cd22ffc246f34d",
+   "httpStatus": 200,
+   "latencyMs": 5156,
+   "finishReason": "stop",
+   "content": "You descend the cobbled steps of Tallow Street, the air thick with the scent of roasting chestnuts and damp wool. A flickering lantern mounted on a wrought-iron post casts long, dancing shadows against the brickwork, revealing a narrow alleyway that seems to swallow the light. The street is quiet, save for the distant hoot of an owl and the occasional drip of water from a leaking gutter.\n\nAs you move forward, the cobblestones beneath your boots feel uneven, hinting at the age of the city beneath your feet. The warmth of a bakery seeps through the cracks in the pavement, promising sustenance if you dare to linger. You are alone in this shadowed thoroughfare, the only sound your own footsteps echoing softly against the silent walls.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 159,
+    "prompt_tokens": 432,
+    "total_tokens": 591,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-07-commerce-receipt",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "f48677d4fd795a823fd5026a34a3bd383ac78da969df1e2511a7fb0ce8b791c0",
+   "httpStatus": 200,
+   "latencyMs": 2548,
+   "finishReason": "stop",
+   "content": "You hand over the silver coin to Mrs. Bramley, and she wraps the heavy wool overcoat in oilcloth. The receipt confirms the transaction: a wool overcoat purchased for 12 silver coins, dated the 14th of November. You slip the coat on, feeling its warmth against the biting wind as you step out into the street.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 458,
+    "total_tokens": 531,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-08-rest-recovery",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "2f4127af3647b901926028c23b186ddc83179b0d47be117c9e29b265977211a1",
+   "httpStatus": 200,
+   "latencyMs": 2526,
+   "finishReason": "stop",
+   "content": "The hearth glows warmly, casting dancing shadows against the stone walls as you settle into the rough-hewn chair. The crackling fire provides a comforting rhythm, and the scent of woodsmoke fills the air, easing the tension from your shoulders. You take a moment to breathe, letting the heat seep into your bones and restore your weary spirit.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 442,
+    "total_tokens": 515,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-09-quest-progress",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "a2346cece776b2f61b0f0a744e74b4144410892eca0644dab4cf44bc33ae14cb",
+   "httpStatus": 200,
+   "latencyMs": 3516,
+   "finishReason": "stop",
+   "content": "The night ledger for the fourteenth reveals a single verified receipt: a transaction labeled \"Midnight Brew\" recorded at 02:14 AM, showing a precise value of 3.50 credits exchanged for a steaming mug of coffee. The receipt confirms the merchant's name as \"Elara's Roast\" and notes the location coordinates as Sector 7, Grid C. You sip the coffee, the warmth spreading through your chilled fingers as the city outside remains shrouded in the deep, unbroken darkness of the night.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 111,
+    "prompt_tokens": 442,
+    "total_tokens": 553,
+    "prompt_tokens_details": {
+     "cached_tokens": 419
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-10-journey-interrupted",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "8dcd0653bd0d3233820711fba4c1b7e295ce68fd158062bd5c2f1a8572d058cc",
+   "httpStatus": 200,
+   "latencyMs": 4394,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "submit_adventure_narration",
+     "argumentsRaw": "{\"narration\":\"You follow the road east, the cobblestones worn smooth by centuries of footsteps. The air grows colder as you approach Coldharbour Row, where the streetlamps flicker with an unnatural blue hue. Shadows stretch unnaturally long between the buildings, and a faint, metallic tang hangs in the air. You reach the row's entrance, where a heavy iron gate stands slightly ajar, revealing a narrow alleyway beyond. The gate bears the inscription \\\"Coldharbour Row\\\" in faded, rusted letters.\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 134,
+    "prompt_tokens": 447,
+    "total_tokens": 581,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-ground-11-two-receipts",
+   "category": "receipt-grounded-narration",
+   "promptSha256": "cc5e1cddc5c0c1d30c83f6276e48fc7b23781cffb2fb1f9940797e0991595313",
+   "httpStatus": 200,
+   "latencyMs": 2033,
+   "finishReason": "stop",
+   "content": "You clip the brass whistle to your belt, the cold metal biting into your leather. The sound of the latch clicking echoes in the empty locker room, a sharp punctuation to your preparation. You feel the weight of it, a small but significant promise of authority you now carry.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 56,
+    "prompt_tokens": 462,
+    "total_tokens": 518,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-01-travel-four-args",
+   "category": "tool-selection",
+   "promptSha256": "fa2e93d39d0f1de106b80890e7550e10793c86a3661792185ea841de23924789",
+   "httpStatus": 200,
+   "latencyMs": 32513,
+   "finishReason": "length",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_actor_travel.select",
+     "argumentsRaw": "{"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 1024,
+    "prompt_tokens": 888,
+    "total_tokens": 1912,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-02-check-not-travel",
+   "category": "tool-selection",
+   "promptSha256": "99adb617d1c13391bbbf280434ecebe534b687a5cbb4b0fd70c75230735b2fb6",
+   "httpStatus": 200,
+   "latencyMs": 31956,
+   "finishReason": "length",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_srd_check.select",
+     "argumentsRaw": "{}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 1024,
+    "prompt_tokens": 809,
+    "total_tokens": 1833,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-03-no-tool-chitchat",
+   "category": "tool-selection",
+   "promptSha256": "8b69b5ed81254a7fe7eff81c8880818dfb2c975e26cf7697cfb97abc76038a32",
+   "httpStatus": 200,
+   "latencyMs": 1694,
+   "finishReason": "stop",
+   "content": "Good morning. The weather is indeed favorable for the dyeing process. Are you planning to start the dyeing today, or do you need to prepare the materials first?",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 35,
+    "prompt_tokens": 931,
+    "total_tokens": 966,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-04-clarify-ambiguous-purchase",
+   "category": "tool-selection",
+   "promptSha256": "09235fe8c12c3614ed6ac75b56540fc42b09757cc7b13b0d2fbc26e0eb83734d",
+   "httpStatus": 200,
+   "latencyMs": 7022,
+   "finishReason": "stop",
+   "content": "I'm ready to help you select an item from the available options. Could you please specify which item you'd like to purchase or acquire? The options are:\n\n1. Dyed Wool (shop:buy-dyed-wool-36)\n2. Undyed Flax (shop:buy-undyed-flax-37)\n\nAlso, please provide the corresponding digest for your selection:\n- For Dyed Wool: 37b42e063b6cadc55f8bf62cba7fc74467f609ecdc772e3502648a8726c1b9ee\n- For Undyed Flax: 6a83a0677381be0384df650f126e1dcf7caaaba359c2c2ec573d95daa55be9a1",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 210,
+    "prompt_tokens": 895,
+    "total_tokens": 1105,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-05-quest-objective",
+   "category": "tool-selection",
+   "promptSha256": "05a9f5c17af597d00dfa04d73df3af2f7f4a13ef9555819e89f5b152ddee095e",
+   "httpStatus": 200,
+   "latencyMs": 32554,
+   "finishReason": "length",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    },
+    {
+     "name": "exact_quest_objective.select",
+     "argumentsRaw": "{}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 1024,
+    "prompt_tokens": 953,
+    "total_tokens": 1977,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-06-combat-legal-action",
+   "category": "tool-selection",
+   "promptSha256": "bf34788b3c8d8afb36885b5ef48d92aafa87be030a56621cb9cf1fbdf41cefc9",
+   "httpStatus": 200,
+   "latencyMs": 1355,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "combat_action.execute",
+     "argumentsRaw": "{}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 20,
+    "prompt_tokens": 813,
+    "total_tokens": 833,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-07-read-with-empty-arguments",
+   "category": "tool-selection",
+   "promptSha256": "8eaebae0393221d0e3b204653d5b5c7ae9046d1562914ba55affeb5c4d5a29f0",
+   "httpStatus": 200,
+   "latencyMs": 950,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "actor_inventory.read",
+     "argumentsRaw": "{}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 517,
+    "total_tokens": 533,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-08-unadvertised-bribe",
+   "category": "tool-selection",
+   "promptSha256": "c86c554df2753cad43505f61e9ba2b56b42b6826307fa112cdc6b5eaa06b1098",
+   "httpStatus": 200,
+   "latencyMs": 2755,
+   "finishReason": "stop",
+   "content": "I cannot process a player declaration as a completed action or modify the game state based on it. I can only execute specific vendor commerce transactions using the available tools.\n\nPlease specify which exact candidate you wish to purchase, sell, or transfer using the provided IDs, or provide a narration for the scene if you are describing the event without executing a transaction.",
+   "reasoningContent": null,
+   "toolCalls": [],
+   "usage": {
+    "completion_tokens": 71,
+    "prompt_tokens": 657,
+    "total_tokens": 728,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-09-commerce-buy",
+   "category": "tool-selection",
+   "promptSha256": "e8c3dc4ffa56e5198b6eceb3e18acb8c09a08325b0efe1a4537cfd6ae6e95507",
+   "httpStatus": 200,
+   "latencyMs": 3886,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "exact_vendor_commerce.select",
+     "argumentsRaw": "{\"candidateId\":\"shop:buy-dyed-wool-36\",\"digest\":\"37b42e063b6cadc55f8bf62cba7fc74467f609ecdc772e3502648a8726c1b9ee\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 107,
+    "prompt_tokens": 726,
+    "total_tokens": 833,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-10-clarify-rest-versus-travel",
+   "category": "tool-selection",
+   "promptSha256": "5e49cc06dbe5aeded93aed090ab90000913cf50860600ab8dbcdd305676f6e71",
+   "httpStatus": 200,
+   "latencyMs": 3828,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "exact_rest.select",
+     "argumentsRaw": "{\"candidateId\":\"rest:long-loft-41\",\"digest\":\"a36d4b00a31355a52ee90592617da46f3adf5fd0127060be73c452cc44d7c43c\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 104,
+    "prompt_tokens": 716,
+    "total_tokens": 820,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-11-attribute-set-confirmation",
+   "category": "tool-selection",
+   "promptSha256": "5a921677bd9db515694cfbe8f0c259e733255eb32933560769bf9609886a23b0",
+   "httpStatus": 200,
+   "latencyMs": 1309,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "actor_attribute.set",
+     "argumentsRaw": "{}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 20,
+    "prompt_tokens": 769,
+    "total_tokens": 789,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "error": null
+  },
+  {
+   "id": "dev-tool-12-power-versus-rest",
+   "category": "tool-selection",
+   "promptSha256": "f57f9f737b3dcde8ff36c38d63dcf03e7db6cccb6ca28f0948357f72eeac3c2f",
+   "httpStatus": 200,
+   "latencyMs": 3760,
+   "finishReason": "tool_calls",
+   "content": "",
+   "reasoningContent": null,
+   "toolCalls": [
+    {
+     "name": "exact_power_use.select",
+     "argumentsRaw": "{\"candidateId\":\"power:mend-vat-43\",\"digest\":\"450a8fa7d8526eff8e8d9394b48363dd1f34fef8f38f59155e682f891f0cb15c\"}"
+    }
+   ],
+   "usage": {
+    "completion_tokens": 105,
+    "prompt_tokens": 636,
+    "total_tokens": 741,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "error": null
+  }
+ ]
+}

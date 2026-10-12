@@ -1,0 +1,1895 @@
+{
+  "version": 3,
+  "generatedAt": "2026-10-12T20:25:25.574Z",
+  "mode": "in-process",
+  "provider": {
+    "baseUrl": "http://127.0.0.1:8081/v1",
+    "model": "qwen3-8b"
+  },
+  "seed": 11,
+  "dataDir": "C:\\Users\\kyle\\projects\\velvetrp\\data\\velvet-bench\\reports\\freeform-run\\world-ctx16k",
+  "baseUrl": null,
+  "world": {
+    "campaignId": "4fa366bf-8ab5-47d4-bf9b-06de6422c922",
+    "sessionId": "7b35f092-524e-466d-8595-c2df5eeec320",
+    "actorId": "9e709819-4650-40cf-86a3-60f305c6c948"
+  },
+  "declarations": 18,
+  "narrationClassification": {
+    "classes": [
+      "provider",
+      "deliberate-hold",
+      "narration-failure"
+    ],
+    "deliberateHoldMarker": "\\bsuggested next step:|\\bnothing is resolved;",
+    "fallbackDistinctnessScope": "narration-failure narration events only (deliberate-hold excluded)",
+    "probes": [
+      {
+        "kind": "declared-purchase",
+        "title": "declared purchase exercises commerce",
+        "expected": "an awaiting-confirmation commerce proposal followed by a committed commerce receipt"
+      },
+      {
+        "kind": "unknown-npc",
+        "title": "unknown NPC does not resolve as a skill check",
+        "expected": "a hold or receipt-free provider prose; never a committed check"
+      },
+      {
+        "kind": "cheating-commerce",
+        "title": "self-directed commerce holds without a receipt",
+        "expected": "no receipt and no vendor_give proposal"
+      }
+    ]
+  },
+  "reliability": {
+    "providerCalls": true,
+    "dmCandidates": true,
+    "coherence": true,
+    "notes": [
+      "Location coherence is a conservative heuristic over committed receipts and the resolved actor location.",
+      "Narration classes: provider (source=provider-assisted), deliberate-hold (grounded server hold marker), narration-failure (every other deterministic fallback). fallbackDistinctness is computed over narration-failure events only."
+    ]
+  },
+  "probes": [
+    {
+      "kind": "declared-purchase",
+      "title": "declared purchase exercises commerce",
+      "turnIndex": 2,
+      "turnId": "shop-buy",
+      "expected": "an awaiting-confirmation commerce proposal followed by a committed commerce receipt",
+      "observed": "no commerce: receipts=[] state=completed narration=provider",
+      "passed": false
+    },
+    {
+      "kind": "unknown-npc",
+      "title": "unknown NPC does not resolve as a skill check",
+      "turnIndex": 7,
+      "turnId": "unknown-npc",
+      "expected": "a hold or receipt-free provider prose; never a committed check",
+      "observed": "held / receipt-free: receipts=[] narration=provider",
+      "passed": true
+    },
+    {
+      "kind": "cheating-commerce",
+      "title": "self-directed commerce holds without a receipt",
+      "turnIndex": 3,
+      "turnId": "illegal",
+      "expected": "no receipt and no vendor_give proposal",
+      "observed": "held without a receipt: receipts=[] narration=provider",
+      "passed": true
+    }
+  ],
+  "metrics": {
+    "turns": 18,
+    "turnsWithNarration": 18,
+    "providerCalls": 66,
+    "providerOk": 55,
+    "providerFailed": 11,
+    "providerSuccessRate": 0.8333333333333334,
+    "narrationEventsTotal": 18,
+    "narrationsProvider": 13,
+    "narrationsTotal": 18,
+    "narrationProviderShare": 0.7222222222222222,
+    "deliberateHoldEvents": 0,
+    "deliberateHoldTurns": 0,
+    "deliberateHoldRate": 0,
+    "narrationFailureTurns": 5,
+    "fallbackCount": 5,
+    "fallbackDistinct": 4,
+    "fallbackIdentical": 1,
+    "fallbackDistinctness": 0.8,
+    "materializedTurns": 4,
+    "materializationRate": 0.2222222222222222,
+    "dmBeats": 6,
+    "dmBeatsSucceeded": 6,
+    "dmBeatSuccessRate": 1,
+    "coherenceViolations": 0,
+    "coherenceViolationTurns": 0,
+    "latencyAvgMs": 8371,
+    "latencyP50Ms": 6842,
+    "latencyP95Ms": 21984,
+    "latencyMaxMs": 21984,
+    "commerceExercised": 0,
+    "commerceCommitted": 0,
+    "unknownNpcResolvedAsCheck": 0,
+    "unknownNpcHeld": 1,
+    "cheatingCommerceHeld": 1,
+    "cheatingCommerceGiveMisfire": 0,
+    "cheatingCommerceReceipts": 0
+  },
+  "turns": [
+    {
+      "index": 0,
+      "id": "look-around",
+      "category": "read",
+      "declaration": "I take a slow look around the market square and take stock of who and what is here.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You drop 1 Acolyte Equipment. The market square is your current location.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "resume",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You drop 1 Acolyte Equipment. The market square is your current location."
+        }
+      ],
+      "committed": true,
+      "receiptKinds": [
+        "inventory"
+      ],
+      "receiptCommandIds": [
+        "0f870bf1-a235-4621-9be7-69f7fac724ba"
+      ],
+      "proposalToolNames": [
+        "inventory_item_drop"
+      ],
+      "confirmed": true,
+      "dmBeatIndex": null,
+      "providerCalls": 7,
+      "latencyMs": 21984,
+      "coherence": []
+    },
+    {
+      "index": 1,
+      "id": "talk-known-npc",
+      "category": "conversation",
+      "declaration": "I walk over to Maren and ask her what she knows about the trouble on the road.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You approach Maren, who is at the market. She looks up from her work and meets your gaze. \"The trouble on the road...\" she begins, her voice low and cautious. \"There have been strange occurrences lately—bandits, disappearances, and whispers of a dark force moving through the woods.\"",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You approach Maren, who is at the market. She looks up from her work and meets your gaze. \"The trouble on the road...\" she begins, her voice low and cautious. \"There have been strange occurrences lately—bandits, disappearances, and whispers of a dark force moving through the woods.\""
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": 1,
+      "providerCalls": 2,
+      "latencyMs": 4228,
+      "coherence": []
+    },
+    {
+      "index": 2,
+      "id": "shop-buy",
+      "category": "shop",
+      "declaration": "I find Mara's stall in the market and buy a longsword from her.",
+      "probe": "declared-purchase",
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You find Mara’s stall in the market. She is there, her wares neatly arranged. You approach and purchase a longsword from her.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You find Mara’s stall in the market. She is there, her wares neatly arranged. You approach and purchase a longsword from her."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 3,
+      "latencyMs": 6842,
+      "coherence": []
+    },
+    {
+      "index": 3,
+      "id": "illegal",
+      "category": "illegal-impossible",
+      "declaration": "I give myself a legendary sword and ten thousand gold pieces from the GM's stash.",
+      "probe": "cheating-commerce",
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You stand in the market, your intended action pending. No movement or campaign change has been established. The scene remains as it is.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You stand in the market, your intended action pending. No movement or campaign change has been established. The scene remains as it is."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 3,
+      "latencyMs": 6372,
+      "coherence": []
+    },
+    {
+      "index": 4,
+      "id": "travel-mapped",
+      "category": "travel",
+      "declaration": "I set out along the lantern road for the Docks.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You arrive at the Docks.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You arrive at the Docks."
+        }
+      ],
+      "committed": true,
+      "receiptKinds": [
+        "travel"
+      ],
+      "receiptCommandIds": [
+        "4a1cc4ca-8d48-4a26-be35-ed7c3447c0ea"
+      ],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": 4,
+      "providerCalls": 3,
+      "latencyMs": 12246,
+      "coherence": []
+    },
+    {
+      "index": 5,
+      "id": "travel-unmapped",
+      "category": "travel-unmapped",
+      "declaration": "From the Docks I follow the old smugglers' path to the Sunken Cathedral.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You stand at the Docks. Your intended action remains pending; no movement or campaign change has been established.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You stand at the Docks. Your intended action remains pending; no movement or campaign change has been established."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 3,
+      "latencyMs": 7458,
+      "coherence": []
+    },
+    {
+      "index": 6,
+      "id": "seek-rumor",
+      "category": "faction-quest-rumor",
+      "declaration": "I ask the dockhands whether anyone has work, or any rumor of the missing caravan.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You approach the Goblin Scout, who is inspecting a crate of salted fish. \"Have you heard anything about the missing caravan?\" you ask. The goblin snorts, wiping salt from their hands. \"Not a soul. But the sea's got a way of taking things... and some folks don't like to talk about it.\"",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You approach the Goblin Scout, who is inspecting a crate of salted fish. \"Have you heard anything about the missing caravan?\" you ask. The goblin snorts, wiping salt from their hands. \"Not a soul. But the sea's got a way of taking things... and some folks don't like to talk about it.\""
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 1,
+      "latencyMs": 3440,
+      "coherence": []
+    },
+    {
+      "index": 7,
+      "id": "unknown-npc",
+      "category": "unknown-npc",
+      "declaration": "I approach a hooded stranger leaning on a bollard and demand to know their name and business.",
+      "probe": "unknown-npc",
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You stand at the Docks. Your intended action remains pending; no movement or campaign change has been established.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You stand at the Docks. Your intended action remains pending; no movement or campaign change has been established."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": 7,
+      "providerCalls": 2,
+      "latencyMs": 6564,
+      "coherence": []
+    },
+    {
+      "index": 8,
+      "id": "quest-accept",
+      "category": "quest",
+      "declaration": "I accept the quest to guard the market.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You stand at the Docks. The quest to guard the market has been accepted.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "resume",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You stand at the Docks. The quest to guard the market has been accepted."
+        }
+      ],
+      "committed": true,
+      "receiptKinds": [
+        "quest-progression"
+      ],
+      "receiptCommandIds": [
+        "b45586d1-a354-4ace-91ec-1284f4582031"
+      ],
+      "proposalToolNames": [
+        "quest_accept"
+      ],
+      "confirmed": true,
+      "dmBeatIndex": null,
+      "providerCalls": 3,
+      "latencyMs": 15932,
+      "coherence": []
+    },
+    {
+      "index": 9,
+      "id": "check-search",
+      "category": "check",
+      "declaration": "I search the crates along the dock for anything hidden or valuable.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "The scene holds. Your intended action remains pending; no movement or other campaign change is established.",
+      "narrationSource": "deterministic-fallback",
+      "narrationClass": "narration-failure",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "deterministic-fallback",
+          "class": "narration-failure",
+          "text": "The scene holds. Your intended action remains pending; no movement or other campaign change is established."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 2,
+      "latencyMs": 4980,
+      "coherence": []
+    },
+    {
+      "index": 10,
+      "id": "hold-wait",
+      "category": "hold",
+      "declaration": "I lean on the rail, watch the grey water, and wait for the fog to lift.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "The salt air bites at your skin as you lean on the weathered rail, your breath visible in the damp chill. The grey water laps at the docks, a restless murmur beneath the mist. You watch the fog curl and shift, waiting for its thin veil to lift. A goblin scout shuffles nearby, its eyes darting between the crates and the shoreline. It mutters something in its guttural tongue, then turns and slips between the shadows of the cargo. The fog clings stubbornly, but the silence is thick with anticipation.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "The salt air bites at your skin as you lean on the weathered rail, your breath visible in the damp chill. The grey water laps at the docks, a restless murmur beneath the mist. You watch the fog curl and shift, waiting for its thin veil to lift. A goblin scout shuffles nearby, its eyes darting between the crates and the shoreline. It mutters something in its guttural tongue, then turns and slips between the shadows of the cargo. The fog clings stubbornly, but the silence is thick with anticipation."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": 10,
+      "providerCalls": 2,
+      "latencyMs": 4711,
+      "coherence": []
+    },
+    {
+      "index": 11,
+      "id": "impossible",
+      "category": "illegal-impossible",
+      "declaration": "I snap my fingers and teleport straight to the moon.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "That action cannot be established from the current state. It remains unresolved; no movement or other campaign change is established.",
+      "narrationSource": "deterministic-fallback",
+      "narrationClass": "narration-failure",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "deterministic-fallback",
+          "class": "narration-failure",
+          "text": "That action cannot be established from the current state. It remains unresolved; no movement or other campaign change is established."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 3,
+      "latencyMs": 7542,
+      "coherence": []
+    },
+    {
+      "index": 12,
+      "id": "attack",
+      "category": "encounter",
+      "declaration": "I draw my sword and attack the Goblin Scout by the crates.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "The fight holds where it stands. Your next move is not resolved; no damage, turn change, or movement or other campaign change is established.",
+      "narrationSource": "deterministic-fallback",
+      "narrationClass": "narration-failure",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "deterministic-fallback",
+          "class": "narration-failure",
+          "text": "The fight holds where it stands. Your next move is not resolved; no damage, turn change, or movement or other campaign change is established."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 3,
+      "latencyMs": 7367,
+      "coherence": []
+    },
+    {
+      "index": 13,
+      "id": "combat-continue",
+      "category": "encounter",
+      "declaration": "I press the attack and swing at the Goblin Scout again.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "The fight holds where it stands. Your next move is not resolved; no damage, turn change, or movement or other campaign change is established.",
+      "narrationSource": "deterministic-fallback",
+      "narrationClass": "narration-failure",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "deterministic-fallback",
+          "class": "narration-failure",
+          "text": "The fight holds where it stands. Your next move is not resolved; no damage, turn change, or movement or other campaign change is established."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": 13,
+      "providerCalls": 2,
+      "latencyMs": 5721,
+      "coherence": []
+    },
+    {
+      "index": 14,
+      "id": "rest",
+      "category": "rest",
+      "declaration": "I sit down on a crate and take a short rest.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "The rest is not yet committed. No recovery, time skip, or movement or other campaign change is established.",
+      "narrationSource": "deterministic-fallback",
+      "narrationClass": "narration-failure",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "deterministic-fallback",
+          "class": "narration-failure",
+          "text": "The rest is not yet committed. No recovery, time skip, or movement or other campaign change is established."
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 3,
+      "latencyMs": 9468,
+      "coherence": []
+    },
+    {
+      "index": 15,
+      "id": "travel-back",
+      "category": "travel",
+      "declaration": "I head back to the Market before it gets dark.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You arrive at the Market. The market square is alive with the hum of evening trade, lanterns casting golden light over the stalls. Mara, Quill, and Joss are present, their voices weaving through the chatter. Maren stands nearby, her gaze wary. Your longsword is at your side. The air feels charged, as if something unseen watches from the shadows.",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You arrive at the Market. The market square is alive with the hum of evening trade, lanterns casting golden light over the stalls. Mara, Quill, and Joss are present, their voices weaving through the chatter. Maren stands nearby, her gaze wary. Your longsword is at your side. The air feels charged, as if something unseen watches from the shadows."
+        }
+      ],
+      "committed": true,
+      "receiptKinds": [
+        "travel"
+      ],
+      "receiptCommandIds": [
+        "6b8cf7dc-7364-47e5-a88d-6ad38b682006"
+      ],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 3,
+      "latencyMs": 15740,
+      "coherence": []
+    },
+    {
+      "index": 16,
+      "id": "conversation",
+      "category": "conversation",
+      "declaration": "I find Joss and ask him what he makes of the strangers in the market.",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You approach Joss, who is chatting with Mara. He pauses, glancing at the strangers lingering near the edge of the market. \"They seem wary,\" he says, his voice low. \"I’ve seen travelers like them before—always looking over their shoulders. I hope the market stays safe.\"",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You approach Joss, who is chatting with Mara. He pauses, glancing at the strangers lingering near the edge of the market. \"They seem wary,\" he says, his voice low. \"I’ve seen travelers like them before—always looking over their shoulders. I hope the market stays safe.\""
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": 16,
+      "providerCalls": 1,
+      "latencyMs": 4401,
+      "coherence": []
+    },
+    {
+      "index": 17,
+      "id": "meta",
+      "category": "meta",
+      "declaration": "/help what commands exist and what can I do here?",
+      "probe": null,
+      "status": 200,
+      "finalState": "completed",
+      "outcome": "done",
+      "narration": "You stand in the heart of the market, where the scent of spiced meats and fresh bread mingles in the air. Lanterns cast a warm glow over the square, illuminating the faces of Mara, Quill, and Joss, who are haggling over a bundle of herbs. Maren watches from the shadows, her posture tense. The market is alive with the sounds of merchants calling out their wares, but there’s an unspoken tension in the air. A goblin scout lurks near the docks, his gaze darting between the stalls. You feel a subtle shift in the atmosphere, as if something unseen is watching. What would you like to do?",
+      "narrationSource": "provider-assisted",
+      "narrationClass": "provider",
+      "narrationEvents": [
+        {
+          "phase": "initial",
+          "source": "provider-assisted",
+          "class": "provider",
+          "text": "You stand in the heart of the market, where the scent of spiced meats and fresh bread mingles in the air. Lanterns cast a warm glow over the square, illuminating the faces of Mara, Quill, and Joss, who are haggling over a bundle of herbs. Maren watches from the shadows, her posture tense. The market is alive with the sounds of merchants calling out their wares, but there’s an unspoken tension in the air. A goblin scout lurks near the docks, his gaze darting between the stalls. You feel a subtle shift in the atmosphere, as if something unseen is watching. What would you like to do?"
+        }
+      ],
+      "committed": false,
+      "receiptKinds": [],
+      "receiptCommandIds": [],
+      "proposalToolNames": [],
+      "confirmed": false,
+      "dmBeatIndex": null,
+      "providerCalls": 2,
+      "latencyMs": 5686,
+      "coherence": []
+    }
+  ],
+  "dmBeats": [
+    {
+      "index": 1,
+      "intent": "open",
+      "state": "completed",
+      "receipts": [
+        "reveal-node",
+        "advance-time"
+      ],
+      "candidatesOffered": [
+        "reveal-node",
+        "advance-time",
+        "ambient-beat",
+        "reveal-node",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "narration": "Scene revealed: Scene 0. Public scene 0 of the s11 road. Time passes: 30 minutes elapse with no other change to the world.\n\nScene description (non-authoritative):\nThe market square is bathed in the warm glow of lanterns, their light flickering against the damp cobblestones. A faint scent of spiced meat and fresh bread lingers in the air, mingling with the distant sound of a lute playing from a nearby stall. Quill: \"You're early, Hero. The market’s still quiet, but the vendors are already preparing their wares.\" Joss: \"The prices are fair today, but don’t expect any discounts. You’ll have to haggle like a local.\" Will you explore the market stalls or seek out the merchant, Mara, to begin your trade?",
+      "blockers": [],
+      "latencyMs": 14653,
+      "success": true
+    },
+    {
+      "index": 4,
+      "intent": "continue",
+      "state": "completed",
+      "receipts": [
+        "reveal-clue",
+        "advance-time"
+      ],
+      "candidatesOffered": [
+        "reveal-clue",
+        "advance-time",
+        "ambient-beat",
+        "reveal-clue",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "narration": "Clue discovered: s11 Key. A brass key lies on the stones. Time passes: 30 minutes elapse with no other change to the world.\n\nScene description (non-authoritative):\nThe weathered docks are shrouded in a salty mist, dampening the wooden planks. The sound of waves crashing against the stones echoes faintly, mingling with the distant creak of a windlass. Goblin Scout: \"Watch your step, human. The tide's been rising, and these planks are slick.\" Will you search for the brass key or inspect the crates nearby?",
+      "blockers": [
+        "scene-resolution-requires-gm-binding-or-human-adjudication"
+      ],
+      "latencyMs": 12588,
+      "success": true
+    },
+    {
+      "index": 7,
+      "intent": "continue",
+      "state": "completed",
+      "receipts": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "candidatesOffered": [
+        "advance-time",
+        "ambient-beat",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "narration": "Time passes: 30 minutes elapse with no other change to the world. An ambient moment passes. No game state changes.\n\nScene description (non-authoritative):\nThe weathered docks are shrouded in a salty mist, dampening the wooden planks. The sound of waves crashing against the stones echoes faintly, mingling with the distant creak of a windlass. Goblin Scout: \"Watch your step, human. The tide's been rising, and these planks are slick.\" Will you search for the brass key or inspect the crates nearby?",
+      "blockers": [
+        "scene-resolution-requires-gm-binding-or-human-adjudication"
+      ],
+      "latencyMs": 12912,
+      "success": true
+    },
+    {
+      "index": 10,
+      "intent": "continue",
+      "state": "completed",
+      "receipts": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "candidatesOffered": [
+        "advance-time",
+        "ambient-beat",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "narration": "Time passes: 30 minutes elapse with no other change to the world. An ambient moment passes. No game state changes.\n\nScene description (non-authoritative):\nThe weathered docks are shrouded in a salty mist, dampening the wooden planks. The sound of waves crashing against the stones echoes faintly, mingling with the distant creak of a windlass. Goblin Scout: \"Watch your step, human. The tide's been rising, and these planks are slick.\" Will you search for the brass key or inspect the crates nearby?",
+      "blockers": [
+        "scene-resolution-requires-gm-binding-or-human-adjudication"
+      ],
+      "latencyMs": 12432,
+      "success": true
+    },
+    {
+      "index": 13,
+      "intent": "continue",
+      "state": "completed",
+      "receipts": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "candidatesOffered": [
+        "advance-time",
+        "ambient-beat",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "narration": "Time passes: 30 minutes elapse with no other change to the world. An ambient moment passes. No game state changes.\n\nScene description (non-authoritative):\nThe weathered docks are shrouded in a salty mist, dampening the wooden planks. The sound of waves crashing against the stones echoes faintly, mingling with the distant creak of a windlass. Goblin Scout: \"Watch your step, human. The tide's been rising, and these planks are slick.\" Will you search for the brass key or inspect the crates nearby?",
+      "blockers": [
+        "scene-resolution-requires-gm-binding-or-human-adjudication"
+      ],
+      "latencyMs": 12651,
+      "success": true
+    },
+    {
+      "index": 16,
+      "intent": "continue",
+      "state": "completed",
+      "receipts": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "candidatesOffered": [
+        "advance-time",
+        "ambient-beat",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "narration": "Time passes: 30 minutes elapse with no other change to the world. An ambient moment passes. No game state changes.\n\nScene description (non-authoritative):\nThe market square is bathed in the soft glow of lanterns, their light flickering against the damp cobblestones. A faint scent of spiced meats and fresh bread lingers in the air, mingling with the distant sound of a lute playing nearby. Quill: \"The market’s always lively, but tonight feels... quiet, almost like the world is holding its breath.\" Joss: \"Maybe the tide of fate has receded. Or perhaps it’s waiting for something.\" Will you search for the brass key or speak with Mara about the market’s quiet?",
+      "blockers": [
+        "scene-resolution-requires-gm-binding-or-human-adjudication"
+      ],
+      "latencyMs": 14170,
+      "success": true
+    }
+  ],
+  "providerCalls": [
+    {
+      "seq": 1,
+      "lane": "adventure-planning-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "world_state.read"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 10694,
+      "completionTokens": 17,
+      "totalTokens": 10711,
+      "costUsd": 0.0010745,
+      "latencyMs": 6616
+    },
+    {
+      "seq": 2,
+      "lane": "adventure-planning-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "actor_sheet.read"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 10776,
+      "completionTokens": 17,
+      "totalTokens": 10793,
+      "costUsd": 0.0010827,
+      "latencyMs": 599
+    },
+    {
+      "seq": 3,
+      "lane": "adventure-planning-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "actor_inventory.read"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 11198,
+      "completionTokens": 17,
+      "totalTokens": 11215,
+      "costUsd": 0.0011248999999999999,
+      "latencyMs": 819
+    },
+    {
+      "seq": 4,
+      "lane": "adventure-planning-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "actor_powers.read"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 11270,
+      "completionTokens": 18,
+      "totalTokens": 11288,
+      "costUsd": 0.0011324,
+      "latencyMs": 671
+    },
+    {
+      "seq": 5,
+      "lane": "adventure-planning-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "exact_inventory_action.select"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 11336,
+      "completionTokens": 134,
+      "totalTokens": 11470,
+      "costUsd": 0.0011738000000000002,
+      "latencyMs": 4393
+    },
+    {
+      "seq": 6,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 2953,
+      "completionTokens": 202,
+      "totalTokens": 3155,
+      "costUsd": 0.0003559,
+      "latencyMs": 7080
+    },
+    {
+      "seq": 7,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3246,
+      "completionTokens": 42,
+      "totalTokens": 3288,
+      "costUsd": 0.00033720000000000006,
+      "latencyMs": 1263
+    },
+    {
+      "seq": 8,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (21900 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 237
+    },
+    {
+      "seq": 9,
+      "lane": "adventure-conversation-narration-v2",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 2450,
+      "completionTokens": 89,
+      "totalTokens": 2539,
+      "costUsd": 0.0002717,
+      "latencyMs": 3763
+    },
+    {
+      "seq": 10,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "read_campaign_recall"
+      ],
+      "dmCandidates": [
+        "reveal-node",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3882,
+      "completionTokens": 23,
+      "totalTokens": 3905,
+      "costUsd": 0.0003951,
+      "latencyMs": 2622
+    },
+    {
+      "seq": 11,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "select_dm_beat"
+      ],
+      "dmCandidates": [
+        "reveal-node",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3991,
+      "completionTokens": 234,
+      "totalTokens": 4225,
+      "costUsd": 0.0004693,
+      "latencyMs": 6396
+    },
+    {
+      "seq": 12,
+      "lane": "campaign-dm-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_dm_scene"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 1987,
+      "completionTokens": 176,
+      "totalTokens": 2163,
+      "costUsd": 0.0002515,
+      "latencyMs": 5520
+    },
+    {
+      "seq": 13,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (22567 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 198
+    },
+    {
+      "seq": 14,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 4334,
+      "completionTokens": 126,
+      "totalTokens": 4460,
+      "costUsd": 0.00047120000000000007,
+      "latencyMs": 4795
+    },
+    {
+      "seq": 15,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 4555,
+      "completionTokens": 54,
+      "totalTokens": 4609,
+      "costUsd": 0.0004717,
+      "latencyMs": 1591
+    },
+    {
+      "seq": 16,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (19761 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 252
+    },
+    {
+      "seq": 17,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3040,
+      "completionTokens": 138,
+      "totalTokens": 3178,
+      "costUsd": 0.0003454,
+      "latencyMs": 4361
+    },
+    {
+      "seq": 18,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3273,
+      "completionTokens": 52,
+      "totalTokens": 3325,
+      "costUsd": 0.00034290000000000004,
+      "latencyMs": 1530
+    },
+    {
+      "seq": 19,
+      "lane": "adventure-planning-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "exact_actor_travel.select"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 10546,
+      "completionTokens": 72,
+      "totalTokens": 10618,
+      "costUsd": 0.0010762,
+      "latencyMs": 6450
+    },
+    {
+      "seq": 20,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3793,
+      "completionTokens": 127,
+      "totalTokens": 3920,
+      "costUsd": 0.0004174,
+      "latencyMs": 4548
+    },
+    {
+      "seq": 21,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 4008,
+      "completionTokens": 32,
+      "totalTokens": 4040,
+      "costUsd": 0.00041040000000000006,
+      "latencyMs": 1010
+    },
+    {
+      "seq": 22,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "read_campaign_recall"
+      ],
+      "dmCandidates": [
+        "reveal-clue",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3807,
+      "completionTokens": 23,
+      "totalTokens": 3830,
+      "costUsd": 0.00038760000000000004,
+      "latencyMs": 2587
+    },
+    {
+      "seq": 23,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "select_dm_beat"
+      ],
+      "dmCandidates": [
+        "reveal-clue",
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3958,
+      "completionTokens": 223,
+      "totalTokens": 4181,
+      "costUsd": 0.00046269999999999997,
+      "latencyMs": 6155
+    },
+    {
+      "seq": 24,
+      "lane": "campaign-dm-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_dm_scene"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 2078,
+      "completionTokens": 119,
+      "totalTokens": 2197,
+      "costUsd": 0.0002435,
+      "latencyMs": 3741
+    },
+    {
+      "seq": 25,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (20644 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 193
+    },
+    {
+      "seq": 26,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3772,
+      "completionTokens": 166,
+      "totalTokens": 3938,
+      "costUsd": 0.0004270000000000001,
+      "latencyMs": 5591
+    },
+    {
+      "seq": 27,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 4034,
+      "completionTokens": 47,
+      "totalTokens": 4081,
+      "costUsd": 0.00041750000000000007,
+      "latencyMs": 1448
+    },
+    {
+      "seq": 28,
+      "lane": "adventure-conversation-narration-v2",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3078,
+      "completionTokens": 95,
+      "totalTokens": 3173,
+      "costUsd": 0.0003363,
+      "latencyMs": 3344
+    },
+    {
+      "seq": 29,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3974,
+      "completionTokens": 149,
+      "totalTokens": 4123,
+      "costUsd": 0.0004421,
+      "latencyMs": 5024
+    },
+    {
+      "seq": 30,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 4218,
+      "completionTokens": 47,
+      "totalTokens": 4265,
+      "costUsd": 0.0004359,
+      "latencyMs": 1428
+    },
+    {
+      "seq": 31,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "read_campaign_recall"
+      ],
+      "dmCandidates": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3588,
+      "completionTokens": 23,
+      "totalTokens": 3611,
+      "costUsd": 0.0003657,
+      "latencyMs": 2460
+    },
+    {
+      "seq": 32,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "select_dm_beat"
+      ],
+      "dmCandidates": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3765,
+      "completionTokens": 236,
+      "totalTokens": 4001,
+      "costUsd": 0.00044730000000000003,
+      "latencyMs": 6526
+    },
+    {
+      "seq": 33,
+      "lane": "campaign-dm-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_dm_scene"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 2177,
+      "completionTokens": 119,
+      "totalTokens": 2296,
+      "costUsd": 0.0002534,
+      "latencyMs": 3825
+    },
+    {
+      "seq": 34,
+      "lane": "adventure-planning-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "exact_quest_lifecycle.select"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 11133,
+      "completionTokens": 131,
+      "totalTokens": 11264,
+      "costUsd": 0.0011526,
+      "latencyMs": 8695
+    },
+    {
+      "seq": 35,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 4778,
+      "completionTokens": 148,
+      "totalTokens": 4926,
+      "costUsd": 0.0005222,
+      "latencyMs": 5651
+    },
+    {
+      "seq": 36,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 5018,
+      "completionTokens": 42,
+      "totalTokens": 5060,
+      "costUsd": 0.0005143999999999999,
+      "latencyMs": 1339
+    },
+    {
+      "seq": 37,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (20538 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 261
+    },
+    {
+      "seq": 38,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3571,
+      "completionTokens": 133,
+      "totalTokens": 3704,
+      "costUsd": 0.000397,
+      "latencyMs": 4532
+    },
+    {
+      "seq": 39,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (20430 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 222
+    },
+    {
+      "seq": 40,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 2968,
+      "completionTokens": 137,
+      "totalTokens": 3105,
+      "costUsd": 0.00033790000000000003,
+      "latencyMs": 4291
+    },
+    {
+      "seq": 41,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "read_campaign_recall"
+      ],
+      "dmCandidates": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3586,
+      "completionTokens": 23,
+      "totalTokens": 3609,
+      "costUsd": 0.0003655,
+      "latencyMs": 2464
+    },
+    {
+      "seq": 42,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "select_dm_beat"
+      ],
+      "dmCandidates": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3763,
+      "completionTokens": 235,
+      "totalTokens": 3998,
+      "costUsd": 0.0004468,
+      "latencyMs": 6489
+    },
+    {
+      "seq": 43,
+      "lane": "campaign-dm-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_dm_scene"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 2155,
+      "completionTokens": 119,
+      "totalTokens": 2274,
+      "costUsd": 0.0002512,
+      "latencyMs": 3389
+    },
+    {
+      "seq": 44,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (20564 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 192
+    },
+    {
+      "seq": 45,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3059,
+      "completionTokens": 192,
+      "totalTokens": 3251,
+      "costUsd": 0.0003635,
+      "latencyMs": 5819
+    },
+    {
+      "seq": 46,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3347,
+      "completionTokens": 44,
+      "totalTokens": 3391,
+      "costUsd": 0.00034790000000000005,
+      "latencyMs": 1360
+    },
+    {
+      "seq": 47,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (21457 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 259
+    },
+    {
+      "seq": 48,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 4296,
+      "completionTokens": 127,
+      "totalTokens": 4423,
+      "costUsd": 0.00046770000000000004,
+      "latencyMs": 4836
+    },
+    {
+      "seq": 49,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 4518,
+      "completionTokens": 70,
+      "totalTokens": 4588,
+      "costUsd": 0.0004728,
+      "latencyMs": 2053
+    },
+    {
+      "seq": 50,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (20984 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 251
+    },
+    {
+      "seq": 51,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3942,
+      "completionTokens": 152,
+      "totalTokens": 4094,
+      "costUsd": 0.00043980000000000007,
+      "latencyMs": 5266
+    },
+    {
+      "seq": 52,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "read_campaign_recall"
+      ],
+      "dmCandidates": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3604,
+      "completionTokens": 23,
+      "totalTokens": 3627,
+      "costUsd": 0.00036730000000000004,
+      "latencyMs": 2479
+    },
+    {
+      "seq": 53,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "select_dm_beat"
+      ],
+      "dmCandidates": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3781,
+      "completionTokens": 244,
+      "totalTokens": 4025,
+      "costUsd": 0.0004513,
+      "latencyMs": 6665
+    },
+    {
+      "seq": 54,
+      "lane": "campaign-dm-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_dm_scene"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 2183,
+      "completionTokens": 119,
+      "totalTokens": 2302,
+      "costUsd": 0.000254,
+      "latencyMs": 3417
+    },
+    {
+      "seq": 55,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (20694 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 195
+    },
+    {
+      "seq": 56,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3581,
+      "completionTokens": 148,
+      "totalTokens": 3729,
+      "costUsd": 0.0004025,
+      "latencyMs": 4924
+    },
+    {
+      "seq": 57,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3825,
+      "completionTokens": 148,
+      "totalTokens": 3973,
+      "costUsd": 0.00042689999999999997,
+      "latencyMs": 4116
+    },
+    {
+      "seq": 58,
+      "lane": "adventure-planning-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "exact_actor_travel.select"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 11887,
+      "completionTokens": 71,
+      "totalTokens": 11958,
+      "costUsd": 0.00121,
+      "latencyMs": 7505
+    },
+    {
+      "seq": 59,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 5447,
+      "completionTokens": 107,
+      "totalTokens": 5554,
+      "costUsd": 0.0005768,
+      "latencyMs": 5041
+    },
+    {
+      "seq": 60,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 5641,
+      "completionTokens": 101,
+      "totalTokens": 5742,
+      "costUsd": 0.0005944,
+      "latencyMs": 2940
+    },
+    {
+      "seq": 61,
+      "lane": "adventure-conversation-narration-v2",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 5021,
+      "completionTokens": 86,
+      "totalTokens": 5107,
+      "costUsd": 0.0005279,
+      "latencyMs": 4248
+    },
+    {
+      "seq": 62,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "read_campaign_recall"
+      ],
+      "dmCandidates": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3578,
+      "completionTokens": 23,
+      "totalTokens": 3601,
+      "costUsd": 0.0003647,
+      "latencyMs": 2473
+    },
+    {
+      "seq": 63,
+      "lane": "campaign-dm-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "select_dm_beat"
+      ],
+      "dmCandidates": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "promptTokens": 3904,
+      "completionTokens": 232,
+      "totalTokens": 4136,
+      "costUsd": 0.00046,
+      "latencyMs": 6486
+    },
+    {
+      "seq": 64,
+      "lane": "campaign-dm-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_dm_scene"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 2477,
+      "completionTokens": 163,
+      "totalTokens": 2640,
+      "costUsd": 0.0002966,
+      "latencyMs": 5121
+    },
+    {
+      "seq": 65,
+      "lane": "adventure-planning-v1",
+      "ok": false,
+      "finishReason": "ProviderHttpError",
+      "detail": "HTTP 400: Provider completion HTTP 400: {\"error\":{\"code\":400,\"message\":\"request (22439 tokens) exceeds the available context size (16384 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_",
+      "tools": [],
+      "dmCandidates": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "latencyMs": 237
+    },
+    {
+      "seq": 66,
+      "lane": "adventure-narration-v1",
+      "ok": true,
+      "finishReason": "tool_calls",
+      "detail": "",
+      "tools": [
+        "submit_adventure_narration"
+      ],
+      "dmCandidates": null,
+      "promptTokens": 3336,
+      "completionTokens": 163,
+      "totalTokens": 3499,
+      "costUsd": 0.0003825,
+      "latencyMs": 5243
+    }
+  ],
+  "verdict": {
+    "passed": false,
+    "failures": [
+      "declared-purchase: no commerce: receipts=[] state=completed narration=provider"
+    ],
+    "skipped": []
+  }
+}

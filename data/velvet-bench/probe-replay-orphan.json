@@ -1,0 +1,17 @@
+{
+  "model": "qwen3-8b",
+  "max_tokens": 400,
+  "temperature": 0.5,
+  "reasoning_effort": "none",
+  "messages": [
+    { "role": "system", "content": "Plan exactly one supported action." },
+    { "role": "user", "content": "{\"declaration\":\"I travel to the Docks.\",\"candidates\":[\"market\",\"docks\",\"chapel\"]}" },
+    { "role": "assistant", "content": null, "tool_calls": [ { "type": "function", "function": { "name": "propose_travel", "arguments": "{\"destination\":\"docks\"}" }, "id": "call_replay_1" } ] },
+    { "role": "tool", "tool_call_id": "call_replay_1", "content": "{\"ok\":true,\"commandId\":\"cmd_1\",\"facts\":[\"actor moved to docks\"]}" },
+    { "role": "user", "content": "Now write the narration for that result." }
+  ],
+  "tools": [
+    { "type": "function", "function": { "name": "submit_adventure_narration", "parameters": { "type": "object", "properties": { "narration": { "type": "string" } }, "required": ["narration"], "additionalProperties": false } } }
+  ],
+  "tool_choice": { "type": "function", "function": { "name": "submit_adventure_narration" } }
+}

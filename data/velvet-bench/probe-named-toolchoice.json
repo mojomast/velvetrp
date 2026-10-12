@@ -1,0 +1,14 @@
+{
+  "model": "qwen3-8b",
+  "max_tokens": 250,
+  "temperature": 0,
+  "messages": [
+    { "role": "system", "content": "Plan exactly one supported action. Choose the single best tool." },
+    { "role": "user", "content": "{\"declaration\":\"I look around.\",\"candidates\":[\"observe\",\"rest\",\"travel\"]}" }
+  ],
+  "tools": [
+    { "type": "function", "function": { "name": "propose_travel", "parameters": { "type": "object", "properties": { "destination": { "type": "string", "enum": ["observe", "rest", "travel"] } }, "required": ["destination"], "additionalProperties": false } } },
+    { "type": "function", "function": { "name": "propose_rest", "parameters": { "type": "object", "properties": { "kind": { "type": "string" } }, "required": ["kind"], "additionalProperties": false } } }
+  ],
+  "tool_choice": { "type": "function", "function": { "name": "propose_rest" } }
+}

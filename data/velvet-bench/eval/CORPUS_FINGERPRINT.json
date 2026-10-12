@@ -1,0 +1,19 @@
+{
+  "corpusVersion": "velvet-baseline-v1",
+  "devFileSha256": {
+    "dev-cases/flexible-roleplay.json": "9756cdf9c6638a10d605dcec7e613d0ce25b2b204a86bd054c77737b26ee6046",
+    "dev-cases/json-schema-generation.json": "aab0cbb32188ddbd5644bfbdcc596758b9dd19f2de8dfe25113cf513e390c25c",
+    "dev-cases/multi-turn-continuity.json": "d33bbe5455912a66f25f43c24c221251588226658dabc7bbed017fdc4e43a9b7",
+    "dev-cases/narration-envelope.json": "39b799b3558a29b82c6d25aa9a930c7dfa7da9ab28088bbd977fef4acc4d3791",
+    "dev-cases/narrative-initiative.json": "9556d81baed2d7c3bfd21db8c5b9169269381ae08a46e55b5fb28c961fd1299a",
+    "dev-cases/no-tool-behavior.json": "b99b33e9d00f04f0743f7debeeeb60d85dd5ebf19ac2c240a98e091cf41667ff",
+    "dev-cases/npc-knowledge-boundary.json": "6d1425a2d21e3371f129620856c5196c9ff4c782ba3c99b0def42598ce0747ca",
+    "dev-cases/player-agency.json": "a821772a05e70f5d005c0392489649073c2b250981b9829d1eaa6b681f527d60",
+    "dev-cases/prose-quality.json": "50a7f5475eb8f621479458bddaf28ce62ad6422836139037b89627ac57a7dea8",
+    "dev-cases/receipt-grounded-narration.json": "6d5894d2dc422f6d57aced2c44d8cf0a9bf33d2e437deb30c50cafb2698c9915",
+    "dev-cases/tool-selection.json": "b77557e86cc46cc093d15fb25f17341387a01689ee280a39f769ad49cae9d681"
+  },
+  "devCaseIdListDigest": "d3baa542c0a0e4b666d6e1f52641803e0b44b68224f3ed74fca3db411ab194f9",
+  "devCaseCount": 106,
+  "foundryCorpusDigest": "22eb78976caa9ca91102f75576ea19eeb8cef8d594435275630542b7ddef8e58"
+}

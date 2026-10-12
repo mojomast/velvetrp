@@ -1,0 +1,11 @@
+﻿
+  "Qwen3.5-9B UD-Q4_K_XL - forced-tool adherence after tool-result round-trip"
+  "probe: probe-replay-orphan.json (byte-identical to the Qwen3-8B run; only `model` field overridden)"
+  "endpoint: http://127.0.0.1:8081/v1 (same gateway)  |  ctx 24576  |  kv q8_0/q8_0"
+  "captured: $(Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')"
+  ""
+  Get-Content "$b\reports\replay-reliability-qwen35-9b.txt" -Raw
+  ""
+  "RESULT: 9 / 10 tool calls emitted; 1 failure ran to the 400-token cap in prose (finish=length)."
+  "Qwen3-8B comparison: 3 / 10, with 7 failures of the same prose-to-cap mode."
+

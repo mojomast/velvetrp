@@ -1,0 +1,99 @@
+{
+  "$comment": "Configuration for the VelvetRP stock-model baseline workstation. Edit paths here; scripts never hard-code machine-specific locations. All paths may contain spaces.",
+  "velvetRepo": "C:\\Users\\kyle\\projects\\velvetrp",
+  "velvetCommit": "4447d2cdb0260174bb2c2461f76600d11980c427",
+  "modelDir": "C:\\Users\\kyle\\projects\\velvetrp\\data\\llm-models",
+  "llamaRuntimeDir": "C:\\Users\\kyle\\projects\\velvetrp\\data\\llm-runtime\\llama",
+  "velvetDataDir": "C:\\Users\\kyle\\projects\\velvetrp\\data\\velvet-bench",
+  "reportDir": "C:\\Users\\kyle\\projects\\velvetrp\\data\\velvet-bench\\reports",
+  "llamaServer": {
+    "host": "127.0.0.1",
+    "port": 9931,
+    "gpuLayers": 99,
+    "ctxSize": 24576,
+    "parallel": 1,
+    "flashAttn": true,
+    "threads": 16,
+    "cacheTypeK": "q8_0",
+    "cacheTypeV": "q8_0",
+    "ctxRationale": "VelvetRP adventure-planning prompts measured 10,000-24,400 tokens during the 18-turn free-form run, so the 4096 default caused HTTP 400 context overflow on 40 of 58 provider calls. 16384 with a q8_0 KV cache fits the 5.03 GiB Q4_K_M weights plus KV into the ~7 GiB free on this 8 GiB card. q8_0 rather than q4_0 is deliberate: llama.cpp warns that heavy KV quantisation degrades tool-calling quality, which is exactly the capability under test."
+  },
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 8081,
+    "log": "C:\\Users\\kyle\\projects\\velvetrp\\data\\velvet-bench\\reports\\gateway.log"
+  },
+  "velvet": {
+    "host": "127.0.0.1",
+    "port": 8787,
+    "clientPort": 5173,
+    "providerType": "llamacpp",
+    "apiKey": "local-benchmark-noop"
+  },
+  "models": [
+    {
+      "id": "qwen3-8b",
+      "alias": "qwen3-8b",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "huggingface": {
+        "repo": "Qwen/Qwen3-8B-GGUF",
+        "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+        "file": "Qwen3-8B-Q4_K_M.gguf",
+        "license": "apache-2.0",
+        "source": "official Qwen GGUF publication"
+      },
+      "expectedBytes": 5000000000,
+      "notes": "Official Qwen GGUF. Uses an embedded qwen3 chat template with native tool support."
+    },
+    {
+      "id": "rpimax-8b",
+      "alias": "rpimax-8b",
+      "file": "RPMax-v1.3-Llama-3.1-8B-Q4_K_M.gguf",
+      "huggingface": {
+        "repo": "ArliAI/Llama-3.1-8B-ArliAI-RPMax-v1.3",
+        "revision": "8fb4a0d9e7944ecfa75b9c50a2818b33b85cc436",
+        "license": "llama3.1",
+        "source": "upstream safetensors; converted locally (no third-party v1.3 GGUF exists)"
+      },
+      "expectedBytes": 0,
+      "notes": "Roleplay-tuned Llama 3.1 8B. Converted from upstream safetensors with llama.cpp b11574 convert_hf_to_gguf + imatrix-free Q4_K_M. All four source shards verified against HF content-addressed blob ids. Uses the Llama 3.1 chat template, so unlike Qwen3 it has no hybrid-reasoning budget problem; named-tool-call behaviour should differ."
+    },
+    {
+      "id": "stheno-8b",
+      "alias": "stheno-8b",
+      "file": "L3-8B-Stheno-v3.2-Q4_K_M.gguf",
+      "huggingface": {
+        "repo": "bartowski/L3-8B-Stheno-v3.2-GGUF",
+        "revision": "TO_BE_PINNED",
+        "file": "L3-8B-Stheno-v3.2-Q4_K_M.gguf",
+        "license": "llama3.1",
+        "source": "optional third-party"
+      },
+      "expectedBytes": 0,
+      "optional": true,
+      "notes": "Optional third model."
+    },
+    {
+      "id": "qwen35-9b",
+      "alias": "qwen35-9b",
+      "file": "Qwen3.5-9B-UD-Q4_K_XL.gguf",
+      "mmproj": "mmproj-F16.gguf",
+      "mmprojOffload": false,
+      "huggingface": {
+        "repo": "unsloth/Qwen3.5-9B-GGUF",
+        "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
+        "file": "Qwen3.5-9B-UD-Q4_K_XL.gguf",
+        "license": "apache-2.0",
+        "source": "unsloth GGUF; hybrid linear/full attention (8 full-attn of 32 layers)"
+      },
+      "expectedBytes": 5966095584,
+      "notes": "Re-baseline candidate for the forced-tool-adherence probe. Hybrid architecture, so full-attention KV at 24576 is ~0.38 GiB vs 1.69 GiB for Qwen3-8B. mmproj held on CPU via --no-mmproj-offload to protect VRAM; reasoning disabled via --chat-template-kwargs.",
+      "reasoning": "off"
+    }
+  ],
+  "eval": {
+    "freeformTurns": 18,
+    "freeformSeed": 11,
+    "dmCorpus": "server/test/fixtures/dm-evals/corpus.v1.json"
+  }
+}

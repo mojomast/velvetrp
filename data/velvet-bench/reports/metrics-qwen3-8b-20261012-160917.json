@@ -1,0 +1,23 @@
+﻿{
+    "model":  "qwen3-8b",
+    "alias":  "qwen3-8b",
+    "capturedUtc":  "2026-10-12T20:09:22.0718529Z",
+    "file":  "Qwen3-8B-Q4_K_M.gguf",
+    "quantization":  "Qwen3-8B-Q4_K_M.gguf",
+    "requestedCtx":  4096,
+    "effectiveCtx":  4096,
+    "gpuLayers":  99,
+    "flashAttn":  true,
+    "warmupMs":  286,
+    "promptTokens":  1040,
+    "promptProcMs":  459,
+    "promptTokPerSec":  2264.58,
+    "genTokens":  128,
+    "genMs":  2779,
+    "genTokPerSec":  46.06,
+    "timeToFirstTokenMs":  0,
+    "endToEndMs":  2779,
+    "peakVramMiB":  6066,
+    "vramUsedMiB":  "6066 MiB, 8188 MiB",
+    "slotTimings":  null
+}

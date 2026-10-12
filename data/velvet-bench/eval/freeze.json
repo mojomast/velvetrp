@@ -1,0 +1,571 @@
+{
+  "caseIds": [
+    "dev-flex-01-weather-smalltalk",
+    "dev-flex-02-paraphrase-no-receipt",
+    "dev-flex-03-greet-vendor",
+    "dev-flex-04-question-about-absent-npc",
+    "dev-flex-05-ambiguous-vague-request",
+    "dev-flex-06-offer-help",
+    "dev-flex-07-typo-heavy-input",
+    "dev-flex-08-foreign-register",
+    "dev-flex-09-long-observation-paragraphs",
+    "dev-flex-10-offer-to-leave",
+    "dev-schema-01-npcs",
+    "dev-schema-02-lore",
+    "dev-schema-03-locations-and-connections",
+    "dev-schema-04-factions-gm-notes",
+    "dev-schema-05-quests",
+    "dev-schema-06-encounters",
+    "dev-schema-07-scene-prompts",
+    "dev-schema-08-quest-items-mechanics-union",
+    "dev-schema-09-monster-concepts",
+    "dev-schema-10-story-graph",
+    "dev-cont-01-callback-promise",
+    "dev-cont-02-stale-fact-override",
+    "dev-cont-03-pronoun-reference",
+    "dev-cont-04-no-campaign-recap",
+    "dev-cont-05-corrected-fact",
+    "dev-cont-06-second-person-cast",
+    "dev-cont-07-name-stability",
+    "dev-cont-08-repeat-loop",
+    "dev-cont-09-long-history-omission",
+    "dev-env-01-single-sentence",
+    "dev-env-02-conversation-cap",
+    "dev-env-03-long-beat-under-cap",
+    "dev-env-04-no-markdown",
+    "dev-env-05-exactly-one-call",
+    "dev-env-06-second-person-lock",
+    "dev-env-07-no-speaker-labels",
+    "dev-env-08-no-meta-commentary",
+    "dev-init-01-npc-moves-first",
+    "dev-init-02-world-advances-time",
+    "dev-init-03-planted-hook",
+    "dev-init-04-npc-initiated-offer",
+    "dev-init-05-consequence-of-declared-intent",
+    "dev-init-06-two-npcs-contrast",
+    "dev-init-07-receding-tide",
+    "dev-init-08-ambient-no-push",
+    "dev-notool-01-routine-observation",
+    "dev-notool-02-question-about-present-npc",
+    "dev-notool-03-injection-secret-markers",
+    "dev-notool-04-meta-question",
+    "dev-notool-05-contradictory-declaration",
+    "dev-notool-06-cheat-request",
+    "dev-notool-07-ambiguous-attack-target",
+    "dev-notool-08-repetition-spam",
+    "dev-notool-09-slash-command",
+    "dev-notool-10-typo-and-waiting",
+    "dev-npc-01-knowledge-scope",
+    "dev-npc-02-hearsay-kept-as-hearsay",
+    "dev-npc-03-two-npcs-knowledge-not-merged",
+    "dev-npc-04-private-goals-never-spoken",
+    "dev-npc-05-no-answer-invented",
+    "dev-npc-06-belonging-not-truth",
+    "dev-npc-07-player-knowledge-not-npc",
+    "dev-npc-08-no-meta-knowledge",
+    "dev-npc-09-npc-boundary-respected",
+    "dev-npc-10-injection-forbidden-facts",
+    "dev-agency-01-dont-write-speech",
+    "dev-agency-02-attempt-not-resolved",
+    "dev-agency-03-refusal-respected",
+    "dev-agency-04-emotion-not-authored",
+    "dev-agency-05-player-defined-character-kept",
+    "dev-agency-06-no-npc-mood-swing",
+    "dev-agency-07-no-railroad-endgame",
+    "dev-agency-08-two-declared-actions-hold",
+    "dev-agency-09-hypothetical-not-committed",
+    "dev-agency-10-no-mind-reading-of-player",
+    "dev-prose-01-sensory-specificity",
+    "dev-prose-02-restraint-not-purple",
+    "dev-prose-03-dialogue-interleaved",
+    "dev-prose-04-length-calibration-short",
+    "dev-prose-05-register-match",
+    "dev-prose-06-concrete-numbers",
+    "dev-prose-07-two-beats-paragraphs",
+    "dev-prose-08-no-implementation-language",
+    "dev-ground-01-check-success",
+    "dev-ground-02-check-failure-no-side-effects",
+    "dev-ground-03-bare-dice-roll",
+    "dev-ground-04-combat-damage",
+    "dev-ground-05-combat-miss",
+    "dev-ground-06-travel-destination",
+    "dev-ground-07-commerce-receipt",
+    "dev-ground-08-rest-recovery",
+    "dev-ground-09-quest-progress",
+    "dev-ground-10-journey-interrupted",
+    "dev-ground-11-two-receipts",
+    "dev-tool-01-travel-four-args",
+    "dev-tool-02-check-not-travel",
+    "dev-tool-03-no-tool-chitchat",
+    "dev-tool-04-clarify-ambiguous-purchase",
+    "dev-tool-05-quest-objective",
+    "dev-tool-06-combat-legal-action",
+    "dev-tool-07-read-with-empty-arguments",
+    "dev-tool-08-unadvertised-bribe",
+    "dev-tool-09-commerce-buy",
+    "dev-tool-10-clarify-rest-versus-travel",
+    "dev-tool-11-attribute-set-confirmation",
+    "dev-tool-12-power-versus-rest",
+    "sealed-flex-01-weather-observation",
+    "sealed-flex-02-one-sentence-beat",
+    "sealed-flex-03-greet-supply-boat",
+    "sealed-flex-04-question-about-absent-board",
+    "sealed-flex-05-vague-ambiguous",
+    "sealed-flex-06-player-offer-not-accepted",
+    "sealed-flex-07-declaration-is-intent",
+    "sealed-flex-08-rich-sensory-pass",
+    "sealed-flex-09-foreign-and-idiosyncratic",
+    "sealed-schema-01-outline",
+    "sealed-schema-02-arcs",
+    "sealed-schema-03-clues",
+    "sealed-schema-04-handouts",
+    "sealed-schema-05-locations-and-connections",
+    "sealed-schema-06-npcs-private-goals",
+    "sealed-schema-07-quests",
+    "sealed-schema-08-encounters-inert",
+    "sealed-schema-09-quest-items-union",
+    "sealed-schema-10-story-graph",
+    "sealed-cont-01-callback-to-earlier-offer",
+    "sealed-cont-02-authority-overrides-narration",
+    "sealed-cont-03-referent-stability",
+    "sealed-cont-04-no-recap",
+    "sealed-cont-05-hearsay-not-upgraded",
+    "sealed-cont-06-controlled-actor-is-you",
+    "sealed-cont-07-name-stability",
+    "sealed-cont-08-repeat-loop",
+    "sealed-cont-09-history-omitted",
+    "sealed-env-01-one-sentence",
+    "sealed-env-02-conversation-cap",
+    "sealed-env-03-receipt-lane-length-ceiling",
+    "sealed-env-04-no-markdown",
+    "sealed-env-05-exactly-one-call",
+    "sealed-env-06-second-person-lock",
+    "sealed-env-07-no-screenplay-formatting",
+    "sealed-env-08-no-outside-the-frame",
+    "sealed-env-09-tense-and-register-lock",
+    "sealed-init-01-neighbour-offers",
+    "sealed-init-02-world-closes-in",
+    "sealed-init-03-hook-without-assignment",
+    "sealed-init-04-two-voices-one-room",
+    "sealed-init-05-consequence-without-commitment",
+    "sealed-init-06-ambient-kept-alive",
+    "sealed-init-07-npc-refuses-and-it-stands",
+    "sealed-init-08-structure-and-pace",
+    "sealed-notool-01-gibberish-number",
+    "sealed-notool-02-html-injection",
+    "sealed-notool-03-control-characters",
+    "sealed-notool-04-run-on-declaration",
+    "sealed-notool-05-roleplay-injection",
+    "sealed-notool-06-json-shaped-command",
+    "sealed-notool-07-emoji-question",
+    "sealed-notool-08-accents-question",
+    "sealed-notool-09-cyrillic-travel",
+    "sealed-notool-10-lowercase-travel",
+    "sealed-notool-11-missing-recipient",
+    "sealed-npc-01-knowledge-scope",
+    "sealed-npc-02-hearsay-kept-as-hearsay",
+    "sealed-npc-03-knowledge-isolation",
+    "sealed-npc-04-private-goals",
+    "sealed-npc-05-legitimate-abstention",
+    "sealed-npc-06-belief-versus-truth",
+    "sealed-npc-07-player-private-knowledge",
+    "sealed-npc-08-no-meta-knowledge",
+    "sealed-npc-09-npc-refusal",
+    "sealed-npc-10-injection-extraction",
+    "sealed-agency-01-no-authored-speech",
+    "sealed-agency-02-attempt-not-resolved",
+    "sealed-agency-03-choice-not-collapsed",
+    "sealed-agency-04-emotion-not-authored",
+    "sealed-agency-05-player-character-fact-honoured",
+    "sealed-agency-06-refusal-stands",
+    "sealed-agency-07-two-actions-hold",
+    "sealed-agency-08-no-attitude-reward",
+    "sealed-agency-09-quoted-speech-not-an-action",
+    "sealed-agency-10-declaration-not-overwritten",
+    "sealed-prose-01-specificity-over-adjectives",
+    "sealed-prose-02-no-thriller-register",
+    "sealed-prose-03-dialogue-without-player-speech",
+    "sealed-prose-04-single-sentence",
+    "sealed-prose-05-concrete-values-survive",
+    "sealed-prose-06-long-beat-paragraphs",
+    "sealed-prose-07-no-implementation-language",
+    "sealed-prose-08-register-match",
+    "sealed-ground-01-check-success",
+    "sealed-ground-02-check-failure-boundaries",
+    "sealed-ground-03-raw-dice",
+    "sealed-ground-04-combat-damage-values",
+    "sealed-ground-05-combat-contest",
+    "sealed-ground-06-commerce-sell",
+    "sealed-ground-07-power-costs-and-deltas",
+    "sealed-ground-08-progression",
+    "sealed-ground-09-quest-lifecycle-accept",
+    "sealed-ground-10-travel-destination",
+    "sealed-tool-01-inventory-equip",
+    "sealed-tool-02-rest-preview",
+    "sealed-tool-03-power-use-direct",
+    "sealed-tool-04-combat-consumable",
+    "sealed-tool-05-combat-power",
+    "sealed-tool-06-progression-apply",
+    "sealed-tool-07-quest-reward-claim",
+    "sealed-tool-08-combat-state-read",
+    "sealed-tool-09-travel-four-arguments",
+    "sealed-tool-10-unadvertised-impossible",
+    "sealed-tool-11-spurious-tool-call",
+    "sealed-tool-12-clarify-compound-intent",
+    "sealed-tool-13-gift-recipient-missing"
+  ],
+  "corpusDigest": "22eb78976caa9ca91102f75576ea19eeb8cef8d594435275630542b7ddef8e58",
+  "corpusId": "velvet-baseline",
+  "corpusVersion": "velvet-baseline-v1",
+  "files": [
+    {
+      "bytes": 38820,
+      "caseCount": 10,
+      "categories": [
+        "flexible-roleplay"
+      ],
+      "path": "dev-cases/flexible-roleplay.json",
+      "sha256": "9756cdf9c6638a10d605dcec7e613d0ce25b2b204a86bd054c77737b26ee6046",
+      "split": "dev"
+    },
+    {
+      "bytes": 79756,
+      "caseCount": 10,
+      "categories": [
+        "json-schema-generation"
+      ],
+      "path": "dev-cases/json-schema-generation.json",
+      "sha256": "aab0cbb32188ddbd5644bfbdcc596758b9dd19f2de8dfe25113cf513e390c25c",
+      "split": "dev"
+    },
+    {
+      "bytes": 35359,
+      "caseCount": 9,
+      "categories": [
+        "multi-turn-continuity"
+      ],
+      "path": "dev-cases/multi-turn-continuity.json",
+      "sha256": "d33bbe5455912a66f25f43c24c221251588226658dabc7bbed017fdc4e43a9b7",
+      "split": "dev"
+    },
+    {
+      "bytes": 27018,
+      "caseCount": 8,
+      "categories": [
+        "narration-envelope"
+      ],
+      "path": "dev-cases/narration-envelope.json",
+      "sha256": "39b799b3558a29b82c6d25aa9a930c7dfa7da9ab28088bbd977fef4acc4d3791",
+      "split": "dev"
+    },
+    {
+      "bytes": 30802,
+      "caseCount": 8,
+      "categories": [
+        "narrative-initiative"
+      ],
+      "path": "dev-cases/narrative-initiative.json",
+      "sha256": "9556d81baed2d7c3bfd21db8c5b9169269381ae08a46e55b5fb28c961fd1299a",
+      "split": "dev"
+    },
+    {
+      "bytes": 38427,
+      "caseCount": 10,
+      "categories": [
+        "no-tool-behavior"
+      ],
+      "path": "dev-cases/no-tool-behavior.json",
+      "sha256": "b99b33e9d00f04f0743f7debeeeb60d85dd5ebf19ac2c240a98e091cf41667ff",
+      "split": "dev"
+    },
+    {
+      "bytes": 39116,
+      "caseCount": 10,
+      "categories": [
+        "npc-knowledge-boundary"
+      ],
+      "path": "dev-cases/npc-knowledge-boundary.json",
+      "sha256": "6d1425a2d21e3371f129620856c5196c9ff4c782ba3c99b0def42598ce0747ca",
+      "split": "dev"
+    },
+    {
+      "bytes": 33769,
+      "caseCount": 10,
+      "categories": [
+        "player-agency"
+      ],
+      "path": "dev-cases/player-agency.json",
+      "sha256": "a821772a05e70f5d005c0392489649073c2b250981b9829d1eaa6b681f527d60",
+      "split": "dev"
+    },
+    {
+      "bytes": 28456,
+      "caseCount": 8,
+      "categories": [
+        "prose-quality"
+      ],
+      "path": "dev-cases/prose-quality.json",
+      "sha256": "50a7f5475eb8f621479458bddaf28ce62ad6422836139037b89627ac57a7dea8",
+      "split": "dev"
+    },
+    {
+      "bytes": 43237,
+      "caseCount": 11,
+      "categories": [
+        "receipt-grounded-narration"
+      ],
+      "path": "dev-cases/receipt-grounded-narration.json",
+      "sha256": "6d5894d2dc422f6d57aced2c44d8cf0a9bf33d2e437deb30c50cafb2698c9915",
+      "split": "dev"
+    },
+    {
+      "bytes": 54796,
+      "caseCount": 12,
+      "categories": [
+        "tool-selection"
+      ],
+      "path": "dev-cases/tool-selection.json",
+      "sha256": "b77557e86cc46cc093d15fb25f17341387a01689ee280a39f769ad49cae9d681",
+      "split": "dev"
+    },
+    {
+      "bytes": 32002,
+      "caseCount": 9,
+      "categories": [
+        "flexible-roleplay"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/flexible-roleplay.json",
+      "sha256": "6bb9f5ad8bb3a3eef45f579ce4a65545a3a7d0d29f4e4e9d225c6dedda155f9d",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 74830,
+      "caseCount": 10,
+      "categories": [
+        "json-schema-generation"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/json-schema-generation.json",
+      "sha256": "a422ef4278930517c91c415a56d551d2b66158616015f3a17cd2b0caafca242e",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 33499,
+      "caseCount": 9,
+      "categories": [
+        "multi-turn-continuity"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/multi-turn-continuity.json",
+      "sha256": "1b42a315c0d24456a1b50cd23c1888d20a1bc07fdc77cec27cd3a2aac060a911",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 29771,
+      "caseCount": 9,
+      "categories": [
+        "narration-envelope"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/narration-envelope.json",
+      "sha256": "42a5407e28ccd1c149d70123927b1dd784c1be9b66c197dc9bfe046f2a600241",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 28337,
+      "caseCount": 8,
+      "categories": [
+        "narrative-initiative"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/narrative-initiative.json",
+      "sha256": "d44266ba2554d46fe9c900f8d9a4405742f1c3fded4e12120f465d157c336183",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 40405,
+      "caseCount": 11,
+      "categories": [
+        "no-tool-behavior"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/no-tool-behavior.json",
+      "sha256": "3f9c30384e88e4fc413cdc2bcc2d08ef86a9eb8af8ddeb1c2d131518615be13f",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 37884,
+      "caseCount": 10,
+      "categories": [
+        "npc-knowledge-boundary"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/npc-knowledge-boundary.json",
+      "sha256": "2f24d46f1daf16fc84fb12ea6978b19e9f053b506680a4fab6d663aedbdefc47",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 34795,
+      "caseCount": 10,
+      "categories": [
+        "player-agency"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/player-agency.json",
+      "sha256": "2eb74956cedd45ce18bf7562a1b2533dd9ebe5f590bd57ead1d1d603391fef71",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 27201,
+      "caseCount": 8,
+      "categories": [
+        "prose-quality"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/prose-quality.json",
+      "sha256": "19b342a501a1842ca5101c523254ab54f503983a421cb21976e0999835645654",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 38485,
+      "caseCount": 10,
+      "categories": [
+        "receipt-grounded-narration"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/receipt-grounded-narration.json",
+      "sha256": "9fab6d1a58f8f957d56f76a5b9ccceae548ef08ed756e38bc166cda6ff4c0175",
+      "split": "sealed-test"
+    },
+    {
+      "bytes": 54924,
+      "caseCount": 13,
+      "categories": [
+        "tool-selection"
+      ],
+      "path": "../../../../../../../tmp/opencode/sintermark-sealed-cases/sealed-cases/tool-selection.json",
+      "sha256": "034d57d3e34aed3d47204190679641ed093d884e8f9fb297e65c0407566ceb4a",
+      "split": "sealed-test"
+    }
+  ],
+  "freezeVersion": "corpus-freeze-v2",
+  "frozenAt": "2026-10-12T19:45:56.285Z",
+  "gitCommit": "4447d2cdb0260174bb2c2461f76600d11980c427",
+  "splitLineage": {
+    "dev": [
+      {
+        "characterFamily": "dev-char-saltmarsh-quarry",
+        "scenarioFamily": "dev-scenario-saltmarsh-quarry",
+        "worldFamily": "dev-world-saltmarsh-quarry"
+      },
+      {
+        "characterFamily": "dev-char-tannery-quarter",
+        "scenarioFamily": "dev-scenario-saltmarsh-quarry",
+        "worldFamily": "dev-world-saltmarsh-quarry"
+      },
+      {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild",
+        "worldFamily": "dev-world-threadneedle-quarter"
+      },
+      {
+        "characterFamily": "dev-char-quarantine-quarter",
+        "scenarioFamily": "dev-scenario-quarantine-quarter",
+        "worldFamily": "dev-world-plague-quarter"
+      },
+      {
+        "characterFamily": "dev-char-glasshouse",
+        "scenarioFamily": "dev-scenario-wrenfield-glasshouse",
+        "worldFamily": "dev-world-wrenfield-glasshouse"
+      },
+      {
+        "characterFamily": "dev-char-frostrail-lift",
+        "scenarioFamily": "dev-scenario-frostrail-lift",
+        "worldFamily": "dev-world-frostrail-lift"
+      },
+      {
+        "characterFamily": "dev-char-threadneedle-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-quay",
+        "worldFamily": "dev-world-threadneedle-quarter"
+      },
+      {
+        "characterFamily": "dev-char-hollowmere",
+        "scenarioFamily": "dev-scenario-hollowmere-village",
+        "worldFamily": "dev-world-hollowmere-village"
+      },
+      {
+        "characterFamily": "dev-char-canal-conservancy",
+        "scenarioFamily": "dev-scenario-holm-canal",
+        "worldFamily": "dev-world-holm-canal-conservancy"
+      },
+      {
+        "characterFamily": "dev-char-orbital-station",
+        "scenarioFamily": "dev-scenario-tannice-station",
+        "worldFamily": "dev-world-tannice-orbital-station"
+      },
+      {
+        "characterFamily": "dev-char-nightwatch-precinct",
+        "scenarioFamily": "dev-scenario-candlewick-precinct",
+        "worldFamily": "dev-world-candlewick-nightwatch"
+      },
+      {
+        "characterFamily": "dev-char-tannery-quarter",
+        "scenarioFamily": "dev-scenario-threadneedle-guild",
+        "worldFamily": "dev-world-threadneedle-quarter"
+      }
+    ],
+    "sealed-test": [
+      {
+        "characterFamily": "sealed-char-callas-lighthouse",
+        "scenarioFamily": "sealed-scenario-callas-rock",
+        "worldFamily": "sealed-world-callas-lighthouse-archive"
+      },
+      {
+        "characterFamily": "sealed-char-arles-canal",
+        "scenarioFamily": "sealed-scenario-arles-canal",
+        "worldFamily": "sealed-world-arlescanal"
+      },
+      {
+        "characterFamily": "sealed-char-orsay-junction",
+        "scenarioFamily": "sealed-scenario-orsay-junction",
+        "worldFamily": "sealed-world-orsay-copper-railway"
+      },
+      {
+        "characterFamily": "sealed-char-northgate-hotel",
+        "scenarioFamily": "sealed-scenario-northgate-hotel",
+        "worldFamily": "sealed-world-northgate-hotel-night-desk"
+      },
+      {
+        "characterFamily": "sealed-char-marrow-court",
+        "scenarioFamily": "sealed-scenario-marrow-court",
+        "worldFamily": "sealed-world-marrow-court-tenements"
+      },
+      {
+        "characterFamily": "sealed-char-fenwick-terminal",
+        "scenarioFamily": "sealed-scenario-fenwick-terminal",
+        "worldFamily": "sealed-world-fenwick-ferry-terminal"
+      },
+      {
+        "characterFamily": "sealed-char-thornbury-fair",
+        "scenarioFamily": "sealed-scenario-thornbury-fair",
+        "worldFamily": "sealed-world-thornbury-midsummer-fair"
+      },
+      {
+        "characterFamily": "sealed-char-verrin-house",
+        "scenarioFamily": "sealed-scenario-verrin-wedding",
+        "worldFamily": "sealed-world-verrin-dynasty-wedding"
+      },
+      {
+        "characterFamily": "sealed-char-kestrel-station",
+        "scenarioFamily": "sealed-scenario-kestrel-post",
+        "worldFamily": "sealed-world-kestrel-arctic-radio"
+      },
+      {
+        "characterFamily": "sealed-char-aldermoor-apothecary",
+        "scenarioFamily": "sealed-scenario-aldermoor-counter",
+        "worldFamily": "sealed-world-aldermoor-apothecary"
+      },
+      {
+        "characterFamily": "sealed-char-kessex-yard",
+        "scenarioFamily": "sealed-scenario-kessex-yard",
+        "worldFamily": "sealed-world-kessex-depot-rail-yard"
+      }
+    ],
+    "train": []
+  },
+  "splitPolicy": {
+    "dev": "dev-cases/",
+    "sealed-test": "sealed-cases/ (external)"
+  }
+}

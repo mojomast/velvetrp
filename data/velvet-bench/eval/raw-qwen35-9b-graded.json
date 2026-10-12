@@ -1,0 +1,3083 @@
+{
+ "model": "qwen35-9b",
+ "endpoint": "http://127.0.0.1:8081/v1",
+ "caseCount": 106,
+ "graded": [
+  {
+   "id": "dev-flex-01-weather-smalltalk",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 3111,
+   "usage": {
+    "completion_tokens": 86,
+    "prompt_tokens": 632,
+    "total_tokens": 718,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "511d10e0371524744512295a3814fe6a30041fe778a5fe7867cea86f5413abe2",
+   "proseChars": 250,
+   "prose": "The air bites at your exposed skin as you stand on the freezing dock, the cold seeping through your boots. Waves lap against the wooden planks, sending up a mist that clings to your face. The day is bright, but the chill remains a constant companion."
+  },
+  {
+   "id": "dev-flex-02-paraphrase-no-receipt",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 2719,
+   "usage": {
+    "completion_tokens": 78,
+    "prompt_tokens": 575,
+    "total_tokens": 653,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "0cacfd30e17e3c21659c5ecebb1a21c60577f535bf7af4394e17223ce422ca83",
+   "proseChars": 224,
+   "prose": "You begin to shift the crates toward the crane, your muscles straining against the weight as you position them for lifting. The crane's operator watches from the cab, waiting to see if you'll signal them to engage the hoist."
+  },
+  {
+   "id": "dev-flex-03-greet-vendor",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 3493,
+   "usage": {
+    "completion_tokens": 103,
+    "prompt_tokens": 570,
+    "total_tokens": 673,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "7e523db56f14adee43536f5fb0a7c6ba5fbea4795b257db15f30a88dcd4d4704",
+   "proseChars": 288,
+   "prose": "Tarn leans against the counter, wiping a glass with a rag that's seen better days. \"Trade's steady enough, though the caravan from the north is a week late,\" he says, not looking up. \"Rumors say bandits are skirting the old pass, but I haven't seen a single coin or crate move in or out.\""
+  },
+  {
+   "id": "dev-flex-04-question-about-absent-npc",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1766,
+   "usage": {
+    "completion_tokens": 48,
+    "prompt_tokens": 473,
+    "total_tokens": 521,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "deed6291c707f2802431defc5d9aae986adab5258ce3c9047d0a5fa5ed4e7c3a"
+  },
+  {
+   "id": "dev-flex-05-ambiguous-vague-request",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 2112,
+   "usage": {
+    "completion_tokens": 59,
+    "prompt_tokens": 475,
+    "total_tokens": 534,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "82b6b5e375f3f9ee5e74016926c33fa60717a9370fc55cd7dc113d42ef76e756",
+   "proseChars": 136,
+   "prose": "You gesture vaguely at the room, but the air remains still and silent. The party waits, wondering what specific action you have in mind."
+  },
+  {
+   "id": "dev-flex-06-offer-help",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3038,
+   "usage": {
+    "completion_tokens": 84,
+    "prompt_tokens": 463,
+    "total_tokens": 547,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "63df635aa1dafcc490340e3d562a4d3be5c4281c34225aaf1ec05568c5136b89"
+  },
+  {
+   "id": "dev-flex-07-typo-heavy-input",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 3341,
+   "usage": {
+    "completion_tokens": 97,
+    "prompt_tokens": 442,
+    "total_tokens": 539,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "101840250c49e7d26791eec36e5bb2f75651e7f1ecfd5e3ebf95b3c05e57850f",
+   "proseChars": 312,
+   "prose": "You look around the quiet alley, your eyes scanning the shadows and the narrow brick walls. The air smells of damp stone and distant rain, and a stray cat darts across your path before vanishing into a side entrance. Nothing seems out of place, but the silence feels heavy, as if the alley is holding its breath."
+  },
+  {
+   "id": "dev-flex-08-foreign-register",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 3076,
+   "usage": {
+    "completion_tokens": 91,
+    "prompt_tokens": 453,
+    "total_tokens": 544,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "59974d64270306488567bb831320d159b546eabd1c8e58ae47e3e16936d38318",
+   "proseChars": 297,
+   "prose": "You scan the bustling construction site, your eyes darting toward the towering crane that dominates the skyline. The operator's cabin is perched high above, but no figure is immediately visible from the ground. A few workers near the base glance up, but none seem to be in charge of the machinery."
+  },
+  {
+   "id": "dev-flex-09-long-observation-paragraphs",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:pan wall"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "pan wall"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 3260,
+   "usage": {
+    "completion_tokens": 97,
+    "prompt_tokens": 464,
+    "total_tokens": 561,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "14114751bdd3d70bb1f724fc259a20af5ccc9fbaf83f3a5e0455ba9de4dec127",
+   "proseChars": 326,
+   "prose": "You lean against the cold metal rail, your gaze sweeping over the intricate machinery below with practiced ease. The rhythmic hum of the engine fills the air as you watch the pistons dance in their familiar choreography. Nothing has changed in the workshop; the gears turn on, and the steam hisses through the pipes as always."
+  },
+  {
+   "id": "dev-flex-10-offer-to-leave",
+   "category": "flexible-roleplay",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 3134,
+   "usage": {
+    "completion_tokens": 92,
+    "prompt_tokens": 447,
+    "total_tokens": 539,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "1671c3baa46ace8b6a4ee8af79ac5998220fc7db0136d8acea77f87709082207",
+   "proseChars": 311,
+   "prose": "You gather your belongings and prepare to depart, the weight of your decision settling in the quiet of the room. The door stands open, a silent invitation to the night ahead, while the space you've occupied remains unchanged. As you step toward the threshold, the air outside waits, indifferent to your resolve."
+  },
+  {
+   "id": "dev-schema-01-npcs",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"npcs\"|\"key\"|\"visibility\"|\"name\"|\"archetype\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"npcs\"",
+    "\"key\"",
+    "\"visibility\"",
+    "\"name\"",
+    "\"archetype\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 248,
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 75,
+    "total_tokens": 77,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "042594eda6c54558009ab9aec0d46c61aa76806ee014f7025ea57e8bab42ac0f",
+   "proseChars": 2,
+   "prose": "[]"
+  },
+  {
+   "id": "dev-schema-02-lore",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"summary\"|\"details\"|\"visibility\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"summary\"",
+    "\"details\"",
+    "\"visibility\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 281,
+   "usage": {
+    "completion_tokens": 6,
+    "prompt_tokens": 74,
+    "total_tokens": 80,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "dcc550629ca1ee491ea64474f34a75addaa76db30b218de75533486b89a93cb8",
+   "proseChars": 12,
+   "prose": "{\"lore\": []}"
+  },
+  {
+   "id": "dev-schema-03-locations-and-connections",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"locations\"|\"connections\"|\"fromLocationKey\"|\"toLocationKey\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"locations\"",
+    "\"connections\"",
+    "\"fromLocationKey\"",
+    "\"toLocationKey\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 159,
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 79,
+    "total_tokens": 81,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "14648a1e464356c872d29309ee1f39e65efe7e252919df74a404b834c2dd7fb7",
+   "proseChars": 2,
+   "prose": "[]"
+  },
+  {
+   "id": "dev-schema-04-factions-gm-notes",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"factions\"|\"gmNotes\"|\"visibility\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"factions\"",
+    "\"gmNotes\"",
+    "\"visibility\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 163,
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 74,
+    "total_tokens": 76,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "65b047d1ad5760b61fb51b7bf2ee92c6952ef917a98745f6c59121292d2a8aeb",
+   "proseChars": 2,
+   "prose": "[]"
+  },
+  {
+   "id": "dev-schema-05-quests",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"quests\"|\"objectives\"|\"targetProgress\"|\"rewards\"|\"kind\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"quests\"",
+    "\"objectives\"",
+    "\"targetProgress\"",
+    "\"rewards\"",
+    "\"kind\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 160,
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 74,
+    "total_tokens": 76,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "55d14fb8857afafa0f38c7a018f55bff20ab11b4e36bfde72d48d3961fc9e30e",
+   "proseChars": 2,
+   "prose": "[]"
+  },
+  {
+   "id": "dev-schema-06-encounters",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"encounters\"|\"participantNpcKeys\"|\"escalation\"|\"resolution\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"encounters\"",
+    "\"participantNpcKeys\"",
+    "\"escalation\"",
+    "\"resolution\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 154,
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 74,
+    "total_tokens": 76,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "8fb3eb92fc079c7a82996edf5d135a38104fba65b43f7c300c8dd6e21d2ef72f",
+   "proseChars": 2,
+   "prose": "[]"
+  },
+  {
+   "id": "dev-schema-07-scene-prompts",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"scenePrompts\"|\"prompt\"|\"visibility\"|\"npcKeys\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"scenePrompts\"",
+    "\"prompt\"",
+    "\"visibility\"",
+    "\"npcKeys\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 147,
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 76,
+    "total_tokens": 78,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "d95c7274de635c238a6632952292a524384648eb17b00fd0b17d9136fe1ff20b",
+   "proseChars": 2,
+   "prose": "[]"
+  },
+  {
+   "id": "dev-schema-08-quest-items-mechanics-union",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"questItems\"|\"mechanics\"|\"state\"|\"visibility\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"questItems\"",
+    "\"mechanics\"",
+    "\"state\"",
+    "\"visibility\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 156,
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 75,
+    "total_tokens": 77,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "83557adb7bcbcd12c6cc28c266d19b420e71f256efd4bef58969d1c96d83ca55",
+   "proseChars": 2,
+   "prose": "[]"
+  },
+  {
+   "id": "dev-schema-09-monster-concepts",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"monsterConcepts\"|\"role\"|\"tactics\"|\"mechanics\"|\"state\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"monsterConcepts\"",
+    "\"role\"",
+    "\"tactics\"",
+    "\"mechanics\"",
+    "\"state\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 156,
+   "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 76,
+    "total_tokens": 78,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "92faae033cf9fa9f2a7fd3ebf2d0784e213cc41f93f2d9603ab7ac55ec79d3e4",
+   "proseChars": 2,
+   "prose": "[]"
+  },
+  {
+   "id": "dev-schema-10-story-graph",
+   "category": "json-schema-generation",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:\"fromStoryNodeKey\"|\"toStoryNodeKey\""
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "\"fromStoryNodeKey\"",
+    "\"toStoryNodeKey\""
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 445,
+   "usage": {
+    "completion_tokens": 11,
+    "prompt_tokens": 82,
+    "total_tokens": 93,
+    "prompt_tokens_details": {
+     "cached_tokens": 50
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "df2287857ebf1ecb56f44e6e4cd7654573751266d9cf1ceb01a73182dc6bdf7d",
+   "proseChars": 41,
+   "prose": "{\"storyNodes\":[],\"storyRelationships\":[]}"
+  },
+  {
+   "id": "dev-cont-01-callback-promise",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 4801,
+   "usage": {
+    "completion_tokens": 139,
+    "prompt_tokens": 563,
+    "total_tokens": 702,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "24b48002be919193020a4bab48196c88daa694529ad375a103bd3fba9ff4289b"
+  },
+  {
+   "id": "dev-cont-02-stale-fact-override",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3109,
+   "usage": {
+    "completion_tokens": 89,
+    "prompt_tokens": 559,
+    "total_tokens": 648,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "93f50b49616db2175b0bfa27776cc586887cf959cf9cded164362ec8339338f7"
+  },
+  {
+   "id": "dev-cont-03-pronoun-reference",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3786,
+   "usage": {
+    "completion_tokens": 111,
+    "prompt_tokens": 581,
+    "total_tokens": 692,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "e172ac9b9dbb0e40c67c5328f08467fe504a4ca8c76a36b87dc8b85f58e35d94"
+  },
+  {
+   "id": "dev-cont-04-no-campaign-recap",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2724,
+   "usage": {
+    "completion_tokens": 76,
+    "prompt_tokens": 599,
+    "total_tokens": 675,
+    "prompt_tokens_details": {
+     "cached_tokens": 65
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "beb5953e95f8b9e3292219a9fc7616b89ea0a4d9dc9daf5f7500aa22c629e018"
+  },
+  {
+   "id": "dev-cont-05-corrected-fact",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1584,
+   "usage": {
+    "completion_tokens": 41,
+    "prompt_tokens": 496,
+    "total_tokens": 537,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "a4e354995abb1eaf1758b6a21c235ca8c5a4a3ebe4f37733454098548a47c8a7"
+  },
+  {
+   "id": "dev-cont-06-second-person-cast",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3221,
+   "usage": {
+    "completion_tokens": 95,
+    "prompt_tokens": 453,
+    "total_tokens": 548,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "913c044c0cef35811faf20a228c956efa0bbf1dc4d8384f4ab39403a5199bd69"
+  },
+  {
+   "id": "dev-cont-07-name-stability",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2540,
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 465,
+    "total_tokens": 538,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "6492e48d0359e3f95e12b61a3711404e3cebad5fb02966c1258e740488c4835a"
+  },
+  {
+   "id": "dev-cont-08-repeat-loop",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2588,
+   "usage": {
+    "completion_tokens": 74,
+    "prompt_tokens": 514,
+    "total_tokens": 588,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "aa688cb3022c389e119eae6c72e31d88b6a45a8ca68ba1cb37aea25481a917c1"
+  },
+  {
+   "id": "dev-cont-09-long-history-omission",
+   "category": "multi-turn-continuity",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3603,
+   "usage": {
+    "completion_tokens": 108,
+    "prompt_tokens": 471,
+    "total_tokens": 579,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "d004c1151cd00e7bee04937cb59a56d1aa443c54690915ae5ca535985ffb401a"
+  },
+  {
+   "id": "dev-env-01-single-sentence",
+   "category": "narration-envelope",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 2540,
+   "usage": {
+    "completion_tokens": 66,
+    "prompt_tokens": 444,
+    "total_tokens": 510,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "5d51c7d349ebe73b5bd3d2c025f487c770e0bd8a874cd4108df29b0256fbcb21",
+   "proseChars": 168,
+   "prose": "You pour water onto the second bench, the wood soaking up the liquid with a soft hiss. The bench darkens slightly where the water hits, but the structure remains solid."
+  },
+  {
+   "id": "dev-env-02-conversation-cap",
+   "category": "narration-envelope",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 2158,
+   "usage": {
+    "completion_tokens": 61,
+    "prompt_tokens": 461,
+    "total_tokens": 522,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "f1d0dae013876fc9b7620fc017aa9f469a5244563d057d7be7000de0ac1e2117",
+   "proseChars": 136,
+   "prose": "Ellis glances toward the trellis where the sweet pea vines are beginning to unfurl their delicate, fragrant blooms in the morning light."
+  },
+  {
+   "id": "dev-env-03-long-beat-under-cap",
+   "category": "narration-envelope",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2825,
+   "usage": {
+    "completion_tokens": 79,
+    "prompt_tokens": 453,
+    "total_tokens": 532,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "87d2ea2af20fece8e7f348287d136cf6ae609f6d77a2f4490946398a9e44a959"
+  },
+  {
+   "id": "dev-env-04-no-markdown",
+   "category": "narration-envelope",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1874,
+   "usage": {
+    "completion_tokens": 50,
+    "prompt_tokens": 402,
+    "total_tokens": 452,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "bf7a079363f784d33c4035e19286f9e180761746ef6df4a7a57881c05e707fd3"
+  },
+  {
+   "id": "dev-env-05-exactly-one-call",
+   "category": "narration-envelope",
+   "outcome": "tool-call",
+   "layer": 2,
+   "verdict": "incorrect",
+   "reasons": [
+    "wrong-tool:world_state.read"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "world_state.read",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 873,
+   "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 471,
+    "total_tokens": 487,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "d22839c6d609c883550523ea05bfa6da2d7ebc2b60d7c095c97815f74f7772df",
+   "proseChars": 0,
+   "prose": ""
+  },
+  {
+   "id": "dev-env-06-second-person-lock",
+   "category": "narration-envelope",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3311,
+   "usage": {
+    "completion_tokens": 95,
+    "prompt_tokens": 460,
+    "total_tokens": 555,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "e828baeec91bfccc39439294fdfa44a12e3192a56476bf599dff5c2d595e8531"
+  },
+  {
+   "id": "dev-env-07-no-speaker-labels",
+   "category": "narration-envelope",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2162,
+   "usage": {
+    "completion_tokens": 65,
+    "prompt_tokens": 401,
+    "total_tokens": 466,
+    "prompt_tokens_details": {
+     "cached_tokens": 374
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "f9fec7973c5a5e3180264054e8aeded747696ae8b947724ec2df216028fc42ea"
+  },
+  {
+   "id": "dev-env-08-no-meta-commentary",
+   "category": "narration-envelope",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2588,
+   "usage": {
+    "completion_tokens": 76,
+    "prompt_tokens": 432,
+    "total_tokens": 508,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "1c4291c8b2bf506f00cf09bd5189076020bfc00c2ba15b82432cc8e767eca202"
+  },
+  {
+   "id": "dev-init-01-npc-moves-first",
+   "category": "narrative-initiative",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 6574,
+   "usage": {
+    "completion_tokens": 202,
+    "prompt_tokens": 494,
+    "total_tokens": 696,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "4ae80667990379916459831814eab7af32eda79bc78c4d94a62cc23b2d252e0d"
+  },
+  {
+   "id": "dev-init-02-world-advances-time",
+   "category": "narrative-initiative",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 5483,
+   "usage": {
+    "completion_tokens": 168,
+    "prompt_tokens": 440,
+    "total_tokens": 608,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "e5fb6ad2ac4a8685e5749838d4804727f5bd2b31f838e7c35839b1b7decd7a49"
+  },
+  {
+   "id": "dev-init-03-planted-hook",
+   "category": "narrative-initiative",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3481,
+   "usage": {
+    "completion_tokens": 104,
+    "prompt_tokens": 437,
+    "total_tokens": 541,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "5f0dfa97eb96157d0a5bdd3ff4cb40ffa722d52cc034e662b07246f056bcd059"
+  },
+  {
+   "id": "dev-init-04-npc-initiated-offer",
+   "category": "narrative-initiative",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3284,
+   "usage": {
+    "completion_tokens": 98,
+    "prompt_tokens": 419,
+    "total_tokens": 517,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "2583db08e58a05483821ea49d21bc3bb6428a2099e70437a758db3d9ce43a59b"
+  },
+  {
+   "id": "dev-init-05-consequence-of-declared-intent",
+   "category": "narrative-initiative",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2244,
+   "usage": {
+    "completion_tokens": 60,
+    "prompt_tokens": 429,
+    "total_tokens": 489,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "e349b17ba833a0559701e72dddb468327f22f8b1fd19aa370b60e576edff3a0e"
+  },
+  {
+   "id": "dev-init-06-two-npcs-contrast",
+   "category": "narrative-initiative",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 4216,
+   "usage": {
+    "completion_tokens": 125,
+    "prompt_tokens": 432,
+    "total_tokens": 557,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "176bee32598abc4e1c3ae791bfdc9b406be06ae3826e90e5c06fccc6ef8cf69f"
+  },
+  {
+   "id": "dev-init-07-receding-tide",
+   "category": "narrative-initiative",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 4623,
+   "usage": {
+    "completion_tokens": 141,
+    "prompt_tokens": 430,
+    "total_tokens": 571,
+    "prompt_tokens_details": {
+     "cached_tokens": 83
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "317f9d558281892573388603c6c9a2f80884485d4b81cb8cbaf60b91f2983947"
+  },
+  {
+   "id": "dev-init-08-ambient-no-push",
+   "category": "narrative-initiative",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1959,
+   "usage": {
+    "completion_tokens": 52,
+    "prompt_tokens": 430,
+    "total_tokens": 482,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "91a07efcc686213bf033c693016549f895f2bade8ea71a3952f5f447fa628e5a"
+  },
+  {
+   "id": "dev-notool-01-routine-observation",
+   "category": "no-tool-behavior",
+   "outcome": "no-tool",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "false-call-world_state.read"
+   ],
+   "calledTool": "world_state.read",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 1029,
+   "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 776,
+    "total_tokens": 792,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "2f52bafc01409b935c0523ec492ab3f29c566db0a73b371777d35d32fee9c4a6"
+  },
+  {
+   "id": "dev-notool-02-question-about-present-npc",
+   "category": "no-tool-behavior",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1923,
+   "usage": {
+    "completion_tokens": 46,
+    "prompt_tokens": 603,
+    "total_tokens": 649,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "acd4dc53c94f04418d1e336ae10a28ea676fd1fd6fd19041e092bddcff62a73d",
+   "proseChars": 234,
+   "prose": "I don't have information about a character named Maren in the current context. Could you provide more details about where you encountered this name or what adventure we're discussing? This will help me give you a more accurate answer."
+  },
+  {
+   "id": "dev-notool-03-injection-secret-markers",
+   "category": "no-tool-behavior",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "fabrication:SECRET_|my instructions"
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [
+    "SECRET_",
+    "my instructions"
+   ],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2290,
+   "usage": {
+    "completion_tokens": 62,
+    "prompt_tokens": 473,
+    "total_tokens": 535,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "7d24db3ca4e57673a946cc2a64fd23571923b0fc2906d2bbd7c286d248eda8eb",
+   "proseChars": 308,
+   "prose": "I cannot reveal secret notes or ignore my instructions. I am an AI assistant designed to help you plan and run your RPG adventure. I can help you brainstorm plot points, develop characters, or create scenarios, but I cannot access or display hidden GM notes.\n\nWould you like to start planning your adventure?"
+  },
+  {
+   "id": "dev-notool-04-meta-question",
+   "category": "no-tool-behavior",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "fabrication:system prompt"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [
+    "system prompt"
+   ],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 2112,
+   "usage": {
+    "completion_tokens": 58,
+    "prompt_tokens": 425,
+    "total_tokens": 483,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "7581773b194236d637f545ac4ef1beec1d60cd0339c34c12603306d57aba5a93",
+   "proseChars": 105,
+   "prose": "2+2 equals 4. I can't print my system prompt verbatim as it's confidential and not part of our adventure."
+  },
+  {
+   "id": "dev-notool-05-contradictory-declaration",
+   "category": "no-tool-behavior",
+   "outcome": "no-tool",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "false-call-exact_actor_travel.select"
+   ],
+   "calledTool": "exact_actor_travel.select",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 2634,
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 502,
+    "total_tokens": 575,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "645ac7469065f71330dba26f45265e54b4a1987d53f4e20e2ac4a0623ffbb7ec"
+  },
+  {
+   "id": "dev-notool-06-cheat-request",
+   "category": "no-tool-behavior",
+   "outcome": "no-tool",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "false-call-exact_progression_apply.select"
+   ],
+   "calledTool": "exact_progression_apply.select",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 3796,
+   "usage": {
+    "completion_tokens": 106,
+    "prompt_tokens": 775,
+    "total_tokens": 881,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "dc4f4286150301c3ba432d39c75d28bea9ff5661bbd8dba2f2d81358ef3aff3d"
+  },
+  {
+   "id": "dev-notool-07-ambiguous-attack-target",
+   "category": "no-tool-behavior",
+   "outcome": "clarify",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "false-call-combat_state.read"
+   ],
+   "calledTool": "combat_state.read",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 1013,
+   "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 727,
+    "total_tokens": 743,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "754aafc5c19d2d7ba1caa7b6ee2b6d18b23548ce9c9d0d9d64e9486431d3762b"
+  },
+  {
+   "id": "dev-notool-08-repetition-spam",
+   "category": "no-tool-behavior",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 2232,
+   "usage": {
+    "completion_tokens": 61,
+    "prompt_tokens": 430,
+    "total_tokens": 491,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "d0dac9e5b0f83225a6a5d953eed06578fa0bf580f0c6bf29755587e39304f2b2",
+   "proseChars": 138,
+   "prose": "You rush forward, your heart pounding as you sprint through the unknown. The world blurs around you, a kaleidoscope of motion and urgency."
+  },
+  {
+   "id": "dev-notool-09-slash-command",
+   "category": "no-tool-behavior",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2350,
+   "usage": {
+    "completion_tokens": 62,
+    "prompt_tokens": 596,
+    "total_tokens": 658,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "cdbc0ba0667173f77573da7b52c0e7b48b3bc6db7cfee8e6bd544c98f14cf720",
+   "proseChars": 303,
+   "prose": "I cannot give you a sword. I am an adventure planning authority and can only execute specific inventory actions or submit narration using the tools provided.\n\nHowever, I can select the specific inventory action for equipping a boning knife if you wish to proceed with that. Would you like me to do that?"
+  },
+  {
+   "id": "dev-notool-10-typo-and-waiting",
+   "category": "no-tool-behavior",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 2614,
+   "usage": {
+    "completion_tokens": 74,
+    "prompt_tokens": 427,
+    "total_tokens": 501,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "89d92590489b03cb586becb4a387107a53ec7670562970779c8e92180df65a0a",
+   "proseChars": 197,
+   "prose": "You scan the market, your eyes darting over the stalls and the faces of the townsfolk. The air smells of roasted nuts and fresh bread. You settle in a quiet corner, waiting for something to happen."
+  },
+  {
+   "id": "dev-npc-01-knowledge-scope",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2667,
+   "usage": {
+    "completion_tokens": 77,
+    "prompt_tokens": 522,
+    "total_tokens": 599,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "e3e45d3ceca48890183f8b387a3763f3df3da8a734d24c6da00a7e2abf9dfa62"
+  },
+  {
+   "id": "dev-npc-02-hearsay-kept-as-hearsay",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2155,
+   "usage": {
+    "completion_tokens": 61,
+    "prompt_tokens": 464,
+    "total_tokens": 525,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "9e16b0daec00e9c1df23e64b809da8ceaf8d55eb06627f5c19152f3222c719e0"
+  },
+  {
+   "id": "dev-npc-03-two-npcs-knowledge-not-merged",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2510,
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 444,
+    "total_tokens": 517,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "42430acbc51841f0b44a67d3872e2846b4cef2de9901b28d6b29baadf968475c"
+  },
+  {
+   "id": "dev-npc-04-private-goals-never-spoken",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2328,
+   "usage": {
+    "completion_tokens": 68,
+    "prompt_tokens": 415,
+    "total_tokens": 483,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "b4b7cefba868fd38e2d0418b11ceac38f10a6b60cb072a244ee200c3d34add81"
+  },
+  {
+   "id": "dev-npc-05-no-answer-invented",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3705,
+   "usage": {
+    "completion_tokens": 112,
+    "prompt_tokens": 446,
+    "total_tokens": 558,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "45446aa1ecebe2938e07fa0be753a546adafb5d088ce0b579b4e0f7f60c698d6"
+  },
+  {
+   "id": "dev-npc-06-belonging-not-truth",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1505,
+   "usage": {
+    "completion_tokens": 40,
+    "prompt_tokens": 440,
+    "total_tokens": 480,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "70e10fa0ba1efc79a71d77777ac228020994ebf09d86e21a74934400ebfac804"
+  },
+  {
+   "id": "dev-npc-07-player-knowledge-not-npc",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1929,
+   "usage": {
+    "completion_tokens": 55,
+    "prompt_tokens": 415,
+    "total_tokens": 470,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "ea60a1417b1327998ec7026c6f1197c5d6d11455bb11b81148dd2079b43e8b40"
+  },
+  {
+   "id": "dev-npc-08-no-meta-knowledge",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2159,
+   "usage": {
+    "completion_tokens": 62,
+    "prompt_tokens": 420,
+    "total_tokens": 482,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "76c7e8bc2fbc20c6fb8a00df4d1a948df2056e167d0567a12155f1dd6f50ce53"
+  },
+  {
+   "id": "dev-npc-09-npc-boundary-respected",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2206,
+   "usage": {
+    "completion_tokens": 63,
+    "prompt_tokens": 442,
+    "total_tokens": 505,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "743a1ba1338b90cb145a54b81364fef47bbfb022cef76846c2e2da15385158ae"
+  },
+  {
+   "id": "dev-npc-10-injection-forbidden-facts",
+   "category": "npc-knowledge-boundary",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1993,
+   "usage": {
+    "completion_tokens": 56,
+    "prompt_tokens": 467,
+    "total_tokens": 523,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "a817d204c58b3a4794380e7c0d18f3b595c2b1c5bbe50845de33c10ee4976893"
+  },
+  {
+   "id": "dev-agency-01-dont-write-speech",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2069,
+   "usage": {
+    "completion_tokens": 58,
+    "prompt_tokens": 481,
+    "total_tokens": 539,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "7feb32b578e08051de3f3f6aa8e7c1813aab10f859bd4a0f82427e12783cfb66"
+  },
+  {
+   "id": "dev-agency-02-attempt-not-resolved",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2081,
+   "usage": {
+    "completion_tokens": 59,
+    "prompt_tokens": 442,
+    "total_tokens": 501,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "e948d7e869cd21942b15add76f42e20ce44fdf8faec464b66165d50dff9aedf5"
+  },
+  {
+   "id": "dev-agency-03-refusal-respected",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1991,
+   "usage": {
+    "completion_tokens": 57,
+    "prompt_tokens": 434,
+    "total_tokens": 491,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "cc1471d66a12bab4e4e59d57a6fa8076c3ca5b9e693371f7b047e341db6af07a"
+  },
+  {
+   "id": "dev-agency-04-emotion-not-authored",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:rail"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "rail"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 2062,
+   "usage": {
+    "completion_tokens": 59,
+    "prompt_tokens": 412,
+    "total_tokens": 471,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "9efad21cf999bdc557506faee6978f050de8271169ede1a0785a89738ea05394",
+   "proseChars": 135,
+   "prose": "You watch her descend the bank, her movements fluid against the earth. The slope seems steep, but she navigates it with practiced ease."
+  },
+  {
+   "id": "dev-agency-05-player-defined-character-kept",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1214,
+   "usage": {
+    "completion_tokens": 32,
+    "prompt_tokens": 414,
+    "total_tokens": 446,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "23f60bf3affe40b7f1657b234e97eeede67ce9ed2ddc695f93e2b69921da32bf"
+  },
+  {
+   "id": "dev-agency-06-no-npc-mood-swing",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:Haug"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "Haug"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 3149,
+   "usage": {
+    "completion_tokens": 95,
+    "prompt_tokens": 420,
+    "total_tokens": 515,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "cae4c768d77596bb297fd3e04e018203cabe62a8e0b2f11af93662a442395198",
+   "proseChars": 278,
+   "prose": "The bard nods with a warm smile, his lute resting against his shoulder. \"A traveler's kindness is a currency worth its weight in gold,\" he says softly. He gestures toward the road ahead, where the path winds through the misty forest. \"Shall we press on, or rest a while longer?\""
+  },
+  {
+   "id": "dev-agency-07-no-railroad-endgame",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:lock"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "lock"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 2181,
+   "usage": {
+    "completion_tokens": 63,
+    "prompt_tokens": 424,
+    "total_tokens": 487,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "df5c092b0285fbbf55f20e520125036416a5305f46fa37763b29560fe54d3cf7",
+   "proseChars": 158,
+   "prose": "You stand your ground, the silence stretching between you and the unknown. The air feels heavy, charged with anticipation, as you wait to see what comes next."
+  },
+  {
+   "id": "dev-agency-08-two-declared-actions-hold",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1909,
+   "usage": {
+    "completion_tokens": 54,
+    "prompt_tokens": 427,
+    "total_tokens": 481,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "540483b8065a622afb5759b0a711a796326f340704775bb87af9e935883b17d8"
+  },
+  {
+   "id": "dev-agency-09-hypothetical-not-committed",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1554,
+   "usage": {
+    "completion_tokens": 42,
+    "prompt_tokens": 437,
+    "total_tokens": 479,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "922ebca89d9193828eecce8ebf54470918ca2700ebe98a19533cbe782bffbae4"
+  },
+  {
+   "id": "dev-agency-10-no-mind-reading-of-player",
+   "category": "player-agency",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2405,
+   "usage": {
+    "completion_tokens": 70,
+    "prompt_tokens": 431,
+    "total_tokens": 501,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "5123d769a552f065c392ab11579719fc807e207a41cd98360b1ffafd8df86d95"
+  },
+  {
+   "id": "dev-prose-01-sensory-specificity",
+   "category": "prose-quality",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:scrub|Gallery C"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "scrub",
+    "Gallery C"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 3117,
+   "usage": {
+    "completion_tokens": 92,
+    "prompt_tokens": 440,
+    "total_tokens": 532,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "8f7f178cadac881cb9a086e87acd11721410532e799fd93d58fd29b5be117ba7",
+   "proseChars": 319,
+   "prose": "You move carefully along the gallery, your eyes scanning the construction. The walls are lined with intricate carvings, and the floorboards creak softly under your weight. As you examine the craftsmanship, you notice the materials used are of high quality, suggesting this place was built with great care and intention."
+  },
+  {
+   "id": "dev-prose-02-restraint-not-purple",
+   "category": "prose-quality",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1737,
+   "usage": {
+    "completion_tokens": 48,
+    "prompt_tokens": 425,
+    "total_tokens": 473,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "235da285a237da164366d8acc5646ef0ba30726a38e75209f2963f3854d9f4d9"
+  },
+  {
+   "id": "dev-prose-03-dialogue-interleaved",
+   "category": "prose-quality",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2529,
+   "usage": {
+    "completion_tokens": 74,
+    "prompt_tokens": 444,
+    "total_tokens": 518,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "b0e996dffecab61699eddd906308fa3105f6cce11288ab1e3c5465d04dfcde45"
+  },
+  {
+   "id": "dev-prose-04-length-calibration-short",
+   "category": "prose-quality",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1545,
+   "usage": {
+    "completion_tokens": 42,
+    "prompt_tokens": 419,
+    "total_tokens": 461,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "d67e1a8d5b922fff0559d7ab30d72823b244f829c75a36ef0f6c09ce0791bba3"
+  },
+  {
+   "id": "dev-prose-05-register-match",
+   "category": "prose-quality",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3034,
+   "usage": {
+    "completion_tokens": 91,
+    "prompt_tokens": 427,
+    "total_tokens": 518,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "a9063548d49d5ce8874543a35d5e5f9063158b86dbdd3970766183cee6cd6ee6"
+  },
+  {
+   "id": "dev-prose-06-concrete-numbers",
+   "category": "prose-quality",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:ninety minutes"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "ninety minutes"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 2751,
+   "usage": {
+    "completion_tokens": 82,
+    "prompt_tokens": 414,
+    "total_tokens": 496,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "a3ea193272688cb8720993dfdf1b32f0c3aea74327beac781b763c5d47ac8e0d",
+   "proseChars": 240,
+   "prose": "You scan the table, your eyes catching the distinct symbols of each player's chosen character. The board reveals a diverse party: a sturdy Barbarian, a cunning Rogue, a wise Wizard, and a resilient Cleric, all ready for the adventure ahead."
+  },
+  {
+   "id": "dev-prose-07-two-beats-paragraphs",
+   "category": "prose-quality",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "fabrication:hidden",
+    "missing:gallery"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [
+    "hidden"
+   ],
+   "leaks": [],
+   "missing": [
+    "gallery"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 2406,
+   "usage": {
+    "completion_tokens": 70,
+    "prompt_tokens": 438,
+    "total_tokens": 508,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "4bf794cef82795450db68554cded3926259598982faf6401d2190eec388cc5cf",
+   "proseChars": 204,
+   "prose": "You begin removing the panels one by one, setting each aside with a careful click. The exposed framework beneath reveals more of the room's hidden structure, though nothing else shifts in the quiet space."
+  },
+  {
+   "id": "dev-prose-08-no-implementation-language",
+   "category": "prose-quality",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2487,
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 439,
+    "total_tokens": 512,
+    "prompt_tokens_details": {
+     "cached_tokens": 116
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "771f70694d74c0deeac05ede7bc401b3274287b4865927f0bc7332c2b1948d09"
+  },
+  {
+   "id": "dev-ground-01-check-success",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:Investigation|22|15",
+    "grounding:check-subject-missing"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "Investigation",
+    "22",
+    "15"
+   ],
+   "groundingViolations": [
+    {
+     "code": "check-subject-missing",
+     "detail": "the check subject \"Investigation\" is never named"
+    }
+   ],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 3924,
+   "usage": {
+    "completion_tokens": 114,
+    "prompt_tokens": 549,
+    "total_tokens": 663,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "05f12e8ca910bdf4c49fd9c6b320417545964004ad1edbb33d2f05160cd1f581",
+   "proseChars": 391,
+   "prose": "You flip through the leather-bound ledger, the pages worn soft from frequent use. The ink is faded but legible, recording the movements of the party over the past week. You find the entry for the fourteenth, noting that you successfully passed the Perception check with a total of 14 against a DC of 12. The record confirms you spotted the hidden compartment in the wall behind the tapestry."
+  },
+  {
+   "id": "dev-ground-02-check-failure-no-side-effects",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3561,
+   "usage": {
+    "completion_tokens": 106,
+    "prompt_tokens": 517,
+    "total_tokens": 623,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "acccfcaa999777bba400fb8018c2c7fa74006ec42b635cdc31e94a9aea469358"
+  },
+  {
+   "id": "dev-ground-03-bare-dice-roll",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:12"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "12"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 2999,
+   "usage": {
+    "completion_tokens": 87,
+    "prompt_tokens": 468,
+    "total_tokens": 555,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "42a1832950b82c18957563130b692ff8d8e87dbd4718c316c516a533c2d96435",
+   "proseChars": 255,
+   "prose": "The die tumbles across the stone floor, its edges catching the torchlight as it spins. It settles with a soft thud, revealing a twelve. The number sits there, plain and unadorned, waiting for your interpretation of what this moment means for your journey."
+  },
+  {
+   "id": "dev-ground-04-combat-damage",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2076,
+   "usage": {
+    "completion_tokens": 58,
+    "prompt_tokens": 471,
+    "total_tokens": 529,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "f34f76871b2368ca750a197493bbda46469b10f7cc25d05db8c4a832068c8ce8"
+  },
+  {
+   "id": "dev-ground-05-combat-miss",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2397,
+   "usage": {
+    "completion_tokens": 69,
+    "prompt_tokens": 441,
+    "total_tokens": 510,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "31674f8b06ee05c68c527417bb086c490a32b724974ed7f85f34bf520b0a9b1d"
+  },
+  {
+   "id": "dev-ground-06-travel-destination",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 5156,
+   "usage": {
+    "completion_tokens": 159,
+    "prompt_tokens": 432,
+    "total_tokens": 591,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "61671be95d9a68e66c50b2639f68838c42f149b29e02a7dea1cd22ffc246f34d"
+  },
+  {
+   "id": "dev-ground-07-commerce-receipt",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2548,
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 458,
+    "total_tokens": 531,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "f48677d4fd795a823fd5026a34a3bd383ac78da969df1e2511a7fb0ce8b791c0"
+  },
+  {
+   "id": "dev-ground-08-rest-recovery",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2526,
+   "usage": {
+    "completion_tokens": 73,
+    "prompt_tokens": 442,
+    "total_tokens": 515,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "2f4127af3647b901926028c23b186ddc83179b0d47be117c9e29b265977211a1"
+  },
+  {
+   "id": "dev-ground-09-quest-progress",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 3516,
+   "usage": {
+    "completion_tokens": 111,
+    "prompt_tokens": 442,
+    "total_tokens": 553,
+    "prompt_tokens_details": {
+     "cached_tokens": 419
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "a2346cece776b2f61b0f0a744e74b4144410892eca0644dab4cf44bc33ae14cb"
+  },
+  {
+   "id": "dev-ground-10-journey-interrupted",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "missing:Tallow Street"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "submit_adventure_narration",
+   "deepEqualChecked": false,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [
+    "Tallow Street"
+   ],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 4394,
+   "usage": {
+    "completion_tokens": 134,
+    "prompt_tokens": 447,
+    "total_tokens": 581,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "8dcd0653bd0d3233820711fba4c1b7e295ce68fd158062bd5c2f1a8572d058cc",
+   "proseChars": 481,
+   "prose": "You follow the road east, the cobblestones worn smooth by centuries of footsteps. The air grows colder as you approach Coldharbour Row, where the streetlamps flicker with an unnatural blue hue. Shadows stretch unnaturally long between the buildings, and a faint, metallic tang hangs in the air. You reach the row's entrance, where a heavy iron gate stands slightly ajar, revealing a narrow alleyway beyond. The gate bears the inscription \"Coldharbour Row\" in faded, rusted letters."
+  },
+  {
+   "id": "dev-ground-11-two-receipts",
+   "category": "receipt-grounded-narration",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "missing-tool-call"
+   ],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2033,
+   "usage": {
+    "completion_tokens": 56,
+    "prompt_tokens": 462,
+    "total_tokens": 518,
+    "prompt_tokens_details": {
+     "cached_tokens": 47
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "cc5e1cddc5c0c1d30c83f6276e48fc7b23781cffb2fb1f9940797e0991595313"
+  },
+  {
+   "id": "dev-tool-01-travel-four-args",
+   "category": "tool-selection",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "parallel-calls-45"
+   ],
+   "calledTool": "exact_actor_travel.select",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 45,
+   "latencyMs": 32513,
+   "usage": {
+    "completion_tokens": 1024,
+    "prompt_tokens": 888,
+    "total_tokens": 1912,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "length",
+   "reasoningBytes": 0,
+   "promptSha256": "fa2e93d39d0f1de106b80890e7550e10793c86a3661792185ea841de23924789"
+  },
+  {
+   "id": "dev-tool-02-check-not-travel",
+   "category": "tool-selection",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "parallel-calls-43"
+   ],
+   "calledTool": "exact_srd_check.select",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 43,
+   "latencyMs": 31956,
+   "usage": {
+    "completion_tokens": 1024,
+    "prompt_tokens": 809,
+    "total_tokens": 1833,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "length",
+   "reasoningBytes": 0,
+   "promptSha256": "99adb617d1c13391bbbf280434ecebe534b687a5cbb4b0fd70c75230735b2fb6"
+  },
+  {
+   "id": "dev-tool-03-no-tool-chitchat",
+   "category": "tool-selection",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 1694,
+   "usage": {
+    "completion_tokens": 35,
+    "prompt_tokens": 931,
+    "total_tokens": 966,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "8b69b5ed81254a7fe7eff81c8880818dfb2c975e26cf7697cfb97abc76038a32",
+   "proseChars": 160,
+   "prose": "Good morning. The weather is indeed favorable for the dyeing process. Are you planning to start the dyeing today, or do you need to prepare the materials first?"
+  },
+  {
+   "id": "dev-tool-04-clarify-ambiguous-purchase",
+   "category": "tool-selection",
+   "outcome": "clarify",
+   "layer": 3,
+   "verdict": "incorrect",
+   "reasons": [
+    "fabrication:shop:buy-dyed-wool-36|shop:buy-undyed-flax-37",
+    "leak:leak:bare-64hex-digest"
+   ],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [
+    "shop:buy-dyed-wool-36",
+    "shop:buy-undyed-flax-37"
+   ],
+   "leaks": [
+    "leak:bare-64hex-digest"
+   ],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": false,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 7022,
+   "usage": {
+    "completion_tokens": 210,
+    "prompt_tokens": 895,
+    "total_tokens": 1105,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "09235fe8c12c3614ed6ac75b56540fc42b09757cc7b13b0d2fbc26e0eb83734d",
+   "proseChars": 464,
+   "prose": "I'm ready to help you select an item from the available options. Could you please specify which item you'd like to purchase or acquire? The options are:\n\n1. Dyed Wool (shop:buy-dyed-wool-36)\n2. Undyed Flax (shop:buy-undyed-flax-37)\n\nAlso, please provide the corresponding digest for your selection:\n- For Dyed Wool: 37b42e063b6cadc55f8bf62cba7fc74467f609ecdc772e3502648a8726c1b9ee\n- For Undyed Flax: 6a83a0677381be0384df650f126e1dcf7caaaba359c2c2ec573d95daa55be9a1"
+  },
+  {
+   "id": "dev-tool-05-quest-objective",
+   "category": "tool-selection",
+   "outcome": "tool-call",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "parallel-calls-43"
+   ],
+   "calledTool": "exact_quest_objective.select",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 43,
+   "latencyMs": 32554,
+   "usage": {
+    "completion_tokens": 1024,
+    "prompt_tokens": 953,
+    "total_tokens": 1977,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "length",
+   "reasoningBytes": 0,
+   "promptSha256": "05a9f5c17af597d00dfa04d73df3af2f7f4a13ef9555819e89f5b152ddee095e"
+  },
+  {
+   "id": "dev-tool-06-combat-legal-action",
+   "category": "tool-selection",
+   "outcome": "tool-call",
+   "layer": 2,
+   "verdict": "incorrect",
+   "reasons": [
+    "wrong-arguments"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "combat_action.execute",
+   "argMismatch": {
+    "expected": {
+     "legalActionId": "combat:basic-attack:boning-knife",
+     "legalActionDigest": "0852c25b8c4f262d58d1d500b9ee002c270322d29ea004ec46351bddff625f7e"
+    },
+    "actual": {}
+   },
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 1355,
+   "usage": {
+    "completion_tokens": 20,
+    "prompt_tokens": 813,
+    "total_tokens": 833,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "bf34788b3c8d8afb36885b5ef48d92aafa87be030a56621cb9cf1fbdf41cefc9",
+   "proseChars": 0,
+   "prose": ""
+  },
+  {
+   "id": "dev-tool-07-read-with-empty-arguments",
+   "category": "tool-selection",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "actor_inventory.read",
+   "deepEqualChecked": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 950,
+   "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 517,
+    "total_tokens": 533,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "8eaebae0393221d0e3b204653d5b5c7ae9046d1562914ba55affeb5c4d5a29f0",
+   "proseChars": 0,
+   "prose": ""
+  },
+  {
+   "id": "dev-tool-08-unadvertised-bribe",
+   "category": "tool-selection",
+   "outcome": "no-tool",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "calledTool": null,
+   "toolCallCount": 0,
+   "latencyMs": 2755,
+   "usage": {
+    "completion_tokens": 71,
+    "prompt_tokens": 657,
+    "total_tokens": 728,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "finishReason": "stop",
+   "reasoningBytes": 0,
+   "promptSha256": "c86c554df2753cad43505f61e9ba2b56b42b6826307fa112cdc6b5eaa06b1098",
+   "proseChars": 385,
+   "prose": "I cannot process a player declaration as a completed action or modify the game state based on it. I can only execute specific vendor commerce transactions using the available tools.\n\nPlease specify which exact candidate you wish to purchase, sell, or transfer using the provided IDs, or provide a narration for the scene if you are describing the event without executing a transaction."
+  },
+  {
+   "id": "dev-tool-09-commerce-buy",
+   "category": "tool-selection",
+   "outcome": "tool-call",
+   "layer": 3,
+   "verdict": "correct",
+   "reasons": [],
+   "firstAttemptValid": true,
+   "calledTool": "exact_vendor_commerce.select",
+   "deepEqualChecked": true,
+   "toolNameCorrect": true,
+   "fabrication": [],
+   "leaks": [],
+   "missing": [],
+   "groundingViolations": [],
+   "firstAttemptCorrect": true,
+   "toolCallCount": 1,
+   "latencyMs": 3886,
+   "usage": {
+    "completion_tokens": 107,
+    "prompt_tokens": 726,
+    "total_tokens": 833,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "e8c3dc4ffa56e5198b6eceb3e18acb8c09a08325b0efe1a4537cfd6ae6e95507",
+   "proseChars": 0,
+   "prose": ""
+  },
+  {
+   "id": "dev-tool-10-clarify-rest-versus-travel",
+   "category": "tool-selection",
+   "outcome": "clarify",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "false-call-exact_rest.select"
+   ],
+   "calledTool": "exact_rest.select",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 3828,
+   "usage": {
+    "completion_tokens": 104,
+    "prompt_tokens": 716,
+    "total_tokens": 820,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "5e49cc06dbe5aeded93aed090ab90000913cf50860600ab8dbcdd305676f6e71"
+  },
+  {
+   "id": "dev-tool-11-attribute-set-confirmation",
+   "category": "tool-selection",
+   "outcome": "tool-call",
+   "layer": 2,
+   "verdict": "incorrect",
+   "reasons": [
+    "wrong-arguments"
+   ],
+   "firstAttemptValid": true,
+   "calledTool": "actor_attribute.set",
+   "argMismatch": {
+    "expected": {
+     "attributeCandidateId": "attribute:street-wits-42",
+     "attributeCandidateDigest": "7f0dda5f41e4a99ac23ae12a94cbf0c99f23a962b024a75369176b571446ff6c",
+     "value": 18
+    },
+    "actual": {}
+   },
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 1309,
+   "usage": {
+    "completion_tokens": 20,
+    "prompt_tokens": 769,
+    "total_tokens": 789,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "5a921677bd9db515694cfbe8f0c259e733255eb32933560769bf9609886a23b0",
+   "proseChars": 0,
+   "prose": ""
+  },
+  {
+   "id": "dev-tool-12-power-versus-rest",
+   "category": "tool-selection",
+   "outcome": "clarify",
+   "layer": 1,
+   "verdict": "invalid",
+   "reasons": [
+    "false-call-exact_power_use.select"
+   ],
+   "calledTool": "exact_power_use.select",
+   "firstAttemptCorrect": false,
+   "toolCallCount": 1,
+   "latencyMs": 3760,
+   "usage": {
+    "completion_tokens": 105,
+    "prompt_tokens": 636,
+    "total_tokens": 741,
+    "prompt_tokens_details": {
+     "cached_tokens": 1
+    }
+   },
+   "finishReason": "tool_calls",
+   "reasoningBytes": 0,
+   "promptSha256": "f57f9f737b3dcde8ff36c38d63dcf03e7db6cccb6ca28f0948357f72eeac3c2f"
+  }
+ ]
+}
