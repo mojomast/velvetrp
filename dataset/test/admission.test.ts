@@ -230,8 +230,15 @@ test("fabricated death against surviving HP is rejected", () => {
 });
 
 test("authorized consequence is permitted", () => {
-  const receipt = { kind: "combat-damage" as const, applied: 30, hitPointsAfter: 0 };
+  // Death requires explicit status, never an inference from zero HP: production
+  // carries `statusAfter` separately from hit points.
+  const receipt = { kind: "combat-damage" as const, applied: 30, hitPointsAfter: 0, statusAfter: "dead" as const, target: "goblin" };
   assert.equal(validateGroundedNarration("The blade lands for 30 and the goblin dies.", [receipt]).ok, true);
+});
+
+test("zero hit points alone never authorize a death claim", () => {
+  const receipt = { kind: "combat-damage" as const, applied: 30, hitPointsAfter: 0, target: "goblin" };
+  assert.throws(() => validateGroundedNarration("The blade lands for 30 and the goblin dies.", [receipt]), GroundingFailure);
 });
 
 // --- templates ---

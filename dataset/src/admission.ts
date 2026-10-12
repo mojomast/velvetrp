@@ -21,6 +21,8 @@
  */
 
 import { createHash } from "node:crypto";
+import { selectTargets, type TargetSelection } from "./hfAdapter.js";
+import { assertTemplateReadyForExport, type TemplateProfile } from "./templateProfiles.js";
 import {
   RECORD_SCHEMA_VERSION,
   stableStringify,
@@ -36,6 +38,7 @@ import {
 } from "./spec.js";
 
 export const ADMISSION_VERSION = "admission-v1";
+export const ADMISSION_CERTIFICATE_VERSION = "admission-certificate-v1";
 
 /**
  * Per-family validator requirements. A family with no mechanical gate must say so
@@ -82,6 +85,7 @@ export function computePayloadDigest(input: {
       prompt: input.preference.prompt,
       chosen: input.preference.chosen,
       rejected: input.preference.rejected,
+      tools: input.tools ?? null,
     }));
   }
   return sha256(stableStringify({ kind: "sft", messages: input.messages, tools: input.tools ?? null }));
@@ -89,7 +93,7 @@ export function computePayloadDigest(input: {
 
 /** Evidence from one deterministic validator, bound to a specific payload. */
 export interface GateEvidence {
-  /** Must be one of `REQUIRED_VALIDATORS[family]`. */
+  /** Required gates are a minimum; additional validators are retained and checked. */
   validator: string;
   version: string;
   /** Digest of the payload this verdict applies to. Stale verdicts are rejected. */
@@ -125,6 +129,12 @@ export interface AdmissionInput {
   generatorIdentity: string;
   /** Set for DPO-style pairs only. */
   preferenceAxis?: string;
+  behaviourTags?: readonly string[];
+  /** Scenario-owned requirements, retained and bound by the certificate. */
+  visibilityRequirements?: readonly string[];
+  authorityRequirements?: readonly string[];
+  targetSelection?: TargetSelection;
+  preferenceTargets?: { chosen: TargetSelection; rejected: TargetSelection };
 }
 
 /** An admitted record. Construct only through `admitCandidate`. */
@@ -144,6 +154,125 @@ export interface AdmittedRecordV1 {
   payloadDigest: string;
   provenance: Provenance;
   admission: Admission;
+  behaviourTags: readonly string[];
+  visibilityRequirements: readonly string[];
+  authorityRequirements: readonly string[];
+  targetSelection: TargetSelection;
+  preferenceTargets?: { chosen: TargetSelection; rejected: TargetSelection };
+  readonly admissionCertificate: AdmissionCertificate;
+}
+
+type DeepReadonly<T> = T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
+
+export type AdmissionCertificate = DeepReadonly<{
+  version: typeof ADMISSION_CERTIFICATE_VERSION;
+  payloadDigest: string;
+  recordBindingDigest: string;
+  targetSelectionDigest: string;
+  generatorIdentity: string;
+  evidence: GateEvidence[];
+  reviews: ReviewRecord[];
+  /** Includes score/rationale disagreement even when all verdicts accept. */
+  reviewerDisagreement: boolean;
+  certificateDigest: string;
+}>;
+
+/** Supplied by the run owner, never reconstructed from the candidate's assertions. */
+export interface ApprovedAdmissionRegistry {
+  validators: Readonly<Record<string, { version: string; implementationDigest: string }>>;
+  /** SHA-256 -> exact inspected-source, validator implementation, or template bytes. */
+  artifacts: ReadonlyMap<string, string | Uint8Array>;
+  /** recordId -> independently approved certificate digest, preserving ALL reviews. */
+  certificates: ReadonlyMap<string, string>;
+  templateProfiles: readonly TemplateProfile[];
+}
+
+type GateShape = Pick<AdmissionInput, "family" | "messages" | "tools" | "preference"
+  | "behaviourTags" | "visibilityRequirements" | "authorityRequirements">;
+
+export function requiredValidatorsFor(record: GateShape): readonly string[] {
+  const gates = new Set(REQUIRED_VALIDATORS[record.family]);
+  const messages = [...record.messages, ...(record.preference
+    ? [...record.preference.prompt, ...record.preference.chosen, ...record.preference.rejected] : [])];
+  if (record.tools?.length || messages.some((message) => message.tool_calls !== undefined || message.role === "tool")) {
+    gates.add("tool-envelope");
+  }
+  // Do not try to infer whether prose actually leaks a secret with a keyword
+  // heuristic. Any narration (including prose carried in tool arguments) needs
+  // a boundary verdict; the source-aware validator decides whether it leaks.
+  if (messages.some((message) => message.role === "assistant" && (message.content.trim() || message.tool_calls?.length))
+    || record.visibilityRequirements?.length) gates.add("boundary-leakage");
+  if (record.authorityRequirements?.length) gates.add("authority-respected");
+  for (const tag of record.behaviourTags ?? []) {
+    if (/private|hidden|knowledge|visibility|boundary|leak/i.test(tag)) gates.add("boundary-leakage");
+    if (/authority|injection|unsupported|confirmation/i.test(tag)) gates.add("authority-respected");
+    if (/agency/i.test(tag)) gates.add("player-agency");
+    if (/absten|refus|clarif|no-tool/i.test(tag)) gates.add("abstention-correctness");
+    if (/tool/i.test(tag) && !/no-tool/i.test(tag)) gates.add("tool-envelope");
+  }
+  return [...gates];
+}
+
+function immutableSnapshot<T>(value: T): T {
+  const copy = structuredClone(value);
+  const freeze = (item: unknown): void => {
+    if (!item || typeof item !== "object" || Object.isFrozen(item)) return;
+    for (const child of Object.values(item)) freeze(child);
+    Object.freeze(item);
+  };
+  freeze(copy);
+  return copy;
+}
+
+function defaultTargets(messages: readonly StoredMessage[]): TargetSelection {
+  let index = messages.length - 1;
+  while (index >= 0 && messages[index]?.role !== "assistant") index -= 1;
+  if (index < 0) return { supervisedAssistantIndices: [], supervisedToolCallIndices: [] };
+  return selectTargets(messages, { targetAssistantIndex: index });
+}
+
+function targetProblems(messages: readonly StoredMessage[], selection: TargetSelection, allowEmpty = false): string[] {
+  const problems: string[] = [];
+  if (!selection || !Array.isArray(selection.supervisedAssistantIndices) || !Array.isArray(selection.supervisedToolCallIndices)) {
+    return ["missing target selection"];
+  }
+  const prose = selection.supervisedAssistantIndices;
+  const calls = selection.supervisedToolCallIndices;
+  if (!allowEmpty && prose.length + calls.length === 0) problems.push("target selection has nothing to supervise");
+  for (const [kind, indices] of [["prose", prose], ["tool-call", calls]] as const) {
+    if (new Set(indices).size !== indices.length) problems.push(`duplicate ${kind} target index`);
+    for (const index of indices) {
+      const message = messages[index];
+      if (!Number.isSafeInteger(index) || index < 0 || message?.role !== "assistant"
+        || (kind === "prose" ? !message.content.trim() : !message.tool_calls?.length)) {
+        problems.push(`invalid ${kind} target at ${index}`);
+      }
+    }
+  }
+  for (const index of new Set([...prose, ...calls])) {
+    const message = messages[index];
+    if (message?.tool_calls?.length && !calls.includes(index)) problems.push(`target ${index} omits tool-call supervision`);
+    if (message?.content.trim() && !prose.includes(index)) problems.push(`target ${index} omits assistant prose supervision`);
+  }
+  return problems;
+}
+
+export function computeTargetSelectionDigest(record: Pick<AdmittedRecordV1, "targetSelection" | "preferenceTargets">): string {
+  return sha256(stableStringify({ messages: record.targetSelection, preference: record.preferenceTargets ?? null }));
+}
+
+function recordBindingDigest(record: Omit<AdmittedRecordV1, "admissionCertificate">): string {
+  return sha256(stableStringify({
+    schemaVersion: record.schemaVersion, admissionVersion: record.admissionVersion,
+    recordId: record.recordId, unitId: record.unitId, family: record.family, split: record.split,
+    lineage: record.lineage, splitAssignmentDigest: record.splitAssignmentDigest,
+    provenance: record.provenance, behaviourTags: record.behaviourTags,
+    visibilityRequirements: record.visibilityRequirements, authorityRequirements: record.authorityRequirements,
+  }));
+}
+
+function reviewerDisagreement(reviews: readonly ReviewRecord[]): boolean {
+  return new Set(reviews.map((review) => stableStringify(review.scores))).size > 1;
 }
 
 /** Review verdicts that may admit. A "revise" never admits. */
@@ -162,6 +291,47 @@ export const REVIEW_FLOORS = {
   playerAgency: 0.5,
   nonRepetitive: 0.4,
 } as const;
+
+function evidenceProblems(evidence: readonly GateEvidence[], required: readonly string[], payloadDigest: string): string[] {
+  const problems: string[] = [];
+  const provided = new Set<string>();
+  for (const item of evidence) {
+    if (provided.has(item.validator)) problems.push(`duplicate evidence for validator ${item.validator}`);
+    provided.add(item.validator);
+    if (!item.validator.trim() || !item.version.trim()) problems.push(`validator ${item.validator} supplied no version or identity`);
+    if (item.passed !== true) problems.push(`validator ${item.validator} did not pass`);
+    if (item.payloadDigest !== payloadDigest) problems.push(`validator ${item.validator} evidence is stale for this payload`);
+    if (!/^[0-9a-f]{64}$/.test(item.evidenceDigest)) problems.push(`validator ${item.validator} supplied no valid evidence digest`);
+  }
+  for (const validator of required) if (!provided.has(validator)) problems.push(`missing required validator ${validator}`);
+  return problems;
+}
+
+function reviewProblems(reviews: readonly ReviewRecord[], generatorIdentity: string, payloadDigest: string): string[] {
+  const problems: string[] = [];
+  if (!generatorIdentity.trim()) problems.push("generator identity is required");
+  if (reviews.length === 0) problems.push("an independent review is required");
+  const identities = new Set<string>();
+  for (const review of reviews) {
+    if (!review.reviewerIdentity.trim()) problems.push("reviewer identity is required");
+    if (identities.has(review.reviewerIdentity)) problems.push("duplicate reviewer identity cannot count as independent reviews");
+    identities.add(review.reviewerIdentity);
+    if (review.reviewerIdentity === generatorIdentity) problems.push("reviewer identity equals the generator identity; the review is not independent");
+    if (review.candidateDigest !== payloadDigest) problems.push("review was performed against a different payload");
+    if (!ACCEPTABLE_VERDICTS.has(review.scores.verdict)) problems.push(`review verdict "${review.scores.verdict}" cannot admit`);
+    for (const [key, floor] of Object.entries(REVIEW_FLOORS)) {
+      const score = review.scores[key as keyof typeof REVIEW_FLOORS];
+      if (!Number.isFinite(score) || score < 0 || score > 1) problems.push(`review score ${key} is not a valid probability`);
+      else if (score < floor) problems.push(`review score ${key} is ${score}, below the floor ${floor}`);
+    }
+    if (!/^[0-9a-f]{64}$/.test(review.reviewerPromptDigest)) problems.push("review record has no valid prompt digest");
+  }
+  // Retain the existing conservative policy for conflicting overall verdicts.
+  if (new Set(reviews.map((review) => review.scores.verdict)).size > 1) {
+    problems.push("independent reviewers disagree and no majority verdict was reached");
+  }
+  return problems;
+}
 
 /**
  * The admission constructor. Recomputes digests and refuses anything that cannot
@@ -182,48 +352,18 @@ export function admitCandidate(input: AdmissionInput): AdmittedRecordV1 {
     ? payloadDigest
     : sha256(stableStringify({ messages: input.messages, tools: input.tools ?? null }));
 
-  const required = REQUIRED_VALIDATORS[input.family];
-  const provided = new Map<string, GateEvidence>();
-  for (const item of input.evidence) {
-    if (provided.has(item.validator)) problems.push(`duplicate evidence for validator ${item.validator}`);
-    if (!item.version) problems.push(`validator ${item.validator} supplied no version`);
-    provided.set(item.validator, item);
-  }
-  for (const validator of required) {
-    const item = provided.get(validator);
-    if (!item) { problems.push(`missing required validator ${validator} for ${input.family}`); continue; }
-    if (!item.passed) problems.push(`validator ${validator} did not pass`);
-    if (item.payloadDigest !== payloadDigest) problems.push(`validator ${validator} evidence is stale for this payload`);
-    if (!item.evidenceDigest) problems.push(`validator ${validator} supplied no evidence digest`);
-  }
-  for (const item of input.evidence) {
-    if (!required.includes(item.validator)) problems.push(`unexpected validator ${item.validator} for ${input.family}`);
-  }
-
-  if (input.reviews.length === 0) problems.push("an independent review is required");
-  for (const review of input.reviews) {
-    if (review.reviewerIdentity === input.generatorIdentity) {
-      problems.push("reviewer identity equals the generator identity; the review is not independent");
-    }
-    if (review.candidateDigest !== payloadDigest) problems.push("review was performed against a different payload");
-    if (!ACCEPTABLE_VERDICTS.has(review.scores.verdict)) {
-      problems.push(`review verdict "${review.scores.verdict}" cannot admit`);
-    }
-    for (const [key, floor] of Object.entries(REVIEW_FLOORS)) {
-      const score = review.scores[key as keyof typeof REVIEW_FLOORS];
-      if (typeof score !== "number" || Number.isNaN(score) || score < 0 || score > 1) {
-        problems.push(`review score ${key} is not a valid probability`);
-      } else if (score < floor) {
-        problems.push(`review score ${key} is ${score}, below the floor ${floor}`);
-      }
-    }
-    if (!review.reviewerPromptDigest) problems.push("review record has no prompt digest");
-  }
-  // Disagreement must be visible, never averaged away.
-  const verdicts = new Set(input.reviews.map((review) => review.scores.verdict));
-  if (verdicts.size > 1 && !input.reviews.every((review) => review.scores.verdict === "accept-with-notes")) {
-    problems.push("independent reviewers disagree and no majority verdict was reached");
-  }
+  const required = requiredValidatorsFor(input);
+  problems.push(...evidenceProblems(input.evidence, required, payloadDigest));
+  problems.push(...reviewProblems(input.reviews, input.generatorIdentity, payloadDigest));
+  const targetSelection = input.targetSelection ?? defaultTargets(input.messages);
+  const preferenceTargets = input.preference ? input.preferenceTargets ?? {
+    chosen: defaultTargets(input.preference.chosen), rejected: defaultTargets(input.preference.rejected),
+  } : undefined;
+  problems.push(...targetProblems(input.messages, targetSelection, Boolean(input.preference)));
+  if (input.preference && preferenceTargets) {
+    problems.push(...targetProblems(input.preference.chosen, preferenceTargets.chosen));
+    problems.push(...targetProblems(input.preference.rejected, preferenceTargets.rejected));
+  } else if (input.preferenceTargets) problems.push("preference targets supplied without a preference pair");
 
   if (!input.splitAssignmentDigest) problems.push("record has no split assignment digest");
   if (input.provenance.syntheticOrigin !== true) problems.push("record is not labelled synthetic");
@@ -242,7 +382,7 @@ export function admitCandidate(input: AdmissionInput): AdmittedRecordV1 {
   for (const item of input.evidence) if (item.findings) findings[item.validator] = item.findings;
 
   const scores = input.reviews[0]!.scores;
-  return {
+  const record: Omit<AdmittedRecordV1, "admissionCertificate"> = {
     schemaVersion: RECORD_SCHEMA_VERSION,
     admissionVersion: ADMISSION_VERSION,
     recordId: input.recordId,
@@ -258,7 +398,7 @@ export function admitCandidate(input: AdmissionInput): AdmittedRecordV1 {
     payloadDigest,
     provenance: {
       ...input.provenance,
-      validators: [...required],
+      validators: input.evidence.map((item) => item.validator),
       validatorVersions,
       createdAt: now,
     },
@@ -269,7 +409,24 @@ export function admitCandidate(input: AdmissionInput): AdmittedRecordV1 {
       review: { ...scores, reviewerCount: input.reviews.length },
       admittedAt: now,
     },
+    behaviourTags: [...input.behaviourTags ?? []],
+    visibilityRequirements: [...input.visibilityRequirements ?? []],
+    authorityRequirements: [...input.authorityRequirements ?? []],
+    targetSelection: structuredClone(targetSelection),
+    ...(preferenceTargets ? { preferenceTargets: structuredClone(preferenceTargets) } : {}),
   };
+  const certificate: Omit<AdmissionCertificate, "certificateDigest"> = {
+    version: ADMISSION_CERTIFICATE_VERSION,
+    payloadDigest,
+    recordBindingDigest: recordBindingDigest(record),
+    targetSelectionDigest: computeTargetSelectionDigest(record),
+    generatorIdentity: input.generatorIdentity,
+    evidence: [...input.evidence], reviews: [...input.reviews],
+    reviewerDisagreement: reviewerDisagreement(input.reviews),
+  };
+  return { ...record, admissionCertificate: immutableSnapshot({
+    ...certificate, certificateDigest: sha256(stableStringify(certificate)),
+  }) };
 }
 
 /**
@@ -304,24 +461,88 @@ export function validatePreference(pair: PreferencePair): string[] {
 }
 
 /**
- * Re-validates an admitted record. Called again on export, so a record that was
- * mutated after admission cannot escape.
+ * Compatibility diagnostic for local certificate integrity. Export callers must
+ * use assertExportable with the independently approved registry as well.
  */
 export function revalidateAdmitted(record: AdmittedRecordV1): string[] {
+  try {
+    verifyAdmissionCertificate(record);
+    return [];
+  } catch (error) {
+    return error instanceof AdmissionError ? [...error.problems] : ["malformed admission certificate or record"];
+  }
+}
+
+/** Local integrity verification; the approved registry additionally authenticates pins. */
+export function verifyAdmissionCertificate<T extends AdmittedRecordV1>(record: T, approvedRegistry?: ApprovedAdmissionRegistry): T {
   const problems: string[] = [];
+  const certificate = record.admissionCertificate;
+  if (!certificate) throw new AdmissionError(["record has no admission certificate"]);
+  const { certificateDigest, ...body } = certificate;
+  if (certificate.version !== ADMISSION_CERTIFICATE_VERSION) problems.push("unsupported admission certificate version");
+  if (sha256(stableStringify(body)) !== certificateDigest) problems.push("admission certificate digest mismatch (evidence or reviews changed)");
+  if (recordBindingDigest(record) !== certificate.recordBindingDigest) problems.push("certificate record binding mismatch");
+  if (computeTargetSelectionDigest(record) !== certificate.targetSelectionDigest) problems.push("target-selection digest mismatch");
   const recomputed = computePayloadDigest({
     messages: record.messages,
     tools: record.tools,
     preference: record.preference,
   });
   if (recomputed !== record.payloadDigest) problems.push("payload digest does not match the stored messages");
+  if (recomputed !== certificate.payloadDigest) problems.push("certificate is stale for this payload");
+  const contentDigest = record.preference ? recomputed : sha256(stableStringify({ messages: record.messages, tools: record.tools ?? null }));
+  if (record.contentDigest !== contentDigest) problems.push("content digest does not match the stored messages");
   if (record.admission.status !== "admitted") problems.push("record status is not admitted");
   if (record.admission.reasons.length > 0) problems.push("an admitted record must have no rejection reasons");
   if (!record.admission.admittedAt) problems.push("admitted record has no admission timestamp");
-  for (const validator of REQUIRED_VALIDATORS[record.family]) {
+  const required = requiredValidatorsFor(record);
+  problems.push(...evidenceProblems(certificate.evidence, required, recomputed));
+  problems.push(...reviewProblems(certificate.reviews, certificate.generatorIdentity, recomputed));
+  if (certificate.reviewerDisagreement !== reviewerDisagreement(certificate.reviews)) problems.push("reviewer disagreement was not preserved");
+  const first = certificate.reviews[0];
+  if (!first || !record.admission.review || stableStringify(record.admission.review)
+    !== stableStringify({ ...first.scores, reviewerCount: certificate.reviews.length })) problems.push("admission review summary is missing or differs from preserved reviews");
+  for (const validator of required) {
     if (!record.provenance.validators.includes(validator)) problems.push(`provenance is missing validator ${validator}`);
     if (!record.provenance.validatorVersions[validator]) problems.push(`provenance is missing version for ${validator}`);
   }
+  for (const item of certificate.evidence) {
+    if (record.provenance.validatorVersions[item.validator] !== item.version) problems.push(`validator ${item.validator} version differs from certificate`);
+  }
+  if (stableStringify(record.provenance.validators) !== stableStringify(certificate.evidence.map((item) => item.validator))) problems.push("provenance validators differ from certificate");
+  problems.push(...targetProblems(record.messages, record.targetSelection, Boolean(record.preference)));
+  if (record.preference) {
+    if (!record.preferenceTargets) problems.push("missing preference target selection");
+    else {
+      problems.push(...targetProblems(record.preference.chosen, record.preferenceTargets.chosen));
+      problems.push(...targetProblems(record.preference.rejected, record.preferenceTargets.rejected));
+    }
+  } else if (record.preferenceTargets) problems.push("preference targets supplied without a preference pair");
   if (record.preference) problems.push(...validatePreference(record.preference));
-  return problems;
+  if (approvedRegistry) {
+    if (approvedRegistry.certificates.get(record.recordId) !== certificateDigest) problems.push("certificate is not pinned in the approved registry");
+    const resolveArtifact = (digest: string, label: string): void => {
+      const bytes = approvedRegistry.artifacts.get(digest);
+      if (bytes === undefined || createHash("sha256").update(bytes).digest("hex") !== digest) problems.push(`${label} artifact is absent or has a digest mismatch`);
+    };
+    for (const item of certificate.evidence) {
+      const pin = approvedRegistry.validators[item.validator];
+      if (!pin || pin.version !== item.version) problems.push(`validator ${item.validator} version is not approved`);
+      else resolveArtifact(pin.implementationDigest, `validator ${item.validator} implementation`);
+      resolveArtifact(item.evidenceDigest, `validator ${item.validator} inspected source`);
+    }
+    for (const review of certificate.reviews) resolveArtifact(review.reviewerPromptDigest, "review prompt");
+    for (const digest of Object.values(record.provenance.sourceDigests)) resolveArtifact(digest, "provenance source");
+  }
+  if (problems.length > 0) throw new AdmissionError(problems);
+  return record;
+}
+
+/** The export boundary: local hashes alone are not authorization to export. */
+export function assertExportable<T extends AdmittedRecordV1>(record: T, approvedRegistry: ApprovedAdmissionRegistry): T {
+  if (!approvedRegistry) throw new AdmissionError(["an approved artifact registry is required for export"]);
+  verifyAdmissionCertificate(record, approvedRegistry);
+  if (!approvedRegistry.templateProfiles.length) throw new AdmissionError(["export requires an approved template artifact and measured training contract"]);
+  for (const profile of approvedRegistry.templateProfiles) assertTemplateReadyForExport(profile, approvedRegistry.artifacts);
+  return record;
 }
