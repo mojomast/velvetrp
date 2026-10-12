@@ -60,6 +60,7 @@ import {
   writeSync,
 } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { verifyAdmissionCertificate, type AdmittedRecordV1 } from "./admission.js";
 import type { CandidateRecord, ReviewScores } from "./spec.js";
 import { stableStringify } from "./spec.js";
 
@@ -637,6 +638,7 @@ export type RunEventBody =
   | { type: "stage.completed"; stage: RunStage }
   | {
       type: "attempt.registered";
+      admittedRecord?: AdmittedRecordV1;
       unitId: string;
       attemptId: string;
       parentAttemptId: string | null;
@@ -653,6 +655,7 @@ export type RunEventBody =
     }
   | {
       type: "attempt.admitted";
+      admittedRecord?: AdmittedRecordV1;
       unitId: string;
       attemptId: string;
       status: AdmissionStatus;
@@ -801,6 +804,7 @@ function parseEventLog(path: string): ParsedEventLog {
 // -------------------------------------------------------------------------------------------------
 
 interface AttemptProjection {
+  admittedRecord?: AdmittedRecordV1;
   unitId: string;
   attemptId: string;
   parentAttemptId: string | null;
@@ -948,6 +952,7 @@ function applyEvent(projection: Projection, event: RunEventBody, at: string): vo
         projection.unitOrder.push(event.unitId);
       }
       const attempt: AttemptProjection = {
+        ...(event.admittedRecord ? { admittedRecord: event.admittedRecord } : {}),
         unitId: event.unitId,
         attemptId: event.attemptId,
         parentAttemptId: event.parentAttemptId,
@@ -983,6 +988,8 @@ function applyEvent(projection: Projection, event: RunEventBody, at: string): vo
     }
     case "attempt.admitted": {
       const attempt = requireAttempt(projection, event.unitId, event.attemptId);
+      if (event.admittedRecord) attempt.admittedRecord = event.admittedRecord;
+      else delete attempt.admittedRecord;
       attempt.status = event.status;
       attempt.reasons = event.reasons;
       attempt.findings = event.findings;
@@ -1402,7 +1409,10 @@ export interface OpenRunStoreOptions {
 }
 
 export interface AdmissionDecision {
+  /** An unverified admitted claim is retained as pending-review, with a diagnostic reason. */
   readonly status: AdmissionStatus;
+  /** Full constructor output, including its certificate and all bound context. */
+  readonly admittedRecord?: AdmittedRecordV1;
   readonly reasons?: readonly string[];
   readonly findings?: Record<string, unknown>;
   readonly review?: ReviewScores | null;
@@ -1872,6 +1882,7 @@ export class RunStore {
       for (const attemptId of unit.order) {
         const attempt = unit.attempts.get(attemptId);
         if (!attempt) continue;
+        const admission = this.admissionView(attempt);
         rows.push({
           unitId,
           attemptId,
@@ -1880,8 +1891,8 @@ export class RunStore {
           family: attempt.family,
           scenarioSeed: attempt.scenarioSeed,
           contentDigest: attempt.contentDigest,
-          admissionStatus: attempt.status,
-          reasons: attempt.reasons,
+          admissionStatus: admission.status,
+          reasons: admission.reasons,
           finalized: unit.finalizedAttemptId === attemptId,
           completed: unit.completedAt !== null,
           superseded: attempt.supersededBy !== null,
@@ -1977,10 +1988,10 @@ export class RunStore {
     this.assertOpen();
     const unitId = requireNonEmptyString(input.unitId, "unitId");
     const attemptId = requireNonEmptyString(input.attemptId, "attemptId");
-    const record = input.record;
-    if (!isJsonObject(record) || typeof record.recordId !== "string") {
+    if (!isJsonObject(input.record) || typeof input.record.recordId !== "string") {
       throw new InvalidUsageError("record must be a CandidateRecord carrying a string recordId");
     }
+    const record = frozenCopy(input.record);
 
     const existingUnit = this.projection.units.get(unitId);
     if (existingUnit?.finalizedAttemptId != null) {
@@ -2005,7 +2016,7 @@ export class RunStore {
         committed: false,
         unitId,
         attemptId,
-        status: existingAttempt.status,
+        status: this.admissionView(existingAttempt).status,
         supersededAttemptId: existingAttempt.parentAttemptId,
         payloadFile: existingAttempt.payloadFile,
         alreadyRegistered: true,
@@ -2030,10 +2041,11 @@ export class RunStore {
 
     this.writePayload(unitId, attemptId, parentAttemptId, record, payloadDigest);
 
-    const decision = resolveAdmission(record, input.admission);
+    const decision = resolveAdmission(record, unitId, input.admission);
     const events: RunEventBody[] = [
       {
         type: "attempt.registered",
+        ...(decision.admittedRecord ? { admittedRecord: decision.admittedRecord } : {}),
         unitId,
         attemptId,
         parentAttemptId,
@@ -2080,17 +2092,23 @@ export class RunStore {
     if (!attempt) {
       throw new InvalidAttemptError(`unit ${JSON.stringify(unitId)} has no attempt ${JSON.stringify(attemptId)}`);
     }
-    const status = requireAdmissionStatus(decision.status);
+    const admittedRecord = decision.admittedRecord ?? attempt.admittedRecord;
+    const resolved = resolveAdmission(this.readPayload(attempt).record, unitId, {
+      ...decision,
+      ...(admittedRecord ? { admittedRecord } : {}),
+    });
+    const status = resolved.status;
     const admittedAt = status === "admitted" ? new Date(this.clock()).toISOString() : null;
     this.append([
       {
         type: "attempt.admitted",
+        ...(resolved.admittedRecord ? { admittedRecord: resolved.admittedRecord } : {}),
         unitId,
         attemptId,
         status,
-        reasons: normalizeReasons(decision.reasons),
-        findings: decision.findings ?? {},
-        review: decision.review ?? null,
+        reasons: resolved.reasons,
+        findings: resolved.findings,
+        review: resolved.review,
         admittedAt,
       },
     ]);
@@ -2100,11 +2118,19 @@ export class RunStore {
     return this.toCandidate(unitId, updated);
   }
 
-  /** Reads and integrity-checks one stored candidate payload. */
+  /** Reads the pre-admission payload; an unverified status claim is quarantined. */
   readCandidate(attemptId: string): CandidateRecord | null {
     this.assertOpen();
     const attempt = this.findAttemptInternal(attemptId);
-    return attempt ? this.readPayload(attempt).record : null;
+    return attempt ? candidateForRead(this.readPayload(attempt).record) : null;
+  }
+
+  /** Certified constructor output, reverified against the immutable attempt on every read. */
+  readAdmittedRecord(attemptId: string): AdmittedRecordV1 | null {
+    this.assertOpen();
+    const attempt = this.findAttemptInternal(attemptId);
+    if (!attempt || this.admissionView(attempt).status !== "admitted") return null;
+    return frozenCopy(attempt.admittedRecord!);
   }
 
   /** Every registered attempt's record, in deterministic (unit, ordinal) order. */
@@ -2116,7 +2142,7 @@ export class RunStore {
       if (!unit) continue;
       for (const attemptId of unit.order) {
         const attempt = unit.attempts.get(attemptId);
-        if (attempt) records.push(this.readPayload(attempt).record);
+        if (attempt) records.push(candidateForRead(this.readPayload(attempt).record));
       }
     }
     return frozenCopy(records);
@@ -2386,6 +2412,7 @@ export class RunStore {
   // -- internals ----------------------------------------------------------------------------------
 
   private toCandidate(unitId: string, attempt: AttemptProjection): UnitCandidate {
+    const admission = this.admissionView(attempt);
     return frozenCopy({
       unitId,
       attemptId: attempt.attemptId,
@@ -2394,8 +2421,8 @@ export class RunStore {
       family: attempt.family,
       scenarioSeed: attempt.scenarioSeed,
       contentDigest: attempt.contentDigest,
-      status: attempt.status,
-      reasons: attempt.reasons,
+      status: admission.status,
+      reasons: admission.reasons,
       ordinal: attempt.ordinal,
       finalized: this.projection.units.get(unitId)?.finalizedAttemptId === attempt.attemptId,
       superseded: attempt.supersededBy !== null,
@@ -2403,6 +2430,17 @@ export class RunStore {
       payloadDigest: attempt.payloadDigest,
       registeredAt: attempt.registeredAt,
     });
+  }
+
+  /** Never trust a replayed event's admitted flag without checking its persisted proof. */
+  private admissionView(attempt: AttemptProjection): { status: AdmissionStatus; reasons: string[] } {
+    if (attempt.status !== "admitted") return attempt;
+    try {
+      verifyAttemptAdmission(this.readPayload(attempt).record, attempt.unitId, attempt.admittedRecord);
+      return attempt;
+    } catch {
+      return { status: "pending-review", reasons: [...attempt.reasons, "invalid-admission-certificate"] };
+    }
   }
 
   private findAttemptInternal(attemptId: string): AttemptProjection | null {
@@ -2467,6 +2505,9 @@ export class RunStore {
         `${attempt.payloadFile} digest ${String(parsed.payloadDigest)} does not match the registered digest ${attempt.payloadDigest}`,
       );
     }
+    if (sha256(stableStringify(parsed.record)) !== attempt.payloadDigest) {
+      throw new CorruptPayloadError(attempt.attemptId, "record bytes do not match the registered payload digest");
+    }
     return parsed as unknown as StoredAttemptPayload;
   }
 
@@ -2490,12 +2531,14 @@ export class RunStore {
 
 function resolveAdmission(
   record: CandidateRecord,
+  unitId: string,
   decision?: AdmissionDecision,
 ): {
   status: AdmissionStatus;
   reasons: string[];
   findings: Record<string, unknown> | null;
   review: ReviewScores | null;
+  admittedRecord?: AdmittedRecordV1;
 } {
   const source: AdmissionDecision = decision ?? {
     status: record.admission.status,
@@ -2503,12 +2546,57 @@ function resolveAdmission(
     findings: record.admission.findings,
     review: record.admission.review,
   };
-  return {
+  const resolved = {
     status: requireAdmissionStatus(source.status),
     reasons: normalizeReasons(source.reasons),
     findings: source.findings ?? {},
     review: source.review ?? null,
   };
+  if (resolved.status !== "admitted") return resolved;
+  try {
+    const admittedRecord = source.admittedRecord ? frozenCopy(source.admittedRecord) : undefined;
+    verifyAttemptAdmission(record, unitId, admittedRecord);
+    if (resolved.reasons.length) throw new InvalidAttemptError("admission has rejection reasons");
+    return { ...resolved, admittedRecord: admittedRecord! };
+  } catch {
+    // Keep registration, repairs and accounting resumable, but do not grant
+    // admission to a caller-supplied status or a stale/malformed certificate.
+    return { ...resolved, status: "pending-review", reasons: [...resolved.reasons, "invalid-admission-certificate"] };
+  }
+}
+
+function verifyAttemptAdmission(
+  candidate: CandidateRecord,
+  unitId: string,
+  admitted: AdmittedRecordV1 | undefined,
+): void {
+  if (!admitted) throw new InvalidAttemptError("admitted status requires an admission certificate");
+  verifyAdmissionCertificate(admitted);
+  // Admission adds validator/reviewer bookkeeping, but cannot change the source,
+  // generator, rights or other scenario provenance of the registered candidate.
+  const { createdAt: _createdAt, validators: _validators, validatorVersions: _versions,
+    reviewer: _reviewer, ...admittedProvenance } = admitted.provenance;
+  const { validators: _candidateValidators, validatorVersions: _candidateVersions,
+    reviewer: _candidateReviewer, ...candidateProvenance } = candidate.provenance;
+  // A valid certificate for a different attempt cannot authorize this payload.
+  if (admitted.unitId !== unitId || admitted.recordId !== candidate.recordId
+    || admitted.family !== candidate.family || admitted.schemaVersion !== candidate.schemaVersion
+    || admitted.contentDigest !== candidate.contentDigest
+    || admitted.provenance.scenarioSeed !== candidate.scenarioSeed
+    || stableStringify(admittedProvenance) !== stableStringify(candidateProvenance)
+    || stableStringify(admitted.lineage) !== stableStringify(candidate.lineage)
+    || stableStringify({ messages: admitted.messages, tools: admitted.tools, preference: admitted.preference })
+      !== stableStringify({ messages: candidate.messages, tools: candidate.tools, preference: candidate.preference })) {
+    throw new InvalidAttemptError("admission certificate does not bind this candidate and unit");
+  }
+}
+
+function candidateForRead(record: CandidateRecord): CandidateRecord {
+  // CandidateRecord predates admission (its admittedAt is always null). Only
+  // readAdmittedRecord returns the complete certified record for export.
+  if (record.admission.status !== "admitted") return record;
+  return { ...record, admission: { ...record.admission, status: "pending-review",
+    reasons: [...record.admission.reasons, "candidate-requires-certified-admission"] } };
 }
 
 // -------------------------------------------------------------------------------------------------

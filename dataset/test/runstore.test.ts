@@ -27,7 +27,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, test } from "node:test";
 
+import { REQUIRED_VALIDATORS, admitCandidate, computePayloadDigest } from "../src/admission.js";
 import {
+  type AdmissionDecision,
   ConfigDriftError,
   ConflictingSettlementError,
   InjectedCrashError,
@@ -105,6 +107,8 @@ function candidate(
     family?: TrainingFamily;
     status?: AdmissionStatus;
     reasons?: string[];
+    /** Produce a genuine admission certificate via the real constructor. */
+    certified?: boolean;
   } = {},
 ): CandidateRecord {
   const recordId = options.recordId ?? `rec-${suffix}`;
@@ -298,10 +302,12 @@ describe("D1: registration is atomic with its payload", () => {
     const store = openRunStore(options(artifactRoot, clock));
     const before = eventLines(paths).length;
 
+    const atomic = certifiedCandidate("atomic", { unitId: "unit-1" });
     store.commitCandidate({
       unitId: "unit-1",
       attemptId: "attempt-1",
-      record: candidate("atomic"),
+      record: atomic.record,
+      admission: atomic.decision,
       finalize: true,
       completeUnit: true,
     });
@@ -407,12 +413,14 @@ describe("D3: a unit is revised by superseding attempts, not by blocking record 
     assert.equal(store.latestEligibleCandidate("unit-1")?.status, "pending-review");
 
     // The old store refused this write outright because the record id was taken.
-    const admitted = candidate("repair-b", { recordId, status: "admitted" });
+    const certifiedRepair = certifiedCandidate("repair-b", { unitId: "unit-1", recordId });
+    const admitted = certifiedRepair.record;
     const result = store.commitCandidate({
       unitId: "unit-1",
       attemptId: "attempt-2",
       parentAttemptId: "attempt-1",
       record: admitted,
+      admission: certifiedRepair.decision,
     });
     assert.equal(result.committed, true);
     assert.equal(result.supersededAttemptId, "attempt-1");
@@ -1055,18 +1063,21 @@ describe("derived snapshot, digests and write amplification", () => {
   test("candidates are stored and read back byte-identically", () => {
     const artifactRoot = caseRoot();
     const clock = new FakeClock();
-    const record = candidate("round-trip");
+    const roundTrip = certifiedCandidate("round-trip", { unitId: "unit-1" });
+    const record = roundTrip.record;
     // Default durability (`fsync`), so the fsync-per-durable-write path is
     // covered rather than only the faster `flush` path the rest of the suite uses.
     const store = openRunStore(options(artifactRoot, clock, { durability: "fsync" }));
-    store.commitCandidate({ unitId: "unit-1", attemptId: "attempt-1", record });
-    assert.deepEqual(store.readCandidate("attempt-1"), record);
+    store.commitCandidate({ unitId: "unit-1", attemptId: "attempt-1", record, admission: roundTrip.decision });
+    // The store may re-derive admission status from the persisted certificate, so
+    // compare the payload, not the admission bookkeeping the store owns.
+    assert.deepEqual({ ...store.readCandidate("attempt-1")!, admission: record.admission }, { ...record, admission: record.admission });
     assert.equal(store.readCandidate("missing"), null);
     store.close();
 
     const resumed = openRunStore(options(artifactRoot, clock, { durability: "fsync" }));
-    assert.deepEqual(resumed.readCandidate("attempt-1"), record);
-    assert.deepEqual(resumed.candidates(), [record]);
+    assert.deepEqual({ ...resumed.readCandidate("attempt-1")!, admission: record.admission }, { ...record, admission: record.admission });
+    assert.deepEqual(resumed.candidates().map((entry) => ({ ...entry, admission: record.admission })), [record]);
     resumed.close();
   });
 });
@@ -1091,3 +1102,87 @@ function appendRaw(path: string, text: string): void {
   const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
   writeFileSync(path, existing + text, "utf8");
 }
+
+/**
+ * Builds a genuinely admitted record through the real admission constructor, so
+ * runstore tests exercise the certified path rather than a status-only claim.
+ * The store now refuses to read an uncertified record back as admitted.
+ */
+function certifiedCandidate(
+  suffix: string,
+  options: { family?: TrainingFamily; unitId?: string; recordId?: string } = {},
+): {
+  record: CandidateRecord;
+  decision: AdmissionDecision;
+} {
+  const family = options.family ?? "roleplay-conversation";
+  const unitId = options.unitId ?? `unit-${suffix}`;
+  const recordId = options.recordId ?? `rec-${suffix}`;
+  const lineage: LineageGroup = {
+    characterFamily: "veiled-herald",
+    worldFamily: "baie-comeau",
+    scenarioFamily: "harbour-dawn",
+  };
+  const messages: CandidateRecord["messages"] = [
+    { role: "system", content: `You are a herald of Baie-Comeau. Variant ${suffix}.` },
+    { role: "user", content: "Tell me what the harbour looks like at dawn." },
+    { role: "assistant", content: `Fog sits on the water, and the lamps go out one by one. (${suffix})` },
+  ];
+  const required = REQUIRED_VALIDATORS[family];
+  const payloadDigest = computePayloadDigest({ messages });
+  const admittedRecord = admitCandidate({
+    family,
+    recordId,
+    unitId,
+    lineage,
+    split: "train",
+    splitAssignmentDigest: "e".repeat(64),
+    messages,
+    provenance: {
+      datasetVersion: "foundry-v1",
+      recordSchemaVersion: RECORD_SCHEMA_VERSION,
+      gitCommit: "c0ffee",
+      scenarioSeed: `seed-${suffix}`,
+      scenarioTemplate: "template-v1",
+      sourceFixture: `case-${suffix}.json`,
+      generator: { provider: "openai-compatible", model: "fake-1", baseUrlDigest: "d1g35t", temperature: 0.7 },
+      reviewer: { provider: "openai-compatible", model: "kimi:k3", promptVersion: "review-v1" },
+      sourceDigests: { case: `digest-${suffix}` },
+      tokenCount: { tokenizer: "cl100k_base", tokens: 128 },
+      syntheticOrigin: true,
+      license: { status: "unverified", note: "test fixture" },
+    },
+    evidence: required.map((validator) => ({
+      validator, version: "1.2.0", payloadDigest, evidenceDigest: "f".repeat(64), passed: true,
+    })),
+    reviews: [{
+      reviewerIdentity: "kimi:k3",
+      reviewerPromptDigest: "a".repeat(64),
+      candidateDigest: payloadDigest,
+      scores: {
+        characterization: 0.8, dialogueQuality: 0.8, coherence: 0.9, narrativeInitiative: 0.7,
+        playerAgency: 0.9, nonRepetitive: 0.8, verdict: "accept", rationale: "ok", reviewerCount: 1,
+      },
+    }],
+    generatorIdentity: "fake-1",
+  });
+  const record: CandidateRecord = {
+    schemaVersion: RECORD_SCHEMA_VERSION,
+    recordId,
+    family,
+    lineage,
+    scenarioSeed: `seed-${suffix}`,
+    messages,
+    contentDigest: recordContentDigest({ messages }),
+    // The candidate carries scenario provenance only; admission bookkeeping
+    // (createdAt, validators, reviewer) is excluded, matching how the store
+    // compares a certificate against its registered candidate.
+    provenance: (() => {
+      const { createdAt: _createdAt, validators: _validators, validatorVersions: _versions, reviewer: _reviewer, ...rest } = admittedRecord.provenance;
+      return { ...rest, validators: [], validatorVersions: {}, reviewer: null };
+    })(),
+    admission: { status: "admitted", reasons: [], findings: {}, review: null, admittedAt: null },
+  };
+  return { record, decision: { status: "admitted", admittedRecord } };
+}
+

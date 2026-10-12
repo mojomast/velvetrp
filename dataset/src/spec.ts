@@ -15,6 +15,12 @@
  *     production validator that admitted it. Prose quality is never sufficient.
  */
 
+/**
+ * Persisted admission contract. The constructor owns its canonical definition;
+ * expose the same type here rather than maintaining a second certificate shape.
+ */
+export type { AdmissionCertificate } from "./admission.js";
+
 /** Foundry-wide version. Bump when any record shape changes. */
 export const FOUNDRY_VERSION = "foundry-v1";
 
@@ -217,6 +223,22 @@ export interface PreferencePair {
    * within this ratio, or the pair is discarded.
    */
   lengthRatio: number;
+}
+
+/**
+ * Export projection. Only messages/tools and preference branches are training
+ * columns. The identity and certificate digest belong in the sidecar manifest,
+ * never in messages or other trainer-visible conversational fields.
+ */
+export interface ExportedTrainingRecord {
+  messages: readonly StoredMessage[];
+  tools?: readonly StoredTool[];
+  preference?: Pick<PreferencePair, "prompt" | "chosen" | "rejected">;
+  certificateDigest: string;
+  recordId: string;
+  unitId: string;
+  lineage: LineageGroup;
+  split: DatasetSplit;
 }
 
 /** A candidate record mid-pipeline, before admission is decided. */
