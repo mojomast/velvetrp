@@ -1,97 +1,114 @@
-# Baseline signal and generation weights
+# Measured dev-partition results and re-derived weights
 
-Source: the benchmarking agent's stock-model run (Qwen3-8B, llama.cpp, context 24,576,
-q8_0 KV cache). Sealed corpus not yet graded; no subjective quality scores were produced.
+Source: `bench/stock-baseline-findings` @ `ff9d2de`. Frozen dev partition, 106 cases, 11
+categories, pass@1, no retries, sealed never run. Context 24,576 / KV q8_0 / identical prompts,
+verified by per-case payload digests.
 
-## Model selection is settled
+## Results
 
-**Qwen3-8B is the target. RPMax v1.3 is ruled out for DM play.**
+```
+                Qwen3-8B        Qwen3.5-9B
+correct         33/106 (31.1%)  17/106 (16.0%)
+valid           90/106          43/106
+false abstention, of 84 outcome=tool-call cases:
+                 7/84  (8.3%)  54/84 (64.3%)
+```
 
-The benchmarking agent reports `dmPlayCompatible: false` for RPMax, root-caused to its
-348-character chat template having no reference to `tools` or `tool_calls`. Proof: a request
-carrying a full tool schema reported `prompt_tokens: 20` — the tools were never rendered, and
-llama.cpp emitted no warning.
+Corpus resolved: `22eb7897…` is canonical. Content identity confirmed by 11/11 per-file SHA-256.
+The earlier `6310180d` was a different local artifact with zero cases — disregarded, no
+measurement is invalidated.
 
-**This independently confirms the blocker I found before generation.** I fetched RPMax's
-`tokenizer_config.json` at revision `8fb4a0d9…`, recorded the template verbatim, and showed that
-`content | trim` renders the literal string `None` for a tool-call message with null content.
-`dataset/src/templateProfiles.ts` now carries both profiles with a mandatory override for RPMax
-and TRL's patched `qwen3_training.jinja` for Qwen3.
+## Model selection reverses
 
-The audited result: my `assertTemplateCanTrain` would have refused this configuration. The
-prediction held.
+I proposed Qwen3.5-9B on the 9/10 forced-adherence number. That was wrong, and the 9/10 turns out
+to measure "did it call the tool it was told to call", not "did it propose the right action".
 
-## The one number that drives generation
+On the actual corpus Qwen3.5-9B is worse on every aggregate: half the correctness, less than half
+the valid responses, and 64% false abstention against 8%.
 
-**Forced-tool adherence after a tool-result round-trip: 3/10 for stock Qwen3-8B.**
+**Qwen3-8B is the working baseline.** It produces gradeable output half as often again more often,
+which matters more than its lower headline score: a silent model cannot be graded and will not be
+useful in play.
 
-Raising `max_tokens` does not help — failures run to the cap in prose and never convert. This is
-a behavioural refusal, not a budget problem.
+Caveat carried forward: this is **not a controlled pair** — 8B vs 9B, Q4_K_M vs UD-Q4_K_XL, full
+vs hybrid attention. Model age, quant quality and architecture are confounded. The conclusion
+"Qwen3.5-9B is worse *here*" is supported; "Qwen3-8B is better *in general*" is not established.
 
-That matches the documented multi-turn tool-calling failure exactly: a model cannot make sense of
-a tool response it cannot see the originating call for. Both candidate templates preserve the
-call/result pair in history, but the model must learn to *continue* after a result rather than
-fall back into prose.
+## What Qwen3.5-9B's numbers cannot tell us
 
-## Family weights, set from this signal
+It produced gradeable narration on **6/19** receipt cases and **0/10** boundary cases. Its
+grounding and leakage figures are **unmeasurable, not good**. Its "0/10 leakage" is an artefact of
+saying nothing at all.
 
-| Family | Weight | Rationale |
+This matters for weighting: if we train it to speak, leakage may appear. Absence of leakage in a
+silent model is not evidence of a boundary.
+
+## The real deficits, reordered
+
+### 1. Referential fidelity — 40/106 (37.7%), unweighted
+
+The single largest failure mode. Almost always the same cause: a required anchor is omitted,
+typically a proper noun carried from the setup (Haug, Ailsa, Oswin, Tallow Street). The model
+paraphrases and reaches for pronouns.
+
+This is concrete, teachable, and cuts across every family. It was in no weighting at all.
+Grounding is probably blocked behind it rather than parallel to it.
+
+### 2. JSON-schema generation — 0/10 on both models, unweighted
+
+Complete failure, both models. The production validation chain already exists in
+`dataset/src/worldGeneration.ts`; only the training data is missing.
+
+### 3. Tool initiation, split by tool family
+
+A single tool-selection weight cannot express this:
+
+- `submit_adventure_narration`: Qwen3.5-9B abstains on 54/84 tool-call cases.
+- `exact-candidate` tools: Qwen3.5-9B initiates **7/7**, then emits 43–45 copies with `{}`
+  arguments to the token cap.
+
+Two different behaviours: it will act when arguments are structured, and refuses when the "tool"
+is prose — preferring to write prose. And where it does initiate, argument binding collapses.
+Initiation and argument binding need separate weights.
+
+### 4. Grounding — 0/11 on both models
+
+Real, but partly blocked behind referential fidelity, and unmeasurable on Qwen3.5-9B.
+
+### 5. Boundary — largely absent as a gap
+
+Leakage 0/9 where measurable; the only real fault is fabrication (2/9).
+
+## Re-derived weights
+
+| Family | Weight | Driver |
 |---|---|---|
-| `tool-selection` | **high** | 3/10 round-trip adherence is the largest measured gap |
-| `grounded-narration` | **high** | DM beats and narration share reached parity with the hosted reference, but narration grounding remains the riskiest behaviour to train |
-| `boundary-recovery` | medium-high | No-tool behaviour and abstention are the documented failure mode, and naive negatives cause over-conservatism |
-| `world-generation` | medium | Structured; weakest measured stock behaviour is argument binding, not schema shape |
-| `roleplay-conversation` | **deferred** | RPMax was the roleplay candidate and it is out. The 8B roleplay ceiling is unmeasured, so I cannot justify spending the budget on prose before the structured gap is closed |
+| `tool-selection` (initiation + argument binding, split by tool family) | **high** | 64% false abstention; `{}`-argument collapse |
+| `world-generation` | **high** | 0/10 on both models |
+| `grounded-narration` | **medium-high** | 0/11 both; partly blocked by #1 |
+| `boundary-recovery` | **medium** | leakage not the gap *for Qwen3-8B*; re-measure after it speaks |
+| `roleplay-conversation` | **deferred** | still unmeasured; RPMax was the roleplay candidate and is out |
 
-The last row is a deliberate reduction, not an oversight. LIMA's finding is that ~1,000 curated
-examples beat 56,000, and that 1,000 high-quality samples can impose a single output format. With
-a tool-adherence gap of 3/10 in front of us, spending the first tranche on prose is the wrong
-allocation.
+**Cross-cutting priority above all families: referential fidelity.** Every family should carry
+anchor-preservation anchors, because 37.7% of failures are a single omitted proper noun. This is
+the cheapest large win available and it is a behaviour, not a topic.
 
-**Blend hypothesis (to be measured, not assumed):** 2:1 tool-call to cannot-answer, from the
-When2Call result. Measure BOTH false calls and false abstentions — the published failure is that
-naive negatives push models to under-call.
+## Limits on these numbers
 
-## Multi-turn tool round-trip is now the primary generator target
+- Layer-2 exact deep-equal covers only **7 of 84** tool-call cases. The other 77 declare a single
+  free-prose `narration` exemplar and are graded by anchor constraints, so `correct` there means
+  "met the constraints", not "matched a reference".
+- One run per model. Wilson intervals cover binomial error only, not run-to-run variance.
+- The harness commits a `.gitignore` change that re-includes `data/velvet-bench/**` selectively.
+  It should not be merged blind.
+- `devCaseIdListDigest` was produced by an inline script and is not implemented anywhere, so it is
+  not independently reproducible. The per-file SHA-256 list in `CORPUS_FINGERPRINT.json` is the
+  check that matters and it does match. A committed verifier should replace the ad-hoc digest.
 
-Every Family C example must include the full sequence:
+## Before generating
 
-```
-assistant(tool_calls=[...])  ->  tool(result)  ->  assistant(next tool_calls=[...])
-```
-
-not just the isolated first call. The adapter already enforces that a `tool` message answers a
-preceding call and that nothing dangles, so a generated example cannot accidentally teach the
-model that a result ends the turn.
-
-## Operational constraints the baseline imposes
-
-1. **Context 24,576 minimum.** VelvetRP planning prompts run 10k–24k tokens. Generation and
-   preprocessing must keep examples inside that budget; `assertWithinTruncationPolicy` rejects
-   rather than truncates, which is the correct behaviour for a supervised target.
-2. **Tool calls must survive rendering.** With Qwen3 this requires TRL's patched
-   `qwen3_training.jinja`, which also fixes prefix preservation when a tool message is appended.
-   A stock Qwen3 template emits the same shape but breaks prefix preservation for exactly our
-   sequence.
-3. **The gateway is outside the training path.** llama.cpp ignores named `tool_choice`; the
-   200-line gateway translates that one field. Training must use the protocol the gateway
-   accepts, and `dataset/src/templateProfiles.ts` already pins `qwen3_coder` as the deployment
-   parser.
-4. **Do not select checkpoints by eval loss.** LIMA reports perplexity does not correlate with
-   generation quality. Select on first-attempt tool fidelity, grounding, agency and continuity.
-
-## Still missing before weight finalisation
-
-- **The dev-partition failure report.** This note sets provisional weights from the 3/10 finding
-  alone. Full per-category dev numbers would let Family A be re-evaluated rather than deferred.
-- **Sealed grading.** Untouched, correctly.
-- **n=1 per context size.** The baseline agent flagged this themselves; treat as a sample.
-
-## Cross-checks worth keeping
-
-- Provider success 93.9%, DM beats 6/6, materialization 50% now match the hosted
-  `deepseek-v4-flash` reference. That is the environment behaving correctly, which is what makes
-  the remaining 3/10 attributable to the model rather than the harness.
-- An upstream test failure (asserts `1.6.0`, source exports `1.7.0+a870b31918ec`) exists at a
-  clean tree. Reported, not patched — patching would change the pinned commit the catalog
-  identity depends on.
+1. Confirm the target is Qwen3-8B, not Qwen3.5-9B.
+2. Add a referential-fidelity anchor set — it is currently absent from the weighting entirely.
+3. Split Family C by tool family; initiation and argument binding are different targets.
+4. Re-measure grounding and boundary on whichever model is chosen, since Qwen3.5-9B's figures
+   are unmeasurable rather than good.
