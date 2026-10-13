@@ -29,6 +29,9 @@ const runId = process.argv[2] ?? "calibration-2026-10-13-v1";
 const seed = process.argv[3] ?? runId;
 const units = Number(process.argv[4] ?? 20);
 const k = Number(process.argv[5] ?? 1);
+// `seed` and `k` are retained only as a cross-check against the bound plan; the
+// plan is never re-derived here. See the fail-closed check below.
+void seed;
 const groundedCohort = process.argv[6] === "--grounded";
 const root = join(repositoryRoot, ".dataset", "runs", runId, "pipeline");
 const output = join(repositoryRoot, ".dataset", "measurements", runId);
@@ -43,11 +46,22 @@ function checkpoint<T>(key: string): T | null {
 }
 
 const binding = checkpoint<{ planDigest: string }>("binding");
-const retainedPlan = binding ? checkpoint<string>(`artifact:${binding.planDigest}`) : null;
-const plan = retainedPlan
-  ? { ...(JSON.parse(retainedPlan) as ReturnType<typeof planRun>), digest: binding!.planDigest }
-  : planRun({ seed, units, realizationsPerScenario: k });
-if (retainedPlan && hash(retainedPlan) !== binding!.planDigest) throw new Error("retained historical plan integrity mismatch");
+// FAIL CLOSED. The census MUST describe the plan that actually ran. Substituting
+// a freshly planned inventory when the bound artifact is missing would silently
+// freeze a different set of units (for example an ordinary plan instead of a
+// six-task diagnostic), so a missing or mismatched bound plan is a hard error.
+if (!binding) throw new Error("run store has no plan binding; refusing to guess a census plan");
+const retainedPlan = checkpoint<string>(`artifact:${binding.planDigest}`);
+if (!retainedPlan) throw new Error(`bound plan artifact ${binding.planDigest} is missing; refusing to substitute a freshly planned inventory`);
+if (hash(retainedPlan) !== binding.planDigest) throw new Error("retained historical plan integrity mismatch");
+const plan = { ...(JSON.parse(retainedPlan) as ReturnType<typeof planRun>), digest: binding.planDigest };
+// Cross-check the caller's arguments against the plan that actually ran.
+if (plan.scenarioCount !== units) {
+  throw new Error(`caller declared ${units} scenarios but the bound plan has ${plan.scenarioCount}`);
+}
+if (plan.realizationsPerScenario !== k) {
+  throw new Error(`caller declared k=${k} but the bound plan has k=${plan.realizationsPerScenario}`);
+}
 
 const audit: unknown[] = [];
 const sources: ProseSource[] = [];

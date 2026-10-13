@@ -16,6 +16,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stableStringify } from "../src/spec.js";
+import { isReviewScores, parseReviewScores } from "../src/generate.js";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const runId = process.argv[2] ?? "calibration-2026-10-13-v1";
@@ -87,13 +88,27 @@ for (const [key, value] of entries) {
     if (entries.has(`dispatch:${key.slice("validation:".length)}-review`)) { validated += 1; cohort.reachedIndependentReview += 1; }
     for (const run of validation.runs) if (!run.passed) problems[run.validator] = (problems[run.validator] ?? 0) + 1;
     const id = key.slice("validation:".length);
-    const contract = entries.get(`review-contract:${id}`) as { attempts?: string[] } | undefined;
-    const review = entries.get(`response:${contract?.attempts?.at(-1) ?? `${id}-review`}`) as { content?: string } | undefined;
-    if (review) {
-      try {
-        const decoded = JSON.parse(review.content ?? "") as { verdict?: string };
-        if (["accept", "accept-with-notes"].includes(decoded.verdict ?? "")) { reviewAccepted += 1; cohort.reviewAccepted += 1; }
-      } catch { problems["review-json-unusable"] = (problems["review-json-unusable"] ?? 0) + 1; }
+    // Count reviews through the PRODUCTION contract and parser, not by a naive
+    // JSON.parse. A contract records the retry attempts and whether the final one
+    // was usable; a fenced or otherwise contract-repaired review is valid, and an
+    // unusable one must never be reported as accepted.
+    const contract = entries.get(`review-contract:${id}`) as { attempts?: string[]; usable?: boolean } | undefined;
+    if (contract && contract.usable !== true) {
+      problems["review-contract-unusable"] = (problems["review-contract-unusable"] ?? 0) + 1;
+    } else {
+      const lastAttemptId = contract?.attempts?.at(-1) ?? `${id}-review`;
+      const review = entries.get(`response:${lastAttemptId}`) as { content?: string } | undefined;
+      if (review) {
+        const decoded = parseReviewScores(review.content ?? "");
+        if (isReviewScores(decoded)) {
+          if (decoded.verdict === "accept" || decoded.verdict === "accept-with-notes") {
+            reviewAccepted += 1;
+            cohort.reviewAccepted += 1;
+          }
+        } else {
+          problems["review-json-unusable"] = (problems["review-json-unusable"] ?? 0) + 1;
+        }
+      }
     }
   }
 }
