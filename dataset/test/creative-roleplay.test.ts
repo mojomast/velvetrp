@@ -601,6 +601,29 @@ test("a character turn that impersonates the player is rejected", () => {
   ]) {
     assert.deepEqual(build(text), [], `a legitimate question was refused: "${text}"`);
   }
+  // ADDRESSING the player in a subordinate or possessive phrase is ordinary
+  // dialogue, not impersonation. The shipped detector refused all of these, which
+  // made natural conversation impossible: a character could not say "if you stand
+  // where I stand" without the whole transcript being rejected. Only a
+  // main-clause assertion decides for the player.
+  for (const text of [
+    "If you stand where I stand, at the north pier, with your hand flat on the stone, you will see it.",
+    "And if you stand there and feel nothing, go home, and I will never bring it up again.",
+    "It matters that it is yours when you do it.",
+    "That is when the count comes round, and if you stand at the north pier, you will see it.",
+    "Take the lantern, and when you reach the gate, count the stones.",
+    "She will hold the door while you look.",
+  ]) {
+    assert.deepEqual(build(text), [], `subordinate player address was refused as impersonation: "${text}"`);
+  }
+  // A main-clause assertion is STILL refused even after the guard, including when
+  // it follows a vocative or another sentence.
+  for (const text of [
+    "Right. You open the ledger, you read the name, and then it is over with.",
+    "Listen. You take the lantern and you go.",
+  ]) {
+    assert.ok(build(text).includes("transcript-player-impersonation"), `main-clause assertion was accepted: "${text}"`);
+  }
 });
 
 test("meta commentary, grading metadata and mechanical register are rejected", () => {

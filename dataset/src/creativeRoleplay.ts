@@ -1660,6 +1660,28 @@ const PLAYER_IMPERSONATION_SOFT: readonly RegExp[] = Object.freeze([
   /\byou (?:are|feel|feels|seem|seems|look|looks) (?:relieved|afraid|guilty|grateful|sad|angry|happy|nervous|ashamed|hopeful|torn|empty|confused|annoyed|furious|cold|warm|shaken)\b/i,
 ]);
 
+/**
+ * A second-person action verb is ordinary ADDRESS, not impersonation, unless it
+ * is asserted as a MAIN CLAUSE. "You open the door" states what the player did;
+ * "if you stand where I stand", "with your hand on the stone", "when you do it"
+ * are things a character says TO the player and do not decide for them.
+ *
+ * This guard applies ONLY to the SOFT patterns. A clause-initial assertion is
+ * still refused, and the HARD patterns still catch reported speech, decisions
+ * and parentheticals in any position ("Because you agreed to this...").
+ * Questions were already exempt.
+ *
+ * Without this, the shipped detector refused ordinary dialogue: a character
+ * could not say "if you stand where I stand" without the whole conversation
+ * being rejected as player impersonation.
+ */
+const PLAYER_CLAUSE_START = /(?:^\s*|[.!?;:,]\s+|\b(?:and|but|so|then|or|yet)\s+)$/i;
+
+/** True when `index` begins a main clause within `segment`. */
+function startsPlayerClause(segment: string, index: number): boolean {
+  return PLAYER_CLAUSE_START.test(segment.slice(0, index));
+}
+
 /** Split into sentence-ish segments, keeping their terminating punctuation. */
 function nonQuestionSegments(text: string): string[] {
   const matched = text.match(/[^.!?]*[.!?]+/g) ?? [];
@@ -1748,7 +1770,12 @@ export function checkCreativeTranscript(raw: string, plan: CreativePlan): Creati
       }
       for (const segment of nonQuestionSegments(text)) {
         for (const pattern of PLAYER_IMPERSONATION_SOFT) {
-          if (pattern.test(segment)) {
+          // Only a main-clause second-person assertion is impersonation; a
+          // subordinate or possessive reference is ordinary address. See
+          // PLAYER_CLAUSE_START. This never exempts a clause-initial assertion
+          // and does not touch the HARD patterns.
+          const match = pattern.exec(segment);
+          if (match && startsPlayerClause(segment, match.index)) {
             refusals.push(refuse("transcript-player-impersonation", index, `${segment.trim()} :: ${pattern.source}`));
           }
         }
