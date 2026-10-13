@@ -22,6 +22,7 @@
  * Run: npm run test:foundry   (tsx --test --test-concurrency=1)
  */
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -33,8 +34,10 @@ import {
   ConfigDriftError,
   ConflictingSettlementError,
   InjectedCrashError,
+  InvalidAttemptError,
   InvalidUsageError,
   RUN_STAGES,
+  RUN_STORE_VERSION,
   RunCorruptionError,
   RunLockError,
   RunStore,
@@ -49,6 +52,7 @@ import {
   readGitCommit,
   recordContentDigest,
   runStorePaths,
+  sha256,
   type AdmissionStatus,
   type FaultContext,
   type FaultInjector,
@@ -59,6 +63,7 @@ import {
 } from "../src/runstore.js";
 import {
   RECORD_SCHEMA_VERSION,
+  stableStringify,
   type CandidateRecord,
   type LineageGroup,
   type TrainingFamily,
@@ -941,6 +946,170 @@ describe("single-writer lease", () => {
       () => store.commitCandidate({ unitId: "u", attemptId: "a", record: candidate("closed") }),
       /is closed/,
     );
+  });
+
+  test("ownership is a unique nonce, not a pid and a millisecond", () => {
+    const artifactRoot = caseRoot();
+    const clock = new FakeClock();
+    const paths = pathsFor(artifactRoot);
+    const store = openRunStore(options(artifactRoot, clock));
+    const mine = JSON.parse(readFileSync(paths.lockPath, "utf8")) as {
+      pid: number; ownerNonce: string; acquiredAtMs: number;
+    };
+    assert.equal(mine.pid, process.pid);
+    assert.match(mine.ownerNonce, /^[0-9a-f-]{36}$/);
+
+    // A replacement holder that happens to share this process AND this exact
+    // acquisition millisecond is still a different owner. pid+timestamp
+    // identity cannot tell them apart; a nonce can.
+    const same = { ...mine, ownerNonce: "11111111-2222-3333-4444-555555555555" };
+    writeFileSync(paths.lockPath, JSON.stringify(same), "utf8");
+    assert.throws(() => store.addNote("stale holder write"), RunLockError);
+    assert.throws(() => store.renewLease(), RunLockError);
+    store.close();
+    assert.equal(existsSync(paths.lockPath), true, "a lost holder must not release its replacement's lease");
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// 10. Writer exclusion and immutable publication (F3)
+// -------------------------------------------------------------------------------------------------
+
+describe("F3: ownership is fenced at the moment bytes are published", () => {
+  /** Bytes of a published payload envelope, as the store would write them. */
+  function publishedBytes(record: CandidateRecord, attemptId: string, unitId: string): string {
+    return `${stableStringify({
+      storeVersion: RUN_STORE_VERSION,
+      attemptId,
+      unitId,
+      parentAttemptId: null,
+      payloadDigest: sha256(stableStringify(record)),
+      writtenAt: "2026-04-01T00:00:00.000Z",
+      record,
+    })}\n`;
+  }
+
+  test("a stale publisher cannot replace the replacement owner's payload", () => {
+    const artifactRoot = caseRoot();
+    const clock = new FakeClock();
+    const paths = pathsFor(artifactRoot);
+    const replacement = candidate("replacement", { status: "rejected" });
+    const stale = candidate("stale", { status: "rejected" });
+    const payloadPath = join(paths.attemptsDir, attemptPayloadFileName("attempt-1"));
+
+    let stolen = false;
+    const store = openRunStore(options(artifactRoot, clock, {
+      faultInjector: (context: FaultContext) => {
+        if (stolen || context.fault !== "before-payload-write") return;
+        stolen = true;
+        // The replacement owner takes the run at this exact seam: it publishes
+        // its own bytes for the SAME attempt id and records its own lease.
+        writeFileSync(payloadPath, publishedBytes(replacement, "attempt-1", "unit-1"), "utf8");
+        writeFileSync(paths.lockPath, JSON.stringify({
+          pid: 4_194_303, ownerNonce: "replacement-nonce", acquiredAtMs: 1, renewedAtMs: 1, runId: "run-a",
+        }), "utf8");
+      },
+    }));
+
+    assert.throws(
+      () => store.commitCandidate({ unitId: "unit-1", attemptId: "attempt-1", record: stale }),
+      (error: unknown) => error instanceof RunLockError,
+      "ownership is re-read after the seam, inside the publication section",
+    );
+    assert.equal(readFileSync(payloadPath, "utf8"), publishedBytes(replacement, "attempt-1", "unit-1"),
+      "the replacement owner's bytes are untouched");
+    assert.equal(
+      eventLines(paths).filter((line) => line.includes("attempt.registered")).length,
+      0,
+      "a fenced publisher registers nothing",
+    );
+    store.close();
+
+    // The run remains readable and consistent for whoever holds it next.
+    const next = openRunStore(options(artifactRoot, clock));
+    assert.equal(next.hasAttempt("attempt-1"), false, "the fenced publisher left no registration");
+    next.commitCandidate({ unitId: "unit-1", attemptId: "attempt-1", record: replacement });
+    assert.deepEqual(next.readCandidate("attempt-1"), replacement);
+    next.close();
+  });
+
+  test("an attempt's published payload is immutable even for the rightful owner", () => {
+    const artifactRoot = caseRoot();
+    const clock = new FakeClock();
+    const paths = pathsFor(artifactRoot);
+    const store = openRunStore(options(artifactRoot, clock));
+
+    // A payload a previous (now lost) owner published, under the same attempt id.
+    const orphan = candidate("orphan", { status: "rejected" });
+    const payloadPath = join(paths.attemptsDir, attemptPayloadFileName("attempt-1"));
+    writeFileSync(payloadPath, publishedBytes(orphan, "attempt-1", "unit-1"), "utf8");
+
+    assert.throws(
+      () => store.commitCandidate({
+        unitId: "unit-1", attemptId: "attempt-1", record: candidate("different", { status: "rejected" }),
+      }),
+      (error: unknown) => error instanceof InvalidAttemptError && /immutable payload/.test(error.message),
+    );
+    assert.equal(readFileSync(payloadPath, "utf8"), publishedBytes(orphan, "attempt-1", "unit-1"),
+      "different bytes under one attempt id are refused, never replaced");
+
+    // Identical bytes are a no-op: the durable orphan is reused, not rewritten.
+    const committed = store.commitCandidate({ unitId: "unit-1", attemptId: "attempt-1", record: orphan });
+    assert.equal(committed.committed, true);
+    assert.deepEqual(store.readCandidate("attempt-1"), orphan);
+    store.close();
+  });
+
+  test("an unreadable orphan is set aside rather than blocking the run forever", () => {
+    const artifactRoot = caseRoot();
+    const clock = new FakeClock();
+    const paths = pathsFor(artifactRoot);
+    const store = openRunStore(options(artifactRoot, clock));
+    const payloadPath = join(paths.attemptsDir, attemptPayloadFileName("attempt-1"));
+    writeFileSync(payloadPath, "{ truncated", "utf8");
+
+    const record = candidate("recovered", { status: "rejected" });
+    store.commitCandidate({ unitId: "unit-1", attemptId: "attempt-1", record });
+    assert.deepEqual(store.readCandidate("attempt-1"), record);
+    assert.equal(
+      readdirSync(paths.attemptsDir).some((name) => name.includes(".corrupt-")),
+      true,
+      "the damaged file is retained as evidence",
+    );
+    store.close();
+  });
+
+  test("a writer holding the exclusion guard refuses a competing opener", async () => {
+    const artifactRoot = caseRoot();
+    const clock = new FakeClock();
+    const paths = pathsFor(artifactRoot);
+    openRunStore(options(artifactRoot, clock)).close();
+
+    // A second PROCESS holds the same exclusion database, which is what makes
+    // this a real cross-process test rather than a same-process mock.
+    const holder = spawn(process.execPath, ["-e", `
+      const { DatabaseSync } = require("node:sqlite");
+      const db = new DatabaseSync(${JSON.stringify(paths.guardPath)});
+      db.exec("PRAGMA busy_timeout = 0");
+      db.exec("BEGIN IMMEDIATE");
+      process.stdout.write("locked\\n");
+      setTimeout(() => process.exit(0), 1500);
+    `], { stdio: ["ignore", "pipe", "inherit"] });
+    await new Promise<void>((resolve, reject) => {
+      holder.stdout.once("data", () => resolve());
+      holder.once("error", reject);
+      holder.once("exit", (code) => reject(new Error(`writer-guard holder exited early with ${String(code)}`)));
+    });
+    try {
+      assert.throws(
+        () => openRunStore(options(artifactRoot, clock, { guardBusyTimeoutMs: 150 })),
+        (error: unknown) => error instanceof RunLockError,
+        "the competing opener is refused while the guard is held, not queued behind it",
+      );
+      assert.equal(existsSync(paths.lockPath), false, "the refused opener left no lease behind");
+    } finally {
+      holder.kill("SIGKILL");
+    }
   });
 });
 

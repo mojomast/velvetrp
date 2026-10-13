@@ -1,6 +1,6 @@
 /** Fail-closed, provider-free HF export with separate provenance and checksums. */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { AdmissionError, assertExportable, type AdmittedRecordV1, type ApprovedAdmissionRegistry } from "./admission.js";
 import { MESSAGE_ROLES, stableStringify, type ExportedTrainingRecord, type StoredMessage, type StoredTool } from "./spec.js";
@@ -171,12 +171,22 @@ export function exportTrainingJsonl(
     }
     throw new Error(`export destination must be a new or empty directory: ${outputDir}`);
   }
-  mkdirSync(dirname(outputDir), { recursive: true });
+  const syncPath = (path: string): void => { const fd = openSync(path, "r"); try { fsyncSync(fd); } finally { closeSync(fd); } };
+  const durableParent = (path: string): void => {
+    if (existsSync(path)) return;
+    durableParent(dirname(path));
+    try { mkdirSync(path); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+    syncPath(dirname(path));
+  };
+  durableParent(dirname(outputDir));
   const staging = mkdtempSync(join(dirname(outputDir), `.${basename(outputDir)}-export-`));
   try {
-    for (const file of contents) writeFileSync(join(staging, file.path), file.bytes, { encoding: "utf8", flag: "wx" });
+    for (const file of contents) { const path = join(staging, file.path); writeFileSync(path, file.bytes, { encoding: "utf8", flag: "wx" }); syncPath(path); }
     writeFileSync(join(staging, "checksums.json"), checksumBytes, { encoding: "utf8", flag: "wx" });
+    syncPath(join(staging, "checksums.json"));
+    syncPath(staging);
     renameSync(staging, outputDir);
+    syncPath(dirname(outputDir));
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }

@@ -1,12 +1,12 @@
 # Training Data Foundry — Corrections Log
 
-Status of the audit remediation. **No synthetic training data has been generated.**
-
-Branch `feat/training-data-foundry`. 70 tests pass, typecheck clean.
+Chronological remediation log. Later entries supersede earlier status summaries.
+**No paid synthetic training data or model training has run as of the readiness
+checkpoint below.** Branch `feat/training-data-foundry`.
 
 ---
 
-## Blockers — all closed
+## Initial infrastructure blockers — historical checkpoint
 
 ### V1 · RPMax template drops tool calls — **CLOSED**
 
@@ -322,3 +322,73 @@ npm exec -- tsx dataset/src/corpus.ts verify --expect 22eb7897…
 npm run typecheck:foundry
 npm run test:foundry
 ```
+
+---
+
+## Independent pre-generation audit and readiness remediation (2026-10-13)
+
+GPT-6 Astra xhigh reproduced eight material runner defects at `fd039e7`. Passing
+adapter tests did not exercise the orchestration gaps. The paid pilot was held.
+Runner-level regressions now exercise the reported paths:
+
+- World admission requires the complete production verdict and raw first-attempt
+  validity, inspects references in the exact raw target, requires each requested
+  section/minimum, and rejects dependency-key reuse. The shared enum supplies
+  `quest-items`/`monster-concepts`; prompts expose sparse JSON schemas and the
+  count-targeted NPC-location/quest-objective requirements.
+- Narration must use the advertised single-call envelope with exactly one
+  narration string and no additional supervised prose. Duplicate tool calls are
+  retained for validation rather than sanitized away. Public receipts identify
+  actor and target; requested receipts require bound coverage. Independent
+  reviewers receive the private oracle only in their review prompt.
+- Candidate-menu membership and actual requested intent are separate verdicts.
+  Scenario construction defines the public request and acceptable candidate IDs
+  together. Selection does not assert a committed engine settlement.
+- Resume reserves all durable attempt/checkpoint/response measurements before new
+  dispatch, including later spend behind an earlier budget hole. Attempts charge
+  once. Unmeasurable candidates are durable null-count quarantines, never invented
+  zero-token measurements; accounting uncertainty pauses new requests.
+- Prepared twins supply immutable authored source lineage/digest. Original
+  reserved source IDs are rejected; run/K/twin seeds cannot change source split.
+  Conflicting authored identities and identical cross-split preferences refuse.
+- A SQLite writer guard and nonce-based lease ownership protect acquisition,
+  renewal, release, payload/event/snapshot and journal publication. Live process
+  age cannot trigger takeover. Payloads publish immutably and recheck ownership
+  after fault seams. File and directory entries are fsynced before registration.
+- Physical dispatches/raw response outcomes are journaled before decoding.
+  Uncertain transport and upstream 5xx do not repeat; 429 may retry, permanent
+  refusals replay as errors, and captured malformed 2xx responses decode from
+  retained bytes without another network request. Outstanding calls heartbeat.
+
+DeepSeek's official API and general terms §4.2(3) explicitly permit **training
+other models (such as model distillation)**. Exact public HTML snapshots and
+RouteTok's operator confirmation are pinned in `rights/`. Matching CLI runs now
+retain route-bound `verified-permitted` source evidence.
+
+The independent blinded prose protocol freezes source artifacts, full delivered
+prose surfaces, public style projections, inventory and rubric before grading.
+The loader derives scores from actual retained JSON judgments with exact quotes,
+unique judging contexts and global individual-before-parity phase bindings. Both
+twin branches must pass and have no material style advantage. Missingness and
+compromised judgments stay explicit. No fixture grade is a quality measurement;
+the inherited 4/8 floor is not a newly regraded controlled stock baseline.
+
+Tokenizer identity now binds evidence, sequence limit, thinking, truncation,
+packing and selective-loss policy. `preprocessTrainingExport()` verifies approved
+bundle/sidecar reload and reproduces actual SFT labels and preference branch
+masks. Live CPU coverage confirms IDs/labels, masked history and selected turn
+terminators survive export/reload. An eventual DPO consumer must use the emitted
+explicit log-probability masks; stock DPOTrainer compatibility remains unclaimed.
+
+Validation checkpoint: **432 foundry tests passed serially, zero failures or
+skips**, including real CPU tokenization and export/reload. Owning typecheck
+passed. No paid generation or training occurred during these checks. Astra's
+follow-up initially found three remaining integration gaps, all subsequently
+closed and independently reproduced as resolved: raw-HTTP-outcome accounting
+before new calls, invalid argument string coercion, and unadvertised roleplay
+tools. A shared exact advertised schema check now protects every tool-bearing
+prose target. Newly created storage/export ancestor entries are individually
+synced. The final independent verdict supports bounded 20-seed calibration under
+the documented operating conditions; no new concrete blocker was found.
+Final checkpoint after those fixes: **440/440 serial foundry tests passed, zero
+failures/skips**, with the real CPU tokenizer enabled; owning typecheck clean.

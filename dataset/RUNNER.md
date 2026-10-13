@@ -18,9 +18,11 @@ VELVET_REVIEWER_MODEL=kimi:k3 npm run foundry -- generate --execute \
   --seed pilot-1 --run-id pilot-1 --cluster-cap 8
 ```
 
-Confirm provider training-use terms and obtain the independent prose-retention
-measurement before the live pilot. Generated rights provenance currently says
-`unverified`. The RouteTok credit balance is funded; provider billing accounting
+Provider training-use terms are pinned in [`rights/README.md`](rights/README.md):
+DeepSeek permits training other models; RouteTok is operator-controlled. The CLI
+records `verified-permitted` for the matching route. Obtain real independent
+blinded judgments on calibration outputs using [`PROSE_MEASUREMENT.md`](PROSE_MEASUREMENT.md).
+The RouteTok credit balance is funded; provider billing accounting
 is optional. Neither the implementation tests nor the tokenizer checks spend
 teacher credit.
 
@@ -46,16 +48,24 @@ client, then fsyncs the returned response before processing it. Resume reuses
 completed responses, reviews and exact admitted certificates. It replays local
 validation and token measurements to reconstruct the full report and supervised
 spend. Newly committed admission/refusal callbacks are emitted once.
-Checkpoint writes and provider dispatches renew the lease using the host wall
-clock. A replaced holder cannot renew, dispatch, append or publish payloads, and
-closing an old holder preserves its replacement's lease and snapshot.
+Lease and publication operations use a SQLite `BEGIN IMMEDIATE` exclusion guard
+with per-open nonce ownership. Opening a store requires Node 22. Age alone never
+evicts a live process. Checkpoints and outstanding asynchronous provider calls
+renew the lease using the host wall clock. A replaced holder cannot renew,
+dispatch, append or publish payloads, and closing an old holder preserves its
+replacement's lease and snapshot. Attempt payload publication is immutable.
 
 A persisted dispatch with no returned response is **uncertain**. Resume stops
 with `UncertainDispatchError`; it does not automatically send that call again.
 This also covers a crash between the dispatch marker and network submission.
-Reliable response evidence is needed to recover an uncertain call. Successful
-HTTP-call retries inside the teacher client remain recorded in that client's
-response metadata.
+Reliable response evidence is needed to recover an uncertain call. Each physical
+HTTP attempt and credential-scrubbed raw response is retained before decoding.
+Returned malformed responses replay the same decoding refusal without another
+request. Transport/timeouts and upstream 5xx are uncertain and do not automatically
+repeat. Explicit 429 rate limits may retry; permanent HTTP refusals replay without
+new calls. The standalone teacher client has an opt-in idempotency key for an
+independently verified deduplication contract; the runner does not assume such a
+contract for RouteTok.
 
 Each repair has a new immutable attempt ID and supersedes its parent. The original
 RAW candidate, parsed output and refusal reason are retained. Admitted units and
@@ -70,8 +80,18 @@ admission. An overshoot is retained and charged as observed, then pauses the run
 It cannot be admitted merely because the teacher's max-token setting was small.
 An operator may increase `--max-supervised-tokens` and resume a budget pause.
 Provider token usage is separate from this ledger.
-Supervised-budget policies are retained as checkpoints/audit notes. A cap below
-already observed durable spend refuses before new calls.
+Supervised-budget policies are retained as checkpoints/audit notes. Every known
+attempt/checkpoint/returned response is charged before any new dispatch, including
+non-prefix budget pauses. Replay does not charge it again. A cap below already
+observed durable spend refuses before new calls.
+
+All scheduled prompt contexts are tokenizer-preflighted before dispatch. A
+candidate that cannot be measured is durably quarantined with `tokenCount: null`
+and an explicit `unmeasuredAttemptIds` report entry; it is not assigned zero
+measured tokens. New dispatches stop while that accounting is unresolved. Resume
+reconstructs the quarantine instead of buying another response or throwing on an
+unrecorded candidate. Validator errors follow bounded repair/refusal handling;
+invalid section configuration fails during planning.
 
 ## Split isolation
 
@@ -93,7 +113,11 @@ dev/test rows remain available in the store/report.
 Use the embedding API's `pairedTwins: ScheduledTwinInput[]` for previously authored
 drafts. Each input supplies a `TwinCaseSpec`, explicit counterfactual receipts,
 2–3 typed anchors, deterministic seed, and the actual drafts' generator identity
-and temperature. Both prompt-conditioned preferences are built by
+and temperature, immutable authored lineage, and `twinSourceDigest(input)`. The
+original source ID and authored lineage are checked against reserved metadata.
+Split assignment inherits that source independently of twin/K/run seeds;
+conflicting source identities and cross-split identical payloads refuse.
+Both prompt-conditioned preferences are built by
 `buildSelectiveFidelityTwins()` and keep a common lineage, split and cluster.
 
 A separate `proseQualityScorer` is required. Its measured rate must meet the
@@ -146,6 +170,25 @@ only a byte-identical, complete published bundle. Changed files, different input
 records, absent approvals or unexpected files refuse reuse.
 
 ## Validation
+
+### Export reload and preparation
+
+`preprocessTrainingExport({ outputDir, checksumDigest, approvedRegistry, tokenizer })`
+from `src/preprocessExport.ts` reloads the JSONL and sidecar. It checks independently
+pinned checksum bytes, bundle hashes, row/certificate bindings, preprocessing
+policy and real token counts. SFT materialization preserves measured input IDs
+and labels, including masked historical assistants and selected terminators.
+Preference branches retain full prompts and explicit selected-token
+log-probability masks. A future preference trainer must apply those masks; stock
+`DPOTrainer` compatibility has not been asserted or measured.
+
+The supported durability model is a local Linux filesystem providing SQLite
+locks, atomic same-filesystem publication and working file/directory fsync.
+Files and directory entries are synced before registering payloads or publishing
+exports. Process-crash and lease-interleaving tests exercise recovery; they do not
+simulate physical power loss or distributed filesystem behavior.
+
+### Focused checks
 
 ```bash
 npm run typecheck:foundry

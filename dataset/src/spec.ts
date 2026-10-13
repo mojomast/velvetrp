@@ -260,7 +260,15 @@ export interface CandidateRecord {
 export function stableStringify(value: unknown, indent = 0): string {
   const sorted = (input: unknown): unknown => {
     if (Array.isArray(input)) return input.map(sorted);
+    if (input instanceof Map) {
+      const entries = [...input.entries()].map(([key, entry]) => [sorted(key), sorted(entry)]);
+      entries.sort((left, right) => JSON.stringify(left[0]).localeCompare(JSON.stringify(right[0])));
+      return { $map: entries };
+    }
     if (input && typeof input === "object") {
+      if (Object.getPrototypeOf(input) !== Object.prototype && Object.getPrototypeOf(input) !== null) {
+        throw new TypeError("canonical JSON rejects unsupported non-JSON objects");
+      }
       return Object.fromEntries(
         Object.entries(input as Record<string, unknown>)
           .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))

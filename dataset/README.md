@@ -75,6 +75,9 @@ Modules:
 | `src/pipelineJournal.ts` | Durable request/response, validation-artifact and report checkpoints |
 | `src/generationPolicy.ts` | Metadata-only attestation verification and generated lineage/split enforcement |
 | `src/selection.ts` | Quality-ranked, cluster-capped selection with indivisible twin groups |
+| `src/teacherRights.ts`, `rights/` | Inspected upstream training-use permission and operator-confirmed relay identity |
+| `src/proseMeasurement.ts` | Frozen blinded inventories and independently pinned offline judgment ledgers |
+| `src/preprocessExport.ts` | Checksummed export reload with exact selected SFT labels and explicit preference masks |
 
 ### Teacher configuration
 
@@ -113,7 +116,9 @@ The lower-level `buildTwinPair()` returns a single contrast and diagnostics; it
 does not by itself materialize both conditioned arms. Neither builder grants
 admission. Review and certify each arm before export, and keep the pair together
 in its lineage, split and selection cluster. A prose-quality scorer must provide
-the separate regression measurement; its absent implementation fails closed.
+the separate measurement. The offline loader in [`PROSE_MEASUREMENT.md`](PROSE_MEASUREMENT.md)
+verifies actual blinded judgments, complete answer surfaces and pair parity;
+absent evidence fails closed. Generated-data grades do not measure student retention.
 The runner accepts `pairedTwins` draft inputs through its embedding API, verifies
 their actual generator provenance, independently reviews each conditioned arm,
 and selects both together. It counts both branches with their full prompt context.
@@ -154,8 +159,16 @@ Before a production run:
   and attestation-bound generated splits are implemented and covered by crash,
   repair, selection and export integration tests. Training export includes only
   selected `train` records and requires an independently approved registry.
-- Confirm provider training-use terms and run the independent prose-quality
-  regression measurement. Generated provenance retains license `unverified`.
+- Provider terms are captured in [`rights/README.md`](rights/README.md): DeepSeek
+  permits training other models, and RouteTok is operator-controlled. The CLI
+  binds `verified-permitted` evidence to the matching teacher route; embedding
+  callers can explicitly supply `loadTeacherRights()`.
+- Run independent blinded grading on actual calibration outputs. **4/8** remains
+  an inherited numeric policy floor; historical raw stock answers have not been
+  recovered in this checkout, so a controlled retention comparison is unestablished.
+- The export reload API proves policy-bound SFT labels and emits explicit branch
+  log-probability masks. The eventual DPO consumer must honor those masks; stock
+  `DPOTrainer` compatibility has not been asserted or measured.
 
 Then run the 150–200-seed pilot and inspect measured fidelity, repair rates,
 diversity and prose retention before scaling. No training data has been generated.

@@ -2,13 +2,14 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_TOKEN_BUDGET, PipelineRefusal, planRun, requireTokenizer, runPipeline, type PipelineOptions } from "./generate.js";
-import { createTeacherClient, requireTeacherCredentials, requireReviewerCredentials } from "./teacher.js";
+import { createTeacherClient, requireTeacherCredentials, requireReviewerCredentials, TeacherUncertainDispatchError } from "./teacher.js";
 import { verifyCorpus } from "./verifyCorpus.js";
 import { isTrainingFamily, stableStringify, TRAINING_FAMILIES, type TrainingFamily } from "./spec.js";
 import { createTokenizerBridge, TokenizerBridgeError } from "./tokenizer.js";
 import { loadGenerationPolicy } from "./generationPolicy.js";
 import { openRunStore, sourceTreeDigest } from "./runstore.js";
 import { UncertainDispatchError } from "./pipelineJournal.js";
+import { loadTeacherRights } from "./teacherRights.js";
 
 const USAGE = `Velvet training-data foundry
 
@@ -209,6 +210,7 @@ export async function main(argv: readonly string[], dependencies: CliDependencie
       execute: args.execute, maxRepairs: args.maxRepairs, tokenizer, generator, reviewer,
       generationPolicy: policy, selectionPolicy: { maxRecordsPerCluster: args.clusterCap },
       budget: { ...DEFAULT_TOKEN_BUDGET, maxSupervisedAssistantTokens: args.maxSupervisedTokens },
+      ...(!dependencies.generator ? { teacherRights: loadTeacherRights() } : {}),
       ...(args.families ? { families: args.families } : {}),
       ...(store ? { store } : {}),
     });
@@ -222,7 +224,7 @@ export async function main(argv: readonly string[], dependencies: CliDependencie
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error: unknown) => {
     // Provider errors may contain untrusted response text; do not echo them.
-    process.stderr.write(error instanceof PipelineRefusal || error instanceof UncertainDispatchError
+    process.stderr.write(error instanceof PipelineRefusal || error instanceof UncertainDispatchError || error instanceof TeacherUncertainDispatchError
       ? `REFUSED: ${error.message}\n` : "foundry command failed; inspect local validation diagnostics\n");
     process.exitCode = 1;
   });

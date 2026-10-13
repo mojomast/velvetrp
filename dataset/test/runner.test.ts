@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { planRun, runPipeline, type PipelineOptions, type ScheduledTwinInput, type TokenizerPort } from "../src/generate.js";
+import { planRun, runPipeline, scenarioSpec, twinSourceDigest, type PipelineOptions, type ScheduledTwinInput, type TokenizerPort } from "../src/generate.js";
 import { assertGeneratedSplits, loadGenerationPolicy } from "../src/generationPolicy.js";
 import { openRunStore, RunLockError, type OpenRunStoreOptions } from "../src/runstore.js";
 import { inspectPipelineCheckpoint, PipelineJournal, UncertainDispatchError } from "../src/pipelineJournal.js";
@@ -10,15 +10,21 @@ import { authoritativeFacts, type GroundingReceipt } from "../src/grounding.js";
 import { anchorCandidates, type ProseQualityScorer } from "../src/twins.js";
 import { selectAdmittedRecords } from "../src/selection.js";
 import { verifyAdmissionCertificate, type ApprovedAdmissionRegistry } from "../src/admission.js";
-import { sha256Hex, type TeacherClient, type TeacherCompletionRequest } from "../src/teacher.js";
+import { createTeacherClient, sha256Hex, TeacherUncertainDispatchError, type TeacherClient, type TeacherCompletionRequest } from "../src/teacher.js";
 import { stableStringify } from "../src/spec.js";
 import { createTokenizerBridge, withMeasuredQwen3Template } from "../src/tokenizer.js";
+import { fieldsForSections, WORLD_GENERATION_SECTIONS } from "../src/worldGeneration.js";
+import { loadTeacherRights } from "../src/teacherRights.js";
+import type { StoredToolCall } from "../src/spec.js";
+import { exportTrainingJsonl } from "../src/export.js";
+import { preprocessTrainingExport } from "../src/preprocessExport.js";
 
 const ACCEPT = JSON.stringify({ characterization: 0.8, dialogueQuality: 0.8, coherence: 0.8, narrativeInitiative: 0.8,
   playerAgency: 0.9, nonRepetitive: 0.8, verdict: "accept", rationale: "independent test fixture review" });
 const policy = loadGenerationPolicy();
 const tokenizer: TokenizerPort = { name: "runner test only: whitespace counter", countSupervisedTokens: (example) =>
-  example.targetSelection.supervisedAssistantIndices.reduce((sum, index) => sum + example.messages[index]!.content.split(/\s+/).filter(Boolean).length, 0) };
+  example.targetSelection.supervisedAssistantIndices.reduce((sum, index) => sum + example.messages[index]!.content.split(/\s+/).filter(Boolean).length, 0)
+  + example.targetSelection.supervisedToolCallIndices.reduce((sum, index) => sum + stableStringify(example.messages[index]!.tool_calls).split(/\s+/).length, 0) };
 const proseScorer: ProseQualityScorer = { scorerId: "independent-fixture-grader", version: "fixture-rubric-v1",
   score: () => ({ rate: 0.75, graded: 2, measuredBy: "test:independent-fixture-grader" }) };
 
@@ -26,6 +32,37 @@ function client(model: string, answer: (request: TeacherCompletionRequest) => st
   return { model, baseUrlDigest: "fixture-route-digest", identity: { provider: "test", model, baseUrlDigest: "fixture-route-digest", credentialSource: "env" },
     complete: async (request) => ({ content: await answer(request), toolCalls: [], finishReason: "stop", usage: null,
       responseId: null, attempts: 1, latencyMs: 0, requestDigest: sha256Hex(stableStringify(request)) }) };
+}
+
+function outputClient(answer: (request: TeacherCompletionRequest) => { content: string; toolCalls?: readonly StoredToolCall[] }): TeacherClient {
+  const base = client("fixture-teacher", () => "");
+  return { ...base, complete: async (request) => ({ ...await base.complete(request), ...answer(request) }) };
+}
+
+function publicWorldAnswer(request: TeacherCompletionRequest): Record<string, unknown> {
+  const contract = JSON.parse(request.system.split("PUBLIC WORLD CONTRACT\n")[1]!.split("OUTPUT JSON SCHEMA\n")[0]!.trim()) as { sections: string[]; dependencies: { key: string; kind: string }[] };
+  const locationKey = contract.dependencies.find((dependency) => dependency.kind === "location")!.key;
+  const common = { description: "A bounded public campaign detail.", visibility: "public" };
+  const candidates: Record<string, unknown> = {
+    locations: [{ ...common, key: "new-location", name: "The Pier" }],
+    factions: [{ ...common, key: "new-faction", name: "The Dock Guild" }],
+    npcs: [{ ...common, key: "new-npc", name: "The Keeper", archetype: "clerk", locationKey }],
+    quests: [{ ...common, key: "new-quest", title: "Find the Ledger", objectives: [{ key: "new-objective", description: "Locate the ledger at the pier.", visibility: "public", targetProgress: 1 }] }],
+    encounters: [{ ...common, key: "new-encounter", title: "An Empty Office" }],
+    lore: [{ key: "new-lore", title: "The Pier", summary: "The pier is publicly known.", visibility: "public" }],
+    questItems: [{ ...common, key: "new-item", name: "A Ribbon", mechanics: { state: "inert", reason: "Decorative only." } }],
+    monsterConcepts: [{ ...common, key: "new-monster", name: "A Harbour Hound", role: "watcher", mechanics: { state: "inert", reason: "No mechanics implemented." } }],
+  };
+  return Object.fromEntries(contract.sections.flatMap((section) => [...fieldsForSections([section])]).filter((field) => field !== "connections")
+    .map((field) => [field, candidates[field]]));
+}
+
+function publicReceiptNarration(request: TeacherCompletionRequest): string {
+  const receipts = JSON.parse(request.system.split("AUTHORITATIVE PUBLIC RECEIPTS\n")[1]!.split(" ADVERTISED")[0]!
+    .split(" PUBLIC WORLD")[0]!) as GroundingReceipt[];
+  return receipts.map((receipt) => receipt.kind === "check"
+    ? `Your ${receipt.skill} check comes to ${receipt.total} against DC ${receipt.dc}: ${receipt.outcome}.`
+    : receipt.kind === "combat" && receipt.outcome.kind === "damage" ? `${receipt.target} has ${receipt.outcome.hitPointsAfter} HP remaining.` : "").join(" ");
 }
 
 function setup(t: { after(fn: () => void): void }, overrides: Partial<PipelineOptions> = {}) {
@@ -51,13 +88,15 @@ function twinInput(): ScheduledTwinInput {
     difficulty: "Medium", outcome: "success", visibility: "public" }];
   const candidates = anchorCandidates(authoritativeFacts(receipts));
   const numeric = candidates.find((anchor) => anchor.value === "22")!;
-  return { spec: { caseId: "runner-twin", prompt: [{ role: "user", content: "Narrate the committed check." }], receipts,
+  const input: Omit<ScheduledTwinInput, "sourceDigest"> = { lineage: { characterFamily: "authored-runner-character", worldFamily: "authored-runner-world", scenarioFamily: "authored-runner-scenario" },
+    spec: { caseId: "runner-twin", prompt: [{ role: "user", content: "Narrate the committed check." }], receipts,
     faithfulNarration: "Your Investigation check comes to 22 against a Medium DC of 15: success.",
     counterfactualNarration: "Your Investigation check comes to 24 against a Medium DC of 15: your Investigation check succeeds.",
     flip: { op: "set-value", factId: "roll", role: "total", value: 24 }, flipAnchor: numeric },
     counterfactualReceipts: [{ ...receipts[0]!, total: 24 } as GroundingReceipt],
     anchors: [candidates.find((anchor) => anchor.value === "Investigation")!, numeric, candidates.find((anchor) => anchor.value === "Medium")!],
     seed: "twin-seed", generator: { provider: "test", model: "fixture-teacher", baseUrlDigest: "fixture-route-digest", temperature: 0.7 } };
+  return { ...input, sourceDigest: twinSourceDigest(input) };
 }
 
 test("K realizations retain scenario facts, lineage and split, while producing distinct contextual prompts", () => {
@@ -178,6 +217,192 @@ test("budget pauses remain resumable, reconstruct spend and skip already complet
   assert.equal(resumed.budget.supervisedTokens, run.store.candidates().reduce((sum, record) => sum + record.provenance.tokenCount!.tokens, 0));
 });
 
+test("mixed-family non-prefix resume reserves all known spend before filling earlier budget holes", async (t) => {
+  const generator = client("fixture-teacher", () => "I cannot open it.");
+  const run = setup(t, { seed: "budget-audit", units: 2, families: ["boundary-recovery", "roleplay-conversation"], generator,
+    tokenizer: { name: "audit fixture count:15", countSupervisedTokens: () => 15 }, maxCompletionTokens: 20 });
+  const target = run.plan.units[0]!.target;
+  const first = await runPipeline({ ...run.options, store: run.store, budget: { maxSupervisedAssistantTokens: 20, perTarget: { [target]: 0 } } });
+  assert.equal(first.admitted, 1);
+  assert.equal(first.budget.supervisedTokens, 15);
+  const calls = run.calls.length;
+  const resumed = await runPipeline({ ...run.options, store: run.reopen(), budget: { maxSupervisedAssistantTokens: 20, perTarget: { [target]: 20 } } });
+  assert.equal(resumed.admitted, 1);
+  assert.equal(resumed.budget.supervisedTokens, 15);
+  assert.equal(run.calls.length, calls, "known later spend must prevent an earlier new generation/review");
+  assert.equal(resumed.complete, false);
+});
+
+for (const outcome of ["raw-response", "uncertain", "dispatch-only"] as const) test(`non-prefix resume reconciles ${outcome} before any new paid work`, async (t) => {
+  let posts = 0;
+  const real = createTeacherClient({ credentials: { providerId: "test", model: "fixture-teacher", baseUrl: "https://fixture.invalid/v1", apiKey: "fixture-secret-only", source: "env" },
+    sleep: async () => {}, transport: async () => {
+      posts += 1;
+      if (outcome === "uncertain") throw new Error("fixture lost response");
+      return { status: 200, body: JSON.stringify({ id: "fixture-response", choices: [{ message: { content: "I cannot open it." }, finish_reason: "stop" }] }), headers: {} };
+    } });
+  let interrupted = true;
+  const generator: TeacherClient = { ...real, complete: async (request) => {
+    if (interrupted && outcome === "dispatch-only") throw new Error("fixture crash before physical request");
+    const completion = await real.complete(request);
+    if (interrupted) throw new Error("fixture crash after raw outcome before logical response");
+    return completion;
+  } };
+  const run = setup(t, { seed: "budget-audit", units: 2, families: ["boundary-recovery", "roleplay-conversation"], generator,
+    tokenizer: { name: "audit fixture count:15", countSupervisedTokens: () => 15 }, maxCompletionTokens: 20, maxRepairs: 0 });
+  const earlier = run.plan.units[0]!;
+  const later = run.plan.units[1]!;
+  await assert.rejects(() => runPipeline({ ...run.options, store: run.store,
+    budget: { maxSupervisedAssistantTokens: 20, perTarget: { [earlier.target]: 0 } } }), outcome === "uncertain" ? TeacherUncertainDispatchError : /fixture crash/);
+  assert.equal(inspectPipelineCheckpoint(run.store, `response:${later.unitId}-a0`), null);
+  const originalPosts = posts;
+  interrupted = false;
+  const resumed = run.reopen();
+  const options = { ...run.options, store: resumed, budget: { maxSupervisedAssistantTokens: 20, perTarget: { [earlier.target]: 20 } } };
+  if (outcome !== "raw-response") {
+    await assert.rejects(() => runPipeline(options), UncertainDispatchError);
+    assert.equal(posts, originalPosts);
+    assert.equal(run.calls.length, 0);
+  } else {
+    const report = await runPipeline(options);
+    assert.equal(report.budget.supervisedTokens, 15);
+    assert.equal(report.admitted, 1);
+    assert.equal(report.complete, false);
+    assert.equal(posts, originalPosts, "raw response replay must reserve known spend before earlier new calls");
+    assert.equal(run.calls.length, 1, "only the recovered candidate needs independent review");
+    assert.ok(inspectPipelineCheckpoint(resumed, `response:${later.unitId}-a0`));
+  }
+});
+
+test("world plan uses shared section identifiers and exposes schema/counts sufficient for public-only successful answers", async (t) => {
+  const plan = planRun({ seed: "pilot-1", units: 175, realizationsPerScenario: 3 });
+  for (const unit of plan.units.filter((entry) => entry.spec.family === "world-generation")) {
+    assert.ok(unit.spec.oracle.sections.every((section) => (WORLD_GENERATION_SECTIONS as readonly string[]).includes(section)));
+    assert.match(unit.realization.context[0]!.content, /OUTPUT JSON SCHEMA/);
+    assert.ok(Object.values(unit.spec.oracle.desiredCounts).every((count) => count > 0));
+  }
+  const run = setup(t, { units: 8, families: ["world-generation"], generator: outputClient((request) => ({ content: JSON.stringify(publicWorldAnswer(request)) })) });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 8, JSON.stringify(run.store.candidates().map((record) => record.admission.findings)));
+});
+
+for (const defect of ["bad-reference", "omitted-section", "existing-key"] as const) test(`exact raw world target cannot be certified with ${defect}`, async (t) => {
+  let seed = "world-negative";
+  while (!planRun({ seed, units: 1, families: ["world-generation"] }).units[0]!.spec.oracle.sections.includes("npcs")) seed += "+";
+  const generator = outputClient((request) => {
+    const answer = publicWorldAnswer(request);
+    const npc = (answer.npcs as Record<string, unknown>[])[0]!;
+    if (defect === "bad-reference") npc.factionKeys = ["nonexistent-faction"];
+    if (defect === "omitted-section") delete answer.npcs;
+    if (defect === "existing-key") {
+      const contract = JSON.parse(request.system.split("PUBLIC WORLD CONTRACT\n")[1]!.split("OUTPUT JSON SCHEMA\n")[0]!.trim());
+      npc.key = contract.dependencies[0].key;
+    }
+    return { content: JSON.stringify(answer) };
+  });
+  const run = setup(t, { seed, units: 1, families: ["world-generation"], generator, maxRepairs: 0 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 0);
+  assert.match(report.unitOutcomes[0]!.refusedAt!, /requested-section-schema|reference-closure/);
+});
+
+for (const defect of ["mixed-content", "unadvertised-tool", "extra-argument", "extra-call", "omitted-receipt"] as const) test(`grounded ${defect} cannot hide behind valid narration`, async (t) => {
+  const generator = outputClient((request) => {
+    let narration = publicReceiptNarration(request);
+    if (defect === "omitted-receipt") narration = narration.split(". ")[0]! + ".";
+    const call: StoredToolCall = { id: "grounded", type: "function", function: { name: defect === "unadvertised-tool" ? "unadvertised_admin_grant" : "submit_adventure_narration",
+      arguments: { narration, ...(defect === "extra-argument" ? { amount: 999 } : {}) } } };
+    return { content: defect === "mixed-content" ? "You gain 999 gold." : "", toolCalls: defect === "extra-call" ? [call, { ...call, id: "other" }] : [call] };
+  });
+  const run = setup(t, { units: 1, families: ["grounded-narration"], generator, maxRepairs: 0 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 0);
+  assert.match(report.unitOutcomes[0]!.refusedAt!, /narration-transport|receipt-provenance/);
+});
+
+test("public actor/target receipts support an on-request grounded happy path", async (t) => {
+  const generator = outputClient((request) => ({ content: "", toolCalls: [{ id: "grounded", type: "function", function: {
+    name: "submit_adventure_narration", arguments: { narration: publicReceiptNarration(request) } } }] }));
+  const run = setup(t, { units: 1, families: ["grounded-narration"], generator });
+  assert.equal((await runPipeline({ ...run.options, store: run.store })).admitted, 1);
+});
+
+for (const correct of [false, true]) test(`tool selection independently checks intent for ${correct ? "correct" : "wrong but advertised"} candidates`, async (t) => {
+  let seed = "tool-audit";
+  while (planRun({ seed, units: 1, families: ["tool-selection"] }).units[0]!.spec.oracle.toolFamily !== "exact-candidate") seed += "+";
+  const plan = planRun({ seed, units: 1, families: ["tool-selection"] });
+  const unit = plan.units[0]!;
+  const selected = unit.spec.oracle.advertisedCandidates.find((candidate) => unit.spec.oracle.allowedCandidateIds.includes(candidate.candidateId) === correct)!;
+  const generator = outputClient(() => ({ content: "", toolCalls: [{ id: "choice", type: "function", function: {
+    name: selected.toolName, arguments: { candidateId: selected.candidateId, digest: selected.digest } } }] }));
+  const run = setup(t, { seed, units: 1, families: ["tool-selection"], generator, maxRepairs: 0 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, Number(correct));
+  const validation = inspectPipelineCheckpoint<{ runs: { validator: string; evidence: { selection: { finalOutcome: string; intentCorrect: boolean } } }[] }>(run.store, `validation:${unit.unitId}-a0`)!;
+  const decision = validation.runs.find((entry) => entry.validator === "advertised-candidate-binding")!.evidence.selection;
+  assert.equal(decision.intentCorrect, correct);
+  assert.equal(decision.finalOutcome, "unknown", "choice is not a committed engine settlement");
+});
+
+for (const value of ["array", "object", "null"] as const) test(`exact candidate ${value} arguments never earn transport validity through coercion`, async (t) => {
+  let seed = "tool-audit";
+  while (planRun({ seed, units: 1, families: ["tool-selection"] }).units[0]!.spec.oracle.toolFamily !== "exact-candidate") seed += "+";
+  const unit = planRun({ seed, units: 1, families: ["tool-selection"] }).units[0]!;
+  const candidate = unit.spec.oracle.advertisedCandidates.find((entry) => unit.spec.oracle.allowedCandidateIds.includes(entry.candidateId))!;
+  const invalid = (text: string): unknown => value === "array" ? [text] : value === "object" ? { value: text } : null;
+  const generator = outputClient(() => ({ content: "", toolCalls: [{ id: "invalid", type: "function", function: {
+    name: candidate.toolName, arguments: { candidateId: invalid(candidate.candidateId), digest: invalid(candidate.digest) } } }] }));
+  const run = setup(t, { seed, units: 1, families: ["tool-selection"], generator, maxRepairs: 0 });
+  assert.equal((await runPipeline({ ...run.options, store: run.store })).admitted, 0);
+  assert.deepEqual(run.store.candidates()[0]!.messages.at(-1)!.tool_calls![0]!.function.arguments.candidateId, invalid(candidate.candidateId));
+});
+
+for (const family of ["roleplay-conversation", "boundary-recovery"] as const) test(`no-tools ${family} refuses an unadvertised supervised action`, async (t) => {
+  const generator = outputClient(() => ({ content: "The lantern gutters beside the closed ledger.", toolCalls: [{ id: "unadvertised", type: "function", function: {
+    name: "unadvertised_admin_grant", arguments: { amount: 999 } } }] }));
+  const run = setup(t, { units: 1, families: [family], generator, maxRepairs: 0 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 0);
+  const validation = inspectPipelineCheckpoint<{ runs: { validator: string; passed: boolean }[] }>(run.store, `validation:${run.plan.units[0]!.unitId}-a0`)!;
+  assert.equal(validation.runs.find((run) => run.validator === "tool-envelope")!.passed, false);
+});
+
+test("dependencies are hash-bound and canonical serialization rejects unsupported objects", () => {
+  const spec = scenarioSpec("dependency-binding", { family: "world-generation" });
+  const digest = sha256Hex(stableStringify(spec));
+  (spec.oracle.dependencies as Map<string, unknown>).set("new-hidden-dependency", { key: "new-hidden-dependency", kind: "faction", visibility: "gm" });
+  assert.notEqual(sha256Hex(stableStringify(spec)), digest);
+  assert.throws(() => stableStringify({ unsupported: new Set(["hidden"]) }), /unsupported non-JSON/);
+});
+
+test("unmeasurable candidate is durably quarantined, never assigned zero measured tokens or blindly replayed", async (t) => {
+  const generator = client("fixture-teacher", () => "unmeasurable-candidate");
+  const run = setup(t, { units: 2, generator, tokenizer: { name: "fixture-refusal-tokenizer", countSupervisedTokens: (example) => {
+    if (example.messages.at(-1)?.content === "unmeasurable-candidate") throw new Error("test-only unsupported target");
+    return 1;
+  } } });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.complete, false);
+  assert.equal(report.admitted, 0);
+  assert.equal(report.unmeasuredAttemptIds.length, 1);
+  assert.equal(run.store.candidates()[0]!.provenance.tokenCount, null);
+  const resumed = await runPipeline({ ...run.options, store: run.reopen() });
+  assert.deepEqual(resumed, report);
+});
+
+test("teacher rights provenance retains the matching inspected terms and exact source bytes", async (t) => {
+  const rights = loadTeacherRights();
+  const base = client(rights.teacher.model, () => "The lantern gutters beside the closed ledger.");
+  const generator = { ...base, baseUrlDigest: rights.teacher.baseUrlDigest!, identity: { ...base.identity,
+    provider: rights.teacher.provider, baseUrlDigest: rights.teacher.baseUrlDigest! } };
+  const run = setup(t, { units: 1, generator, teacherRights: rights });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  const record = report.unitOutcomes[0]!.admittedRecord!;
+  assert.equal(record.provenance.license.status, "verified-permitted");
+  assert.deepEqual(record.provenance.sourceDigests.teacherTrainingRights, rights.receiptDigest);
+  for (const digest of Object.values(rights.sourceDigests)) assert.equal(sha256Hex(inspectPipelineCheckpoint<string>(run.store, `artifact:${digest}`)!), digest);
+});
+
 test("actual student-label overshoot refuses admission before review", async (t) => {
   const run = setup(t, { units: 1, tokenizer: { name: "test-only deliberately-large-mask", countSupervisedTokens: () => 200 },
     budget: { maxSupervisedAssistantTokens: 128 } });
@@ -214,8 +439,10 @@ test("checkpoint heartbeats retain an active lease beyond its original age, and 
   now += 90;
   assert.throws(() => openRunStore(options), RunLockError);
   now += 101;
+  assert.throws(() => openRunStore(options), RunLockError, "age alone must not reclaim a live process");
+  // Explicit lease loss is a test seam; production reclaims only a gone holder.
+  rmSync(owner.paths.lockPath, { force: true });
   const replacement = openRunStore(options);
-  assert.equal(replacement.snapshot().diagnostics.tookOverStaleLock, true);
   assert.throws(() => owner.renewLease(), RunLockError);
   assert.throws(() => owner.addNote("lost holder write"), RunLockError);
   let calls = 0;
@@ -321,6 +548,21 @@ test("both selective-fidelity arms are independently reviewed, admitted and sele
   assert.deepEqual(await runPipeline({ ...run.options, store: run.reopen() }), report);
 });
 
+test("prepared twin source IDs and authored lineages remain reserved and stable across run/realization seeds", () => {
+  const input = twinInput();
+  const first = planRun({ seed: "outer-1", units: 1, pairedTwins: [input] }).units.filter((unit) => unit.twinGroupId);
+  const second = planRun({ seed: "outer-2", units: 1, pairedTwins: [{ ...input, seed: "changed-realization" }] }).units.filter((unit) => unit.twinGroupId);
+  assert.equal(first[0]!.spec.split, second[0]!.spec.split);
+  assert.deepEqual(first[0]!.spec.lineage, input.lineage);
+  assert.deepEqual(second[0]!.spec.lineage, input.lineage);
+  const reserved = { ...input, spec: { ...input.spec, caseId: policy.reservedCaseIds[0]! } };
+  assert.throws(() => planRun({ seed: "outer", units: 1, pairedTwins: [{ ...reserved, sourceDigest: twinSourceDigest(reserved) }] }), /frozen-reserved/);
+  const overlap = { ...input, lineage: policy.reservedLineages[0]! };
+  assert.throws(() => planRun({ seed: "outer", units: 1, pairedTwins: [{ ...overlap, sourceDigest: twinSourceDigest(overlap) }] }), /frozen evaluation lineage/);
+  const conflicting = { ...input, lineage: { ...input.lineage, worldFamily: "different-authored-world" } };
+  assert.throws(() => planRun({ seed: "outer", units: 1, pairedTwins: [input, { ...conflicting, sourceDigest: twinSourceDigest(conflicting) }] }), /conflicting immutable source/);
+});
+
 test("a rejected or cap-limited twin arm cannot leave a single selected preference", async (t) => {
   const reviewer = client("fixture-reviewer", (request) => request.attemptId.includes("counterfactual")
     ? ACCEPT.replace('"accept"', '"reject"') : ACCEPT);
@@ -411,4 +653,45 @@ test("the real CPU tokenizer measures full runner context and both preference br
     }
   }
   assert.deepEqual(await runPipeline({ ...run.options, store: run.reopen() }), report);
+  const artifacts = new Map<string, string>();
+  const certificates = new Map<string, string>();
+  const validators: Record<string, { version: string; implementationDigest: string }> = {};
+  const implementation = readFileSync("dataset/src/generate.ts", "utf8");
+  const implementationDigest = sha256Hex(implementation);
+  artifacts.set(implementationDigest, implementation);
+  const records = report.unitOutcomes.map((outcome) => outcome.admittedRecord!);
+  for (const outcome of report.unitOutcomes) {
+    const record = outcome.admittedRecord!;
+    certificates.set(record.recordId, record.admissionCertificate.certificateDigest);
+    const validation = inspectPipelineCheckpoint<{ artifactDigests: string[] }>(run.store, `validation:${outcome.admittedAttemptId}`)!;
+    for (const digest of validation.artifactDigests) artifacts.set(digest, inspectPipelineCheckpoint<string>(run.store, `artifact:${digest}`)!);
+    const review = inspectPipelineCheckpoint<{ request: TeacherCompletionRequest }>(run.store, `dispatch:${outcome.admittedAttemptId}-review`)!;
+    artifacts.set(sha256Hex(review.request.system), review.request.system);
+    for (const evidence of record.admissionCertificate.evidence) validators[evidence.validator] = { version: evidence.version, implementationDigest };
+  }
+  const approvedRegistry = withMeasuredQwen3Template({ artifacts, certificates, validators, templateProfiles: [] });
+  const exported = exportTrainingJsonl(records, { outputDir: join(run.root, "real-tokenizer-export"), approvedRegistry });
+  const checksumDigest = sha256Hex(readFileSync(exported.checksumPath, "utf8"));
+  const prepared = preprocessTrainingExport({ outputDir: exported.outputDir, checksumDigest, approvedRegistry, tokenizer: bridge });
+  assert.equal(prepared.sft.length, 1);
+  assert.equal(prepared.preference.length, 2);
+  const sftRecord = records.find((record) => !record.preference)!;
+  const sftTrace = bridge.measure({ family: sftRecord.family, messages: sftRecord.messages, targetSelection: sftRecord.targetSelection });
+  assert.deepEqual(prepared.sft[0]!.inputIds, sftTrace.inputIds);
+  assert.deepEqual(prepared.sft[0]!.labels, sftTrace.labels);
+  for (const row of prepared.preference) for (const arm of ["chosen", "rejected"] as const) {
+    const record = records.find((entry) => entry.recordId === row.recordId)!;
+    const offset = record.preference!.prompt.length;
+    const trace = bridge.measure({ family: record.family, messages: [...record.preference!.prompt, ...record.preference![arm]],
+      targetSelection: { supervisedAssistantIndices: record.preferenceTargets![arm].supervisedAssistantIndices.map((index) => index + offset), supervisedToolCallIndices: [] } });
+    assert.deepEqual(row[arm].inputIds, trace.inputIds);
+    assert.deepEqual(row[arm].labels, trace.labels);
+    assert.deepEqual(arm === "chosen" ? row.chosenLogProbabilityMask : row.rejectedLogProbabilityMask, trace.labels.map((label) => label !== -100));
+    assert.equal(row[arm].labels.filter((label) => label !== -100).at(-1), 151645, "the selected turn terminator survives export and preparation; trailing newlines stay masked");
+  }
+  const alternate = createTokenizerBridge({ python: process.env.FOUNDRY_TOKENIZER_PYTHON!, assetsDir: ".dataset/tokenizer/qwen3-8b", maxSequenceLength: 8192 });
+  assert.notEqual(alternate.policyDigest, bridge.policyDigest);
+  assert.throws(() => preprocessTrainingExport({ outputDir: exported.outputDir, checksumDigest, approvedRegistry, tokenizer: alternate }), /preprocessing policy/);
+  writeFileSync(exported.trainingPath, "tampered\n");
+  assert.throws(() => preprocessTrainingExport({ outputDir: exported.outputDir, checksumDigest, approvedRegistry, tokenizer: bridge }), /changed training/);
 });

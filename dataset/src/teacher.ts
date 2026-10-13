@@ -29,10 +29,26 @@
  *    here matches it. An "optimistic" 30s default would abort real generations
  *    and turn a cost problem into a completeness problem.
  *
- * 4. RETRY ONLY WHAT IS RETRYABLE. 429 and 5xx are transient. Every other 4xx is
- *    a permanent refusal by the provider -- a malformed request, a bad model id,
- *    an auth failure -- and retrying it burns wall-clock and money to reach the
- *    same answer. Those are surfaced immediately.
+ * 4. NEVER RESEND AN UNCERTAIN REQUEST. A socket error or a timeout AFTER the
+ *    request left this process is not proof that the provider refused it. It may
+ *    have accepted, generated and billed the completion before the connection
+ *    died, and repeating it buys a second copy of data the run cannot prove it
+ *    does not already have. An uncertain transport outcome therefore raises
+ *    `TeacherUncertainDispatchError` and the client stops. The only way to earn
+ *    the right to repeat one is an explicit, VERIFIED provider idempotency
+ *    contract, supplied per request as `idempotencyKey`; then a repeat is a
+ *    deduplicated lookup rather than a second charge, and the evidence says so.
+ * 5. RETRY ONLY WHAT THE SERVER EXPLICITLY REFUSED. 429 is the relay
+ *    answering "not now", which is evidence the request was NOT accepted. Every
+ *    other 4xx is a permanent refusal by the provider -- a malformed request, a
+ *    bad model id, an auth failure -- and retrying it burns wall-clock and money
+ *    to reach the same answer. Those are surfaced immediately.
+ * 6. LEAVE DURABLE EVIDENCE OF EVERY PHYSICAL REQUEST. A request may carry a
+ *    runtime-only `observer`. It is awaited BEFORE each socket opens and again
+ *    with the returned body BEFORE parsing, so a caller can durably record that
+ *    a specific physical request was sent and exactly what came back. The
+ *    observer is never part of the request body, headers or digest, and every
+ *    value it receives has already passed the credential guard.
  *
  * Usage is returned per call so budget accounting is possible at all. When the
  * provider omits usage the client says so (`usage: null`) rather than inventing
@@ -122,6 +138,40 @@ export class TeacherResponseError extends TeacherError {
   constructor(message: string) {
     super(message);
     this.name = "TeacherResponseError";
+  }
+}
+
+/**
+ * A physical request whose outcome the client CANNOT observe.
+ *
+ * The socket died, the relay never answered, or the timeout fired after the
+ * bytes were handed to the kernel. The provider may still have accepted,
+ * generated and billed the request. This client will not send it again: without a
+ * verified provider idempotency or retrieval contract, a repeat is an
+ * unverifiable second charge. A caller must persist this evidence and refuse to
+ * resend on a later invocation.
+ */
+export class TeacherUncertainDispatchError extends TeacherError {
+  readonly attemptId: string;
+  /** 1-based index of the physical request whose outcome is unknown. */
+  readonly requestNumber: number;
+  /** True only when a verified idempotency contract authorised the repeat. */
+  readonly idempotent: boolean;
+  readonly cause: Error;
+
+  constructor(attemptId: string, requestNumber: number, detail: string, cause: Error, idempotent = false) {
+    super(
+      `teacher dispatch outcome is unknown for attempt ${JSON.stringify(attemptId)} ` +
+        `(physical request ${requestNumber}): ${detail}` +
+        `${idempotent
+          ? "; a verified provider idempotency contract permits a deduplicated retry"
+          : "; it will not be resent automatically because the provider offers no verified idempotency contract"}`,
+    );
+    this.name = "TeacherUncertainDispatchError";
+    this.attemptId = attemptId;
+    this.requestNumber = requestNumber;
+    this.idempotent = idempotent;
+    this.cause = cause;
   }
 }
 
@@ -438,7 +488,58 @@ export interface TeacherCompletionRequest {
   readonly responseFormat?: "text" | "json" | undefined;
   readonly timeoutMs?: number | undefined;
   readonly maxAttempts?: number | undefined;
+  /**
+   * A VERIFIED provider idempotency contract for this logical request.
+   *
+   * Absent by default, and absent means exactly one thing: an uncertain physical
+   * dispatch is never repeated. Supply it only for a relay whose idempotency
+   * behaviour has actually been confirmed; the key then travels as the
+   * `idempotency-key` header, joins the request digest (so a resume cannot
+   * silently drop or change it), and authorises a deduplicated retry.
+   */
+  readonly idempotencyKey?: string | undefined;
+  /**
+   * Runtime-only observer for PHYSICAL request evidence.
+   *
+   * Awaited before each socket opens and again with the returned body before
+   * parsing, so a durable caller (the pipeline journal) can record what was sent
+   * and what came back. NEVER part of the request body, the headers or the
+   * request digest, and therefore never a source of request-identity drift.
+   * Throwing from the observer aborts the call before the next socket opens,
+   * which is what makes an expired lease able to stop a physical retry.
+   */
+  readonly observer?: TeacherDispatchObserver | undefined;
 }
+
+/** Evidence about one physical HTTP request. Contains no credential by construction. */
+export interface TeacherDispatchObservation {
+  /** `before-send` precedes the socket; `response`/`uncertain` follow it. */
+  readonly phase: "before-send" | "response" | "uncertain";
+  readonly attemptId: string;
+  /** 1-based physical request number within this `complete()` call. */
+  readonly requestNumber: number;
+  /** HTTP status, or null when no response arrived. */
+  readonly status: number | null;
+  /**
+   * The raw relay body, credential-scrubbed. Full for a 2xx (so the exact
+   * returned bytes can be replayed without a resend), a bounded excerpt for a
+   * rejection. Null when no body was returned.
+   */
+  readonly body: string | null;
+  /** Digest of the UNSCRUBBED body, so a redacted replay is detectable rather than trusted. */
+  readonly bodyDigest: string | null;
+  readonly errorName: string | null;
+  readonly errorMessage: string | null;
+  /** Digest of the logical request this physical request carried. */
+  readonly requestDigest: string;
+  /** Repeatable rate-limit rejection, or an explicit verified idempotency contract. */
+  readonly retryable: boolean;
+}
+
+export type TeacherDispatchObserver = (observation: TeacherDispatchObservation) => void | Promise<void>;
+
+/** Rejection evidence is bounded; a 2xx body is retained whole for exact replay. */
+export const REJECTION_EVIDENCE_LIMIT = 4_000;
 
 export interface TeacherUsage {
   readonly promptTokens: number;
@@ -494,9 +595,9 @@ export interface CreateTeacherClientOptions {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** 429 and 5xx are transient. Every other non-2xx is a permanent refusal. */
+/** Rate-limit rejection is repeatable. An upstream 5xx can follow a billed execution. */
 export function isRetryableStatus(status: number): boolean {
-  return status === 429 || (status >= 500 && status <= 599);
+  return status === 429;
 }
 
 export function retryDelayMs(attempt: number, retryAfterHeader?: string | undefined): number {
@@ -612,6 +713,64 @@ function buildRequestBody(request: TeacherCompletionRequest, model: string): str
 }
 
 /**
+ * Pure, deterministic decode of a relay body.
+ *
+ * Split out from the transport so that a durable caller holding the RAW bytes of
+ * a returned response can reproduce the exact same completion — or the exact same
+ * `TeacherResponseError` — WITHOUT sending the request again. That is what makes
+ * "the provider answered and the answer was unusable" distinguishable from "the
+ * provider never answered".
+ */
+export function decodeTeacherResponseBody(
+  body: string,
+  context: { readonly requestNumber: number; readonly requestDigest: string; readonly latencyMs?: number },
+): TeacherCompletion {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new TeacherResponseError("teacher response body is not valid JSON");
+  }
+  const { choices, usage } = parseChoices(parsed);
+  const first = choices[0]!;
+  return {
+    content: first.message.content,
+    toolCalls: parseToolCalls(first.message.tool_calls),
+    finishReason: first.finish_reason ?? "unknown",
+    usage,
+    responseId: typeof (parsed as Record<string, unknown>).id === "string"
+      ? (parsed as Record<string, unknown>).id as string
+      : `resp-${context.requestDigest.slice(0, 16)}-${context.requestNumber}`,
+    attempts: context.requestNumber,
+    latencyMs: context.latencyMs ?? 0,
+    requestDigest: context.requestDigest,
+  };
+}
+
+/**
+ * Replays a captured response body captured by {@link TeacherDispatchObserver}.
+ *
+ * The digest is over the bytes as the provider returned them. If it does not
+ * match, the retained body was redacted (the credential guard replaced a secret
+ * the provider echoed) and the stored bytes are NOT the bytes the model
+ * produced. Replaying them would fabricate training data, so the replay is
+ * refused instead of silently returning altered content.
+ */
+export function replayCapturedTeacherResponse(
+  captured: { readonly bodyDigest: string; readonly body: string },
+  context: { readonly attemptId: string; readonly requestNumber: number; readonly requestDigest: string },
+): TeacherCompletion {
+  if (sha256Hex(captured.body) !== captured.bodyDigest) {
+    throw new TeacherCredentialError(
+      `the retained teacher response for attempt ${JSON.stringify(context.attemptId)} was redacted before it ` +
+        "was journaled, so its exact bytes cannot be recovered; the provider echoed credential-shaped content " +
+        "and this response must not be replayed or resent",
+    );
+  }
+  return decodeTeacherResponseBody(captured.body, context);
+}
+
+/**
  * Constructs a teacher client, or refuses.
  *
  * Refusal is total: with no credential there is no object, so no downstream
@@ -641,10 +800,18 @@ export function createTeacherClient(options: CreateTeacherClientOptions = {}): T
 
     async complete(request: TeacherCompletionRequest): Promise<TeacherCompletion> {
       const body = buildRequestBody(request, credentials.model);
+      const idempotencyKey = request.idempotencyKey?.trim() ?? "";
       // The digest is over the request WITHOUT the credential, so it can be
-      // recorded in the run store and compared across attempts safely.
+      // recorded in the run store and compared across attempts safely. The
+      // idempotency contract IS part of it: a resume that dropped or changed it
+      // would change what a repeat of the same attempt id means.
       const requestDigest = sha256Hex(
-        JSON.stringify({ model: credentials.model, body, attemptId: request.attemptId }),
+        JSON.stringify({
+          model: credentials.model,
+          body,
+          attemptId: request.attemptId,
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+        }),
       );
       const timeoutMs = request.timeoutMs ?? defaultTimeoutMs;
       const maxAttempts = request.maxAttempts ?? DEFAULT_TEACHER_MAX_ATTEMPTS;
@@ -654,7 +821,17 @@ export function createTeacherClient(options: CreateTeacherClientOptions = {}): T
       const startedAt = Date.now();
       let lastError: TeacherError | null = null;
 
+      /** Evidence is durable before the next socket opens; a throw here stops the call. */
+      const observe = async (observation: Omit<TeacherDispatchObservation, "attemptId" | "requestDigest">): Promise<void> => {
+        await request.observer?.({ ...observation, attemptId: request.attemptId, requestDigest });
+      };
+
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        await observe({
+          phase: "before-send", requestNumber: attempt, status: null,
+          body: null, bodyDigest: null, errorName: null, errorMessage: null, retryable: false,
+        });
+
         let response: TeacherHttpResponse;
         try {
           response = await transport({
@@ -665,15 +842,31 @@ export function createTeacherClient(options: CreateTeacherClientOptions = {}): T
             headers: {
               "content-type": "application/json",
               authorization: `Bearer ${credentials.apiKey}`,
+              ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
             },
             body,
             timeoutMs,
           });
         } catch (cause) {
-          // Transport-level failure (socket, abort). Retried within budget; the
-          // message is flattened through the guard so a driver error cannot
-          // surface a header.
+          // A transport-level failure (socket, abort). The message is flattened
+          // through the guard so a driver error cannot surface a header.
           const message = guard.describe(cause);
+          const errorName = cause instanceof Error ? cause.name : "Error";
+          // Retryable ONLY under a verified idempotency contract. Without one,
+          // this is an unknown outcome, not a failure.
+          await observe({
+            phase: "uncertain", requestNumber: attempt, status: null,
+            body: null, bodyDigest: null, errorName, errorMessage: message, retryable: idempotencyKey !== "",
+          });
+          options.onCall?.({
+            attemptId: request.attemptId, model: credentials.model, baseUrlDigest, requestDigest,
+            attempts: attempt, status: null, finishReason: null, usage: null, contentBytes: 0,
+          });
+          if (!idempotencyKey) {
+            throw new TeacherUncertainDispatchError(
+              request.attemptId, attempt, message, cause instanceof Error ? cause : new Error(message),
+            );
+          }
           lastError = cause instanceof TeacherTimeoutError ? cause : new TeacherError(`teacher transport failed: ${message}`);
           if (attempt === maxAttempts) break;
           await sleep(retryDelayMs(attempt));
@@ -681,26 +874,18 @@ export function createTeacherClient(options: CreateTeacherClientOptions = {}): T
         }
 
         if (response.status >= 200 && response.status < 300) {
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(response.body);
-          } catch {
-            throw new TeacherResponseError("teacher response body is not valid JSON");
-          }
-          const { choices, usage } = parseChoices(parsed);
-          const first = choices[0]!;
-          const completion: TeacherCompletion = {
-            content: first.message.content,
-            toolCalls: parseToolCalls(first.message.tool_calls),
-            finishReason: first.finish_reason ?? "unknown",
-            usage,
-            responseId: typeof (parsed as Record<string, unknown>).id === "string"
-              ? (parsed as Record<string, unknown>).id as string
-              : `resp-${requestDigest.slice(0, 16)}-${attempt}`,
-            attempts: attempt,
-            latencyMs: Date.now() - startedAt,
-            requestDigest,
-          };
+          // Evidence first, parse second: a malformed 2xx body must already be
+          // durable before anything downstream can throw on it. The observation
+          // carries SCRUBBED bytes plus the digest of the bytes as returned.
+          const evidence = guard.scrub(response.body);
+          await observe({
+            phase: "response", requestNumber: attempt, status: response.status,
+            body: evidence, bodyDigest: sha256Hex(response.body),
+            errorName: null, errorMessage: null, retryable: false,
+          });
+          const completion = decodeTeacherResponseBody(response.body, {
+            requestNumber: attempt, requestDigest, latencyMs: Date.now() - startedAt,
+          });
           guard.assertClean("teacher completion", completion);
           options.onCall?.({
             attemptId: request.attemptId,
@@ -710,14 +895,23 @@ export function createTeacherClient(options: CreateTeacherClientOptions = {}): T
             attempts: attempt,
             status: response.status,
             finishReason: completion.finishReason,
-            usage,
+            usage: completion.usage,
             contentBytes: completion.content.length,
           });
           return completion;
         }
 
-        const excerpt = guard.scrub(response.body).slice(0, 400);
-        const retryable = isRetryableStatus(response.status);
+        const excerpt = guard.scrub(response.body).slice(0, REJECTION_EVIDENCE_LIMIT);
+        const uncertain = response.status >= 500 && response.status <= 599;
+        const retryable = isRetryableStatus(response.status) || (uncertain && !!idempotencyKey);
+        // An explicit answer: safe to record, safe to repeat when retryable.
+        await observe({
+          phase: uncertain ? "uncertain" : "response", requestNumber: attempt, status: response.status,
+          body: excerpt, bodyDigest: sha256Hex(response.body),
+          errorName: "TeacherHttpError", errorMessage: null, retryable,
+        });
+        if (uncertain && !idempotencyKey) throw new TeacherUncertainDispatchError(request.attemptId, attempt,
+          `upstream returned ${response.status}; execution/billing outcome is unknown`, new Error("upstream outcome unknown"));
         if (!retryable) {
           // A permanent refusal. Retrying reaches the same answer for more money.
           options.onCall?.({

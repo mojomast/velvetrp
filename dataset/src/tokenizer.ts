@@ -168,6 +168,9 @@ export function withMeasuredQwen3Template(registry: ApprovedAdmissionRegistry, e
 
 export interface TokenizerBridge extends TokenizerPort {
   readonly evidence: MeasuredTokenizerEvidence;
+  readonly policy: { readonly evidenceDigest: string; readonly maxSequenceLength: number;
+    readonly truncation: false; readonly packing: false; readonly thinking: false; readonly selectionVersion: "selective-v1" };
+  readonly policyDigest: string;
   measure(example: SupervisedExample): TokenizerMeasurement;
 }
 
@@ -210,6 +213,9 @@ export function createTokenizerBridge(options: { python: string; assetsDir: stri
   const actual = measure(probe.example);
   if (stableStringify(actual.inputIds) !== stableStringify(probe.measurement.inputIds)
     || stableStringify(actual.labels) !== stableStringify(probe.measurement.labels)) refuse("installed runtime does not reproduce measured token IDs and labels");
-  return { name: `Qwen3-8B@${evidence.profile.tokenizerRevision}:trl-${VERSIONS.trl}:transformers-${VERSIONS.transformers}:selective-v1`,
-    evidence, measure, countSupervisedTokens: (example) => measure(example).supervisedTokens };
+  const policy = { evidenceDigest: evidence.bundleDigest, maxSequenceLength: maximum,
+    truncation: false as const, packing: false as const, thinking: false as const, selectionVersion: "selective-v1" as const };
+  const policyDigest = HASH(stableStringify(policy));
+  return { name: `Qwen3-8B@${evidence.profile.tokenizerRevision}:trl-${VERSIONS.trl}:transformers-${VERSIONS.transformers}:selective-v1:${policyDigest}`,
+    policy, policyDigest, evidence, measure, countSupervisedTokens: (example) => measure(example).supervisedTokens };
 }

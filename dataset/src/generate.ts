@@ -75,6 +75,9 @@ import {
   scoreSelection,
   validateAdvertisedSelection,
   validateWorldGeneration,
+  WORLD_GENERATION_SECTIONS,
+  fieldsForSections,
+  worldGenerationSchema,
   type AdvertisedCandidate,
   type ProviderSelection,
   type SelectionVerdict,
@@ -110,12 +113,13 @@ import {
   type TeacherCompletion,
   type TeacherMessage,
 } from "./teacher.js";
+import { assertTeacherRightsFor, type VerifiedTeacherRights } from "./teacherRights.js";
 
 // ---------------------------------------------------------------------------
 // Versions, stages, weights
 // ---------------------------------------------------------------------------
 
-export const GENERATOR_VERSION = "generator-v2";
+export const GENERATOR_VERSION = "generator-v3";
 export const REVIEW_PROMPT_VERSION = "review-prompt-v1";
 export const REPAIR_PROMPT_VERSION = "repair-prompt-v1";
 
@@ -303,6 +307,7 @@ export interface SupervisedExample {
 export interface TokenizerPort {
   /** Recorded in `provenance.tokenCount.tokenizer`. */
   readonly name: string;
+  readonly policyDigest?: string;
   /** Tokens under loss, after masking. Must be measured, never estimated. */
   countSupervisedTokens(example: SupervisedExample): number;
 }
@@ -480,9 +485,9 @@ const SECTION_POOL = Object.freeze([
   "quests",
   "encounters",
   "lore",
-  "questItems",
-  "monsterConcepts",
-] as const);
+  "quest-items",
+  "monster-concepts",
+] as const satisfies readonly (typeof WORLD_GENERATION_SECTIONS)[number][]);
 
 const TOOL_FAMILIES = Object.freeze([
   "exact-candidate",
@@ -507,6 +512,8 @@ export interface ScenarioOracle {
   readonly expectsToolCall: boolean;
   readonly advertisedCandidates: readonly AdvertisedCandidate[];
   readonly advertisedToolNames: readonly string[];
+  readonly allowedCandidateIds: readonly string[];
+  readonly decisionRequest: string;
   /** Never disclosable. The boundary-leakage gate checks every one of these. */
   readonly hiddenFacts: readonly string[];
   readonly visibilityRequirements: readonly string[];
@@ -571,6 +578,8 @@ function splitForLineage(lineage: LineageGroup): DatasetSplit {
 function candidateMenu(rng: Rng, npc: string, place: string): {
   candidates: AdvertisedCandidate[];
   toolNames: string[];
+  allowedCandidateIds: string[];
+  decisionRequest: string;
 } {
   const labels = [
     `advance toward ${place}`,
@@ -585,7 +594,12 @@ function candidateMenu(rng: Rng, npc: string, place: string): {
     toolName,
     label,
   }));
-  return { candidates, toolNames: [toolName] };
+  const correct = rng.pick(candidates);
+  const intentRequests: Record<string, string> = {
+    [labels[0]!]: `Move toward ${place}.`, [labels[1]!]: `Ask ${npc} directly.`,
+    [labels[2]!]: "Search the lower stair.", [labels[3]!]: "Wait for the watch to turn.",
+  };
+  return { candidates, toolNames: [toolName], allowedCandidateIds: [correct.candidateId], decisionRequest: intentRequests[correct.label!]! };
 }
 
 function advertisedToolsFor(family: TrainingFamily, oracle: ScenarioOracle): readonly StoredTool[] {
@@ -665,13 +679,13 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
 
   const menu = family === "tool-selection" && toolFamily === "exact-candidate"
     ? candidateMenu(rng.fork("menu"), npc, place)
-    : { candidates: [] as AdvertisedCandidate[], toolNames: toolFamily === "narration-submit" ? ["submit_adventure_narration"]
+    : { candidates: [] as AdvertisedCandidate[], allowedCandidateIds: [] as string[], decisionRequest: "", toolNames: toolFamily === "narration-submit" ? ["submit_adventure_narration"]
       : toolFamily === "read-tool" ? ["inspect_public_scene"] : [] as string[] };
 
   const damage = rng.int(9) + 3;
   const checkTotal = rng.int(14) + 8;
   const checkDc = rng.pick([10, 12, 14, 15, 18] as const);
-  const receipts: GroundingReceipt[] = family !== "grounded-narration" ? [] : [
+  const receipts: GroundingReceipt[] = family !== "grounded-narration" && toolFamily !== "narration-submit" ? [] : [
     {
       kind: "check",
       receiptId: `${sha256Hex(`${seed}|check`).slice(0, 10)}`,
@@ -685,7 +699,8 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
     {
       kind: "combat",
       receiptId: `${sha256Hex(`${seed}|damage`).slice(0, 10)}`,
-      actor: npc,
+      actor: "the attacker",
+      target: npc,
       action: "attack",
       visibility: "public",
       outcome: {
@@ -699,6 +714,7 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
       },
     },
   ];
+  if (family === "tool-selection" && toolFamily === "narration-submit") receipts.splice(1);
 
   const sections: string[] = family === "world-generation"
     ? rng.shuffled([...SECTION_POOL]).slice(0, rng.int(2) + 2)
@@ -719,7 +735,8 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
       referenceIdentity: `${guild.toLowerCase().replace(/\W+/g, "-")}-bestiary@1.2.0#${slug(npc)}-hound`,
     },
   ];
-  const desiredCounts: Record<string, number> = {};
+  const desiredCounts: Record<string, number> = Object.fromEntries(sections.flatMap((section) => [...fieldsForSections([section])]
+    .filter((field) => field !== "connections").map((field) => [field, 1])));
 
   const oracle: ScenarioOracle = {
     family,
@@ -727,6 +744,8 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
     expectsToolCall: toolFamily !== "no-tool",
     advertisedCandidates: menu.candidates,
     advertisedToolNames: menu.toolNames,
+    allowedCandidateIds: menu.allowedCandidateIds,
+    decisionRequest: menu.decisionRequest,
     hiddenFacts,
     visibilityRequirements: family === "grounded-narration" || family === "boundary-recovery" || family === "roleplay-conversation"
       ? [`${npc} does not know why the lower stair is sealed`]
@@ -833,12 +852,13 @@ function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>
   if (spec.oracle.advertisedCandidates.length) system.push(`ADVERTISED CANDIDATES\n${stableStringify(spec.oracle.advertisedCandidates)}`);
   if (spec.family === "world-generation") system.push(`PUBLIC WORLD CONTRACT\n${stableStringify({ sections: spec.oracle.sections,
     dependencies: [...spec.oracle.dependencies.values()], catalogReferences: spec.oracle.catalogReferences, desiredCounts: spec.oracle.desiredCounts })}`);
+  if (spec.family === "world-generation") system.push(`OUTPUT JSON SCHEMA\n${stableStringify(worldGenerationSchema(spec.oracle.sections, { ...spec.oracle.desiredCounts }))}\nReturn sparse additive JSON. Produce every requested minimum count. New entity keys must not reuse dependency keys. Follow declared dependency kinds, visibility and pinned catalog references. Every count-targeted NPC needs a locationKey linking a supplied or newly generated location. Every count-targeted quest needs at least one actionable objective. Narrative-only encounters omit roster fields. Mechanics are inert unless an exact compatible catalog reference is supplied; never invent a ruleset, pack version or definition.`);
   const messages: StoredMessage[] = [{ role: "system", content: system.join(" ") }];
   switch (spec.family) {
     case "grounded-narration":
       messages.push({
         role: "user",
-        content: `The turn is committed. Describe only what happened to ${slots.npc}.`,
+        content: "The turn is committed. Narrate the public committed check and damage receipts only. Identify each receipt's actor and target explicitly; do not add unsupported connective events.",
       });
       break;
     case "world-generation":
@@ -851,11 +871,11 @@ function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>
       if (spec.oracle.toolFamily === "no-tool") {
         messages.push({ role: "user", content: "Say what you can see. There is nothing to call." });
       } else if (spec.oracle.toolFamily === "narration-submit") {
-        messages.push({ role: "user", content: `Submit a public description of ${slots.place} through the narration tool. No mechanical outcomes are committed.` });
+        messages.push({ role: "user", content: "Submit the authoritative committed public check through the narration tool. Do not invent other outcomes." });
       } else if (spec.oracle.toolFamily === "read-tool") {
         messages.push({ role: "user", content: "Inspect the public scene before answering." });
       } else {
-        messages.push({ role: "user", content: `${capitalize(fill(motive, slots))}. Act on it.` });
+        messages.push({ role: "user", content: `${spec.oracle.decisionRequest} Choose the advertised candidate matching this request.` });
       }
       break;
     case "boundary-recovery":
@@ -1225,33 +1245,12 @@ export function parseStage(family: TrainingFamily, completion: TeacherCompletion
 }
 
 /**
- * SANITIZED. Only lossless repairs: whitespace, fences, and the degenerate
- * repeated-tool-call collapse. Anything that changes meaning is NOT sanitized
- * here -- it is a repair, and a repair is a new attempt with its own target.
+ * SANITIZED. Preserve the complete parsed target. Duplicate calls are behavior,
+ * not a lossless formatting repair; the gate must see all of them.
  */
 export function sanitizeStage(parsed: ParsedOutput | null): { sanitized: ParsedOutput | null; changes: string[] } {
   if (!parsed) return { sanitized: null, changes: [] };
-  const changes: string[] = [];
-  if (parsed.kind === "json") return { sanitized: parsed, changes };
-  if (parsed.kind === "text") {
-    const collapsed = parsed.text.replace(/\s+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
-    if (collapsed !== parsed.text) changes.push("collapsed whitespace in narration");
-    return { sanitized: { kind: "text", text: collapsed }, changes };
-  }
-  const seen = new Set<string>();
-  const toolCalls: StoredToolCall[] = [];
-  for (const call of parsed.toolCalls) {
-    const key = stableStringify({ name: call.function.name, args: call.function.arguments });
-    if (seen.has(key)) {
-      changes.push(`dropped duplicate tool call ${call.function.name}`);
-      continue;
-    }
-    seen.add(key);
-    toolCalls.push(call);
-  }
-  const collapsed = parsed.content.replace(/\s+\n/g, "\n").trim();
-  if (collapsed !== parsed.content) changes.push("collapsed whitespace in assistant content");
-  return { sanitized: { kind: "tools", content: collapsed, toolCalls }, changes };
+  return { sanitized: parsed, changes: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -1265,7 +1264,7 @@ const VERSION = {
   productionPredicate: "generate-production-presence-predicate-v1",
   bindingGrounding: GROUNDING_VALIDATOR_VERSION,
   advertisedBinding: FAMILY_C_VALIDATOR_VERSION,
-  toolEnvelope: "generate-tool-envelope-v1",
+  toolEnvelope: "generate-tool-envelope-v2",
   sectionSchema: FAMILY_D_VALIDATOR_VERSION,
   referenceClosure: "generate-reference-closure-v1",
   catalogPinning: "generate-catalog-pinning-v1",
@@ -1324,6 +1323,7 @@ function groundingRuns(spec: ScenarioSpec, text: string): ValidatorRun[] {
   const verdict = evaluateGroundedNarration(text, receipts);
   const known = new Set(authoritativeFacts(receipts).map((fact) => fact.receiptId));
   const unbound = verdict.bindings.filter((binding) => !known.has(binding.receiptId)).map((binding) => binding.clause);
+  const missing = [...known].filter((receiptId) => !verdict.bindings.some((entry) => entry.receiptId === receiptId));
   const binding: ValidatorRun = {
     validator: "binding-grounding",
     version: VERSION.bindingGrounding,
@@ -1339,9 +1339,9 @@ function groundingRuns(spec: ScenarioSpec, text: string): ValidatorRun[] {
   const provenance: ValidatorRun = {
     validator: "receipt-provenance",
     version: VERSION.receiptProvenance,
-    passed: verdict.verdict === "verified" && unbound.length === 0,
-    findings: unbound.length === 0 ? {} : { unboundClauses: unbound },
-    evidence: { receiptIds: [...known], boundReceiptIds: verdict.bindings.map((entry) => entry.receiptId), unbound },
+    passed: verdict.verdict === "verified" && unbound.length === 0 && missing.length === 0,
+    findings: unbound.length === 0 && missing.length === 0 ? {} : { unboundClauses: unbound, omittedRequestedReceipts: missing },
+    evidence: { receiptIds: [...known], boundReceiptIds: verdict.bindings.map((entry) => entry.receiptId), unbound, missing },
   };
   return [binding, provenance];
 }
@@ -1384,6 +1384,8 @@ function advertisedBindingRun(
     passed: verdict.problems.length === 0 && scoreSelection(selection, verdict).firstAttemptCorrect,
     findings: verdict.problems.length === 0 ? {} : { problems: verdict.problems },
     evidence: {
+      selection,
+      allowedCandidateIds: spec.oracle.allowedCandidateIds,
       advertised: verdict.advertised,
       toolAdvertised: verdict.toolAdvertised,
       digestMatched: verdict.digestMatched,
@@ -1395,7 +1397,7 @@ function advertisedBindingRun(
   };
 }
 
-function toolEnvelopeRun(messages: readonly StoredMessage[]): ValidatorRun {
+function toolEnvelopeRun(spec: ScenarioSpec, messages: readonly StoredMessage[]): ValidatorRun {
   const problems: string[] = [];
   const seenIds = new Set<string>();
   const pending = new Map<string, number>();
@@ -1408,6 +1410,27 @@ function toolEnvelopeRun(messages: readonly StoredMessage[]): ValidatorRun {
       pending.set(call.id, index);
       if (!call.function.name.trim()) problems.push(`messages[${index}] tool call has no function name`);
       if (!isObject(call.function.arguments)) problems.push(`messages[${index}] tool call arguments are not an object`);
+      const tool = spec.advertisedTools.find((entry) => entry.function.name === call.function.name);
+      if (!tool) problems.push(`messages[${index}] function ${call.function.name} was not advertised`);
+      else {
+        // Only the bounded object/string schema dialect advertised by this runner
+        // is supported. Unsupported features refuse rather than widen a contract.
+        const schema = tool.function.parameters as { type?: unknown; properties?: Record<string, { type?: unknown; minLength?: unknown }>; required?: unknown; additionalProperties?: unknown };
+        const allowed = new Set(["type", "properties", "required", "additionalProperties", "description"]);
+        const properties = schema.properties ?? {};
+        const args = call.function.arguments;
+        const required = schema.required ?? [];
+        if (schema.type !== "object" || schema.additionalProperties !== false || !Array.isArray(required)
+          || Object.keys(schema).some((key) => !allowed.has(key))) problems.push("advertised tool schema has unsupported validation features");
+        else {
+          for (const key of required) if (typeof key !== "string" || !Object.hasOwn(args, key)) problems.push("required advertised argument missing");
+          for (const [key, value] of Object.entries(args)) {
+            const property = properties[key];
+            if (!property || property.type !== "string" || Object.keys(property).some((field) => !["type", "minLength", "description"].includes(field))
+              || typeof value !== "string" || (typeof property.minLength === "number" && value.length < property.minLength)) problems.push(`argument ${key} does not match the exact advertised schema`);
+          }
+        }
+      }
     }
     if (message.role === "tool") {
       if (!message.tool_call_id) problems.push(`messages[${index}] tool result has no tool_call_id`);
@@ -1516,20 +1539,24 @@ function catalogPinningRun(content: unknown, pinned: readonly CatalogIdentity[])
 }
 
 function sectionSchemaRun(verdict: WorldGenerationVerdict): ValidatorRun {
-  const schemaProblems = verdict.problems.filter((problem) =>
-    problem.startsWith("output does not match")
-    || problem.includes("is not part of the requested sections")
-    || problem.includes("produced no content"),
-  );
+  const schemaProblems = [...verdict.problems];
+  for (const section of verdict.requestedSections) {
+    const primary = [...fieldsForSections([section])][0]!;
+    const value = (verdict.versions.raw as Record<string, unknown>)?.[primary];
+    if (!Array.isArray(value) || value.length === 0) schemaProblems.push(`requested section ${section} produced no ${primary}`);
+  }
   return {
     validator: "requested-section-schema",
     version: VERSION.sectionSchema,
-    passed: verdict.versions.parsed !== null && schemaProblems.length === 0 && verdict.producedFields.length > 0,
+    passed: verdict.ok && verdict.rawFirstAttemptValid && verdict.versions.parsed !== null && schemaProblems.length === 0,
     findings: schemaProblems.length === 0 ? {} : { problems: schemaProblems },
     evidence: {
       requestedSections: verdict.requestedSections,
       producedFields: verdict.producedFields,
       sanitized: verdict.sanitized,
+      ok: verdict.ok,
+      rawFirstAttemptValid: verdict.rawFirstAttemptValid,
+      problems: schemaProblems,
     },
   };
 }
@@ -1550,6 +1577,11 @@ function abstentionRun(spec: ScenarioSpec, messages: readonly StoredMessage[]): 
       findings: {},
       evidence: { expectsToolCall: true, called },
     };
+  }
+  if (spec.family === "tool-selection" && spec.oracle.toolFamily === "no-tool") {
+    return { validator: "abstention-correctness", version: VERSION.abstention, passed: !called && !!text.trim(),
+      findings: called ? { reason: "observation-only request initiated a tool" } : {},
+      evidence: { expectsToolCall: false, called, observationRequested: true } };
   }
   const refused = !called && /\b(?:cannot|can't|won't|will not|not able|unable|no way|don't have|do not have|i don't|i do not|nothing)\b/.test(text);
   return {
@@ -1618,7 +1650,7 @@ function validatorRunFor(
       return context.selection && context.selectionVerdict
         ? advertisedBindingRun(spec, context.selection, context.selectionVerdict)
         : null;
-    case "tool-envelope": return toolEnvelopeRun(messages);
+    case "tool-envelope": return toolEnvelopeRun(spec, messages);
     case "requested-section-schema":
       return context.worldVerdict ? sectionSchemaRun(context.worldVerdict) : null;
     case "reference-closure":
@@ -1755,11 +1787,24 @@ function proseGate(
  */
 function gateGrounded(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcome {
   const narration = narrationText(parsed);
+  const contractProblems = narrationContractProblems(spec, parsed);
   const runs: ValidatorRun[] = [
     ...groundingRuns(spec, narration),
     productionPredicateRun(spec, narration),
   ];
-  return proseGate(spec, parsed, { groundingRuns: runs });
+  return proseGate(spec, parsed, { groundingRuns: runs }, contractProblems.map((problem) => stageFailure("VALIDATED", "narration-transport", problem, { raw: parsedText(parsed), parsed })));
+}
+
+/** One submission surface, or plain prose where a prepared preference has no tools. */
+function narrationContractProblems(spec: ScenarioSpec, parsed: ParsedOutput): string[] {
+  if (parsed.kind === "text") return spec.advertisedTools.length ? ["narration submission must call the advertised tool"] : [];
+  if (parsed.kind !== "tools") return ["narration has no supported prose surface"];
+  if (parsed.toolCalls.length !== 1 || parsed.content.trim()) return ["narration submission requires one call with no additional assistant prose"];
+  const call = parsed.toolCalls[0]!;
+  if (call.function.name !== "submit_adventure_narration" || !spec.advertisedTools.some((tool) => tool.function.name === call.function.name)) return ["narration tool was not advertised"];
+  if (stableStringify(Object.keys(call.function.arguments).sort()) !== '["narration"]'
+    || typeof call.function.arguments.narration !== "string" || !call.function.arguments.narration.trim()) return ["narration requires exactly one nonempty string argument"];
+  return [];
 }
 
 /**
@@ -1783,7 +1828,7 @@ function gateWorldGeneration(spec: ScenarioSpec, parsed: ParsedOutput): GateOutc
   // The reference and catalog gates run even when the chain failed: a dangling
   // reference is exactly what an operator needs, and withholding the check
   // because the output was already refused would hide the reason.
-  const inspected = verdict.versions.validated ?? verdict.versions.parsed ?? parsed.value;
+  const inspected = parsed.value;
   const built = gateMessagesWithSelection([], { kind: "text", text: raw });
   const { runs } = requiredRuns(spec, built.messages, undefined, { worldVerdict: verdict, worldContent: inspected });
   const failures: StageFailure[] = [];
@@ -1828,28 +1873,35 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
   const contract = spec.oracle.toolFamily;
   const firstArguments = calls[0]?.function.arguments ?? {};
   const firstName = calls[0]?.function.name ?? "";
+  const narrationProblems = contract === "narration-submit" ? narrationContractProblems(spec, parsed) : [];
+  const narrationRuns = contract === "narration-submit" ? [...groundingRuns(spec, narrationText(parsed)), productionPredicateRun(spec, narrationText(parsed))] : [];
+  const intentCorrect = contract === "exact-candidate" ? typeof firstArguments.candidateId === "string" && spec.oracle.allowedCandidateIds.includes(firstArguments.candidateId)
+    : contract === "no-tool" ? calls.length === 0 && !!parsed.content.trim()
+    : contract === "read-tool" ? firstName === "inspect_public_scene" && !parsed.content.trim()
+    : narrationProblems.length === 0 && narrationRuns.every((run) => run.passed);
   const selection: ProviderSelection = contract === "no-tool"
     ? { contract: "no-tool", content: parsed.content, transportValid: calls.length === 0,
-      intentCorrect: calls.length === 0 && /\b(?:nothing|not|can't|cannot|no|only|unclear|unsure)\b/i.test(parsed.content), finalOutcome: "no-tool" }
+      intentCorrect, finalOutcome: "unknown" }
     : contract === "read-tool" ? { contract: "read-tool", toolName: firstName, arguments: firstArguments,
-      transportValid: calls.length === 1 && Object.keys(firstArguments).length === 0, intentCorrect: true, finalOutcome: "read-completed" }
+      transportValid: calls.length === 1 && Object.keys(firstArguments).length === 0, intentCorrect, finalOutcome: "unknown" }
     : contract === "narration-submit"
     ? {
       contract: "narration-submit",
       toolName: firstName,
       arguments: firstArguments as { narration: string },
       transportValid: calls.length === 1,
-      intentCorrect: true,
-      finalOutcome: "narration-submitted",
+      intentCorrect,
+      finalOutcome: "unknown",
     }
     : {
       contract: "exact-candidate",
       toolName: firstName,
-      candidateId: String(firstArguments.candidateId ?? ""),
-      digest: String(firstArguments.digest ?? ""),
-      transportValid: calls.length === 1 && Object.keys(firstArguments).length === 2,
-      intentCorrect: true,
-      finalOutcome: "mechanics-committed",
+      candidateId: typeof firstArguments.candidateId === "string" ? firstArguments.candidateId : "",
+      digest: typeof firstArguments.digest === "string" ? firstArguments.digest : "",
+      transportValid: calls.length === 1 && stableStringify(Object.keys(firstArguments).sort()) === '["candidateId","digest"]'
+        && typeof firstArguments.candidateId === "string" && typeof firstArguments.digest === "string" && !parsed.content.trim(),
+      intentCorrect,
+      finalOutcome: "unknown",
     };
   const verdict = validateAdvertisedSelection(
     selection,
@@ -1864,7 +1916,7 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
   if (!spec.oracle.expectsToolCall) {
     // Abstention is a POSITIVE behaviour here, not a missing answer, so the
     // no-tool family is scored on whether the abstention was explained.
-    const compliance = /\b(?:nothing|not|can't|cannot|no|only|unclear|unsure)\b/i.test(parsed.content);
+    const compliance = !!parsed.content.trim();
     return proseGate(
       spec,
       parsed,
@@ -1975,6 +2027,7 @@ export interface PlannedUnit {
   readonly preference?: PreferencePair;
   readonly twinInstrumentation?: unknown;
   readonly draftGenerator?: GeneratorIdentity;
+  readonly authoredSource?: ScheduledTwinInput;
 }
 
 /** Previously authored drafts; both conditioned preferences are reviewed independently. */
@@ -1984,6 +2037,12 @@ export interface ScheduledTwinInput {
   readonly anchors: readonly AnchorSpec[];
   readonly seed: string;
   readonly generator: GeneratorIdentity;
+  readonly lineage: LineageGroup;
+  readonly sourceDigest: string;
+}
+
+export function twinSourceDigest(input: Pick<ScheduledTwinInput, "spec" | "counterfactualReceipts" | "lineage">): string {
+  return sha256Hex(stableStringify({ spec: input.spec, counterfactualReceipts: input.counterfactualReceipts, lineage: input.lineage }));
 }
 
 export interface RunPlan {
@@ -2073,10 +2132,20 @@ export function planRun(options: {
       splitCounts[spec.split] += 1;
     });
   });
+  const authoredIdentities = new Map<string, string>();
   for (const input of structuredClone(options.pairedTwins ?? [])) {
+    if (policy.reservedCaseIds.includes(input.spec.caseId) || !input.lineage || input.sourceDigest !== twinSourceDigest(input)) {
+      throw new PipelineRefusal("execution-not-authorized", ["prepared twin source identity/lineage is frozen-reserved or lacks exact authored evidence"]);
+    }
+    if (authoredIdentities.has(input.spec.caseId) && authoredIdentities.get(input.spec.caseId) !== input.sourceDigest) {
+      throw new PipelineRefusal("execution-not-authorized", ["one authored twin case has conflicting immutable source identity"]);
+    }
+    authoredIdentities.set(input.spec.caseId, input.sourceDigest);
     const twins = buildSelectiveFidelityTwins(input.spec, input.counterfactualReceipts, input.anchors, input.seed);
     const twinGroupId = `twins-${sha256Hex(`${input.spec.caseId}|${input.seed}`).slice(0, 20)}`;
-    const base = scenarioSpec(`${seed}|${twinGroupId}`, { ...(options.specOptions ?? {}), family: "grounded-narration" });
+    const authoredSplit = splitForLineage(input.lineage);
+    const base_ = scenarioSpec(`authored:${input.spec.caseId}|${input.sourceDigest}`, { ...(options.specOptions ?? {}), family: "grounded-narration" });
+    const base = { ...base_, lineage: input.lineage, split: authoredSplit };
     for (const [arm, preference, receipts] of [["original", twins.original, input.spec.receipts],
       ["counterfactual", twins.counterfactual, input.counterfactualReceipts]] as const) {
       const spec: ScenarioSpec = { ...base, oracle: { ...base.oracle, receipts, hiddenFacts: [], visibilityRequirements: [],
@@ -2088,9 +2157,16 @@ export function planRun(options: {
         slots: {}, context, digest: sha256Hex(stableStringify(context)) };
       units_.push({ unitId: `${twinGroupId}-${arm}`, scenarioUnitId: twinGroupId, realizationOrdinal: 0,
         target: "grounded-narration", twinGroupId, preference, twinInstrumentation: twins.instrumentation,
-        draftGenerator: input.generator, spec, realization });
+        draftGenerator: input.generator, authoredSource: input, spec, realization });
       splitCounts[spec.split] += 1;
     }
+  }
+  const payloadSplits = new Map<string, DatasetSplit>();
+  for (const unit of units_) {
+    if (!unit.preference) continue;
+    const digest = computePayloadDigest({ messages: unit.preference.prompt, preference: unit.preference });
+    if (payloadSplits.has(digest) && payloadSplits.get(digest) !== unit.spec.split) throw new PipelineRefusal("execution-not-authorized", ["identical prepared payloads cross generated splits"]);
+    payloadSplits.set(digest, unit.spec.split);
   }
   assertGeneratedSplits(units_, policy);
   const splitAssignmentDigest = sha256Hex(stableStringify({
@@ -2187,6 +2263,10 @@ export function isReviewScores(value: ReviewScores | { problems: string[] }): va
 export function reviewPromptFor(spec: ScenarioSpec, messages: readonly StoredMessage[]): string {
   return [
     "You are an independent reviewer. Judge the final assistant response; earlier assistant turns are context only.",
+    `PRIVATE REVIEW-ONLY ORACLE (never part of the teacher prompt): ${stableStringify({ hiddenFacts: spec.oracle.hiddenFacts,
+      visibilityRequirements: spec.oracle.visibilityRequirements, authorityRequirements: spec.oracle.authorityRequirements,
+      receipts: spec.oracle.receipts, decisionRequest: spec.oracle.decisionRequest, allowedCandidateIds: spec.oracle.allowedCandidateIds })}`,
+    "Reject semantic paraphrases of hidden facts, unsupported outcomes and unauthorized player decisions, not just verbatim disclosures. Judge requested public receipt coverage separately from prose style. A lack of lexical matches does not prove privacy or grounding.",
     "Score each field as a probability in [0,1] and give a verdict.",
     "Return JSON with keys: " + [...REVIEW_SCORE_KEYS].join(", ") + ", verdict, rationale.",
     `Family: ${spec.family}`,
@@ -2223,6 +2303,7 @@ export interface PipelineOptions {
   readonly proseQualityScorer?: ProseQualityScorer;
   readonly generationPolicy?: GenerationPolicy;
   readonly selectionPolicy?: SelectionPolicy;
+  readonly teacherRights?: VerifiedTeacherRights;
 }
 
 export type PipelineEvent =
@@ -2276,6 +2357,7 @@ export interface PilotReport {
   readonly selection: { readonly digest: string; readonly selectedUnitIds: readonly string[];
     readonly excluded: readonly { unitId: string; reason: string }[]; readonly clusterCounts: Readonly<Record<string, number>> };
   readonly selected: number;
+  readonly unmeasuredAttemptIds: readonly string[];
 }
 
 function emptyBuckets(): Record<ToolSelectionBucket, number> {
@@ -2290,7 +2372,7 @@ function candidateProvenance(input: {
   gitCommit: string | null;
   runs: readonly { readonly validator: string; readonly version: string }[];
   tokenizerName: string;
-  supervisedTokens: number;
+  supervisedTokens: number | null;
 }): Omit<Provenance, "createdAt"> {
   const validators = input.runs.map((run) => run.validator);
   const validatorVersions: Record<string, string> = {};
@@ -2320,7 +2402,7 @@ function candidateProvenance(input: {
         candidates: input.spec.oracle.advertisedCandidates,
       })),
     },
-    tokenCount: { tokenizer: input.tokenizerName, tokens: input.supervisedTokens },
+    tokenCount: input.supervisedTokens === null ? null : { tokenizer: input.tokenizerName, tokens: input.supervisedTokens },
     syntheticOrigin: true,
     license: { status: "unverified", note: "teacher output; confirm provider training-use terms before publishing" },
   };
@@ -2374,6 +2456,18 @@ function conversationMessages(unit: PlannedUnit): TeacherMessage[] {
   }));
 }
 
+function capturedTargetExample(unit: PlannedUnit, completion: TeacherCompletion): SupervisedExample {
+  const parsed = parseStage(unit.spec.family, completion).parsed;
+  const base = unit.realization.context.map((message) => ({ ...message }));
+  const messages: StoredMessage[] = parsed ? withToolCall(base, parsed) : [...base, { role: "assistant", content: completion.content }];
+  const index = lastAssistantIndex(messages);
+  const target = messages[index];
+  return { family: unit.spec.family, messages,
+    ...(unit.spec.advertisedTools.length ? { tools: unit.spec.advertisedTools } : {}),
+    targetSelection: target && (target.content.trim() || target.tool_calls?.length)
+      ? selectTargets(messages, { targetAssistantIndex: index }) : { supervisedAssistantIndices: [], supervisedToolCallIndices: [] } };
+}
+
 /** The supervised spans of a validated candidate, for diversity and token work. */
 function candidateSupervisedText(messages: readonly StoredMessage[], selection: TargetSelection): string {
   const parts: string[] = [];
@@ -2422,6 +2516,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
   const tokenizer = requireTokenizer(options.tokenizer);
 
   const policy = structuredClone(options.generationPolicy ?? loadGenerationPolicy());
+  const rights = options.teacherRights;
+  if (rights) assertTeacherRightsFor(rights, { provider: options.generator.identity.provider, model: options.generator.model, baseUrlDigest: options.generator.baseUrlDigest });
   const plan = planRun({
     seed: options.seed,
     units: options.units ?? 12,
@@ -2441,6 +2537,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       || config.generator.temperature !== temperature) throw new PipelineRefusal("execution-not-authorized", ["run-store config does not bind the generated plan, splits, corpus and actual generator"]);
   }
   const selectionPolicy = options.selectionPolicy ?? DEFAULT_SELECTION_POLICY;
+  for (const unit of plan.units) {
+    const messages: StoredMessage[] = [...(unit.preference?.prompt ?? unit.realization.context), { role: "assistant", content: "preflight" }];
+    measuredTokens(tokenizer, { family: unit.spec.family, messages,
+      ...(unit.spec.advertisedTools.length ? { tools: unit.spec.advertisedTools } : {}),
+      targetSelection: selectTargets(messages, { targetAssistantIndex: messages.length - 1 }) });
+  }
   if (!Number.isSafeInteger(selectionPolicy.maxRecordsPerCluster) || selectionPolicy.maxRecordsPerCluster < 1
     || (selectionPolicy.maxRecords !== undefined && (!Number.isSafeInteger(selectionPolicy.maxRecords) || selectionPolicy.maxRecords < 1))) {
     throw new PipelineRefusal("execution-not-authorized", ["selection caps must be positive safe integers"]);
@@ -2449,20 +2551,53 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     version: GENERATOR_VERSION, planDigest: plan.digest, policyDigest: policy.digest,
     storeConfigDigest: options.store!.snapshot().configDigest,
     runId: options.runId, seed: options.seed, tokenizer: tokenizer.name, gitCommit,
+    tokenizerPolicy: tokenizer.policyDigest ?? sha256Hex(`test-or-custom-policy:${tokenizer.name}`),
+    teacherRights: rights?.receiptDigest ?? null,
     generator: options.generator.identity, reviewer: options.reviewer.identity,
     maxRepairs, maxCompletionTokens, temperature, selectionPolicy,
     proseScorer: options.proseQualityScorer ? { id: options.proseQualityScorer.scorerId, version: options.proseQualityScorer.version } : null,
   }) : null;
+  const ledger = createBudgetLedger();
+  const charged = new Set<string>();
+  const unmeasuredAttemptIds = new Set<string>();
+  const charge = (attemptId: string, target: GenerationTarget, tokens: number | null): void => {
+    if (tokens === null) { unmeasuredAttemptIds.add(attemptId); return; }
+    if (charged.has(attemptId)) return;
+    recordSpend(ledger, target, tokens);
+    charged.add(attemptId);
+  };
   if (journal) {
-    const priorSpend = createBudgetLedger();
+    // Physical responses precede decoded checkpoints. Reconcile all scheduled
+    // calls first so later unknown outcomes cannot authorize earlier budget holes.
+    // This is local replay only, with no network request.
+    for (const unit of plan.units) for (let ordinal = 0; ordinal <= (unit.preference ? 0 : maxRepairs); ordinal += 1) {
+      const attemptId = `${unit.unitId}-a${ordinal}`;
+      journal.reconcileCompletion(options.generator, attemptId);
+      journal.reconcileCompletion(options.reviewer, `${attemptId}-review`);
+    }
     const targetsByUnit = new Map(plan.units.map((unit) => [unit.unitId, unit.target]));
     for (const entry of options.store!.ledger()) {
       const count = options.store!.readCandidate(entry.attemptId)!.provenance.tokenCount;
       const target = targetsByUnit.get(entry.unitId);
-      if (!target || !count || count.tokenizer !== tokenizer.name) throw new PipelineRefusal("execution-not-authorized", ["persisted attempt does not bind the tokenizer and scheduled budget target"]);
-      recordSpend(priorSpend, target, count.tokens);
+      if (!target || (count && count.tokenizer !== tokenizer.name)) throw new PipelineRefusal("execution-not-authorized", ["persisted attempt does not bind the tokenizer and scheduled budget target"]);
+      charge(entry.attemptId, target, count?.tokens ?? null);
     }
-    if (priorSpend.total > budget.maxSupervisedAssistantTokens || [...priorSpend.byTarget].some(([target, tokens]) => tokens > (budget.perTarget?.[target] ?? Infinity))) {
+    for (const unit of plan.units) for (let ordinal = 0; ordinal <= (unit.preference ? 0 : maxRepairs); ordinal += 1) {
+      const attemptId = `${unit.unitId}-a${ordinal}`;
+      if (charged.has(attemptId) || unmeasuredAttemptIds.has(attemptId)) continue;
+      const checkpoint = journal.read<{ measuredTokens: number | null; budgetTarget: GenerationTarget; tokenizer: string }>(`validation:${attemptId}`);
+      if (checkpoint) {
+        if (checkpoint.budgetTarget !== unit.target || checkpoint.tokenizer !== tokenizer.name) throw new PipelineRefusal("execution-not-authorized", ["durable measurement policy differs from scheduled work"]);
+        charge(attemptId, unit.target, checkpoint.measuredTokens);
+      } else {
+        const response = journal.read<TeacherCompletion>(`response:${attemptId}`);
+        if (response) {
+          try { charge(attemptId, unit.target, measuredTokens(tokenizer, capturedTargetExample(unit, response))); }
+          catch { charge(attemptId, unit.target, null); }
+        }
+      }
+    }
+    if (ledger.total > budget.maxSupervisedAssistantTokens || [...ledger.byTarget].some(([target, tokens]) => tokens > (budget.perTarget?.[target] ?? Infinity))) {
       throw new PipelineRefusal("budget-exhausted", ["configured supervised cap is below already observed durable spend"]);
     }
     const digest = sha256Hex(stableStringify(budget));
@@ -2493,7 +2628,6 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
   }
   options.onEvent?.({ kind: "plan", units: plan.units.length });
 
-  const ledger = createBudgetLedger();
   const buckets = emptyBuckets();
   const plannedPrompts: { text: string; clusterId: string }[] = [];
   const diversityBefore: { text: string; clusterId: string }[] = [];
@@ -2563,7 +2697,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         ledger, budget, target: preflightTarget, maxCompletionTokens: twinTokens ?? maxCompletionTokens,
       });
       const replaying = journal!.hasResponse(attemptId) || options.store.hasAttempt(attemptId);
-      if (!decision.allowed && !replaying) {
+      if ((!decision.allowed || unmeasuredAttemptIds.size > 0) && !replaying) {
         options.onEvent?.({ kind: "budget-exhausted", unitId: unit.unitId, target: preflightTarget, reason: decision.reason ?? "" });
         refusedAt = `budget:${preflightTarget}`;
         break;
@@ -2609,6 +2743,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
           failure = stageFailure("SANITIZED", "sanitize-produced-nothing", "sanitization produced no usable output", stages);
         } else {
           stages.sanitized = sanitized.sanitized;
+          try {
           const targetGate = dispatchGate(unit.spec, sanitized.sanitized);
           // Gates inspect the new assistant target; training and certification
           // bind its actual prompt context as well, with historical turns masked.
@@ -2633,6 +2768,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
               clusterId: unit.realization.clusterId,
             });
           }
+          } catch {
+            failure = stageFailure("VALIDATED", "candidate-validator-error", "candidate validation could not complete; response retained for bounded repair", { raw: stages.raw, parsed: stages.parsed });
+          }
         }
       }
 
@@ -2650,12 +2788,15 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         : { supervisedAssistantIndices: [], supervisedToolCallIndices: [] };
       // Measured, not estimated: the refusal cost is a real token count. A
       // candidate with nothing supervisable costs nothing to train on, and says so.
-      const refusalTokens = twinTokens ?? measuredTokens(tokenizer, {
+      let refusalTokens: number | null = twinTokens;
+      if (refusalTokens === null) try { refusalTokens = measuredTokens(tokenizer, {
         family: unit.spec.family,
         messages: refusalMessages,
         ...(tools ? { tools } : {}),
         targetSelection: refusalSelection,
-      });
+      }); } catch {
+        failure = stageFailure("VALIDATED", "measurement-unavailable", "candidate cannot be measured under the bound preprocessing policy; retained for quarantine, not zero-token accounting", { raw: stages.raw, parsed: stages.parsed });
+      }
       const refusalProvenance = candidateProvenance({
         spec: unit.spec, generator: options.generator, reviewer: options.reviewer, temperature, gitCommit,
         runs: gate ? gate.runs.map((run) => ({ validator: run.validator, version: run.version })) : [],
@@ -2663,13 +2804,28 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       });
       const runnerSourceDigests = { generationPlan: plan.digest, splitAssignment: plan.splitAssignmentDigest,
         sealedAttestation: policy.attestationDigest, realization: unit.realization.digest,
+        tokenizerPolicy: tokenizer.policyDigest ?? sha256Hex(`test-or-custom-policy:${tokenizer.name}`),
+        ...(unit.authoredSource ? { authoredTwinSource: unit.authoredSource.sourceDigest } : {}),
         ...(unit.twinInstrumentation ? { selectiveTwin: sha256Hex(stableStringify(unit.twinInstrumentation)) } : {}) };
       Object.assign(refusalProvenance.sourceDigests, runnerSourceDigests);
+      if (rights) {
+        refusalProvenance.license = { ...rights.license };
+        Object.assign(refusalProvenance.sourceDigests, rights.sourceDigests);
+        for (const [digest, bytes] of rights.artifacts) journal!.save(`artifact:${digest}`, typeof bytes === "string" ? bytes : Buffer.from(bytes).toString("utf8"));
+      }
       const { digest: _planDigest, ...planBody } = plan;
       const { attestationDigest: _attestationDigest, ...attestationBody } = policy.sealedAttestation;
       const artifacts: Record<string, string> = {};
+      if (rights) for (const [digest, bytes] of rights.artifacts) artifacts[digest] = typeof bytes === "string" ? bytes : Buffer.from(bytes).toString("utf8");
       const retainArtifact = (value: unknown): void => { const bytes = stableStringify(value); artifacts[sha256Hex(bytes)] = bytes; };
       retainArtifact(unit.spec);
+      if (tokenizer.policyDigest) {
+        // Production bridge policy is optional on custom ports, required when declared.
+        const preprocessing = (tokenizer as TokenizerPort & { policy?: unknown }).policy;
+        if (!preprocessing || sha256Hex(stableStringify(preprocessing)) !== tokenizer.policyDigest) throw new PipelineRefusal("execution-not-authorized", ["tokenizer policy artifact does not resolve to its declared digest"]);
+        retainArtifact(preprocessing);
+      } else artifacts[runnerSourceDigests.tokenizerPolicy] = `test-or-custom-policy:${tokenizer.name}`;
+      if (unit.authoredSource) retainArtifact({ spec: unit.authoredSource.spec, counterfactualReceipts: unit.authoredSource.counterfactualReceipts, lineage: unit.authoredSource.lineage });
       retainArtifact({ hiddenFacts: unit.spec.oracle.hiddenFacts, receipts: unit.spec.oracle.receipts,
         sections: unit.spec.oracle.sections, candidates: unit.spec.oracle.advertisedCandidates });
       retainArtifact(planBody);
@@ -2712,8 +2868,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
             findings,
           },
         });
-        recordSpend(ledger, unit.target, refusalTokens);
-        unitSupervisedTokens += refusalTokens;
+        charge(attemptId, unit.target, refusalTokens);
+        unitSupervisedTokens += refusalTokens ?? 0;
         if (!alreadyCommitted) options.onEvent?.({ kind: "rejected", unitId: unit.unitId, attemptId, reason: reason.detail });
         parentAttemptId = attemptId;
         previousFailure = reason;
@@ -2721,7 +2877,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
 
       // Teacher and student tokenizers differ. A teacher max_tokens bound is a
       // dispatch guard, not proof that the rendered student labels fit the cap.
-      const measuredBudget = checkBudget({ ledger, budget, target: unit.target, maxCompletionTokens: refusalTokens });
+      if (refusalTokens === null) {
+        commitRefused(failure!);
+        refusedAt = "quarantine:measurement-unavailable";
+        break;
+      }
+      const measuredBudget = checkBudget({ ledger, budget, target: unit.target, maxCompletionTokens: charged.has(attemptId) ? 0 : refusalTokens });
       const persisted = options.store.readCandidate(attemptId)?.admission.findings;
       if (persisted?.code === "measured-token-budget") failure = stageFailure("VALIDATED", "measured-token-budget",
         String(persisted.detail), { raw: stages.raw, parsed: stages.parsed });
@@ -2765,6 +2926,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         tokenizerName: tokenizer.name, supervisedTokens: supervised,
       });
       Object.assign(provenance.sourceDigests, runnerSourceDigests);
+      if (rights) { provenance.license = { ...rights.license }; Object.assign(provenance.sourceDigests, rights.sourceDigests); }
       const record = buildCandidateRecord({ unit, messages: unit.preference?.prompt ?? validated.messages, tools, provenance });
 
       if (!isReviewScores(scores)) {
@@ -2847,7 +3009,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         admission: { status: "admitted", admittedRecord: admitted },
       });
       if (committed.status !== "admitted") {
-        recordSpend(ledger, unit.target, supervised);
+        charge(attemptId, unit.target, supervised);
         unitSupervisedTokens += supervised;
         // The store already REGISTERED this attempt (it downgraded rather than
         // refused). Re-committing the same attempt id with different bytes is
@@ -2868,7 +3030,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       }
       admittedRecord = admitted;
       // Exactly once per replayed durable attempt, including review refusals.
-      recordSpend(ledger, unit.target, supervised);
+      charge(attemptId, unit.target, supervised);
       unitSupervisedTokens += supervised;
       admittedAttemptId = attemptId;
       refusedAt = null;
@@ -2886,7 +3048,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     if (admittedRecord) {
       admittedRecords.push(admittedRecord);
     }
-    if (!refusedAt?.startsWith("budget:") && options.store.unit(unit.unitId)) {
+    if (!refusedAt?.startsWith("budget:") && !refusedAt?.startsWith("quarantine:") && options.store.unit(unit.unitId)) {
       const effective = admittedAttemptId ?? options.store.latestEligibleCandidate(unit.unitId)?.attemptId;
       if (effective) options.store.finalizeUnit(unit.unitId, effective);
       options.store.markUnitComplete(unit.unitId);
@@ -2904,7 +3066,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     diversitySelected.push({ text: record.preference ? record.preference.chosen.map((message) => message.content).join("\n")
       : candidateSupervisedText(record.messages, record.targetSelection), clusterId: unit.realization.clusterId });
   }
-  const complete = !dryRun && !unitOutcomes.some((outcome) => outcome.refusedAt?.startsWith("budget:"));
+  const complete = !dryRun && unmeasuredAttemptIds.size === 0 && !unitOutcomes.some((outcome) => outcome.refusedAt?.startsWith("budget:"));
   if (complete) {
     for (const stage of ["generate", "validate", "admit"] as const) options.store!.markStageComplete(stage);
     journal!.save("selection", { digest: selection.digest, selectedUnitIds: selection.selected.map((record) => record.unitId),
@@ -2947,6 +3109,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     admitted: admittedRecords.length,
     attempts: totalAttempts,
     complete, planDigest: plan.digest, selected: selection.selected.length,
+    unmeasuredAttemptIds: [...unmeasuredAttemptIds].sort(),
     selection: { digest: selection.digest, selectedUnitIds: selection.selected.map((record) => record.unitId),
       excluded: selection.excluded, clusterCounts: selection.clusterCounts },
   };

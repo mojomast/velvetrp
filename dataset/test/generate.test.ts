@@ -662,9 +662,12 @@ describe("4f. a clean run reaches admission with a verifiable certificate", () =
     const receipt = spec.oracle.receipts.find((entry) => entry.kind === "check");
     assert.ok(receipt, "the scenario should carry a check receipt");
     const check = receipt as Extract<typeof receipt, { kind: "check" }>;
+    const combat = spec.oracle.receipts.find((entry) => entry.kind === "combat");
+    assert.ok(combat && combat.outcome.kind === "damage");
     const narration =
       `Your ${check.skill} check comes to ${check.total} against DC of ${check.dc}. ` +
-      `Your ${check.skill} check is a ${check.outcome}.`;
+      `Your ${check.skill} check is a ${check.outcome}. ` +
+      `${spec.slots.npc} has ${combat.outcome.hitPointsAfter} HP remaining.`;
     const bound = evaluateGroundedNarration(narration, spec.oracle.receipts);
     assert.equal(bound.verdict, "verified", `fixture narration should bind: ${JSON.stringify(bound)}`);
 

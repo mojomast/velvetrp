@@ -24,14 +24,20 @@ import {
   DEFAULT_TEACHER_TIMEOUT_MS,
   TeacherCredentialError,
   TeacherHttpError,
+  TeacherResponseError,
+  TeacherTimeoutError,
+  TeacherUncertainDispatchError,
   assertDistinctModels,
   createTeacherClient,
   isRetryableStatus,
+  replayCapturedTeacherResponse,
   requireReviewerCredentials,
   requireTeacherCredentials,
   resolveTeacherCredentials,
   retryDelayMs,
+  sha256Hex,
   type ResolvedTeacherCredentials,
+  type TeacherDispatchObservation,
   type TeacherHttpRequest,
   type TeacherHttpResponse,
   type TeacherTransport,
@@ -201,10 +207,10 @@ test("2c. a multi-model provider without an explicit model falls back to the doc
 
 // --- 3. Retry policy ---------------------------------------------------------------------------
 
-test("3. only 429 and 5xx are retryable; every other 4xx is a permanent refusal", () => {
+test("3. only explicit rate limiting is retryable without provider idempotency", () => {
   assert.equal(isRetryableStatus(429), true);
-  assert.equal(isRetryableStatus(500), true);
-  assert.equal(isRetryableStatus(503), true);
+  assert.equal(isRetryableStatus(500), false);
+  assert.equal(isRetryableStatus(503), false);
   for (const status of [400, 401, 403, 404, 409, 418, 422]) {
     assert.equal(isRetryableStatus(status), false, `${status} must not be retried`);
   }
@@ -231,7 +237,7 @@ test("3b. a 400 is attempted exactly once, even with retry budget remaining", as
 test("3c. a 429 is retried within the bounded budget and then succeeds", async () => {
   const { transport, recorded } = fakeTransport([
     { status: 429, body: "slow down", headers: { "retry-after": "0" } },
-    { status: 503, body: "unavailable" },
+    { status: 429, body: "still rate limited" },
     { status: 200, body: completionBody("eventually") },
   ]);
   const delays: number[] = [];
@@ -277,11 +283,11 @@ test("3e. backoff is deterministic and capped, not jittered", () => {
 
 // --- 4. Timeout -------------------------------------------------------------------------------
 
-test("4. the default timeout matches the relay's long completion budget", () => {
+test("4. the default timeout matches the relay's long completion budget", async () => {
   assert.equal(DEFAULT_TEACHER_TIMEOUT_MS, 660_000);
   const { transport, recorded } = fakeTransport([{ status: 200, body: completionBody("ok") }]);
   const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
-  void client.complete({ attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }] });
+  await client.complete({ attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }] });
   const request = recorded.requests[0]!;
   assert.equal(request.timeoutMs, DEFAULT_TEACHER_TIMEOUT_MS);
   assert.ok(request.timeoutMs > 600_000, "a default under 10 minutes would abort real generations");
@@ -403,6 +409,197 @@ test("6f. a model that answers with the credential in its content is refused, no
     (error: unknown) => {
       assert.ok(error instanceof TeacherCredentialError);
       assertNoCredential(error.message, "content-refusal message");
+      return true;
+    },
+  );
+});
+
+// --- 7. Uncertain dispatch is never repeated (F4) ---------------------------------------------------
+
+test("7a. a lost response after submission is UNCERTAIN and is sent exactly once", async () => {
+  // The relay accepted and billed the request, then the connection died. A second
+  // POST would be a second bill for a completion this run already owns.
+  const { transport, recorded } = fakeTransport([
+    new Error("socket hang up after the provider accepted the request"),
+    { status: 200, body: completionBody("second copy the run must not buy") },
+  ]);
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  await assert.rejects(
+    () => client.complete({ attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }] }),
+    (error: unknown) => {
+      assert.ok(error instanceof TeacherUncertainDispatchError);
+      assert.equal(error.attemptId, "a1");
+      assert.equal(error.requestNumber, 1);
+      assert.equal(error.idempotent, false);
+      assert.match(error.message, /will not be resent automatically/);
+      assertNoCredential(error.message, "uncertain-dispatch message");
+      return true;
+    },
+  );
+  assert.equal(recorded.requests.length, 1, "an uncertain dispatch must not be repeated inside one call");
+});
+
+test("7b. a timeout is an unknown outcome, not a failure to retry", async () => {
+  const { transport, recorded } = fakeTransport([new TeacherTimeoutError(660_000)]);
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  await assert.rejects(
+    () => client.complete({ attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }] }),
+    TeacherUncertainDispatchError,
+  );
+  assert.equal(recorded.requests.length, 1);
+});
+
+test("7c. an explicit 429 rate limit rejection is repeatable", async () => {
+  const { transport, recorded } = fakeTransport([
+    { status: 429, body: "not accepted" },
+    { status: 200, body: completionBody("accepted on the second try") },
+  ]);
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  const completion = await client.complete({
+    attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }],
+  });
+  assert.equal(completion.content, "accepted on the second try");
+  assert.equal(recorded.requests.length, 2, "a refusal that the server stated is safe to repeat");
+});
+
+test("7d. repeats are only allowed under an explicit, verified idempotency contract", async () => {
+  const { transport, recorded } = fakeTransport([
+    new Error("connection reset after acceptance"),
+    { status: 200, body: completionBody("deduplicated replay") },
+  ]);
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  const completion = await client.complete({
+    attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }],
+    idempotencyKey: "velvet-attempt-a1",
+  });
+  assert.equal(completion.content, "deduplicated replay");
+  assert.equal(recorded.requests.length, 2);
+  assert.equal(recorded.requests[0]!.headers["idempotency-key"], "velvet-attempt-a1");
+});
+
+test("7e. the idempotency contract joins the request digest; the observer does not", async () => {
+  const plain = fakeTransport([{ status: 200, body: completionBody("hi") }]);
+  const observed = fakeTransport([{ status: 200, body: completionBody("hi") }]);
+  const a = createTeacherClient({ credentials: CREDENTIALS, transport: plain.transport, sleep: noSleep });
+  const b = createTeacherClient({ credentials: CREDENTIALS, transport: observed.transport, sleep: noSleep });
+  const request = { attemptId: "a1", system: "s", messages: [{ role: "user" as const, content: "hi" }] };
+  const withoutObserver = await a.complete(request);
+  const withObserver = await b.complete({ ...request, observer: () => {} });
+  assert.equal(
+    withoutObserver.requestDigest,
+    withObserver.requestDigest,
+    "a runtime-only observer must never change request identity",
+  );
+  assert.deepEqual(plain.recorded.requests[0]!.headers, observed.recorded.requests[0]!.headers);
+
+  const keyed = fakeTransport([{ status: 200, body: completionBody("hi") }]);
+  const c = createTeacherClient({ credentials: CREDENTIALS, transport: keyed.transport, sleep: noSleep });
+  const withKey = await c.complete({ ...request, idempotencyKey: "k1" });
+  assert.notEqual(withoutObserver.requestDigest, withKey.requestDigest,
+    "changing the idempotency contract changes what a repeat of this attempt means");
+});
+
+// --- 8. Durable evidence for every physical request (F4) -------------------------------------------
+
+test("8a. the observer sees each physical request before the socket and the raw body before parsing", async () => {
+  const body = completionBody("evidence please");
+  const { transport } = fakeTransport([{ status: 200, body }]);
+  const seen: TeacherDispatchObservation[] = [];
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  await client.complete({
+    attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }],
+    observer: (observation) => { seen.push(observation); },
+  });
+  assert.deepEqual(seen.map((entry) => entry.phase), ["before-send", "response"]);
+  assert.equal(seen[0]!.requestNumber, 1);
+  assert.equal(seen[1]!.status, 200);
+  assert.equal(seen[1]!.body, body, "the returned bytes are captured verbatim");
+  assert.equal(seen[1]!.bodyDigest, sha256Hex(body), "the digest is over the bytes as returned");
+  assert.match(seen[1]!.requestDigest, /^[0-9a-f]{64}$/, "evidence names the logical request it carried");
+  assert.equal(seen[1]!.retryable, false);
+  assertNoCredential(seen, "physical-request evidence");
+});
+
+test("8b. a malformed 200 is durable evidence, not a lost response", async () => {
+  const { transport, recorded } = fakeTransport([{ status: 200, body: "{not json" }]);
+  const seen: TeacherDispatchObservation[] = [];
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  await assert.rejects(
+    () => client.complete({
+      attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }],
+      observer: (observation) => { seen.push(observation); },
+    }),
+    TeacherResponseError,
+  );
+  assert.equal(recorded.requests.length, 1, "an unusable answer is not a reason to ask again");
+  assert.deepEqual(seen.map((entry) => entry.phase), ["before-send", "response"]);
+  assert.equal(seen[1]!.body, "{not json", "the unusable bytes are retained for replay");
+});
+
+test("8c. an uncertain transport outcome is reported as uncertain, with no body", async () => {
+  const { transport } = fakeTransport([new TeacherTimeoutError(660_000)]);
+  const seen: TeacherDispatchObservation[] = [];
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  await assert.rejects(() => client.complete({
+    attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }],
+    observer: (observation) => { seen.push(observation); },
+  }), TeacherUncertainDispatchError);
+  const last = seen[seen.length - 1]!;
+  assert.equal(last.phase, "uncertain");
+  assert.equal(last.body, null);
+  assert.equal(last.status, null);
+  assert.equal(last.retryable, false);
+});
+
+test("8d. an observer that throws stops the call BEFORE the socket opens", async () => {
+  const { transport, recorded } = fakeTransport([{ status: 200, body: completionBody("hi") }]);
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  await assert.rejects(
+    () => client.complete({
+      attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }],
+      observer: () => { throw new Error("the run lost its lease"); },
+    }),
+    /the run lost its lease/,
+  );
+  assert.equal(recorded.requests.length, 0, "an expired owner must not open a socket it cannot account for");
+});
+
+test("8e. evidence handed to an observer never carries the credential", async () => {
+  const { transport } = fakeTransport([{ status: 500, body: `upstream rejected ${SECRET}` }]);
+  const seen: TeacherDispatchObservation[] = [];
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  await assert.rejects(() => client.complete({
+    attemptId: "a1", system: "s", messages: [{ role: "user", content: "hi" }], maxAttempts: 1,
+    observer: (observation) => { seen.push(observation); },
+  }), TeacherUncertainDispatchError);
+  assertNoCredential(seen, "rejection evidence");
+  assert.match(seen[1]!.body ?? "", /redacted-credential/);
+});
+
+test("8f. a captured response replays without a second request", () => {
+  const body = completionBody("replayed, not resent");
+  const completion = replayCapturedTeacherResponse(
+    { body, bodyDigest: sha256Hex(body) },
+    { attemptId: "a1", requestNumber: 1, requestDigest: "d".repeat(64) },
+  );
+  assert.equal(completion.content, "replayed, not resent");
+  assert.equal(completion.requestDigest, "d".repeat(64));
+});
+
+test("8g. a redacted capture is refused rather than replayed as fabricated data", () => {
+  const body = `the api key is ${SECRET}`;
+  const completionBodyText = JSON.stringify({
+    id: "r9",
+    choices: [{ message: { role: "assistant", content: body }, finish_reason: "stop" }],
+  });
+  assert.throws(
+    () => replayCapturedTeacherResponse(
+      { body: completionBodyText, bodyDigest: sha256Hex(body) },
+      { attemptId: "a1", requestNumber: 1, requestDigest: "e".repeat(64) },
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof TeacherCredentialError);
+      assertNoCredential(error.message, "redacted-replay refusal");
       return true;
     },
   );

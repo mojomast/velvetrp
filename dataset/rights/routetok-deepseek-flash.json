@@ -1,0 +1,35 @@
+{
+  "version": "teacher-training-rights-v1",
+  "verifiedOn": "2026-10-13",
+  "status": "verified-permitted",
+  "teacher": {
+    "provider": "agentrouter",
+    "model": "deepseek-v4-flash",
+    "baseUrlDigest": "d7a8ad8be89f210be883dcb46b234ab0e47f89992b191e92a241661e7a53e682"
+  },
+  "relay": {
+    "name": "RouteTok",
+    "operatorControlled": true,
+    "confirmation": "i built routetok its fine.",
+    "source": "operator confirmation in the foundry conversation, 2026-10-13"
+  },
+  "scope": "Use DeepSeek Flash synthetic outputs to build and fine-tune the local VelvetRP Qwen3-8B model.",
+  "permissionExcerpt": "You may apply the Inputs and Outputs of the Services to a wide range of use cases, including personal use, academic research, derivative product development, training other models (such as model distillation), etc.",
+  "sources": [
+    {
+      "file": "snapshots/deepseek-open-platform-terms.html",
+      "url": "https://cdn.deepseek.com/policies/en-US/deepseek-open-platform-terms-of-service.html",
+      "section": "4.2(3)",
+      "releaseDate": "2026-04-22",
+      "effectiveDate": "2026-04-29",
+      "sha256": "2b433c53cbac75491959025eba5a27908f9f1886352dce0a05f3d5a936d87790"
+    },
+    {
+      "file": "snapshots/deepseek-terms-of-use.html",
+      "url": "https://cdn.deepseek.com/policies/en-US/deepseek-terms-of-use.html",
+      "section": "4.2(3)",
+      "lastUpdate": "2026-03-27",
+      "sha256": "e5c52c238ff59a6d274cd66c449f939ba6bd3183fe7927397b595df02887a76d"
+    }
+  ]
+}

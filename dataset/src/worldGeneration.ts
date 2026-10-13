@@ -28,6 +28,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import { generatedCampaignContentProviderSchema, campaignGenerationSectionFields, campaignGenerationSectionSchema } from "@velvet/contracts";
 import type { GeneratedCampaignContentProvider } from "@velvet/contracts";
 import {
@@ -227,6 +228,10 @@ export function scoreSelection(selection: ProviderSelection, verdict: SelectionV
 // ---------------------------------------------------------------------------
 
 export const WORLD_GENERATION_SECTIONS = campaignGenerationSectionSchema.options;
+export function worldGenerationSchema(sections: readonly string[], counts: Record<string, number>): object {
+  fieldsForSections(sections);
+  return z.toJSONSchema(requestedCampaignContentProviderSchema([...sections], counts));
+}
 export const WORLD_GENERATION_FIELDS = Object.keys(generatedCampaignContentProviderSchema.shape).filter(
   (field) => field !== "kind",
 ) as Array<keyof GeneratedCampaignContentProvider>;

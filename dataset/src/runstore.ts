@@ -39,16 +39,39 @@
  *     committed, which is the only way to stop a request that would overshoot.
  *
  * Deliberate non-goals: no network, no provider SDK, nothing outside
- * `node:builtins`, and no attempt at concurrent writes to one run. Concurrency is
- * handled by refusing it with a lease, not by merging it.
+ * `node:builtins`, and no attempt to MERGE concurrent writes to one run.
+ * Concurrency is handled by refusing it, but refusing is only honest if the
+ * refusal is real, which is why this module also carries the machinery that
+ * makes that refusal load-bearing:
+ *
+ *  6. WRITER EXCLUSION IS A REAL LOCK, NOT A READ-THEN-WRITE HOPEFULNESS. Lease
+ *     acquisition, renewal, release, payload publication and event append all run
+ *     inside one `BEGIN IMMEDIATE` transaction on a per-run SQLite database
+ *     (`writer.sqlite`, via Node 22's built-in `node:sqlite`). That is a real
+ *     cross-process mutex, so "check the lease, then mutate" can no longer
+ *     interleave with a takeover. Wall-clock age is reported as a diagnostic and
+ *     is deliberately NEVER used to seize a lease from a process that is still
+ *     alive: fencing prevents corruption, but only the owner itself can prevent
+ *     a replaced owner from spending.
+ *  7. OWNERSHIP HAS AN IDENTITY, NOT A TIMESTAMP. Every open mints a random
+ *     `ownerNonce`. Ownership is `pid` + nonce, so a replacement holder remains
+ *     distinguishable from its predecessor even inside one process and one
+ *     millisecond.
+ *  8. PUBLICATION IS IMMUTABLE. An attempt's payload file is created with
+ *     `link(2)`/atomic create-if-absent and fsynced, together with its directory
+ *     entry, BEFORE the event that claims it. Re-publishing identical bytes is a
+ *     no-op; re-publishing DIFFERENT bytes under one attempt id is refused. A
+ *     stale publisher can therefore never replace the bytes a replacement owner
+ *     already committed, even if every ownership check were bypassed.
  */
 
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   closeSync,
   existsSync,
   fsyncSync,
+  linkSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -59,7 +82,8 @@ import {
   unlinkSync,
   writeSync,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { verifyAdmissionCertificate, type AdmittedRecordV1 } from "./admission.js";
 import type { CandidateRecord, ReviewScores } from "./spec.js";
 import { stableStringify } from "./spec.js";
@@ -120,6 +144,7 @@ export type RunStoreErrorCode =
   | "invalid-attempt"
   | "unit-finalized"
   | "run-closed"
+  | "unsupported-runtime"
   | "injected-crash";
 
 /** Base class, so a caller can distinguish a store refusal from a programmer bug. */
@@ -143,18 +168,32 @@ export class UnsafeRunIdError extends RunStoreError {
 export class RunLockError extends RunStoreError {
   readonly holderPid: number | null;
   readonly heldSinceMs: number | null;
+  /** Last renewal the holder recorded, when the lease file was readable. */
+  readonly lastRenewedMs: number | null;
+  /** Extra operator-facing context, e.g. a stale-window warning. Never a remedy. */
+  readonly advice: string | null;
 
-  constructor(runId: string, holderPid: number | null, heldSinceMs: number | null) {
+  constructor(
+    runId: string,
+    holderPid: number | null,
+    heldSinceMs: number | null,
+    lastRenewedMs: number | null = null,
+    advice: string | null = null,
+  ) {
     super(
       "run-locked",
       `run ${JSON.stringify(runId)} is already open by another writer` +
         `${holderPid === null ? "" : ` (pid ${holderPid})`}` +
-        `${heldSinceMs === null ? "" : ` since ${new Date(heldSinceMs).toISOString()}`}; ` +
+        `${heldSinceMs === null ? "" : ` since ${new Date(heldSinceMs).toISOString()}`}` +
+        `${lastRenewedMs === null ? "" : `, last renewed ${new Date(lastRenewedMs).toISOString()}`}` +
+        `${advice === null ? "" : `; ${advice}`}; ` +
         `a run store admits exactly one writer`,
     );
     this.name = "RunLockError";
     this.holderPid = holderPid;
     this.heldSinceMs = heldSinceMs;
+    this.lastRenewedMs = lastRenewedMs;
+    this.advice = advice;
   }
 }
 
@@ -427,6 +466,8 @@ export interface RunStorePaths {
   readonly snapshotPath: string;
   readonly lockPath: string;
   readonly attemptsDir: string;
+  /** Cross-process writer exclusion database. See `WriterGuard`. */
+  readonly guardPath: string;
 }
 
 /** True when `runId` can be used as a single, non-escaping path segment. */
@@ -488,6 +529,7 @@ export function runStorePaths(runId: string, artifactRoot = DEFAULT_ARTIFACT_ROO
     snapshotPath: join(runDir, "manifest.json"),
     lockPath: join(runDir, "writer.lock"),
     attemptsDir: join(runDir, "attempts"),
+    guardPath: join(runDir, "writer.sqlite"),
   };
 }
 
@@ -1327,7 +1369,27 @@ function writeAll(fd: number, text: string): void {
   }
 }
 
-/** Temp file + fsync + rename: a reader sees either the old bytes or the new ones. */
+/**
+ * Makes a directory ENTRY durable. `rename(2)` gives visibility atomicity, not
+ * durability: without this, a system failure can leave a durable file whose name
+ * was never committed, and a later fsynced event that references it would outlive
+ * the payload it claims.
+ */
+function fsyncDirectory(path: string): void {
+  const fd = openSync(path, "r");
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+/** Creates a directory and, when durable, commits its entry in the parent. */
+function mkdirDurably(path: string, durable: boolean): void {
+  if (existsSync(path)) return;
+  const parent = dirname(path);
+  if (parent !== path) mkdirDurably(parent, durable);
+  try { mkdirSync(path); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+  if (durable) fsyncDirectory(parent);
+}
+
+/** Temp file + fsync + rename + parent fsync: a reader sees old bytes or new ones, durably. */
 function writeFileAtomic(path: string, contents: string, fsync: boolean): void {
   const temp = `${path}.tmp-${process.pid.toString(36)}-${randomSuffix()}`;
   const fd = openSync(temp, "wx");
@@ -1338,6 +1400,48 @@ function writeFileAtomic(path: string, contents: string, fsync: boolean): void {
     closeSync(fd);
   }
   renameSync(temp, path);
+  if (fsync) fsyncDirectory(dirname(path));
+}
+
+/**
+ * Publishes bytes at `path` exactly once, atomically.
+ *
+ * `link(2)` is the primitive that matters here: it creates the destination or
+ * FAILS, and it can never replace an existing file. That is what makes an
+ * attempt's payload immutable — a second publisher with different bytes is
+ * refused by the kernel, not by a check that a concurrent process can interleave
+ * with. Filesystems without hard links fall back to `O_EXCL`, which refuses to
+ * truncate but is briefly visible while being written.
+ */
+function publishFileOnce(path: string, contents: string, fsync: boolean): "published" | "exists" {
+  const temp = `${path}.tmp-${process.pid.toString(36)}-${randomSuffix()}`;
+  const fd = openSync(temp, "wx");
+  try {
+    writeAll(fd, contents);
+    if (fsync) fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  try {
+    linkSync(temp, path);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") return "exists";
+    // Some filesystems (and some container mounts) cannot hard-link at all.
+    if (code !== "EPERM" && code !== "EXDEV" && code !== "ENOSYS" && code !== "EMLINK" && code !== "ENOTSUP") {
+      throw error;
+    }
+    const target = openSync(path, "wx");
+    try {
+      writeAll(target, contents);
+      if (fsync) fsyncSync(target);
+    } finally {
+      closeSync(target);
+    }
+  } finally {
+    try { unlinkSync(temp); } catch { /* the temp copy is disposable */ }
+  }
+  return "published";
 }
 
 /** Process-local, dependency-free uniqueness suffix for temp file names. */
@@ -1398,8 +1502,10 @@ export interface OpenRunStoreOptions {
   readonly amendmentReason?: string;
   /** Injectable clock returning epoch milliseconds. Tests supply a fake. */
   readonly clock?: () => number;
-  /** Lease age past which a lock is treated as abandoned. */
+  /** Diagnostic renewal window; age never reclaims a live process. */
   readonly staleLockMs?: number;
+  /** How long to wait for the cross-process writer guard before refusing. */
+  readonly guardBusyTimeoutMs?: number;
   /** `fsync` costs a syscall per durable write; `flush` is faster and weaker. */
   readonly durability?: "fsync" | "flush";
   /** Rewrite the derived snapshot on every mutation. Off by default; see `checkpoint`. */
@@ -1460,6 +1566,9 @@ export class RunStore {
   private readonly writeSnapshotOnMutation: boolean;
   private readonly faultInjector: FaultInjector | undefined;
   private readonly lockAcquiredAtMs: number;
+  /** Unique per open. Ownership is this nonce, not a millisecond. */
+  private readonly ownerNonce: string;
+  private readonly guard: WriterGuard;
 
   private projection: Projection;
   private diagnostics: OpenDiagnostics;
@@ -1479,6 +1588,8 @@ export class RunStore {
       runId: string;
       openedAt: string;
       lockAcquiredAtMs: number;
+      ownerNonce: string;
+      guard: WriterGuard;
     },
   ) {
     this.paths = paths;
@@ -1491,6 +1602,8 @@ export class RunStore {
     this.runId = options.runId;
     this.openedAt = options.openedAt;
     this.lockAcquiredAtMs = options.lockAcquiredAtMs;
+    this.ownerNonce = options.ownerNonce;
+    this.guard = options.guard;
   }
 
   static open(options: OpenRunStoreOptions): RunStore {
@@ -1507,14 +1620,24 @@ export class RunStore {
     const durability = options.durability ?? "fsync";
     const staleLockMs = options.staleLockMs ?? DEFAULT_STALE_LOCK_MS;
     const faultInjector = options.faultInjector;
-    const identity: LeaseIdentity = { pid: process.pid, acquiredAtMs: leaseNowMs, runId: options.runId };
+    const ownerNonce = randomUUID();
+    const identity: LeaseIdentity = { pid: process.pid, ownerNonce, acquiredAtMs: leaseNowMs, runId: options.runId };
     const fault = (point: FaultPoint): void => faultInjector?.({ fault: point, runId: options.runId, txId: "open" });
 
-    mkdirSync(paths.runDir, { recursive: true });
-    mkdirSync(paths.attemptsDir, { recursive: true });
+    mkdirDurably(paths.runDir, durability === "fsync");
+    mkdirDurably(paths.attemptsDir, durability === "fsync");
 
     fault("before-lock");
-    const lease = acquireLease(paths, identity, staleLockMs, leaseNowMs);
+    // The exclusion guard must exist before the lease is taken: it is what makes
+    // "decide, then replace the lease file" a single indivisible step.
+    const guard = new WriterGuard(paths.guardPath, options.guardBusyTimeoutMs ?? DEFAULT_WRITER_GUARD_BUSY_TIMEOUT_MS, options.runId);
+    let lease: LeaseAcquireResult;
+    try {
+      lease = acquireLease(paths, identity, guard, staleLockMs, leaseNowMs);
+    } catch (error) {
+      guard.close();
+      throw error;
+    }
     fault("after-lock");
 
     try {
@@ -1565,12 +1688,21 @@ export class RunStore {
           runId: options.runId,
           openedAt: new Date(nowMs).toISOString(),
           lockAcquiredAtMs: leaseNowMs,
+          ownerNonce,
+          guard,
         },
       );
       store.reconcile(config, options.amendmentReason ?? null);
       return store;
     } catch (error) {
-      releaseLease(paths, identity);
+      try {
+        releaseLease(paths, identity, guard);
+      } catch {
+        // The lease stays; a dead holder's lease is reclaimable, and losing the
+        // original refusal to a cleanup error would be the worse outcome.
+      } finally {
+        guard.close();
+      }
       throw error;
     }
   }
@@ -1629,13 +1761,41 @@ export class RunStore {
 
   private assertLeaseOwned(): void {
     const existing = readLease(this.paths.lockPath);
-    if (!existing || existing.pid !== process.pid || existing.acquiredAtMs !== this.lockAcquiredAtMs) {
-      throw new RunLockError(this.runId, existing?.pid ?? null, existing?.acquiredAtMs ?? null);
+    // Ownership is an identity, not a timestamp: two opens of one run inside one
+    // process and one millisecond still have distinct owners.
+    if (!existing || existing.pid !== process.pid || existing.ownerNonce !== this.ownerNonce) {
+      throw new RunLockError(this.runId, existing?.pid ?? null, existing?.acquiredAtMs ?? null, existing?.renewedAtMs ?? null);
     }
   }
 
+  /**
+   * The only way this class mutates durable state.
+   *
+   * Acquiring the cross-process guard and re-reading ownership inside one
+   * synchronous section is what makes "check, then write" indivisible. A
+   * takeover cannot interleave, and a caller that lost the run cannot publish.
+   * Re-entrant calls join the section already held rather than deadlocking.
+   */
+  private withWriter<T>(what: string, fn: () => T): T {
+    this.assertOpen();
+    return this.guard.exclusive(what, () => {
+      this.assertLeaseOwned();
+      return fn();
+    });
+  }
+
+  /** Journal publication joins the same lease-checked exclusion as store mutations. */
+  withDurableWriter<T>(fn: () => T): T {
+    return this.withWriter("external-durable-publication", fn);
+  }
+
   private ensureEventFd(): number {
-    if (this.eventFd === null) this.eventFd = openSync(this.paths.eventsPath, "a");
+    if (this.eventFd === null) {
+      this.eventFd = openSync(this.paths.eventsPath, "a");
+      // The log's own directory entry must be durable before the first append,
+      // or a system failure can leave a fully fsynced transaction with no file.
+      fsyncDirectory(this.paths.runDir);
+    }
     return this.eventFd;
   }
 
@@ -1651,26 +1811,26 @@ export class RunStore {
    * construction rather than by convention.
    */
   private append(events: readonly RunEventBody[]): RunTransaction {
-    this.assertOpen();
-    this.assertLeaseOwned();
     if (events.length === 0) throw new InvalidUsageError("refusing to append an empty transaction");
-    const transaction: RunTransaction = {
-      seq: this.projection.lastSeq + 1,
-      txId: this.nextTxId(),
-      at: new Date(this.clock()).toISOString(),
-      events,
-    };
-    this.fault("before-event-append", transaction.txId);
-    const fd = this.ensureEventFd();
-    writeAll(fd, `${stableStringify(transaction)}\n`);
-    if (this.durability === "fsync") fsyncSync(fd);
-    this.fault("after-event-append", transaction.txId);
+    return this.withWriter("event-append", () => {
+      const transaction: RunTransaction = {
+        seq: this.projection.lastSeq + 1,
+        txId: this.nextTxId(),
+        at: new Date(this.clock()).toISOString(),
+        events,
+      };
+      this.fault("before-event-append", transaction.txId);
+      const fd = this.ensureEventFd();
+      writeAll(fd, `${stableStringify(transaction)}\n`);
+      if (this.durability === "fsync") fsyncSync(fd);
+      this.fault("after-event-append", transaction.txId);
 
-    for (const event of transaction.events) applyEvent(this.projection, event, transaction.at);
-    this.projection.updatedAt = transaction.at;
-    this.projection.lastEventAt = transaction.at;
-    this.projection.lastSeq = transaction.seq;
-    return transaction;
+      for (const event of transaction.events) applyEvent(this.projection, event, transaction.at);
+      this.projection.updatedAt = transaction.at;
+      this.projection.lastEventAt = transaction.at;
+      this.projection.lastSeq = transaction.seq;
+      return transaction;
+    });
   }
 
   private fault(point: FaultPoint, txId: string): void {
@@ -1688,16 +1848,16 @@ export class RunStore {
    * boundaries, after bursts of work, and on close.
    */
   checkpoint(): RunSnapshot {
-    this.assertOpen();
-    this.assertLeaseOwned();
-    this.fault("before-snapshot", "snapshot");
-    writeFileAtomic(
-      this.paths.snapshotPath,
-      `${stableStringify(this.snapshot(), 2)}\n`,
-      this.durability === "fsync",
-    );
-    this.fault("after-snapshot", "snapshot");
-    return this.snapshot();
+    return this.withWriter("snapshot", () => {
+      this.fault("before-snapshot", "snapshot");
+      writeFileAtomic(
+        this.paths.snapshotPath,
+        `${stableStringify(this.snapshot(), 2)}\n`,
+        this.durability === "fsync",
+      );
+      this.fault("after-snapshot", "snapshot");
+      return this.snapshot();
+    });
   }
 
   // -- read-only views ----------------------------------------------------------------------------
@@ -1752,13 +1912,14 @@ export class RunStore {
 
   /** Keep a long-running pipeline leased; a lost owner must stop before dispatch/write. */
   renewLease(): void {
-    this.assertOpen();
-    this.assertLeaseOwned();
-    writeFileAtomic(this.paths.lockPath, stableStringify({
-      pid: process.pid, platform: process.platform, acquiredAtMs: this.lockAcquiredAtMs,
-      acquiredAt: new Date(this.lockAcquiredAtMs).toISOString(), renewedAtMs: Date.now(),
-      runId: this.runId, storeVersion: RUN_STORE_VERSION,
-    }) + "\n", true);
+    this.withWriter("lease-renewal", () => {
+      writeFileAtomic(this.paths.lockPath, stableStringify({
+        pid: process.pid, platform: process.platform, ownerNonce: this.ownerNonce,
+        acquiredAtMs: this.lockAcquiredAtMs,
+        acquiredAt: new Date(this.lockAcquiredAtMs).toISOString(), renewedAtMs: Date.now(),
+        runId: this.runId, storeVersion: RUN_STORE_VERSION,
+      }) + "\n", true);
+    });
   }
 
   /** The stage a resume would pick up from. */
@@ -2029,9 +2190,13 @@ export class RunStore {
             `(registered digest ${existingAttempt.payloadDigest}, offered ${payloadDigest})`,
         );
       }
-      // Re-materialise the payload so a crash that lost the file between rename
-      // and append self-heals instead of leaving a row pointing at nothing.
-      this.writePayload(unitId, attemptId, existingAttempt.parentAttemptId, record, payloadDigest);
+      // Re-materialise the payload so a crash that lost the file between
+      // publication and append self-heals instead of leaving a row pointing at
+      // nothing. Publication is immutable, so this can only ever restore the
+      // exact bytes the registered digest already names.
+      this.withWriter("payload-repair", () => {
+        this.writePayload(unitId, attemptId, existingAttempt.parentAttemptId, record, payloadDigest);
+      });
       const result: CommitCandidateResult = {
         committed: false,
         unitId,
@@ -2059,32 +2224,35 @@ export class RunStore {
       }
     }
 
-    this.writePayload(unitId, attemptId, parentAttemptId, record, payloadDigest);
-
-    const decision = resolveAdmission(record, unitId, input.admission);
-    const events: RunEventBody[] = [
-      {
-        type: "attempt.registered",
-        ...(decision.admittedRecord ? { admittedRecord: decision.admittedRecord } : {}),
-        unitId,
-        attemptId,
-        parentAttemptId,
-        recordId: record.recordId,
-        family: record.family,
-        scenarioSeed: record.scenarioSeed,
-        contentDigest: record.contentDigest,
-        payloadDigest,
-        payloadFile: attemptPayloadFileName(attemptId),
-        status: decision.status,
-        reasons: decision.reasons,
-        findings: decision.findings,
-        review: decision.review,
-      },
-    ];
-    if (input.finalize === true) events.push({ type: "unit.finalized", unitId, attemptId });
-    if (input.completeUnit === true) events.push({ type: "unit.completed", unitId });
-
-    this.append(events);
+    // Publication and the event that claims it share ONE exclusion section, so
+    // no takeover can observe (or produce) a payload without its registration.
+    const decision = this.withWriter("candidate-registration", () => {
+      this.writePayload(unitId, attemptId, parentAttemptId, record, payloadDigest);
+      const resolved = resolveAdmission(record, unitId, input.admission);
+      const registered: RunEventBody[] = [
+        {
+          type: "attempt.registered",
+          ...(resolved.admittedRecord ? { admittedRecord: resolved.admittedRecord } : {}),
+          unitId,
+          attemptId,
+          parentAttemptId,
+          recordId: record.recordId,
+          family: record.family,
+          scenarioSeed: record.scenarioSeed,
+          contentDigest: record.contentDigest,
+          payloadDigest,
+          payloadFile: attemptPayloadFileName(attemptId),
+          status: resolved.status,
+          reasons: resolved.reasons,
+          findings: resolved.findings,
+          review: resolved.review,
+        },
+      ];
+      if (input.finalize === true) registered.push({ type: "unit.finalized", unitId, attemptId });
+      if (input.completeUnit === true) registered.push({ type: "unit.completed", unitId });
+      this.append(registered);
+      return resolved;
+    });
     this.maybeSnapshot();
 
     const result: CommitCandidateResult = {
@@ -2471,6 +2639,20 @@ export class RunStore {
     return null;
   }
 
+  /**
+   * Publishes an attempt's payload exactly once, inside the writer guard.
+   *
+   * Two properties matter and both are structural rather than conventional:
+   *
+   *  - IMMUTABLE. The file is created with `link(2)`. If it already exists with
+   *    identical bytes, publication is a no-op; if it exists with DIFFERENT
+   *    bytes, publication is refused. A stale publisher therefore cannot replace
+   *    a replacement owner's committed payload and turn a readable run into a
+   *    `CorruptPayloadError`.
+   *  - ORDERED. The bytes and the directory entry that names them are fsynced
+   *    BEFORE the registering event is appended, so an fsynced event can never
+   *    outlive the payload it references.
+   */
   private writePayload(
     unitId: string,
     attemptId: string,
@@ -2480,6 +2662,33 @@ export class RunStore {
   ): void {
     this.assertLeaseOwned();
     this.fault("before-payload-write", `payload:${attemptId}`);
+    // The seam above is where a run can lose its lease to a replacement owner.
+    // Ownership is re-read here, inside the exclusion guard, so nothing is
+    // written by a publisher that is no longer the owner.
+    this.assertLeaseOwned();
+
+    const path = join(this.paths.attemptsDir, attemptPayloadFileName(attemptId));
+    const published = this.publishedPayloadState(path, attemptId, payloadDigest);
+    if (published === "same") return;
+    if (published === "different") {
+      throw new InvalidAttemptError(
+        `attempt ${JSON.stringify(attemptId)} already has a published payload with different bytes ` +
+          `(published digest ${this.publishedDigest(path)}, offered ${payloadDigest}); an attempt id names one ` +
+          `immutable payload, so publish a repair under a new attempt id`,
+      );
+    }
+    if (published === "corrupt") {
+      // An unregistered, unreadable orphan: no event can point at it, so it is
+      // set aside (never deleted — it is evidence) and the run continues.
+      if (this.findAttemptInternal(attemptId) !== null) {
+        throw new CorruptPayloadError(
+          attemptId,
+          `${attemptPayloadFileName(attemptId)} is registered but unreadable; refusing to replace it`,
+        );
+      }
+      renameSync(path, `${path}.corrupt-${randomSuffix()}`);
+    }
+
     const payload: StoredAttemptPayload = {
       storeVersion: RUN_STORE_VERSION,
       attemptId,
@@ -2489,12 +2698,49 @@ export class RunStore {
       writtenAt: new Date(this.clock()).toISOString(),
       record,
     };
-    writeFileAtomic(
-      join(this.paths.attemptsDir, attemptPayloadFileName(attemptId)),
-      `${stableStringify(payload)}\n`,
-      this.durability === "fsync",
-    );
+    const result = publishFileOnce(path, `${stableStringify(payload)}\n`, this.durability === "fsync");
+    if (result === "exists") {
+      // Only reachable if publication raced despite the guard. Refuse rather than
+      // replace; the existing bytes belong to someone else's attempt.
+      const state = this.publishedPayloadState(path, attemptId, payloadDigest);
+      if (state !== "same") {
+        throw new InvalidAttemptError(
+          `attempt ${JSON.stringify(attemptId)} acquired a concurrent payload publication; ` +
+            `refusing to overwrite the committed bytes`,
+        );
+      }
+    }
+    if (this.durability === "fsync") fsyncDirectory(this.paths.attemptsDir);
     this.fault("after-payload-write", `payload:${attemptId}`);
+  }
+
+  /** Immutable publication state of an attempt's payload file. */
+  private publishedPayloadState(
+    path: string,
+    attemptId: string,
+    payloadDigest: string,
+  ): "absent" | "same" | "different" | "corrupt" {
+    if (!existsSync(path)) return "absent";
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      return "corrupt";
+    }
+    if (!isJsonObject(parsed) || parsed.attemptId !== attemptId) return "corrupt";
+    if (parsed.payloadDigest !== payloadDigest) return "different";
+    if (sha256(stableStringify(parsed.record)) !== payloadDigest) return "different";
+    return "same";
+  }
+
+  /** The digest recorded inside an already-published payload, for refusal messages. */
+  private publishedDigest(path: string): string {
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+      return isJsonObject(parsed) && typeof parsed.payloadDigest === "string" ? parsed.payloadDigest : "unreadable";
+    } catch {
+      return "unreadable";
+    }
   }
 
   private readPayload(attempt: AttemptProjection): StoredAttemptPayload {
@@ -2538,14 +2784,20 @@ export class RunStore {
     if (this.closed) return this.snapshot();
     this.fault("before-close", "close");
     const lease = readLease(this.paths.lockPath);
-    if (lease?.pid === process.pid && lease.acquiredAtMs === this.lockAcquiredAtMs) this.checkpoint();
+    if (lease?.pid === process.pid && lease.ownerNonce === this.ownerNonce) this.checkpoint();
     this.closed = true;
     if (this.eventFd !== null) {
       const fd = this.eventFd;
       this.eventFd = null;
       closeSync(fd);
     }
-    releaseLease(this.paths, { pid: process.pid, acquiredAtMs: this.lockAcquiredAtMs, runId: this.runId });
+    try {
+      releaseLease(this.paths, {
+        pid: process.pid, ownerNonce: this.ownerNonce, acquiredAtMs: this.lockAcquiredAtMs, runId: this.runId,
+      }, this.guard);
+    } finally {
+      this.guard.close();
+    }
     this.fault("after-close", "close");
     return this.snapshot();
   }
@@ -2622,11 +2874,126 @@ function candidateForRead(record: CandidateRecord): CandidateRecord {
 }
 
 // -------------------------------------------------------------------------------------------------
+// Cross-process writer exclusion
+// -------------------------------------------------------------------------------------------------
+
+/** How long a writer waits for the exclusion guard before refusing. */
+export const DEFAULT_WRITER_GUARD_BUSY_TIMEOUT_MS = 1_000;
+
+/** Minimal structural view of `node:sqlite`; no ambient type dependency. */
+interface SqliteDatabase {
+  exec(sql: string): void;
+  close(): void;
+}
+
+interface SqliteModule {
+  DatabaseSync: new (path: string) => SqliteDatabase;
+}
+
+/**
+ * Resolved lazily through `createRequire` rather than a top-level import so that
+ * importing this module still works on a runtime without `node:sqlite`; only
+ * actually OPENING a run store needs Node 22, and that refusal is explicit.
+ */
+function loadSqlite(): SqliteModule {
+  try {
+    return createRequire(import.meta.url)("node:sqlite") as SqliteModule;
+  } catch (cause) {
+    throw new RunStoreError(
+      "unsupported-runtime",
+      "the run store's writer exclusion guard requires the built-in node:sqlite module, so it needs Node 22 " +
+        `or newer (${cause instanceof Error ? cause.message : String(cause)})`,
+    );
+  }
+}
+
+/**
+ * A real cross-process mutex around every durable mutation of one run.
+ *
+ * `BEGIN IMMEDIATE` takes SQLite's RESERVED lock at the first statement rather
+ * than at the first write, and the operating system drops it when the process
+ * dies — including a crash mid-transaction. That is the property a
+ * read-the-lease-then-write-the-file sequence cannot have: with it, "decide, then
+ * replace the lease", "check the lease, then publish a payload" and "check, then
+ * append an event" become indivisible, so a takeover cannot interleave with a
+ * publisher that already passed its check.
+ *
+ * The database holds no state of record. It is a mutex, deliberately created and
+ * used for nothing else.
+ */
+export class WriterGuard {
+  private readonly db: SqliteDatabase;
+  private depth = 0;
+  private closed = false;
+
+  constructor(readonly path: string, busyTimeoutMs: number, private readonly runId: string) {
+    const timeout = Number.isFinite(busyTimeoutMs) ? Math.max(0, Math.trunc(busyTimeoutMs)) : DEFAULT_WRITER_GUARD_BUSY_TIMEOUT_MS;
+    this.db = new (loadSqlite().DatabaseSync)(path);
+    this.db.exec(`PRAGMA busy_timeout = ${timeout}`);
+    // One row, never written: the table exists so the file has a schema and the
+    // first write transaction has something to lock against.
+    this.db.exec("CREATE TABLE IF NOT EXISTS writer_guard (id INTEGER PRIMARY KEY CHECK (id = 1), note TEXT)");
+  }
+
+  /** Runs `fn` with exclusive write ownership of this run's durable state. */
+  exclusive<T>(what: string, fn: () => T): T {
+    if (this.closed) throw new RunClosedError(this.runId);
+    if (this.depth > 0) {
+      // Re-entrant call inside a section already held by this process: joining is
+      // correct, because a nested BEGIN would deadlock against our own lock.
+      this.depth += 1;
+      try {
+        return fn();
+      } finally {
+        this.depth -= 1;
+      }
+    }
+    try {
+      this.db.exec("BEGIN IMMEDIATE");
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (/lock|busy/i.test(message)) {
+        const holder = readLease(join(this.runDir(), "writer.lock"));
+        throw new RunLockError(this.runId, holder?.pid ?? null, holder?.acquiredAtMs ?? null, holder?.renewedAtMs ?? null);
+      }
+      throw new RunStoreError("run-closed", `cannot acquire the run writer guard for ${what}: ${message}`);
+    }
+    this.depth = 1;
+    try {
+      return fn();
+    } finally {
+      this.depth = 0;
+      try {
+        // The transaction is a lock, not data: releasing is all it ever does.
+        this.db.exec("ROLLBACK");
+      } catch {
+        // The OS drops the lock when the connection closes regardless.
+      }
+    }
+  }
+
+  private runDir(): string {
+    return dirname(this.path);
+  }
+
+  close(): void {
+    this.closed = true;
+    try {
+      this.db.close();
+    } catch {
+      // Already closed; releasing twice is not an error.
+    }
+  }
+}
+
+// -------------------------------------------------------------------------------------------------
 // Single-writer lease
 // -------------------------------------------------------------------------------------------------
 
 interface LeaseIdentity {
   pid: number;
+  /** Unique per open. The identity that distinguishes a replacement holder. */
+  ownerNonce: string;
   acquiredAtMs: number;
   runId: string;
 }
@@ -2634,6 +3001,8 @@ interface LeaseIdentity {
 interface LeaseAcquireResult {
   tookOver: boolean;
   staleHolderPid: number | null;
+  /** How long the reclaimed lease had been silent, for diagnostics only. */
+  staleHolderAgeMs: number | null;
 }
 
 function processIsAlive(pid: number): boolean {
@@ -2648,16 +3017,16 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
-function readLease(path: string): { pid: number; acquiredAtMs: number; renewedAtMs: number } | null {
+function readLease(path: string): { pid: number; ownerNonce: string | null; acquiredAtMs: number; renewedAtMs: number } | null {
   if (!existsSync(path)) return null;
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
     if (!isJsonObject(parsed)) return null;
-    const { pid, acquiredAtMs } = parsed;
+    const { pid, acquiredAtMs, ownerNonce } = parsed;
     if (typeof pid !== "number" || typeof acquiredAtMs !== "number") return null;
     const renewedAtMs = typeof parsed.renewedAtMs === "number" && Number.isFinite(parsed.renewedAtMs)
       ? parsed.renewedAtMs : acquiredAtMs;
-    return { pid, acquiredAtMs, renewedAtMs };
+    return { pid, ownerNonce: typeof ownerNonce === "string" ? ownerNonce : null, acquiredAtMs, renewedAtMs };
   } catch {
     // An unparsable lease belongs to a process that died mid-write.
     return null;
@@ -2665,86 +3034,109 @@ function readLease(path: string): { pid: number; acquiredAtMs: number; renewedAt
 }
 
 /**
- * Single-writer lease, created with `O_EXCL` so acquisition is atomic against a
- * concurrent opener even where advisory locking is unreliable.
+ * Single-writer lease, created with `O_EXCL` and held behind the writer guard so
+ * that acquisition itself is indivisible: the read, the staleness decision, the
+ * quarantine of an abandoned lease and the claim cannot interleave with another
+ * opener. Two reclaimers can no longer both decide against the same lease and then
+ * race to move it.
  *
- * A holder is presumed dead when its pid is gone OR when the lease's last renewal has aged past
- * `staleLockMs`. Either condition alone can be wrong (a recycled pid, a clock
- * jump), so a lease is only reclaimed when at least one is decisively satisfied
- * and the reclaim itself races through `O_EXCL` again.
+ * A holder is presumed dead ONLY when its pid is decisively gone, or when the
+ * lease file is unreadable. Wall-clock age is reported to the operator but is
+ * deliberately NOT a reclaim trigger: a fenced writer can no longer corrupt its
+ * replacement, but nothing except the owner itself can stop a stalled owner from
+ * sending one more paid request. Seizing a live writer's lease is therefore an
+ * operator decision, not an automatic one.
  */
 function acquireLease(
   paths: RunStorePaths,
   identity: LeaseIdentity,
+  guard: WriterGuard,
   staleLockMs: number,
   nowMs: number,
 ): LeaseAcquireResult {
-  const payload = `${stableStringify({
-    pid: identity.pid,
-    platform: process.platform,
-    acquiredAtMs: identity.acquiredAtMs,
-    acquiredAt: new Date(identity.acquiredAtMs).toISOString(),
-    runId: identity.runId,
-    storeVersion: RUN_STORE_VERSION,
-  })}\n`;
+  return guard.exclusive("lease-acquisition", () => {
+    const payload = `${stableStringify({
+      pid: identity.pid,
+      platform: process.platform,
+      ownerNonce: identity.ownerNonce,
+      acquiredAtMs: identity.acquiredAtMs,
+      acquiredAt: new Date(identity.acquiredAtMs).toISOString(),
+      runId: identity.runId,
+      storeVersion: RUN_STORE_VERSION,
+    })}\n`;
 
-  const claim = (): void => {
-    const fd = openSync(paths.lockPath, "wx");
+    const claim = (): void => {
+      const fd = openSync(paths.lockPath, "wx");
+      try {
+        writeAll(fd, payload);
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+      fsyncDirectory(dirname(paths.lockPath));
+    };
+
     try {
-      writeAll(fd, payload);
-      fsyncSync(fd);
-    } finally {
-      closeSync(fd);
+      claim();
+      return { tookOver: false, staleHolderPid: null, staleHolderAgeMs: null };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
-  };
 
-  try {
-    claim();
-    return { tookOver: false, staleHolderPid: null };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-  }
-
-  const existing = readLease(paths.lockPath);
-  const staleByPid = existing === null || !processIsAlive(existing.pid);
-  const staleByAge = existing !== null && nowMs - existing.renewedAtMs > staleLockMs;
-  if (!staleByPid && !staleByAge) {
-    throw new RunLockError(identity.runId, existing?.pid ?? null, existing?.acquiredAtMs ?? null);
-  }
-
-  // Move the abandoned lease aside first, so a racing opener observes a missing
-  // lock and retries `claim()` itself. That is the only interleaving in which two
-  // processes could both believe they won.
-  const quarantine = `${paths.lockPath}.stale-${randomSuffix()}`;
-  try {
-    renameSync(paths.lockPath, quarantine);
-  } catch {
-    if (!existsSync(paths.lockPath)) {
-      throw new RunLockError(identity.runId, existing?.pid ?? null, existing?.acquiredAtMs ?? null);
+    const existing = readLease(paths.lockPath);
+    // A live holder always writes a well-formed lease, and renews it with an
+    // atomic rename, so a file that cannot be parsed can only be a dead writer's.
+    if (existing !== null && processIsAlive(existing.pid)) {
+      // `staleLockMs` sharpens the warning an operator sees. It never authorises
+      // the reclaim: only a decisively dead holder does.
+      throw new RunLockError(
+        identity.runId, existing.pid, existing.acquiredAtMs, existing.renewedAtMs,
+        nowMs - existing.renewedAtMs > staleLockMs
+          ? "its holder process is alive but has not renewed within the stale window; " +
+            "reclaim the lease only after confirming that holder is gone"
+          : null,
+      );
     }
-  }
-  try {
-    claim();
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-      const holder = readLease(paths.lockPath);
-      throw new RunLockError(identity.runId, holder?.pid ?? null, holder?.acquiredAtMs ?? null);
+
+    // Move the abandoned lease aside first, so a racing opener observes a missing
+    // lock and retries `claim()` itself. Inside the guard, this can only move the
+    // lease that was just read: nobody else can publish one in between.
+    const quarantine = `${paths.lockPath}.stale-${randomSuffix()}`;
+    try {
+      renameSync(paths.lockPath, quarantine);
+    } catch {
+      if (existsSync(paths.lockPath)) throw new RunStoreError("run-closed", "the abandoned lease file could not be quarantined");
     }
-    throw error;
-  }
-  return { tookOver: true, staleHolderPid: existing?.pid ?? null };
+    try {
+      claim();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+        const holder = readLease(paths.lockPath);
+        throw new RunLockError(identity.runId, holder?.pid ?? null, holder?.acquiredAtMs ?? null, holder?.renewedAtMs ?? null);
+      }
+      throw error;
+    }
+    return {
+      tookOver: true,
+      staleHolderPid: existing?.pid ?? null,
+      staleHolderAgeMs: existing === null ? null : nowMs - existing.renewedAtMs,
+    };
+  });
 }
 
-function releaseLease(paths: RunStorePaths, identity: LeaseIdentity): void {
-  const existing = readLease(paths.lockPath);
-  // Only ever remove a lease we still hold, so a process that lost its lease to a
-  // stale takeover cannot unlease the new owner.
-  if (existing !== null && (existing.pid !== identity.pid || existing.acquiredAtMs !== identity.acquiredAtMs)) return;
-  try {
-    unlinkSync(paths.lockPath);
-  } catch {
-    // Already gone; releasing twice is not an error.
-  }
+function releaseLease(paths: RunStorePaths, identity: LeaseIdentity, guard: WriterGuard): void {
+  guard.exclusive("lease-release", () => {
+    const existing = readLease(paths.lockPath);
+    // Only ever remove a lease we still hold, so a process that lost its lease to a
+    // takeover cannot unlease the new owner.
+    if (existing !== null && (existing.pid !== identity.pid || existing.ownerNonce !== identity.ownerNonce)) return;
+    try {
+      unlinkSync(paths.lockPath);
+      fsyncDirectory(dirname(paths.lockPath));
+    } catch {
+      // Already gone; releasing twice is not an error.
+    }
+  });
 }
 
 // -------------------------------------------------------------------------------------------------
