@@ -58,7 +58,7 @@ interface Approval {
   trainingAuthorized: boolean;
   inspectedGitCommit: string;
   measuredTemplateEvidenceDigest: string;
-  validators: Record<string, { version: string; implementationDigest: string }>;
+  validators: Record<string, { version: string; implementationDigest: string; implementationPaths: string[] }>;
   implementationArtifacts: Record<string, { kind: string; commit: string; path: string }>;
   runs: RunSection[];
   records: RecordEntry[];
@@ -124,6 +124,22 @@ function main(argv: readonly string[]): void {
   for (const [digest, source] of Object.entries(approval.implementationArtifacts)) {
     if (source.kind !== "git-blob" || source.commit !== approval.inspectedGitCommit) throw new Error("unexpected implementation resolution");
     retain(digest, execFileSync("git", ["show", `${source.commit}:${source.path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }));
+  }
+
+  // A validator's implementation pin is a digest over the EXACT SET of source
+  // files that implement and dispatch it. Recompute it here rather than trusting
+  // the stored value: a plausible-but-wrong single file, or a gate-result blob,
+  // would otherwise authenticate nothing.
+  const implementationDigestFor = (paths: readonly string[]): string =>
+    hash(stableStringify(paths.map((path) => ({ path,
+      digest: hash(execFileSync("git", ["show", `${approval.inspectedGitCommit}:${path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 })) }))));
+  for (const [name, validator] of Object.entries(approval.validators)) {
+    if (!Array.isArray(validator.implementationPaths) || validator.implementationPaths.length === 0) {
+      throw new Error(`validator "${name}" has no implementation paths`);
+    }
+    if (implementationDigestFor(validator.implementationPaths) !== validator.implementationDigest) {
+      throw new Error(`validator "${name}" implementation pin does not reproduce from its declared source files`);
+    }
   }
 
   const python = process.env.FOUNDRY_TOKENIZER_PYTHON;

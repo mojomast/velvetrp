@@ -34,40 +34,44 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".
  * `implementationArtifacts`, and the exporter resolves each one with
  * `git show <inspectedCommit>:<path>`.
  */
-const VALIDATOR_IMPLEMENTATION: Readonly<Record<string, string>> = Object.freeze({
-  "binding-grounding": "dataset/src/grounding.ts",
-  "production-grounding-predicate": "dataset/src/generate.ts",
-  "creative-transcript-contract": "dataset/src/creativeRoleplay.ts",
-  "boundary-leakage": "dataset/src/generate.ts",
-  "player-agency": "dataset/src/generate.ts",
-  "receipt-provenance": "dataset/src/generate.ts",
-  "advertised-candidate-binding": "dataset/src/generate.ts",
-  "tool-envelope": "dataset/src/generate.ts",
-  "reference-closure": "dataset/src/generate.ts",
-  "catalog-pinning": "dataset/src/generate.ts",
-  "requested-section-schema": "dataset/src/generate.ts",
-  "abstention-correctness": "dataset/src/generate.ts",
-  "authority-respected": "dataset/src/generate.ts",
-  "selective-fidelity": "dataset/src/generate.ts",
-  "prose-quality-retention": "dataset/src/generate.ts",
+const VALIDATOR_IMPLEMENTATION: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  // The binding logic is evaluateGroundedNarration in grounding.ts; groundingRuns
+  // in generate.ts dispatches it. Both authenticate the check.
+  "binding-grounding": ["dataset/src/grounding.ts", "dataset/src/generate.ts"],
+  // productionPredicateRun lives entirely in generate.ts.
+  "production-grounding-predicate": ["dataset/src/generate.ts"],
+  "creative-transcript-contract": ["dataset/src/creativeRoleplay.ts", "dataset/src/generate.ts"],
+  "boundary-leakage": ["dataset/src/generate.ts"],
+  "player-agency": ["dataset/src/generate.ts"],
+  "receipt-provenance": ["dataset/src/generate.ts"],
+  "advertised-candidate-binding": ["dataset/src/generate.ts"],
+  "tool-envelope": ["dataset/src/generate.ts"],
+  "reference-closure": ["dataset/src/generate.ts"],
+  "catalog-pinning": ["dataset/src/generate.ts"],
+  "requested-section-schema": ["dataset/src/generate.ts"],
+  "abstention-correctness": ["dataset/src/generate.ts"],
+  "authority-respected": ["dataset/src/generate.ts"],
+  "selective-fidelity": ["dataset/src/generate.ts"],
+  "prose-quality-retention": ["dataset/src/generate.ts"],
 });
 
 const blobAt = (commit: string, path: string): string =>
   execFileSync("git", ["show", `${commit}:${path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }).toString("utf8");
 
 /**
- * The mapped file must actually NAME the validator. A wrong-but-plausible
- * mapping (for example pointing a predicate at the module that supplies its
- * inputs rather than the module that implements the check) otherwise pins
- * perfectly valid source that does not authenticate anything. Independent
- * review caught exactly that once.
+ * A validator's implementation pin is a digest over the EXACT SET of source files
+ * that implement and dispatch it, not a single file.
+ *
+ * Two independent reviews found pinning defects here: first a gate-RESULT blob
+ * masquerading as an implementation, then a plausible-but-wrong single file
+ * (`production-grounding-predicate` was pointed at `grounding.ts`, which supplies
+ * its inputs but does not implement the predicate). Pinning the whole set, and
+ * recomputing it from `git show` at export time, makes both classes impossible:
+ * the digest only matches if every listed file is byte-identical.
  */
-function assertImplementationNamesValidator(commit: string, path: string, validator: string): string {
-  const source = blobAt(commit, path);
-  if (!source.includes(`"${validator}"`)) {
-    throw new Error(`validator "${validator}" is not named in its mapped implementation ${path}; refusing a plausible but unverified pin`);
-  }
-  return source;
+function implementationDigestFor(commit: string, paths: readonly string[]): string {
+  const entries = paths.map((path) => ({ path, digest: hash(blobAt(commit, path)) }));
+  return hash(stableStringify(entries));
 }
 
 const outPath = process.argv[2];
@@ -87,7 +91,7 @@ interface RunSection {
 }
 interface RecordEntry { unitId: string; runId: string; family: string; split: string; certificateDigest: string; payloadDigest: string; labels: number }
 
-const validators: Record<string, { version: string; implementationDigest: string }> = {};
+const validators: Record<string, { version: string; implementationDigest: string; implementationPaths: string[] }> = {};
 const implementationArtifacts: Record<string, { kind: string; commit: string; path: string }> = {};
 const runs: RunSection[] = [];
 const records: RecordEntry[] = [];
@@ -126,18 +130,20 @@ for (const runId of runIds) {
       sourceArtifactDigests.add(digest);
     }
     for (const item of record.admissionCertificate.evidence) {
-      const implementationPath = VALIDATOR_IMPLEMENTATION[item.validator];
-      if (!implementationPath) {
+      const implementationPaths = VALIDATOR_IMPLEMENTATION[item.validator];
+      if (!implementationPaths) {
         throw new Error(`no implementation mapping for validator "${item.validator}"; refusing to pin a result blob as an implementation`);
       }
-      const implementationBytes = assertImplementationNamesValidator(inspectedGitCommit, implementationPath, item.validator);
-      const implementationDigest = hash(implementationBytes);
-      implementationArtifacts[implementationDigest] = { kind: "git-blob", commit: inspectedGitCommit, path: implementationPath };
+      for (const path of implementationPaths) {
+        const digest = hash(blobAt(inspectedGitCommit, path));
+        implementationArtifacts[digest] = { kind: "git-blob", commit: inspectedGitCommit, path };
+      }
+      const implementationDigest = implementationDigestFor(inspectedGitCommit, implementationPaths);
       const existing = validators[item.validator];
       if (existing && existing.implementationDigest !== implementationDigest) {
         throw new Error(`validator "${item.validator}" resolved to two different implementations`);
       }
-      validators[item.validator] ??= { version: item.version, implementationDigest };
+      validators[item.validator] ??= { version: item.version, implementationDigest, implementationPaths: [...implementationPaths] };
       // The per-record gate RESULT is evidence, never an implementation pin.
       gateEvidenceArtifactDigests.add(item.evidenceDigest);
     }
