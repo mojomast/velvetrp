@@ -66,32 +66,42 @@ remediation record is in [`CORRECTIONS_LOG.md`](CORRECTIONS_LOG.md).
 
 ### Adapter integrity status
 
-The context adapter's source manifest and plan are frozen. Its first
-pre-dispatch review returned a **HOLD** on reproduced integrity defects that had
-to fail closed before any request could be sent:
+The context adapter's source manifest and plan are frozen. Two independent
+reviews have now been through it.
 
-1. **Connector loss.** At a semicolon boundary, a mechanical sibling re-entering
-   the lossy clause splitter could shed `while`/`but`/`however` or a question mark
-   and still verify with complete mechanical coverage.
-2. **Copyable runtime authority.** The issued registry was mutable and its brand
-   survived object spread, so a changed source or an upgraded control arm could be
-   authorized under the original pin.
-3. **Schedule drift.** A valid noncontiguous manifest order executed in grouped
-   order, disagreeing with the frozen schedule it reported.
-4. Plus a silent manifest-digest repair and one false contradiction.
+The **first** returned a HOLD on four reproduced defects, all fixed:
+connector loss at a semicolon boundary; a mutable and copyable scene authority
+that let a changed source or an upgraded control arm resolve under the original
+pin; silent replacement of an invalid declared manifest digest; and schedule
+drift. A related false contradiction was also corrected.
 
-**All four are now fixed.** Each was verified by reverting the fix and observing
-its regression fail, then re-probed independently: **28/28 probes pass**,
-**305 focused tests pass** with the real CPU tokenizer enabled, typecheck is
-clean, and preflight still makes **zero generation or review attempts**.
+The **second** confirmed those four closed and the frozen digests reproducing,
+then held on three further blockers, all fixed in `b41712b`:
 
-Independent re-review of the corrected tree and the live caller is still
-required before dispatch, and the 175-seed pilot remains held regardless. This
-branch remains a **checkpoint**, not an approved dispatch.
+1. **Style-driven regeneration.** A candidate that passed every functional
+   validator but was refused by a review-quality floor triggered a generator
+   repair, contradicting this protocol's "no style-based generation retries".
+   The diagnostic now selects a `functional-only` repair policy: review and
+   admission-quality refusals are terminal, while genuine functional failures
+   still repair. Default callers are unchanged.
+2. **Reviewer identity.** The repository runner accepted the environment's
+   default reviewer instead of the preregistered Kimi K3. It now refuses any
+   other reviewer before opening a store.
+3. **Preflight crash.** `runPipeline` dereferences both client identities
+   immediately, so the runner's preflight path threw. Clients are now built in
+   both modes (no network call), and `dataset/scripts` is included in the foundry
+   typecheck so the error class cannot recur.
 
-One known mechanical-grammar gap remains open: a factually correct
-present-tense check narration ("You succeed on the ... check ...") is refused as
-unrecognized.
+A **third independent clearance** is in progress. Until it returns GO, the
+diagnostic is not dispatched. The 175-seed pilot is held regardless and this
+branch remains a **checkpoint**.
+
+The known present-tense check-grammar gap is **fixed**; the grounding validator
+is now `grounding-binding-v7`.
+
+Measurement tooling is durable in `dataset/scripts/`: the frozen diagnostic
+caller, the blind-census collector, the journal-verified run summarizer and the
+pinned prose-ledger freezer. Frozen inputs are preserved in `dataset/frozen/`.
 
 ```bash
 npm run foundry -- generate --execute --units 175 --seed pilot-1
