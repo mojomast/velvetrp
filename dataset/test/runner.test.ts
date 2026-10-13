@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { createPublicContextDiagnosticManifest, planRun, PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION, runPipeline, scenarioSpec, twinSourceDigest, type PipelineOptions, type ScheduledTwinInput, type TokenizerPort } from "../src/generate.js";
+import { createPublicContextDiagnosticManifest, planRun, PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION, refusalAuthorizesRepair, runPipeline, scenarioSpec, twinSourceDigest, type PipelineOptions, type ScheduledTwinInput, type StageFailure, type TokenizerPort } from "../src/generate.js";
 import { parsePublicObservationSource, publicContextDiagnosticManifestBody, publicContextDiagnosticManifestDigest,
   publicObservationSourceDigest, type PublicContextDiagnosticManifest } from "../src/publicSceneFacts.js";
 import { assertGeneratedSplits, loadGenerationPolicy } from "../src/generationPolicy.js";
@@ -11,7 +11,7 @@ import { inspectPipelineCheckpoint, PipelineJournal, UncertainDispatchError } fr
 import { authoritativeFacts, PUBLIC_SCENE_GROUNDING_VALIDATOR_VERSION, type GroundingReceipt } from "../src/grounding.js";
 import { anchorCandidates, type ProseQualityScorer } from "../src/twins.js";
 import { selectAdmittedRecords } from "../src/selection.js";
-import { verifyAdmissionCertificate, type ApprovedAdmissionRegistry } from "../src/admission.js";
+import { AdmissionError, verifyAdmissionCertificate, type ApprovedAdmissionRegistry } from "../src/admission.js";
 import { createTeacherClient, sha256Hex, TeacherUncertainDispatchError, type TeacherClient, type TeacherCompletionRequest } from "../src/teacher.js";
 import { stableStringify } from "../src/spec.js";
 import { createTokenizerBridge, withMeasuredQwen3Template } from "../src/tokenizer.js";
@@ -1118,4 +1118,115 @@ test("observations cannot cover an omitted receipt in either arm, and refusals s
   await assert.rejects(() => runPipeline({ ...run.options, store: run.reopen(),
     publicContextDiagnostic: { manifest: other, expectedManifestDigest: other.manifestDigest } }),
     /public-context diagnostic refused: the plan seed must be the manifest's diagnostic seed/);
+});
+
+// ---------------------------------------------------------------------------
+// Opt-in repair policy (functional-only)
+//
+// The frozen public-context protocol reads: "At most two content repairs for
+// functional failures; no style-based generation retries." A candidate that
+// passes every functional gate but is refused by an independent REVIEW_FLOOR is
+// a quality refusal, not a functional one, so it must be terminal for that unit
+// when the policy is "functional-only". The default ("any-refusal", including
+// the option absent) must remain byte-for-byte the historical behaviour.
+// ---------------------------------------------------------------------------
+
+/** An independent accept whose coherence score sits below REVIEW_FLOORS.coherence (0.5). */
+const BELOW_FLOOR_ACCEPT = JSON.stringify({ ...JSON.parse(ACCEPT), coherence: 0.4,
+  rationale: "Independent fixture review scoring coherence below the review floor." });
+
+test("functional-only: a review-floor refusal is terminal, exercising one generation and zero repairs", async (t) => {
+  let generations = 0;
+  const generator = client("fixture-teacher", () => { generations += 1; return "The lantern gutters beside the closed ledger."; });
+  const reviewer = client("fixture-reviewer", () => BELOW_FLOOR_ACCEPT);
+  const run = setup(t, { units: 1, generator, reviewer, maxRepairs: 2, repairPolicy: "functional-only" });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(generations, 1, "a quality-only refusal must not re-dispatch the generator");
+  assert.equal(report.attempts, 1, "a review-floor refusal must not consume a repair attempt");
+  const outcome = report.unitOutcomes[0]!;
+  assert.equal(outcome.attempts, 1);
+  assert.equal(outcome.admittedAttemptId, null);
+  assert.equal(outcome.refusedAt, "VALIDATED:admission-refused");
+  // The refusal is still recorded and charged exactly once, like every refusal.
+  const candidates = run.store.candidates();
+  assert.equal(candidates.length, 1, "the terminal refusal is committed exactly once");
+  assert.equal(candidates[0]!.admission.findings?.code, "admission-refused");
+  assert.match(String(candidates[0]!.admission.findings?.detail), /below the floor/);
+  assert.ok(candidates[0]!.admission.findings?.review, "the review that refused the candidate is retained");
+  const registered = run.store.attempts(run.plan.units[0]!.unitId);
+  assert.equal(registered.length, 1, "no superseding repair attempt is registered");
+  assert.equal(registered[0]!.status, "pending-review");
+  assert.deepEqual(registered[0]!.reasons, ["VALIDATED:admission-refused"]);
+  assert.equal(report.budget.supervisedTokens, candidates[0]!.provenance.tokenCount!.tokens);
+  assert.equal(outcome.supervisedTokens, candidates[0]!.provenance.tokenCount!.tokens);
+  // A resume replays the durable terminal refusal and sends nothing new.
+  assert.deepEqual(await runPipeline({ ...run.options, store: run.reopen() }), report);
+  assert.equal(generations, 1);
+});
+
+test("default repair policy (option absent): a review-floor refusal still repairs", async (t) => {
+  let generations = 0;
+  const generator = client("fixture-teacher", () => { generations += 1; return "The lantern gutters beside the closed ledger."; });
+  const reviewer = client("fixture-reviewer", () => BELOW_FLOOR_ACCEPT);
+  const run = setup(t, { units: 1, generator, reviewer, maxRepairs: 1 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(generations, 2, "the default policy still authorizes a generator repair");
+  assert.equal(report.attempts, 2);
+  assert.equal(report.unitOutcomes[0]!.admittedAttemptId, null);
+  assert.match(report.unitOutcomes[0]!.refusedAt!, /^VALIDATED:/);
+});
+
+test("functional-only: a genuine functional validator failure still performs a bounded repair", async (t) => {
+  const requests: TeacherCompletionRequest[] = [];
+  const generator = outputClient((request) => {
+    requests.push(request);
+    // Drop the damage receipt: a functional grounding failure, never a style one.
+    const narration = publicReceiptNarration(request).split(". ")[0]! + ".";
+    return { content: "", toolCalls: [{ id: "grounded", type: "function", function: {
+      name: "submit_adventure_narration", arguments: { narration } } }] };
+  });
+  const run = setup(t, { units: 1, families: ["grounded-narration"], generator, maxRepairs: 1, repairPolicy: "functional-only" });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.attempts, 2, "a missing receipt is functional and must still repair");
+  assert.equal(requests.length, 2);
+  assert.match(stableStringify(requests[1]!.messages), /RAW output that was refused/);
+  assert.match(report.unitOutcomes[0]!.refusedAt!, /narration-transport|receipt-provenance/);
+});
+
+test("functional-only policy is bound into the durable resume identity and cannot be switched", async (t) => {
+  const reviewer = client("fixture-reviewer", () => BELOW_FLOOR_ACCEPT);
+  const run = setup(t, { units: 1, reviewer, maxRepairs: 1, repairPolicy: "functional-only" });
+  await runPipeline({ ...run.options, store: run.store });
+  // Same policy resumes; a silent switch back to the default does not.
+  const { repairPolicy: _policy, ...withoutPolicy } = run.options;
+  await assert.rejects(() => runPipeline({ ...withoutPolicy, store: run.reopen() }), /configuration\/plan drift/);
+});
+
+test("functional-only classifies review-quality problems as terminal but certificate failures as repairable", () => {
+  const reason = (code: string): StageFailure => ({ stage: "VALIDATED", code, detail: "fixture", raw: "", parsed: "", findings: {} });
+  const admission = (problems: string[]): AdmissionError => new AdmissionError(problems);
+  // A review-floor judgment, an unacceptable verdict or a disagreement is a
+  // quality refusal: terminal for the unit under the protocol.
+  assert.equal(refusalAuthorizesRepair(reason("admission-refused"),
+    admission(["review score coherence is 0.4, below the floor 0.5"]), "functional-only"), false);
+  assert.equal(refusalAuthorizesRepair(reason("admission-refused"),
+    admission(['review verdict "revise" cannot admit']), "functional-only"), false);
+  assert.equal(refusalAuthorizesRepair(reason("admission-refused"),
+    admission(["independent reviewers disagree and no majority verdict was reached"]), "functional-only"), false);
+  // A certificate/verification failure is functional: it must still repair.
+  assert.equal(refusalAuthorizesRepair(reason("admission-refused"),
+    admission(["admission certificate digest mismatch (evidence or reviews changed)"]), "functional-only"), true);
+  // A floor message whose parsed floor does not match the live constant is not
+  // treated as ours, and a mixture with any functional problem repairs overall.
+  assert.equal(refusalAuthorizesRepair(reason("admission-refused"),
+    admission(["review score coherence is 0.4, below the floor 0.9"]), "functional-only"), true);
+  assert.equal(refusalAuthorizesRepair(reason("admission-refused"),
+    admission(["review score coherence is 0.4, below the floor 0.5", "payload digest does not match the stored messages"]),
+    "functional-only"), true);
+  // The store downgrade is named terminal by the protocol; any other code repairs.
+  assert.equal(refusalAuthorizesRepair(reason("admission-downgraded"), null, "functional-only"), false);
+  assert.equal(refusalAuthorizesRepair(reason("receipt-provenance"), null, "functional-only"), true);
+  // The default policy authorizes every refusal, exactly as today.
+  assert.equal(refusalAuthorizesRepair(reason("admission-refused"),
+    admission(["review score coherence is 0.4, below the floor 0.5"]), "any-refusal"), true);
 });

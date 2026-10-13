@@ -1,7 +1,8 @@
 # Public-context narration diagnostic
 
-Status: implemented; **independent pre-dispatch review HOLD**. The 175-seed pilot
-remains held. This diagnostic changes no model weights and authorizes no export.
+Status: implemented; dispatch pending a second independent clearance after the
+pipeline repair-policy and runner corrections below. The 175-seed pilot remains
+held. This diagnostic changes no model weights and authorizes no export.
 
 ### Adapter defects that blocked dispatch — now fixed
 
@@ -20,8 +21,22 @@ A related nonblocking false contradiction for identical repeated scene subjects
 was also corrected: contradiction is now decided on value, not repetition.
 
 The present-tense check-grammar false refusal found in the v7 audit
-(`You succeed on ...`) remains a separate known mechanical-grammar gap and is
-not repaired by this work.
+(`You succeed on ...`) is **fixed**; the grounding validator is now
+`grounding-binding-v7`.
+
+### Blockers found by the second independent clearance
+
+A second read-only review confirmed F1–F4 closed and all four frozen digests
+reproducing, then found three new blockers. Report:
+`/tmp/opencode/foundry-public-context-clearance-review.md`.
+
+| # | Severity | Defect | Correction |
+|---|---|---|---|
+| N1 | P1 | **Style-driven regeneration.** A candidate passing every functional validator but refused by a review-quality floor triggered a generator repair, contradicting this protocol's "no style-based generation retries" | The diagnostic selects `repairPolicy: "functional-only"`: a review/admission-quality refusal is terminal and does not authorize repair; genuine functional failures still repair. Default callers are unchanged |
+| N2 | P1 | The first repository runner accepted the environment's default reviewer (`claude-opus-4-8`) instead of the preregistered Kimi K3 | The runner now refuses any reviewer other than the preregistered Kimi K3 before opening a store |
+| N3 | P2 | The first repository runner's preflight crashed because `runPipeline` dereferences generator/reviewer identities that the preflight path omitted | Clients are constructed in both modes (construction performs no network call); `dataset/scripts/**` is now included in the foundry typecheck so this cannot recur |
+
+A third independent clearance is required before dispatch.
 
 ## Preregistered execution identity
 
@@ -43,10 +58,20 @@ plan entries: exact receipts, realization slots, lineage, split and cluster matc
 The real-CPU preflight reproduced the six-unit plan with **zero generation/review
 attempts**. Preflight is not generated-data quality evidence.
 
-Programmatic caller: `/tmp/opencode/foundry-public-context-runner.ts`. It requires
-the externally supplied preregistered manifest pin, preserves the Flash/K3 settings
-and opens the existing fsync-backed journal only for actual execution. Dispatch
-awaits independent source/grammar and caller review.
+Durable, credential-free caller:
+`dataset/scripts/runPublicContextDiagnostic.ts`. It requires the externally
+supplied preregistered manifest pin rather than re-deriving one from the bytes it
+validates, verifies both the manifest and the plan identity, requires the
+preregistered Flash generator and Kimi K3 reviewer, and makes zero provider
+requests in `--preflight`. Frozen inputs are preserved in `dataset/frozen/`:
+
+| Artifact | SHA-256 / identity |
+|---|---|
+| `dataset/frozen/public-context-v8-manifest.json` | file `4089f73ebff102fbbeff891e69e976e9502d2fba2a2e68ad683dae1c38d140a5`; canonical digest `c07754537a920d4a7acbb09fd5951ee4974273224f1925fa845f6d38647d6c58` |
+| `dataset/frozen/public-context-v8-preregistration.json` | file `84faac99e0a42dd7384494d063a0561b2cef91f7e8ed590dccc753150fc03d9c` |
+
+The canonical manifest digest is recomputed from the committed manifest body, so
+the frozen identity is reproducible from repository bytes alone.
 
 ## Purpose and frozen selection rule
 

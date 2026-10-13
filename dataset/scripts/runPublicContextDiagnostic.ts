@@ -142,18 +142,26 @@ async function dispatch(command: "--preflight" | "--execute", expectedManifestDi
   if (!python) throw new Error("FOUNDRY_TOKENIZER_PYTHON is required; see dataset/tokenizer/README.md");
   const tokenizer = createTokenizerBridge({ python, assetsDir: tokenizerAssets() });
 
-  const execute = command === "--execute";
-  const generator = execute
-    ? createTeacherClient({ credentials: requireTeacherCredentials() }) : undefined;
-  const reviewer = execute && generator
-    ? createTeacherClient({ credentials: requireReviewerCredentials(generator.model) }) : undefined;
-  if (generator && reviewer) {
-    // Preregistered route: the independent reviewer must differ from the generator.
-    if (generator.model !== "deepseek-v4-flash") throw new Error(`preregistered generator is deepseek-v4-flash, got ${generator.model}`);
-    if (reviewer.model === generator.model) throw new Error("reviewer must be an independent model");
+  // The clients are constructed in both modes. Construction performs NO network
+  // call; only runPipeline with execute:true dispatches. runPipeline dereferences
+  // both identities immediately, so preflight without them would crash before it
+  // could prove anything. Requiring the exact preregistered pair here means
+  // preflight also proves the environment selects the right route, and it refuses
+  // an environment whose default reviewer is not the frozen independent one.
+  const generator = createTeacherClient({ credentials: requireTeacherCredentials() });
+  const reviewer = createTeacherClient({ credentials: requireReviewerCredentials(generator.model) });
+  if (generator.model !== "deepseek-v4-flash") {
+    throw new Error(`preregistered generator is deepseek-v4-flash, got "${generator.model}"`);
   }
+  // Accept only the preregistered independent reviewer identity. Both spellings
+  // the CLI accepts are allowed; anything else refuses before a store is opened.
+  if (!["kimi:k3", "kimi-k3"].includes(reviewer.model)) {
+    throw new Error(`preregistered reviewer is Kimi K3, got "${reviewer.model}"; set VELVET_REVIEWER_MODEL=kimi:k3`);
+  }
+  if (reviewer.model === generator.model) throw new Error("reviewer must be an independent model");
 
-  const store = execute && generator && reviewer
+  const execute = command === "--execute";
+  const store = execute
     ? openRunStore({
       runId: PUBLIC_CONTEXT_RUN_ID, seed: PUBLIC_CONTEXT_SEED,
       sourceDigest: sourceTreeDigest(datasetRoot, { skip: ["__pycache__"] }),
@@ -176,12 +184,14 @@ async function dispatch(command: "--preflight" | "--execute", expectedManifestDi
       maxRepairs: PUBLIC_CONTEXT_MAX_REPAIRS,
       maxCompletionTokens: 2048, teacherThinking: "disabled", temperature: 0.7,
       reviewerTemperature: null, reviewerReasoningEffort: "low", reviewerMaxCompletionTokens: 4096,
-      tokenizer,
-      ...(generator && reviewer ? { generator, reviewer } : {}),
+      // The frozen protocol forbids style-driven regeneration: only a typed
+      // functional failure may authorize a repair in this diagnostic.
+      repairPolicy: "functional-only",
+      tokenizer, generator, reviewer,
       generationPolicy: loadGenerationPolicy(),
       selectionPolicy: { maxRecordsPerCluster: 8 },
       budget: DEFAULT_TOKEN_BUDGET,
-      ...(execute && !generator ? {} : { teacherRights: loadTeacherRights() }),
+      teacherRights: loadTeacherRights(),
       ...(store ? { store } : {}),
     });
     process.stdout.write(`${stableStringify(report, 2)}\n`);

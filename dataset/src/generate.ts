@@ -57,6 +57,8 @@ import { DEFAULT_SELECTION_POLICY, selectAdmittedRecords, type SelectionPolicy }
 
 import {
   ADMISSION_CERTIFICATE_VERSION,
+  AdmissionError,
+  REVIEW_FLOORS,
   admitCandidate,
   computePayloadDigest,
   requiredValidatorsFor,
@@ -2660,6 +2662,64 @@ export function isReviewScores(value: ReviewScores | { problems: string[] }): va
   return !("problems" in value);
 }
 
+/**
+ * The opt-in repair policy. "any-refusal" is the historical rule; "functional-only"
+ * is the frozen public-context protocol, which permits at most two CONTENT repairs
+ * and forbids style-based generation retries.
+ */
+export type RepairPolicy = "any-refusal" | "functional-only";
+
+/** The exact admission problem an independent review emits below a REVIEW_FLOOR. */
+const REVIEW_FLOOR_PROBLEM = /^review score ([A-Za-z]+) is ([0-9.eE+-]+), below the floor ([0-9.]+)$/;
+/** An unacceptable overall verdict: a quality refusal, not a contract failure. */
+const REVIEW_VERDICT_PROBLEM = /^review verdict ".*" cannot admit$/;
+/** Conflicting independent verdicts with no majority: still a quality judgment. */
+const REVIEW_DISAGREEMENT_PROBLEM = /^independent reviewers disagree and no majority verdict was reached$/;
+
+/**
+ * Is this one admission problem a REVIEW-QUALITY refusal (the candidate passed
+ * every functional gate, but the independent review judged it below a floor or
+ * refused the verdict), or a functional/contract problem?
+ *
+ * The distinction is load-bearing: under "functional-only" a quality refusal is
+ * terminal, so classifying a certificate-integrity problem as "quality" would
+ * silently strand a genuinely broken candidate. We therefore match the floor
+ * problem EXACTLY (the key must exist in REVIEW_FLOORS and the parsed floor must
+ * equal the live constant), and treat every other problem -- stale evidence,
+ * missing validator, failed certificate verification, a wrong-generator review,
+ * a malformed record -- as functional.
+ */
+function isReviewQualityProblem(problem: string): boolean {
+  const floor = REVIEW_FLOOR_PROBLEM.exec(problem);
+  if (floor) {
+    const expected = REVIEW_FLOORS[floor[1] as keyof typeof REVIEW_FLOORS];
+    return expected !== undefined && Number(floor[3]) === expected;
+  }
+  return REVIEW_VERDICT_PROBLEM.test(problem) || REVIEW_DISAGREEMENT_PROBLEM.test(problem);
+}
+
+/**
+ * Does this VALIDATED refusal authorize another bounded generator repair?
+ *
+ * "any-refusal" preserves today's behaviour for every existing caller and test.
+ * "functional-only" (the diagnostic protocol) makes a review/admission-quality
+ * refusal terminal for the unit: the refusal is still recorded, charged and
+ * finalized exactly as before, but the generator is not re-dispatched to restyle
+ * an answer that the review floor -- not a functional validator -- refused.
+ *
+ * `admission-downgraded` is the store refusing to register an admitted
+ * certificate; the protocol names it alongside the review floor as a terminal
+ * admission refusal. `admission-refused` is quality ONLY when every problem is a
+ * review-quality judgment; a certificate/verification failure (digest mismatch,
+ * stale payload, unapproved pin) is functional and still repairs.
+ */
+export function refusalAuthorizesRepair(reason: StageFailure, error: unknown, policy: RepairPolicy): boolean {
+  if (policy !== "functional-only") return true;
+  if (reason.code === "admission-downgraded") return false;
+  if (reason.code !== "admission-refused" || !(error instanceof AdmissionError) || error.problems.length === 0) return true;
+  return !error.problems.every(isReviewQualityProblem);
+}
+
 export function reviewPromptFor(spec: ScenarioSpec, messages: readonly StoredMessage[]): string {
   return [
     "You are an independent reviewer. Judge the final assistant response; earlier assistant turns are context only.",
@@ -2695,6 +2755,14 @@ export interface PipelineOptions {
   readonly units?: number | undefined;
   readonly families?: readonly TrainingFamily[] | undefined;
   readonly maxRepairs?: number | undefined;
+  /**
+   * How a VALIDATED refusal authorizes a bounded generator repair. The default
+   * ("any-refusal") preserves the historical rule, including for every caller
+   * that never sets this option. "functional-only" makes a review/admission
+   * quality refusal terminal for the unit while functional failures still
+   * repair; the public-context diagnostic sets it to honour its frozen protocol.
+   */
+  readonly repairPolicy?: RepairPolicy | undefined;
   readonly maxCompletionTokens?: number | undefined;
   readonly temperature?: number | undefined;
   readonly budget?: TokenBudget | undefined;
@@ -2936,6 +3004,7 @@ function publicSceneContextsFor(plan: RunPlan, diagnostic: PublicContextDiagnost
 export async function runPipeline(options: PipelineOptions): Promise<PilotReport> {
   const dryRun = options.execute !== true;
   const maxRepairs = options.maxRepairs ?? 2;
+  const repairPolicy: RepairPolicy = options.repairPolicy ?? "any-refusal";
   const maxCompletionTokens = options.maxCompletionTokens ?? 512;
   const temperature = options.temperature ?? 0.7;
   const reviewerTemperature = options.reviewerTemperature === undefined ? 0 : options.reviewerTemperature;
@@ -2950,8 +3019,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     || !Number.isSafeInteger(reviewerMaxCompletionTokens) || reviewerMaxCompletionTokens < 1
     || !Number.isSafeInteger(maxReviewContractRetries) || maxReviewContractRetries < 0
     || (options.teacherThinking !== undefined && !["enabled", "disabled"].includes(options.teacherThinking))
+    || (options.repairPolicy !== undefined && options.repairPolicy !== "any-refusal" && options.repairPolicy !== "functional-only")
     || (options.reviewerReasoningEffort !== undefined && !["low", "high", "max"].includes(options.reviewerReasoningEffort))) {
-    throw new PipelineRefusal("execution-not-authorized", ["invalid repair, completion, temperature or supervised-budget configuration"]);
+    throw new PipelineRefusal("execution-not-authorized", ["invalid repair, repair-policy, completion, temperature or supervised-budget configuration"]);
   }
 
   // FAIL CLOSED #1. A reviewer that is the generator is not a reviewer, and
@@ -3010,7 +3080,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     tokenizerPolicy: tokenizer.policyDigest ?? sha256Hex(`test-or-custom-policy:${tokenizer.name}`),
     teacherRights: rights?.receiptDigest ?? null,
     generator: options.generator.identity, reviewer: options.reviewer.identity,
-    maxRepairs, maxCompletionTokens, temperature, selectionPolicy,
+    maxRepairs, repairPolicy, maxCompletionTokens, temperature, selectionPolicy,
     teacherThinking: options.teacherThinking ?? null, reviewerTemperature,
     reviewerReasoningEffort: options.reviewerReasoningEffort ?? null, reviewerMaxCompletionTokens,
     maxReviewContractRetries, reviewPromptVersion: REVIEW_PROMPT_VERSION,
@@ -3319,7 +3389,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         artifactDigests: Object.keys(artifacts),
         scenarioSpec: unit.spec, realization: unit.realization,
         ...(unit.twinInstrumentation ? { selectiveTwin: unit.twinInstrumentation, proseQuality: proseScores.get(unit.unitId) } : {}) });
-      const commitRefused = (reason: StageFailure, extra: Record<string, unknown> = {}): void => {
+      const commitRefused = (reason: StageFailure, extra: Record<string, unknown> = {}, authorizeRepair = true): void => {
         // The failed attempt is COMMITTED AS REFUSED with its RAW and PARSED
         // text retained, and the next attempt supersedes it. It is never edited
         // in place; the store does not represent that and neither do we.
@@ -3350,7 +3420,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         unitSupervisedTokens += refusalTokens ?? 0;
         if (!alreadyCommitted) options.onEvent?.({ kind: "rejected", unitId: unit.unitId, attemptId, reason: reason.detail });
         parentAttemptId = attemptId;
-        previousFailure = reason;
+        // A terminal quality refusal must not seed the next attempt's repair
+        // prompt; the caller that passes authorizeRepair=false also breaks.
+        if (authorizeRepair) previousFailure = reason;
       };
 
       // Teacher and student tokenizers differ. A teacher max_tokens bound is a
@@ -3504,8 +3576,13 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
           error instanceof Error ? error.message : String(error),
           { raw: stages.raw, parsed: stages.parsed },
         );
-        commitRefused(refused, { review: scores });
+        const authorizeRepair = refusalAuthorizesRepair(refused, error, repairPolicy);
+        commitRefused(refused, { review: scores }, authorizeRepair);
         refusedAt = "VALIDATED:admission-refused";
+        // Under "functional-only" a quality refusal ends the unit here: the
+        // refusal is committed, charged and finalized above, but the generator
+        // is not re-dispatched to restyle an answer only the review floor refused.
+        if (!authorizeRepair) break;
         continue;
       }
 
@@ -3529,12 +3606,17 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
           reasons: ["VALIDATED:admission-downgraded"],
           findings: { certificateStatus: committed.status },
         });
-        previousFailure = stageFailure(
+        const downgraded = stageFailure(
           "VALIDATED", "admission-downgraded",
           `the run store downgraded the certificate to ${committed.status}`, stages,
         );
+        // The protocol names the downgrade alongside the review floor as a
+        // terminal admission refusal: charge and record it, then stop the unit.
+        const authorizeRepair = refusalAuthorizesRepair(downgraded, null, repairPolicy);
+        if (authorizeRepair) previousFailure = downgraded;
         refusedAt = "VALIDATED:admission-downgraded";
         parentAttemptId = attemptId;
+        if (!authorizeRepair) break;
         continue;
       }
       admittedRecord = admitted;
