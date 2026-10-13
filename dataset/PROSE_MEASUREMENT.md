@@ -18,6 +18,16 @@ they do not become fixture answers or disappear from denominators. Later student
 evaluation should cover all eight public/dev prose-quality cases and ten flexible
 RP cases, with separate cohort denominators. Sealed cases remain unavailable.
 
+Focused receipt-narration campaigns use a separate **`generated-grounded`** cohort,
+including narration-submit tool decisions. Display each complete native narration
+argument, or the complete plain-assistant surface if that was actually delivered;
+mixed/ambiguous surfaces retain objective ungradeability. This cohort is never
+pooled into `generated-rp` to inflate ordinary-RP coverage or retention evidence.
+Freeze every planned initial and actually dispatched repair before judging, and
+report its own voice/clarity/proportion/naturalness results separately from factual
+binding and tool transport. A focused campaign scheduling no ordinary RP has no
+new ordinary-RP denominator, rather than an invented RP score.
+
 The inherited **4/8** summary is an absolute numeric policy floor. Raw historical
 student answers are not available locally, so a new blinded measurement cannot
 establish controlled stock-versus-candidate retention. Generated-data style quality

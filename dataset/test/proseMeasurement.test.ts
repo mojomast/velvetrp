@@ -70,6 +70,23 @@ test("blinded packets are reproducible, display the whole captured surface and h
   assert.equal(new Set(inventory.packets.map((packet) => packet.sampleId)).size, 2);
 });
 
+test("grounded prose grading cannot inflate ordinary roleplay coverage or quality", () => {
+  const sources = [plainSource("ordinary", chosenArm), plainSource("receipt-prose", rejectedArm, { cohort: "generated-grounded" })];
+  const inventory = createBlindProseInventory(sources, [], "separate-functional-cohort");
+  const judgments = sources.map((source, index) => {
+    const packet = packetOf(inventory, source.sourceId);
+    return { packetDigest: proseArtifactDigest(packet), grader: { ...fixtureGrader, sessionId: `separate-cohort-${index}`, judgedAt: "2026-10-13T00:00:00Z" },
+      rawResponse: rawSample(packet, { ...passFields, ...(index ? { verdict: "fail", ratings: { voice: 0, clarity: 1, proportion: 1, naturalness: 1 } } : {}) }) };
+  });
+  const ledger = { inventory, judgments, parity: [] };
+  const { report } = loadMeasuredProseEvidence(ledger, proseArtifactDigest(ledger));
+  assert.equal(report.cohorts["generated-rp"]!.planned, 1);
+  assert.equal(report.cohorts["generated-rp"]!.passed, 1);
+  assert.equal(report.cohorts["generated-grounded"]!.planned, 1);
+  assert.equal(report.cohorts["generated-grounded"]!.failed, 1);
+  assert.equal(report.cohorts["generated-grounded"]!.passed, 0);
+});
+
 test("offline scorer resolves only exact independently pinned pair/ordered-arm/rubric evidence", () => {
   const { ledger, request } = fixture();
   const measured = loadMeasuredProseEvidence(ledger, proseArtifactDigest(ledger));

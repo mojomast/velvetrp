@@ -482,3 +482,41 @@ Final checkpoint: **523/523 serial foundry tests passed, zero skips/failures**,
 including real CPU tokenization/export reload. Independent pre-v5 review reproduced
 ten targeted scope/replay/duplicate/catalog checks and approved the bounded
 20-seed/K=1 campaign. No patch-readiness blocker was found.
+
+## Focused grounding calibration readiness
+
+Independent v5 inspection approved all fourteen actual admissions and the complete
+one-sample ordinary-RP ledger. Grounded admission remained zero despite correct
+native transport. `grounding-binding-v6` now handles common scoped check/attack
+declarations and contextual total/result/damage continuations, with role/property
+ownership checks and context reset on unknown/ambiguous prose. Attack pronouns need
+an established attack referent; target/status statements cannot supply one.
+
+Ten of twelve prior grounded surfaces verify offline; unsupported record-count/
+settlement preambles and “You read the ground” remain adjudication. Three narrow
+narration-submit surfaces verify. No historical admissions are recomputed. Added
+160 mutation-matrix cases retain the earlier 103 and 192 calibration mutations.
+
+Public value-free sentence examples define a stable, role-bound output interface
+without supplying scenario values. Twenty fixture scenarios spanning both check
+outcomes and multiple entities pass the complete native-call admission path.
+Focused live calibration schedules thirteen seeds covering grounded narration and
+all four tool subtypes; its `generated-grounded` style census stays separate from
+ordinary RP. The conditional pilot's public plan was updated before any pilot
+requests to bind these generator-v8 contracts, preserving seed/count/split policy.
+
+Validation checkpoint: **559/559 serial foundry tests passed, zero skips/failures**,
+including the real CPU bridge and export reload; owning typecheck passed.
+
+The pre-v6 independent check found a target-to-attacker scope substitution in the
+draft grammar: a recipient/status head could license outgoing damage/hit predicates.
+Paid v6 dispatch was held. The correction requires a genuine attack-event focus
+for actorless outgoing predicates, including compound/record components; recipient,
+HP, status and passive-damage clauses switch focus away from the attack. Failed
+or ambiguous siblings cannot supply an event premise. A 624-case target/outgoing
+matrix and complete guided six-scenario controls exercise these conditions.
+
+Final independent follow-up resolved the original seven recipient-focus probes
+and found no remaining concrete variant. **570/570 serial foundry tests passed,
+zero failures/skips**, including real CPU tokenization/export reload; owning
+typecheck passed. The frozen thirteen-seed/K=1 v6 calibration received GO.

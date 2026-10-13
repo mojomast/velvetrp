@@ -172,3 +172,43 @@ contexts, then independently inspect every actual admission and relevant refusal
 Require sound actual grounded admissions and aligned world behavior, with no false
 certificate or unresolved transport/token accounting. All prior artifacts and
 historical yields remain immutable. No training occurs during calibration or pilot.
+
+## Version 6 focused grounding/tool calibration (before generation)
+
+Independent v5 inspection approved 14/14 admissions and aligned world behavior.
+All twelve grounded outputs used the correct native transport, but common
+sentence-scoped roles still failed grammar. The next campaign targets those
+remaining paths rather than repeating the working world/boundary/RP families.
+
+- Run `calibration-2026-10-13-v6`; seed `calibration-grounding-2026-10-13-6`;
+  **13 scenario seeds, K=1**; families grounded narration and tool selection.
+- Plan: `d07529276a23a5f1be1e3bea3a04c34226adfb7dfc4f995e19b117865fdf6b46`.
+- Six grounded narration, seven tool decisions: four exact-candidate, one
+  narration-submit, one read-tool, one no-tool. Splits: twelve train, one dev.
+- The seed suffix was selected from public planning metadata to cover all four
+  tool subtypes before observing any answers; no quality-based answer selection.
+- Same corrected Flash/K3 inference, budgets, bounded repair/review, immutable
+  storage and selection settings. Public value-free sentence examples define a
+  stable checkable interface without providing scenario answers or numeric values.
+- Freeze the complete initial/actual-repair **`generated-grounded`** census for
+  the six grounded scenarios plus narration-submit subtype. Grade all complete
+  displayed surfaces blind in fresh Astra contexts before functional unblinding.
+  This campaign schedules no ordinary RP; its results cannot inflate RP coverage.
+- Independently inspect every actual admission, particularly common scoped
+  check/attack/HP/status language and legitimate no-tool behavior. Unsupported
+  actions, contradictory values and unknown consequences remain explicit failures
+  or adjudications. Historical v5 outcomes are not re-admitted.
+
+Require actual semantically sound grounded and narration-submit admissions,
+acceptable separate prose outcomes, and resolved transport/token accounting before
+the already frozen 175-seed pilot. Earlier independently measured world, boundary
+and RP evidence supplies the other-family calibration context. No student training
+or controlled retention claim follows from these generated-data grades.
+
+The independent pre-v6 check initially held dispatch on a target-to-attacker
+continuation substitution. `grounding-binding-v6` requires valid attack focus for
+actorless outgoing predicates even inside compounds/records; HP/status/recipient
+clauses do not authorize them. The original reproductions now adjudicate, valid
+guided controls verify, and an independent follow-up cleared the frozen inventory
+before any v6 paid request. This correction changes validator evidence, not the
+already preregistered prompt/plan digest.

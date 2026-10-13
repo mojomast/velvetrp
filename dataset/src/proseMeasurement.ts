@@ -56,7 +56,7 @@ export interface ProseAvailability {
 
 export interface ProseSource {
   readonly sourceId: string;
-  readonly cohort: "generated-rp" | "generated-twin" | "student-prose" | "student-flexible-rp";
+  readonly cohort: "generated-rp" | "generated-grounded" | "generated-twin" | "student-prose" | "student-flexible-rp";
   readonly generator: string;
   readonly prompt: readonly StoredMessage[];
   readonly tools?: readonly StoredTool[];

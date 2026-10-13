@@ -36,8 +36,9 @@ Sealed content stays outside the repository.
 
 Live calibration is underway. The completed v2 campaign admitted 4/20 scenarios;
 all four passed independent functional inspection and exact export/CPU-label
-approval. The next small campaign measures corrected review, grounding, boundary
-and read-schema behavior before the 175-seed pilot. Actual yields, blinded prose
+approval. Completed v5 calibration admitted fourteen sound records, including five
+world targets. The next focused thirteen-seed campaign measures corrected receipt
+scope, grounded prose and all four tool subtypes before the 175-seed pilot. Actual yields, blinded prose
 coverage and immutable artifact pins are in
 [`CALIBRATION_RESULTS.md`](CALIBRATION_RESULTS.md); frozen campaign settings are
 in [`CALIBRATION_PROTOCOL.md`](CALIBRATION_PROTOCOL.md). No model training has run.

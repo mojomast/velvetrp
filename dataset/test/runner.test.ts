@@ -66,6 +66,13 @@ function publicReceiptNarration(request: TeacherCompletionRequest): string {
     : receipt.kind === "combat" && receipt.outcome.kind === "damage" ? `${receipt.target} has ${receipt.outcome.hitPointsAfter} HP remaining.` : "").join(" ");
 }
 
+function guidedReceiptNarration(request: TeacherCompletionRequest): string {
+  const receipts = JSON.parse(request.system.split("AUTHORITATIVE PUBLIC RECEIPTS\n")[1]!.split(" ADVERTISED")[0]!.split(" NARRATION SUBMISSION CONTRACT\n")[0]!) as GroundingReceipt[];
+  return receipts.map((receipt) => receipt.kind === "check"
+    ? `Your ${receipt.skill} check comes to ${receipt.total} against DC ${receipt.dc}: ${receipt.outcome}.`
+    : receipt.kind === "combat" && receipt.outcome.kind === "damage" ? `${receipt.actor} attacks ${receipt.target}. The attack ${receipt.outcome.hit ? "hits" : "misses"}. ${receipt.actor} deals ${receipt.outcome.applied} ${receipt.outcome.damageType} damage to ${receipt.target}. ${receipt.target}'s hit points go from ${receipt.outcome.hitPointsBefore} to ${receipt.outcome.hitPointsAfter}. ${receipt.target} is ${receipt.outcome.statusAfter}.` : "").join(" ");
+}
+
 function setup(t: { after(fn: () => void): void }, overrides: Partial<PipelineOptions> = {}) {
   const root = mkdtempSync("/tmp/opencode/foundry-runner-");
   const calls: string[] = [];
@@ -437,6 +444,18 @@ test("public actor/target receipts support an on-request grounded happy path", a
   assert.equal((await runPipeline({ ...run.options, store: run.store })).admitted, 1);
   assert.match(run.plan.units[0]!.realization.context[0]!.content, /exactly one native submit_adventure_narration function call/);
   assert.match(run.plan.units[0]!.realization.context[0]!.content, /Leave assistant content empty/);
+});
+
+test("value-free public sentence guide yields fully bound targets across check outcomes and entity identities", async (t) => {
+  const generator = outputClient((request) => ({ content: "", toolCalls: [{ id: request.attemptId, type: "function", function: {
+    name: "submit_adventure_narration", arguments: { narration: guidedReceiptNarration(request) } } }] }));
+  const run = setup(t, { seed: "guide-realization-matrix", units: 20, families: ["grounded-narration"], generator, maxRepairs: 0 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 20);
+  const outcomes = new Set(run.plan.units.map((unit) => unit.spec.oracle.receipts[0]!.kind === "check" ? unit.spec.oracle.receipts[0]!.outcome : null));
+  assert.deepEqual(outcomes, new Set(["success", "failure"]));
+  assert.ok(new Set(run.plan.units.map((unit) => unit.spec.slots.npc)).size > 1);
+  assert.match(run.plan.units[0]!.realization.context[0]!.content, /bracketed terms below are value-free syntax examples/);
 });
 
 for (const correct of [false, true]) test(`tool selection independently checks intent for ${correct ? "correct" : "wrong but advertised"} candidates`, async (t) => {

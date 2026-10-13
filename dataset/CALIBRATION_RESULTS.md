@@ -193,3 +193,53 @@ Independent report and machine verdicts:
 `/tmp/opencode/foundry-calibration-v4-independent-review.machine.json`.
 Semantic inspection does not itself supply the full certificate/artifact export
 registry; v4 export approval remains pending.
+
+## Version 5 — complete, world contracts validated, grounding still held
+
+Run `calibration-2026-10-13-v5`, producer
+`7dc235d9230b0ff94488a03416d8937ff4d294c1`, 20 seeds/K=1.
+
+| Family | Planned | Attempts | Initial admissions | Final admissions |
+|---|---:|---:|---:|---:|
+| World generation | 6 | 12 | 2 | 5 |
+| Tool selection | 6 | 8 | 5 | 5 |
+| Grounded narration | 4 | 12 | 0 | 0 |
+| Boundary recovery | 3 | 3 | 3 | 3 |
+| Roleplay | 1 | 1 | 1 | 1 |
+| **Total** | **20** | **36** | **11** | **14** |
+
+Actual physical/logical responses: **50** (36 generation outputs + 14 reviews).
+All reviews are usable: **13 accept + one accept-with-notes**. The original local
+summary counted only `accept` in its review tally; the separately retained
+`summary-corrected-accept-with-notes.json` fixes that derived count without changing
+any historical review, admission or producer report.
+
+Parsing: **18/20 initial**, **32/36 all attempts**. Sixteen repairs. Measured label
+spend **6,890**; fourteen selected train targets contain **3,732** labels, across
+thirteen selection clusters. No unknown/unmeasured outcome remains.
+
+Independent audit verified **14/14 certificates, supervised targets and semantic
+admissions**, and reconciled all 50 responses. No concrete false admission was
+found. All five world targets pass the production validation chain without
+sanitization; compatible kind, exact identity and roster rules are sound. The
+fifteen refused narration targets all use correct native submission. Common
+sentence forms still lose receipt scope; some surfaces also violate the requested
+prose form, and one adds “You read the ground,” an unsupported specific action.
+Those historical refusals remain unchanged.
+
+Ordinary RP: complete **1/1** captured census, style-pass at **2/2/1/2**, independently
+pinned ledger
+`1a3ff4cd9205f76ea791ac5ea82531d23c728cb0925ab25a05d1cf32d6863353`.
+This is one generated-data scene, not controlled student retention or twin parity.
+
+Bindings: plan
+`ecd5135a00fa9eabdb55b313f9357944d8b0bafab5159ba3b83db8bdc3284c22`;
+report `7494b1ad9070360b7fc415f4cb9e7c2f39315fc00b76b1d1c7a216bfcbdabcd7`;
+selection `05ddc4e5fb405960b0b7cf6b60fa149eef180bbd48a7deb8eca51ac379e85f54`.
+Artifacts: `.dataset/measurements/calibration-2026-10-13-v5/` and matching run store.
+Independent report: `/tmp/opencode/foundry-calibration-v5-independent-review.md`;
+machine verdicts: `/tmp/opencode/foundry-calibration-v5-independent-review.machine.json`.
+
+**Pilot HOLD:** focused grounded/tool calibration is appropriate after the remaining
+scope corrections pass validation, with separate grounded-prose grading. Full
+artifact/certificate export approval for v5 remains a separate pending check.
