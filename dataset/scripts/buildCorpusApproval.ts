@@ -35,29 +35,28 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".
  * `git show <inspectedCommit>:<path>`.
  */
 /**
- * Implementation evidence is the COMPLETE foundry source at the inspected commit,
- * not a per-validator file list.
+ * Implementation evidence is the git TREE OBJECT of the inspected commit.
  *
- * Two independent reviews rejected per-validator pinning, correctly: a validator's
- * true implementation is a transitive closure (for example
- * `production-grounding-predicate` depends on `authoritativeFacts` in
- * `grounding.ts`, and `advertised-candidate-binding` on `scoreSelection` in
- * `worldGeneration.ts`). Any hand-written list is either incomplete or, if it
- * grows to cover every helper, an unmaintainable restatement of the module graph.
+ * Four independent reviews pushed this from "a plausible file per validator" to
+ * "the whole truth". A curated file list cannot be complete: a validator's
+ * implementation is a transitive closure, and the foundry genuinely reaches
+ * outside `dataset/src` -- `worldGeneration.ts` imports generated-content schema
+ * and route helpers from `server/src/routes/rpg/v1/` and `@velvet/contracts`.
  *
- * Pinning every `dataset/src` source file at the inspected commit makes
- * completeness true by construction: the digest changes if ANY implementation file
- * changes, and the per-validator `implementationPaths` below are retained only as
- * documentation of where each check is primarily implemented.
+ * A git tree id is the Merkle root over every path, mode and blob in the
+ * repository: complete by construction, changes if ANY tracked file changes, and
+ * verifiable with one command. `VALIDATOR_PRIMARY_FILE` below is documentation of
+ * where each check is primarily implemented, not evidence.
  */
 const blobAt = (commit: string, path: string): string =>
   execFileSync("git", ["show", `${commit}:${path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }).toString("utf8");
 
-function implementationManifest(commit: string): Array<{ path: string; digest: string }> {
-  const paths = execFileSync("git", ["ls-tree", "-r", "--name-only", `${commit}:dataset/src`], { cwd: repositoryRoot })
-    .toString("utf8").trim().split("\n").filter((path) => path.endsWith(".ts")).sort();
-  if (paths.length === 0) throw new Error("no dataset/src sources at the inspected commit");
-  return paths.map((relative) => ({ path: `dataset/src/${relative}`, digest: hash(blobAt(commit, `dataset/src/${relative}`)) }));
+function implementationTree(commit: string): { tree: string; fileCount: number } {
+  const tree = execFileSync("git", ["rev-parse", `${commit}^{tree}`], { cwd: repositoryRoot }).toString("utf8").trim();
+  if (!/^[0-9a-f]{40}$/.test(tree)) throw new Error("could not resolve the inspected commit tree");
+  const fileCount = execFileSync("git", ["ls-tree", "-r", "--name-only", commit], { cwd: repositoryRoot })
+    .toString("utf8").trim().split("\n").filter(Boolean).length;
+  return { tree, fileCount };
 }
 
 /** Documentation only: the file that primarily implements each check. */
@@ -96,8 +95,9 @@ interface RunSection {
 }
 interface RecordEntry { unitId: string; runId: string; family: string; split: string; certificateDigest: string; payloadDigest: string; labels: number }
 
-const implementationSourceManifest = implementationManifest(inspectedGitCommit);
-const implementationSourceDigest = hash(stableStringify(implementationSourceManifest));
+const implementationSourceTree = implementationTree(inspectedGitCommit);
+const implementationSourceManifest = implementationSourceTree;
+const implementationSourceDigest = hash(`git-tree:${implementationSourceTree.tree}`);
 const validators: Record<string, { version: string; implementationDigest: string; implementationPaths: string[] }> = {};
 const implementationArtifacts: Record<string, { kind: string; commit: string; path: string }> = {};
 const runs: RunSection[] = [];
@@ -198,7 +198,8 @@ process.stdout.write(stableStringify({
   trainLabels: records.reduce((sum, record) => sum + record.labels, 0),
   validators: Object.keys(validators).length,
   implementationSourceDigest,
-  implementationSourceFiles: implementationSourceManifest.length,
+  implementationSourceFiles: implementationSourceTree.fileCount,
+  implementationSourceTree: implementationSourceTree.tree,
   sourceArtifactDigests: runs.reduce((sum, run) => sum + run.sourceArtifactDigests.length, 0),
   reviewPromptArtifacts: runs.reduce((sum, run) => sum + Object.keys(run.reviewPromptArtifacts).length, 0),
 }, 2) + "\n");

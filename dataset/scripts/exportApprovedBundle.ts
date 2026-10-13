@@ -59,7 +59,7 @@ interface Approval {
   inspectedGitCommit: string;
   measuredTemplateEvidenceDigest: string;
   implementationSourceDigest: string;
-  implementationSourceManifest: Array<{ path: string; digest: string }>;
+  implementationSourceManifest: { tree: string; fileCount: number };
   validators: Record<string, { version: string; implementationDigest: string; implementationPaths: string[] }>;
   implementationArtifacts: Record<string, { kind: string; commit: string; path: string }>;
   runs: RunSection[];
@@ -123,20 +123,19 @@ function main(argv: readonly string[]): void {
     }
   }
 
-  // Implementation evidence is the COMPLETE foundry source at the inspected commit.
-  // Recompute the manifest digest from the git blobs and REGISTER the manifest
-  // bytes, because admission.ts resolves each validator's implementationDigest
-  // through the artifact registry. Computing the digest without registering the
-  // bytes made every record fail registry verification.
-  const manifest = approval.implementationSourceManifest;
-  if (!Array.isArray(manifest) || manifest.length === 0) throw new Error("approval has no implementation source manifest");
-  for (const entry of manifest) {
-    const actual = hash(execFileSync("git", ["show", `${approval.inspectedGitCommit}:${entry.path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }));
-    if (actual !== entry.digest) throw new Error(`implementation source differs at the inspected commit: ${entry.path}`);
+  // Implementation evidence is the git TREE OBJECT of the inspected commit: a
+  // Merkle root over every path, mode and blob, so it is complete by construction.
+  // Verify it resolves, then REGISTER its bytes, because admission.ts resolves each
+  // validator's implementationDigest through the artifact registry.
+  const sourceTree = approval.implementationSourceManifest as unknown as { tree: string; fileCount: number };
+  if (!sourceTree || typeof sourceTree.tree !== "string" || !/^[0-9a-f]{40}$/.test(sourceTree.tree)) {
+    throw new Error("approval has no implementation source tree");
   }
-  const manifestBytes = stableStringify(manifest);
+  const actualTree = execFileSync("git", ["rev-parse", `${approval.inspectedGitCommit}^{tree}`], { cwd: repositoryRoot }).toString("utf8").trim();
+  if (actualTree !== sourceTree.tree) throw new Error("implementation source tree does not match the inspected commit");
+  const manifestBytes = `git-tree:${sourceTree.tree}`;
   const manifestDigest = hash(manifestBytes);
-  if (manifestDigest !== approval.implementationSourceDigest) throw new Error("implementation source digest does not reproduce from its manifest");
+  if (manifestDigest !== approval.implementationSourceDigest) throw new Error("implementation source digest does not reproduce from its tree");
   retain(manifestDigest, manifestBytes);
   for (const [name, validator] of Object.entries(approval.validators)) {
     if (validator.implementationDigest !== manifestDigest) {
