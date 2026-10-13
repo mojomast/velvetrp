@@ -8,9 +8,14 @@ import {
 } from "../src/repo/db/schema.js";
 
 const asset = (name: string) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8");
+// This list mirrors the production `currentSchemaSql` concatenation in
+// server/src/repo/db/schema.ts. It fell out of sync when actorJourneySchema.sql
+// was added, so the fresh reference database was missing the journey objects and
+// this file's migration comparison reported a spurious 1187-vs-1192 mismatch.
+// Keep it in step with the production list whenever a schema asset is added.
 const currentSql = () => ["currentSchema.sql", "campaignDmSchema.sql", "recallSchema.sql", "contextInspectionProvenanceSchema.sql",
   "npcKnowledgeSchema.sql", "combatMarkerSchema.sql", "attunementSchema.sql", "combatReadyActionSchema.sql", "systemOneSchema.sql",
-  "combatantLabelSchema.sql"].map(asset).join("\n");
+  "combatantLabelSchema.sql", "actorJourneySchema.sql"].map(asset).join("\n");
 
 const AT = "2036-01-01T00:00:00.000Z";
 
