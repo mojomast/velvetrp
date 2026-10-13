@@ -21,6 +21,17 @@ import { loadTeacherRights } from "../src/teacherRights.js";
 import type { StoredToolCall } from "../src/spec.js";
 import { exportTrainingJsonl } from "../src/export.js";
 import { preprocessTrainingExport } from "../src/preprocessExport.js";
+import {
+  DEFAULT_CREATIVE_TARGET_MODE,
+  buildCreativeTrainingExample,
+  createCreativePlan,
+  creativeLineage,
+  creativeSplitForLineage,
+  foldCreativeReviewIntoSpecScores,
+  parseCreativeReview,
+  parseCreativeTranscript,
+  type CreativePlan,
+} from "../src/creativeRoleplay.js";
 
 const ACCEPT = JSON.stringify({ characterization: 0.8, dialogueQuality: 0.8, coherence: 0.8, narrativeInitiative: 0.8,
   playerAgency: 0.9, nonRepetitive: 0.8, verdict: "accept", rationale: "independent test fixture review" });
@@ -89,7 +100,8 @@ function setup(t: { after(fn: () => void): void }, overrides: Partial<PipelineOp
     tokenizer, generator, reviewer, maxRepairs: 1, maxCompletionTokens: 128, gitCommit: null, execute: true, ...overrides };
   const plan = planRun({ seed: options.seed, units: options.units!, families: options.families!,
     realizationsPerScenario: options.realizationsPerScenario ?? 1, pairedTwins: options.pairedTwins ?? [],
-    ...(options.publicContextDiagnostic ? { publicContextDiagnostic: options.publicContextDiagnostic } : {}) });
+    ...(options.publicContextDiagnostic ? { publicContextDiagnostic: options.publicContextDiagnostic } : {}),
+    ...(options.creativeStream ? { creativeStream: options.creativeStream } : {}) });
   const storeOptions: OpenRunStoreOptions = { runId: options.runId, seed: options.seed, artifactRoot: root, sourceDigest: "fixture-source-digest",
     corpusFreezeDigest: policy.corpusDigest, splitAssignmentDigest: plan.splitAssignmentDigest, totalUnits: plan.units.length,
     generator: { provider: options.generator.identity.provider, model: options.generator.model, baseUrlDigest: options.generator.baseUrlDigest,
@@ -1229,4 +1241,248 @@ test("functional-only classifies review-quality problems as terminal but certifi
   // The default policy authorizes every refusal, exactly as today.
   assert.equal(refusalAuthorizesRepair(reason("admission-refused"),
     admission(["review score coherence is 0.4, below the floor 0.5"]), "any-refusal"), true);
+});
+
+// ---------------------------------------------------------------------------
+// Opt-in creative character-roleplay stream (`creative-stream-v1`)
+//
+// The creative stream is a separate unit source: it plans via
+// `createCreativePlan`, carries `creativeLineage`/`creativeSplitForLineage`
+// splits, supervises ONLY the character turns, refuses malformed,
+// player-impersonating and meta-commentary transcripts fail-closed, and routes
+// review through the independent creative rubric. The option ABSENT must leave
+// the ordinary inventories byte-identical (asserted below).
+// ---------------------------------------------------------------------------
+
+const CREATIVE_PLAN_SEED = "creative-runner-test-seed";
+const CREATIVE_REVIEW_ACCEPT = JSON.stringify({
+  voiceConsistency: 0.9, voiceDistinctiveness: 0.9, dialogueNaturalness: 0.9, characterAutonomy: 0.9,
+  playerAgencyPreservation: 0.9, pacingAndProportion: 0.9, emotionalPlausibility: 0.9, repetitionControl: 0.9,
+  nonMechanicalRegister: 0.9, noMetaCommentary: 0.9, verdict: "accept",
+  rationale: "Independent creative fixture review of the whole conversation.",
+});
+
+/** The creative teacher prompt states the requested exchange depth verbatim. */
+function creativeDepthOf(request: TeacherCompletionRequest): number {
+  const match = /Write exactly (\d+) player turns/.exec(request.system);
+  assert.ok(match, "the creative teacher prompt must state the requested depth");
+  return Number(match[1]);
+}
+
+/** Alternating player/character turns that pass the fail-closed transcript gate. */
+function creativeTurns(depth: number): { speaker: "player" | "character"; text: string }[] {
+  return Array.from({ length: depth }, (_, index) => [
+    { speaker: "player" as const, text: `I have thought about it. Here is my side, part ${index}.` },
+    { speaker: "character" as const, text: `I hear that, and I will answer in my own words, part ${index}.` },
+  ]).flat();
+}
+
+function creativeRaw(request: TeacherCompletionRequest): string {
+  return JSON.stringify({ turns: creativeTurns(creativeDepthOf(request)) });
+}
+
+test("creative opt-in plans creative units with creative lineage/splits and leaves the ordinary digests byte-identical", () => {
+  const plan = planRun({ seed: CREATIVE_PLAN_SEED, units: 3, creativeStream: { units: 3 } });
+  assert.equal(plan.units.length, 3);
+  for (const [index, unit] of plan.units.entries()) {
+    assert.ok(unit.creative, "a creative unit carries its binding");
+    assert.equal(unit.spec.family, "roleplay-conversation");
+    assert.equal(unit.target, "roleplay-conversation");
+    const expected: CreativePlan = createCreativePlan({ seed: `${CREATIVE_PLAN_SEED}|creative|${index}` });
+    assert.equal(unit.creative!.plan.planId, expected.planId);
+    const moduleLineage = creativeLineage(expected);
+    assert.equal(unit.spec.lineage.characterFamily, moduleLineage.characterFamily);
+    assert.equal(unit.spec.lineage.worldFamily, moduleLineage.worldFamily);
+    // The scheduled scenario family is seed-bound so the runner's per-field
+    // split gate sees three unique fields; it preserves the module's identity.
+    assert.ok(unit.spec.lineage.scenarioFamily.startsWith(moduleLineage.scenarioFamily));
+    assert.equal(new Set([unit.spec.lineage.characterFamily, unit.spec.lineage.worldFamily, unit.spec.lineage.scenarioFamily]).size, 3);
+    // The runner's own splitter agrees byte-for-byte with the module fallback.
+    assert.equal(unit.spec.split, creativeSplitForLineage(unit.spec.lineage));
+    assert.deepEqual(unit.creative!.targetMode, DEFAULT_CREATIVE_TARGET_MODE);
+    assert.equal(unit.realization.context.length, 2);
+    assert.equal(unit.realization.context[0]!.role, "system");
+    assert.equal(unit.realization.context[0]!.content, unit.creative!.prompt.system);
+    assert.equal(unit.realization.context[1]!.content, unit.creative!.prompt.user);
+    assert.deepEqual(unit.spec.advertisedTools, []);
+  }
+  assert.equal(new Set(plan.units.map((unit) => unit.unitId)).size, 3);
+  assert.equal(Object.values(plan.splitCounts).reduce((sum, count) => sum + count, 0), 3);
+  assert.ok(plan.units.every((unit) => ["train", "dev", "sealed-test"].includes(unit.spec.split)));
+  assert.deepEqual(planRun({ seed: CREATIVE_PLAN_SEED, units: 3, creativeStream: { units: 3 } }), plan, "the creative plan is deterministic");
+  // The option owns the count, independently of planRun's own `units`.
+  assert.equal(planRun({ seed: CREATIVE_PLAN_SEED, units: 99, creativeStream: { units: 4 } }).units.length, 4);
+  // The ordinary inventories are untouched when the option is absent.
+  assert.equal(planRun({ seed: "pilot-1", units: 175, realizationsPerScenario: 3 }).digest, ORDINARY_PILOT_PLAN_DIGEST);
+  const matched = planRun({ seed: "calibration-grounding-2026-10-13-6", units: 13, realizationsPerScenario: 1,
+    families: ["grounded-narration", "tool-selection"] });
+  assert.equal(matched.digest, MATCHED_V7_PLAN_DIGEST);
+  assert.equal(matched.publicContextDiagnostic, undefined);
+});
+
+test("a creative unit generates, parses, builds and admits end to end, supervising character turns only", async (t) => {
+  const generator = client("fixture-teacher", (request) => creativeRaw(request));
+  const reviewer = client("fixture-reviewer", () => CREATIVE_REVIEW_ACCEPT);
+  const run = setup(t, { units: 2, families: ["roleplay-conversation"], creativeStream: { units: 2 }, generator, reviewer, maxRepairs: 0 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 2, JSON.stringify(report.unitOutcomes.map((outcome) => outcome.refusedAt)));
+  assert.equal(report.complete, true);
+  assert.equal(report.units, 2);
+  assert.ok(report.budget.supervisedTokens > 0);
+  for (const outcome of report.unitOutcomes) {
+    const record = outcome.admittedRecord!;
+    const unit = run.plan.units.find((entry) => entry.unitId === outcome.unitId)!;
+    const plan = unit.creative!.plan;
+    const transcript = parseCreativeTranscript(creativeRaw({ system: unit.creative!.prompt.system } as TeacherCompletionRequest), plan);
+    const example = buildCreativeTrainingExample(plan, transcript, { targetMode: DEFAULT_CREATIVE_TARGET_MODE });
+    // The admitted example IS the built creative example: messages and the
+    // creative (multi-turn) target selection, not the legacy single-turn path.
+    assert.deepEqual(record.messages, example.example.messages);
+    assert.deepEqual(record.targetSelection, example.example.targetSelection);
+    assert.notDeepEqual(record.targetSelection.supervisedAssistantIndices, [record.messages.length - 1]);
+    assert.equal(record.targetSelection.supervisedAssistantIndices.length, plan.depth);
+    // Every supervised index is a CHARACTER turn.
+    for (const index of record.targetSelection.supervisedAssistantIndices) {
+      assert.equal(record.messages[index]!.role, "assistant");
+      assert.ok(example.characterMessageIndices.includes(index));
+    }
+    // The simulated player's turns are present as context and never supervised.
+    const playerIndices = record.messages.map((message, index) => (message.role === "user" ? index : -1)).filter((index) => index >= 0);
+    assert.equal(playerIndices.length, plan.depth);
+    assert.deepEqual(playerIndices, example.playerMessageIndices);
+    for (const index of playerIndices) assert.ok(!record.targetSelection.supervisedAssistantIndices.includes(index));
+    // Sidecar provenance carries the creative label and plan/transcript digests,
+    // and nothing creative leaks into the training messages.
+    assert.equal(record.provenance.sourceDigests.creativePlan, plan.digest);
+    assert.equal(record.provenance.sourceDigests.creativeTranscript, transcript.digest);
+    assert.equal(record.provenance.sourceDigests.creativeTeacherPrompt, unit.creative!.prompt.digest);
+    assert.match(record.provenance.scenarioTemplate, /creative-only/);
+    assert.ok(record.provenance.sourceDigests.creativeCategory);
+    for (const message of record.messages) assert.ok(!/creativePlan|creativeTranscript|creativeCategory|creative-only/.test(message.content));
+    // Every creative provenance digest resolves to retained bytes (the export
+    // registry verifies exactly this), including the recoverable category label.
+    const validation = inspectPipelineCheckpoint<{ artifactDigests: string[] }>(run.store, `validation:${outcome.admittedAttemptId}`)!;
+    const artifacts = new Map(validation.artifactDigests.map((digest) => [digest, inspectPipelineCheckpoint<string>(run.store, `artifact:${digest}`)!]));
+    for (const key of ["creativePlan", "creativeTranscript", "creativeTeacherPrompt", "creativeCategory"] as const) {
+      const artifactDigest = record.provenance.sourceDigests[key]!;
+      assert.ok(artifacts.has(artifactDigest), `${key} artifact is retained`);
+      assert.equal(sha256Hex(artifacts.get(artifactDigest)!), artifactDigest, key);
+    }
+    assert.equal(JSON.parse(artifacts.get(record.provenance.sourceDigests.creativeCategory!)!), "creative-only");
+    assert.doesNotThrow(() => verifyAdmissionCertificate(record));
+  }
+  assert.deepEqual(await runPipeline({ ...run.options, store: run.reopen() }), report);
+});
+
+test("the creative opt-in honours a single-character-turn target mode", async (t) => {
+  const generator = client("fixture-teacher", (request) => creativeRaw(request));
+  const reviewer = client("fixture-reviewer", () => CREATIVE_REVIEW_ACCEPT);
+  const targetMode = { kind: "single-character-turn", characterTurnIndex: 1 } as const;
+  const run = setup(t, { units: 1, families: ["roleplay-conversation"], creativeStream: { units: 1, targetMode }, generator, reviewer, maxRepairs: 0 });
+  assert.deepEqual(run.plan.units[0]!.creative!.targetMode, targetMode);
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 1);
+  const record = report.unitOutcomes[0]!.admittedRecord!;
+  // Exactly the chosen character turn is supervised; every other turn is context.
+  assert.equal(record.targetSelection.supervisedAssistantIndices.length, 1);
+  // Layout is [system, player, character, ...]: ordinal 1 is message index 4.
+  assert.deepEqual(record.targetSelection.supervisedAssistantIndices, [4]);
+  assert.equal(record.messages[4]!.role, "assistant");
+  assert.equal(record.messages[1]!.role, "user");
+});
+
+test("a malformed, player-impersonating or meta-commentary creative transcript is refused, recorded and charged", async (t) => {
+  const depth = 3;
+  const expected: Record<string, string> = {
+    malformed: "transcript-not-json",
+    "player-impersonating": "transcript-player-impersonation",
+    meta: "transcript-meta-commentary",
+  };
+  const samples: { readonly label: keyof typeof expected; readonly raw: () => string }[] = [
+    { label: "malformed", raw: () => "this is not the required JSON transcript" },
+    { label: "player-impersonating", raw: () => JSON.stringify({ turns: creativeTurns(depth).map((turn, index) =>
+      turn.speaker === "character" && index === 1 ? { ...turn, text: "You decide to open the door and walk through it." } : turn) }) },
+    { label: "meta", raw: () => JSON.stringify({ turns: creativeTurns(depth).map((turn, index) =>
+      turn.speaker === "character" && index === 1 ? { ...turn, text: "Here's the transcript, as requested." } : turn) }) },
+  ];
+  for (const sample of samples) {
+    let generations = 0;
+    const generator = client("fixture-teacher", () => { generations += 1; return sample.raw(); });
+    const reviewer = client("fixture-reviewer", () => CREATIVE_REVIEW_ACCEPT);
+    const run = setup(t, { units: 1, families: ["roleplay-conversation"], creativeStream: { units: 1, depth },
+      generator, reviewer, maxRepairs: 0 });
+    const report = await runPipeline({ ...run.options, store: run.store });
+    assert.equal(report.admitted, 0, sample.label);
+    assert.equal(generations, 1, sample.label);
+    const candidate = run.store.candidates()[0]!;
+    assert.equal(candidate.admission.status, "pending-review", sample.label);
+    assert.equal(candidate.admission.findings?.code, "creative-transcript-refused", sample.label);
+    assert.equal(report.unitOutcomes[0]!.refusedAt, "PARSED:creative-transcript-refused", sample.label);
+    const refusals = (candidate.admission.findings?.gateFindings as { refusals?: { code: string }[] } | undefined)?.refusals ?? [];
+    assert.ok(refusals.some((refusal) => refusal.code === expected[sample.label]), `${sample.label}: ${JSON.stringify(refusals)}`);
+    // The refusal is charged its measured supervised tokens, never silently repaired.
+    assert.equal(report.unitOutcomes[0]!.supervisedTokens, candidate.provenance.tokenCount!.tokens, sample.label);
+    assert.ok(candidate.provenance.tokenCount!.tokens > 0, sample.label);
+  }
+});
+
+test("the creative reviewer yields the six review scores and admission applies the existing floors", async (t) => {
+  const folded = foldCreativeReviewIntoSpecScores(parseCreativeReview(CREATIVE_REVIEW_ACCEPT));
+  assert.deepEqual(Object.keys(folded).sort(),
+    ["characterization", "coherence", "dialogueQuality", "narrativeInitiative", "nonRepetitive", "playerAgency"].sort());
+  const generator = client("fixture-teacher", (request) => creativeRaw(request));
+  const reviewer = client("fixture-reviewer", () => CREATIVE_REVIEW_ACCEPT);
+  const run = setup(t, { units: 1, families: ["roleplay-conversation"], creativeStream: { units: 1 }, generator, reviewer, maxRepairs: 0 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 1);
+  const review = report.unitOutcomes[0]!.admittedRecord!.admission.review!;
+  assert.equal(review.characterization, folded.characterization);
+  assert.equal(review.dialogueQuality, folded.dialogueQuality);
+  assert.equal(review.playerAgency, folded.playerAgency);
+  assert.equal(review.reviewerCount, 1);
+  // A zero on playerAgencyPreservation survives the fold and trips the floor.
+  const low = JSON.stringify({ ...JSON.parse(CREATIVE_REVIEW_ACCEPT), playerAgencyPreservation: 0.2 });
+  const lowReviewer = client("fixture-reviewer", () => low);
+  const lowRun = setup(t, { units: 1, families: ["roleplay-conversation"], creativeStream: { units: 1 }, generator,
+    reviewer: lowReviewer, maxRepairs: 0 });
+  const lowReport = await runPipeline({ ...lowRun.options, store: lowRun.store });
+  assert.equal(lowReport.admitted, 0);
+  assert.equal(lowReport.unitOutcomes[0]!.refusedAt, "VALIDATED:admission-refused");
+  const refusal = lowRun.store.candidates().at(-1)!;
+  assert.equal(refusal.admission.findings?.code, "admission-refused");
+  assert.match(String(refusal.admission.findings?.detail), /playerAgency/);
+  assert.match(String(refusal.admission.findings?.detail), /below the floor/);
+});
+
+test("a creative refusal obeys the bounded repair policy, and functional-only leaves a quality refusal terminal", async (t) => {
+  const requests: TeacherCompletionRequest[] = [];
+  let generations = 0;
+  const generator = client("fixture-teacher", (request) => {
+    requests.push(request);
+    generations += 1;
+    return generations === 1 ? "not a transcript" : creativeRaw(request);
+  });
+  const reviewer = client("fixture-reviewer", () => CREATIVE_REVIEW_ACCEPT);
+  const run = setup(t, { units: 1, families: ["roleplay-conversation"], creativeStream: { units: 1 }, generator, reviewer, maxRepairs: 1 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(generations, 2, "a closed failure authorizes exactly one bounded repair");
+  assert.equal(report.admitted, 1);
+  assert.match(stableStringify(requests[1]!.messages), /RAW output that was refused/);
+  assert.match(stableStringify(requests[1]!.messages), /not a transcript/);
+  const attempts = run.store.attempts(run.plan.units[0]!.unitId);
+  assert.equal(attempts.length, 2);
+  assert.equal(attempts[0]!.superseded, true);
+  assert.equal(attempts[1]!.parentAttemptId, attempts[0]!.attemptId);
+  // functional-only: a review-floor refusal is terminal and does not re-dispatch.
+  const low = JSON.stringify({ ...JSON.parse(CREATIVE_REVIEW_ACCEPT), playerAgencyPreservation: 0.2 });
+  let fGenerations = 0;
+  const fGenerator = client("fixture-teacher", (request) => { fGenerations += 1; return creativeRaw(request); });
+  const fReviewer = client("fixture-reviewer", () => low);
+  const fRun = setup(t, { units: 1, families: ["roleplay-conversation"], creativeStream: { units: 1 },
+    generator: fGenerator, reviewer: fReviewer, maxRepairs: 2, repairPolicy: "functional-only" });
+  const fReport = await runPipeline({ ...fRun.options, store: fRun.store });
+  assert.equal(fGenerations, 1, "a quality-only refusal must not re-dispatch the generator");
+  assert.equal(fReport.attempts, 1, "a review-floor refusal must not consume a repair attempt");
+  assert.equal(fReport.unitOutcomes[0]!.refusedAt, "VALIDATED:admission-refused");
+  assert.equal(fRun.store.candidates().length, 1, "the terminal refusal is committed exactly once");
 });

@@ -54,6 +54,32 @@ import { assertGeneratedSplits, loadGenerationPolicy, type GenerationPolicy } fr
 import { buildSelectiveFidelityTwins } from "./selectiveTwins.js";
 import { assertProseQualityMeasured, type AnchorSpec, type TwinCaseSpec, type ProseQualityScorer } from "./twins.js";
 import { DEFAULT_SELECTION_POLICY, selectAdmittedRecords, type SelectionPolicy } from "./selection.js";
+import {
+  CREATIVE_CATEGORY_CREATIVE_ONLY,
+  CREATIVE_FAMILY,
+  CREATIVE_STREAM_VERSION,
+  CreativeConfigError,
+  CreativeReviewError,
+  CreativeTranscriptError,
+  assertCreativeExampleInvariants,
+  buildCreativeTrainingExample,
+  createCreativePlan,
+  creativeLineage,
+  creativeReviewPrompt,
+  creativeSplitForLineage,
+  creativeTeacherPrompt,
+  DEFAULT_CREATIVE_TARGET_MODE,
+  foldCreativeReviewIntoSpecScores,
+  parseCreativeReview,
+  parseCreativeTranscript,
+  type CreativeArcShape,
+  type CreativePlan,
+  type CreativeSettingId,
+  type CreativeTargetMode,
+  type CreativeTeacherPrompt,
+  type CreativeTrainingExample,
+  type CreativeTranscript,
+} from "./creativeRoleplay.js";
 
 import {
   ADMISSION_CERTIFICATE_VERSION,
@@ -2389,6 +2415,75 @@ function gateRoleplay(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcome {
   return proseGate(spec, parsed, {});
 }
 
+/**
+ * The opt-in creative transcript gate.
+ *
+ * `parseCreativeTranscript` and `buildCreativeTrainingExample` are the
+ * fail-closed structural gates (a malformed, player-impersonating or
+ * meta-commentary transcript is refused, never repaired). The family's own
+ * required validators still run on the built example's character turns, so
+ * admission binds the same evidence every other roleplay record must carry, and
+ * `assertCreativeExampleInvariants` is the FINAL never-supervise-a-player-turn
+ * gate. The returned gate's `messages`/`targetSelection` are the built example's,
+ * so the pipeline supervises the creative character turns rather than the legacy
+ * `lastAssistantIndex`+`selectTargets` single turn.
+ */
+function creativeGateFor(unit: PlannedUnit, parsed: ParsedOutput):
+  | { readonly kind: "failed"; readonly failure: StageFailure }
+  | { readonly kind: "built"; readonly transcript: CreativeTranscript; readonly example: CreativeTrainingExample; readonly gate: GateOutcome } {
+  const binding = unit.creative;
+  const raw = parsedText(parsed);
+  if (!binding) {
+    return { kind: "failed", failure: stageFailure("VALIDATED", "creative-binding-missing", "a creative unit carries no creative binding", { raw, parsed }) };
+  }
+  const plan = binding.plan;
+  let transcript: CreativeTranscript;
+  try {
+    transcript = parseCreativeTranscript(raw, plan);
+  } catch (error) {
+    if (error instanceof CreativeTranscriptError) {
+      return { kind: "failed", failure: stageFailure("PARSED", "creative-transcript-refused", error.message, { raw, parsed }, { refusals: error.refusals }) };
+    }
+    return { kind: "failed", failure: stageFailure("PARSED", "creative-transcript-error", error instanceof Error ? error.message : String(error), { raw, parsed }) };
+  }
+  let example: CreativeTrainingExample;
+  try {
+    example = buildCreativeTrainingExample(plan, transcript, { targetMode: binding.targetMode });
+  } catch (error) {
+    return { kind: "failed", failure: stageFailure("VALIDATED", "creative-example-invalid", error instanceof Error ? error.message : String(error), { raw, parsed }) };
+  }
+  const invariantProblems = assertCreativeExampleInvariants(example);
+  const failures: StageFailure[] = [];
+  if (invariantProblems.length > 0) {
+    failures.push(stageFailure("VALIDATED", "creative-invariant-violation", invariantProblems.join("; "), { raw, parsed }, { problems: invariantProblems }));
+  }
+  const { runs: familyRuns } = requiredRuns(unit.spec, example.example.messages, undefined, {});
+  for (const run of familyRuns) if (!run.passed) failures.push(refusalFor(parsed, run, raw));
+  const contractRun: ValidatorRun = {
+    validator: "creative-transcript-contract",
+    version: CREATIVE_STREAM_VERSION,
+    passed: invariantProblems.length === 0,
+    findings: invariantProblems.length > 0 ? { problems: invariantProblems } : {},
+    evidence: {
+      planId: plan.planId, planDigest: plan.digest, transcriptDigest: transcript.digest,
+      supervisedAssistantIndices: example.example.targetSelection.supervisedAssistantIndices,
+      characterMessageIndices: example.characterMessageIndices, playerMessageIndices: example.playerMessageIndices,
+    },
+  };
+  return {
+    kind: "built", transcript, example,
+    gate: {
+      passed: failures.length === 0,
+      failures,
+      runs: [...familyRuns, contractRun],
+      bucket: "unscored",
+      targetSelection: example.example.targetSelection,
+      messages: example.example.messages,
+      findings: { characterMessageIndices: example.characterMessageIndices, playerMessageIndices: example.playerMessageIndices },
+    },
+  };
+}
+
 function dispatchGate(spec: ScenarioSpec, parsed: ParsedOutput, publicScene?: PublicSceneGroundingContext | undefined): GateOutcome {
   switch (spec.family) {
     case "grounded-narration": return gateGrounded(spec, parsed, publicScene);
@@ -2420,6 +2515,36 @@ export interface PlannedUnit {
   readonly authoredSource?: ScheduledTwinInput;
   /** Present only on an opt-in public-context arm; never a twin/preference pair. */
   readonly publicContext?: PlannedUnitPublicContext;
+  /** Present only on an opt-in creative unit; never a twin/preference pair. */
+  readonly creative?: CreativeUnitBinding;
+}
+
+/**
+ * Opt-in creative character-roleplay stream.
+ *
+ * Present => the plan is EXACTLY the requested creative units and nothing else;
+ * absent => the ordinary inventory is byte-identical to before this option
+ * existed. The option carries the count, so `planRun`'s own `units` is ignored on
+ * this path.
+ */
+export interface CreativeStreamOption {
+  /** Number of creative units to plan. */
+  readonly units: number;
+  /** Force an arc shape; otherwise drawn from the creative RNG. */
+  readonly shape?: CreativeArcShape;
+  /** Force a setting; otherwise drawn from the creative RNG. */
+  readonly setting?: CreativeSettingId;
+  /** Force an exchange depth in [3, 8]. */
+  readonly depth?: number;
+  /** Every character turn (default) or one chosen character turn. */
+  readonly targetMode?: CreativeTargetMode;
+}
+
+/** The creative plan, its exact teacher prompt and the chosen target mode. */
+export interface CreativeUnitBinding {
+  readonly plan: CreativePlan;
+  readonly prompt: CreativeTeacherPrompt;
+  readonly targetMode: CreativeTargetMode;
 }
 
 /** Previously authored drafts; both conditioned preferences are reviewed independently. */
@@ -2454,6 +2579,121 @@ export interface RunPlan {
 const emptySplitCounts = (): Record<DatasetSplit, number> => ({ train: 0, dev: 0, "sealed-test": 0 });
 
 /**
+ * The opt-in creative plan: each unit carries a `createCreativePlan` (never
+ * `scenarioSpec`), a synthetic roleplay `ScenarioSpec` whose `lineage`/`split`
+ * come from `creativeLineage` + `creativeSplitForLineage(lineage,
+ * splitForLineage)`, and a `Realization` whose context is the exact creative
+ * teacher prompt (system + user). No shared RNG draw, no ordinary allocation
+ * change, and no contact with the frozen corpus: with the option absent, this
+ * function is never reached.
+ */
+function planCreativeStream(options: {
+  readonly seed: string;
+  readonly families: readonly TrainingFamily[] | undefined;
+  readonly k: number;
+  readonly pairedTwins: readonly ScheduledTwinInput[];
+  readonly policy: GenerationPolicy;
+  readonly creative: CreativeStreamOption;
+}): RunPlan {
+  const { creative } = options;
+  const refuse = (detail: string): never => {
+    throw new PipelineRefusal("execution-not-authorized", [`creative stream refused: ${detail}`]);
+  };
+  if (!Number.isSafeInteger(creative.units) || creative.units < 1) {
+    refuse(`units must be a positive safe integer, got ${creative.units}`);
+  }
+  if (options.k !== 1) refuse("creative units are not stochastic realizations; pass realizationsPerScenario: 1");
+  if (options.pairedTwins.length > 0) refuse("paired twins are not part of the creative stream");
+  if (options.families !== undefined && (options.families.length !== 1 || options.families[0] !== CREATIVE_FAMILY)) {
+    refuse(`only the ${CREATIVE_FAMILY} family is scheduled by the creative stream`);
+  }
+  const units_: PlannedUnit[] = [];
+  const splitCounts = emptySplitCounts();
+  for (let index = 0; index < creative.units; index += 1) {
+    const unitSeed = `${options.seed}|creative|${index}`;
+    let plan: CreativePlan;
+    try {
+      plan = createCreativePlan({
+        seed: unitSeed,
+        ...(creative.shape !== undefined ? { shape: creative.shape } : {}),
+        ...(creative.setting !== undefined ? { setting: creative.setting } : {}),
+        ...(creative.depth !== undefined ? { depth: creative.depth } : {}),
+      });
+    } catch (error) {
+      return refuse(error instanceof CreativeConfigError ? error.message : "the creative plan could not be built");
+    }
+    const prompt = creativeTeacherPrompt(plan);
+    const moduleLineage = creativeLineage(plan);
+    // `creativeLineage` hashes the scenario identity ALONE, so two unrelated
+    // creative plans can share a `scenarioFamily` while drawing different splits.
+    // The runner assigns splits per lineage FIELD (`assertGeneratedSplits`) and
+    // would (correctly, for its own contract) refuse that. Binding the scheduled
+    // scenario family to this unit's seed -- exactly as the ordinary
+    // `scenarioSpec` seed-binds all three fields -- keeps the module's lineage
+    // for character/world and makes the schedule per-field split-disjoint without
+    // loosening any gate.
+    const lineage: LineageGroup = Object.freeze({
+      characterFamily: moduleLineage.characterFamily,
+      worldFamily: moduleLineage.worldFamily,
+      scenarioFamily: `${moduleLineage.scenarioFamily}-${sha256Hex(unitSeed).slice(0, 8)}`,
+    });
+    const split = creativeSplitForLineage(lineage, splitForLineage);
+    const clusterFamily = "creative-only";
+    const templateVersion = `${GENERATOR_VERSION}/creative-stream-v1`;
+    const specId = `creative-spec-${sha256Hex(`${unitSeed}|${plan.planId}`).slice(0, 20)}`;
+    // A mechanics-free roleplay oracle: no receipts, no menu, no hidden facts.
+    // The creative parser is the structural gate; the family's agency/boundary
+    // validators still run over the built example.
+    const oracle: ScenarioOracle = {
+      family: CREATIVE_FAMILY, toolFamily: "no-tool", expectsToolCall: false,
+      advertisedCandidates: [], advertisedToolNames: [], allowedCandidateIds: [], decisionRequest: "",
+      hiddenFacts: [], visibilityRequirements: [], authorityRequirements: [],
+      behaviourTags: ["roleplay", "agency-preservation", "anchor-preservation"],
+      receipts: [], authorizedConsequences: [], sections: [], dependencies: new Map(),
+      catalogReferences: [], desiredCounts: {},
+    };
+    const specBody = {
+      specId, seed: plan.seed, family: CREATIVE_FAMILY, split, lineage, clusterFamily, templateVersion,
+      tone: plan.shape, slots: {}, motive: plan.scenario.situationClass, oracle,
+      creativePlanId: plan.planId, creativePlanDigest: plan.digest, creativeTeacherPromptDigest: prompt.digest,
+    };
+    const spec: ScenarioSpec = Object.freeze({
+      specId, seed: plan.seed, family: CREATIVE_FAMILY, split, lineage, clusterFamily, templateVersion,
+      slots: Object.freeze({}), advertisedTools: [], oracle, digest: sha256Hex(stableStringify(specBody)),
+    });
+    const context: readonly StoredMessage[] = Object.freeze([
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ]);
+    const realization: Realization = Object.freeze({
+      realizationId: `${specId}-r000`,
+      specId,
+      clusterId: sha256Hex(`creative|${plan.shape}|${plan.scenario.situationClass}|${plan.card.stance.primary}`).slice(0, 12),
+      slots: Object.freeze({}),
+      context,
+      digest: sha256Hex(stableStringify({ specId, context })),
+    });
+    const unitId = `creative-unit-${sha256Hex(unitSeed).slice(0, 16)}`;
+    units_.push({
+      unitId, spec, realization, scenarioUnitId: unitId, realizationOrdinal: 0,
+      target: "roleplay-conversation",
+      creative: { plan, prompt, targetMode: creative.targetMode ?? DEFAULT_CREATIVE_TARGET_MODE },
+    });
+    splitCounts[split] += 1;
+  }
+  assertGeneratedSplits(units_, options.policy);
+  const splitAssignmentDigest = sha256Hex(stableStringify({
+    seed: options.seed, policyDigest: options.policy.digest,
+    units: units_.map((unit) => ({ unitId: unit.unitId, split: unit.spec.split, lineage: unit.spec.lineage })),
+  }));
+  const body = {
+    seed: options.seed, units: units_, splitCounts, splitAssignmentDigest,
+    scenarioCount: creative.units, realizationsPerScenario: 1, policyDigest: options.policy.digest,
+  };
+  return { ...body, digest: sha256Hex(stableStringify(body)) };
+}
+
+/**
  * Allocation by weight. Deterministic largest-remainder, so `planRun` with
  * `units: 20` produces the same mix on every machine.
  */
@@ -2467,12 +2707,19 @@ export function planRun(options: {
   readonly generationPolicy?: GenerationPolicy;
   /** Opt-in six-surface context ablation. Absent means the ordinary inventory. */
   readonly publicContextDiagnostic?: PublicContextDiagnosticOption | undefined;
+  /** Opt-in creative character-roleplay stream. Absent means the ordinary inventory. */
+  readonly creativeStream?: CreativeStreamOption | undefined;
 }): RunPlan {
   const { seed, units } = options;
   if (options.publicContextDiagnostic) {
     const policy = structuredClone(options.generationPolicy ?? loadGenerationPolicy());
     return planPublicContextDiagnostic({ seed, units, k: options.realizationsPerScenario ?? 1,
       families: options.families, pairedTwins: options.pairedTwins ?? [], policy, diagnostic: options.publicContextDiagnostic });
+  }
+  if (options.creativeStream) {
+    const policy = structuredClone(options.generationPolicy ?? loadGenerationPolicy());
+    return planCreativeStream({ seed, families: options.families, k: options.realizationsPerScenario ?? 1,
+      pairedTwins: options.pairedTwins ?? [], policy, creative: options.creativeStream });
   }
   if (!Number.isSafeInteger(units) || units < 1) {
     throw new PipelineRefusal("execution-not-authorized", [`unit count must be a positive safe integer, got ${units}`]);
@@ -2663,6 +2910,33 @@ export function isReviewScores(value: ReviewScores | { problems: string[] }): va
 }
 
 /**
+ * The opt-in creative reviewer contract, folded onto the six `ReviewScores`
+ * fields admission already binds. `parseCreativeReview` is fail-closed, and
+ * `foldCreativeReviewIntoSpecScores` takes the `min()` of the creative criteria
+ * that feed one spec field, so the existing `REVIEW_FLOORS` apply unchanged.
+ */
+export function creativeReviewScores(raw: string): ReviewScores | { problems: string[] } {
+  try {
+    const review = parseCreativeReview(raw);
+    const folded = foldCreativeReviewIntoSpecScores(review);
+    return {
+      characterization: folded.characterization,
+      dialogueQuality: folded.dialogueQuality,
+      coherence: folded.coherence,
+      narrativeInitiative: folded.narrativeInitiative,
+      playerAgency: folded.playerAgency,
+      nonRepetitive: folded.nonRepetitive,
+      verdict: review.verdict,
+      rationale: review.rationale,
+      reviewerCount: 1,
+    };
+  } catch (error) {
+    if (error instanceof CreativeReviewError) return { problems: error.refusals.map((refusal) => refusal.code) };
+    return { problems: [error instanceof Error ? error.message : String(error)] };
+  }
+}
+
+/**
  * The opt-in repair policy. "any-refusal" is the historical rule; "functional-only"
  * is the frozen public-context protocol, which permits at most two CONTENT repairs
  * and forbids style-based generation retries.
@@ -2775,6 +3049,8 @@ export interface PipelineOptions {
   readonly pairedTwins?: readonly ScheduledTwinInput[];
   /** Opt-in six-surface context ablation. Forwarded into the internal planRun. */
   readonly publicContextDiagnostic?: PublicContextDiagnosticOption | undefined;
+  /** Opt-in creative character-roleplay stream. Forwarded into the internal planRun. */
+  readonly creativeStream?: CreativeStreamOption | undefined;
   readonly proseQualityScorer?: ProseQualityScorer;
   readonly generationPolicy?: GenerationPolicy;
   readonly selectionPolicy?: SelectionPolicy;
@@ -2843,6 +3119,24 @@ export interface PilotReport {
 
 function emptyBuckets(): Record<ToolSelectionBucket, number> {
   return { ok: 0, "initiation-failure": 0, "argument-binding-failure": 0, "shape-failure": 0, unscored: 0 };
+}
+
+/**
+ * The creative stream's sidecar provenance. The category label is carried as a
+ * digest of its exact bytes (so it resolves as an artifact at export), and the
+ * plan/transcript/prompt digests name the exact creative inputs and output.
+ * Nothing here ever enters `messages`.
+ */
+function creativeProvenanceDigests(unit: PlannedUnit, capture: {
+  readonly transcript: CreativeTranscript;
+  readonly example: CreativeTrainingExample;
+}): Record<string, string> {
+  return {
+    creativeCategory: sha256Hex(stableStringify(CREATIVE_CATEGORY_CREATIVE_ONLY)),
+    creativePlan: capture.example.planDigest,
+    creativeTranscript: capture.example.transcriptDigest,
+    creativeTeacherPrompt: unit.creative!.prompt.digest,
+  };
 }
 
 function candidateProvenance(input: {
@@ -2995,6 +3289,43 @@ function publicSceneContextsFor(plan: RunPlan, diagnostic: PublicContextDiagnost
 }
 
 /**
+ * The selection view for an opt-in creative run.
+ *
+ * `selectAdmittedRecords` requires an SFT payload to preserve its SCHEDULED
+ * realization exactly (`record.messages.slice(0,-1) === unit.realization.context`)
+ * because every ordinary unit is a single supervised continuation of a fixed
+ * prompt. A creative unit is different: the teacher prompt is the INPUT, and the
+ * realization is the whole built conversation (whose earlier character turns are
+ * themselves supervised). The view therefore reconstructs each admitted creative
+ * unit's scheduled realization from its exact admitted messages, leaving the
+ * original plan (and its digest, reported separately) untouched. Ordinary units
+ * are returned unchanged, so nothing about the non-creative path moves.
+ */
+function creativeSelectionPlan(plan: RunPlan, records: readonly AdmittedRecordV1[]): RunPlan {
+  const byId = new Map(records.map((record) => [record.unitId, record]));
+  let changed = false;
+  const units = plan.units.map((unit) => {
+    if (!unit.creative) return unit;
+    const record = byId.get(unit.unitId);
+    if (!record || record.preference) return unit;
+    const context = record.messages.slice(0, -1);
+    if (stableStringify(context) === stableStringify(unit.realization.context)) return unit;
+    changed = true;
+    return {
+      ...unit,
+      realization: Object.freeze({
+        ...unit.realization,
+        context: Object.freeze(context.map((message) => ({ ...message }))),
+      }),
+    };
+  });
+  if (!changed) return plan;
+  const { digest: _digest, ...body } = plan;
+  const nextBody = { ...body, units };
+  return { ...nextBody, digest: sha256Hex(stableStringify(nextBody)) };
+}
+
+/**
  * Runs the pipeline.
  *
  * `dryRun` (the default) performs the plan, the realizations, the diversity
@@ -3049,6 +3380,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     realizationsPerScenario: options.realizationsPerScenario ?? 1,
     pairedTwins: options.pairedTwins ?? [],
     ...(options.publicContextDiagnostic ? { publicContextDiagnostic: options.publicContextDiagnostic } : {}),
+    ...(options.creativeStream ? { creativeStream: options.creativeStream } : {}),
   });
   // Validated again before any prompt is rendered, measured or dispatched.
   const publicSceneContexts = publicSceneContextsFor(plan, options.publicContextDiagnostic);
@@ -3268,6 +3600,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       };
       let failure: StageFailure | null = parse.failure;
       let gate: GateOutcome | null = null;
+      let creativeCapture: { readonly transcript: CreativeTranscript; readonly example: CreativeTrainingExample } | null = null;
       if (!failure && parse.parsed) {
         const sanitized = sanitizeStage(parse.parsed);
         if (sanitized.sanitized === null) {
@@ -3275,6 +3608,29 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         } else {
           stages.sanitized = sanitized.sanitized;
           try {
+          if (unit.creative) {
+            // The creative path never runs the legacy single-turn gate: the
+            // structural parser, the builder and the invariant gate own target
+            // capture, and the family validators still run on the built example.
+            const outcome = creativeGateFor(unit, sanitized.sanitized);
+            if (outcome.kind === "failed") {
+              failure = outcome.failure;
+            } else {
+              creativeCapture = { transcript: outcome.transcript, example: outcome.example };
+              gate = outcome.gate;
+              stages.validated = sanitized.sanitized;
+              lastBucket = gate.bucket;
+              buckets[gate.bucket] += 1;
+              if (!gate.passed) {
+                failure = gate.failures[0] ?? stageFailure("VALIDATED", "gate-refused", "a gate refused the candidate", stages);
+              } else {
+                diversityValidated.push({
+                  text: candidateSupervisedText(gate.messages, gate.targetSelection ?? { supervisedAssistantIndices: [0], supervisedToolCallIndices: [] }),
+                  clusterId: unit.realization.clusterId,
+                });
+              }
+            }
+          } else {
           const targetGate = dispatchGate(unit.spec, sanitized.sanitized, publicSceneContexts.get(unit.unitId));
           // Gates inspect the new assistant target; training and certification
           // bind its actual prompt context as well, with historical turns masked.
@@ -3299,6 +3655,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
               clusterId: unit.realization.clusterId,
             });
           }
+          }
           } catch {
             failure = stageFailure("VALIDATED", "candidate-validator-error", "candidate validation could not complete; response retained for bounded repair", { raw: stages.raw, parsed: stages.parsed });
           }
@@ -3308,15 +3665,22 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       const tools = unit.spec.advertisedTools.length > 0 ? unit.spec.advertisedTools : undefined;
       // The refused candidate keeps its tool calls: dropping them would make a
       // tool-selection refusal indistinguishable from an abstention in the ledger.
-      const refusalBase = unit.realization.context.map((message) => ({ ...message }));
-      const refusalMessages: StoredMessage[] = parse.parsed
-        ? withToolCall(refusalBase, parse.parsed)
-        : [...refusalBase, { role: "assistant", content: completion.content }];
-      const refusalIndex = lastAssistantIndex(refusalMessages);
-      const refusalTarget = refusalMessages[refusalIndex!];
-      const refusalSelection: TargetSelection = refusalTarget && (refusalTarget.content.trim() || refusalTarget.tool_calls?.length)
-        ? selectTargets(refusalMessages, { targetAssistantIndex: refusalIndex })
-        : { supervisedAssistantIndices: [], supervisedToolCallIndices: [] };
+      // A creative candidate that parsed keeps its built example so the refusal
+      // retains the real multi-turn payload and creative target selection.
+      const refusalMessages: StoredMessage[] = creativeCapture
+        ? creativeCapture.example.example.messages.map((message) => ({ ...message }))
+        : (parse.parsed
+          ? withToolCall(unit.realization.context.map((message) => ({ ...message })), parse.parsed)
+          : [...unit.realization.context.map((message) => ({ ...message })), { role: "assistant", content: completion.content }]);
+      const refusalSelection: TargetSelection = creativeCapture
+        ? creativeCapture.example.example.targetSelection
+        : ((): TargetSelection => {
+          const index = lastAssistantIndex(refusalMessages);
+          const target = refusalMessages[index!];
+          return target && (target.content.trim() || target.tool_calls?.length)
+            ? selectTargets(refusalMessages, { targetAssistantIndex: index })
+            : { supervisedAssistantIndices: [], supervisedToolCallIndices: [] };
+        })();
       // Measured, not estimated: the refusal cost is a real token count. A
       // candidate with nothing supervisable costs nothing to train on, and says so.
       let refusalTokens: number | null = twinTokens;
@@ -3341,7 +3705,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         ...(unit.publicContext ? { publicSceneManifest: unit.publicContext.manifestDigest } : {}),
         ...(unit.publicContext && unit.publicContext.publicContext === "observations" ? { publicSceneSource: unit.publicContext.sourceCanonicalDigest } : {}),
         ...(unit.authoredSource ? { authoredTwinSource: unit.authoredSource.sourceDigest } : {}),
-        ...(unit.twinInstrumentation ? { selectiveTwin: sha256Hex(stableStringify(unit.twinInstrumentation)) } : {}) };
+        ...(unit.twinInstrumentation ? { selectiveTwin: sha256Hex(stableStringify(unit.twinInstrumentation)) } : {}),
+        // The creative category label and plan/transcript/prompt digests live in
+        // sidecar provenance, never inside `messages`.
+        ...(unit.creative && creativeCapture ? creativeProvenanceDigests(unit, creativeCapture) : {}) };
       Object.assign(refusalProvenance.sourceDigests, runnerSourceDigests);
       if (rights) {
         refusalProvenance.license = { ...rights.license };
@@ -3383,6 +3750,17 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       retainArtifact(unit.preference ? unit.realization.context : { specId: unit.spec.specId, context: unit.realization.context });
       for (const run of gate?.runs ?? []) retainArtifact(run.evidence);
       if (unit.twinInstrumentation) { retainArtifact(unit.twinInstrumentation); retainArtifact(proseScores.get(unit.unitId)); }
+      if (unit.creative && creativeCapture) {
+        // The creative provenance digests must resolve to the exact bytes they
+        // bind: reconstruct each module-owned digest body and retain it, plus the
+        // category-label bytes, so an approved export registry can verify them.
+        const { planId: _creativePlanId, digest: _creativePlanDigest, ...creativePlanBody } = unit.creative.plan;
+        retainArtifact(creativePlanBody);
+        retainArtifact({ schemaVersion: creativeCapture.transcript.schemaVersion, planId: creativeCapture.transcript.planId, turns: creativeCapture.transcript.turns });
+        const { digest: _creativePromptDigest, ...creativePromptBody } = unit.creative.prompt;
+        retainArtifact(creativePromptBody);
+        retainArtifact(CREATIVE_CATEGORY_CREATIVE_ONLY);
+      }
       for (const [digest, bytes] of Object.entries(artifacts)) journal!.save(`artifact:${digest}`, bytes);
       journal!.save(`validation:${attemptId}`, { stages, runs: gate?.runs ?? [], sourceDigests: refusalProvenance.sourceDigests,
         measuredTokens: refusalTokens, budgetTarget: unit.target, tokenizer: tokenizer.name,
@@ -3458,9 +3836,15 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         ...(tools ? { tools } : {}),
         targetSelection: selection,
       });
-      // Independent review by a DIFFERENT model.
-      const baseReviewPrompt = reviewPromptFor(unit.spec, validated.messages)
-        + (unit.preference ? `\nPreference (judge source-sensitive chosen/rejected ordering as well):\n${stableStringify(unit.preference)}` : "");
+      // Independent review by a DIFFERENT model. A creative unit uses the
+      // creative reviewer contract and folds its ten criteria onto the six
+      // scores admission binds; everything else uses the legacy contract.
+      const parseScores = (raw: string): ReturnType<typeof parseReviewScores> =>
+        creativeCapture ? creativeReviewScores(raw) : parseReviewScores(raw);
+      const baseReviewPrompt = creativeCapture
+        ? creativeReviewPrompt(unit.creative!.plan, creativeCapture.transcript)
+        : reviewPromptFor(unit.spec, validated.messages)
+          + (unit.preference ? `\nPreference (judge source-sensitive chosen/rejected ordering as well):\n${stableStringify(unit.preference)}` : "");
       const reviewCandidateDigest = computePayloadDigest({ messages: validated.messages, ...(tools ? { tools } : {}), ...(unit.preference ? { preference: unit.preference } : {}) });
       const reviewSurfaceDigest = sha256Hex(stableStringify({
         messages: validated.messages.map((message) => ({ ...message, ...(message.tool_calls ? { tool_calls: message.tool_calls.map(({ id: _transportId, ...call }) => call) } : {}) })),
@@ -3476,7 +3860,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       }
       if (priorUsableReview) {
         const priorResponse = journal!.read<TeacherCompletion>(`response:${priorUsableReview.contract.attempts.at(-1)!}`);
-        if (!priorResponse || !isReviewScores(parseReviewScores(priorResponse.content))) throw new Error("usable prior review checkpoint lacks its exact usable response");
+        if (!priorResponse || !isReviewScores(parseScores(priorResponse.content))) throw new Error("usable prior review checkpoint lacks its exact usable response");
         const refused = stageFailure("VALIDATED", "unchanged-reviewed-candidate", "the repair returned an identical candidate with an existing usable judgment; change the answer to address that judgment before requesting review again", { raw: stages.raw, parsed: stages.parsed });
         commitRefused(refused, { priorReviewedAttemptId: priorUsableReview.attemptId, priorReviewContract: priorUsableReview.contract, priorReviewRaw: priorResponse.content });
         refusedAt = "VALIDATED:unchanged-reviewed-candidate";
@@ -3495,7 +3879,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
           ...(options.reviewerReasoningEffort ? { reasoningEffort: options.reviewerReasoningEffort } : {}),
           maxTokens: reviewerMaxCompletionTokens, responseFormat: "json",
         });
-        scores = parseReviewScores(reviewCompletion.content);
+        scores = parseScores(reviewCompletion.content);
         if (isReviewScores(scores)) break;
         if (retry < maxReviewContractRetries) reviewPrompt = baseReviewPrompt + `\nREVIEW OUTPUT-CONTRACT REPAIR ONLY: the candidate is unchanged. Your last raw JSON was invalid: ${stableStringify(reviewCompletion.content)}. Problems: ${stableStringify(scores.problems)}. Return a new schema-conforming judgment of the SAME candidate. Do not rewrite the candidate or reinterpret the previous verdict.`;
       }
@@ -3651,7 +4035,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     });
   }
 
-  const selection = selectAdmittedRecords(plan, admittedRecords, policy, selectionPolicy);
+  const selection = selectAdmittedRecords(creativeSelectionPlan(plan, admittedRecords), admittedRecords, policy, selectionPolicy);
   for (const record of selection.selected) {
     const unit = plan.units.find((entry) => entry.unitId === record.unitId)!;
     diversitySelected.push({ text: record.preference ? record.preference.chosen.map((message) => message.content).join("\n")
