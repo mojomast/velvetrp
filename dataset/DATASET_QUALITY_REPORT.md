@@ -81,24 +81,41 @@ authored observations (an amber lamplight, closed shutters).
 **Conclusion: two inert observations do not remedy the register problem.** Per the
 stop rule, no further tuning against those frozen cases is authorized.
 
-## 5. Creative stream — implemented, not yet cleared
+## 5. Creative stream — implemented, evaluated, and materially better
 
 The creative stream is a large, tested module with strong structural guarantees
-(never supervises a player turn; deterministic; fail-closed) and a live
-calibration that is still establishing its yield.
+(never supervises a player turn; deterministic; fail-closed). It is now wired
+into the pipeline and has a measured live yield.
 
-Its first live runs exposed three distinct failure modes, which are recorded
-rather than hidden:
+Four calibration runs, each an honest record:
 
 | Failure | Cause | Status |
 |---|---|---|
 | `transcript-player-impersonation` on ordinary dialogue | The detector refused second-person address anywhere in a sentence | Fixed: a match must now begin a main clause |
-| `transcript-not-json` | The response was truncated by the output-token budget | Budget raised to 16384 |
-| `transcript-turn-count-mismatch` | The teacher does not reliably obey the prompt's explicit exact-turn-count instruction | Open |
+| `transcript-not-json` | The response was truncated by the output-token budget | Budget raised 2048 → 16384; truncation went to **zero** |
+| `transcript-turn-count-mismatch` | The teacher does not reliably obey an exact-turn-count instruction | Fixed: the parser accepts any structurally valid length in range |
 
-No quality claim is made for the creative stream until its live yield and blinded
-prose are measured. Structural correctness alone does not establish that the
-conversations are good.
+Latest run: **8 of 10 units admitted**, 6 train / 2 sealed-test, **8 distinct
+character lineages**, **8/8 multi-turn**, 3,882 admitted labels. Remaining
+refusals are teacher non-compliance (impersonation 9, speaker-alternation 9,
+turn-count 2, grading-metadata 1), not pipeline defects.
+
+**Independent creative review: 3 pass / 2 fail** on a stratified sample of five
+conversations, judged in fresh contexts against a nine-criterion creative rubric
+with the player's turns marked as not targets. This is a real measured score for a
+family that previously could not be evaluated at all.
+
+Two caveats that matter:
+
+1. One failure was `dialogueNaturalness: 0` — everything the character said was a
+   polished speech. Real, and a reason to sample more before scaling.
+2. The other failure was `writesPlayerActions: true` — the character asserted an
+   unstated player intention (*"You want to know what I want"*). **The structural
+   gate admitted it**, because `want` is not in the impersonation verb list.
+   Structural admission is therefore not sufficient evidence of player-agency
+   preservation; independent review caught what the pipeline missed.
+
+No claim is made that training on these conversations improves a model.
 
 ## 6. What is explicitly NOT established
 

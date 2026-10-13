@@ -463,3 +463,73 @@ The model produces this naturally. It is the same class of defect as the
 present-tense gap closed in `edf834b`, and it was not repaired here: this run
 used the grammar as frozen. It is recorded as a known false refusal, not
 retroactively re-admitted.
+
+## Creative roleplay — the stream that does produce engaging prose
+
+The creative stream (`dataset/src/creativeRoleplay.ts`, wired into the pipeline as
+an opt-in path) was calibrated in four runs. Unlike grounded narration, this
+family produces the kind of prose the project is actually for.
+
+| Run | Admitted | Empty completions | Transcript refusals | Note |
+|---|---:|---:|---:|---|
+| v1 | few | many | many | Recorded failure: the impersonation detector refused ordinary dialogue |
+| v2 | 4 | 5 | 15 | Output budget 4096 still truncated longer conversations |
+| v3 | 6 | **0** | 13 | Budget 16384 fixed truncation entirely |
+| v4 | **8 / 10** | 0 | 11 | Exact-turn-count demand relaxed to a valid range |
+
+### v4 detail
+
+- 10 planned, 19 attempts, **8 admitted**, 8 selected, 9 bounded repairs.
+- **27 captured responses**, 8 independent review verdicts, all accepted.
+- **6 train / 2 sealed-test**, **8 distinct character lineages** (no two share a
+  character), and **8/8 are multi-turn** (3–8 supervised character turns each).
+- **14,630** supervised labels across all attempts; **3,882** admitted. For scale,
+  the entire previously approved export was 806.
+- Remaining refusals are teacher non-compliance, not detector bugs:
+  `transcript-player-impersonation` 9, `transcript-speaker-alternation` 9,
+  `transcript-turn-count-mismatch` 2, `transcript-grading-metadata` 1.
+
+### Independent creative review
+
+A stratified sample of five of the eight admitted conversations was rendered as
+plain dialogue (the training surface is JSON, which a style judge cannot assess)
+and judged in fresh independent contexts against a nine-criterion creative rubric.
+The player's turns were marked as **not** training targets.
+
+**3 pass / 2 fail.** Every passing conversation reported
+`writesPlayerActions: false` and `playerTurnsNatural: true`.
+
+The two failures were genuine and different:
+
+1. `dialogueNaturalness: 0` — every character turn was an elaborately balanced
+   speech, and the player's matching rhetorical cadence read as scripted support
+   rather than conversation.
+2. **`playerAgencyPreservation: 0`, `writesPlayerActions: true`** — the character
+   asserted an unstated player intention: *"You want to know what I want."* The
+   player's uncertainty about what they wanted did not establish that desire.
+   **The structural gate did not catch this**, because `want` is not in the
+   impersonation verb list. This is a real false negative in the detector, found
+   by independent review rather than by the pipeline.
+
+Representative passing evidence, with the character's own voice:
+
+> "Two winters I've practised it at the kettle, and the kettle's very forgiving,
+> so that's not saying much for me."
+
+> "I am not asking to be agreed with. I am asking to be believed, and those are
+> not the same thing."
+
+### What this establishes, and what it does not
+
+Established: the creative stream can generate diverse, character-driven,
+multi-turn roleplay that independent judges rate as good training material, with
+the simulated player never supervised. This is the **implemented and evaluated
+response to the creative-coverage gap**, not a proposal. Independent creative
+quality is **3/5 on a stratified sample**, not a high score but a real one, on a
+family that previously could not be evaluated at all.
+
+Not established: that training on it improves a model. The sample is five
+conversations, not a corpus. This is a calibration yield, not a production
+dataset. And the detector gap above means structural admission is **not**
+sufficient evidence of player-agency preservation; independent review found a
+case the pipeline admitted.
