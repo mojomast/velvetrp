@@ -37,7 +37,14 @@ export const CORPUS_RUN_ID = "corpus-structured-2026-10-13-v1";
 export const CORPUS_SEED = "corpus-structured-2026-10-13-1";
 export const CORPUS_UNITS = 60;
 export const CORPUS_MAX_REPAIRS = 2;
-export const CORPUS_MAX_COMPLETION_TOKENS = 2048;
+/**
+ * 4096, not the CLI default of 2048. The first campaign produced twelve
+ * `world-generation-not-json` refusals whose captured `finishReason` was
+ * `max_tokens`: the world JSON was truncated mid-object. The repair loop
+ * recovered most of it (20/21 world units admitted) but each truncation wastes a
+ * dispatch. Structured world output needs more room than a single narration.
+ */
+export const CORPUS_MAX_COMPLETION_TOKENS = 4096;
 
 /**
  * Re-weighted family allocation. Deliberately NOT the module default, and scoped
