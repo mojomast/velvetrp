@@ -86,8 +86,14 @@ authorizes **export only**. Do not read it as permission to train.
 - **No controlled retention comparison.** The historical raw stock answers were
   never recovered, so the inherited 4/8 floor is a policy threshold, not a
   measurement.
-- **CI** had a backlog of queued runs at handoff. Confirm it is green before
-  building on this.
+- **CI is backed up, and it is not a code failure.** At handoff, 11 `ci` runs were
+  queued on `ubuntu-latest`, the oldest for ~2.5 hours, while earlier runs
+  completed normally. That is runner capacity, not a red build — the last
+  completed run was green. Confirm CI is green before building on this branch, and
+  expect a delay.
+- **The full foundry suite is green locally**: 641 passed, 0 failed, 0 skipped,
+  0 todo, with the real CPU tokenizer (`test:foundry`, serial). This is the
+  handoff checkpoint.
 
 ## 6. Two known scaling costs
 

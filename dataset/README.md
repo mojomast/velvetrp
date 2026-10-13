@@ -295,6 +295,7 @@ Latest recorded validation checkpoints:
 
 | Check | Result |
 |---|---|
+| Full foundry suite, real CPU tokenizer (serial, handoff checkpoint) | **641 passed, 0 failed, 0 skipped** |
 | Generator-v9 readiness (committed, serial) | 570 passed, 0 failed, 0 skipped |
 | Public-context adapter, corrected, focused files (serial, real CPU) | 305 passed, 0 failed, 0 skipped |
 | Parent re-probes of every reported bypass | 28/28 passed |
