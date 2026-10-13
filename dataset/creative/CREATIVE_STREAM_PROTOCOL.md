@@ -1,9 +1,17 @@
 # Creative Stream Protocol (`creative-stream-v1`)
 
-Status: **module complete, not yet wired into `dataset/src/generate.ts`.**
-Owner file: `dataset/src/creativeRoleplay.ts` (self-contained; imports only
-`node:crypto`, `./hfAdapter.js` types and `./spec.js` types at runtime).
-Tests: `dataset/test/creative-roleplay.test.ts` (18/18 passing).
+Status: **module complete and committed (`d2dd8c0`).** As of that commit it was
+not wired into `dataset/src/generate.ts`. A separate agent is wiring it now in an
+uncommitted change to that file; this document does not track that diff, and
+section 13 describes the module-side contract the wiring must satisfy rather than
+the current state of `generate.ts`.
+
+Owner file: `dataset/src/creativeRoleplay.ts` (self-contained). Its only runtime
+imports are `createHash` from `node:crypto` and `stableStringify` from
+`./spec.js`; the `./hfAdapter.js` import is type-only and erased at runtime.
+
+Tests: `dataset/test/creative-roleplay.test.ts` (18/18 passing; verified by
+running the file, see section 14).
 
 This document is written to be **accurate to the code that actually ships**. Where
 the module and this document disagree, the module is authoritative.
@@ -30,9 +38,17 @@ Invariants that may not be weakened:
    only ever emits assistant indices taken from `characterMessageIndices`),
    by the reusable gate `assertCreativeExampleInvariants`, and by a regression
    test over a large deterministic batch.
-2. **The creative stream must not reuse the legacy cast/place/object/guild
-   anchors.** The legacy cast names are blocked from name generation; the
-   legacy place/object/guild phrases are kept out of every setting's pools.
+2. **The creative stream must not reuse the legacy cast, place or guild
+   anchors.** The eight legacy cast names (`LEGACY_CAST_NAMES`) are hard-blocked
+   inside `generateName` and additionally asserted absent. The legacy place and
+   guild phrases do not appear anywhere. This guarantee does **not** extend to the
+   five legacy object nouns: `"the manifest"` occurs whole inside the
+   science-fiction idiom `"on the manifest"`, and `"the ledger"` occurs whole
+   inside the mystery pressure `"a name missing from the ledger"`; `"ledger"` also
+   recurs as an ordinary object noun (fantasy `"a toll ledger"`, mystery
+   `"a ledger of loans"`). The committed reskin test asserts whole-phrase absence
+   for names, places and guilds only — its anchor list omits the legacy objects —
+   so those two phrases are a known, documented overlap rather than a caught defect.
 3. **Fail closed.** A malformed transcript, wrong speaker label, empty turn,
    meta commentary, grading metadata, mechanical-report register, or a character
    turn that impersonates the player is **rejected** with a stable code, never
@@ -66,17 +82,17 @@ CharacterCard {
   name: string              // generated, legacy-blocked
   apparentAgeBand: "teen" | "early-twenties" | "thirties" | "forties"
                  | "fifties-or-older" | "age-indeterminate"      // APPEARANCE_AGE_BANDS
-  role: string              // an occupation from the setting profile
+  role: string              // drawn from the setting profile's occupations; validated non-empty
   background: string        // formative event + present situation + shared detail
   motivation: string        // one framed want
   goal: string              // the same want as a bare verb phrase
-  temperament: string[]     // >= 2 distinct tags from TEMPERAMENT_TAGS
+  temperament: string[]     // >= 2 distinct tags from TEMPERAMENT_TAGS (validated)
   speech: SpeechRegister {
-    vocabulary: string      // VOCABULARY_BANDS, non-empty
-    tic: string             // VERBAL_TICS, non-empty
-    verbosity: "terse" | "measured" | "expansive"       // VERBOSITIES
-    sentenceHabits: string  // SENTENCE_HABITS, non-empty
-    formality: "casual" | "neutral" | "formal"          // FORMALITIES
+    vocabulary: string      // drawn from VOCABULARY_BANDS; validated non-empty
+    tic: string             // drawn from VERBAL_TICS; validated non-empty
+    verbosity: "terse" | "measured" | "expansive"       // VERBOSITIES (validated)
+    sentenceHabits: string  // drawn from SENTENCE_HABITS; validated non-empty
+    formality: "casual" | "neutral" | "formal"          // FORMALITIES (validated)
   }
   stance: RelationshipStance {
     primary: RelationshipStancePrimary      // RELATIONSHIP_STANCES
@@ -90,9 +106,20 @@ CharacterCard {
 }
 ```
 
-`characterSignature(card)` is the coarse identity signature
-(`setting|role|apparentAgeBand|stance.primary|stance.secondary|volatility|speech.tic`);
-two cards agreeing on it read as the same person to a batch reviewer.
+`validateCharacterCard` enforces: membership in `APPEARANCE_AGE_BANDS`,
+`EMOTIONAL_VOLATILITIES`, `RELATIONSHIP_STANCES` and `CREATIVE_SETTINGS`; a
+`temperament` of at least two distinct `TEMPERAMENT_TAGS`; `verbosity` and
+`formality` in `VERBOSITIES` / `FORMALITIES`; a boolean `stance.conflicting`; and
+**non-empty strings** for `name`, `role`, `background`, `motivation`, `goal`,
+`voiceAnchor`, `speech.vocabulary`, `speech.tic` and `speech.sentenceHabits`. The
+vocabulary/tic/sentence-habit and occupation *bands* are generation-time draws,
+not validation-time checks: a card carrying a non-empty string outside the bank
+still validates.
+
+`characterSignature(card)` is the coarse identity signature, formed by joining
+`[setting, role, apparentAgeBand, stance.primary, stance.secondary ?? "-",
+emotionalVolatility, speech.tic]` with `"|"`; two cards agreeing on it read as the
+same person to a batch reviewer.
 
 `generateName(rng, cultureId)` produces given + family/epithet names from
 composable onset/nucleus/coda banks and family heads. Twelve name cultures are
@@ -112,7 +139,8 @@ own `props`, `socialContext`, `idioms`, `occupations`, `institutions`,
 `localeSuffixes` and `nameCultures`. `creativeSettingTokens(setting)` exposes the
 tokens a setting lends its prose, which is how the tests prove a setting changes
 **surface text, not a label**. Occupations are setting-specific: a role from one
-setting never appears in another setting's profile.
+setting never appears in another setting's profile (verified: no occupation
+string occurs in more than one profile).
 
 ---
 
@@ -131,11 +159,12 @@ createCreativePlan(input) -> CreativePlan
 input: { seed, card?, setting?, shape?, depth?, world?, situationClass? }
 ```
 
-`CreativePlan` has `scenario { situationClass, shape, setting }`, `beats`
-(`opening` at index 0, `closing` at index depth-1, a `turn` beat for the two
-turning-point shapes at depth-2, otherwise `escalation`), `closingBeat`,
-`situation`, `stakes`, `characterGoal`, `playerIntent`, `digest` and `planId`.
-`validateCreativePlan(plan) -> string[]`.
+`CreativePlan` carries `schemaVersion`, `seed` and `category` (`"creative-only"`),
+and has `scenario { situationClass, shape, setting }`, `beats` (`opening` at
+index 0, `closing` at index depth-1, a `turn` beat at index depth-2 for
+`dramatic-turning-point` and `emotional-escalation`, otherwise `escalation`),
+`closingBeat`, `situation`, `stakes`, `characterGoal`, `playerIntent`, `digest`
+and `planId`. `validateCreativePlan(plan) -> string[]`.
 
 Private helpers `beatRoleFor`, `fillPlaceholders`, `STANCE_ARC`,
 `SHAPE_*` tables are not exported.
@@ -177,7 +206,10 @@ Structural: `transcript-not-json`, `transcript-not-object`,
 Register/content (character turns): `transcript-player-impersonation`,
 `transcript-mechanical-register-leak`. All turns:
 `transcript-meta-commentary`, `transcript-grading-metadata`.
-Plan: `plan-invalid`.
+Plan: `plan-invalid`. The review contract has its own refusals (section 8):
+`review-not-json`, `review-not-object`, `review-unknown-key`,
+`review-missing-field`, `review-score-out-of-range`, `review-unknown-verdict`,
+`review-rationale-empty`.
 
 ### Player-impersonation rule
 
@@ -197,9 +229,23 @@ outcome. Two pattern families:
 
 ### Meta / grading / mechanical register
 
-- `META_COMMENTARY_PATTERNS` catch AI self-reference, transcript/answer framing,
-  `per the beats/card/plan`, `let me know if`, field-name echoes
-  (`character card`, `emotionalVolatility`, …) and `note:/commentary:/feedback:`.
+- `META_COMMENTARY_PATTERNS` catch AI self-reference, transcript/answer framing
+  (`here's the transcript`, `I have written the scene`), `per the
+  beats/card/plan/arc/instructions` and `based on the …`, `let me know if`,
+  `please note`, `I hope this helps`, `as requested`,
+  `note:/commentary:/feedback:`, prompt field-name echoes (`character card`,
+  `voice anchor`, `apparent age band`, `speech register`, `emotional volatility`,
+  `situation class`, `conversation plan`, `emotionalVolatility`,
+  `apparentAgeBand`), and the meta construction `(the )player <verb>`
+  (`wants|needs|will|should|must|decides|feels|says|does|goes|is|has|turn|side`).
+  A bare `"the player"` is deliberately **not** refused, because "players" is
+  ordinary English.
+- Interaction worth knowing: the plan *input* for some shapes contains literal
+  `"The player wants …"` / `"The player is …"` sentences inside `situation` and
+  `playerIntent`. A teacher that echoes that phrasing verbatim into a turn is
+  refused by the `(the )player <verb>` pattern; the prompt instructs the teacher
+  never to quote the intention back. This is fail-closed by design, not a
+  validator bug.
 - `GRADING_METADATA_PATTERNS` catch quoted answer/score keys, `expected answer`,
   `correct answer`, `rubric`, `score:`/`grade:`, and `n/10`.
 - `MECHANICAL_REGISTER_PATTERNS` catch `DC <n>`, hit points, initiative order,
@@ -242,6 +288,15 @@ Message layout is `[system, player, character, player, character, …]`; player
 turns become `user`, character turns become `assistant`. The build records the
 **actual** `characterMessageIndices` / `playerMessageIndices` it assigned.
 
+Two distinct shapes, deliberately:
+
+- `creativeTargetSelection` returns a `CreativeTargetSelection`, whose
+  `supervisedCharacterTurnOrdinals` index into `transcript.characterTurns` and are
+  **not** message indices.
+- The built example's `example.targetSelection` is the `./hfAdapter.js`
+  `TargetSelection`: its `supervisedAssistantIndices` are **message indices** into
+  `example.messages`, and its `supervisedToolCallIndices` is always empty.
+
 **Selection is by character-turn ordinal, never by message-index arithmetic.**
 `buildCreativeTrainingExample` resolves each ordinal through its own
 `characterMessageIndices`. This is why the property holds for a player-first
@@ -273,11 +328,17 @@ repetitionControl, nonMechanicalRegister, noMetaCommentary
 `creativeReviewPrompt(plan, transcript) -> string` shows the reviewer the plan
 (input) and the transcript (output); it states that the absence of numbers,
 checks, DCs, dice, status effects or receipts is never a defect and their presence
-is. `CREATIVE_REVIEW_SCHEMA` (`creative-review-v1`) requires all ten scores in
-`[0,1]`, a `verdict` in `{accept, accept-with-notes, revise, reject}` and a
-non-empty `rationale`; extra keys are refused (reviewer counts are pipeline-owned).
-`parseCreativeReview(raw) -> CreativeReview` throws `CreativeReviewError` on any
-refusal. `creativeReviewPrompt` / review digests are deterministic.
+is. `CREATIVE_REVIEW_SCHEMA` (labelled with `CREATIVE_REVIEW_PROMPT_VERSION =
+"creative-review-v1"`; there is no separate review-schema version constant)
+requires all ten scores in `[0,1]`, a `verdict` in `{accept, accept-with-notes,
+revise, reject}` and a non-empty `rationale`; extra keys are refused (reviewer
+counts are pipeline-owned). `parseCreativeReview(raw) -> CreativeReview` throws
+`CreativeReviewError` carrying `refusals` on any refusal; the review refusal codes
+are `review-not-json`, `review-not-object`, `review-unknown-key` (including the
+pipeline-owned `reviewerCount`, `model`, `promptVersion`, `pass`, `total` and
+`score`), `review-missing-field`, `review-score-out-of-range`,
+`review-unknown-verdict` and `review-rationale-empty`. `creativeReviewPrompt` /
+review digests are deterministic.
 
 `foldCreativeReviewIntoSpecScores(review)` maps the ten creative scores onto the
 existing six `ReviewScores` fields using `min()` (never a mean), so admission's
@@ -326,18 +387,38 @@ share a single family are not a defect.
 
 ---
 
-## 10. Diversity guarantees
+## 10. Diversity and coverage measurement
 
 `creativeBatchDiversity(cards) -> CreativeDiversityReport` measures `total`,
 `distinctNames`, `distinctCards`, `distinctSignatures`, `distinctRoles`,
 `largestSignatureBucket`, `signatureShare`, `legacyNameCollisions`, per-setting /
-age-band / stance / volatility tallies, and capped collision samples.
+age-band / stance / volatility tallies, `collisionPairCount`, and a deterministic
+sample of colliding `{a, b, signature}` pairs capped at `COLLISION_SAMPLE_CAP`
+(20).
 
 `assertCreativeBatchDiversity(cards, policy = DEFAULT_CREATIVE_DIVERSITY_POLICY)`
 throws `CreativeDiversityError` (carrying the report) when the batch reuses legacy
 cast names, has a distinct-signature share below `minDistinctSignatureShare`
 (0.7), a largest signature bucket above `maxLargestSignatureBucket` (6), or
-byte-identical cards.
+byte-identical cards. `DEFAULT_CREATIVE_DIVERSITY_POLICY =
+{ maxLargestSignatureBucket: 6, minDistinctSignatureShare: 0.7 }`.
+
+### 10.1 What is measured, and what is not claimed
+
+- `creativeBatchDiversity` reports generator-side **surface** statistics over the
+  cards it is handed; `assertCreativeBatchDiversity` promotes four of them into a
+  fail-closed gate.
+- `creativeCoverageReport(items)` tallies category, split, setting, arc shape and
+  stance, counts distinct character / world / scenario lineage families, and
+  reports `creativeToStructured` (`creative`, `structured`, `ratio`).
+- `selectCreativeMix(items, policy)` maps a configured
+  `{ seed, creativeShare, structuredShare }` onto a deterministic selection and
+  **reports** `achieved` / `achievedShares` next to the `requestedShares`.
+- **Not claimed.** Nothing here measures student retention, learning effect,
+  quality or difficulty. No optimal creative:structured mixing ratio is asserted
+  or recommended in advance: the ratio is a policy input and the achieved mix is a
+  measurement. Diversity counts are satisfied by varied surface text and say
+  nothing about quality; quality is a separate, independent judgment (section 8).
 
 ---
 
@@ -376,16 +457,22 @@ arc shape, stance, distinct family counts and the creative:structured ratio.
 `createCreativeRng(seed)` is splitmix64 over a SHA-256-derived state, matching
 `createRng` in `generate.ts`. All generated artifacts are canonical-JSON hashed
 (`stableStringify`), so a seed yields byte-identical output on every platform.
-Verified: a 200-card + 200-plan batch serialised twice in separate processes
-produces identical bytes and the same SHA-256.
+Verified by a two-process run of `createCharacterCardBatch(seed, 200)` +
+`createCreativePlans(seed, 200)`: the canonical-JSON batch hashes to the same
+SHA-256 both times
+(`6bd9794397372e304eb2078e054133208ad3109a56e134a4ba0e8b92dd0c2ae6`). The
+committed test file covers in-process determinism (repeated card builds and RNG
+streams) rather than the cross-process check, which was run separately.
 
 ---
 
 ## 13. Intended integration into `dataset/src/generate.ts`
 
-**This module is not wired in yet, and `generate.ts` must not be edited by this
-change.** The orchestrator wires it. The integration points below are exact as of
-`generator-v9`.
+**At commit `d2dd8c0` this module was not wired into `dataset/src/generate.ts`; a
+separate agent is wiring it now in an uncommitted change to that file.** This
+document does not track that diff. Everything below describes the module-side
+contract the wiring must satisfy, using the `generate.ts` names current as of
+`GENERATOR_VERSION = "generator-v9"`.
 
 ### 13.1 Family registration
 
@@ -428,10 +515,13 @@ change.** The orchestrator wires it. The integration points below are exact as o
 
 ### 13.4 Splits
 
-- Pass the runner's own splitter as the delegate:
-  `creativeSplitForLineage(lineage, splitForLineage)`. Without a delegate the
-  module's fallback is byte-identical to `splitForLineage`, so the two agree even
-  if the delegate is omitted. Do **not** re-derive splits from derivative labels.
+- `creativeSplitForLineage(lineage, delegate?)` accepts the runner's splitter as
+  an optional delegate. `splitForLineage` in `generate.ts` is currently
+  module-private (declared without `export`), so the delegate form requires
+  exporting it first; without a delegate the module's fallback is byte-identical
+  to it (SHA-256 of `stableStringify(lineage)`, first 8 hex digits mod 100, `< 80`
+  train, `< 90` dev, else `sealed-test`), so the two agree either way. Do **not**
+  re-derive splits from derivative labels.
 
 ### 13.5 Review and admission
 
@@ -465,7 +555,9 @@ target selection, full-context preservation, derivative lineage/split guarantees
 the 80/10/10 policy (independently recomputed), fail-closed malformed
 transcripts, player-impersonation rejection, meta/grading/mechanical refusal, the
 review round-trip, category/mix/coverage measurement, and the legacy-reskin
-exclusion.
+exclusion (whole-phrase anchors for the eight cast names, six legacy places and
+four legacy guilds; the five legacy objects are **not** in the anchor list, see
+section 1).
 
 Run it with:
 
