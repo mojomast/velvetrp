@@ -106,6 +106,12 @@ function freeze(): void {
 }
 
 async function dispatch(command: "--preflight" | "--execute", expectedPlanDigest: string): Promise<void> {
+  // The pin is the first 64-hex argument, so optional flags may appear in any
+  // order without shifting it.
+  const pin = expectedPlanDigest && /^[a-f0-9]{64}$/.test(expectedPlanDigest)
+    ? expectedPlanDigest
+    : (process.argv.slice(2).find((arg) => /^[a-f0-9]{64}$/.test(arg)) ?? "");
+  expectedPlanDigest = pin;
   if (!/^[a-f0-9]{64}$/.test(expectedPlanDigest)) throw new Error("expected frozen plan pin required");
   const plan = frozenPlan();
   if (plan.digest !== expectedPlanDigest) throw new Error("frozen corpus plan drift");
