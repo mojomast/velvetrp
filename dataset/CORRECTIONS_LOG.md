@@ -408,3 +408,41 @@ Flash thinking with 2048 response tokens and omits K3 temperature, requesting lo
 effort with 4096 response tokens. Settings join request and resume digests; final
 answers alone become training targets. A fresh version-2 calibration keeps the
 same preregistered scenario inventory and preserves all version-1 failures.
+
+## Actual version-2 quality audit and focused correction
+
+Version 2 completed 20 scenarios with 55 generation attempts/24 reviews: 4 actual
+admissions and selections, 11,503 measured student-label tokens, zero unknown token
+counts. All four admissions independently passed functional inspection. Blinded
+ordinary-RP measurement passed 2/2 captured outputs from ONE seed, with independent
+ledger pin `1607afb639561690f2cc489c732f42f041c1dbb350daf8564aca41bc19480dce`.
+This is generated-data style evidence, not student retention.
+
+The independent audit found 20/24 reviewer verdicts unusable because the prompt
+omitted the parser enum, eight faithful transported grounded answers falsely
+refused by grammar, and a permitted boundary response falsely refused by a
+refusal-word proxy. All historical results remain unchanged in
+`CALIBRATION_RESULTS.md`; progression was held.
+
+The reviewer prompt now specifies its exact schema/enum and task-relative score
+semantics. Bounded output-contract retries retain the identical candidate and all
+raw reviews, with no generator repair for malformed judgment JSON. Boundary
+recovery renders its safe public knowledge/authority contract, permits the
+conversation and screens whole-interaction over-refusal; authority still forbids
+opening the sealed lower stair. World feedback retains exact sanitizer paths,
+and narration-tool subtypes preserve their underlying grounding diagnostics.
+
+The bounded grounding grammar now binds faithful possessive HP/status transitions,
+passive damage and explicit actor/target/receipt field records. All eight audited
+faithful transported surfaces verify offline; 103 role/value/polarity mutations
+reject. The three delivered unsupported-consequence surfaces still require
+adjudication. Unknown prose is not promoted into an invented factual contradiction;
+it remains explicit uncertainty. These provider-free regressions are infrastructure
+evidence, not corrected historical admissions or new live quality rates.
+
+Focused correction checkpoint: **481/481 serial foundry tests passed**, no skips,
+with real CPU tokenizer/export preparation enabled; owning typecheck passed.
+The final independent pre-v3 review approved the bounded 20-seed/K=1 campaign,
+reproducing first-usable-rejection stopping and raw/uncertain review-retry recovery
+before new work. No concrete false-admission, review-binding or accounting blocker
+was found. This approves measurement readiness, not the future pilot yield.

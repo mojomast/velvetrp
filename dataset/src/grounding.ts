@@ -7,7 +7,7 @@
 import { analyzeClaimReceipts } from "../../scripts/audit-adventure-consistency.js";
 import type { providerNarrationMatchesReceipts } from "../../server/src/routes/rpg/v1/adventureTurns.js";
 
-export const GROUNDING_VALIDATOR_VERSION = "grounding-binding-v2";
+export const GROUNDING_VALIDATOR_VERSION = "grounding-binding-v3";
 
 type ProductionReceipt = Parameters<typeof providerNarrationMatchesReceipts>[1][number];
 type CombatStatus = "active" | "unconscious" | "stable" | "defeated" | "dead";
@@ -146,10 +146,24 @@ export function authoritativeFacts(receipts: readonly GroundingReceipt[]): Autho
   });
 }
 
-/** Sentence/conjunction boundaries stop authorization and polarity leaking. */
+/** Keep complete mechanical schemas intact before considering clause boundaries. */
 function clausesOf(text: string): string[] {
-  return text.split(/[;:,!?\n]+|\.(?!\d)|\b(?:and|but|yet|however|whereas|while)\b/iu)
-    .map((clause) => clause.trim()).filter(Boolean);
+  const split = (text: string): string[] => {
+    const clause = text.trim();
+    if (!clause) return [];
+    if (parseClause(clause)) return [clause];
+    for (const boundary of [/[;:]+/u, /,+/u, /\b(?:and|but|yet|however|whereas|while)\b/iu]) {
+      const parts = clause.split(boundary);
+      if (parts.length > 1) return parts.flatMap(split);
+    }
+    return [clause];
+  };
+  return text.split(/\n\s*\n/u).flatMap((paragraph) => {
+    // A field record is one scope even when its fields are period-separated.
+    // An unknown field must not be dropped by retrying its known fragments.
+    if (RECEIPT_RECORD.test(paragraph.trim())) return [paragraph.trim().replace(/\.$/, "")];
+    return paragraph.split(/[!?\n]+|\.(?!\d)/u).flatMap(split);
+  });
 }
 
 interface OutcomeClaim { value: "success" | "failure"; excerpt: string }
@@ -178,6 +192,11 @@ interface Claim {
   damageType: string | null;
   difficulty: string | null;
   complete: boolean;
+  receiptId?: string;
+  receiptKind?: string;
+  visibility?: string;
+  /** Every component of a labelled schema binds to the SAME fact. */
+  components?: readonly Claim[];
 }
 function claim(family: Claim["family"], fields: Partial<Claim> = {}): Claim {
   return { family, actor: null, target: null, subject: null, values: [], outcomes: [], status: null, attackOutcome: null, action: null, damageType: null, difficulty: null, complete: true, ...fields };
@@ -198,7 +217,7 @@ function damageActor(head: string): string | null {
   return head.replace(/['’]s\s+(?:attack|blade|blow|strike)$/i, "");
 }
 function damageTarget(head: string): string | null {
-  return /^(?:the\s+)?(?:target|combatant)$/i.test(head) ? null : head;
+  return /^(?:the\s+)?(?:target|combatant)$/i.test(head) ? null : head.replace(/^(?:the\s+)?target\s+/i, "");
 }
 
 const NUMBER = "(-?\\d+(?:\\.\\d+)?)";
@@ -218,40 +237,188 @@ const DEALS = new RegExp(`^(.+?)\\s+(deals?|dealt|lands? for|hits? for)\\s+${NUM
 const TAKES = new RegExp(`^(.+?)\\s+(?:takes?|took|suffers?|suffered)\\s+${NUMBER}\\s+damage(?:\\s+from\\s+(.+))?$`, "i");
 const HP = new RegExp(`^(.+?)\\s+(has|have|had|remains at|is at|survives? at)\\s+${NUMBER}\\s+(?:HP|hit points?)(?:\\s+(remaining|after the attack|before the attack))?$`, "i");
 
+// Roles are names/noun phrases, not unbounded clauses containing punctuation,
+// predicates or mechanical labels (notably the noun phrase "hit points").
+const NAME = "[\\p{L}][\\p{L}\\p{N}'’ -]*?";
+const STATUS = "(active|unconscious|stable|defeated|dead|alive)";
+const DAMAGE_TYPE = "(physical|bludgeoning|piercing|slashing)";
+const RECEIPT_RECORD = /^(?:receipt\s+[\w-]+|receiptId:\s*[\w-]+)\s*[:—]\s*(?:actor|kind)\b/i;
+const HP_TRANSITION = new RegExp(`^(${NAME})['’]s\\s+hit points\\s+(?:go|went) from\\s+${NUMBER}(?:\\s+before)?\\s+to\\s+${NUMBER}(?:\\s+after)?$`, "iu");
+const HP_PAIR = new RegExp(`^(${NAME})['’]s\\s+hit points\\s*:?\\s*${NUMBER}\\s+before\\s*(?:,|and)\\s*${NUMBER}\\s+after$`, "iu");
+const HP_POSSESSIVE = new RegExp(`^(${NAME})['’]s\\s+hit points\\s+(before|after)(?: the attack)?\\s+(?:are|were|is|was)\\s+${NUMBER}$`, "iu");
+const STATUS_POSSESSIVE = new RegExp(`^(${NAME})['’]s\\s+status after(?: the attack)?\\s+(?:is|was)\\s+${STATUS}$`, "iu");
+const PASSIVE_DAMAGE = new RegExp(`^${NUMBER}\\s+${DAMAGE_TYPE}\\s+damage (?:was|is) applied to\\s+(${NAME})(?:\\s+by\\s+(${NAME}))?$`, "iu");
+
+function rolePhrase(text: string): boolean {
+  return new RegExp(`^${NAME}$`, "iu").test(text)
+    && !/^(?:the|an?)$/i.test(text) && !/^an?\s/i.test(text) && !/['’]s$/i.test(text)
+    && !/\b(?:points?|status|before|after|because|with|from|to|on|is|was|are|were|has|have|go|went|and|but|yet|however|whereas|while|deals?|takes?|comes|hits?|misses|total|dc)\b/i.test(text);
+}
+
+/** A small typed field vocabulary, with exact full-value parsing. */
+function parseField(text: string, family: Claim["family"]): Claim | null {
+  const match = /^(hitPointsBefore(?: for target .+?)?|hitPointsAfter(?: for target .+?)?|hit points before|hit points after|damage applied|damage type|damageType|status after|statusAfter|check DC|actor|target|kind|skill|dc|total|outcome|action|applied|damage|visibility|hit)\s*:?\s+(.+)$/i.exec(text);
+  if (!match) return null;
+  const key = normalize(match[1] ?? "").replace(/\s/g, "");
+  const value = match[2] ?? "";
+  if (["actor", "target", "skill"].includes(key)) {
+    if (!rolePhrase(value)) return null;
+    return claim(family, { [key === "skill" ? "subject" : key]: value });
+  }
+  if (key === "kind" && /^(?:check|combat|combat-damage)$/i.test(value)) return claim(family, { receiptKind: normalize(value) });
+  if (key === "visibility" && /^(?:public|private|hidden)$/i.test(value)) return claim(family, { visibility: normalize(value) });
+  if (key === "action" && /^\w+$/u.test(value)) return claim(family, { action: normalize(value) });
+  if (key === "outcome") {
+    if (family === "check" && /^(?:success|failure)$/i.test(value)) return claim(family, { outcomes: polaritiesOf(value) });
+    if (family === "damage" && /^(?:hit(?: true)?|miss|hit false)$/i.test(value)) return claim(family, { attackOutcome: /^(?:miss|hit false)$/i.test(value) ? "miss" : "hit" });
+  }
+  if (family === "damage" && key === "hit" && /^(?:true|false)$/i.test(value)) return claim(family, { attackOutcome: normalize(value) === "true" ? "hit" : "miss" });
+  if (family === "damage" && key === "statusafter" && new RegExp(`^${STATUS}$`, "i").test(value)) return claim(family, { status: normalize(value) });
+  if (family === "damage" && key === "damagetype" && new RegExp(`^${DAMAGE_TYPE}$`, "i").test(value)) return claim(family, { damageType: normalize(value) });
+  const damage = new RegExp(`^${NUMBER}(?:\\s+${DAMAGE_TYPE})?$`, "i").exec(value);
+  if (family === "damage" && ["damage", "damageapplied", "applied"].includes(key) && damage) return claim(family, {
+    values: [numeric("damage-applied", Number(damage[1]))], damageType: damage[2] ?? null,
+  });
+  if (!new RegExp(`^${NUMBER}$`).test(value)) return null;
+  const hp = /^(hitPointsBefore|hitPointsAfter|hit points before|hit points after)(?: for target (.+))?$/i.exec(match[1] ?? "");
+  if (family === "damage" && hp && (!hp[2] || rolePhrase(hp[2]))) return claim(family, {
+    target: hp[2] ?? null, values: [numeric(/before/i.test(hp[1] ?? "") ? "hp-before" : "hp-after", Number(value))],
+  });
+  if (family === "check" && ["dc", "checkdc", "total"].includes(key)) return claim(family, { values: [numeric(key === "total" ? "total" : "dc", Number(value))] });
+  return null;
+}
+
+function parseRecord(text: string): Claim | null {
+  const header = /^(?:receipt\s+|receiptId:\s*)([\w-]+)\s*[:—]\s*([\s\S]+)$/i.exec(text);
+  if (!header || !RECEIPT_RECORD.test(text)) return null;
+  const fields = (header[2] ?? "").split(/[;\n]+|\.(?!\d)/u).map((field) => field.trim()).filter(Boolean);
+  if (!fields.some((field) => /^(?:skill|kind\s*:?\s+(?:check|combat|combat-damage)|damage|applied|hit)\b/i.test(field))) return null;
+  const family = fields.some((field) => /^(?:skill|kind\s*:?\s+check)\b/i.test(field)) ? "check" : "damage";
+  const components = fields.map((field) => parseField(field, family));
+  const parsed = components.filter((component): component is Claim => component !== null);
+  let complete = parsed.length === fields.length;
+  // Receipt IDs scope the record, but never replace the required role/value fields.
+  const requiredRoles: AuthoritativeValue["role"][] = family === "check" ? ["dc", "total"] : ["damage-applied", "hp-before", "hp-after"];
+  if (!parsed.some((item) => item.actor) || !requiredRoles.every((role) => parsed.some((item) => item.values.some((value) => value.role === role)))) complete = false;
+  if (family === "check" ? !parsed.some((item) => item.subject) || !parsed.some((item) => item.outcomes.length)
+    : !parsed.some((item) => item.target) || !parsed.some((item) => item.action) || !parsed.some((item) => item.attackOutcome)
+      || !parsed.some((item) => item.damageType) || !parsed.some((item) => item.status)) complete = false;
+  // Retain recognizable contradictions, but never certify a partial record.
+  return claim(family, { receiptId: header[1]!, components: parsed, complete });
+}
+
+function parseExplicitHead(text: string): Claim | null {
+  let match = new RegExp(`^(${NAME})\\s+(?:made an?|(?:is|are) the actor of an?)\\s+(${NAME})\\s+check(?: against DC\\s+${NUMBER})?$`, "iu").exec(text);
+  if (match && rolePhrase(match[1]!) && rolePhrase(match[2]!)) return claim("check", {
+    actor: match[1]!, subject: match[2]!, values: match[3] ? [numeric("dc", Number(match[3]))] : [],
+  });
+  match = new RegExp(`^(${NAME})\\s+attempt(?:s|ed)?\\s+(?:the\\s+)?(${NAME})$`, "iu").exec(text);
+  if (match && rolePhrase(match[1]!) && rolePhrase(match[2]!)) return claim("check", { actor: match[1]!, subject: match[2]! });
+  match = new RegExp(`^(${NAME})\\s+(?:attacks?|attacked|made an attack against|(?:is|are) the actor of an attack against)\\s+(${NAME})$`, "iu").exec(text);
+  if (match && rolePhrase(match[1]!) && rolePhrase(match[2]!)) return claim("damage", { actor: match[1]!, target: damageTarget(match[2]!), action: "attack" });
+  return null;
+}
+
+/** A compound schema keeps every component on its head's actor/target receipt. */
+function parseCompound(text: string): Claim | null {
+  let head: Claim | null = null;
+  let tail = "";
+  const labelled = new RegExp(`^(${NAME})\\s*[:—]\\s*(.+)$`, "iu").exec(text);
+  if (labelled && rolePhrase(labelled[1]!)) {
+    const body = labelled[2]!;
+    const check = /^(.+?)\s+check\s*[,;:]\s*(.+)$/i.exec(body);
+    const attack = /^attack against\s+(.+?)\s*[,;]\s*(.+)$/i.exec(body);
+    if (check && rolePhrase(check[1]!)) { head = claim("check", { actor: labelled[1]!, subject: check[1]! }); tail = check[2]!; }
+    else if (attack && rolePhrase(attack[1]!)) { head = claim("damage", { actor: labelled[1]!, target: damageTarget(attack[1]!), action: "attack" }); tail = attack[2]!; }
+    else if (/^hit points before\b/i.test(body)) { head = claim("damage", { target: damageTarget(labelled[1]!) }); tail = body; }
+  }
+  if (!head) {
+    const split = /^(.+?)\s*[:,]\s*(.+)$/.exec(text);
+    if (!split) return null;
+    head = parseExplicitHead(split[1]!) ?? parseAtomicClause(split[1]!);
+    if (!head) return null;
+    tail = split[2]!;
+  }
+  // HP pairs contain their own comma/conjunction and must stay atomic.
+  const parts = tail.split(/[,;:]\s*(?!-?\d+(?:\.\d+)?\s+after\b)/i);
+  const components: Claim[] = [];
+  for (const part of parts) {
+    const component = parseAtomicClause(part.trim()) ?? parseField(part.trim(), head.family);
+    if (!component || component.family !== head.family) return null;
+    components.push(component);
+  }
+  return { ...head, components };
+}
+
 /** Anchored patterns matter: a valid prefix must not license an unknown suffix. */
 function parseClause(text: string): Claim | null {
-  let match = CHECK_NUMBERS.exec(text);
-  if (match) return claim("check", { ...checkIdentity(match[1] ?? ""), difficulty: match[3] ?? null, values: [numeric("total", Number(match[2])), numeric("dc", Number(match[4]))] });
+  if (RECEIPT_RECORD.test(text)) return parseRecord(text);
+  return parseAtomicClause(text) ?? parseCompound(text);
+}
+
+function parseAtomicClause(text: string): Claim | null {
+  const explicit = parseExplicitHead(text);
+  if (explicit) return explicit;
+  let match = HP_TRANSITION.exec(text) ?? HP_PAIR.exec(text);
+  if (match && rolePhrase(match[1]!)) return claim("damage", { target: damageTarget(match[1]!), values: [numeric("hp-before", Number(match[2])), numeric("hp-after", Number(match[3]))] });
+  match = HP_POSSESSIVE.exec(text);
+  if (match && rolePhrase(match[1]!)) return claim("damage", { target: damageTarget(match[1]!), values: [numeric(normalize(match[2]!) === "before" ? "hp-before" : "hp-after", Number(match[3]))] });
+  match = STATUS_POSSESSIVE.exec(text);
+  if (match && rolePhrase(match[1]!)) return claim("damage", { target: damageTarget(match[1]!), status: normalize(match[2]!) });
+  match = PASSIVE_DAMAGE.exec(text);
+  if (match && rolePhrase(match[3]!) && (!match[4] || rolePhrase(match[4]))) return claim("damage", { target: damageTarget(match[3]!), actor: match[4] ?? null, damageType: match[2]!, values: [numeric("damage-applied", Number(match[1]))] });
+  match = new RegExp(`^(?:the\\s+)?check resolves against DC\\s+${NUMBER}\\s+with a total of\\s+${NUMBER}$`, "i").exec(text);
+  if (match) return claim("check", { values: [numeric("dc", Number(match[1])), numeric("total", Number(match[2]))] });
+  match = new RegExp(`^(?:the\\s+)?total(?: was| is)?\\s+${NUMBER}\\s+against DC\\s+${NUMBER}$`, "i").exec(text);
+  if (match) return claim("check", { values: [numeric("total", Number(match[1])), numeric("dc", Number(match[2]))] });
+  match = /^(?:the\s+)?outcome\s+(?:(?:is|was)\s+)?(success|failure|a hit|a miss)$/i.exec(text);
+  if (match) return /^a /i.test(match[1]!) ? claim("damage", { attackOutcome: /miss$/i.test(match[1]!) ? "miss" : "hit" }) : claim("check", { outcomes: polaritiesOf(match[1]!) });
+  match = new RegExp(`^(?:dealing\\s+)?${NUMBER}\\s+${DAMAGE_TYPE}\\s+damage(?: applied)?$`, "i").exec(text)
+    ?? new RegExp(`^damage\\s*:\\s*${NUMBER}\\s+${DAMAGE_TYPE}$`, "i").exec(text);
+  if (match) return claim("damage", { values: [numeric("damage-applied", Number(match[1]))], damageType: match[2]! });
+  match = new RegExp(`^damage applied is\\s+${NUMBER}$`, "i").exec(text);
+  if (match) return claim("damage", { values: [numeric("damage-applied", Number(match[1]))] });
+  if (/^(?:hit(?: true)?|miss|hit false)$/i.test(text)) return claim("damage", { attackOutcome: /^(?:miss|hit false)$/i.test(text) ? "miss" : "hit" });
+  const field = parseField(text, "damage");
+  if (field && (field.status || field.damageType)) return field;
+  // The legacy atomic grammar never captures sibling clauses as role names.
+  if (/[;:,]|\b(?:and|but|yet|however|whereas|while)\b/i.test(text)) return null;
+  match = CHECK_NUMBERS.exec(text);
+  if (match && validCheckIdentity(match[1] ?? "")) return claim("check", { ...checkIdentity(match[1] ?? ""), difficulty: match[3] ?? null, values: [numeric("total", Number(match[2])), numeric("dc", Number(match[4]))] });
   match = CHECK_TOTAL.exec(text);
-  if (match) return claim("check", { ...checkIdentity(match[1] ?? ""), values: [numeric("total", Number(match[2]))] });
+  if (match && validCheckIdentity(match[1] ?? "")) return claim("check", { ...checkIdentity(match[1] ?? ""), values: [numeric("total", Number(match[2]))] });
   match = DC.exec(text);
   if (match) return claim("check", { values: [numeric("dc", Number(match[1]))] });
   match = CHECK_OUTCOME.exec(text);
-  if (match) return claim("check", { ...checkIdentity(match[1] ?? ""), outcomes: polaritiesOf(match[2] ?? "") });
+  if (match && validCheckIdentity(match[1] ?? "")) return claim("check", { ...checkIdentity(match[1] ?? ""), outcomes: polaritiesOf(match[2] ?? "") });
   if (ONLY_OUTCOME.test(text) || /^(?:you\s+)?(?:fail|succeed)(?:\s+(?:the\s+)?check)?$/i.test(text)) {
     return claim("check", { actor: /^you\s+/i.test(text) ? "you" : null, outcomes: polaritiesOf(text) });
   }
   match = DEALS.exec(text);
-  if (match) return claim("damage", {
+  if (match && rolePhrase(match[1]!) && (!match[5] || rolePhrase(match[5]))) return claim("damage", {
     actor: damageActor(match[1] ?? ""), target: match[5] ? damageTarget(match[5]) : null,
     action: /\battack$/i.test(match[1] ?? "") ? "attack" : null,
     attackOutcome: /^hits? for$/i.test(match[2] ?? "") ? "hit" : null,
     damageType: match[4] ?? null, values: [numeric("damage-applied", Number(match[3]))],
   });
   match = TAKES.exec(text);
-  if (match) return claim("damage", { target: damageTarget(match[1] ?? ""), actor: match[3] ?? null, values: [numeric("damage-applied", Number(match[2]))] });
+  if (match && rolePhrase(match[1]!) && (!match[3] || rolePhrase(match[3]))) return claim("damage", { target: damageTarget(match[1] ?? ""), actor: match[3] ?? null, values: [numeric("damage-applied", Number(match[2]))] });
   match = HP.exec(text);
-  if (match) return claim("damage", {
+  if (match && rolePhrase(match[1]!)) return claim("damage", {
     target: damageTarget(match[1] ?? ""),
     values: [numeric(/before/i.test(match[4] ?? "") || (!match[4] && /^had$/i.test(match[2] ?? "")) ? "hp-before" : "hp-after", Number(match[3]))],
     status: /^surviv/i.test(match[2] ?? "") ? "alive" : null,
   });
   match = /^(.+?)\s+(?:is\s+(active|unconscious|stable|defeated|dead|alive)|(?:dies|died|is killed|is slain)|(survives|survived))$/i.exec(text);
-  if (match) return claim("damage", { target: damageTarget(match[1] ?? ""), status: match[2] ? normalize(match[2]) : match[3] ? "alive" : "dead" });
-  match = /^(.+?)\s+(hits?|misses|missed)(?:\s+(.+))?$/i.exec(text);
-  if (match) return claim("damage", { actor: damageActor(match[1] ?? ""), target: match[3] ? damageTarget(match[3]) : null,
+  if (match && rolePhrase(match[1]!)) return claim("damage", { target: damageTarget(match[1] ?? ""), status: match[2] ? normalize(match[2]) : match[3] ? "alive" : "dead" });
+  match = /^(.+?)\s+(hits?|misses|missed)(?:\s+(?!points?\b)(.+))?$/i.exec(text);
+  if (match && rolePhrase(match[1]!) && (!match[3] || rolePhrase(match[3]))) return claim("damage", { actor: damageActor(match[1] ?? ""), target: match[3] ? damageTarget(match[3]) : null,
     action: /\battack$/i.test(match[1] ?? "") ? "attack" : null, attackOutcome: /^hit/i.test(match[2] ?? "") ? "hit" : "miss" });
   return null;
+}
+
+function validCheckIdentity(head: string): boolean {
+  return Object.values(checkIdentity(head)).every((value) => value === null || rolePhrase(value));
 }
 
 const CONSEQUENCE = /\b(?:(?:lock|door|gate|seal)\w*\s+(?:clicks?|opens?|opened|gives?\s+way)|(?:find|discover|uncover|spot)\s+(?:the\s+)?(?:hidden|secret|clue|key|evidence)|(?:npc|[a-z]+\s+name)\s+(?:convinced|agrees?|yields?|relents?|confesses?)|(?:trap|ambush|attack)\w*\s+(?:triggers?|springs?|fires?))\b/i;
@@ -272,6 +439,13 @@ function mechanicalFamily(text: string): string | null {
 function bindFact(assertion: Claim, facts: readonly AuthoritativeFact[], previous: AuthoritativeFact | null,
   excerpt: string, violations: BindingViolation[], adjudications: GroundingAdjudication[]): AuthoritativeFact | null {
   let candidates = facts.filter((fact) => fact.implemented && fact.family === assertion.family);
+  if (assertion.receiptId) {
+    candidates = candidates.filter((fact) => fact.receiptId === assertion.receiptId);
+    if (candidates.length === 0) {
+      violations.push({ code: "receipt-binding-mismatch", detail: `receipt ${assertion.receiptId} does not establish this ${assertion.family} record`, excerpt });
+      return null;
+    }
+  }
   if (candidates.length === 0) {
     // Other combat/power families can establish damage, but need their own adapter.
     if (facts.some((fact) => !fact.implemented)) {
@@ -306,6 +480,13 @@ function validateClaim(assertion: Claim, fact: AuthoritativeFact, excerpt: strin
   const problem = (code: string, detail: string): void => { violations.push({ code, detail, excerpt, receiptId: fact.receiptId }); };
   const adjudicate = (code: string, detail: string, resolution: string): void => { adjudications.push({ code, detail, excerpt, resolution, receiptId: fact.receiptId }); };
   if (fact.visibility !== "public") problem("forbidden-fact-disclosed", "the bound fact is not public");
+  for (const role of ["actor", "target", "subject"] as const) {
+    const stated = assertion[role];
+    if (stated !== null && (fact[role] === null || entity(stated) !== entity(fact[role]))) problem(`${role}-binding-mismatch`, `${role} "${stated}" is not established for this claim`);
+  }
+  if (assertion.receiptKind && assertion.receiptKind !== (fact.family === "damage" ? "combat" : fact.family)
+    && !(assertion.receiptKind === "combat-damage" && fact.family === "damage")) problem("receipt-kind-mismatch", `receipt does not establish kind ${assertion.receiptKind}`);
+  if (assertion.visibility && assertion.visibility !== fact.visibility) problem("visibility-binding-mismatch", `receipt visibility is ${fact.visibility}, not ${assertion.visibility}`);
   if (NONCOMMITTED.test(excerpt)) problem("temporal-state-contradicted", "a committed receipt cannot establish a pending, hypothetical or different-time claim");
   if (assertion.action && assertion.action !== fact.action) problem("action-binding-mismatch", `receipt action is ${fact.action}, not ${assertion.action}`);
   for (const qualifier of ["damageType", "difficulty"] as const) {
@@ -342,6 +523,13 @@ function validateClaim(assertion: Claim, fact: AuthoritativeFact, excerpt: strin
     } else if (assertion.status !== fact.status) problem("fabricated-outcome", `statusAfter is ${fact.status}, not ${assertion.status}`);
   }
   if (!assertion.complete) adjudicate("unrecognized-clause", "the entire clause is not covered by the binding grammar", "Rewrite as an explicit role-labelled clause, or add a reviewed binding rule with contradiction and mutation tests.");
+  for (const component of assertion.components ?? []) validateClaim(component, fact, excerpt, violations, adjudications);
+}
+
+function claimRoles(assertion: Claim): string[] {
+  return [...assertion.values.map((value) => value.role), ...assertion.outcomes.map(() => "outcome"),
+    ...(assertion.status ? ["status-after"] : []), ...(assertion.attackOutcome ? ["hit"] : []),
+    ...(assertion.receiptId ? ["receipt-id"] : []), ...(assertion.components ?? []).flatMap(claimRoles)];
 }
 
 /**
@@ -376,6 +564,13 @@ export function evaluateGroundedNarration(text: string, receipts: readonly Groun
   }
   let previous: AuthoritativeFact | null = null;
   for (const clause of clauses) {
+    const citation = /^receipt\s+([\w-]+)$/i.exec(clause);
+    if (citation) {
+      if (previous && previous.receiptId === citation[1]) bindings.push({ clause, receiptId: previous.receiptId, roles: ["receipt-id"] });
+      else if (previous || !facts.some((fact) => fact.receiptId === citation[1])) violations.push({ code: "receipt-binding-mismatch", detail: "the citation does not name the preceding bound receipt", excerpt: clause });
+      else adjudications.push({ code: "unscoped-receipt-reference", detail: "a receipt citation alone does not establish a claim", excerpt: clause, resolution: "Associate the citation with its explicit mechanical claim." });
+      continue;
+    }
     let assertion = parseClause(clause);
     const family = assertion?.family ?? mechanicalFamily(clause);
     // An unfamiliar check paraphrase can still contain a provable contradiction.
@@ -388,7 +583,7 @@ export function evaluateGroundedNarration(text: string, receipts: readonly Groun
         validateClaim(assertion, fact, clause, violations, adjudications);
         previous = fact;
         if (before === violations.length + adjudications.length) bindings.push({ clause, receiptId: fact.receiptId,
-          roles: [...assertion.values.map((value) => value.role), ...assertion.outcomes.map(() => "outcome"), ...(assertion.status ? ["status-after"] : []), ...(assertion.attackOutcome ? ["hit"] : [])] });
+          roles: claimRoles(assertion) });
       } else previous = null;
       continue;
     }

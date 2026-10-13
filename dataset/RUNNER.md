@@ -82,6 +82,15 @@ exhausted pending-review units are finalized/completed explicitly. Budget-paused
 units remain available for later attempts. A finished attempt loop can contain
 refusals; `complete: true` is a lifecycle statement rather than a quality score.
 
+Reviewer output-contract repair is separate: the prompt defines the exact verdict
+enum, task-relative six score meanings and bounded JSON schema. The embedding API
+defaults to one `maxReviewContractRetries` retry on the **same immutable candidate**,
+with a new durable `-review-contract-1` request. The first usable judgment ends that
+loop, even if it rejects. Exhausted malformed reviews quarantine the candidate
+without asking the generator to rewrite valid content. Retry calls do not create
+independent reviewers; `reviewerCount` is pipeline-owned. All retry outcomes are
+globally reconciled before new work on resume.
+
 The token ledger is rebuilt from durable attempts and measures final student
 labels under loss. Review/admission refusals charge once. The teacher's completion
 limit is a dispatch guard; actual student labels are checked before review and

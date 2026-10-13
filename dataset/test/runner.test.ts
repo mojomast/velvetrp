@@ -196,12 +196,47 @@ test("review/admission refusals charge each measured attempt once, including on 
   const reviewer = client("fixture-reviewer", () => "unusable review");
   const run = setup(t, { reviewer, units: 1 });
   const report = await runPipeline({ ...run.options, store: run.store });
-  assert.equal(report.attempts, 2);
+  assert.equal(report.attempts, 1, "unusable reviews cannot consume a generator-content repair");
   const expected = run.store.candidates().reduce((sum, record) => sum + record.provenance.tokenCount!.tokens, 0);
   assert.equal(report.budget.supervisedTokens, expected);
   assert.equal(report.unitOutcomes[0]!.supervisedTokens, expected);
   assert.deepEqual(await runPipeline({ ...run.options, store: run.reopen() }), report);
 });
+
+test("malformed reviewer verdict is retried on the identical candidate without generator repair", async (t) => {
+  const reviewed: TeacherCompletionRequest[] = [];
+  const malformed = JSON.stringify({ ...JSON.parse(ACCEPT), verdict: "PASS" });
+  const reviewer = client("fixture-reviewer", (request) => { reviewed.push(request); return request.attemptId.includes("review-contract") ? ACCEPT : malformed; });
+  const run = setup(t, { units: 1, reviewer });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 1);
+  assert.equal(report.attempts, 1);
+  assert.equal(run.store.candidates().length, 1);
+  assert.equal(reviewed.length, 2);
+  assert.ok(reviewed[1]!.attemptId.endsWith("-review-contract-1"));
+  assert.match(reviewed[0]!.system, /accept-with-notes/);
+  assert.match(reviewed[1]!.system, /candidate is unchanged/);
+  assert.ok(reviewed[1]!.system.includes(reviewed[0]!.system));
+  const record = report.unitOutcomes[0]!.admittedRecord!;
+  assert.equal(record.admission.review!.reviewerCount, 1, "output-contract attempts do not invent independent judges");
+  assert.equal(record.admissionCertificate.reviews[0]!.reviewerPromptDigest, sha256Hex(reviewed[1]!.system));
+  assert.deepEqual(await runPipeline({ ...run.options, store: run.reopen() }), report);
+  assert.equal(reviewed.length, 2, "both raw reviewer attempts are reused on resume");
+});
+
+for (const response of ["Not mine to open. Not yours either. The stair stays sealed.", "I don’t know why it is sealed. It stays closed."])
+  test(`boundary recovery permits the question while respecting the closed barrier: ${response}`, async (t) => {
+    const run = setup(t, { units: 1, families: ["boundary-recovery"], generator: client("fixture-teacher", () => response) });
+    assert.match(run.plan.units[0]!.realization.context[0]!.content, /Asking .* is permitted/);
+    assert.match(run.plan.units[0]!.realization.context[0]!.content, /does not know why it is sealed/);
+    assert.equal((await runPipeline({ ...run.options, store: run.store })).admitted, 1);
+  });
+
+for (const response of ["I abstain from narrating this interaction. I cannot provide Haug’s response.", "The sealed lower stair opens."])
+  test(`boundary recovery refuses actual over-refusal or opening: ${response}`, async (t) => {
+    const run = setup(t, { units: 1, families: ["boundary-recovery"], generator: client("fixture-teacher", () => response), maxRepairs: 0 });
+    assert.equal((await runPipeline({ ...run.options, store: run.store })).admitted, 0);
+  });
 
 test("budget pauses remain resumable, reconstruct spend and skip already completed calls", async (t) => {
   const run = setup(t, { budget: { maxSupervisedAssistantTokens: 128 } });
@@ -304,6 +339,10 @@ for (const defect of ["bad-reference", "omitted-section", "existing-key"] as con
   const report = await runPipeline({ ...run.options, store: run.store });
   assert.equal(report.admitted, 0);
   assert.match(report.unitOutcomes[0]!.refusedAt!, /requested-section-schema|reference-closure/);
+  if (defect === "bad-reference") {
+    const validation = inspectPipelineCheckpoint<{ runs: { validator: string; findings: { sanitizerChanges?: { path: string }[] } }[] }>(run.store, `validation:${run.plan.units[0]!.unitId}-a0`)!;
+    assert.ok(validation.runs.find((run) => run.validator === "requested-section-schema")!.findings.sanitizerChanges?.some((change) => change.path.includes("factionKeys")));
+  }
 });
 
 for (const defect of ["mixed-content", "unadvertised-tool", "extra-argument", "extra-call", "omitted-receipt"] as const) test(`grounded ${defect} cannot hide behind valid narration`, async (t) => {

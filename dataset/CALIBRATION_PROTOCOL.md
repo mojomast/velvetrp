@@ -102,3 +102,31 @@ Official configuration sources checked 2026-10-13:
 They specify Flash's default-enabled thinking toggle and K3's fixed temperature,
 always-on reasoning and supported low/high/max efforts. The operator relay's
 actual captured responses remain the evidence that settings were honored.
+
+## Version 3 contract/grammar calibration (preregistered before generation)
+
+The independent version-2 audit found all four admissions functionally sound,
+but concrete false refusals and reviewer contract churn held expansion. Version 3
+uses a fresh scenario inventory and the corrected generator/reviewer contracts:
+
+- Run `calibration-2026-10-13-v3`, seed `calibration-2026-10-13-v3-5`, 20 seeds/K=1.
+- Plan digest `a98f984166a99be603cf1dee9b308f394c71178d996935504cd698aaa442e46a`.
+- Same standard family counts: world 6, tool 6, grounded 4, boundary 3, RP 1.
+- Tool subtypes: four exact-candidate, one read-tool, one narration-submit. Seed
+  suffix was selected by public planning metadata to cover these two initiation
+  subtypes before observing answers; no answer-quality selection was performed.
+  Version 2 separately measured its no-tool subtype.
+- Generated split counts: 19 train, 1 dev, zero generated test. Frozen external
+  evaluation content remains unavailable to generation and grading.
+- Keep corrected Flash/K3 inference settings, actual masked-token budget, bounded
+  repairs, cluster caps, and fresh version-bound durable storage. Reviewer JSON
+  contract retries are separately bounded to one retry on an unchanged candidate;
+  retry until a favorable verdict is not allowed.
+- Preregister a complete ordinary-RP attempt census, frozen full surfaces and
+  fresh blinded Astra contexts before semantic unblinding, then independently
+  inspect every actual admission and representative refused outputs.
+
+Require actual independently sound grounded and boundary admissions plus acceptable
+observed review/schema/fidelity/style outcomes before the 175-seed pilot. Do not
+estimate a corrected yield by relabeling version-2 refused outputs. The latter
+remain source-bound historical evidence in `CALIBRATION_RESULTS.md`.

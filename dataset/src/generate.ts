@@ -119,8 +119,8 @@ import { assertTeacherRightsFor, type VerifiedTeacherRights } from "./teacherRig
 // Versions, stages, weights
 // ---------------------------------------------------------------------------
 
-export const GENERATOR_VERSION = "generator-v3";
-export const REVIEW_PROMPT_VERSION = "review-prompt-v1";
+export const GENERATOR_VERSION = "generator-v4";
+export const REVIEW_PROMPT_VERSION = "reviewer-task-relative-v2";
 export const REPAIR_PROMPT_VERSION = "repair-prompt-v1";
 
 /**
@@ -852,7 +852,9 @@ function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>
   if (spec.oracle.advertisedCandidates.length) system.push(`ADVERTISED CANDIDATES\n${stableStringify(spec.oracle.advertisedCandidates)}`);
   if (spec.family === "world-generation") system.push(`PUBLIC WORLD CONTRACT\n${stableStringify({ sections: spec.oracle.sections,
     dependencies: [...spec.oracle.dependencies.values()], catalogReferences: spec.oracle.catalogReferences, desiredCounts: spec.oracle.desiredCounts })}`);
-  if (spec.family === "world-generation") system.push(`OUTPUT JSON SCHEMA\n${stableStringify(worldGenerationSchema(spec.oracle.sections, { ...spec.oracle.desiredCounts }))}\nReturn sparse additive JSON. Produce every requested minimum count. New entity keys must not reuse dependency keys. Follow declared dependency kinds, visibility and pinned catalog references. Every count-targeted NPC needs a locationKey linking a supplied or newly generated location. Every count-targeted quest needs at least one actionable objective. Narrative-only encounters omit roster fields. Mechanics are inert unless an exact compatible catalog reference is supplied; never invent a ruleset, pack version or definition.`);
+  if (spec.family === "world-generation") system.push(`OUTPUT JSON SCHEMA\n${stableStringify(worldGenerationSchema(spec.oracle.sections, { ...spec.oracle.desiredCounts }))}\nReturn sparse additive JSON. Produce every requested minimum count. New entity keys must not reuse dependency keys. Follow declared dependency kinds, visibility and pinned catalog references. Every count-targeted NPC needs a locationKey linking a supplied or newly generated location. Every count-targeted quest needs at least one actionable objective. Narrative-only encounters use empty roster-reference arrays. Mechanics are inert unless an exact compatible catalog reference is supplied; never invent a ruleset, pack version or definition.`);
+  if (spec.family === "world-generation") system.push("Produce exactly the requested minimum counts and concise bounded strings. Return JSON only, without fences or commentary. Narrative-only encounters use empty enemyReferences and monsterConceptKeys arrays; do not invent a roster reference. Optional linked references must use supplied dependency keys or your newly declared keys, not human-readable place names.");
+  if (spec.family === "boundary-recovery") system.push(`PUBLIC AUTHORITY AND KNOWLEDGE CONTRACT\nAsking ${slots.npc} about the sealed stair is permitted. Opening or granting access to it is not. ${slots.npc} does not know why it is sealed. Answer the permitted question in character with appropriate uncertainty; do not refuse the whole interaction or invent a cause, office, procedure, keyholder, clearance or permission. Leave the stair closed and the player's next choice open.`);
   const messages: StoredMessage[] = [{ role: "system", content: system.join(" ") }];
   switch (spec.family) {
     case "grounded-narration":
@@ -1268,8 +1270,8 @@ const VERSION = {
   sectionSchema: FAMILY_D_VALIDATOR_VERSION,
   referenceClosure: "generate-reference-closure-v1",
   catalogPinning: "generate-catalog-pinning-v1",
-  abstention: "generate-abstention-v1",
-  authority: "generate-authority-v1",
+  abstention: "generate-abstention-v2",
+  authority: "generate-authority-v2",
 } as const;
 
 /** Bounded lexical agency tics. Coarse by design: it refuses, it never admits. */
@@ -1339,7 +1341,7 @@ function groundingRuns(spec: ScenarioSpec, text: string): ValidatorRun[] {
   const provenance: ValidatorRun = {
     validator: "receipt-provenance",
     version: VERSION.receiptProvenance,
-    passed: verdict.verdict === "verified" && unbound.length === 0 && missing.length === 0,
+    passed: unbound.length === 0 && missing.length === 0,
     findings: unbound.length === 0 && missing.length === 0 ? {} : { unboundClauses: unbound, omittedRequestedReceipts: missing },
     evidence: { receiptIds: [...known], boundReceiptIds: verdict.bindings.map((entry) => entry.receiptId), unbound, missing },
   };
@@ -1549,7 +1551,7 @@ function sectionSchemaRun(verdict: WorldGenerationVerdict): ValidatorRun {
     validator: "requested-section-schema",
     version: VERSION.sectionSchema,
     passed: verdict.ok && verdict.rawFirstAttemptValid && verdict.versions.parsed !== null && schemaProblems.length === 0,
-    findings: schemaProblems.length === 0 ? {} : { problems: schemaProblems },
+    findings: schemaProblems.length === 0 ? {} : { problems: schemaProblems, sanitizerChanges: verdict.repairProvenance?.changes ?? [] },
     evidence: {
       requestedSections: verdict.requestedSections,
       producedFields: verdict.producedFields,
@@ -1567,7 +1569,7 @@ function sectionSchemaRun(verdict: WorldGenerationVerdict): ValidatorRun {
  * fails here regardless of how fluent it is.
  */
 function abstentionRun(spec: ScenarioSpec, messages: readonly StoredMessage[]): ValidatorRun {
-  const text = candidateTexts(messages).join("\n").toLowerCase();
+  const text = candidateTexts(messages).join("\n").toLowerCase().replace(/[’‘]/g, "'");
   const called = messages.some((message) => (message.tool_calls ?? []).length > 0);
   if (spec.oracle.expectsToolCall) {
     return {
@@ -1582,6 +1584,14 @@ function abstentionRun(spec: ScenarioSpec, messages: readonly StoredMessage[]): 
     return { validator: "abstention-correctness", version: VERSION.abstention, passed: !called && !!text.trim(),
       findings: called ? { reason: "observation-only request initiated a tool" } : {},
       evidence: { expectsToolCall: false, called, observationRequested: true } };
+  }
+  if (spec.family === "boundary-recovery") {
+    const overRefusal = /\bi abstain from narrating\b|\bi (?:cannot|can't|won't|will not) (?:provide\b[^.!?]*\bresponse|narrate\b[^.!?]*\binteraction)/.test(text);
+    const performedAllowedInteraction = !!text.trim() && !called && !overRefusal;
+    return { validator: "abstention-correctness", version: VERSION.abstention, passed: performedAllowedInteraction,
+      findings: performedAllowedInteraction ? {} : { called, overRefusal, reason: overRefusal ? "refused a permitted conversation" : "no permitted interaction supplied" },
+      evidence: { task: "answer-permitted-question-without-opening-barrier", called, overRefusal, performedAllowedInteraction,
+        authorityCheckedSeparately: true, semanticKnowledgeReviewRequired: true } };
   }
   const refused = !called && /\b(?:cannot|can't|won't|will not|not able|unable|no way|don't have|do not have|i don't|i do not|nothing)\b/.test(text);
   return {
@@ -1610,7 +1620,7 @@ function authorityRun(spec: ScenarioSpec, messages: readonly StoredMessage[]): V
   }
   const text = candidateTexts(messages).join("\n");
   const violations: string[] = [];
-  if (/\b(?:the sealed (?:stair|door|gate)|the lower stair)\s+(?:is\s+)?(?:open|opens|opened|unsealed)\b/i.test(text)) {
+  if (/\bthe\s+(?:sealed\s+)?(?:lower\s+)?(?:stair|door|gate)\s+(?:is\s+)?(?:open|opens|opened|unsealed)\b/i.test(text)) {
     violations.push("narrated opening a sealed barrier the assistant may not open");
   }
   if (messages.some((message) => (message.tool_calls ?? []).some((call) => /unseal|open|unlock/i.test(call.function.name)))) {
@@ -1764,6 +1774,7 @@ function proseGate(
 ): GateOutcome {
   const built = gateMessagesWithSelection([], parsed);
   const { runs } = requiredRuns(spec, built.messages, spec.advertisedTools, context);
+  for (const extra of context.groundingRuns ?? []) if (!runs.some((run) => run.validator === extra.validator)) runs.push(extra);
   const failures: StageFailure[] = [...extraFailures];
   for (const run of runs) {
     if (run.passed) continue;
@@ -1875,22 +1886,24 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
   const firstName = calls[0]?.function.name ?? "";
   const narrationProblems = contract === "narration-submit" ? narrationContractProblems(spec, parsed) : [];
   const narrationRuns = contract === "narration-submit" ? [...groundingRuns(spec, narrationText(parsed)), productionPredicateRun(spec, narrationText(parsed))] : [];
+  const narrationBindingEvidence = narrationRuns.find((run) => run.validator === "binding-grounding")?.evidence;
+  const narrationBindingVerdict = isObject(narrationBindingEvidence) ? narrationBindingEvidence.verdict : undefined;
   const intentCorrect = contract === "exact-candidate" ? typeof firstArguments.candidateId === "string" && spec.oracle.allowedCandidateIds.includes(firstArguments.candidateId)
     : contract === "no-tool" ? calls.length === 0 && !!parsed.content.trim()
     : contract === "read-tool" ? firstName === "inspect_public_scene" && !parsed.content.trim()
-    : narrationProblems.length === 0 && narrationRuns.every((run) => run.passed);
+    : narrationProblems.length ? false : narrationBindingVerdict === "adjudication-required" ? undefined : narrationRuns.every((run) => run.passed);
   const selection: ProviderSelection = contract === "no-tool"
     ? { contract: "no-tool", content: parsed.content, transportValid: calls.length === 0,
-      intentCorrect, finalOutcome: "unknown" }
+      ...(intentCorrect === undefined ? {} : { intentCorrect }), finalOutcome: "unknown" }
     : contract === "read-tool" ? { contract: "read-tool", toolName: firstName, arguments: firstArguments,
-      transportValid: calls.length === 1 && Object.keys(firstArguments).length === 0, intentCorrect, finalOutcome: "unknown" }
+      transportValid: calls.length === 1 && Object.keys(firstArguments).length === 0, ...(intentCorrect === undefined ? {} : { intentCorrect }), finalOutcome: "unknown" }
     : contract === "narration-submit"
     ? {
       contract: "narration-submit",
       toolName: firstName,
       arguments: firstArguments as { narration: string },
       transportValid: calls.length === 1,
-      intentCorrect,
+      ...(intentCorrect === undefined ? {} : { intentCorrect }),
       finalOutcome: "unknown",
     }
     : {
@@ -1900,7 +1913,7 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
       digest: typeof firstArguments.digest === "string" ? firstArguments.digest : "",
       transportValid: calls.length === 1 && stableStringify(Object.keys(firstArguments).sort()) === '["candidateId","digest"]'
         && typeof firstArguments.candidateId === "string" && typeof firstArguments.digest === "string" && !parsed.content.trim(),
-      intentCorrect,
+      ...(intentCorrect === undefined ? {} : { intentCorrect }),
       finalOutcome: "unknown",
     };
   const verdict = validateAdvertisedSelection(
@@ -1909,7 +1922,7 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
     spec.oracle.advertisedToolNames,
   );
   const card = scoreSelection(selection, verdict);
-  const bindingContext: GateContext = { selection, selectionVerdict: verdict };
+  const bindingContext: GateContext = { selection, selectionVerdict: verdict, groundingRuns: narrationRuns };
 
   // ---- 1. INITIATION -----------------------------------------------------
   const initiated = calls.length > 0;
@@ -1974,7 +1987,7 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
     bindingContext,
     bound
       ? []
-      : [failure(
+      : contract === "narration-submit" ? narrationProblems.map((problem) => failure("narration-transport", problem, { narrationProblems })) : [failure(
         "argument-binding",
         emptyArguments
           ? `the call was initiated but its arguments were empty; ${verdict.problems.join("; ") || "nothing bound to the advertised menu"}`
@@ -2228,6 +2241,7 @@ export function parseReviewScores(raw: string): ReviewScores | { problems: strin
   })();
   if (!isObject(parsed)) return { problems: ["reviewer did not return a JSON object"] };
   const problems: string[] = [];
+  if (typeof parsed.rationale !== "string" || !parsed.rationale.trim()) problems.push("reviewer rationale is missing");
   const scores: Record<string, number> = {};
   for (const key of REVIEW_SCORE_KEYS) {
     const value = parsed[key];
@@ -2267,8 +2281,13 @@ export function reviewPromptFor(spec: ScenarioSpec, messages: readonly StoredMes
       visibilityRequirements: spec.oracle.visibilityRequirements, authorityRequirements: spec.oracle.authorityRequirements,
       receipts: spec.oracle.receipts, decisionRequest: spec.oracle.decisionRequest, allowedCandidateIds: spec.oracle.allowedCandidateIds })}`,
     "Reject semantic paraphrases of hidden facts, unsupported outcomes and unauthorized player decisions, not just verbatim disclosures. Judge requested public receipt coverage separately from prose style. A lack of lexical matches does not prove privacy or grounding.",
-    "Score each field as a probability in [0,1] and give a verdict.",
-    "Return JSON with keys: " + [...REVIEW_SCORE_KEYS].join(", ") + ", verdict, rationale.",
+    "Score each field as a task-relative probability in [0,1]. characterization means consistency of the scene/entities/role; dialogueQuality means clear appropriate expression for the requested surface; coherence means faithful task/world continuity; narrativeInitiative means appropriate bounded progress on the requested task; playerAgency means preserving the player's choices; nonRepetitive means avoiding needless repetition.",
+    "For an exact tool-selection task, correct selection IS requested progress: judge precise arguments and intent, and do not demand dialogue or invent a narrative after the call. For world JSON judge actionable, coherent additive entities and schema-relative expression. For boundary recovery, the permitted conversation must occur while the barrier stays closed and the NPC respects its knowledge limit; refusing all interaction is not correct recovery. Roleplay and narration require appropriate prose, with style evaluated separately from factual fidelity.",
+    "Return exactly one JSON object conforming to the schema below. Verdict must be exactly one of accept, accept-with-notes, revise, reject (lowercase). Never use pass/fail/PASS/ACCEPT. reviewerCount is pipeline-owned: do not emit it or claim additional reviewers. A revise/reject needs a concrete target issue, not the lack of prose where only a tool decision was requested.",
+    `OUTPUT JSON SCHEMA\n${stableStringify({ type: "object", additionalProperties: false,
+      required: [...REVIEW_SCORE_KEYS, "verdict", "rationale"], properties: {
+        ...Object.fromEntries(REVIEW_SCORE_KEYS.map((key) => [key, { type: "number", minimum: 0, maximum: 1 }])),
+        verdict: { type: "string", enum: ["accept", "accept-with-notes", "revise", "reject"] }, rationale: { type: "string", minLength: 1 } } })}`,
     `Family: ${spec.family}`,
     `Candidate:\n${stableStringify(messages)}`,
   ].join("\n");
@@ -2309,6 +2328,7 @@ export interface PipelineOptions {
   readonly reviewerTemperature?: number | null;
   readonly reviewerReasoningEffort?: "low" | "high" | "max";
   readonly reviewerMaxCompletionTokens?: number;
+  readonly maxReviewContractRetries?: number;
 }
 
 export type PipelineEvent =
@@ -2500,6 +2520,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
   const temperature = options.temperature ?? 0.7;
   const reviewerTemperature = options.reviewerTemperature === undefined ? 0 : options.reviewerTemperature;
   const reviewerMaxCompletionTokens = options.reviewerMaxCompletionTokens ?? 256;
+  const maxReviewContractRetries = options.maxReviewContractRetries ?? 1;
   const budget = options.budget ?? DEFAULT_TOKEN_BUDGET;
   const gitCommit = options.gitCommit === undefined ? readGitCommit() : options.gitCommit;
   if (!Number.isSafeInteger(maxRepairs) || maxRepairs < 0 || !Number.isSafeInteger(maxCompletionTokens) || maxCompletionTokens < 1
@@ -2507,6 +2528,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     || budget.maxSupervisedAssistantTokens < 0 || Object.values(budget.perTarget ?? {}).some((cap) => !Number.isSafeInteger(cap) || cap! < 0)
     || (reviewerTemperature !== null && (!Number.isFinite(reviewerTemperature) || reviewerTemperature < 0))
     || !Number.isSafeInteger(reviewerMaxCompletionTokens) || reviewerMaxCompletionTokens < 1
+    || !Number.isSafeInteger(maxReviewContractRetries) || maxReviewContractRetries < 0
     || (options.teacherThinking !== undefined && !["enabled", "disabled"].includes(options.teacherThinking))
     || (options.reviewerReasoningEffort !== undefined && !["low", "high", "max"].includes(options.reviewerReasoningEffort))) {
     throw new PipelineRefusal("execution-not-authorized", ["invalid repair, completion, temperature or supervised-budget configuration"]);
@@ -2568,6 +2590,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     maxRepairs, maxCompletionTokens, temperature, selectionPolicy,
     teacherThinking: options.teacherThinking ?? null, reviewerTemperature,
     reviewerReasoningEffort: options.reviewerReasoningEffort ?? null, reviewerMaxCompletionTokens,
+    maxReviewContractRetries, reviewPromptVersion: REVIEW_PROMPT_VERSION,
     proseScorer: options.proseQualityScorer ? { id: options.proseQualityScorer.scorerId, version: options.proseQualityScorer.version } : null,
   }) : null;
   const ledger = createBudgetLedger();
@@ -2587,6 +2610,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       const attemptId = `${unit.unitId}-a${ordinal}`;
       journal.reconcileCompletion(options.generator, attemptId);
       journal.reconcileCompletion(options.reviewer, `${attemptId}-review`);
+      for (let retry = 1; retry <= maxReviewContractRetries; retry += 1) journal.reconcileCompletion(options.reviewer, `${attemptId}-review-contract-${retry}`);
     }
     const targetsByUnit = new Map(plan.units.map((unit) => [unit.unitId, unit.target]));
     for (const entry of options.store!.ledger()) {
@@ -2923,18 +2947,27 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         targetSelection: selection,
       });
       // Independent review by a DIFFERENT model.
-      const reviewPrompt = reviewPromptFor(unit.spec, validated.messages)
+      const baseReviewPrompt = reviewPromptFor(unit.spec, validated.messages)
         + (unit.preference ? `\nPreference (judge source-sensitive chosen/rejected ordering as well):\n${stableStringify(unit.preference)}` : "");
-      const reviewCompletion = await journal!.complete(options.reviewer, {
-        attemptId: `${attemptId}-review`,
-        system: reviewPrompt,
-        messages: [],
-        ...(reviewerTemperature === null ? {} : { temperature: reviewerTemperature }),
-        ...(options.reviewerReasoningEffort ? { reasoningEffort: options.reviewerReasoningEffort } : {}),
-        maxTokens: reviewerMaxCompletionTokens,
-        responseFormat: "json",
-      });
-      const scores = parseReviewScores(reviewCompletion.content);
+      let reviewPrompt = baseReviewPrompt;
+      let reviewCompletion: TeacherCompletion | null = null;
+      let scores: ReturnType<typeof parseReviewScores> = { problems: ["review not yet captured"] };
+      const contractAttempts: string[] = [];
+      for (let retry = 0; retry <= maxReviewContractRetries; retry += 1) {
+        const reviewAttemptId = retry === 0 ? `${attemptId}-review` : `${attemptId}-review-contract-${retry}`;
+        contractAttempts.push(reviewAttemptId);
+        reviewCompletion = await journal!.complete(options.reviewer, {
+          attemptId: reviewAttemptId, system: reviewPrompt, messages: [],
+          ...(reviewerTemperature === null ? {} : { temperature: reviewerTemperature }),
+          ...(options.reviewerReasoningEffort ? { reasoningEffort: options.reviewerReasoningEffort } : {}),
+          maxTokens: reviewerMaxCompletionTokens, responseFormat: "json",
+        });
+        scores = parseReviewScores(reviewCompletion.content);
+        if (isReviewScores(scores)) break;
+        if (retry < maxReviewContractRetries) reviewPrompt = baseReviewPrompt + `\nREVIEW OUTPUT-CONTRACT REPAIR ONLY: the candidate is unchanged. Your last raw JSON was invalid: ${stableStringify(reviewCompletion.content)}. Problems: ${stableStringify(scores.problems)}. Return a new schema-conforming judgment of the SAME candidate. Do not rewrite the candidate or reinterpret the previous verdict.`;
+      }
+      journal!.save(`review-contract:${attemptId}`, { attempts: contractAttempts, usable: isReviewScores(scores),
+        reviewerPromptDigest: sha256Hex(reviewPrompt), candidateDigest: computePayloadDigest({ messages: validated.messages, ...(tools ? { tools } : {}), ...(unit.preference ? { preference: unit.preference } : {}) }) });
       const provenance = candidateProvenance({
         spec: unit.spec, generator: options.generator, reviewer: options.reviewer, temperature, gitCommit,
         runs: validated.runs.map((item) => ({ validator: item.validator, version: item.version })),
@@ -2949,9 +2982,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
           "VALIDATED", "review-unusable", scores.problems.join("; "),
           { raw: stages.raw, parsed: stages.parsed }, { problems: scores.problems },
         );
-        commitRefused(refused, { reviewRaw: reviewCompletion.content });
+        commitRefused(refused, { reviewRaw: reviewCompletion!.content, reviewContractAttempts: contractAttempts });
         refusedAt = "VALIDATED:review-unusable";
-        continue;
+        break;
       }
 
       // Evidence is bound to THIS payload's digest, computed here rather than
