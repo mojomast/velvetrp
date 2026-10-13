@@ -126,5 +126,70 @@ read schema failure was explicit HTTP 400, with retained raw outcome and no
 logical completion. A complete planned/actual ordinary-RP inventory is frozen
 under `.dataset/measurements/calibration-2026-10-13-v3/`.
 
+Independent review approved the three exact-tool and two boundary admissions and
+found no definite false admission. RP's added Ninth Watch customs/location remain
+uncorroborated creative setting fiction, rather than a proved private-oracle
+contradiction under the open-RP task. Its two captured answers are **byte-identical**,
+yet their usable reviews changed from revise to accept. This is reviewer
+disagreement, not demonstrated repair improvement; later runs prevent obtaining a
+fresh review for an unchanged candidate, including changed tool-call IDs alone.
+Both locked style grades pass at 2/1/2/2, from two fresh contexts for **one scene**.
+Independently inspected ledger pin:
+`82487b9f6b353d8e77400e39f32a069c9d3cc3702e53d8ccf5ce373b7e896a3c`.
+
 The correction explicitly adds `required: []` for read tools. A fresh version-4
 campaign preserves the same scenario identities and the interrupted run's artifacts.
+
+## Version 4 — completed with improved yield, grounding held
+
+Run `calibration-2026-10-13-v4`, producer
+`222041098cc3a61bc50436aed574899945cbb70b`, 20 seeds/K=1. The explicit read schema
+was accepted; all 20 scheduled scenario loops completed.
+
+| Family | Planned | Attempts | Initial admissions | Final admissions |
+|---|---:|---:|---:|---:|
+| World generation | 6 | 14 | 2 | 2 |
+| Tool selection | 6 | 9 | 4 | 5 |
+| Grounded narration | 4 | 12 | 0 | 0 |
+| Boundary recovery | 3 | 3 | 3 | 3 |
+| Roleplay | 1 | 1 | 1 | 1 |
+| **Total** | **20** | **39** | **10** | **11** |
+
+- **51** captured physical/logical responses: 39 generations plus 12 reviews.
+  All 12 reviews used the specified output contract; no contract retry needed.
+- Parsed initial attempts **19/20**, parsed all attempts **38/39**; 19 repairs.
+- Actual supervised-label spend **7,691**, including refused targets; no unresolved
+  or unmeasured outcomes. Eleven selected records in eleven clusters.
+- Frozen ordinary-RP inventory has **one captured initial output**, independently
+  style-pass in a fresh context. Independently inspected ledger pin:
+  `1f384a539a41b66744566c1dd6cc30c36472cf345e852e60c261e2ea58013c63`.
+  The separate functional review also approves its bounded setting fiction under
+  the actual open-RP contract; no student-retention result follows.
+- The grounded outputs predominantly used sentence-separated mechanical fields
+  that the bounded parser split apart, and several omitted native submission.
+  Independent inspection found all 12 preserve both receipts, six with correct
+  transport (whole-target false refusals) and six with real transport defects.
+
+Bindings: plan
+`a43ede3743db919190b82107a346069f3a455187d57a7991443172d64dd2aa07`;
+report `cb6799f9140f7b4784de7b0fda1feb65184a65d1732ac99a64aed05bfd3590f3`;
+selection `792a3662c8fec311c38ba31c0e8068ccbbe56645c355d4291cace725e9a6b50a`.
+Artifacts: `.dataset/measurements/calibration-2026-10-13-v4/` and matching run store.
+The pilot remains held until actual sound grounded admissions are established and
+the independent functional review resolves the remaining issues.
+
+GPT-6 Astra inspected **39/39 generation outputs**, **11/11 admissions**, and
+**12/12 review contracts**. All eleven admissions are semantically approved; no
+false admission was found. The narration-submit tool's three refused targets
+include one sound narrow paraphrase and two unsupported consequences. The world
+audit found compatible-kind and exact catalog-identity encoding mismatches, plus
+underspecified NPC roster exclusions. The sole usable revise review misunderstands
+inert mechanics versus an incompatible pin; it remains a historical refusal.
+All **51/51 responses** reconcile to captured HTTP bodies. Actual admitted target
+tokens: **1,847**, distinct from 7,691 tokens spent across all attempts.
+
+Independent report and machine verdicts:
+`/tmp/opencode/foundry-calibration-v4-independent-review.md` and
+`/tmp/opencode/foundry-calibration-v4-independent-review.machine.json`.
+Semantic inspection does not itself supply the full certificate/artifact export
+registry; v4 export approval remains pending.

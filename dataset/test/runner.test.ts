@@ -14,6 +14,7 @@ import { createTeacherClient, sha256Hex, TeacherUncertainDispatchError, type Tea
 import { stableStringify } from "../src/spec.js";
 import { createTokenizerBridge, withMeasuredQwen3Template } from "../src/tokenizer.js";
 import { fieldsForSections, WORLD_GENERATION_SECTIONS } from "../src/worldGeneration.js";
+import { catalogReferenceIdentity } from "../src/worldGenerationTypes.js";
 import { loadTeacherRights } from "../src/teacherRights.js";
 import type { StoredToolCall } from "../src/spec.js";
 import { exportTrainingJsonl } from "../src/export.js";
@@ -59,7 +60,7 @@ function publicWorldAnswer(request: TeacherCompletionRequest): Record<string, un
 
 function publicReceiptNarration(request: TeacherCompletionRequest): string {
   const receipts = JSON.parse(request.system.split("AUTHORITATIVE PUBLIC RECEIPTS\n")[1]!.split(" ADVERTISED")[0]!
-    .split(" PUBLIC WORLD")[0]!) as GroundingReceipt[];
+    .split(" PUBLIC WORLD")[0]!.split(" NARRATION SUBMISSION CONTRACT\n")[0]!) as GroundingReceipt[];
   return receipts.map((receipt) => receipt.kind === "check"
     ? `Your ${receipt.skill} check comes to ${receipt.total} against DC ${receipt.dc}: ${receipt.outcome}.`
     : receipt.kind === "combat" && receipt.outcome.kind === "damage" ? `${receipt.target} has ${receipt.outcome.hitPointsAfter} HP remaining.` : "").join(" ");
@@ -224,6 +225,40 @@ test("malformed reviewer verdict is retried on the identical candidate without g
   assert.equal(reviewed.length, 2, "both raw reviewer attempts are reused on resume");
 });
 
+test("unchanged generator repairs cannot shop a usable review verdict", async (t) => {
+  let reviews = 0;
+  const reviewer = client("fixture-reviewer", () => { reviews += 1; return reviews === 1
+    ? JSON.stringify({ ...JSON.parse(ACCEPT), verdict: "revise", rationale: "A real candidate issue requires a changed answer." }) : ACCEPT; });
+  const run = setup(t, { units: 1, reviewer, maxRepairs: 2 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.attempts, 3, "actual returned duplicate generator attempts are retained and charged");
+  assert.equal(reviews, 1, "an unchanged answer already has its usable judgment");
+  assert.equal(report.admitted, 0);
+  assert.equal(report.unitOutcomes[0]!.refusedAt, "VALIDATED:unchanged-reviewed-candidate");
+  const refusal = run.store.candidates().at(-1)!;
+  assert.ok(refusal.admission.findings?.priorReviewedAttemptId);
+  assert.match(String(refusal.admission.findings?.priorReviewRaw), /requires a changed answer/);
+  assert.deepEqual(await runPipeline({ ...run.options, store: run.reopen() }), report);
+  assert.equal(reviews, 1);
+});
+
+test("changing only tool-call transport IDs cannot obtain another usable verdict", async (t) => {
+  const seed = "tool-audit";
+  const unit = planRun({ seed, units: 1, families: ["tool-selection"] }).units[0]!;
+  const candidate = unit.spec.oracle.advertisedCandidates.find((entry) => unit.spec.oracle.allowedCandidateIds.includes(entry.candidateId))!;
+  let generations = 0;
+  let reviews = 0;
+  const generator = outputClient(() => ({ content: "", toolCalls: [{ id: `id-${++generations}`, type: "function", function: { name: candidate.toolName,
+    arguments: { candidateId: candidate.candidateId, digest: candidate.digest } } }] }));
+  const reviewer = client("fixture-reviewer", () => { reviews += 1; return reviews === 1
+    ? JSON.stringify({ ...JSON.parse(ACCEPT), verdict: "revise", rationale: "Change the selection, not transport metadata." }) : ACCEPT; });
+  const run = setup(t, { seed, units: 1, families: ["tool-selection"], generator, reviewer, maxRepairs: 2 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.attempts, 3);
+  assert.equal(reviews, 1);
+  assert.equal(report.admitted, 0);
+});
+
 test("read-only advertised tool includes the explicit empty required array demanded upstream", async (t) => {
   const seed = "calibration-2026-10-13-v3-5";
   const unit = planRun({ seed, units: 20 }).units.find((unit) => unit.spec.oracle.toolFamily === "read-tool")!;
@@ -235,6 +270,29 @@ test("read-only advertised tool includes the explicit empty required array deman
   const readUnit = run.plan.units.find((unit) => unit.spec.oracle.toolFamily === "read-tool")!;
   assert.ok(report.unitOutcomes.find((outcome) => outcome.unitId === readUnit.unitId)!.admittedRecord);
   assert.deepEqual(teacherRequest!.tools![0]!.function.parameters.required, []);
+});
+
+test("repair feedback retains the exact failed tool arguments and persistent submission contract", async (t) => {
+  let repaired: TeacherCompletionRequest | null = null;
+  const generator = outputClient((request) => {
+    if (request.attemptId.endsWith("-a1")) repaired = request;
+    return { content: "", toolCalls: [{ id: request.attemptId, type: "function", function: { name: "submit_adventure_narration",
+      arguments: { narration: "The attacker invented an unsupported consequence." } } }] };
+  });
+  const run = setup(t, { units: 1, families: ["grounded-narration"], generator, maxRepairs: 1 });
+  await runPipeline({ ...run.options, store: run.store });
+  assert.match(repaired!.system, /exactly one native submit_adventure_narration/);
+  assert.match(repaired!.messages.at(-1)!.content, /The attacker invented an unsupported consequence/);
+  assert.match(repaired!.messages.at(-1)!.content, /toolCalls/);
+});
+
+test("world prompts expose compatible exact catalog identities and all narrative roster exclusions", () => {
+  const unit = planRun({ seed: "catalog-contract", units: 1, families: ["world-generation"] }).units[0]!;
+  const identity = unit.spec.oracle.catalogReferences[0]!;
+  assert.equal(identity.kind, "enemy-template");
+  assert.equal(identity.referenceIdentity, catalogReferenceIdentity(identity));
+  assert.match(unit.realization.context[0]!.content, /empty participantNpcKeys, enemyReferences and monsterConceptKeys/);
+  assert.match(unit.realization.context[0]!.content, /does not require you to bind it/);
 });
 
 for (const response of ["Not mine to open. Not yours either. The stair stays sealed.", "I don’t know why it is sealed. It stays closed."])
@@ -377,6 +435,8 @@ test("public actor/target receipts support an on-request grounded happy path", a
     name: "submit_adventure_narration", arguments: { narration: publicReceiptNarration(request) } } }] }));
   const run = setup(t, { units: 1, families: ["grounded-narration"], generator });
   assert.equal((await runPipeline({ ...run.options, store: run.store })).admitted, 1);
+  assert.match(run.plan.units[0]!.realization.context[0]!.content, /exactly one native submit_adventure_narration function call/);
+  assert.match(run.plan.units[0]!.realization.context[0]!.content, /Leave assistant content empty/);
 });
 
 for (const correct of [false, true]) test(`tool selection independently checks intent for ${correct ? "correct" : "wrong but advertised"} candidates`, async (t) => {

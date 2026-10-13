@@ -8,6 +8,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { catalogReferenceIdentity } from "../src/worldGenerationTypes.js";
 import {
   AdapterError,
   adaptMessages,
@@ -221,6 +222,33 @@ test("validator versions are exported for provenance", () => {
 });
 
 // --- Family D ---
+
+test("compatible catalog references bind exact production identities and keep inert concepts valid", () => {
+  const reference = { kind: "enemy-template" as const, packId: "fixture-bestiary", packVersion: "1.2.0", definitionId: "hound" };
+  const identity = { ...reference, referenceIdentity: catalogReferenceIdentity(reference) };
+  assert.equal(identity.referenceIdentity, "enemy-template\u0000fixture-bestiary\u00001.2.0\u0000hound");
+  const monster = { key: "hound", name: "Hound", description: "A watchful hound.", visibility: "public", role: "watcher", tactics: [] };
+  const raw = { monsterConcepts: [{ ...monster, mechanics: { state: "catalog-bound", reference } }],
+    encounters: [{ key: "encounter", title: "A Hound at the Gate", description: "The hound waits at the gate.", visibility: "public",
+      enemyReferences: [reference], monsterConceptKeys: ["hound"], participantNpcKeys: [] }] };
+  const input = { raw, sections: ["monster-concepts", "encounters"], dependencies: new Map(), catalogReferences: [identity],
+    tolerateInvalidReferences: true, allowRepair: false };
+  const valid = validateWorldGeneration(input);
+  assert.equal(valid.ok, true, valid.problems.join("; "));
+  assert.equal(valid.rawFirstAttemptValid, true);
+  for (const field of ["packId", "packVersion", "definitionId"] as const) {
+    const mutated = structuredClone(raw);
+    mutated.monsterConcepts[0]!.mechanics.reference[field] += "-wrong";
+    const verdict = validateWorldGeneration({ ...input, raw: mutated });
+    assert.equal(verdict.rawFirstAttemptValid, false, `${field} cannot bind another catalog entry`);
+  }
+  const incompatible = { ...reference, kind: "monster" };
+  assert.equal(validateWorldGeneration({ ...input, catalogReferences: [{ ...incompatible, referenceIdentity: catalogReferenceIdentity(incompatible) }] }).rawFirstAttemptValid, false, "similarly named kinds are never coerced");
+  const mismatchedIdentity = validateWorldGeneration({ ...input, catalogReferences: [{ ...identity, referenceIdentity: "fixture-bestiary@1.2.0#hound" }] });
+  assert.equal(mismatchedIdentity.ok, false, "display identity cannot silently widen or replace the exact production identity");
+  const inert = validateWorldGeneration({ ...input, raw: { monsterConcepts: [{ ...monster, mechanics: { state: "inert", reason: "Narrative-only hound." } }] }, sections: ["monster-concepts"] });
+  assert.equal(inert.ok, true, inert.problems.join("; "));
+});
 
 test("the 14 requested sections map onto 16 output arrays", () => {
   assert.equal(WORLD_GENERATION_SECTIONS.length, 14);

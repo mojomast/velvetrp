@@ -22,3 +22,8 @@ export interface CatalogIdentity {
   /** Matches production's `referenceIdentity`, so sets compare correctly. */
   referenceIdentity: string;
 }
+
+/** Exact production identity; display labels and similarly named kinds are distinct. */
+export function catalogReferenceIdentity(value: Pick<CatalogIdentity, "kind" | "packId" | "packVersion" | "definitionId">): string {
+  return `${value.kind}\0${value.packId}\0${value.packVersion}\0${value.definitionId}`;
+}

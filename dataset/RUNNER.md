@@ -91,6 +91,19 @@ without asking the generator to rewrite valid content. Retry calls do not create
 independent reviewers; `reviewerCount` is pipeline-owned. All retry outcomes are
 globally reconciled before new work on resume.
 
+An unchanged repaired answer with an existing usable judgment is refused without
+another reviewer call. The judged-surface digest ignores only tool-call transport
+IDs; changing those cannot obtain a new verdict. Actual duplicate generator
+responses are still retained and charged. Malformed judgment JSON remains a
+separate bounded same-candidate contract retry. Tool-shaped repair feedback retains
+the full call names and arguments rather than an empty assistant-content field.
+
+World catalog identities use production's exact kind/pack/version/definition
+representation; supplied identity/field inconsistencies refuse. Narrative-only
+encounters use empty `participantNpcKeys`, `monsterConceptKeys` and
+`enemyReferences`, because any populated roster array triggers the production
+enemy-reference requirement. Inert concepts do not require catalog binding.
+
 The token ledger is rebuilt from durable attempts and measures final student
 labels under loss. Review/admission refusals charge once. The teacher's completion
 limit is a dispatch guard; actual student labels are checked before review and

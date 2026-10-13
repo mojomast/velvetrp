@@ -148,3 +148,27 @@ explicit schema field to
 `a43ede3743db919190b82107a346069f3a455187d57a7991443172d64dd2aa07`.
 Prior run requests and refusals remain immutable; all other preregistered inference,
 repair, review and measurement settings apply.
+
+## Version 5 scoped grounding and exact catalog contracts (before generation)
+
+Independent v4 review approved all eleven actual admissions, but no grounded
+target reached admission. Version 5 fixes sentence/record scope while retaining
+contradiction and unknown-extra checks; states persistent native narration
+transport; retains failed tool arguments in repair feedback; and stops unchanged
+answers from shopping another usable review verdict. World pins now supply exact
+compatible `enemy-template` definitions with production's kind/pack/version/id
+identity, and narrative encounter instructions exclude all three roster arrays.
+An inert concept remains permitted even if a compatible pin is available.
+
+Run `calibration-2026-10-13-v5`, same authored seed `calibration-2026-10-13-v3-5`,
+20 seeds/K=1, plan
+`ecd5135a00fa9eabdb55b313f9357944d8b0bafab5159ba3b83db8bdc3284c22`.
+Family/subtype/split counts and corrected Flash/K3 inference settings remain as
+specified for v4. This new producer revision changes public catalog and narration
+contracts; yields are not treated as a controlled treatment effect.
+
+Before expansion, freeze and grade the complete ordinary-RP census in fresh
+contexts, then independently inspect every actual admission and relevant refusals.
+Require sound actual grounded admissions and aligned world behavior, with no false
+certificate or unresolved transport/token accounting. All prior artifacts and
+historical yields remain immutable. No training occurs during calibration or pilot.

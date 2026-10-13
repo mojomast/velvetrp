@@ -34,6 +34,14 @@ Sealed content stays outside the repository.
 
 ## Generation status
 
+Live calibration is underway. The completed v2 campaign admitted 4/20 scenarios;
+all four passed independent functional inspection and exact export/CPU-label
+approval. The next small campaign measures corrected review, grounding, boundary
+and read-schema behavior before the 175-seed pilot. Actual yields, blinded prose
+coverage and immutable artifact pins are in
+[`CALIBRATION_RESULTS.md`](CALIBRATION_RESULTS.md); frozen campaign settings are
+in [`CALIBRATION_PROTOCOL.md`](CALIBRATION_PROTOCOL.md). No model training has run.
+
 ```bash
 npm run foundry -- generate --execute --units 175 --seed pilot-1
 ```

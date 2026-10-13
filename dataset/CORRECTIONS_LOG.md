@@ -453,3 +453,32 @@ object schema omitted `required`. The shared declaration now specifies
 plus its valid empty-object call. All captured prefix outcomes remain retained.
 The preregistered version-4 calibration uses fresh durable storage and the same
 scenario seed, with an updated schema-bound plan digest.
+
+## Version-4 independent findings and final contract alignment
+
+Version 4 completed with 11/20 admissions, 39 generation attempts/12 usable reviews,
+7,691 measured target tokens and zero unknown outcomes. Independent inspection
+approved 11/11 admissions, reviewed 39/39 outputs, and identified six transported
+faithful grounding false refusals. Actual yielded records contain 1,847 tokens.
+Its one ordinary-RP sample passed independently pinned style grading; no retention
+or preference-parity result is inferred.
+
+`grounding-binding-v4` preserves scoped period-delimited records and bounded natural
+sentences. Eleven of twelve prior grounded surfaces verify offline; the remaining
+record-count preamble stays explicit adjudication. New role/value/type mutations
+reject, and unsupported narration consequences remain adjudication. Generator
+prompts persistently specify native one-call submission and complete prose; repair
+feedback retains exact tool arguments. Unchanged candidates cannot obtain another
+usable review verdict (transport IDs are ignored only for this duplicate guard),
+closing the observed revise/accept disagreement on an identical RP repair.
+
+World pins now supply compatible exact enemy-template identities. The adapter
+rejects inconsistent identity encodings and preserves exact kind/pack/version/id
+comparison through production. Generator/reviewer prompts align all three narrative
+roster exclusions and permit inert concepts even when compatible pins are available.
+Related server campaign-generation-validation tests passed serially; focused
+foundry adapter/runner/generation checks and owning typecheck passed.
+Final checkpoint: **523/523 serial foundry tests passed, zero skips/failures**,
+including real CPU tokenization/export reload. Independent pre-v5 review reproduced
+ten targeted scope/replay/duplicate/catalog checks and approved the bounded
+20-seed/K=1 campaign. No patch-readiness blocker was found.

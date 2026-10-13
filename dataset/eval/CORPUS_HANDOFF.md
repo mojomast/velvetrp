@@ -11,7 +11,7 @@ VelvetRP's source to execute — but the grading notes reference real runtime co
 |---|---|
 | Corpus id | `velvet-baseline` |
 | Corpus version | `velvet-baseline-v1` |
-| **Corpus digest** | `3dccce3c1af34b41158903e89d8f80456b10512ae9ab8fef1847a58dc576ea56` |
+| **Corpus digest** | `22eb78976caa9ca91102f75576ea19eeb8cef8d594435275630542b7ddef8e58` |
 | Frozen at | see `dataset/eval/corpus/freeze.json` |
 | Files | 22 (11 categories × 2 partitions) |
 | Cases | 213 (106 dev, 107 sealed) |
@@ -21,7 +21,7 @@ checksum list. Re-freezing an unchanged corpus reproduces the same digest, so CI
 stability:
 
 ```bash
-npm exec -- tsx dataset/src/cli.ts corpus verify        # exits non-zero on drift
+npm run foundry -- verify        # verifies committed dev content and sealed metadata
 ```
 
 ## Layout
@@ -29,14 +29,22 @@ npm exec -- tsx dataset/src/cli.ts corpus verify        # exits non-zero on drif
 ```
 dataset/eval/corpus/
   freeze.json              # checksums, split counts, lineage per split  (COMMITTED)
-  dev/<category>.json      # 106 cases, lineages prefixed dev-*
-  sealed/<category>.json   # 107 cases, lineages prefixed sealed-*
+  dev-cases/<category>.json # 106 committed dev cases, lineages prefixed dev-*
+  sealed-attestation.json  # ids/counts-only external-sealed attestation
+
+/operator-held/sealed-cases/<category>.json # 107 external cases, never committed
 ```
 
-**`sealed/` is embargoed.** It exists to be run once, at the end, by the benchmarking agent.
-Nothing in the generation path may read it. `dataset/src/freeze.ts` exposes
-`readSealedCases()` behind an explicit audit acknowledgement, and
-`assertLineageDisjoint()` proves no lineage group spans partitions.
+**Sealed content is external and embargoed.** It is held by the evaluation custodian
+for the final benchmarking run. Generation and infrastructure/quality auditors
+consume only the pinned metadata and ids/counts-only attestation. The evaluation
+custodian can verify its own external copy with:
+
+```bash
+npm run foundry -- verify --sealed-source /operator-held/sealed-cases
+```
+
+No sealed content is needed for dev benchmarking or synthetic-data generation.
 
 The **dev** partition is the one that feeds back into dataset generation: measure which
 dimensions the stock models fail, then weight generation accordingly.
@@ -96,7 +104,7 @@ dimensions the stock models fail, then weight generation accordingly.
 
 | Grade path | Cases | Requires |
 |---|---:|---|
-| Deterministic: exact `toolName` + exact `arguments`, or asserted `no-tool` | **206** | nothing but a JSON comparison |
+| Deterministic contract grading | **206** | exact tool/arguments, schema, grounding and other case-owned predicates; see `GRADING.md` |
 | Substring anchors only (`mustInclude`/`mustNotInclude`/`forbiddenFacts`) | 7 | a substring matcher |
 | Requires an LLM judge for correctness | **0** | — |
 
@@ -133,7 +141,7 @@ is the expected and informative result:
 
 ## Ground rules for the benchmarking agent
 
-1. **Do not modify anything under `dataset/`.** Report drift via `corpus verify`.
+1. **Do not modify frozen case content or fingerprints.** Report drift via `npm run foundry -- verify`.
 2. **Run dev first.** Feed the failure report back to the dataset pipeline — it steers
    generation weights.
 3. **Run sealed once, last.** Report per-category first-attempt pass rate.

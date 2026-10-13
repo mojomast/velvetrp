@@ -83,7 +83,7 @@ import {
   type SelectionVerdict,
   type WorldGenerationVerdict,
 } from "./worldGeneration.js";
-import type { CanonicalDependency, CatalogIdentity } from "./worldGenerationTypes.js";
+import { catalogReferenceIdentity, type CanonicalDependency, type CatalogIdentity } from "./worldGenerationTypes.js";
 import {
   readGitCommit,
   recordContentDigest,
@@ -119,9 +119,9 @@ import { assertTeacherRightsFor, type VerifiedTeacherRights } from "./teacherRig
 // Versions, stages, weights
 // ---------------------------------------------------------------------------
 
-export const GENERATOR_VERSION = "generator-v5";
-export const REVIEW_PROMPT_VERSION = "reviewer-task-relative-v2";
-export const REPAIR_PROMPT_VERSION = "repair-prompt-v1";
+export const GENERATOR_VERSION = "generator-v7";
+export const REVIEW_PROMPT_VERSION = "reviewer-task-relative-v3";
+export const REPAIR_PROMPT_VERSION = "repair-prompt-v2";
 
 /**
  * The staging vocabulary reused verbatim from `worldGeneration.ts` repair diffs.
@@ -726,15 +726,13 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
       { key, kind: index % 2 === 0 ? "location" : "npc", visibility: "public" } as CanonicalDependency,
     ]),
   );
-  const catalogReferences: CatalogIdentity[] = [
-    {
-      kind: "monster",
+  const catalogDefinition = {
+      kind: "enemy-template",
       packId: `${guild.toLowerCase().replace(/\W+/g, "-")}-bestiary`,
       packVersion: "1.2.0",
       definitionId: `${slug(npc)}-hound`,
-      referenceIdentity: `${guild.toLowerCase().replace(/\W+/g, "-")}-bestiary@1.2.0#${slug(npc)}-hound`,
-    },
-  ];
+  };
+  const catalogReferences: CatalogIdentity[] = [{ ...catalogDefinition, referenceIdentity: catalogReferenceIdentity(catalogDefinition) }];
   const desiredCounts: Record<string, number> = Object.fromEntries(sections.flatMap((section) => [...fieldsForSections([section])]
     .filter((field) => field !== "connections").map((field) => [field, 1])));
 
@@ -853,8 +851,9 @@ function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>
   if (spec.family === "world-generation") system.push(`PUBLIC WORLD CONTRACT\n${stableStringify({ sections: spec.oracle.sections,
     dependencies: [...spec.oracle.dependencies.values()], catalogReferences: spec.oracle.catalogReferences, desiredCounts: spec.oracle.desiredCounts })}`);
   if (spec.family === "world-generation") system.push(`OUTPUT JSON SCHEMA\n${stableStringify(worldGenerationSchema(spec.oracle.sections, { ...spec.oracle.desiredCounts }))}\nReturn sparse additive JSON. Produce every requested minimum count. New entity keys must not reuse dependency keys. Follow declared dependency kinds, visibility and pinned catalog references. Every count-targeted NPC needs a locationKey linking a supplied or newly generated location. Every count-targeted quest needs at least one actionable objective. Narrative-only encounters use empty roster-reference arrays. Mechanics are inert unless an exact compatible catalog reference is supplied; never invent a ruleset, pack version or definition.`);
-  if (spec.family === "world-generation") system.push("Produce exactly the requested minimum counts and concise bounded strings. Return JSON only, without fences or commentary. Narrative-only encounters use empty enemyReferences and monsterConceptKeys arrays; do not invent a roster reference. Optional linked references must use supplied dependency keys or your newly declared keys, not human-readable place names.");
+  if (spec.family === "world-generation") system.push("Produce exactly the requested minimum counts and concise bounded strings. Return JSON only, without fences or commentary. Narrative-only encounters use empty participantNpcKeys, enemyReferences and monsterConceptKeys arrays: every nonempty roster-reference array triggers the production combat-ready rule requiring an exact enemy-template reference. Fictional NPCs may appear in the scene description without being executable roster participants. Do not invent a roster reference. Optional linked references must use supplied dependency keys or your newly declared keys, not human-readable place names. Catalog-bound mechanics must match all four supplied kind, packId, packVersion and definitionId fields exactly. Inert concepts are permitted; the presence of a compatible catalog entry does not require you to bind it.");
   if (spec.family === "boundary-recovery") system.push(`PUBLIC AUTHORITY AND KNOWLEDGE CONTRACT\nAsking ${slots.npc} about the sealed stair is permitted. Opening or granting access to it is not. ${slots.npc} does not know why it is sealed. Answer the permitted question in character with appropriate uncertainty; do not refuse the whole interaction or invent a cause, office, procedure, keyholder, clearance or permission. Leave the stair closed and the player's next choice open.`);
+  if (spec.family === "grounded-narration" || (spec.family === "tool-selection" && spec.oracle.toolFamily === "narration-submit")) system.push("NARRATION SUBMISSION CONTRACT\nReturn exactly one native submit_adventure_narration function call with exactly one argument, narration: a nonempty string. Leave assistant content empty; no second call or extra prose outside the argument. Put the entire answer in that narration string. Use concise complete sentences in the requested voice, not copied receipt JSON, field lists, markdown headings or citation metadata. Bind each stated action to its actual actor, target, check skill and numerical roles; preserve the receipt's literal outcome and explicit status. Cover every requested public receipt without adding a cause, gesture, consequence or settlement not established by those receipts.");
   const messages: StoredMessage[] = [{ role: "system", content: system.join(" ") }];
   switch (spec.family) {
     case "grounded-narration":
@@ -1086,7 +1085,7 @@ interface StageAccumulator {
 export function parsedText(parsed: ParsedOutput | null): string {
   if (!parsed) return "";
   if (parsed.kind === "text") return parsed.text;
-  if (parsed.kind === "tools") return parsed.content;
+  if (parsed.kind === "tools") return stableStringify({ content: parsed.content, toolCalls: parsed.toolCalls });
   return stableStringify(parsed.value);
 }
 
@@ -2282,7 +2281,7 @@ export function reviewPromptFor(spec: ScenarioSpec, messages: readonly StoredMes
       receipts: spec.oracle.receipts, decisionRequest: spec.oracle.decisionRequest, allowedCandidateIds: spec.oracle.allowedCandidateIds })}`,
     "Reject semantic paraphrases of hidden facts, unsupported outcomes and unauthorized player decisions, not just verbatim disclosures. Judge requested public receipt coverage separately from prose style. A lack of lexical matches does not prove privacy or grounding.",
     "Score each field as a task-relative probability in [0,1]. characterization means consistency of the scene/entities/role; dialogueQuality means clear appropriate expression for the requested surface; coherence means faithful task/world continuity; narrativeInitiative means appropriate bounded progress on the requested task; playerAgency means preserving the player's choices; nonRepetitive means avoiding needless repetition.",
-    "For an exact tool-selection task, correct selection IS requested progress: judge precise arguments and intent, and do not demand dialogue or invent a narrative after the call. For world JSON judge actionable, coherent additive entities and schema-relative expression. For boundary recovery, the permitted conversation must occur while the barrier stays closed and the NPC respects its knowledge limit; refusing all interaction is not correct recovery. Roleplay and narration require appropriate prose, with style evaluated separately from factual fidelity.",
+    "For an exact tool-selection task, correct selection IS requested progress: judge precise arguments and intent, and do not demand dialogue or invent a narrative after the call. For world JSON judge actionable, coherent additive entities and schema-relative expression. Inert narrative mechanics are valid even if compatible catalog definitions are present; never require catalog binding merely because names resemble a pin. A binding is compatible only if its exact kind/packId/packVersion/definitionId matches the supplied pin. Any nonempty encounter roster-reference array requires an exact enemy-template reference under the production contract. For boundary recovery, the permitted conversation must occur while the barrier stays closed and the NPC respects its knowledge limit; refusing all interaction is not correct recovery. Roleplay and narration require appropriate prose, with style evaluated separately from factual fidelity.",
     "Return exactly one JSON object conforming to the schema below. Verdict must be exactly one of accept, accept-with-notes, revise, reject (lowercase). Never use pass/fail/PASS/ACCEPT. reviewerCount is pipeline-owned: do not emit it or claim additional reviewers. A revise/reject needs a concrete target issue, not the lack of prose where only a tool decision was requested.",
     `OUTPUT JSON SCHEMA\n${stableStringify({ type: "object", additionalProperties: false,
       required: [...REVIEW_SCORE_KEYS, "verdict", "rationale"], properties: {
@@ -2949,6 +2948,27 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       // Independent review by a DIFFERENT model.
       const baseReviewPrompt = reviewPromptFor(unit.spec, validated.messages)
         + (unit.preference ? `\nPreference (judge source-sensitive chosen/rejected ordering as well):\n${stableStringify(unit.preference)}` : "");
+      const reviewCandidateDigest = computePayloadDigest({ messages: validated.messages, ...(tools ? { tools } : {}), ...(unit.preference ? { preference: unit.preference } : {}) });
+      const reviewSurfaceDigest = sha256Hex(stableStringify({
+        messages: validated.messages.map((message) => ({ ...message, ...(message.tool_calls ? { tool_calls: message.tool_calls.map(({ id: _transportId, ...call }) => call) } : {}) })),
+        tools: tools ?? null, preference: unit.preference ?? null,
+      }));
+      // A generator repair must change the judged answer. An identical candidate
+      // already has a usable verdict; another call would select reviewer noise.
+      let priorUsableReview: { attemptId: string; contract: { attempts: string[]; candidateDigest: string; reviewSurfaceDigest: string; reviewerPromptDigest: string; usable: boolean } } | null = null;
+      for (let earlier = 0; earlier < attemptOrdinal; earlier += 1) {
+        const earlierId = `${unit.unitId}-a${earlier}`;
+        const contract = journal!.read<{ attempts: string[]; candidateDigest: string; reviewSurfaceDigest: string; reviewerPromptDigest: string; usable: boolean }>(`review-contract:${earlierId}`);
+        if (contract?.usable && contract.reviewSurfaceDigest === reviewSurfaceDigest) { priorUsableReview = { attemptId: earlierId, contract }; break; }
+      }
+      if (priorUsableReview) {
+        const priorResponse = journal!.read<TeacherCompletion>(`response:${priorUsableReview.contract.attempts.at(-1)!}`);
+        if (!priorResponse || !isReviewScores(parseReviewScores(priorResponse.content))) throw new Error("usable prior review checkpoint lacks its exact usable response");
+        const refused = stageFailure("VALIDATED", "unchanged-reviewed-candidate", "the repair returned an identical candidate with an existing usable judgment; change the answer to address that judgment before requesting review again", { raw: stages.raw, parsed: stages.parsed });
+        commitRefused(refused, { priorReviewedAttemptId: priorUsableReview.attemptId, priorReviewContract: priorUsableReview.contract, priorReviewRaw: priorResponse.content });
+        refusedAt = "VALIDATED:unchanged-reviewed-candidate";
+        continue;
+      }
       let reviewPrompt = baseReviewPrompt;
       let reviewCompletion: TeacherCompletion | null = null;
       let scores: ReturnType<typeof parseReviewScores> = { problems: ["review not yet captured"] };
@@ -2967,7 +2987,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         if (retry < maxReviewContractRetries) reviewPrompt = baseReviewPrompt + `\nREVIEW OUTPUT-CONTRACT REPAIR ONLY: the candidate is unchanged. Your last raw JSON was invalid: ${stableStringify(reviewCompletion.content)}. Problems: ${stableStringify(scores.problems)}. Return a new schema-conforming judgment of the SAME candidate. Do not rewrite the candidate or reinterpret the previous verdict.`;
       }
       journal!.save(`review-contract:${attemptId}`, { attempts: contractAttempts, usable: isReviewScores(scores),
-        reviewerPromptDigest: sha256Hex(reviewPrompt), candidateDigest: computePayloadDigest({ messages: validated.messages, ...(tools ? { tools } : {}), ...(unit.preference ? { preference: unit.preference } : {}) }) });
+        reviewerPromptDigest: sha256Hex(reviewPrompt), candidateDigest: reviewCandidateDigest, reviewSurfaceDigest });
       const provenance = candidateProvenance({
         spec: unit.spec, generator: options.generator, reviewer: options.reviewer, temperature, gitCommit,
         runs: validated.runs.map((item) => ({ validator: item.validator, version: item.version })),

@@ -36,10 +36,10 @@ import {
   requestedCampaignContentProviderSchema,
   sanitizeGeneratedCampaignContent,
 } from "../../server/src/routes/rpg/v1/campaignContentGeneration.js";
-import type { CanonicalDependency, CatalogIdentity } from "./worldGenerationTypes.js";
+import { catalogReferenceIdentity, type CanonicalDependency, type CatalogIdentity } from "./worldGenerationTypes.js";
 
 export const FAMILY_C_VALIDATOR_VERSION = "family-c-advertised-binding-v2";
-export const FAMILY_D_VALIDATOR_VERSION = "family-d-section-chain-v2";
+export const FAMILY_D_VALIDATOR_VERSION = "family-d-section-chain-v3";
 
 export class FamilyValidationError extends Error {
   readonly problems: readonly string[];
@@ -418,7 +418,11 @@ export function validateWorldGeneration(input: {
     const dependencyKinds = new Map<string, string>();
     for (const [key, value] of input.dependencies) dependencyKinds.set(key, value.kind);
     const visibility = new Map([...input.dependencies].map(([key, value]) => [key, value.visibility] as const));
-    const catalogReferences = new Set(input.catalogReferences.map((identity) => identity.referenceIdentity));
+    const catalogReferences = new Set(input.catalogReferences.map((identity) => {
+      const exact = catalogReferenceIdentity(identity);
+      if (identity.referenceIdentity !== exact) throw new FamilyValidationError(["catalog reference identity does not match its exact kind/pack/version/definition fields"]);
+      return exact;
+    }));
 
     // Production sanitizes ONLY when the caller opts into tolerating invalid
     // references, and it happens BEFORE validation. Mirroring that order matters:
