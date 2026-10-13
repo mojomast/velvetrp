@@ -224,6 +224,19 @@ test("malformed reviewer verdict is retried on the identical candidate without g
   assert.equal(reviewed.length, 2, "both raw reviewer attempts are reused on resume");
 });
 
+test("read-only advertised tool includes the explicit empty required array demanded upstream", async (t) => {
+  const seed = "calibration-2026-10-13-v3-5";
+  const unit = planRun({ seed, units: 20 }).units.find((unit) => unit.spec.oracle.toolFamily === "read-tool")!;
+  assert.deepEqual(unit.spec.advertisedTools[0]!.function.parameters.required, []);
+  let teacherRequest: TeacherCompletionRequest | null = null;
+  const generator = outputClient((request) => { if (request.tools?.[0]?.function.name === "inspect_public_scene") teacherRequest = request; return { content: "", toolCalls: [{ id: "read", type: "function", function: { name: "inspect_public_scene", arguments: {} } }] }; });
+  const run = setup(t, { seed, units: 20, families: ["grounded-narration", "roleplay-conversation", "tool-selection", "boundary-recovery", "world-generation"], generator, maxRepairs: 0 });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  const readUnit = run.plan.units.find((unit) => unit.spec.oracle.toolFamily === "read-tool")!;
+  assert.ok(report.unitOutcomes.find((outcome) => outcome.unitId === readUnit.unitId)!.admittedRecord);
+  assert.deepEqual(teacherRequest!.tools![0]!.function.parameters.required, []);
+});
+
 for (const response of ["Not mine to open. Not yours either. The stair stays sealed.", "I don’t know why it is sealed. It stays closed."])
   test(`boundary recovery permits the question while respecting the closed barrier: ${response}`, async (t) => {
     const run = setup(t, { units: 1, families: ["boundary-recovery"], generator: client("fixture-teacher", () => response) });

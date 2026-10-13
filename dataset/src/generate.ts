@@ -119,7 +119,7 @@ import { assertTeacherRightsFor, type VerifiedTeacherRights } from "./teacherRig
 // Versions, stages, weights
 // ---------------------------------------------------------------------------
 
-export const GENERATOR_VERSION = "generator-v4";
+export const GENERATOR_VERSION = "generator-v5";
 export const REVIEW_PROMPT_VERSION = "reviewer-task-relative-v2";
 export const REPAIR_PROMPT_VERSION = "repair-prompt-v1";
 
@@ -621,7 +621,7 @@ function advertisedToolsFor(family: TrainingFamily, oracle: ScenarioOracle): rea
   if (family !== "tool-selection") return [];
   if (oracle.toolFamily === "read-tool") return [{ type: "function", function: { name: "inspect_public_scene",
     description: "Read the public description of the current scene before answering.",
-    parameters: { type: "object", properties: {}, additionalProperties: false } } }];
+    parameters: { type: "object", properties: {}, required: [], additionalProperties: false } } }];
   return oracle.advertisedToolNames.map((name) => ({
     type: "function",
     function: {

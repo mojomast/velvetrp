@@ -446,3 +446,10 @@ The final independent pre-v3 review approved the bounded 20-seed/K=1 campaign,
 reproducing first-usable-rejection stopping and raw/uncertain review-retry recovery
 before new work. No concrete false-admission, review-binding or accounting blocker
 was found. This approves measurement readiness, not the future pilot yield.
+
+Version 3 encountered an explicit upstream read-tool schema refusal: its empty
+object schema omitted `required`. The shared declaration now specifies
+`required: []`; a regression covers the advertised and dispatched read schema
+plus its valid empty-object call. All captured prefix outcomes remain retained.
+The preregistered version-4 calibration uses fresh durable storage and the same
+scenario seed, with an updated schema-bound plan digest.

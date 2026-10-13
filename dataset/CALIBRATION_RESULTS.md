@@ -97,3 +97,34 @@ Full independent report: `/tmp/opencode/foundry-calibration-v2-independent-revie
 source-bound machine verdicts: `/tmp/opencode/foundry-calibration-v2-independent-review.json`
 in the implementation environment. Historical yields and reviews remain immutable;
 no corrected yield is estimated from these fixes.
+
+## Version 2 independently approved export
+
+All four exact train records received independent certificate/source/implementation
+approval and were exported to
+`.dataset/exports/calibration-2026-10-13-v2-approved/`. Real CPU preprocessing
+materialized all four rows. Independent byte inspection reconstructed and matched
+**3,014 input IDs**, **806 supervised labels**, and **2,208 masked labels**, including
+selected tool/prose terminators and masked prompts/history/thinking scaffolds.
+
+Consumer `checksumDigest` (exact published `checksums.json` bytes):
+`e6713e87fc54c213d1dde7a45bc98513b62310ff671ddc8e9368e2ff90f0e262`.
+Certificate approval file SHA-256:
+`d7797dcc5711d814c1a4c701113ce3d3e004abfe5045791ab8b4080449edfc2a`.
+Independent bundle-byte approval SHA-256:
+`09c140a94205b0705845d5e90f1039203e31bcc2a5c6f4a4f2b8c8ad5eab3571`.
+These approvals cover the four exported rows and preprocessing, not model training.
+
+## Version 3 interrupted read-tool coverage
+
+At source `bde4ede`, eight of 20 scenarios completed before the first read-tool
+schema was refused upstream. Captured generation responses: **15**; captured
+reviews: **7**, all using the specified verdict enum. Durable admissions before
+the stop: **6** (three exact-tool, two boundary, one RP). These are prefix counts,
+not completed-campaign or independently approved quality rates. The remaining
+read schema failure was explicit HTTP 400, with retained raw outcome and no
+logical completion. A complete planned/actual ordinary-RP inventory is frozen
+under `.dataset/measurements/calibration-2026-10-13-v3/`.
+
+The correction explicitly adds `required: []` for read tools. A fresh version-4
+campaign preserves the same scenario identities and the interrupted run's artifacts.

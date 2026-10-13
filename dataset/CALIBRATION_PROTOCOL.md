@@ -130,3 +130,21 @@ Require actual independently sound grounded and boundary admissions plus accepta
 observed review/schema/fidelity/style outcomes before the 175-seed pilot. Do not
 estimate a corrected yield by relabeling version-2 refused outputs. The latter
 remain source-bound historical evidence in `CALIBRATION_RESULTS.md`.
+
+## Version 4 explicit read-schema correction (before generation)
+
+Version 3 stopped at its first read-tool request with HTTP 400: the relay rejected
+the absent `required` array. Eight scenarios had completed (15 returned generation
+attempts and seven reviews); six records were durably admitted. One additional
+generation dispatch received the explicit schema rejection. No complete campaign
+yield or expansion decision is inferred from this interrupted prefix.
+
+Read tools now explicitly declare `required: []`, matching the exact empty-object
+argument contract already enforced locally. Focused runner/teacher/CLI/generation
+validation and the owning typecheck cover the correction. Version 4 uses a fresh
+run `calibration-2026-10-13-v4` and the same scenario seed
+`calibration-2026-10-13-v3-5`, 20 seeds/K=1. The plan digest changes only with its
+explicit schema field to
+`a43ede3743db919190b82107a346069f3a455187d57a7991443172d64dd2aa07`.
+Prior run requests and refusals remain immutable; all other preregistered inference,
+repair, review and measurement settings apply.
