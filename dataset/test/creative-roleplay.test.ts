@@ -532,8 +532,11 @@ test("malformed transcripts are rejected rather than repaired", () => {
     { name: "text not a string", raw: withTurns((turns) => [{ speaker: "player", text: 7 }, ...turns.slice(1)]), code: "transcript-text-not-string" },
     { name: "empty character turn", raw: withTurns((turns) => { turns[1]!.text = "   "; return { turns }; }), code: "transcript-empty-character-turn" },
     { name: "empty player turn", raw: withTurns((turns) => { turns[0]!.text = ""; return { turns }; }), code: "transcript-empty-player-turn" },
-    { name: "too few turns", raw: withTurns((turns) => ({ turns: turns.slice(0, turns.length - 2) })), code: "transcript-turn-count-mismatch" },
-    { name: "too many turns", raw: withTurns((turns) => ({ turns: [...turns, ...turns.slice(0, 2)] })), code: "transcript-turn-count-mismatch" },
+    // The supported range is the module's own MIN/MAX exchanges, not the plan's
+    // requested depth: a transcript of a different but valid length is accepted.
+    // These cases must therefore be genuinely OUTSIDE that range.
+    { name: "too few turns", raw: withTurns((turns) => ({ turns: turns.slice(0, MIN_EXCHANGE_DEPTH * 2 - 2) })), code: "transcript-turn-count-mismatch" },
+    { name: "too many turns", raw: withTurns((turns) => ({ turns: [...turns, ...turns, ...turns] })), code: "transcript-turn-count-mismatch" },
     { name: "character speaks first", raw: withTurns((turns) => {
       const first = turns[0]!;
       turns[0] = { speaker: "character", text: turns[1]!.text };

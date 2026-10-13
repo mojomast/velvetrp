@@ -182,8 +182,13 @@ truth for the teacher prompt and the parser:
 
 - Top-level keys: exactly `["turns"]`. Turn keys: exactly `["speaker","text"]`.
 - The scene is strictly alternating, **player first and character last**.
-- `minItems` is `2 * MIN_EXCHANGE_DEPTH`; the parser additionally requires
-  exactly `2 * plan.depth` turns.
+- `minItems` is `2 * MIN_EXCHANGE_DEPTH`. The parser requires an **even** turn
+  count within `[2 * MIN_EXCHANGE_DEPTH, 2 * MAX_EXCHANGE_DEPTH]`.
+  *Corrected:* the plan's `depth` is a REQUEST to the teacher, not an exact
+  contract. A live calibration showed the teacher routinely producing a valid
+  conversation of a different length; demanding exact equality with the requested
+  depth refused usable examples. Structural validity — even count, alternation,
+  player-first, character-last — is still enforced.
 
 `checkCreativeTranscript(raw, plan) -> CreativeRefusal[]` performs pure
 structural and register validation (an empty array means ACCEPTED).

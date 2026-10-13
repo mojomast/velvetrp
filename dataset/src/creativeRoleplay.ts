@@ -1723,9 +1723,16 @@ export function checkCreativeTranscript(raw: string, plan: CreativePlan): Creati
   if (!("turns" in value)) return [...refusals, refuse("transcript-missing-turns", null, raw)];
   if (!Array.isArray(value.turns)) return [...refusals, refuse("transcript-turns-not-array", null, raw)];
   const rawTurns = value.turns as unknown[];
-  const expectedTurns = plan.depth * 2;
-  if (rawTurns.length !== expectedTurns) {
-    refusals.push(refuse("transcript-turn-count-mismatch", null, `${rawTurns.length} turns for depth ${plan.depth}`));
+  // The plan REQUESTS a depth; the teacher answers. A transcript of a different
+  // but structurally valid length is still a usable multi-turn example, so the
+  // requirement is the supported range rather than exact equality with the
+  // requested depth. Alternation, player-first and character-last are still
+  // enforced below, and the depth range is the module's own MIN/MAX.
+  const minTurns = MIN_EXCHANGE_DEPTH * 2;
+  const maxTurns = MAX_EXCHANGE_DEPTH * 2;
+  if (rawTurns.length < minTurns || rawTurns.length > maxTurns || rawTurns.length % 2 !== 0) {
+    refusals.push(refuse("transcript-turn-count-mismatch", null,
+      `${rawTurns.length} turns is outside the supported ${minTurns}-${maxTurns} even range for depth ${plan.depth}`));
   }
   rawTurns.forEach((entry, index) => {
     if (!isRecord(entry)) {
@@ -1988,7 +1995,13 @@ export function buildCreativeTrainingExample(
   const problems = validateCreativePlan(plan);
   if (problems.length > 0) throw new CreativeConfigError(`cannot build an example from an invalid plan: ${problems.join("; ")}`);
   if (transcript.planId !== plan.planId) throw new CreativeConfigError("transcript does not belong to this plan");
-  if (transcript.turns.length !== plan.depth * 2) throw new CreativeConfigError("transcript length does not match the plan depth");
+  // The plan requests a depth; the transcript is the teacher's answer and may be
+  // any structurally valid length within the supported range. See the matching
+  // range check in checkCreativeTranscript.
+  if (transcript.turns.length < MIN_EXCHANGE_DEPTH * 2 || transcript.turns.length > MAX_EXCHANGE_DEPTH * 2
+    || transcript.turns.length % 2 !== 0) {
+    throw new CreativeConfigError("transcript length is outside the supported exchange range");
+  }
   const mode = options.targetMode ?? DEFAULT_CREATIVE_TARGET_MODE;
   const messages: StoredMessage[] = [{ role: "system", content: options.systemPrompt ?? creativeSystemPrompt(plan) }];
   const characterMessageIndices: number[] = [];
