@@ -60,9 +60,10 @@ import {
   type SupervisedExample,
   type TokenizerPort,
 } from "../src/generate.js";
-import { openRunStore, type RunStore } from "../src/runstore.js";
+import { openRunStore, readGitCommit, type RunStore } from "../src/runstore.js";
+import { loadGenerationPolicy } from "../src/generationPolicy.js";
 import { stableStringify, FOUNDRY_VERSION, RECORD_SCHEMA_VERSION, type CandidateRecord, type StoredMessage } from "../src/spec.js";
-import { createTeacherClient, type ResolvedTeacherCredentials, type TeacherHttpRequest, type TeacherHttpResponse, type TeacherTransport } from "../src/teacher.js";
+import { createTeacherClient, type TeacherClient, type ResolvedTeacherCredentials, type TeacherHttpRequest, type TeacherHttpResponse, type TeacherTransport } from "../src/teacher.js";
 
 // ---------------------------------------------------------------------------
 // Test doubles. None of these touch a network.
@@ -217,19 +218,23 @@ after(() => {
   for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-function openStore(runId: string): RunStore {
+function openStore(runId: string, planOptions?: { seed: string; units: number; families: readonly ScenarioSpec["family"][];
+  generator: TeacherClient; temperature?: number }): RunStore {
   const root = mkdtempSync(join(tmpdir(), "velvet-gen-"));
   roots.push(root);
+  const plan = planOptions ? planRun(planOptions) : null;
   const store = openRunStore({
     runId,
-    seed: "test-seed",
+    seed: planOptions?.seed ?? "test-seed",
     sourceDigest: "a".repeat(64),
-    splitAssignmentDigest: "b".repeat(64),
-    corpusFreezeDigest: "c".repeat(64),
+    splitAssignmentDigest: plan?.splitAssignmentDigest ?? "b".repeat(64),
+    corpusFreezeDigest: loadGenerationPolicy().corpusDigest,
     artifactRoot: root,
     durability: "flush",
-    gitCommit: null,
-    totalUnits: 8,
+    gitCommit: planOptions ? readGitCommit() : null,
+    totalUnits: plan?.units.length ?? 8,
+    ...(planOptions ? { generator: { provider: planOptions.generator.identity.provider, model: planOptions.generator.model,
+      baseUrlDigest: planOptions.generator.baseUrlDigest, temperature: planOptions.temperature ?? 0.7 } } : {}),
   });
   stores.push(store);
   return store;
@@ -557,7 +562,7 @@ describe("4. nothing is admitted without a real admitCandidate certificate", () 
     const relay = fakeRelay(() => ({ content: "Haug will not say more." }));
     const generator = createTeacherClient({ credentials: credentials("teacher-x"), transport: relay.transport, sleep: async () => {} });
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-y"), transport: relay.transport, sleep: async () => {} });
-    const store = openStore("never-admitted");
+    const store = openStore("never-admitted", { seed: "boundary-seed", units: 4, families: ["boundary-recovery"], generator });
     await runPipeline({
       runId: "never-admitted", seed: "boundary-seed", execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, units: 4, store,
@@ -612,7 +617,7 @@ describe("4f. a clean run reaches admission with a verifiable certificate", () =
     const relay = fakeRelay((call) => (isReviewCall(call) ? { content: REVIEW_ACCEPT } : { content: answer }));
     const generator = createTeacherClient({ credentials: credentials("teacher-alpha"), transport: relay.transport, sleep: async () => {} });
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-beta"), transport: relay.transport, sleep: async () => {} });
-    const store = openStore("happy-roleplay");
+    const store = openStore("happy-roleplay", { seed: "happy-seed", units: 4, families: ["roleplay-conversation"], generator, temperature: 0.37 });
     const report = await runPipeline({
       runId: "happy-roleplay", seed: "happy-seed", execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, store,
@@ -675,7 +680,7 @@ describe("4f. a clean run reaches admission with a verifiable certificate", () =
       }));
     const generator = createTeacherClient({ credentials: credentials("teacher-alpha"), transport: relay.transport, sleep: async () => {} });
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-beta"), transport: relay.transport, sleep: async () => {} });
-    const store = openStore("happy-grounded");
+    const store = openStore("happy-grounded", { seed: "grounded-seed", units: 1, families: ["grounded-narration"], generator });
     const report = await runPipeline({
       runId: "happy-grounded", seed: "grounded-seed", execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, store,
@@ -717,7 +722,7 @@ describe("4f. a clean run reaches admission with a verifiable certificate", () =
       }));
     const generator = createTeacherClient({ credentials: credentials("teacher-alpha"), transport: relay.transport, sleep: async () => {} });
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-beta"), transport: relay.transport, sleep: async () => {} });
-    const store = openStore("grounded-neg");
+    const store = openStore("grounded-neg", { seed: "grounded-neg-seed", units: 1, families: ["grounded-narration"], generator });
     const report = await runPipeline({
       runId: "grounded-neg", seed: "grounded-neg-seed", execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, store,
@@ -761,7 +766,7 @@ describe("5. a repair is a new attempt that supersedes its parent", () => {
       },
       sleep: async () => {},
     });
-    const store = openStore("repair-run");
+    const store = openStore("repair-run", { seed: "repair-seed", units: 1, families: ["world-generation"], generator });
     const spec = plannedSpec("repair-seed", "world-generation", 1);
     const report = await runPipeline({
       runId: "repair-run", seed: "repair-seed", execute: true,
@@ -801,7 +806,7 @@ describe("5. a repair is a new attempt that supersedes its parent", () => {
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-y"), transport: relay.transport, sleep: async () => {} });
     await runPipeline({
       runId: "repair-prompt", seed: "repair-prompt-seed", execute: true,
-      tokenizer: WORD_TOKENIZER, generator, reviewer, store: openStore("repair-prompt"),
+      tokenizer: WORD_TOKENIZER, generator, reviewer, store: openStore("repair-prompt", { seed: "repair-prompt-seed", units: 1, families: ["world-generation"], generator }),
       units: 1, families: ["world-generation"], maxRepairs: 1,
     });
     assert.equal(prompts.length, 2, "the second dispatch should be the repair");
@@ -814,7 +819,7 @@ describe("5. a repair is a new attempt that supersedes its parent", () => {
     const relay = fakeRelay(() => ({ content: "never json" }));
     const generator = createTeacherClient({ credentials: credentials("teacher-x"), transport: relay.transport, sleep: async () => {} });
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-y"), transport: relay.transport, sleep: async () => {} });
-    const store = openStore("bounded-repair");
+    const store = openStore("bounded-repair", { seed: "bounded-seed", units: 1, families: ["world-generation"], generator });
     const report = await runPipeline({
       runId: "bounded-repair", seed: "bounded-seed", execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, store,
@@ -888,7 +893,7 @@ describe("6. the reviewer is a different model, and that is asserted", () => {
     const generator = createTeacherClient({ credentials: credentials("teacher-alpha"), transport: generatorRelay.transport, sleep: async () => {} });
     const reviewerRelay = fakeRelay(() => ({ content: REVIEW_REJECT }));
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-beta"), transport: reviewerRelay.transport, sleep: async () => {} });
-    const store = openStore("reviewer-rejects");
+    const store = openStore("reviewer-rejects", { seed: "reject-seed", units: 1, families: ["roleplay-conversation"], generator });
     const report = await runPipeline({
       runId: "reviewer-rejects", seed: "reject-seed", execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, store,
@@ -937,7 +942,6 @@ describe("7. tool-selection separates initiation from argument binding", () => {
     });
     const generator = createTeacherClient({ credentials: credentials("teacher-alpha"), transport: relay.transport, sleep: async () => {} });
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-beta"), transport: relay.transport, sleep: async () => {} });
-    const store = openStore("initiation-failure");
     // Find a tool-selection spec whose oracle requires a call.
     let seed = "init-seed";
     let spec = plannedSpec(seed, "tool-selection", 200);
@@ -948,6 +952,7 @@ describe("7. tool-selection separates initiation from argument binding", () => {
       guard += 1;
     }
     assert.ok(spec.oracle.expectsToolCall, "no tool-call tool-selection scenario was found");
+    const store = openStore("initiation-failure", { seed, units: 1, families: ["tool-selection"], generator });
 
     const report = await runPipeline({
       runId: "initiation-failure", seed, execute: true,
@@ -973,7 +978,6 @@ describe("7. tool-selection separates initiation from argument binding", () => {
     });
     const generator = createTeacherClient({ credentials: credentials("teacher-alpha"), transport: relay.transport, sleep: async () => {} });
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-beta"), transport: relay.transport, sleep: async () => {} });
-    const store = openStore("empty-args");
     let seed = "binding-seed";
     let spec = plannedSpec(seed, "tool-selection", 200);
     let guard = 0;
@@ -984,6 +988,7 @@ describe("7. tool-selection separates initiation from argument binding", () => {
     }
     assert.equal(spec.oracle.toolFamily, "exact-candidate");
     assert.equal(spec.oracle.expectsToolCall, true);
+    const store = openStore("empty-args", { seed, units: 1, families: ["tool-selection"], generator });
 
     const report = await runPipeline({
       runId: "empty-args", seed, execute: true,
@@ -1022,7 +1027,7 @@ describe("7. tool-selection separates initiation from argument binding", () => {
       spec = plannedSpec(seed, "tool-selection", 200);
       guard += 1;
     }
-    const store = openStore("unadvertised");
+    const store = openStore("unadvertised", { seed, units: 1, families: ["tool-selection"], generator });
     const report = await runPipeline({
       runId: "unadvertised", seed, execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, store,
@@ -1187,7 +1192,7 @@ describe("9. the pipeline produces no credential-shaped artifact", () => {
     const relay = fakeRelay(() => ({ content: "Haug will not say more." }));
     const generator = createTeacherClient({ credentials: credentials("teacher-alpha"), transport: relay.transport, sleep: async () => {} });
     const reviewer = createTeacherClient({ credentials: credentials("reviewer-beta"), transport: relay.transport, sleep: async () => {} });
-    const store = openStore("credential-exec");
+    const store = openStore("credential-exec", { seed: "cred-exec", units: 2, families: ["boundary-recovery"], generator });
     const report = await runPipeline({
       runId: "credential-exec", seed: "cred-exec", execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, store,

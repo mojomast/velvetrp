@@ -231,6 +231,55 @@ message now states that requirement accurately and points to the provider-free
 
 ---
 
+## Runner integration and durable generation
+
+The runner now binds its generated plan and splits to verified frozen metadata and
+the ids/counts-only sealed attestation. Frozen IDs and each frozen lineage field
+are reserved; generated lineage fields cannot cross splits. Selection revalidates
+the scheduled prompt, tools and twin branches as well as certificate metadata.
+
+K realizations, independently reviewed paired-twin drafts, quality-ranked
+cluster-capped selection, explicit unit finalization/completion and CLI-owned
+durable stores are integrated. Twin groups consume two selection slots and are
+never selected partially. Export takes selected training rows only and permits
+resume reuse only for a byte-identical, revalidated complete bundle.
+
+Dispatch/response checkpoints are fsynced under the run-store lease. Resume
+reuses actual responses/reviews and exact certificates, reconstructs local token
+spend, and preserves immutable repair chains. A dispatch with no response is
+uncertain and stops rather than being sent again. Canonical validation/source
+bytes and completed reports are retained outside trainer-visible fields for
+independent approval inspection.
+Long-running checkpoints renew the lease. Lost holders cannot write or dispatch;
+an old holder's close preserves the replacement lease even within the same
+process. Lease timestamps use the host clock rather than an injected run clock.
+
+Integration exposed three defects:
+
+- Review/admission refusals double-charged the supervised ledger. Each attempt
+  now charges once, and actual student labels are checked before review/admission.
+  A teacher completion bound is explicitly not treated as a student-token proof.
+- Gates produced assistant-only payloads, so accepted records lost their prompt
+  context. Certificates now bind the actual scenario conversation, with only the
+  new assistant output selected for loss.
+- Realizations could rename entities independently of their oracle, omit public
+  receipts/candidate menus, render an undefined tone, and construct inconsistent
+  damage/HP or total/DC/outcome receipts. Scenario identities now stay fixed across
+  K, public truth is rendered, and generated receipt arithmetic is consistent.
+
+Validation: owning typecheck passed; **373 foundry tests passed, 0 failed, 0
+skipped**, including fsync/reopen/crash, repair, uncertain dispatch, budget,
+paired-selection, metadata isolation, export replay and the real CPU tokenizer.
+A 175-seed K=3 plan scheduled 525 rows (426 train, 51 dev, 48 generated test).
+The Flash/Kimi six-row CLI dry run dispatched zero attempts. The 106-case frozen
+dev corpus verified. No paid teacher generation or model training ran.
+
+See `RUNNER.md` for runtime/approval APIs and operational semantics. Provider
+training-use terms and actual independent prose-quality measurement remain
+pre-pilot work; the runner does not invent scores or approve its own certificates.
+
+---
+
 ## Measured tokenizer bridge
 
 The tokenizer gate now has real CPU evidence: Qwen3 tokenizer revision

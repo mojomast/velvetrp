@@ -166,6 +166,18 @@ test("real measured Qwen3 evidence unlocks template validation without bypassing
     approvedRegistry: { ...measured, certificates: new Map() } }), /not pinned/);
 });
 
+test("export resume revalidates and reuses only a byte-identical complete bundle", () => {
+  const record = admitted();
+  const outputDir = join(rootFor(), "resumed-export");
+  const options = { outputDir, approvedRegistry: registryFor([record]) };
+  const first = exportTrainingJsonl([record], options);
+  assert.deepEqual(exportTrainingJsonl([record], { ...options, resume: true }), first);
+  assert.throws(() => exportTrainingJsonl([record], { ...options, resume: true,
+    approvedRegistry: { ...options.approvedRegistry, certificates: new Map() } }), /not pinned/);
+  writeFileSync(first.trainingPath, "changed bytes\n");
+  assert.throws(() => exportTrainingJsonl([record], { ...options, resume: true }), /new or empty/);
+});
+
 test("a certificate altered after admission fails verification and cannot replay as admitted", (t) => {
   const root = rootFor();
   const options = storeOptions(root);

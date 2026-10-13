@@ -118,8 +118,9 @@ npm exec -- tsx --test --test-concurrency=1 dataset/test/tokenizer.test.ts
 The live Node test uses `FOUNDRY_TOKENIZER_PYTHON`; without it, CI tests validate
 the committed real traces and skip the local interpreter check. `test_runtime.py`
 always uses the real installed runtime. `generate` without `--execute` is a
-zero-dispatch dry run. Execution still requires a configured run store through
-the embedding API and the remaining pilot integration. Provider billing measurement
+zero-dispatch dry run. The CLI now opens/resumes a durable store for execution;
+[`../RUNNER.md`](../RUNNER.md) documents K/twin scheduling, selection, split
+isolation and independent export approval. Provider billing measurement
 is optional for the funded RouteTok route; no credit check is implemented here.
 
 Recorded validation: owning typecheck passed; 352 foundry tests passed with the

@@ -1,6 +1,6 @@
 /** Fail-closed, provider-free HF export with separate provenance and checksums. */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { AdmissionError, assertExportable, type AdmittedRecordV1, type ApprovedAdmissionRegistry } from "./admission.js";
 import { MESSAGE_ROLES, stableStringify, type ExportedTrainingRecord, type StoredMessage, type StoredTool } from "./spec.js";
@@ -9,6 +9,8 @@ export interface ExportTrainingOptions {
   /** A new or empty directory. The complete bundle is published by one rename. */
   readonly outputDir: string;
   readonly approvedRegistry: ApprovedAdmissionRegistry;
+  /** Resume may reuse only a byte-identical, fully revalidated published bundle. */
+  readonly resume?: boolean;
 }
 
 export interface ExportChecksumManifest {
@@ -160,6 +162,13 @@ export function exportTrainingJsonl(
   // Nothing above this line writes even a temporary file or creates a directory.
   const outputDir = resolve(options.outputDir);
   if (existsSync(outputDir) && (!lstatSync(outputDir).isDirectory() || readdirSync(outputDir).length > 0)) {
+    if (options.resume && lstatSync(outputDir).isDirectory()
+      && stableStringify(readdirSync(outputDir).sort()) === stableStringify([...contents.map((file) => file.path), "checksums.json"].sort())
+      && contents.every((file) => readFileSync(join(outputDir, file.path), "utf8") === file.bytes)
+      && readFileSync(join(outputDir, "checksums.json"), "utf8") === checksumBytes) {
+      return { outputDir, trainingPath: join(outputDir, "training.jsonl"), provenancePath: join(outputDir, "provenance.json"),
+        checksumPath: join(outputDir, "checksums.json"), checksums };
+    }
     throw new Error(`export destination must be a new or empty directory: ${outputDir}`);
   }
   mkdirSync(dirname(outputDir), { recursive: true });

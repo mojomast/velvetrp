@@ -1627,6 +1627,13 @@ export class RunStore {
     if (this.closed) throw new RunClosedError(this.runId);
   }
 
+  private assertLeaseOwned(): void {
+    const existing = readLease(this.paths.lockPath);
+    if (!existing || existing.pid !== process.pid || existing.acquiredAtMs !== this.lockAcquiredAtMs) {
+      throw new RunLockError(this.runId, existing?.pid ?? null, existing?.acquiredAtMs ?? null);
+    }
+  }
+
   private ensureEventFd(): number {
     if (this.eventFd === null) this.eventFd = openSync(this.paths.eventsPath, "a");
     return this.eventFd;
@@ -1645,6 +1652,7 @@ export class RunStore {
    */
   private append(events: readonly RunEventBody[]): RunTransaction {
     this.assertOpen();
+    this.assertLeaseOwned();
     if (events.length === 0) throw new InvalidUsageError("refusing to append an empty transaction");
     const transaction: RunTransaction = {
       seq: this.projection.lastSeq + 1,
@@ -1681,6 +1689,7 @@ export class RunStore {
    */
   checkpoint(): RunSnapshot {
     this.assertOpen();
+    this.assertLeaseOwned();
     this.fault("before-snapshot", "snapshot");
     writeFileAtomic(
       this.paths.snapshotPath,
@@ -1739,6 +1748,17 @@ export class RunStore {
 
   seed(): string {
     return this.projection.config.seed;
+  }
+
+  /** Keep a long-running pipeline leased; a lost owner must stop before dispatch/write. */
+  renewLease(): void {
+    this.assertOpen();
+    this.assertLeaseOwned();
+    writeFileAtomic(this.paths.lockPath, stableStringify({
+      pid: process.pid, platform: process.platform, acquiredAtMs: this.lockAcquiredAtMs,
+      acquiredAt: new Date(this.lockAcquiredAtMs).toISOString(), renewedAtMs: Date.now(),
+      runId: this.runId, storeVersion: RUN_STORE_VERSION,
+    }) + "\n", true);
   }
 
   /** The stage a resume would pick up from. */
@@ -2458,6 +2478,7 @@ export class RunStore {
     record: CandidateRecord,
     payloadDigest: string,
   ): void {
+    this.assertLeaseOwned();
     this.fault("before-payload-write", `payload:${attemptId}`);
     const payload: StoredAttemptPayload = {
       storeVersion: RUN_STORE_VERSION,
@@ -2516,7 +2537,8 @@ export class RunStore {
   close(): RunSnapshot {
     if (this.closed) return this.snapshot();
     this.fault("before-close", "close");
-    this.checkpoint();
+    const lease = readLease(this.paths.lockPath);
+    if (lease?.pid === process.pid && lease.acquiredAtMs === this.lockAcquiredAtMs) this.checkpoint();
     this.closed = true;
     if (this.eventFd !== null) {
       const fd = this.eventFd;
@@ -2626,14 +2648,16 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
-function readLease(path: string): { pid: number; acquiredAtMs: number } | null {
+function readLease(path: string): { pid: number; acquiredAtMs: number; renewedAtMs: number } | null {
   if (!existsSync(path)) return null;
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
     if (!isJsonObject(parsed)) return null;
     const { pid, acquiredAtMs } = parsed;
     if (typeof pid !== "number" || typeof acquiredAtMs !== "number") return null;
-    return { pid, acquiredAtMs };
+    const renewedAtMs = typeof parsed.renewedAtMs === "number" && Number.isFinite(parsed.renewedAtMs)
+      ? parsed.renewedAtMs : acquiredAtMs;
+    return { pid, acquiredAtMs, renewedAtMs };
   } catch {
     // An unparsable lease belongs to a process that died mid-write.
     return null;
@@ -2644,7 +2668,7 @@ function readLease(path: string): { pid: number; acquiredAtMs: number } | null {
  * Single-writer lease, created with `O_EXCL` so acquisition is atomic against a
  * concurrent opener even where advisory locking is unreliable.
  *
- * A holder is presumed dead when its pid is gone OR when the lease has aged past
+ * A holder is presumed dead when its pid is gone OR when the lease's last renewal has aged past
  * `staleLockMs`. Either condition alone can be wrong (a recycled pid, a clock
  * jump), so a lease is only reclaimed when at least one is decisively satisfied
  * and the reclaim itself races through `O_EXCL` again.
@@ -2683,7 +2707,7 @@ function acquireLease(
 
   const existing = readLease(paths.lockPath);
   const staleByPid = existing === null || !processIsAlive(existing.pid);
-  const staleByAge = existing !== null && nowMs - existing.acquiredAtMs > staleLockMs;
+  const staleByAge = existing !== null && nowMs - existing.renewedAtMs > staleLockMs;
   if (!staleByPid && !staleByAge) {
     throw new RunLockError(identity.runId, existing?.pid ?? null, existing?.acquiredAtMs ?? null);
   }
@@ -2715,7 +2739,7 @@ function releaseLease(paths: RunStorePaths, identity: LeaseIdentity): void {
   const existing = readLease(paths.lockPath);
   // Only ever remove a lease we still hold, so a process that lost its lease to a
   // stale takeover cannot unlease the new owner.
-  if (existing !== null && existing.pid !== identity.pid) return;
+  if (existing !== null && (existing.pid !== identity.pid || existing.acquiredAtMs !== identity.acquiredAtMs)) return;
   try {
     unlinkSync(paths.lockPath);
   } catch {

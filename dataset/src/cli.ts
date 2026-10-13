@@ -1,11 +1,14 @@
 /** Foundry commands. Planning and corpus verification are provider-free. */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { planRun, requireTokenizer, runPipeline, type PipelineOptions } from "./generate.js";
+import { DEFAULT_TOKEN_BUDGET, PipelineRefusal, planRun, requireTokenizer, runPipeline, type PipelineOptions } from "./generate.js";
 import { createTeacherClient, requireTeacherCredentials, requireReviewerCredentials } from "./teacher.js";
 import { verifyCorpus } from "./verifyCorpus.js";
-import { isTrainingFamily, TRAINING_FAMILIES, type TrainingFamily } from "./spec.js";
+import { isTrainingFamily, stableStringify, TRAINING_FAMILIES, type TrainingFamily } from "./spec.js";
 import { createTokenizerBridge, TokenizerBridgeError } from "./tokenizer.js";
+import { loadGenerationPolicy } from "./generationPolicy.js";
+import { openRunStore, sourceTreeDigest } from "./runstore.js";
+import { UncertainDispatchError } from "./pipelineJournal.js";
 
 const USAGE = `Velvet training-data foundry
 
@@ -23,10 +26,15 @@ Plan/generate options:
   --units <n>          Logical units (default 12; pilot target 150–200).
   --seed <s>           Deterministic seed (default pilot-0).
   --families <a,b>     Restrict to the listed training families.
+  --k <n>              Realizations per scenario (default 1).
 
 Generate options:
   --execute           Explicitly permit teacher calls.
   --max-repairs <n>   Repair attempts per unit (default 2).
+  --run-id <s>         Stable run identity (default foundry-<seed>).
+  --artifact-root <dir> Run storage root (default .dataset).
+  --cluster-cap <n>    Selected records per cluster (default 8; twins consume 2).
+  --max-supervised-tokens <n> Total measured token cap (default 4000000).
 
 Tokenizer-check/generate options:
   --python <path>     Pinned Python environment (or FOUNDRY_TOKENIZER_PYTHON).
@@ -52,6 +60,11 @@ interface Arguments {
   sealedSource?: string;
   python?: string;
   assets?: string;
+  k: number;
+  runId?: string;
+  artifactRoot?: string;
+  clusterCap: number;
+  maxSupervisedTokens: number;
 }
 
 class UsageError extends Error {}
@@ -63,7 +76,7 @@ function parseArgs(argv: readonly string[]): Arguments {
   }
   const args: Arguments = {
     command: command as Arguments["command"], execute: false,
-    units: 12, seed: "pilot-0", maxRepairs: 2,
+    units: 12, seed: "pilot-0", maxRepairs: 2, k: 1, clusterCap: 8, maxSupervisedTokens: 4_000_000,
   };
   const seen = new Set<string>();
   for (let index = 1; index < argv.length; index += 1) {
@@ -77,8 +90,8 @@ function parseArgs(argv: readonly string[]): Arguments {
     }
     const value = argv[index + 1];
     const planning = command === "plan" || command === "generate";
-    const allowed = (planning && ["--units", "--seed", "--families"].includes(flag))
-      || (command === "generate" && flag === "--max-repairs")
+    const allowed = (planning && ["--units", "--seed", "--families", "--k"].includes(flag))
+      || (command === "generate" && ["--max-repairs", "--run-id", "--artifact-root", "--cluster-cap", "--max-supervised-tokens"].includes(flag))
       || (["generate", "tokenizer-check"].includes(command) && ["--python", "--assets"].includes(flag))
       || (command === "verify" && flag === "--sealed-source");
     if (!allowed) throw new UsageError("unexpected argument; use help for available options");
@@ -86,20 +99,28 @@ function parseArgs(argv: readonly string[]): Arguments {
     index += 1;
     switch (flag) {
       case "--units":
-      case "--max-repairs": {
+      case "--max-repairs":
+      case "--k":
+      case "--cluster-cap":
+      case "--max-supervised-tokens": {
         const number = Number(value);
-        const minimum = flag === "--units" ? 1 : 0;
+        const minimum = ["--max-repairs", "--max-supervised-tokens"].includes(flag) ? 0 : 1;
         if (!/^\d+$/.test(value) || !Number.isSafeInteger(number) || number < minimum) {
           throw new UsageError(`${flag} needs an integer >= ${minimum}`);
         }
         if (flag === "--units") args.units = number;
-        else args.maxRepairs = number;
+        else if (flag === "--max-repairs") args.maxRepairs = number;
+        else if (flag === "--k") args.k = number;
+        else if (flag === "--cluster-cap") args.clusterCap = number;
+        else args.maxSupervisedTokens = number;
         break;
       }
       case "--seed": args.seed = value; break;
       case "--sealed-source": args.sealedSource = value; break;
       case "--python": args.python = value; break;
       case "--assets": args.assets = value; break;
+      case "--run-id": args.runId = value; break;
+      case "--artifact-root": args.artifactRoot = value; break;
       case "--families": {
         const requested = value.split(",").map((family) => family.trim());
         if (!requested.every(isTrainingFamily)) {
@@ -146,7 +167,7 @@ export async function main(argv: readonly string[], dependencies: CliDependencie
     return report.ok ? 0 : 1;
   }
   if (args.command === "plan") {
-    const plan = planRun({ seed: args.seed, units: args.units, ...(args.families ? { families: args.families } : {}) });
+    const plan = planRun({ seed: args.seed, units: args.units, realizationsPerScenario: args.k, ...(args.families ? { families: args.families } : {}) });
     stdout(`${JSON.stringify(plan, null, 2)}\n`);
     return 0;
   }
@@ -171,26 +192,38 @@ export async function main(argv: readonly string[], dependencies: CliDependencie
     stdout(`tokenizer: verified (${tokenizer.name})\n`);
     return 0;
   }
-  if (args.execute && !dependencies.store) {
-    stderr("REFUSED: execution requires a configured run store. No teacher calls were made.\n");
-    return 1;
-  }
   const generator = dependencies.generator ?? createTeacherClient({ credentials: requireTeacherCredentials({ env }) });
   const reviewer = dependencies.reviewer ?? createTeacherClient({ credentials: requireReviewerCredentials(generator.model, { env }) });
-  const report = await runPipeline({
-    runId: `foundry-${args.seed}`, seed: args.seed, units: args.units,
-    execute: args.execute, maxRepairs: args.maxRepairs, tokenizer, generator, reviewer,
-    ...(args.families ? { families: args.families } : {}),
-    ...(dependencies.store ? { store: dependencies.store } : {}),
-  });
-  stdout(`${JSON.stringify(report, null, 2)}\n`);
-  return 0;
+  const policy = loadGenerationPolicy();
+  const plan = planRun({ seed: args.seed, units: args.units, realizationsPerScenario: args.k, generationPolicy: policy,
+    ...(args.families ? { families: args.families } : {}) });
+  const runId = args.runId ?? `foundry-${args.seed}`;
+  const store = args.execute ? dependencies.store ?? openRunStore({ runId, seed: args.seed,
+    sourceDigest: sourceTreeDigest(fileURLToPath(new URL("..", import.meta.url)), { skip: ["__pycache__"] }),
+    splitAssignmentDigest: plan.splitAssignmentDigest, corpusFreezeDigest: policy.corpusDigest, totalUnits: plan.units.length,
+    generator: { provider: generator.identity.provider, model: generator.model, baseUrlDigest: generator.baseUrlDigest, temperature: 0.7 },
+    ...(args.artifactRoot ? { artifactRoot: args.artifactRoot } : {}), durability: "fsync" }) : undefined;
+  try {
+    const report = await runPipeline({
+      runId, seed: args.seed, units: args.units, realizationsPerScenario: args.k,
+      execute: args.execute, maxRepairs: args.maxRepairs, tokenizer, generator, reviewer,
+      generationPolicy: policy, selectionPolicy: { maxRecordsPerCluster: args.clusterCap },
+      budget: { ...DEFAULT_TOKEN_BUDGET, maxSupervisedAssistantTokens: args.maxSupervisedTokens },
+      ...(args.families ? { families: args.families } : {}),
+      ...(store ? { store } : {}),
+    });
+    stdout(`${stableStringify(report, 2)}\n`);
+    return 0;
+  } finally {
+    if (store && !dependencies.store) store.close();
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch(() => {
+  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error: unknown) => {
     // Provider errors may contain untrusted response text; do not echo them.
-    process.stderr.write("foundry command failed; inspect local validation diagnostics\n");
+    process.stderr.write(error instanceof PipelineRefusal || error instanceof UncertainDispatchError
+      ? `REFUSED: ${error.message}\n` : "foundry command failed; inspect local validation diagnostics\n");
     process.exitCode = 1;
   });
 }

@@ -49,6 +49,11 @@
  */
 
 import { createHash } from "node:crypto";
+import { PipelineJournal } from "./pipelineJournal.js";
+import { assertGeneratedSplits, loadGenerationPolicy, type GenerationPolicy } from "./generationPolicy.js";
+import { buildSelectiveFidelityTwins } from "./selectiveTwins.js";
+import { assertProseQualityMeasured, type AnchorSpec, type TwinCaseSpec, type ProseQualityScorer } from "./twins.js";
+import { DEFAULT_SELECTION_POLICY, selectAdmittedRecords, type SelectionPolicy } from "./selection.js";
 
 import {
   ADMISSION_CERTIFICATE_VERSION,
@@ -95,6 +100,7 @@ import {
   type StoredMessage,
   type StoredTool,
   type StoredToolCall,
+  type PreferencePair,
   type TrainingFamily,
 } from "./spec.js";
 import {
@@ -109,7 +115,7 @@ import {
 // Versions, stages, weights
 // ---------------------------------------------------------------------------
 
-export const GENERATOR_VERSION = "generator-v1";
+export const GENERATOR_VERSION = "generator-v2";
 export const REVIEW_PROMPT_VERSION = "review-prompt-v1";
 export const REPAIR_PROMPT_VERSION = "repair-prompt-v1";
 
@@ -318,6 +324,15 @@ export function requireTokenizer(port: TokenizerPort | null | undefined): Tokeni
   return port;
 }
 
+function measuredTokens(port: TokenizerPort, example: SupervisedExample): number {
+  const tokens = port.countSupervisedTokens(example);
+  if (!Number.isSafeInteger(tokens) || tokens < 0 || (tokens === 0
+    && (example.targetSelection.supervisedAssistantIndices.length || example.targetSelection.supervisedToolCallIndices.length))) {
+    throw new TokenizerUnavailableError("the selected example returned an invalid or empty loss-token measurement");
+  }
+  return tokens;
+}
+
 export interface TokenBudget {
   /** Cap across the whole run, in supervised assistant tokens. */
   readonly maxSupervisedAssistantTokens: number;
@@ -382,9 +397,11 @@ export interface BudgetDecision {
 }
 
 /**
- * Refuses BEFORE dispatch when the worst case cannot fit.
+ * Compare an explicit dispatch bound or a measured final-label count to the cap.
  *
- * The worst case is the caller's explicit `maxTokens`, and nothing else. The
+ * Before dispatch the bound is the caller's explicit `maxTokens`. Teacher and
+ * student tokenizers differ, so this guard is followed by a real label-count
+ * check before review/admission; the teacher limit is not a student-token proof. The
  * prompt is CONTEXT, which the mask excludes, so it consumes no supervised
  * budget. Provider billing accounting is optional for the funded RouteTok route
  * and is not measured here. Adding prompt tokens here would inflate the training
@@ -404,7 +421,7 @@ export function checkBudget(input: {
   if (worstCase > remainingTotal) {
     return {
       allowed: false,
-      reason: `worst case ${worstCase} supervised tokens exceeds the ${remainingTotal} remaining for the run`,
+      reason: `requested token bound/count ${worstCase} exceeds the ${remainingTotal} remaining for the run`,
       remainingTotal,
       remainingTarget,
     };
@@ -412,7 +429,7 @@ export function checkBudget(input: {
   if (remainingTarget !== null && worstCase > remainingTarget) {
     return {
       allowed: false,
-      reason: `worst case ${worstCase} supervised tokens exceeds the ${remainingTarget} remaining for target ${input.target}`,
+      reason: `requested token bound/count ${worstCase} exceeds the ${remainingTarget} remaining for target ${input.target}`,
       remainingTotal,
       remainingTarget,
     };
@@ -513,6 +530,8 @@ export interface ScenarioSpec {
   readonly lineage: LineageGroup;
   /** Coarse shape signature used for the realization cluster cap. */
   readonly clusterFamily: string;
+  /** Entity identities are scenario-owned; K realizations vary voice and beats. */
+  readonly slots: Readonly<Record<string, string>>;
   readonly templateVersion: string;
   readonly advertisedTools: readonly StoredTool[];
   readonly oracle: ScenarioOracle;
@@ -529,6 +548,7 @@ export interface ScenarioSpecOptions {
    * the one actually generated.
    */
   readonly family?: TrainingFamily;
+  readonly toolFamily?: ToolFamily;
 }
 
 function fill(template: string, slots: Readonly<Record<string, string>>): string {
@@ -569,7 +589,7 @@ function candidateMenu(rng: Rng, npc: string, place: string): {
 }
 
 function advertisedToolsFor(family: TrainingFamily, oracle: ScenarioOracle): readonly StoredTool[] {
-  if (family === "grounded-narration") {
+  if (family === "grounded-narration" || (family === "tool-selection" && oracle.toolFamily === "narration-submit")) {
     return [{
       type: "function",
       function: {
@@ -585,6 +605,9 @@ function advertisedToolsFor(family: TrainingFamily, oracle: ScenarioOracle): rea
     }];
   }
   if (family !== "tool-selection") return [];
+  if (oracle.toolFamily === "read-tool") return [{ type: "function", function: { name: "inspect_public_scene",
+    description: "Read the public description of the current scene before answering.",
+    parameters: { type: "object", properties: {}, additionalProperties: false } } }];
   return oracle.advertisedToolNames.map((name) => ({
     type: "function",
     function: {
@@ -635,24 +658,28 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
   ];
 
   const toolFamily: ToolFamily = family === "tool-selection"
-    ? rng.pick(TOOL_FAMILIES)
+    ? options.toolFamily ?? rng.pick(TOOL_FAMILIES)
     : family === "grounded-narration"
       ? "narration-submit"
       : "no-tool";
 
   const menu = family === "tool-selection" && toolFamily === "exact-candidate"
     ? candidateMenu(rng.fork("menu"), npc, place)
-    : { candidates: [] as AdvertisedCandidate[], toolNames: [] as string[] };
+    : { candidates: [] as AdvertisedCandidate[], toolNames: toolFamily === "narration-submit" ? ["submit_adventure_narration"]
+      : toolFamily === "read-tool" ? ["inspect_public_scene"] : [] as string[] };
 
+  const damage = rng.int(9) + 3;
+  const checkTotal = rng.int(14) + 8;
+  const checkDc = rng.pick([10, 12, 14, 15, 18] as const);
   const receipts: GroundingReceipt[] = family !== "grounded-narration" ? [] : [
     {
       kind: "check",
       receiptId: `${sha256Hex(`${seed}|check`).slice(0, 10)}`,
       actor: "you",
       skill: rng.pick(["Perception", "Insight", "Deception", "Survival"] as const),
-      total: rng.int(14) + 8,
-      dc: rng.pick([10, 12, 14, 15, 18] as const),
-      outcome: rng.pick(["success", "failure"] as const),
+      total: checkTotal,
+      dc: checkDc,
+      outcome: checkTotal >= checkDc ? "success" : "failure",
       visibility: "public",
     },
     {
@@ -663,9 +690,9 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
       visibility: "public",
       outcome: {
         kind: "damage",
-        applied: rng.int(9) + 3,
+        applied: damage,
         hitPointsBefore: 24,
-        hitPointsAfter: 24 - (rng.int(9) + 3),
+        hitPointsAfter: 24 - damage,
         hit: true,
         damageType: "slashing",
         statusAfter: "stable",
@@ -738,6 +765,7 @@ export function scenarioSpec(seed: string, options: ScenarioSpecOptions = {}): S
     lineage,
     clusterFamily,
     templateVersion: body.templateVersion,
+    slots: Object.freeze({ ...slots, tone }),
     advertisedTools: advertisedToolsFor(family, oracle),
     oracle,
     digest,
@@ -798,8 +826,13 @@ function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>
   const system: string[] = [
     `You are the narrator for ${slots.place}. Keep the voice ${slots.tone}.`,
     "Never invent a mechanical outcome. Never disclose what the player has not observed.",
-    "Use every proper noun exactly as written; do not replace a name with a pronoun.",
+    "Preserve established entity identities and mechanical values when they are relevant.",
+    `Focus the description on ${slots.lens ?? "committed public facts"}.`,
   ];
+  if (spec.oracle.receipts.length) system.push(`AUTHORITATIVE PUBLIC RECEIPTS\n${stableStringify(spec.oracle.receipts.filter((receipt) => receipt.visibility === undefined || receipt.visibility === "public"))}`);
+  if (spec.oracle.advertisedCandidates.length) system.push(`ADVERTISED CANDIDATES\n${stableStringify(spec.oracle.advertisedCandidates)}`);
+  if (spec.family === "world-generation") system.push(`PUBLIC WORLD CONTRACT\n${stableStringify({ sections: spec.oracle.sections,
+    dependencies: [...spec.oracle.dependencies.values()], catalogReferences: spec.oracle.catalogReferences, desiredCounts: spec.oracle.desiredCounts })}`);
   const messages: StoredMessage[] = [{ role: "system", content: system.join(" ") }];
   switch (spec.family) {
     case "grounded-narration":
@@ -817,6 +850,10 @@ function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>
     case "tool-selection":
       if (spec.oracle.toolFamily === "no-tool") {
         messages.push({ role: "user", content: "Say what you can see. There is nothing to call." });
+      } else if (spec.oracle.toolFamily === "narration-submit") {
+        messages.push({ role: "user", content: `Submit a public description of ${slots.place} through the narration tool. No mechanical outcomes are committed.` });
+      } else if (spec.oracle.toolFamily === "read-tool") {
+        messages.push({ role: "user", content: "Inspect the public scene before answering." });
       } else {
         messages.push({ role: "user", content: `${capitalize(fill(motive, slots))}. Act on it.` });
       }
@@ -863,6 +900,7 @@ export function realizeScenario(spec: ScenarioSpec, seed: string, count: number)
   if (!Number.isSafeInteger(count) || count < 1) {
     throw new PipelineRefusal("execution-not-authorized", [`realization count must be a positive safe integer, got ${count}`]);
   }
+  if (count > TONES.length * TURN_MOTIVES.length) throw new PipelineRefusal("execution-not-authorized", ["K exceeds the available distinct voice/beat combinations (30)"]);
   const rng = createRng(`realize:${spec.seed}:${seed}`);
   const minClusters = Math.max(1, Math.min(count, CLUSTER_TARGETS.length));
   const perClusterCap = Math.max(1, Math.ceil(count / minClusters));
@@ -873,13 +911,9 @@ export function realizeScenario(spec: ScenarioSpec, seed: string, count: number)
 
   for (let round = 0; round < maxRounds && out.length < count; round += 1) {
     const variant = rng.fork(`v${round}`);
-    const slots: Record<string, string> = {
-      npc: variant.pick(ANCHORS.npc),
-      place: variant.pick(ANCHORS.place),
-      object: variant.pick(ANCHORS.object),
-      guild: variant.pick(ANCHORS.guild),
-    };
+    const slots: Record<string, string> = { ...spec.slots, tone: variant.pick(TONES) };
     const motive = variant.pick(TURN_MOTIVES);
+    slots.lens = ["the established setting", "the public exchange", "known concrete details", "the immediate scene", "observable reactions", "committed facts"][TURN_MOTIVES.indexOf(motive)]!;
     const clusterId = sha256Hex(`${spec.clusterFamily}|${spec.family}|${motive}`).slice(0, 12);
     const used = clusterCounts.get(clusterId) ?? 0;
     if (used >= perClusterCap) continue;
@@ -1347,7 +1381,7 @@ function advertisedBindingRun(
   return {
     validator: "advertised-candidate-binding",
     version: VERSION.advertisedBinding,
-    passed: verdict.advertised && verdict.toolAdvertised && verdict.digestMatched && verdict.problems.length === 0,
+    passed: verdict.problems.length === 0 && scoreSelection(selection, verdict).firstAttemptCorrect,
     findings: verdict.problems.length === 0 ? {} : { problems: verdict.problems },
     evidence: {
       advertised: verdict.advertised,
@@ -1791,15 +1825,20 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
   // The advertised-binding validator is REQUIRED for this family, so it runs on
   // every path including the refusals. When nothing was called there is no
   // selection to bind, and the honest verdict is that nothing bound.
-  const contract = spec.oracle.toolFamily === "narration-submit" ? "narration-submit" : "exact-candidate";
+  const contract = spec.oracle.toolFamily;
   const firstArguments = calls[0]?.function.arguments ?? {};
   const firstName = calls[0]?.function.name ?? "";
-  const selection: ProviderSelection = contract === "narration-submit"
+  const selection: ProviderSelection = contract === "no-tool"
+    ? { contract: "no-tool", content: parsed.content, transportValid: calls.length === 0,
+      intentCorrect: calls.length === 0 && /\b(?:nothing|not|can't|cannot|no|only|unclear|unsure)\b/i.test(parsed.content), finalOutcome: "no-tool" }
+    : contract === "read-tool" ? { contract: "read-tool", toolName: firstName, arguments: firstArguments,
+      transportValid: calls.length === 1 && Object.keys(firstArguments).length === 0, intentCorrect: true, finalOutcome: "read-completed" }
+    : contract === "narration-submit"
     ? {
       contract: "narration-submit",
       toolName: firstName,
-      arguments: { narration: typeof firstArguments.narration === "string" ? firstArguments.narration : "" },
-      transportValid: calls.length > 0,
+      arguments: firstArguments as { narration: string },
+      transportValid: calls.length === 1,
       intentCorrect: true,
       finalOutcome: "narration-submitted",
     }
@@ -1808,7 +1847,7 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
       toolName: firstName,
       candidateId: String(firstArguments.candidateId ?? ""),
       digest: String(firstArguments.digest ?? ""),
-      transportValid: calls.length > 0,
+      transportValid: calls.length === 1 && Object.keys(firstArguments).length === 2,
       intentCorrect: true,
       finalOutcome: "mechanics-committed",
     };
@@ -1835,7 +1874,7 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
         : compliance
           ? []
           : [failure("no-initiation", "abstention carried no explanation", {})],
-      "initiation-failure",
+      initiated || !compliance ? "initiation-failure" : "ok",
     );
   }
   if (!initiated) {
@@ -1874,9 +1913,8 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
   }
 
   // ---- 3. ARGUMENT BINDING -----------------------------------------------
-  const emptyArguments = calls.some((call) => Object.keys(call.function.arguments).length === 0);
-  const bound = verdict.advertised && verdict.digestMatched && verdict.toolAdvertised
-    && card.firstAttemptCorrect
+  const emptyArguments = spec.oracle.toolFamily !== "read-tool" && calls.some((call) => Object.keys(call.function.arguments).length === 0);
+  const bound = card.firstAttemptCorrect
     && !emptyArguments;
   const outcome = proseGate(
     spec,
@@ -1930,6 +1968,22 @@ export interface PlannedUnit {
   readonly unitId: string;
   readonly spec: ScenarioSpec;
   readonly realization: Realization;
+  readonly scenarioUnitId: string;
+  readonly realizationOrdinal: number;
+  readonly target: GenerationTarget;
+  readonly twinGroupId?: string;
+  readonly preference?: PreferencePair;
+  readonly twinInstrumentation?: unknown;
+  readonly draftGenerator?: GeneratorIdentity;
+}
+
+/** Previously authored drafts; both conditioned preferences are reviewed independently. */
+export interface ScheduledTwinInput {
+  readonly spec: TwinCaseSpec;
+  readonly counterfactualReceipts: readonly GroundingReceipt[];
+  readonly anchors: readonly AnchorSpec[];
+  readonly seed: string;
+  readonly generator: GeneratorIdentity;
 }
 
 export interface RunPlan {
@@ -1938,6 +1992,10 @@ export interface RunPlan {
   readonly splitCounts: Readonly<Record<DatasetSplit, number>>;
   /** Digest over the split assignment, bound into every record. */
   readonly splitAssignmentDigest: string;
+  readonly scenarioCount: number;
+  readonly realizationsPerScenario: number;
+  readonly policyDigest: string;
+  readonly digest: string;
 }
 
 const emptySplitCounts = (): Record<DatasetSplit, number> => ({ train: 0, dev: 0, "sealed-test": 0 });
@@ -1951,12 +2009,18 @@ export function planRun(options: {
   readonly units: number;
   readonly families?: readonly TrainingFamily[] | undefined;
   readonly specOptions?: ScenarioSpecOptions | undefined;
+  readonly realizationsPerScenario?: number;
+  readonly pairedTwins?: readonly ScheduledTwinInput[];
+  readonly generationPolicy?: GenerationPolicy;
 }): RunPlan {
   const { seed, units } = options;
   if (!Number.isSafeInteger(units) || units < 1) {
     throw new PipelineRefusal("execution-not-authorized", [`unit count must be a positive safe integer, got ${units}`]);
   }
   const families = options.families ?? TRAINING_FAMILIES;
+  const k = options.realizationsPerScenario ?? 1;
+  if (!Number.isSafeInteger(k) || k < 1) throw new PipelineRefusal("execution-not-authorized", ["K must be a positive safe integer"]);
+  const policy = structuredClone(options.generationPolicy ?? loadGenerationPolicy());
   const allowed: Set<TrainingFamily> = new Set(families);
   if (families.length === 0) {
     throw new PipelineRefusal("execution-not-authorized", ["a plan needs at least one family"]);
@@ -1997,18 +2061,46 @@ export function planRun(options: {
   ordered.forEach((slot, index) => {
     const unitSeed = `${seed}|unit|${index}|${slot.family}`;
     const spec = scenarioSpec(unitSeed, {
-      family: slot.family,
       ...(options.specOptions ?? {}),
+      family: slot.family,
+      ...(slot.family === "tool-selection" ? { toolFamily: slot.target === "tool-selection:argument-binding" ? "exact-candidate" as const
+        : createRng(`${unitSeed}|initiation`).pick(["narration-submit", "read-tool", "no-tool"] as const) } : {}),
     });
-    const realization = realizeScenario(spec, `${seed}|realize|${index}`, 1)[0]!;
-    units_.push({ unitId: `unit-${sha256Hex(unitSeed).slice(0, 16)}`, spec, realization });
-    splitCounts[spec.split] += 1;
+    const scenarioUnitId = `unit-${sha256Hex(unitSeed).slice(0, 16)}`;
+    realizeScenario(spec, `${seed}|realize|${index}`, k).forEach((realization, ordinal) => {
+      units_.push({ unitId: k === 1 ? scenarioUnitId : `${scenarioUnitId}-r${ordinal}`, scenarioUnitId,
+        realizationOrdinal: ordinal, target: slot.target, spec, realization });
+      splitCounts[spec.split] += 1;
+    });
   });
+  for (const input of structuredClone(options.pairedTwins ?? [])) {
+    const twins = buildSelectiveFidelityTwins(input.spec, input.counterfactualReceipts, input.anchors, input.seed);
+    const twinGroupId = `twins-${sha256Hex(`${input.spec.caseId}|${input.seed}`).slice(0, 20)}`;
+    const base = scenarioSpec(`${seed}|${twinGroupId}`, { ...(options.specOptions ?? {}), family: "grounded-narration" });
+    for (const [arm, preference, receipts] of [["original", twins.original, input.spec.receipts],
+      ["counterfactual", twins.counterfactual, input.counterfactualReceipts]] as const) {
+      const spec: ScenarioSpec = { ...base, oracle: { ...base.oracle, receipts, hiddenFacts: [], visibilityRequirements: [],
+        behaviourTags: ["grounded-narration", "receipt-bound", "selective-fidelity"] }, advertisedTools: [] };
+      const context: StoredMessage[] = [{ role: "system", content: preference.prompt.filter((message) => message.role === "system").map((message) => message.content).join("\n") },
+        ...preference.prompt.filter((message) => message.role !== "system")];
+      const realization: Realization = { realizationId: `${twinGroupId}-${arm}`, specId: spec.specId,
+        clusterId: sha256Hex(`selective-fidelity|${input.spec.receipts.map((receipt) => receipt.kind).sort().join(",")}`).slice(0, 12),
+        slots: {}, context, digest: sha256Hex(stableStringify(context)) };
+      units_.push({ unitId: `${twinGroupId}-${arm}`, scenarioUnitId: twinGroupId, realizationOrdinal: 0,
+        target: "grounded-narration", twinGroupId, preference, twinInstrumentation: twins.instrumentation,
+        draftGenerator: input.generator, spec, realization });
+      splitCounts[spec.split] += 1;
+    }
+  }
+  assertGeneratedSplits(units_, policy);
   const splitAssignmentDigest = sha256Hex(stableStringify({
     seed,
+    policyDigest: policy.digest,
     units: units_.map((unit) => ({ unitId: unit.unitId, split: unit.spec.split, lineage: unit.spec.lineage })),
   }));
-  return { seed, units: units_, splitCounts, splitAssignmentDigest };
+  const body = { seed, units: units_, splitCounts, splitAssignmentDigest, scenarioCount: units,
+    realizationsPerScenario: k, policyDigest: policy.digest };
+  return { ...body, digest: sha256Hex(stableStringify(body)) };
 }
 
 // ---------------------------------------------------------------------------
@@ -2094,7 +2186,7 @@ export function isReviewScores(value: ReviewScores | { problems: string[] }): va
 
 export function reviewPromptFor(spec: ScenarioSpec, messages: readonly StoredMessage[]): string {
   return [
-    "You are an independent reviewer. Judge the ASSISTANT turn only.",
+    "You are an independent reviewer. Judge the final assistant response; earlier assistant turns are context only.",
     "Score each field as a probability in [0,1] and give a verdict.",
     "Return JSON with keys: " + [...REVIEW_SCORE_KEYS].join(", ") + ", verdict, rationale.",
     `Family: ${spec.family}`,
@@ -2126,6 +2218,11 @@ export interface PipelineOptions {
   readonly gitCommit?: string | null | undefined;
   readonly onEvent?: ((event: PipelineEvent) => void) | undefined;
   readonly exportOptions?: ExportTrainingOptions | undefined;
+  readonly realizationsPerScenario?: number;
+  readonly pairedTwins?: readonly ScheduledTwinInput[];
+  readonly proseQualityScorer?: ProseQualityScorer;
+  readonly generationPolicy?: GenerationPolicy;
+  readonly selectionPolicy?: SelectionPolicy;
 }
 
 export type PipelineEvent =
@@ -2174,6 +2271,11 @@ export interface PilotReport {
   readonly unitOutcomes: readonly UnitOutcome[];
   readonly admitted: number;
   readonly attempts: number;
+  readonly complete: boolean;
+  readonly planDigest: string;
+  readonly selection: { readonly digest: string; readonly selectedUnitIds: readonly string[];
+    readonly excluded: readonly { unitId: string; reason: string }[]; readonly clusterCounts: Readonly<Record<string, number>> };
+  readonly selected: number;
 }
 
 function emptyBuckets(): Record<ToolSelectionBucket, number> {
@@ -2247,7 +2349,8 @@ function buildCandidateRecord(input: {
     scenarioSeed: input.unit.spec.seed,
     messages,
     ...(input.tools ? { tools: [...input.tools] } : {}),
-    contentDigest: recordContentDigest({
+    ...(input.unit.preference ? { preference: input.unit.preference } : {}),
+    contentDigest: input.unit.preference ? computePayloadDigest({ messages, preference: input.unit.preference, tools: input.tools }) : recordContentDigest({
       messages,
       ...(input.tools ? { tools: [...input.tools] } : {}),
     }),
@@ -2269,17 +2372,6 @@ function conversationMessages(unit: PlannedUnit): TeacherMessage[] {
     role: message.role === "tool" ? "user" : message.role,
     content: message.content,
   }));
-}
-
-function assistantTextOf(messages: readonly StoredMessage[]): string {
-  const index = lastAssistantIndex(messages);
-  if (index < 0) return "";
-  const message = messages[index];
-  if (!message) return "";
-  if (message.content.trim()) return message.content;
-  const args = message.tool_calls?.[0]?.function.arguments;
-  const narration = args?.narration;
-  return typeof narration === "string" ? narration : "";
 }
 
 /** The supervised spans of a validated candidate, for diversity and token work. */
@@ -2309,6 +2401,11 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
   const temperature = options.temperature ?? 0.7;
   const budget = options.budget ?? DEFAULT_TOKEN_BUDGET;
   const gitCommit = options.gitCommit === undefined ? readGitCommit() : options.gitCommit;
+  if (!Number.isSafeInteger(maxRepairs) || maxRepairs < 0 || !Number.isSafeInteger(maxCompletionTokens) || maxCompletionTokens < 1
+    || !Number.isFinite(temperature) || temperature < 0 || !Number.isSafeInteger(budget.maxSupervisedAssistantTokens)
+    || budget.maxSupervisedAssistantTokens < 0 || Object.values(budget.perTarget ?? {}).some((cap) => !Number.isSafeInteger(cap) || cap! < 0)) {
+    throw new PipelineRefusal("execution-not-authorized", ["invalid repair, completion, temperature or supervised-budget configuration"]);
+  }
 
   // FAIL CLOSED #1. A reviewer that is the generator is not a reviewer, and
   // discovering that after the tokens are spent is the expensive way to find out.
@@ -2324,11 +2421,76 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
   // means "unlimited".
   const tokenizer = requireTokenizer(options.tokenizer);
 
+  const policy = structuredClone(options.generationPolicy ?? loadGenerationPolicy());
   const plan = planRun({
     seed: options.seed,
     units: options.units ?? 12,
     ...(options.families ? { families: options.families } : {}),
+    generationPolicy: policy,
+    realizationsPerScenario: options.realizationsPerScenario ?? 1,
+    pairedTwins: options.pairedTwins ?? [],
   });
+  if (!dryRun && !options.store) throw new PipelineRefusal("execution-not-authorized", ["executing generation requires a run store"]);
+  if (options.store && !dryRun && options.store.runId !== options.runId) throw new PipelineRefusal("execution-not-authorized", ["run-store identity differs from pipeline run"]);
+  if (!dryRun) {
+    const config = options.store!.config();
+    if (config.seed !== options.seed || config.splitAssignmentDigest !== plan.splitAssignmentDigest || config.corpusFreezeDigest !== policy.corpusDigest
+      || config.gitCommit !== gitCommit
+      || config.totalUnits !== plan.units.length || config.generator.provider !== options.generator.identity.provider
+      || config.generator.model !== options.generator.model || config.generator.baseUrlDigest !== options.generator.baseUrlDigest
+      || config.generator.temperature !== temperature) throw new PipelineRefusal("execution-not-authorized", ["run-store config does not bind the generated plan, splits, corpus and actual generator"]);
+  }
+  const selectionPolicy = options.selectionPolicy ?? DEFAULT_SELECTION_POLICY;
+  if (!Number.isSafeInteger(selectionPolicy.maxRecordsPerCluster) || selectionPolicy.maxRecordsPerCluster < 1
+    || (selectionPolicy.maxRecords !== undefined && (!Number.isSafeInteger(selectionPolicy.maxRecords) || selectionPolicy.maxRecords < 1))) {
+    throw new PipelineRefusal("execution-not-authorized", ["selection caps must be positive safe integers"]);
+  }
+  const journal = !dryRun ? new PipelineJournal(options.store!, {
+    version: GENERATOR_VERSION, planDigest: plan.digest, policyDigest: policy.digest,
+    storeConfigDigest: options.store!.snapshot().configDigest,
+    runId: options.runId, seed: options.seed, tokenizer: tokenizer.name, gitCommit,
+    generator: options.generator.identity, reviewer: options.reviewer.identity,
+    maxRepairs, maxCompletionTokens, temperature, selectionPolicy,
+    proseScorer: options.proseQualityScorer ? { id: options.proseQualityScorer.scorerId, version: options.proseQualityScorer.version } : null,
+  }) : null;
+  if (journal) {
+    const priorSpend = createBudgetLedger();
+    const targetsByUnit = new Map(plan.units.map((unit) => [unit.unitId, unit.target]));
+    for (const entry of options.store!.ledger()) {
+      const count = options.store!.readCandidate(entry.attemptId)!.provenance.tokenCount;
+      const target = targetsByUnit.get(entry.unitId);
+      if (!target || !count || count.tokenizer !== tokenizer.name) throw new PipelineRefusal("execution-not-authorized", ["persisted attempt does not bind the tokenizer and scheduled budget target"]);
+      recordSpend(priorSpend, target, count.tokens);
+    }
+    if (priorSpend.total > budget.maxSupervisedAssistantTokens || [...priorSpend.byTarget].some(([target, tokens]) => tokens > (budget.perTarget?.[target] ?? Infinity))) {
+      throw new PipelineRefusal("budget-exhausted", ["configured supervised cap is below already observed durable spend"]);
+    }
+    const digest = sha256Hex(stableStringify(budget));
+    journal.save(`budget:${digest}`, budget);
+    options.store!.addNote(`supervised-budget-v1:${digest}:attempts-${options.store!.ledger().length}`);
+  }
+  const proseScores = new Map<string, ReturnType<typeof assertProseQualityMeasured>>();
+  for (const unit of plan.units.filter((entry) => entry.preference)) {
+    const draft = unit.draftGenerator!;
+    if (draft.provider !== options.generator.identity.provider || draft.model !== options.generator.model
+      || draft.baseUrlDigest !== options.generator.baseUrlDigest || draft.temperature !== temperature) throw new PipelineRefusal("execution-not-authorized", ["twin drafts do not identify the configured actual generator and temperature"]);
+    if (!options.proseQualityScorer) throw new PipelineRefusal("execution-not-authorized", ["paired twins require an independent measured prose-quality scorer"]);
+    assertDistinctModels(options.generator.model, options.proseQualityScorer.scorerId);
+    const request = { pairDigest: computePayloadDigest({ messages: unit.preference!.prompt, preference: unit.preference }),
+      armDigests: [sha256Hex(stableStringify(unit.preference!.chosen)), sha256Hex(stableStringify(unit.preference!.rejected))], rubricVersion: "prose-retention-v1" };
+    const key = `prose:${unit.unitId}`;
+    const saved = journal?.read<ReturnType<typeof assertProseQualityMeasured>>(key);
+    const score = assertProseQualityMeasured(request, saved ? { ...options.proseQualityScorer, score: () => saved } : options.proseQualityScorer);
+    if (score.measuredBy === `${options.generator.identity.provider}:${options.generator.model}` || score.measuredBy === options.generator.model) {
+      throw new PipelineRefusal("reviewer-not-independent", ["twin prose measurement came from the generator"]);
+    }
+    journal?.save(key, score);
+    proseScores.set(unit.unitId, score);
+  }
+  if (journal) {
+    if (options.store!.state() !== "complete") options.store!.setState("running");
+    options.store!.markStageComplete("plan");
+  }
   options.onEvent?.({ kind: "plan", units: plan.units.length });
 
   const ledger = createBudgetLedger();
@@ -2344,17 +2506,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
 
   for (const unit of plan.units) {
     const targets = targetsFor(unit.spec.family);
-    // Preflight against the TIGHTER of this family's caps, so a dispatch is
-    // never authorised against a budget it could then overrun on the sibling
-    // target. Actual spend is booked to the behaviour it belongs to.
-    const caps = targets
-      .map((target) => budget.perTarget?.[target])
-      .filter((cap): cap is number => cap !== undefined);
-    const preflightTarget: GenerationTarget = caps.length > 1
-      ? targets.find((target) => budget.perTarget?.[target] === Math.min(...caps))!
-      : targets[0]!;
+    // Charge the scheduled training behavior; failure buckets are diagnostics.
+    const preflightTarget = unit.target;
     plannedPrompts.push({
-      text: unit.realization.context.map((message) => message.content).join("\n"),
+      text: (unit.preference?.prompt ?? unit.realization.context).map((message) => message.content).join("\n"),
       clusterId: unit.realization.clusterId,
     });
 
@@ -2383,9 +2538,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     let unitAttempts = 0;
     let unitSupervisedTokens = 0;
 
-    for (let attemptOrdinal = 0; attemptOrdinal <= maxRepairs; attemptOrdinal += 1) {
-      unitAttempts += 1;
-      totalAttempts += 1;
+    for (let attemptOrdinal = 0; attemptOrdinal <= (unit.preference ? 0 : maxRepairs); attemptOrdinal += 1) {
       const attemptId = `${unit.unitId}-a${attemptOrdinal}`;
       const repairing = attemptOrdinal > 0 && previousFailure !== null;
       const messages: TeacherMessage[] = repairing
@@ -2396,21 +2549,29 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         })]
         : conversationMessages(unit);
 
-      // Budget preflight BEFORE dispatch. The worst case is the caller's own
-      // maxTokens; the prompt is masked context and consumes no supervised
-      // budget. Provider billing measurement for the funded RouteTok route is
-      // optional; this check accounts for supervised training tokens only.
+      // Dispatch guard; the actual student labels are checked after rendering.
+      // Prepared preference branches can be measured before review. Prompt
+      // context is masked and provider billing remains optional.
+      const twinTokens = unit.preference ? [unit.preference.chosen, unit.preference.rejected].reduce((total, branch) => {
+        const branchSelection = selectTargets(branch, { targetAssistantIndex: branch.length - 1 });
+        const offset = unit.preference!.prompt.length;
+        return total + measuredTokens(tokenizer, { family: unit.spec.family, messages: [...unit.preference!.prompt, ...branch],
+          targetSelection: { supervisedAssistantIndices: branchSelection.supervisedAssistantIndices.map((index) => index + offset),
+            supervisedToolCallIndices: branchSelection.supervisedToolCallIndices.map((index) => index + offset) } });
+      }, 0) : null;
       const decision = checkBudget({
-        ledger, budget, target: preflightTarget, maxCompletionTokens,
+        ledger, budget, target: preflightTarget, maxCompletionTokens: twinTokens ?? maxCompletionTokens,
       });
-      if (!decision.allowed) {
+      const replaying = journal!.hasResponse(attemptId) || options.store.hasAttempt(attemptId);
+      if (!decision.allowed && !replaying) {
         options.onEvent?.({ kind: "budget-exhausted", unitId: unit.unitId, target: preflightTarget, reason: decision.reason ?? "" });
         refusedAt = `budget:${preflightTarget}`;
         break;
       }
 
-      options.onEvent?.({ kind: "dispatched", unitId: unit.unitId, attemptId, repair: repairing });
-      const completion = await options.generator.complete({
+      unitAttempts += 1;
+      totalAttempts += 1;
+      const request = {
         attemptId,
         system: unit.realization.context[0]?.content ?? "",
         messages,
@@ -2418,8 +2579,13 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         temperature,
         maxTokens: maxCompletionTokens,
         seed: attemptOrdinal,
-        responseFormat: "text",
-      });
+        responseFormat: "text" as const,
+      };
+      const completion: TeacherCompletion = unit.preference ? {
+        content: unit.preference.chosen.map((message) => message.content).join("\n"), toolCalls: [],
+        finishReason: "prepared-draft", usage: null, responseId: null, attempts: 0, latencyMs: 0,
+        requestDigest: sha256Hex(stableStringify(unit.preference)),
+      } : await journal!.complete(options.generator, request, () => options.onEvent?.({ kind: "dispatched", unitId: unit.unitId, attemptId, repair: repairing }));
 
       diversityBefore.push({
         text: completion.content || stableStringify(completion.toolCalls),
@@ -2443,7 +2609,16 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
           failure = stageFailure("SANITIZED", "sanitize-produced-nothing", "sanitization produced no usable output", stages);
         } else {
           stages.sanitized = sanitized.sanitized;
-          gate = dispatchGate(unit.spec, sanitized.sanitized);
+          const targetGate = dispatchGate(unit.spec, sanitized.sanitized);
+          // Gates inspect the new assistant target; training and certification
+          // bind its actual prompt context as well, with historical turns masked.
+          const context = unit.preference ? unit.preference.prompt : unit.realization.context;
+          const combined = [...context, ...targetGate.messages];
+          gate = { ...targetGate, messages: combined,
+            targetSelection: targetGate.targetSelection ? {
+              supervisedAssistantIndices: targetGate.targetSelection.supervisedAssistantIndices.map((index) => index + context.length),
+              supervisedToolCallIndices: targetGate.targetSelection.supervisedToolCallIndices.map((index) => index + context.length),
+            } : null };
           stages.validated = sanitized.sanitized;
           lastBucket = gate.bucket;
           // Counted whether it passed or not. A histogram that only records
@@ -2475,7 +2650,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         : { supervisedAssistantIndices: [], supervisedToolCallIndices: [] };
       // Measured, not estimated: the refusal cost is a real token count. A
       // candidate with nothing supervisable costs nothing to train on, and says so.
-      const refusalTokens = tokenizer.countSupervisedTokens({
+      const refusalTokens = twinTokens ?? measuredTokens(tokenizer, {
         family: unit.spec.family,
         messages: refusalMessages,
         ...(tools ? { tools } : {}),
@@ -2486,6 +2661,30 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         runs: gate ? gate.runs.map((run) => ({ validator: run.validator, version: run.version })) : [],
         tokenizerName: tokenizer.name, supervisedTokens: refusalTokens,
       });
+      const runnerSourceDigests = { generationPlan: plan.digest, splitAssignment: plan.splitAssignmentDigest,
+        sealedAttestation: policy.attestationDigest, realization: unit.realization.digest,
+        ...(unit.twinInstrumentation ? { selectiveTwin: sha256Hex(stableStringify(unit.twinInstrumentation)) } : {}) };
+      Object.assign(refusalProvenance.sourceDigests, runnerSourceDigests);
+      const { digest: _planDigest, ...planBody } = plan;
+      const { attestationDigest: _attestationDigest, ...attestationBody } = policy.sealedAttestation;
+      const artifacts: Record<string, string> = {};
+      const retainArtifact = (value: unknown): void => { const bytes = stableStringify(value); artifacts[sha256Hex(bytes)] = bytes; };
+      retainArtifact(unit.spec);
+      retainArtifact({ hiddenFacts: unit.spec.oracle.hiddenFacts, receipts: unit.spec.oracle.receipts,
+        sections: unit.spec.oracle.sections, candidates: unit.spec.oracle.advertisedCandidates });
+      retainArtifact(planBody);
+      retainArtifact({ seed: plan.seed, policyDigest: policy.digest,
+        units: plan.units.map((entry) => ({ unitId: entry.unitId, split: entry.spec.split, lineage: entry.spec.lineage })) });
+      retainArtifact(attestationBody);
+      retainArtifact(unit.preference ? unit.realization.context : { specId: unit.spec.specId, context: unit.realization.context });
+      for (const run of gate?.runs ?? []) retainArtifact(run.evidence);
+      if (unit.twinInstrumentation) { retainArtifact(unit.twinInstrumentation); retainArtifact(proseScores.get(unit.unitId)); }
+      for (const [digest, bytes] of Object.entries(artifacts)) journal!.save(`artifact:${digest}`, bytes);
+      journal!.save(`validation:${attemptId}`, { stages, runs: gate?.runs ?? [], sourceDigests: refusalProvenance.sourceDigests,
+        measuredTokens: refusalTokens, budgetTarget: unit.target, tokenizer: tokenizer.name,
+        artifactDigests: Object.keys(artifacts),
+        scenarioSpec: unit.spec, realization: unit.realization,
+        ...(unit.twinInstrumentation ? { selectiveTwin: unit.twinInstrumentation, proseQuality: proseScores.get(unit.unitId) } : {}) });
       const commitRefused = (reason: StageFailure, extra: Record<string, unknown> = {}): void => {
         // The failed attempt is COMMITTED AS REFUSED with its RAW and PARSED
         // text retained, and the next attempt supersedes it. It is never edited
@@ -2499,7 +2698,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
           gateFindings: reason.findings,
           ...extra,
         };
-        options.store!.commitCandidate({
+        const alreadyCommitted = options.store!.hasAttempt(attemptId);
+        if (!alreadyCommitted) options.store!.commitCandidate({
           unitId: unit.unitId,
           attemptId,
           ...(parentAttemptId ? { parentAttemptId } : {}),
@@ -2512,12 +2712,25 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
             findings,
           },
         });
-        recordSpend(ledger, budgetTargetFor(unit.spec.family, lastBucket), refusalTokens);
+        recordSpend(ledger, unit.target, refusalTokens);
         unitSupervisedTokens += refusalTokens;
-        options.onEvent?.({ kind: "rejected", unitId: unit.unitId, attemptId, reason: reason.detail });
+        if (!alreadyCommitted) options.onEvent?.({ kind: "rejected", unitId: unit.unitId, attemptId, reason: reason.detail });
         parentAttemptId = attemptId;
         previousFailure = reason;
       };
+
+      // Teacher and student tokenizers differ. A teacher max_tokens bound is a
+      // dispatch guard, not proof that the rendered student labels fit the cap.
+      const measuredBudget = checkBudget({ ledger, budget, target: unit.target, maxCompletionTokens: refusalTokens });
+      const persisted = options.store.readCandidate(attemptId)?.admission.findings;
+      if (persisted?.code === "measured-token-budget") failure = stageFailure("VALIDATED", "measured-token-budget",
+        String(persisted.detail), { raw: stages.raw, parsed: stages.parsed });
+      if (!measuredBudget.allowed) {
+        const reason = stageFailure("VALIDATED", "measured-token-budget", measuredBudget.reason ?? "measured token cap exceeded", stages);
+        commitRefused(reason);
+        refusedAt = `budget:${unit.target}`;
+        break;
+      }
 
       if (failure) {
         commitRefused(failure);
@@ -2528,18 +2741,16 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       const validated = gate!;
       const selection = validated.targetSelection
         ?? selectTargets(validated.messages, { targetAssistantIndex: lastAssistantIndex(validated.messages) });
-      const supervised = tokenizer.countSupervisedTokens({
+      const supervised = twinTokens ?? measuredTokens(tokenizer, {
         family: unit.spec.family,
         messages: validated.messages,
         ...(tools ? { tools } : {}),
         targetSelection: selection,
       });
-      recordSpend(ledger, budgetTargetFor(unit.spec.family, lastBucket), supervised);
-      unitSupervisedTokens += supervised;
-
       // Independent review by a DIFFERENT model.
-      const reviewPrompt = reviewPromptFor(unit.spec, validated.messages);
-      const reviewCompletion = await options.reviewer.complete({
+      const reviewPrompt = reviewPromptFor(unit.spec, validated.messages)
+        + (unit.preference ? `\nPreference (judge source-sensitive chosen/rejected ordering as well):\n${stableStringify(unit.preference)}` : "");
+      const reviewCompletion = await journal!.complete(options.reviewer, {
         attemptId: `${attemptId}-review`,
         system: reviewPrompt,
         messages: [],
@@ -2553,12 +2764,13 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         runs: validated.runs.map((item) => ({ validator: item.validator, version: item.version })),
         tokenizerName: tokenizer.name, supervisedTokens: supervised,
       });
-      const record = buildCandidateRecord({ unit, messages: validated.messages, tools, provenance });
+      Object.assign(provenance.sourceDigests, runnerSourceDigests);
+      const record = buildCandidateRecord({ unit, messages: unit.preference?.prompt ?? validated.messages, tools, provenance });
 
       if (!isReviewScores(scores)) {
         const refused = stageFailure(
           "VALIDATED", "review-unusable", scores.problems.join("; "),
-          { raw: reviewCompletion.content, parsed: null }, { problems: scores.problems },
+          { raw: stages.raw, parsed: stages.parsed }, { problems: scores.problems },
         );
         commitRefused(refused, { reviewRaw: reviewCompletion.content });
         refusedAt = "VALIDATED:review-unusable";
@@ -2571,8 +2783,15 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       const payloadDigest = computePayloadDigest({
         messages: record.messages,
         ...(tools ? { tools } : {}),
+        ...(unit.preference ? { preference: unit.preference } : {}),
       });
       const evidence: GateEvidence[] = validated.runs.map((run) => toEvidence(run, payloadDigest));
+      if (unit.preference) evidence.push(...[
+        { validator: "selective-fidelity", version: "conditioned-twins-v1", payloadDigest, passed: true,
+          evidenceDigest: sha256Hex(stableStringify(unit.twinInstrumentation)) },
+        { validator: "prose-quality-retention", version: options.proseQualityScorer!.version, payloadDigest, passed: true,
+          evidenceDigest: sha256Hex(stableStringify(proseScores.get(unit.unitId))) },
+      ]);
       const review: ReviewRecord = {
         reviewerIdentity: `${options.reviewer.identity.provider}:${options.reviewer.model}`,
         reviewerPromptDigest: sha256Hex(reviewPrompt),
@@ -2596,11 +2815,15 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         visibilityRequirements: unit.spec.oracle.visibilityRequirements,
         authorityRequirements: unit.spec.oracle.authorityRequirements,
         targetSelection: selection,
+        ...(unit.preference ? { preference: unit.preference, preferenceAxis: unit.preference.axis,
+          targetSelection: { supervisedAssistantIndices: [], supervisedToolCallIndices: [] },
+          preferenceTargets: { chosen: selectTargets(unit.preference.chosen, { targetAssistantIndex: unit.preference.chosen.length - 1 }),
+            rejected: selectTargets(unit.preference.rejected, { targetAssistantIndex: unit.preference.rejected.length - 1 }) } } : {}),
       };
 
       let admitted: AdmittedRecordV1;
       try {
-        admitted = admitCandidate(admissionInput);
+        admitted = (options.store.hasAttempt(attemptId) ? options.store.readAdmittedRecord(attemptId) : null) ?? admitCandidate(admissionInput);
         // Verified BEFORE committing. The store re-verifies on every read, so a
         // silent downgrade here would be invisible until export.
         verifyAdmissionCertificate(admitted);
@@ -2615,7 +2838,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         continue;
       }
 
-      const committed = options.store.commitCandidate({
+      const existing = options.store.findAttempt(attemptId);
+      const committed = existing ? { status: existing.status } : options.store.commitCandidate({
         unitId: unit.unitId,
         attemptId,
         ...(parentAttemptId ? { parentAttemptId } : {}),
@@ -2623,6 +2847,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         admission: { status: "admitted", admittedRecord: admitted },
       });
       if (committed.status !== "admitted") {
+        recordSpend(ledger, unit.target, supervised);
+        unitSupervisedTokens += supervised;
         // The store already REGISTERED this attempt (it downgraded rather than
         // refused). Re-committing the same attempt id with different bytes is
         // exactly what the store is designed to reject, so the admission state
@@ -2641,13 +2867,16 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         continue;
       }
       admittedRecord = admitted;
+      // Exactly once per replayed durable attempt, including review refusals.
+      recordSpend(ledger, unit.target, supervised);
+      unitSupervisedTokens += supervised;
       admittedAttemptId = attemptId;
       refusedAt = null;
       diversityRepaired.push({
         text: candidateSupervisedText(validated.messages, selection),
         clusterId: unit.realization.clusterId,
       });
-      options.onEvent?.({
+      if (!existing) options.onEvent?.({
         kind: "admitted", unitId: unit.unitId, attemptId,
         certificateDigest: admitted.admissionCertificate.certificateDigest,
       });
@@ -2656,10 +2885,11 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
 
     if (admittedRecord) {
       admittedRecords.push(admittedRecord);
-      diversitySelected.push({
-        text: assistantTextOf(admittedRecord.messages),
-        clusterId: unit.realization.clusterId,
-      });
+    }
+    if (!refusedAt?.startsWith("budget:") && options.store.unit(unit.unitId)) {
+      const effective = admittedAttemptId ?? options.store.latestEligibleCandidate(unit.unitId)?.attemptId;
+      if (effective) options.store.finalizeUnit(unit.unitId, effective);
+      options.store.markUnitComplete(unit.unitId);
     }
     unitOutcomes.push({
       unitId: unit.unitId, family: unit.spec.family, targets,
@@ -2668,12 +2898,28 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     });
   }
 
-  if (!dryRun && options.exportOptions && admittedRecords.length > 0) {
-    // Only route: `exportAdmittedCorpus` -> `exportTrainingJsonl`.
-    exportAdmittedCorpus(admittedRecords, options.exportOptions);
+  const selection = selectAdmittedRecords(plan, admittedRecords, policy, selectionPolicy);
+  for (const record of selection.selected) {
+    const unit = plan.units.find((entry) => entry.unitId === record.unitId)!;
+    diversitySelected.push({ text: record.preference ? record.preference.chosen.map((message) => message.content).join("\n")
+      : candidateSupervisedText(record.messages, record.targetSelection), clusterId: unit.realization.clusterId });
   }
+  const complete = !dryRun && !unitOutcomes.some((outcome) => outcome.refusedAt?.startsWith("budget:"));
+  if (complete) {
+    for (const stage of ["generate", "validate", "admit"] as const) options.store!.markStageComplete(stage);
+    journal!.save("selection", { digest: selection.digest, selectedUnitIds: selection.selected.map((record) => record.unitId),
+      excluded: selection.excluded, clusterCounts: selection.clusterCounts });
+  }
+  const trainingRecords = selection.selected.filter((record) => record.split === "train");
+  if (complete && options.exportOptions && trainingRecords.length > 0) {
+    // Only route: `exportAdmittedCorpus` -> `exportTrainingJsonl`.
+    exportAdmittedCorpus(trainingRecords, { ...options.exportOptions, resume: true });
+    options.store!.markStageComplete("export");
+  }
+  if (complete && (!options.exportOptions || trainingRecords.length === 0)) options.store!.markStageComplete("export");
+  if (complete) { options.store!.markStageComplete("done"); options.store!.setState("complete"); }
 
-  return {
+  const report: PilotReport = {
     runId: options.runId,
     dryRun,
     executed: !dryRun,
@@ -2700,8 +2946,14 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     unitOutcomes,
     admitted: admittedRecords.length,
     attempts: totalAttempts,
+    complete, planDigest: plan.digest, selected: selection.selected.length,
+    selection: { digest: selection.digest, selectedUnitIds: selection.selected.map((record) => record.unitId),
+      excluded: selection.excluded, clusterCounts: selection.clusterCounts },
   };
-}// ---------------------------------------------------------------------------
+  if (complete) journal!.save(`report:${sha256Hex(stableStringify(budget))}`, report);
+  return report;
+}
+// ---------------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------------
 

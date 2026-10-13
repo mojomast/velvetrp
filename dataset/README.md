@@ -13,9 +13,11 @@ npm run foundry -- help
 npm run foundry -- verify
 npm run foundry -- plan --units 175 --seed pilot-1
 npm run foundry -- plan --units 20 --seed tool-check --families tool-selection
+npm run foundry -- plan --units 175 --k 3 --seed pilot-1
 ```
 
-`plan` is deterministic and provider-free. Its units are planned scenarios,
+`plan` is deterministic and provider-free. `--units` sets the scenario-seed count;
+`--k` sets realizations per seed (default 1). Plan rows are scheduled realizations,
 **not generated training examples or measured model results**. The family mix
 keeps a nonzero roleplay-retention tranche and separate tool-initiation and
 argument-binding priorities.
@@ -46,13 +48,15 @@ VELVET_REVIEWER_MODEL=kimi:k3 npm run foundry -- generate \
 ```
 
 The second command is a zero-dispatch dry run. Missing/unconfigured tokenizer
-assets still refuse before teacher calls. Actual execution additionally requires
-a configured run store through the embedding API and the remaining pilot wiring.
+assets still refuse before teacher calls. With `--execute`, the CLI opens or
+resumes its own durable run store under `.dataset/runs/`. `--run-id` and
+`--artifact-root` control that storage. See [`RUNNER.md`](RUNNER.md) for scheduling,
+resume, twin inputs, independent approval and selected training export.
 
 `runPipeline()` is the injectable orchestration API. With test transports it
 exercises scenario realization, teacher completion, parsing/sanitization, family
-gates, bounded repairs, independent review, certified admission, and persisted
-attempts. `main()` accepts injectable ports for embedding. The configured production
+gates, bounded repairs, independent review, certified admission, finalized
+attempts, K scheduling and cluster-capped selection. `main()` accepts injectable ports for embedding. The configured production
 port uses real final TRL labels; no test token counter ships as a CLI implementation.
 
 Modules:
@@ -68,6 +72,9 @@ Modules:
 | `src/export.ts` | Atomic training JSONL export plus separate provenance/checksum manifests |
 | `src/templateProfiles.ts` | Pinned model templates and measured-tokenizer export gate |
 | `src/tokenizer.ts` | Local CPU tokenizer bridge, measured-profile loader and registry integration |
+| `src/pipelineJournal.ts` | Durable request/response, validation-artifact and report checkpoints |
+| `src/generationPolicy.ts` | Metadata-only attestation verification and generated lineage/split enforcement |
+| `src/selection.ts` | Quality-ranked, cluster-capped selection with indivisible twin groups |
 
 ### Teacher configuration
 
@@ -107,6 +114,9 @@ does not by itself materialize both conditioned arms. Neither builder grants
 admission. Review and certify each arm before export, and keep the pair together
 in its lineage, split and selection cluster. A prose-quality scorer must provide
 the separate regression measurement; its absent implementation fails closed.
+The runner accepts `pairedTwins` draft inputs through its embedding API, verifies
+their actual generator provenance, independently reviews each conditioned arm,
+and selects both together. It counts both branches with their full prompt context.
 
 The current preference validator imposes a word-count ratio of **1.05–1.5**.
 This is a length heuristic, not a semantic-similarity measurement. Equal-length
@@ -116,12 +126,18 @@ the fact change, not from mechanically padding a rejected answer.
 ### Pilot report interpretation
 
 - `plannedPrompts`: diversity of scenario inputs, including dry runs.
-- `beforeValidation`: actual teacher candidate outputs, including repair attempts.
+- `beforeValidation`: actual teacher outputs and explicitly supplied twin drafts,
+  including repair attempts.
 - `afterValidation`: candidates that passed family gates.
 - `afterRepair`: admitted outputs after the bounded attempt loop, including
   candidates that succeeded without repair.
-- `afterSelection`: the currently admitted set. This is admission-based selection;
-  the final multi-realization, cluster-capped selection policy is still to be wired.
+- `afterSelection`: actual quality-ranked, cluster-capped selected outputs. Twin
+  groups consume two slots and remain together. Default cap: eight records per
+  cluster; `--cluster-cap` changes it. An embedding caller can also set a total cap.
+- `admitted` and `selected` are separate counts. `selection` lists chosen unit IDs,
+  exclusion reasons, cluster counts and the selection digest.
+- `complete` is false for dry runs and budget pauses. Successful completion means
+  all scheduled attempt loops finished; it does not mean every candidate passed.
 
 Repeated answers therefore reduce output diversity even if prompts are varied.
 Provenance records the real generation temperature and reviewer provider.
@@ -134,12 +150,10 @@ Before a production run:
 - Use the measured Qwen3 profile and local tokenizer runtime. Actual mask/prefix
   evidence is committed and satisfies the template export gate; record/certificate
   approvals remain independently required.
-- Complete orchestration resume/finalization, K-realization scheduling, paired-twin
-  scheduling and cluster-capped selection. The primitives exist; the batch runner
-  currently schedules one realization per unit.
-- Bind generation's split plan to the ids/counts-only sealed attestation and
-  enforce lineage disjointness across the planned batch. Corpus verification
-  validates the frozen benchmark, not the generated scenario plan.
+- Choose the seed/K/selection policy. Resume/finalization, paired-twin scheduling,
+  and attestation-bound generated splits are implemented and covered by crash,
+  repair, selection and export integration tests. Training export includes only
+  selected `train` records and requires an independently approved registry.
 - Confirm provider training-use terms and run the independent prose-quality
   regression measurement. Generated provenance retains license `unverified`.
 
@@ -152,13 +166,15 @@ diversity and prose retention before scaling. No training data has been generate
 npm run typecheck:foundry
 npm exec -- tsx --test --test-concurrency=1 dataset/test/cli.test.ts
 npm exec -- tsx --test --test-concurrency=1 dataset/test/selectiveTwins.test.ts
+npm exec -- tsx --test --test-concurrency=1 dataset/test/runner.test.ts
 ```
 
 Use focused files during iteration. The full foundry suite is a serial wave-boundary
 check: `npm run test:foundry`. See `BASELINE_SIGNAL.md`, `CORRECTIONS_LOG.md`, and
 `eval/CORPUS_HANDOFF.md` for measured baseline results, fixes, and benchmark handoff.
 
-Latest integration validation: owning typecheck passed; **352 foundry tests passed,
-0 failed, 0 skipped**, including the live CPU bridge; **8 real Python runtime tests
-passed**. The corpus verifies through the CLI. These are infrastructure checks,
+Latest runner integration validation: owning typecheck passed; **373 foundry tests
+passed, 0 failed, 0 skipped**, including the live CPU bridge and runner/export
+integration. The 175-seed K=3 plan schedules 525 rows; the six-row Flash/Kimi dry
+run makes zero attempts. The corpus verifies through the CLI. These are infrastructure checks,
 not teacher-generated data or model-quality scores.

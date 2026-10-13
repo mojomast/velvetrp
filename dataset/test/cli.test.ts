@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { main, type CliDependencies } from "../src/cli.js";
 import type { TeacherClient } from "../src/teacher.js";
@@ -90,10 +92,29 @@ test("an injected dry run makes no teacher or reviewer calls", async () => {
   assert.equal((JSON.parse(result.out) as { executed: boolean }).executed, false);
 });
 
-test("execute with a tokenizer still refuses before clients without a run store", async () => {
-  const result = await invoke(["generate", "--execute"], {
-    tokenizer: { name: "test-only counter", countSupervisedTokens: () => 1 },
+test("CLI owns a durable run store and resumes without teacher redispatch", async (t) => {
+  const root = mkdtempSync("/tmp/opencode/foundry-cli-runner-");
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let calls = 0;
+  const client = (model: string, content: string): TeacherClient => ({
+    model, baseUrlDigest: "digest", identity: { provider: "test", model, baseUrlDigest: "digest", credentialSource: "env" },
+    complete: async (request) => { calls += 1; return { content, toolCalls: [], finishReason: "stop", usage: null,
+      responseId: null, attempts: 1, latencyMs: 0, requestDigest: request.attemptId }; },
   });
-  assert.equal(result.code, 1);
-  assert.match(result.err, /configured run store/);
+  const ports = {
+    tokenizer: { name: "test-only counter", countSupervisedTokens: () => 1 },
+    generator: client("teacher", "The lantern gutters beside the closed ledger."), reviewer: client("reviewer", JSON.stringify({
+      characterization: 0.8, dialogueQuality: 0.8, coherence: 0.8, narrativeInitiative: 0.8, playerAgency: 0.9, nonRepetitive: 0.8,
+      verdict: "accept", rationale: "fixture review" })),
+  };
+  const args = ["generate", "--execute", "--units", "2", "--k", "2", "--families", "roleplay-conversation",
+    "--run-id", "cli-resume", "--artifact-root", root];
+  const first = await invoke(args, ports);
+  assert.equal(first.code, 0);
+  assert.equal(calls, 8);
+  const resumed = await invoke(args, ports);
+  assert.equal(resumed.out, first.out);
+  assert.equal(calls, 8);
+  const snapshot = JSON.parse(readFileSync(join(root, "runs", "cli-resume", "manifest.json"), "utf8")) as { state: string };
+  assert.equal(snapshot.state, "complete");
 });
