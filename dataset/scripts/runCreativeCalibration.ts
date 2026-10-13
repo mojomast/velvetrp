@@ -30,9 +30,9 @@ import { createTokenizerBridge } from "../src/tokenizer.js";
 import { stableStringify } from "../src/spec.js";
 
 /** Frozen preregistration identity. Changing any value here is a protocol change. */
-export const CREATIVE_RUN_ID = "creative-2026-10-13-v4";
-export const CREATIVE_SEED = "creative-2026-10-13-4";
-export const CREATIVE_UNITS = 10;
+export const CREATIVE_RUN_ID = "creative-2026-10-13-v5";
+export const CREATIVE_SEED = "creative-2026-10-13-5";
+export const CREATIVE_UNITS = 30;
 export const CREATIVE_MAX_REPAIRS = 2;
 /** Multi-turn conversations need far more output room than a single narration.
  * The provider advertises a 128k output ceiling; 16384 gives an 8-exchange
