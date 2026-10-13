@@ -3,7 +3,7 @@
 You are picking up a **finished phase**, not a live experiment. Read this first,
 then the linked reports. Everything here is measured; nothing is projected.
 
-Branch `feat/foundry-context-diagnostic`. Last commit at handoff: `880f90d`.
+Branch `feat/foundry-context-diagnostic`. Last commit at handoff: `1bed2a5`.
 
 ---
 
