@@ -194,9 +194,9 @@ export class TokenizerUnavailableError extends PipelineRefusal {
   constructor(detail: string) {
     super("tokenizer-unavailable", [
       `the token budget is measured in supervised assistant tokens AFTER MASKING, which needs a real ` +
-        `tokenizer; ${detail}. Refusing to proceed: an unmeasured budget is not a budget, and treating a ` +
-        `missing tokenizer as "unlimited" is how a run spends money nobody approved. Supply a TokenizerPort ` +
-        `backed by measured TRL/Transformers output, or run with dryRun (which spends nothing and needs none).`,
+        `tokenizer; ${detail}. Supply a TokenizerPort backed by measured TRL/Transformers output ` +
+        `to account for tokens under training loss. For provider-free scenario planning without a ` +
+        `tokenizer, use the foundry plan command.`,
     ]);
     this.name = "TokenizerUnavailableError";
   }
@@ -387,10 +387,9 @@ export interface BudgetDecision {
  *
  * The worst case is the caller's explicit `maxTokens`, and nothing else. The
  * prompt is CONTEXT, which the mask excludes, so it consumes no supervised
- * budget; context and provider spend are bounded by the run store's own
- * `maxTotalTokens` / `maxCostUsd` reservations, which is the correct place for
- * them. Adding prompt tokens here would have inflated the training budget with
- * numbers that never reach the optimizer.
+ * budget. Provider billing accounting is optional for the funded RouteTok route
+ * and is not measured here. Adding prompt tokens here would inflate the training
+ * budget with numbers that never reach the optimizer.
  */
 export function checkBudget(input: {
   readonly ledger: BudgetLedger;
@@ -2400,9 +2399,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
 
       // Budget preflight BEFORE dispatch. The worst case is the caller's own
       // maxTokens; the prompt is masked context and consumes no supervised
-      // budget. This is not provider billing accounting: reservation/settlement
-      // of transport retries, review calls and uncertain requests remains a
-      // separate integration requirement before a live pilot.
+      // budget. Provider billing measurement for the funded RouteTok route is
+      // optional; this check accounts for supervised training tokens only.
       const decision = checkBudget({
         ledger, budget, target: preflightTarget, maxCompletionTokens,
       });

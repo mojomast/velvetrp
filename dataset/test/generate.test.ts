@@ -391,7 +391,8 @@ describe("2. the token budget fails closed", () => {
           assert.ok(error instanceof TokenizerUnavailableError);
           assert.equal(error.code, "tokenizer-unavailable");
           assert.match(error.message, /supervised assistant tokens AFTER MASKING/);
-          assert.match(error.message, /"unlimited" is how a run spends money nobody approved/);
+          assert.match(error.message, /tokens under training loss/);
+          assert.match(error.message, /foundry plan command/);
           assert.match(error.message, /TokenizerPort/);
           return true;
         },

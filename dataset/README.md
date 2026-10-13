@@ -61,6 +61,12 @@ Modules:
 
 ### Teacher configuration
 
+The selected teacher route is **RouteTok DeepSeek Flash through `agentrouter`**,
+using the operator's funded credit balance. Provider cost measurement and billing
+reservation/settlement are optional reporting, not prerequisites for the pilot.
+The client still returns provider usage when available. Supervised-token counting
+is a separate training-dataset requirement used for masked loss budgets and export.
+
 The client reads `VELVET_TEACHER_BASE_URL`, `VELVET_TEACHER_API_KEY` and
 `VELVET_TEACHER_MODEL` from the environment; the teacher model defaults to
 `deepseek-v4-flash`. An existing `provider.agentrouter` configuration is a
@@ -117,10 +123,6 @@ Before a production run:
 
 - Supply pinned TRL/Transformers measurements for supervised-token counting,
   masks and prefix preservation. Export remains closed without that evidence.
-- Wire provider reservation/settlement around **every** teacher/reviewer HTTP
-  attempt, including retries and uncertain outcomes. `runPipeline()` currently
-  tracks supervised tokens but does not call the run store's billing primitives.
-  Supervised training tokens are not a provider-spend ledger.
 - Complete orchestration resume/finalization, K-realization scheduling, paired-twin
   scheduling and cluster-capped selection. The primitives exist; the batch runner
   currently schedules one realization per unit.

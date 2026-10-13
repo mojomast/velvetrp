@@ -215,11 +215,19 @@ recorded flip. Neither contrast construction nor substring instrumentation grant
 admission or supplies a prose-quality score.
 
 See `README.md` for the runnable commands and remaining live-pilot integration.
-In particular, the batch runner has not yet wired provider reservation/settlement,
-resume/finalization, K scheduling or sealed-attestation-based split enforcement.
+In particular, the batch runner has not yet wired resume/finalization, K scheduling
+or sealed-attestation-based split enforcement.
 The earlier claim that provider spend was already bounded by the run store was
 unsupported by the orchestration code; the billing primitives existed but were
 not called. No live dataset generation has run.
+
+The operator clarified that generation uses RouteTok DeepSeek Flash through
+`agentrouter` with ample funded credit. Provider billing reservation/settlement
+is therefore optional reporting, not a pilot prerequisite. Masked supervised
+token measurements still serve the training budget and template/export evidence;
+they are not a check of the operator's available credits. The tokenizer error
+message now states that requirement accurately and points to the provider-free
+`plan` command, rather than incorrectly promising a tokenizer-free pipeline dry run.
 
 ---
 
