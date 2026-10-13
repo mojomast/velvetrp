@@ -69,6 +69,10 @@ model write naturally without inventing facts. **They did not**, and no further
 tuning against those frozen cases is authorized.
 
 Full corpus identity and pins: [`CORPUS_EXPORT_V1.md`](CORPUS_EXPORT_V1.md).
+**The dataset itself is committed at `dataset/exports/corpus-2026-10-13-v1/`**
+(`training.jsonl`, `provenance.json`, `checksums.json`, and
+`materialized/sft.jsonl` with exact token-level labels), so a training agent can
+clone and train without a separate transfer.
 Training instructions: [`COLAB_TRAINING_HANDOFF.md`](COLAB_TRAINING_HANDOFF.md).
 
 Actual yields, blinded prose coverage and immutable artifact pins are in

@@ -17,16 +17,40 @@ authorized by this approval, and none has been run.**
 
 ## Bundle contents
 
+**The bundle is committed in this repository** at
+`dataset/exports/corpus-2026-10-13-v1/`. The working copy the exporter writes to
+(`.dataset/exports/…`) is gitignored; the committed copy is byte-identical and was
+verified against `checksums.json` after copying.
+
 | File | SHA-256 | Size |
 |---|---|---:|
 | `training.jsonl` | `83c8ade8b29c9db97c88e42409fd2662c3f8e04d67a2ff429d5e1056cc0fb154` | 676,593 B |
 | `provenance.json` | `43daee55c89196c51aab3a4a7b824c64b2cc42be4cb372a773c12a19125bbd7c` | 1,287,066 B |
 | `checksums.json` | checksum manifest | 445 B |
+| `materialized/sft.jsonl` | `6f507c79757c91fe9e5e97d2f583224b7d82a46fe36fea37dd95fb9c982816ed` | exact token-level labels |
+| `materialized/checksums.json` | manifest for the materialized labels | |
 
 - `checksumDigest` **`6f14e9d57d215961b16208437ce278b0402a477049c6f48e6aa561aab198e1f8`**
 - `corpusDigest` **`88052112234c603e440387f7a624de3b6ccfed10ddfa1379ac26718cb4ed6f6a`**
 
 **155 records, all `train` split.** No dev or sealed-test row is in the bundle.
+
+### Materialized labels
+
+`materialized/sft.jsonl` holds the exact `inputIds` and `labels` produced by the
+real pinned Qwen3-8B tokenizer, one JSON object per line, with a
+`materializationDigest` per row. **Prefer these over rebuilding masks by hand** —
+`labels` already contain `-100` for every non-supervised token, including the
+simulated player's turns, and a hand-rolled masking pass can silently break that.
+
+They live in a **separate subdirectory with their own checksum manifest**, never
+inside the bundle's `checksums.json`, because that manifest's digest is itself
+pinned by the independent approval. Adding files to it would invalidate the pin.
+
+Verified: 155 rows, supervised-token total **39,435**, matching `provenance.json`
+exactly for every record; sequence lengths **139–2716** tokens, inside the 4096
+policy limit. `materialized/checksums.json` records
+`sourceChecksumDigest` `6f14e9d5…` so the labels are bound to this exact bundle.
 
 | Family | Records |
 |---|---:|

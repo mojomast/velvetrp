@@ -22,15 +22,21 @@ the export approval.
 
 | Item | Value |
 |---|---|
-| Bundle | `.dataset/exports/corpus-2026-10-13-v1/` (**not committed**; under `.dataset/`) |
+| Bundle | `dataset/exports/corpus-2026-10-13-v1/` — **committed in this repository** |
 | Records | 155, all `train` |
 | Supervised tokens | 39,435 |
 | Families | world 46 · tool 39 · boundary 30 · narration 21 · creative 19 |
 | `training.jsonl` | `83c8ade8b29c9db97c88e42409fd2662c3f8e04d67a2ff429d5e1056cc0fb154` |
 | `provenance.json` | `43daee55c89196c51aab3a4a7b824c64b2cc42be4cb372a773c12a19125bbd7c` |
+| `materialized/sft.jsonl` | `6f507c79757c91fe9e5e97d2f583224b7d82a46fe36fea37dd95fb9c982816ed` |
 | `checksumDigest` | `6f14e9d57d215961b16208437ce278b0402a477049c6f48e6aa561aab198e1f8` |
 | `corpusDigest` | `88052112234c603e440387f7a624de3b6ccfed10ddfa1379ac26718cb4ed6f6a` |
 | Approval | `dataset/frozen/corpus-2026-10-13-v1-approval.json` — `2abc5e6d829809c65e1c62a0482a5968191850b4ed8a4d0eadccc2d4a6207e14` |
+
+**The data is in the repo**, so a training agent can clone and train without a
+separate transfer. `materialized/sft.jsonl` carries the exact token-level
+`inputIds`/`labels`; prefer it over rebuilding masks. The exporter still writes to
+`.dataset/exports/` (gitignored); the committed copy is byte-identical.
 
 Full pins and review history: [`CORPUS_EXPORT_V1.md`](CORPUS_EXPORT_V1.md).
 Training instructions: [`COLAB_TRAINING_HANDOFF.md`](COLAB_TRAINING_HANDOFF.md).

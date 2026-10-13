@@ -1,0 +1,16 @@
+{
+  "algorithm": "sha256",
+  "corpusDigest": "88052112234c603e440387f7a624de3b6ccfed10ddfa1379ac26718cb4ed6f6a",
+  "files": [
+    {
+      "path": "provenance.json",
+      "sha256": "43daee55c89196c51aab3a4a7b824c64b2cc42be4cb372a773c12a19125bbd7c"
+    },
+    {
+      "path": "training.jsonl",
+      "sha256": "83c8ade8b29c9db97c88e42409fd2662c3f8e04d67a2ff429d5e1056cc0fb154"
+    }
+  ],
+  "recordCount": 155,
+  "version": "training-export-v1"
+}

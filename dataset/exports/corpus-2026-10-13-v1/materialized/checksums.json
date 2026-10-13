@@ -1,0 +1,14 @@
+{
+  "algorithm": "sha256",
+  "files": [
+    {
+      "path": "sft.jsonl",
+      "sha256": "6f507c79757c91fe9e5e97d2f583224b7d82a46fe36fea37dd95fb9c982816ed"
+    }
+  ],
+  "policyDigest": "a691ea3d219fb2faaef1c2694599589b711ed09a44ad10dfa73f40a69a683053",
+  "preferenceConsumer": "explicit-selected-token-mask-required",
+  "recordCount": 155,
+  "sourceChecksumDigest": "6f14e9d57d215961b16208437ce278b0402a477049c6f48e6aa561aab198e1f8",
+  "version": "training-export-v1-materialized"
+}

@@ -27,7 +27,7 @@
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertExportable, type ApprovedAdmissionRegistry } from "../src/admission.js";
@@ -171,10 +171,34 @@ function main(argv: readonly string[]): void {
 
   if (reload) {
     const materialized = preprocessTrainingExport({ outputDir: result.outputDir, checksumDigest, approvedRegistry: registry, tokenizer });
+
+    // Persist the exact token-level supervision. The handoff prefers materialized
+    // labels over rebuilding masks by hand, because a hand-rolled masking pass can
+    // silently supervise the simulated player's turns.
+    //
+    // Written to a SEPARATE subdirectory with its OWN checksum manifest. It must
+    // never join the pinned bundle's checksums.json: that manifest's digest is
+    // itself pinned by the independent approval, so adding files to it would
+    // invalidate the pin. The bundle's three files stay byte-identical.
+    const materializedDir = join(result.outputDir, "materialized");
+    mkdirSync(materializedDir, { recursive: true });
+    const sftLines = materialized.sft.map((row) => stableStringify(row)).join("\n") + (materialized.sft.length ? "\n" : "");
+    writeFileSync(join(materializedDir, "sft.jsonl"), sftLines);
+    const materializedFiles = [{ path: "sft.jsonl", sha256: hash(sftLines) }];
+    writeFileSync(join(materializedDir, "checksums.json"), stableStringify({
+      algorithm: "sha256", version: "training-export-v1-materialized",
+      recordCount: materialized.sft.length, policyDigest: materialized.policyDigest,
+      sourceChecksumDigest: checksumDigest,
+      preferenceConsumer: materialized.preferenceConsumer,
+      files: materializedFiles,
+    }, 2) + "\n");
+
     process.stdout.write(stableStringify({
       materializedRows: materialized.sft.length + materialized.preference.length,
       supervisedTokens: materialized.sft.reduce((sum, row) => sum + row.labels.filter((label) => label !== -100).length, 0),
       policyDigest: materialized.policyDigest,
+      materializedDir, materializedSft: join(materializedDir, "sft.jsonl"), materializedSftSha256: hash(sftLines),
+      materializedChecksumDigest: hash(readFileSync(join(materializedDir, "checksums.json"))),
     }, 2) + "\n");
   }
 }
