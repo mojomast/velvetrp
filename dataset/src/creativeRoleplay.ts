@@ -1653,18 +1653,29 @@ const PLAYER_IMPERSONATION_HARD: readonly RegExp[] = Object.freeze([
  * the player. Only refused OUTSIDE a question, because "did you open it?" asks
  * the player something and "I hope you are all right" wishes them well. Both are
  * legal dialogue; "You open the door" is not.
+ *
+ * The last pattern covers INTERNAL-STATE claims: a main-clause assertion about
+ * what the player wants, needs, knows, thinks, believes, remembers, cares about,
+ * hopes, prefers or expects. A character may address the player's mind
+ * ("I know you want to help", "if you want to leave") but may not state it as
+ * fact ("You want to know what I want"). The main-clause guard below supplies
+ * that distinction; a comma straight after the verb marks the discourse marker
+ * ("You know, ...") rather than an assertion and is exempt.
  */
 const PLAYER_IMPERSONATION_SOFT: readonly RegExp[] = Object.freeze([
   /\byou (?:open|opens|close|closes|take|takes|drop|drops|draw|draws|turn|turns|step|steps|go|goes|leave|leaves|walk|walks|sit|sits|stand|stands|laugh|laughs|nod|nods|smile|smiles|sigh|sighs|look|looks|reach|reaches|raise|raises|lower|lowers|follow|follows|wait|waits)\b/i,
   /\byour (?:face|eyes|voice|hand|hands|steps|grip|breath)\b/i,
   /\byou (?:are|feel|feels|seem|seems|look|looks) (?:relieved|afraid|guilty|grateful|sad|angry|happy|nervous|ashamed|hopeful|torn|empty|confused|annoyed|furious|cold|warm|shaken)\b/i,
+  /\byou (?:want|need|know|think|believe|remember|care|hope|prefer|expect)\b(?!\s*,)/i,
 ]);
 
 /**
- * A second-person action verb is ordinary ADDRESS, not impersonation, unless it
- * is asserted as a MAIN CLAUSE. "You open the door" states what the player did;
- * "if you stand where I stand", "with your hand on the stone", "when you do it"
- * are things a character says TO the player and do not decide for them.
+ * A second-person action or internal-state verb is ordinary ADDRESS, not
+ * impersonation, unless it is asserted as a MAIN CLAUSE. "You open the door"
+ * states what the player did and "You want to know what I want" states what the
+ * player wants; "if you stand where I stand", "with your hand on the stone",
+ * "when you do it", "I know you want to help" and "if you want to leave" are
+ * things a character says TO the player and do not decide for them.
  *
  * This guard applies ONLY to the SOFT patterns. A clause-initial assertion is
  * still refused, and the HARD patterns still catch reported speech, decisions

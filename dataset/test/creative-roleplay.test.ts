@@ -629,6 +629,72 @@ test("a character turn that impersonates the player is rejected", () => {
   }
 });
 
+test("a character asserting the player's internal state is rejected, while address is allowed", () => {
+  const plan = createCreativePlan({ seed: "impersonation", depth: 4 });
+  const build = (text: string): string[] => {
+    const { turns } = JSON.parse(syntheticTranscript(plan)) as { turns: { speaker: string; text: string }[] };
+    turns[1] = { speaker: "character", text };
+    return refusalCodes(JSON.stringify({ turns }), plan);
+  };
+
+  // MAIN-CLAUSE INTERNAL-STATE ASSERTIONS. The character states the player's own
+  // mind as fact. The first line is the exact string an independent judge caught:
+  // the player's uncertainty never established that want.
+  for (const text of [
+    "You want to know what I want, so here it is, and it's the first true thing said in this room tonight.",
+    "You want the ledger, and you have wanted it since the day we met.",
+    "You need to hear this before you go.",
+    "You need the truth more than you need the deal.",
+    "You know the answer, and you have known it all along.",
+    "You think I'm lying to you.",
+    "You believe the official story, because it is easier.",
+    "You remember the winter we buried him.",
+    "You care about the ledger more than you care about me.",
+    "You hope this will all be over by morning.",
+    "You prefer the version where nobody is to blame.",
+    "You expect me to apologise, and I will not.",
+    "Right. You want to know what I want, so here it is.",
+  ]) {
+    const codes = build(text);
+    assert.ok(codes.includes("transcript-player-impersonation"),
+      `an internal-state assertion was accepted: "${text}" -> ${codes.join(",")}`);
+  }
+
+  // ADDRESS, OFFERS, SUBORDINATE FRAMES AND QUESTIONS. The character speaks TO
+  // the player without deciding that mind for them. "You may want to sit down"
+  // never puts "you" next to the verb, and a question is exempt entirely.
+  for (const text of [
+    "If you want to leave, the door is there.",
+    "Whatever you think of me, I am not going to lie about this.",
+    "I know you want to help. That is why I asked.",
+    "You may want to sit down. This part is long.",
+    "Do you want a drink? I have tea as well.",
+    "If you need anything, ask the sexton.",
+    "When you know the answer, you can decide what to do with it.",
+    "As you know, the count comes round at the second bell.",
+    "You know, I had not thought of it that way.",
+    "I know what you need, and I will not pretend otherwise.",
+  ]) {
+    assert.deepEqual(build(text), [], `legal address was refused as impersonation: "${text}"`);
+  }
+
+  // The existing main-clause ACTION assertions still refuse...
+  for (const text of [
+    "Right. You open the ledger, you read the name, and then it is over with.",
+    "Listen. You take the lantern and you go.",
+  ]) {
+    assert.ok(build(text).includes("transcript-player-impersonation"), `main-clause action assertion was accepted: "${text}"`);
+  }
+  // ...and the existing SUBORDINATE address is still ordinary dialogue.
+  for (const text of [
+    "If you stand where I stand, at the north pier, with your hand flat on the stone, you will see it.",
+    "Take the lantern, and when you reach the gate, count the stones.",
+    "She will hold the door while you look.",
+  ]) {
+    assert.deepEqual(build(text), [], `subordinate player address was refused as impersonation: "${text}"`);
+  }
+});
+
 test("meta commentary, grading metadata and mechanical register are rejected", () => {
   const plan = createCreativePlan({ seed: "meta", depth: 4 });
   const put = (index: number, text: string): string => {
