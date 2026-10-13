@@ -230,7 +230,7 @@ export function openCodeConfigPath(env: Readonly<Record<string, string | undefin
 }
 
 function readProviderBlock(options: CredentialResolutionOptions): OpenCodeProviderBlock | null {
-  const env = options.env ?? {};
+  const env = options.env ?? process.env;
   const read = options.readFile ?? ((path: string): string => readFileSync(path, "utf8"));
   const homeDir = options.homeDir ?? env.HOME ?? homedir();
   const path = options.configPath === undefined
@@ -264,12 +264,14 @@ function readProviderBlock(options: CredentialResolutionOptions): OpenCodeProvid
 export function resolveTeacherCredentials(
   options: CredentialResolutionOptions = {},
 ): ResolvedTeacherCredentials | null {
-  const env = options.env ?? {};
+  const env = options.env ?? process.env;
   const providerId = options.providerId ?? DEFAULT_TEACHER_PROVIDER_ID;
   const envBaseUrl = env.VELVET_TEACHER_BASE_URL?.trim();
   const envApiKeyPresent = env.VELVET_TEACHER_API_KEY;
   const envApiKey = envApiKeyPresent?.trim();
   const envModel = env.VELVET_TEACHER_MODEL?.trim();
+  if ((envBaseUrl !== undefined || envApiKeyPresent !== undefined)
+    && (!envBaseUrl || envApiKeyPresent === undefined)) return null;
   // Presence, not truthiness: a variable that is SET but blank is a different
   // operator error from one that was never set, and the caller reports them
   // differently. Collapsing them here would hide the real mistake.
@@ -328,16 +330,22 @@ export function requireReviewerCredentials(
   options: CredentialResolutionOptions = {},
 ): ResolvedTeacherCredentials {
   const base = requireTeacherCredentials(options);
-  const env = options.env ?? {};
+  const env = options.env ?? process.env;
   const requested = env.VELVET_REVIEWER_MODEL?.trim();
-  if (requested && requested !== base.model) return { ...base, model: requested };
+  if (requested) {
+    if (["auto", "best"].includes(requested)) {
+      throw new TeacherCredentialError("independent review requires a concrete model, not a routing alias");
+    }
+    assertDistinctModels(generatorModel, requested);
+    return { ...base, model: requested };
+  }
   const block = readProviderBlock(options);
   const declared = Object.keys(block?.models ?? {}).filter((name) => name.length > 0).sort();
-  const alternative = declared.find((name) => name !== base.model);
+  const alternative = declared.find((name) => name !== generatorModel && !["auto", "best"].includes(name));
   if (!alternative) {
     throw new TeacherCredentialError(
       "independent review requires a reviewer model different from the generator model " +
-        `"${base.model}"; set VELVET_REVIEWER_MODEL to one`,
+        `"${generatorModel}"; set VELVET_REVIEWER_MODEL to one`,
     );
   }
   return { ...base, model: alternative };

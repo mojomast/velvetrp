@@ -2160,6 +2160,7 @@ export interface PilotReport {
   readonly splitCounts: Readonly<Record<DatasetSplit, number>>;
   readonly familyWeights: Readonly<Record<WeightTarget, number>>;
   readonly diversity: {
+    readonly plannedPrompts: DiversityReport;
     readonly beforeValidation: DiversityReport;
     readonly afterValidation: DiversityReport;
     readonly afterRepair: DiversityReport;
@@ -2184,7 +2185,8 @@ function emptyBuckets(): Record<ToolSelectionBucket, number> {
 function candidateProvenance(input: {
   spec: ScenarioSpec;
   generator: TeacherClient;
-  reviewerModel: string;
+  reviewer: TeacherClient;
+  temperature: number;
   gitCommit: string | null;
   runs: readonly { readonly validator: string; readonly version: string }[];
   tokenizerName: string;
@@ -2206,9 +2208,9 @@ function candidateProvenance(input: {
       provider: input.generator.identity.provider,
       model: input.generator.model,
       baseUrlDigest: input.generator.baseUrlDigest,
-      temperature: 0,
+      temperature: input.temperature,
     },
-    reviewer: { provider: "openai-compatible", model: input.reviewerModel, promptVersion: REVIEW_PROMPT_VERSION },
+    reviewer: { provider: input.reviewer.identity.provider, model: input.reviewer.model, promptVersion: REVIEW_PROMPT_VERSION },
     sourceDigests: {
       scenarioSpec: sha256Hex(stableStringify(input.spec)),
       oracle: sha256Hex(stableStringify({
@@ -2333,6 +2335,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
 
   const ledger = createBudgetLedger();
   const buckets = emptyBuckets();
+  const plannedPrompts: { text: string; clusterId: string }[] = [];
   const diversityBefore: { text: string; clusterId: string }[] = [];
   const diversityValidated: { text: string; clusterId: string }[] = [];
   const diversityRepaired: { text: string; clusterId: string }[] = [];
@@ -2352,7 +2355,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     const preflightTarget: GenerationTarget = caps.length > 1
       ? targets.find((target) => budget.perTarget?.[target] === Math.min(...caps))!
       : targets[0]!;
-    diversityBefore.push({
+    plannedPrompts.push({
       text: unit.realization.context.map((message) => message.content).join("\n"),
       clusterId: unit.realization.clusterId,
     });
@@ -2397,7 +2400,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
 
       // Budget preflight BEFORE dispatch. The worst case is the caller's own
       // maxTokens; the prompt is masked context and consumes no supervised
-      // budget. Provider spend is bounded separately by the run store.
+      // budget. This is not provider billing accounting: reservation/settlement
+      // of transport retries, review calls and uncertain requests remains a
+      // separate integration requirement before a live pilot.
       const decision = checkBudget({
         ledger, budget, target: preflightTarget, maxCompletionTokens,
       });
@@ -2417,6 +2422,11 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         maxTokens: maxCompletionTokens,
         seed: attemptOrdinal,
         responseFormat: "text",
+      });
+
+      diversityBefore.push({
+        text: completion.content || stableStringify(completion.toolCalls),
+        clusterId: unit.realization.clusterId,
       });
 
       const parse = parseStage(unit.spec.family, completion);
@@ -2475,7 +2485,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         targetSelection: refusalSelection,
       });
       const refusalProvenance = candidateProvenance({
-        spec: unit.spec, generator: options.generator, reviewerModel: options.reviewer.model, gitCommit,
+        spec: unit.spec, generator: options.generator, reviewer: options.reviewer, temperature, gitCommit,
         runs: gate ? gate.runs.map((run) => ({ validator: run.validator, version: run.version })) : [],
         tokenizerName: tokenizer.name, supervisedTokens: refusalTokens,
       });
@@ -2542,7 +2552,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       });
       const scores = parseReviewScores(reviewCompletion.content);
       const provenance = candidateProvenance({
-        spec: unit.spec, generator: options.generator, reviewerModel: options.reviewer.model, gitCommit,
+        spec: unit.spec, generator: options.generator, reviewer: options.reviewer, temperature, gitCommit,
         runs: validated.runs.map((item) => ({ validator: item.validator, version: item.version })),
         tokenizerName: tokenizer.name, supervisedTokens: supervised,
       });
@@ -2567,7 +2577,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       });
       const evidence: GateEvidence[] = validated.runs.map((run) => toEvidence(run, payloadDigest));
       const review: ReviewRecord = {
-        reviewerIdentity: `openai-compatible:${options.reviewer.model}`,
+        reviewerIdentity: `${options.reviewer.identity.provider}:${options.reviewer.model}`,
         reviewerPromptDigest: sha256Hex(reviewPrompt),
         candidateDigest: payloadDigest,
         scores,
@@ -2584,7 +2594,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         provenance,
         evidence,
         reviews: [review],
-        generatorIdentity: `openai-compatible:${options.generator.model}`,
+        generatorIdentity: `${options.generator.identity.provider}:${options.generator.model}`,
         behaviourTags: unit.spec.oracle.behaviourTags,
         visibilityRequirements: unit.spec.oracle.visibilityRequirements,
         authorityRequirements: unit.spec.oracle.authorityRequirements,
@@ -2677,6 +2687,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     splitCounts: plan.splitCounts,
     familyWeights: FAMILY_WEIGHTS,
     diversity: {
+      plannedPrompts: measureDiversity(plannedPrompts),
       beforeValidation: measureDiversity(diversityBefore),
       afterValidation: measureDiversity(diversityValidated),
       afterRepair: measureDiversity(diversityRepaired),

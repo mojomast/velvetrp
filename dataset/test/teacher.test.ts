@@ -490,3 +490,51 @@ test("requireReviewerCredentials refuses when no distinct model exists", () => {
     },
   );
 });
+
+test("credential resolution reads process.env by default", () => {
+  const names = ["VELVET_TEACHER_BASE_URL", "VELVET_TEACHER_API_KEY", "VELVET_TEACHER_MODEL"] as const;
+  const previous = names.map((name) => process.env[name]);
+  try {
+    process.env.VELVET_TEACHER_BASE_URL = BASE_URL;
+    process.env.VELVET_TEACHER_API_KEY = SECRET;
+    process.env.VELVET_TEACHER_MODEL = "environment-teacher";
+    const resolved = resolveTeacherCredentials({ configPath: null });
+    assert.equal(resolved?.source, "env");
+    assert.equal(resolved?.model, "environment-teacher");
+  } finally {
+    names.forEach((name, index) => {
+      const value = previous[index];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    });
+  }
+});
+
+test("a partial environment refuses instead of silently switching to a configured route", () => {
+  const config = JSON.stringify({ provider: { agentrouter: {
+    options: { baseURL: BASE_URL, apiKey: SECRET }, models: { other: {} },
+  } } });
+  assert.equal(resolveTeacherCredentials({
+    env: { VELVET_TEACHER_BASE_URL: "http://other.invalid/v1" },
+    readFile: () => config, configPath: "/virtual/config.json",
+  }), null);
+});
+
+test("reviewer fallback excludes the actual generator even when credential defaults differ", () => {
+  const config = JSON.stringify({ provider: { agentrouter: {
+    options: { baseURL: BASE_URL, apiKey: SECRET }, models: { alpha: {}, gamma: {} },
+  } } });
+  const reviewer = requireReviewerCredentials("alpha", {
+    env: {}, readFile: () => config, configPath: "/virtual/config.json",
+  });
+  assert.equal(reviewer.model, "gamma");
+});
+
+test("explicit self-review and routing aliases refuse rather than selecting a fallback", () => {
+  for (const model of ["teacher", "auto", "best"]) {
+    assert.throws(() => requireReviewerCredentials("teacher", {
+      env: { VELVET_TEACHER_BASE_URL: BASE_URL, VELVET_TEACHER_API_KEY: SECRET,
+        VELVET_REVIEWER_MODEL: model }, configPath: null,
+    }), TeacherCredentialError);
+  }
+});

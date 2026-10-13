@@ -184,6 +184,45 @@ land silently.
 
 ---
 
+## Generator integration follow-up
+
+The terminal entry point now supports provider-free `help`, `verify`, and `plan`.
+`generate` refuses before credential resolution without a measured tokenizer.
+Importing the corpus verifier no longer executes its CLI or modifies exit status.
+
+Review also corrected three silent mismatches:
+
+- Teacher credential resolution defaulted to an empty environment instead of
+  `process.env`. Reviewer fallback compared against the credential default rather
+  than its supplied generator model; it now excludes the actual generator and
+  routing aliases, and rejects an explicitly requested self-review.
+- Generator provenance hardcoded temperature zero despite sampling at 0.7 by
+  default. It now records the actual request temperature and reviewer provider.
+- Pre-validation diversity measured prompts instead of teacher outputs. Prompts
+  now have their own `plannedPrompts` measurement; candidate diversity measures
+  real outputs, so repeated answers cannot masquerade as varied generations.
+
+The certified fsync/resume test no longer replaces actual admission fields with
+fixture fields before comparison. It checks the quarantined candidate view and
+the complete `readAdmittedRecord()` result separately, including certificate
+verification before and after reopening the store.
+
+`buildSelectiveFidelityTwins()` materializes both conditioned preference arms.
+The preferred response reverses when the public receipt facts change. Both chosen
+responses must verify under their own facts, both cross-prompt responses must be
+rejected for grounding, and counterfactual receipts must implement exactly the
+recorded flip. Neither contrast construction nor substring instrumentation grants
+admission or supplies a prose-quality score.
+
+See `README.md` for the runnable commands and remaining live-pilot integration.
+In particular, the batch runner has not yet wired provider reservation/settlement,
+resume/finalization, K scheduling or sealed-attestation-based split enforcement.
+The earlier claim that provider spend was already bounded by the run store was
+unsupported by the orchestration code; the billing primitives existed but were
+not called. No live dataset generation has run.
+
+---
+
 ## Corpus identity
 
 ```

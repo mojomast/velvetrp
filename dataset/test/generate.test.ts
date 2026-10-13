@@ -498,8 +498,9 @@ describe("3. dryRun is the default and dispatches nothing", () => {
       generator, reviewer, units: 10, store: openStore("dry-mix"),
     });
     assert.equal(relay.transportCalls(), 0);
-    assert.equal(report.diversity.beforeValidation.count, 10);
-    assert.ok(report.diversity.beforeValidation.uniqueRatio > 0.5);
+    assert.equal(report.diversity.plannedPrompts.count, 10);
+    assert.ok(report.diversity.plannedPrompts.uniqueRatio > 0.5);
+    assert.equal(report.diversity.beforeValidation.count, 0, "undispatched prompts are not generated candidates");
     assert.ok(report.diversity.afterValidation.count === 0, "nothing was dispatched, so nothing validated");
 
     const counts = report.unitOutcomes.reduce<Record<string, number>>((acc, outcome) => {
@@ -614,11 +615,13 @@ describe("4f. a clean run reaches admission with a verifiable certificate", () =
     const report = await runPipeline({
       runId: "happy-roleplay", seed: "happy-seed", execute: true,
       tokenizer: WORD_TOKENIZER, generator, reviewer, store,
-      units: 4, families: ["roleplay-conversation"], maxRepairs: 0,
+      units: 4, families: ["roleplay-conversation"], maxRepairs: 0, temperature: 0.37,
     });
     assert.equal(report.admitted, 4, `expected every clean candidate to be admitted, got ${report.admitted}`);
     assert.equal(report.buckets.ok, 0, "roleplay is not a tool family, so its bucket is unscored");
     assert.equal(report.buckets.unscored, 4);
+    assert.equal(report.diversity.beforeValidation.count, 4);
+    assert.equal(report.diversity.beforeValidation.uniqueRatio, 0.25, "four identical outputs cannot be scored as diverse prompts");
 
     for (const outcome of report.unitOutcomes) {
       assert.ok(outcome.admittedAttemptId, `${outcome.unitId} should be admitted`);
@@ -631,6 +634,8 @@ describe("4f. a clean run reaches admission with a verifiable certificate", () =
       assert.match(stored!.admissionCertificate.certificateDigest, /^[0-9a-f]{64}$/);
       assert.equal(stored!.provenance.reviewer?.model, "reviewer-beta");
       assert.equal(stored!.provenance.generator.model, "teacher-alpha");
+      assert.equal(stored!.provenance.generator.temperature, 0.37);
+      assert.equal(stored!.provenance.reviewer?.provider, "agentrouter");
       assert.notEqual(
         stored!.admissionCertificate.generatorIdentity,
         stored!.admissionCertificate.reviews[0]!.reviewerIdentity,

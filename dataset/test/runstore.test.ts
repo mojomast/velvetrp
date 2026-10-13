@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, test } from "node:test";
 
-import { REQUIRED_VALIDATORS, admitCandidate, computePayloadDigest } from "../src/admission.js";
+import { REQUIRED_VALIDATORS, admitCandidate, computePayloadDigest, verifyAdmissionCertificate } from "../src/admission.js";
 import {
   type AdmissionDecision,
   ConfigDriftError,
@@ -1060,7 +1060,7 @@ describe("derived snapshot, digests and write amplification", () => {
     );
   });
 
-  test("candidates are stored and read back byte-identically", () => {
+  test("certified records survive fsync and resume without hiding admission fields", () => {
     const artifactRoot = caseRoot();
     const clock = new FakeClock();
     const roundTrip = certifiedCandidate("round-trip", { unitId: "unit-1" });
@@ -1068,16 +1068,23 @@ describe("derived snapshot, digests and write amplification", () => {
     // Default durability (`fsync`), so the fsync-per-durable-write path is
     // covered rather than only the faster `flush` path the rest of the suite uses.
     const store = openRunStore(options(artifactRoot, clock, { durability: "fsync" }));
-    store.commitCandidate({ unitId: "unit-1", attemptId: "attempt-1", record, admission: roundTrip.decision });
-    // The store may re-derive admission status from the persisted certificate, so
-    // compare the payload, not the admission bookkeeping the store owns.
-    assert.deepEqual({ ...store.readCandidate("attempt-1")!, admission: record.admission }, { ...record, admission: record.admission });
+    const committed = store.commitCandidate({ unitId: "unit-1", attemptId: "attempt-1", record, admission: roundTrip.decision });
+    assert.equal(committed.status, "admitted");
+    const certified = roundTrip.decision.admittedRecord!;
+    const quarantined = { ...record, admission: { ...record.admission, status: "pending-review",
+      reasons: ["candidate-requires-certified-admission"] } };
+    assert.deepEqual(store.readCandidate("attempt-1"), quarantined);
+    assert.deepEqual(store.readAdmittedRecord("attempt-1"), certified);
+    verifyAdmissionCertificate(store.readAdmittedRecord("attempt-1")!);
+    assert.equal(store.readAdmittedRecord("missing"), null);
     assert.equal(store.readCandidate("missing"), null);
     store.close();
 
     const resumed = openRunStore(options(artifactRoot, clock, { durability: "fsync" }));
-    assert.deepEqual({ ...resumed.readCandidate("attempt-1")!, admission: record.admission }, { ...record, admission: record.admission });
-    assert.deepEqual(resumed.candidates().map((entry) => ({ ...entry, admission: record.admission })), [record]);
+    assert.deepEqual(resumed.readCandidate("attempt-1"), quarantined);
+    assert.deepEqual(resumed.candidates(), [quarantined]);
+    assert.deepEqual(resumed.readAdmittedRecord("attempt-1"), certified);
+    verifyAdmissionCertificate(resumed.readAdmittedRecord("attempt-1")!);
     resumed.close();
   });
 });
@@ -1185,4 +1192,3 @@ function certifiedCandidate(
   };
   return { record, decision: { status: "admitted", admittedRecord } };
 }
-

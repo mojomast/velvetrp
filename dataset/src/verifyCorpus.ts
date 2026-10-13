@@ -20,6 +20,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { assertLineageDisjoint, verifyFreeze } from "./freeze.js";
 
 const CORPUS_ROOT = resolve(process.cwd(), "dataset/eval/corpus");
@@ -126,8 +127,10 @@ export function verifyCorpus(options: { sealedSource?: string | undefined } = {}
   };
 }
 
-const sealedIndex = process.argv.indexOf("--sealed-source");
-const sealedSource = sealedIndex >= 0 ? process.argv[sealedIndex + 1] : undefined;
-const report = verifyCorpus({ ...(sealedSource ? { sealedSource } : {}) });
-console.log(JSON.stringify(report, null, 2));
-if (!report.ok) process.exitCode = 1;
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const sealedIndex = process.argv.indexOf("--sealed-source");
+  const sealedSource = sealedIndex >= 0 ? process.argv[sealedIndex + 1] : undefined;
+  const report = verifyCorpus({ ...(sealedSource ? { sealedSource } : {}) });
+  console.log(JSON.stringify(report, null, 2));
+  if (!report.ok) process.exitCode = 1;
+}
