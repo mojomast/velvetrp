@@ -22,6 +22,39 @@ import { stableStringify } from "../src/spec.js";
 const hash = (bytes: string | Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+/**
+ * Which source file implements each validator, at the inspected commit.
+ *
+ * This mapping exists because an earlier version of this builder pinned each
+ * validator's GATE-RESULT digest as its `implementationDigest`. Those bytes hash
+ * correctly, so the exporter's registry check accepted them, but a result blob
+ * cannot authenticate the code that produced it. Independent review caught this.
+ *
+ * Every implementation file is also pinned as a git blob in
+ * `implementationArtifacts`, and the exporter resolves each one with
+ * `git show <inspectedCommit>:<path>`.
+ */
+const VALIDATOR_IMPLEMENTATION: Readonly<Record<string, string>> = Object.freeze({
+  "binding-grounding": "dataset/src/grounding.ts",
+  "production-grounding-predicate": "dataset/src/grounding.ts",
+  "creative-transcript-contract": "dataset/src/creativeRoleplay.ts",
+  "boundary-leakage": "dataset/src/generate.ts",
+  "player-agency": "dataset/src/generate.ts",
+  "receipt-provenance": "dataset/src/generate.ts",
+  "advertised-candidate-binding": "dataset/src/generate.ts",
+  "tool-envelope": "dataset/src/generate.ts",
+  "reference-closure": "dataset/src/generate.ts",
+  "catalog-pinning": "dataset/src/generate.ts",
+  "requested-section-schema": "dataset/src/generate.ts",
+  "abstention-correctness": "dataset/src/generate.ts",
+  "authority-respected": "dataset/src/generate.ts",
+  "selective-fidelity": "dataset/src/generate.ts",
+  "prose-quality-retention": "dataset/src/generate.ts",
+});
+
+const blobAt = (commit: string, path: string): string =>
+  execFileSync("git", ["show", `${commit}:${path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }).toString("utf8");
+
 const outPath = process.argv[2];
 const runIds = process.argv.slice(3);
 if (!outPath || runIds.length === 0) throw new Error("usage: buildCorpusApproval.ts <out.json> <runId> [<runId> ...]");
@@ -78,7 +111,19 @@ for (const runId of runIds) {
       sourceArtifactDigests.add(digest);
     }
     for (const item of record.admissionCertificate.evidence) {
-      validators[item.validator] ??= { version: item.version, implementationDigest: item.evidenceDigest };
+      const implementationPath = VALIDATOR_IMPLEMENTATION[item.validator];
+      if (!implementationPath) {
+        throw new Error(`no implementation mapping for validator "${item.validator}"; refusing to pin a result blob as an implementation`);
+      }
+      const implementationBytes = blobAt(inspectedGitCommit, implementationPath);
+      const implementationDigest = hash(implementationBytes);
+      implementationArtifacts[implementationDigest] = { kind: "git-blob", commit: inspectedGitCommit, path: implementationPath };
+      const existing = validators[item.validator];
+      if (existing && existing.implementationDigest !== implementationDigest) {
+        throw new Error(`validator "${item.validator}" resolved to two different implementations`);
+      }
+      validators[item.validator] ??= { version: item.version, implementationDigest };
+      // The per-record gate RESULT is evidence, never an implementation pin.
       gateEvidenceArtifactDigests.add(item.evidenceDigest);
     }
     records.push({ unitId: unit.unitId, runId, family: record.family, split: record.split,
