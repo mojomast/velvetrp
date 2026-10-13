@@ -67,7 +67,28 @@ import {
   type ReviewRecord,
 } from "./admission.js";
 import { exportTrainingJsonl, type ExportTrainingOptions, type ExportTrainingResult } from "./export.js";
-import { GROUNDING_VALIDATOR_VERSION, authoritativeFacts, evaluateGroundedNarration, type GroundingReceipt } from "./grounding.js";
+import { GROUNDING_VALIDATOR_VERSION, authoritativeFacts, evaluateGroundedNarration,
+  PUBLIC_SCENE_GROUNDING_VALIDATOR_VERSION, type GroundingReceipt, type PublicSceneGroundingContext } from "./grounding.js";
+import {
+  createToyPublicObservationSource,
+  loadPublicSceneAuthority,
+  projectPublicSceneFacts,
+  publicContextDiagnosticManifestBody,
+  publicContextDiagnosticManifestDigest,
+  publicObservationSourceBody,
+  publicContextUnitId,
+  PUBLIC_CONTEXT_MANIFEST_VERSION,
+  PUBLIC_SOURCE_RECIPE_VERSION,
+  PublicSceneSourceError,
+  resolvePublicSceneFacts,
+  type FrozenBaseChallenge,
+  type PublicContextDiagnosticManifest,
+  type PublicContextMode,
+  type PublicContextScheduleRow,
+  type PublicSceneFact,
+  type SceneScope,
+  type VerifiedPublicSceneAuthority,
+} from "./publicSceneFacts.js";
 import { selectTargets, type TargetSelection } from "./hfAdapter.js";
 import {
   FAMILY_C_VALIDATOR_VERSION,
@@ -522,6 +543,13 @@ export interface ScenarioOracle {
   /** Grounded narration ground truth. */
   readonly receipts: readonly GroundingReceipt[];
   readonly authorizedConsequences: readonly string[];
+  /**
+   * Opt-in public-scene ground truth. BOTH fields are absent from every ordinary
+   * plan: an omitted field is not an empty scene, and carrying data here does not
+   * wire the grammar -- the runner passes the validated context explicitly.
+   */
+  readonly publicSceneFacts?: readonly PublicSceneFact[];
+  readonly publicSceneScope?: SceneScope;
   /** World generation ground truth. */
   readonly sections: readonly string[];
   readonly dependencies: ReadonlyMap<string, CanonicalDependency>;
@@ -641,7 +669,27 @@ function advertisedToolsFor(family: TrainingFamily, oracle: ScenarioOracle): rea
 }
 
 /**
- * A fully deterministic scenario specification.
+ * The diagnostic overlay advertises the identical one-call, one-argument
+ * narration tool in BOTH arms; only the supplied observation payload differs.
+ */
+function publicContextDiagnosticTools(): readonly StoredTool[] {
+  return [{
+    type: "function",
+    function: {
+      name: "submit_adventure_narration",
+      description: "Submit the narration of a COMMITTED turn and the supplied public scene observations. Arguments must contain the narration text and nothing else.",
+      parameters: {
+        type: "object",
+        properties: { narration: { type: "string", description: "The narration of committed outcomes and supplied public scene observations only." } },
+        required: ["narration"],
+        additionalProperties: false,
+      },
+    },
+  }];
+}
+
+/**
+ * Fully deterministic scenario specification.
  *
  * Same seed => byte-identical spec, including the authoritative receipts. The
  * receipts are generated here, not by the teacher, because the receipt is the
@@ -839,7 +887,21 @@ export interface Realization {
  * the expected answer: a prompt that names the correct tool call teaches
  * transcription, not selection.
  */
-function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>>, motive: string): StoredMessage[] {
+/** The opt-in public-scene payload. Its only difference between arms is depth. */
+export interface PublicScenePromptOverlay {
+  readonly header: string;
+  readonly payload: {
+    readonly sceneId: string;
+    readonly turnId: string;
+    readonly subjects: readonly { subjectId: string; kind: string; displayName: string }[];
+    readonly observations: readonly { factId: string; subjectId: string; predicate: string; value: string }[];
+  };
+  readonly contractAddition: string;
+  readonly guide: string;
+  readonly task: string;
+}
+
+function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>>, motive: string, sceneOverlay?: PublicScenePromptOverlay): StoredMessage[] {
   const system: string[] = [
     `You are the narrator for ${slots.place}. Keep the voice ${slots.tone}.`,
     "Never invent a mechanical outcome. Never disclose what the player has not observed.",
@@ -847,20 +909,23 @@ function buildContext(spec: ScenarioSpec, slots: Readonly<Record<string, string>
     `Focus the description on ${slots.lens ?? "committed public facts"}.`,
   ];
   if (spec.oracle.receipts.length) system.push(`AUTHORITATIVE PUBLIC RECEIPTS\n${stableStringify(spec.oracle.receipts.filter((receipt) => receipt.visibility === undefined || receipt.visibility === "public"))}`);
+  // Structured semantic input, never an answer paragraph. Source digests,
+  // authoring metadata and arm labels stay in provenance, out of the prose task.
+  if (sceneOverlay) system.push(`${sceneOverlay.header}\n${stableStringify(sceneOverlay.payload)}`);
   if (spec.oracle.advertisedCandidates.length) system.push(`ADVERTISED CANDIDATES\n${stableStringify(spec.oracle.advertisedCandidates)}`);
   if (spec.family === "world-generation") system.push(`PUBLIC WORLD CONTRACT\n${stableStringify({ sections: spec.oracle.sections,
     dependencies: [...spec.oracle.dependencies.values()], catalogReferences: spec.oracle.catalogReferences, desiredCounts: spec.oracle.desiredCounts })}`);
   if (spec.family === "world-generation") system.push(`OUTPUT JSON SCHEMA\n${stableStringify(worldGenerationSchema(spec.oracle.sections, { ...spec.oracle.desiredCounts }))}\nReturn sparse additive JSON. Produce every requested minimum count. New entity keys must not reuse dependency keys. Follow declared dependency kinds, visibility and pinned catalog references. Every count-targeted NPC needs a locationKey linking a supplied or newly generated location. Every count-targeted quest needs at least one actionable objective. Narrative-only encounters use empty roster-reference arrays. Mechanics are inert unless an exact compatible catalog reference is supplied; never invent a ruleset, pack version or definition.`);
   if (spec.family === "world-generation") system.push("Produce exactly the requested minimum counts and concise bounded strings. Return JSON only, without fences or commentary. Narrative-only encounters use empty participantNpcKeys, enemyReferences and monsterConceptKeys arrays: every nonempty roster-reference array triggers the production combat-ready rule requiring an exact enemy-template reference. Fictional NPCs may appear in the scene description without being executable roster participants. Do not invent a roster reference. Optional linked references must use supplied dependency keys or your newly declared keys, not human-readable place names. Catalog-bound mechanics must match all four supplied kind, packId, packVersion and definitionId fields exactly. Inert concepts are permitted; the presence of a compatible catalog entry does not require you to bind it.");
   if (spec.family === "boundary-recovery") system.push(`PUBLIC AUTHORITY AND KNOWLEDGE CONTRACT\nAsking ${slots.npc} about the sealed stair is permitted. Opening or granting access to it is not. ${slots.npc} does not know why it is sealed. Answer the permitted question in character with appropriate uncertainty; do not refuse the whole interaction or invent a cause, office, procedure, keyholder, clearance or permission. Leave the stair closed and the player's next choice open.`);
-  if (spec.family === "grounded-narration" || (spec.family === "tool-selection" && spec.oracle.toolFamily === "narration-submit")) system.push("NARRATION SUBMISSION CONTRACT\nReturn exactly one native submit_adventure_narration function call with exactly one argument, narration: a nonempty string. Leave assistant content empty; no second call or extra prose outside the argument. Put the entire answer in that narration string. Use concise complete sentences in the requested voice, not copied receipt JSON, field lists, markdown headings or citation metadata. Bind each stated action to its actual actor, target, check skill and numerical roles; preserve the receipt's literal outcome and explicit status. Cover every requested public receipt without adding a cause, gesture, consequence or settlement not established by those receipts.");
-  if (spec.family === "grounded-narration" || (spec.family === "tool-selection" && spec.oracle.toolFamily === "narration-submit")) system.push("SUPPORTED COMPOSED SENTENCE GUIDE\nThe bracketed terms below are value-free grammatical options, not facts, not a field-by-field script and not extra receipts. Substitute only actual supplied public roles and recorded values, and choose one applicable realization rather than both alternatives. Use a combined form only when every field it names was supplied, keep the standalone forms for a partial receipt, and never fill a missing field or drop a requested receipt to fit a template. For a check whose actor is you: You [succeeded|failed] on the [skill] check against DC [dc], with a total of [total]. Or: Your [skill] check comes to [total] against DC [dc]: [literal outcome]. For committed damage: [actor] [hits|misses] [target] with a [damage type] attack for [applied damage] damage. Or: [actor] attacks [target] and [hits|misses], dealing [applied damage] [damage type] damage. A recorded HP transition and an explicit status may share one sentence as two bound clauses: [target]'s hit points go from [HP before] to [HP after]; [target] is [explicit status after]. These standalone forms stay available for a partial receipt: [actor] attacks [target]. The attack [hits or misses as explicitly recorded]. [actor] deals [damage applied] [damage type] damage to [target]. [target]'s hit points go from [HP before] to [HP after]. [target] is [explicit status after]. Say 'go from' whether or not the recorded values differ. Compose related claims into one connected beat, and vary clause grouping and the balance of shorter and longer sentences to suit the requested voice: no sentence count is required and none should be padded. Keep every stated role unambiguous and every requested receipt represented. Do not copy brackets, do not add a causal connection between separate receipts, and do not invent imagery, reactions, dialogue or reassurance, or any total, hit, damage, hit points or status that no supplied receipt establishes. The complete account still belongs inside the single native narration call.");
+  if (spec.family === "grounded-narration" || (spec.family === "tool-selection" && spec.oracle.toolFamily === "narration-submit")) system.push(`NARRATION SUBMISSION CONTRACT\nReturn exactly one native submit_adventure_narration function call with exactly one argument, narration: a nonempty string. Leave assistant content empty; no second call or extra prose outside the argument. Put the entire answer in that narration string. Use concise complete sentences in the requested voice, not copied receipt JSON, field lists, markdown headings or citation metadata. Bind each stated action to its actual actor, target, check skill and numerical roles; preserve the receipt's literal outcome and explicit status. Cover every requested public receipt without adding a cause, gesture, consequence or settlement not established by those receipts.${sceneOverlay ? ` ${sceneOverlay.contractAddition}` : ""}`);
+  if (spec.family === "grounded-narration" || (spec.family === "tool-selection" && spec.oracle.toolFamily === "narration-submit")) system.push(`SUPPORTED COMPOSED SENTENCE GUIDE\nThe bracketed terms below are value-free grammatical options, not facts, not a field-by-field script and not extra receipts. Substitute only actual supplied public roles and recorded values, and choose one applicable realization rather than both alternatives. Use a combined form only when every field it names was supplied, keep the standalone forms for a partial receipt, and never fill a missing field or drop a requested receipt to fit a template. For a check whose actor is you: You [succeeded|failed] on the [skill] check against DC [dc], with a total of [total]. Or: Your [skill] check comes to [total] against DC [dc]: [literal outcome]. For committed damage: [actor] [hits|misses] [target] with a [damage type] attack for [applied damage] damage. Or: [actor] attacks [target] and [hits|misses], dealing [applied damage] [damage type] damage. A recorded HP transition and an explicit status may share one sentence as two bound clauses: [target]'s hit points go from [HP before] to [HP after]; [target] is [explicit status after]. These standalone forms stay available for a partial receipt: [actor] attacks [target]. The attack [hits or misses as explicitly recorded]. [actor] deals [damage applied] [damage type] damage to [target]. [target]'s hit points go from [HP before] to [HP after]. [target] is [explicit status after]. Say 'go from' whether or not the recorded values differ. Compose related claims into one connected beat, and vary clause grouping and the balance of shorter and longer sentences to suit the requested voice: no sentence count is required and none should be padded. Keep every stated role unambiguous and every requested receipt represented. Do not copy brackets, do not add a causal connection between separate receipts, and do not invent imagery, reactions, dialogue or reassurance, or any total, hit, damage, hit points or status that no supplied receipt establishes. The complete account still belongs inside the single native narration call.${sceneOverlay ? ` ${sceneOverlay.guide}` : ""}`);
   const messages: StoredMessage[] = [{ role: "system", content: system.join(" ") }];
   switch (spec.family) {
     case "grounded-narration":
       messages.push({
         role: "user",
-        content: "The turn is committed. Narrate the public committed check and damage receipts only. Identify each receipt's actor and target explicitly; do not add unsupported connective events.",
+        content: sceneOverlay ? sceneOverlay.task : "The turn is committed. Narrate the public committed check and damage receipts only. Identify each receipt's actor and target explicitly; do not add unsupported connective events.",
       });
       break;
     case "world-generation":
@@ -974,6 +1039,269 @@ const CLUSTER_TARGETS: readonly string[] = Object.freeze([
   "quarters",
 ]);
 
+// ---------------------------------------------------------------------------
+// Opt-in public-context diagnostic (six surfaces, three matched pairs)
+// ---------------------------------------------------------------------------
+//
+// A CONTEXT ABLATION, not a preference twin. The three frozen bases keep their
+// exact mechanics, entities, realization slots including voice/lens, lineage,
+// split and cluster; each is replayed under two prompts that differ ONLY in the
+// supplied public observation projection. `preference` and `twinGroupId` stay
+// absent: nothing here fabricates preference parity.
+
+/** The overlay owns its own template version; the global generator version is unchanged. */
+export const PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION = `${GENERATOR_VERSION}/public-context-v1`;
+/** The frozen calibration schedule the three bases are selected from, by literal voice. */
+export const PUBLIC_CONTEXT_BASE_SEED = "calibration-grounding-2026-10-13-6";
+export const PUBLIC_CONTEXT_FROZEN_BASE_INDICES: readonly number[] = Object.freeze([0, 4, 11]);
+const PUBLIC_CONTEXT_FAMILY: TrainingFamily = "grounded-narration";
+const PUBLIC_CONTEXT_MODES: readonly PublicContextMode[] = Object.freeze(["none", "observations"]);
+
+export interface PlannedUnitPublicContext {
+  readonly manifestDigest: string;
+  readonly pairId: string;
+  readonly baseUnitId: string;
+  readonly baseScenarioSeed: string;
+  readonly publicContext: PublicContextMode;
+  readonly sourceId: string;
+  readonly sourceCanonicalDigest: string;
+  readonly scope: SceneScope;
+  readonly factIds: readonly string[];
+}
+
+export interface PublicContextDiagnosticBinding {
+  readonly manifestDigest: string;
+  readonly seed: string;
+  readonly overlayTemplateVersion: string;
+  readonly pairs: readonly { readonly pairId: string; readonly baseUnitId: string; readonly sourceId: string; readonly modes: readonly PublicContextMode[] }[];
+  readonly schedule: readonly PublicContextScheduleRow[];
+}
+
+export interface PublicContextDiagnosticOption {
+  readonly manifest: PublicContextDiagnosticManifest;
+  /** The trusted caller's pre-dispatch pin. A manifest is not its own authority. */
+  readonly expectedManifestDigest: string;
+}
+
+function publicContextBaseSeeds(index: number): { scenarioSeed: string; realizationSeed: string } {
+  return {
+    scenarioSeed: `${PUBLIC_CONTEXT_BASE_SEED}|unit|${index}|${PUBLIC_CONTEXT_FAMILY}`,
+    realizationSeed: `${PUBLIC_CONTEXT_BASE_SEED}|realize|${index}`,
+  };
+}
+
+/** The public place identity of a resolved base. Derived from identity, never sampled. */
+function resolvedPlaceFor(spec: ScenarioSpec): { entityId: string; displayName: string } {
+  return { entityId: `place-${sha256Hex(`${spec.seed}|public-place`).slice(0, 12)}`, displayName: spec.slots.place ?? "" };
+}
+
+/** Mechanics, slots, split, lineage and cluster, compared on every diagnostic plan. */
+function publicBaseComparisonDigest(input: { spec: ScenarioSpec; realization: Realization }): string {
+  return sha256Hex(stableStringify({
+    receipts: input.spec.oracle.receipts, slots: input.spec.slots, split: input.spec.split,
+    lineage: input.spec.lineage, clusterId: input.realization.clusterId, clusterFamily: input.spec.clusterFamily,
+    // The requested voice and lens are part of what is frozen, not a later choice.
+    realizationSlots: input.realization.slots,
+  }));
+}
+
+function frozenBaseFor(index: number): { base: FrozenBaseChallenge; spec: ScenarioSpec; realization: Realization } {
+  const { scenarioSeed, realizationSeed } = publicContextBaseSeeds(index);
+  const spec = scenarioSpec(scenarioSeed, { family: PUBLIC_CONTEXT_FAMILY });
+  const realization = realizeScenario(spec, realizationSeed, 1)[0]!;
+  return {
+    base: {
+      baseIndex: index, baseUnitId: `unit-${sha256Hex(scenarioSeed).slice(0, 16)}`, scenarioSeed, realizationSeed,
+      slots: { ...spec.slots }, realizationSlots: { ...realization.slots },
+      receiptsDigest: sha256Hex(stableStringify(spec.oracle.receipts)), split: spec.split,
+      lineage: { ...spec.lineage }, clusterId: realization.clusterId, clusterFamily: spec.clusterFamily,
+      comparisonDigest: publicBaseComparisonDigest({ spec, realization }),
+    },
+    spec,
+    realization,
+  };
+}
+
+/**
+ * Freeze the three bases, their three toy sources and the six-row schedule, and
+ * pin the manifest digest BEFORE any teacher dispatch. Nothing here depends on an
+ * observed answer: the arms are a context ablation.
+ */
+export function createPublicContextDiagnosticManifest(seed: string): PublicContextDiagnosticManifest {
+  const bases = PUBLIC_CONTEXT_FROZEN_BASE_INDICES.map(frozenBaseFor);
+  const sources = bases.map(({ base, spec }) => createToyPublicObservationSource({
+    scenarioSeed: base.scenarioSeed, resolvedPlace: resolvedPlaceFor(spec),
+  }));
+  const schedule: PublicContextScheduleRow[] = bases.flatMap(({ base }, position) => {
+    const pairId = `pc-pair-${sha256Hex(`${base.baseUnitId}|public-context-pair`).slice(0, 12)}`;
+    const sourceId = sources[position]!.sourceId;
+    return PUBLIC_CONTEXT_MODES.map((publicContext) => ({
+      unitId: publicContextUnitId(base.baseUnitId, publicContext), pairId,
+      baseUnitId: base.baseUnitId, publicContext, sourceId,
+    }));
+  });
+  const body: PublicContextDiagnosticManifest = {
+    version: PUBLIC_CONTEXT_MANIFEST_VERSION,
+    sourceRecipeVersion: PUBLIC_SOURCE_RECIPE_VERSION,
+    seed,
+    overlayTemplateVersion: PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION,
+    bases: bases.map(({ base }) => base),
+    sources,
+    schedule,
+    manifestDigest: "",
+  };
+  return { ...body, manifestDigest: publicContextDiagnosticManifestDigest(body) };
+}
+
+/** The prompt overlay. Identical wording in both arms; only the payload depth differs. */
+function publicSceneOverlayFor(mode: PublicContextMode, source: {
+  readonly scope: SceneScope;
+  readonly subjects: readonly { readonly subjectId: string; readonly kind: string; readonly displayName: string }[];
+}, facts: readonly PublicSceneFact[]): PublicScenePromptOverlay {
+  return {
+    header: "PUBLIC SCENE OBSERVATIONS",
+    payload: {
+      sceneId: source.scope.sceneId,
+      turnId: source.scope.turnId,
+      // The control gets the same scope and header, and no public prop identity.
+      subjects: mode === "observations"
+        ? source.subjects.map((subject) => ({ subjectId: subject.subjectId, kind: subject.kind, displayName: subject.displayName }))
+        : [],
+      observations: mode === "observations"
+        ? facts.map((fact) => ({ factId: fact.factId, subjectId: fact.subjectId, predicate: fact.predicate, value: fact.value }))
+        : [],
+    },
+    contractAddition: "You may integrate supplied public scene observations; do not invent observations when none are supplied. Cover each requested receipt. Scene observations are optional details and establish no action, cause or consequence.",
+    guide: "PUBLIC SCENE OBSERVATION GUIDE: the bracketed terms below are value-free grammatical options for the supplied scene observations only, not facts and not receipts. Substitute only a subject and a value actually supplied above, or write nothing at all when nothing is supplied: [the lamplight] is [colour]. [the lamplight] has [a|an] [colour] hue. [the shutters] are [state]. Two supplied observations may share one clause joined by a bare 'and', or stand as separate complete sentences or semicolon-separated clauses, each with its own subject. Do not add modifiers, negation, causal, contrast or temporal connectives, scene-setting prepositional lead-ins, verbs of player attention, or any subject or value that was not supplied.",
+    task: "The turn is committed. Narrate the public committed check and damage receipts. You may integrate the supplied public scene observations; do not invent observations when none are supplied. Identify each receipt's actor and target explicitly; do not add unsupported connective events.",
+  };
+}
+
+function refusePublicContext(detail: string): never {
+  throw new PipelineRefusal("execution-not-authorized", [`public-context diagnostic refused: ${detail}`]);
+}
+
+/**
+ * The opt-in plan: reconstruct exactly the three frozen bases, compare them with
+ * the manifest, and materialize two context arms each. No extra shared RNG draw,
+ * no default allocation change, and no contact with the ordinary inventory.
+ */
+function planPublicContextDiagnostic(options: {
+  readonly seed: string;
+  readonly units: number;
+  readonly k: number;
+  readonly families: readonly TrainingFamily[] | undefined;
+  readonly pairedTwins: readonly ScheduledTwinInput[];
+  readonly policy: GenerationPolicy;
+  readonly diagnostic: PublicContextDiagnosticOption;
+}): RunPlan {
+  const { diagnostic } = options;
+  if (options.units !== 3) refusePublicContext("the diagnostic schedules exactly three base challenges; pass units: 3");
+  if (options.k !== 1) refusePublicContext("each base expands into two context arms, not K stochastic realizations; pass realizationsPerScenario: 1");
+  if (options.families !== undefined && (options.families.length !== 1 || options.families[0] !== PUBLIC_CONTEXT_FAMILY)) {
+    refusePublicContext(`only the ${PUBLIC_CONTEXT_FAMILY} family is scheduled by this diagnostic`);
+  }
+  if (options.pairedTwins.length > 0) refusePublicContext("paired twins are not part of this context ablation");
+  if (options.seed !== diagnostic.manifest.seed) refusePublicContext("the plan seed must be the manifest's diagnostic seed");
+  let authority: VerifiedPublicSceneAuthority;
+  try { authority = loadPublicSceneAuthority(diagnostic); }
+  catch (error) {
+    refusePublicContext(error instanceof PublicSceneSourceError
+      ? error.refusals.map((refusal) => `${refusal.code}: ${refusal.detail}`).join("; ")
+      : "the frozen manifest could not be loaded against its pin");
+  }
+  if (authority.manifest.overlayTemplateVersion !== PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION) {
+    refusePublicContext("the frozen overlay template version differs from this generator's diagnostic overlay");
+  }
+  const manifest = authority.manifest;
+  const units: PlannedUnit[] = [];
+  const splitCounts = emptySplitCounts();
+  const pairs: PublicContextDiagnosticBinding["pairs"][number][] = [];
+  for (const pairId of [...new Set(manifest.schedule.map((row) => row.pairId))]) {
+    const rows = manifest.schedule.filter((row) => row.pairId === pairId);
+    const base = manifest.bases.find((entry) => entry.baseUnitId === rows[0]!.baseUnitId);
+    if (!base) refusePublicContext(`pair ${pairId} names no frozen base challenge`);
+    const { spec, realization } = frozenBaseFor(base.baseIndex);
+    if (spec.seed !== base.scenarioSeed) refusePublicContext(`pair ${pairId} does not reconstruct its frozen base scenario seed`);
+    // Reconstruct and compare the retained public plan before using the base.
+    const retained = stableStringify({
+      receiptsDigest: sha256Hex(stableStringify(spec.oracle.receipts)), slots: spec.slots, split: spec.split,
+      lineage: spec.lineage, clusterId: realization.clusterId, clusterFamily: spec.clusterFamily,
+      realizationSlots: realization.slots,
+    });
+    if (retained !== stableStringify({
+      receiptsDigest: base.receiptsDigest, slots: base.slots, split: base.split,
+      lineage: base.lineage, clusterId: base.clusterId, clusterFamily: base.clusterFamily,
+      realizationSlots: base.realizationSlots,
+    })) refusePublicContext(`base ${base.baseUnitId} no longer matches its frozen mechanics, slots, split, lineage or cluster`);
+    if (publicBaseComparisonDigest({ spec, realization }) !== base.comparisonDigest) {
+      refusePublicContext(`base ${base.baseUnitId} no longer matches its frozen comparison digest`);
+    }
+    const source = createToyPublicObservationSource({ scenarioSeed: base.scenarioSeed, resolvedPlace: resolvedPlaceFor(spec) });
+    const frozenSource = manifest.sources.find((entry) => entry.sourceId === rows[0]!.sourceId);
+    if (!frozenSource || stableStringify(frozenSource) !== stableStringify(source)) {
+      refusePublicContext(`pair ${pairId} does not carry the frozen source reconstructed from its resolved base slots`);
+    }
+    pairs.push({ pairId, baseUnitId: base.baseUnitId, sourceId: source.sourceId, modes: rows.map((row) => row.publicContext) });
+    for (const row of rows) {
+      const mode = row.publicContext;
+      const facts = mode === "observations" ? projectPublicSceneFacts(source) : [];
+      const specId = `spec-${sha256Hex(`${base.baseUnitId}|public-context|${mode}`).slice(0, 20)}`;
+      const oracle: ScenarioOracle = { ...spec.oracle, publicSceneFacts: facts, publicSceneScope: { ...source.scope } };
+      const motive = TURN_MOTIVES[Number(realization.slots.lens)] ?? TURN_MOTIVES[0]!;
+      // Recomputed over the COMPLETE derived body plus the declared overlay and
+      // base identity: a stale base digest copied after changing the oracle
+      // would not bind this unit.
+      const body = {
+        specId, seed: base.scenarioSeed, family: PUBLIC_CONTEXT_FAMILY, split: spec.split,
+        lineage: spec.lineage, clusterFamily: spec.clusterFamily, templateVersion: PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION,
+        baseUnitId: base.baseUnitId, publicContext: mode, tone: spec.slots.tone, slots: spec.slots, motive, oracle,
+      };
+      const overlaySpec: ScenarioSpec = Object.freeze({
+        specId, seed: base.scenarioSeed, family: PUBLIC_CONTEXT_FAMILY, split: spec.split,
+        lineage: spec.lineage, clusterFamily: spec.clusterFamily,
+        templateVersion: PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION,
+        slots: Object.freeze({ ...spec.slots }), advertisedTools: publicContextDiagnosticTools(),
+        oracle, digest: sha256Hex(stableStringify(body)),
+      });
+      const slots: Record<string, string> = { ...realization.slots };
+      const context = buildContext(overlaySpec, slots, motive, publicSceneOverlayFor(mode, source, facts));
+      const overlayRealization: Realization = Object.freeze({
+        realizationId: `${specId}-r000`, specId, clusterId: realization.clusterId,
+        slots: Object.freeze({ ...slots }), context: Object.freeze(context),
+        digest: sha256Hex(stableStringify({ specId, context })),
+      });
+      units.push({
+        unitId: row.unitId, spec: overlaySpec, realization: overlayRealization,
+        // The pair is the shared scenario identity; the realization ordinal, the
+        // split, the lineage and the cluster are the base's.
+        scenarioUnitId: pairId, realizationOrdinal: 0, target: targetsFor(PUBLIC_CONTEXT_FAMILY)[0]!,
+        publicContext: {
+          manifestDigest: manifest.manifestDigest, pairId, baseUnitId: base.baseUnitId, baseScenarioSeed: base.scenarioSeed,
+          publicContext: mode, sourceId: source.sourceId, sourceCanonicalDigest: source.canonicalDigest,
+          scope: { ...source.scope }, factIds: facts.map((fact) => fact.factId),
+        },
+      });
+      splitCounts[overlaySpec.split] += 1;
+    }
+  }
+  assertGeneratedSplits(units, options.policy);
+  const splitAssignmentDigest = sha256Hex(stableStringify({
+    seed: options.seed, policyDigest: options.policy.digest,
+    units: units.map((unit) => ({ unitId: unit.unitId, split: unit.spec.split, lineage: unit.spec.lineage })),
+  }));
+  const binding: PublicContextDiagnosticBinding = {
+    manifestDigest: manifest.manifestDigest, seed: options.seed,
+    overlayTemplateVersion: manifest.overlayTemplateVersion, pairs, schedule: manifest.schedule,
+  };
+  const planBody = {
+    seed: options.seed, units, splitCounts, splitAssignmentDigest,
+    // Three base scenarios expand to two context arms each: six units.
+    scenarioCount: manifest.bases.length, realizationsPerScenario: options.k,
+    policyDigest: options.policy.digest, publicContextDiagnostic: binding,
+  };
+  return { ...planBody, digest: sha256Hex(stableStringify(planBody)) };
+}
 // ---------------------------------------------------------------------------
 // Diversity measurement
 // ---------------------------------------------------------------------------
@@ -1319,16 +1647,27 @@ function playerAgencyRun(messages: readonly StoredMessage[]): ValidatorRun {
  *
  * `binding-grounding` is the real gate. `receipt-provenance` proves the bindings
  * came from THIS scenario's receipts rather than from an empty set.
+ *
+ * On the opt-in public-scene path the unit's VALIDATED scene context is threaded
+ * in explicitly: three distinct sets (required mechanical ids, the scene facts
+ * this arm was exposed, and their union) replace one receipt set, so an optional
+ * observation can neither count as mechanical coverage nor cover a missing one.
  */
-function groundingRuns(spec: ScenarioSpec, text: string): ValidatorRun[] {
+function groundingRuns(spec: ScenarioSpec, text: string, publicScene?: PublicSceneGroundingContext | undefined): ValidatorRun[] {
   const receipts = spec.oracle.receipts;
-  const verdict = evaluateGroundedNarration(text, receipts);
+  const verdict = evaluateGroundedNarration(text, receipts, publicScene ? { publicScene } : {});
   const known = new Set(authoritativeFacts(receipts).map((fact) => fact.receiptId));
-  const unbound = verdict.bindings.filter((binding) => !known.has(binding.receiptId)).map((binding) => binding.clause);
+  // On the opt-in path the KNOWN set is the union of required receipts and the
+  // scene facts this arm was actually exposed; the required set stays separate,
+  // so an observation binding is never "unbound" and never covers a receipt.
+  const knownBinding = new Set(verdict.sceneProvenance?.knownBindingIds ?? known);
+  const unbound = verdict.bindings.filter((binding) => !knownBinding.has(binding.receiptId)).map((binding) => binding.clause);
   const missing = [...known].filter((receiptId) => !verdict.bindings.some((entry) => entry.receiptId === receiptId));
+  const scene = verdict.sceneProvenance;
+  const version = scene ? PUBLIC_SCENE_GROUNDING_VALIDATOR_VERSION : VERSION.bindingGrounding;
   const binding: ValidatorRun = {
     validator: "binding-grounding",
-    version: VERSION.bindingGrounding,
+    version,
     passed: verdict.verdict === "verified",
     findings: verdict.verdict === "verified"
       ? {}
@@ -1340,10 +1679,23 @@ function groundingRuns(spec: ScenarioSpec, text: string): ValidatorRun[] {
   };
   const provenance: ValidatorRun = {
     validator: "receipt-provenance",
-    version: VERSION.receiptProvenance,
+    version: scene ? PUBLIC_SCENE_GROUNDING_VALIDATOR_VERSION : VERSION.receiptProvenance,
     passed: unbound.length === 0 && missing.length === 0,
     findings: unbound.length === 0 && missing.length === 0 ? {} : { unboundClauses: unbound, omittedRequestedReceipts: missing },
-    evidence: { receiptIds: [...known], boundReceiptIds: verdict.bindings.map((entry) => entry.receiptId), unbound, missing },
+    evidence: scene
+      ? {
+        receiptIds: [...known], boundReceiptIds: verdict.bindings.map((entry) => entry.receiptId), unbound, missing,
+        sourceValidation: {
+          manifestDigest: scene.manifestDigest, mode: scene.mode, sourceId: scene.sourceId,
+          sourceCanonicalDigest: scene.sourceCanonicalDigest, scope: scene.scope,
+          requiredMechanicalIds: scene.requiredMechanicalIds, allowedSceneFactIds: scene.allowedSceneFactIds,
+          knownBindingIds: scene.knownBindingIds, usedSceneFactIds: scene.usedSceneFactIds,
+          mechanicalBindingsChecked: scene.mechanicalBindingsChecked,
+          observationBindingsChecked: scene.observationBindingsChecked,
+          observations: scene.observations,
+        },
+      }
+      : { receiptIds: [...known], boundReceiptIds: verdict.bindings.map((entry) => entry.receiptId), unbound, missing },
   };
   return [binding, provenance];
 }
@@ -1796,11 +2148,11 @@ function proseGate(
  * binding gate is the one that matters; the presence predicate is recorded
  * alongside it because the audit showed presence alone accepts contradictions.
  */
-function gateGrounded(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcome {
+function gateGrounded(spec: ScenarioSpec, parsed: ParsedOutput, publicScene?: PublicSceneGroundingContext | undefined): GateOutcome {
   const narration = narrationText(parsed);
   const contractProblems = narrationContractProblems(spec, parsed);
   const runs: ValidatorRun[] = [
-    ...groundingRuns(spec, narration),
+    ...groundingRuns(spec, narration, publicScene),
     productionPredicateRun(spec, narration),
   ];
   return proseGate(spec, parsed, { groundingRuns: runs }, contractProblems.map((problem) => stageFailure("VALIDATED", "narration-transport", problem, { raw: parsedText(parsed), parsed })));
@@ -1870,7 +2222,7 @@ function gateWorldGeneration(spec: ScenarioSpec, parsed: ParsedOutput): GateOutc
  * because a single score would let a policy of "always call a tool" look like
  * progress while teaching nothing about binding.
  */
-function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcome {
+function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput, publicScene?: PublicSceneGroundingContext | undefined): GateOutcome {
   if (parsed.kind !== "tools") {
     throw new PipelineRefusal("execution-not-authorized", ["tool-selection gate requires a tools stage"]);
   }
@@ -1885,7 +2237,7 @@ function gateToolSelection(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcom
   const firstArguments = calls[0]?.function.arguments ?? {};
   const firstName = calls[0]?.function.name ?? "";
   const narrationProblems = contract === "narration-submit" ? narrationContractProblems(spec, parsed) : [];
-  const narrationRuns = contract === "narration-submit" ? [...groundingRuns(spec, narrationText(parsed)), productionPredicateRun(spec, narrationText(parsed))] : [];
+  const narrationRuns = contract === "narration-submit" ? [...groundingRuns(spec, narrationText(parsed), publicScene), productionPredicateRun(spec, narrationText(parsed))] : [];
   const narrationBindingEvidence = narrationRuns.find((run) => run.validator === "binding-grounding")?.evidence;
   const narrationBindingVerdict = isObject(narrationBindingEvidence) ? narrationBindingEvidence.verdict : undefined;
   const intentCorrect = contract === "exact-candidate" ? typeof firstArguments.candidateId === "string" && spec.oracle.allowedCandidateIds.includes(firstArguments.candidateId)
@@ -2012,11 +2364,11 @@ function gateRoleplay(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcome {
   return proseGate(spec, parsed, {});
 }
 
-function dispatchGate(spec: ScenarioSpec, parsed: ParsedOutput): GateOutcome {
+function dispatchGate(spec: ScenarioSpec, parsed: ParsedOutput, publicScene?: PublicSceneGroundingContext | undefined): GateOutcome {
   switch (spec.family) {
-    case "grounded-narration": return gateGrounded(spec, parsed);
+    case "grounded-narration": return gateGrounded(spec, parsed, publicScene);
     case "world-generation": return gateWorldGeneration(spec, parsed);
-    case "tool-selection": return gateToolSelection(spec, parsed);
+    case "tool-selection": return gateToolSelection(spec, parsed, publicScene);
     case "boundary-recovery": return gateBoundary(spec, parsed);
     case "roleplay-conversation": return gateRoleplay(spec, parsed);
     default: {
@@ -2041,6 +2393,8 @@ export interface PlannedUnit {
   readonly twinInstrumentation?: unknown;
   readonly draftGenerator?: GeneratorIdentity;
   readonly authoredSource?: ScheduledTwinInput;
+  /** Present only on an opt-in public-context arm; never a twin/preference pair. */
+  readonly publicContext?: PlannedUnitPublicContext;
 }
 
 /** Previously authored drafts; both conditioned preferences are reviewed independently. */
@@ -2067,6 +2421,8 @@ export interface RunPlan {
   readonly scenarioCount: number;
   readonly realizationsPerScenario: number;
   readonly policyDigest: string;
+  /** Present only on the opt-in diagnostic; part of the resume identity. */
+  readonly publicContextDiagnostic?: PublicContextDiagnosticBinding;
   readonly digest: string;
 }
 
@@ -2084,8 +2440,15 @@ export function planRun(options: {
   readonly realizationsPerScenario?: number;
   readonly pairedTwins?: readonly ScheduledTwinInput[];
   readonly generationPolicy?: GenerationPolicy;
+  /** Opt-in six-surface context ablation. Absent means the ordinary inventory. */
+  readonly publicContextDiagnostic?: PublicContextDiagnosticOption | undefined;
 }): RunPlan {
   const { seed, units } = options;
+  if (options.publicContextDiagnostic) {
+    const policy = structuredClone(options.generationPolicy ?? loadGenerationPolicy());
+    return planPublicContextDiagnostic({ seed, units, k: options.realizationsPerScenario ?? 1,
+      families: options.families, pairedTwins: options.pairedTwins ?? [], policy, diagnostic: options.publicContextDiagnostic });
+  }
   if (!Number.isSafeInteger(units) || units < 1) {
     throw new PipelineRefusal("execution-not-authorized", [`unit count must be a positive safe integer, got ${units}`]);
   }
@@ -2319,6 +2682,8 @@ export interface PipelineOptions {
   readonly exportOptions?: ExportTrainingOptions | undefined;
   readonly realizationsPerScenario?: number;
   readonly pairedTwins?: readonly ScheduledTwinInput[];
+  /** Opt-in six-surface context ablation. Forwarded into the internal planRun. */
+  readonly publicContextDiagnostic?: PublicContextDiagnosticOption | undefined;
   readonly proseQualityScorer?: ProseQualityScorer;
   readonly generationPolicy?: GenerationPolicy;
   readonly selectionPolicy?: SelectionPolicy;
@@ -2507,6 +2872,38 @@ function candidateSupervisedText(messages: readonly StoredMessage[], selection: 
 }
 
 /**
+ * Resolve every diagnostic unit's scene context up front, before a prompt is
+ * rendered or measured. A unit whose facts do not equal its arm's permitted
+ * projection stops the run: source failure is a refusal, never a fallback to the
+ * legacy string allowlist.
+ */
+function publicSceneContextsFor(plan: RunPlan, diagnostic: PublicContextDiagnosticOption | undefined): Map<string, PublicSceneGroundingContext> {
+  const contexts = new Map<string, PublicSceneGroundingContext>();
+  if (!diagnostic) return contexts;
+  let authority: VerifiedPublicSceneAuthority;
+  try { authority = loadPublicSceneAuthority(diagnostic); }
+  catch (error) {
+    throw new PipelineRefusal("execution-not-authorized", [`public-context diagnostic refused: ${error instanceof PublicSceneSourceError
+      ? error.refusals.map((refusal) => `${refusal.code}: ${refusal.detail}`).join("; ") : "the frozen manifest did not load"}`]);
+  }
+  for (const unit of plan.units) {
+    const meta = unit.publicContext;
+    if (!meta) continue;
+    if (meta.manifestDigest !== authority.manifestDigest) {
+      throw new PipelineRefusal("execution-not-authorized", ["a planned public-context unit is not bound to the supplied frozen manifest"]);
+    }
+    const resolved = resolvePublicSceneFacts({
+      unitId: unit.unitId, scope: meta.scope, facts: unit.spec.oracle.publicSceneFacts ?? [], authority,
+    });
+    if (!resolved.ok) {
+      throw new PipelineRefusal("execution-not-authorized", [`public-context diagnostic refused: ${resolved.refusals.map((refusal) => `${refusal.code}: ${refusal.detail}`).join("; ")}`]);
+    }
+    contexts.set(unit.unitId, { unitId: unit.unitId, scope: meta.scope, facts: unit.spec.oracle.publicSceneFacts ?? [], authority });
+  }
+  return contexts;
+}
+
+/**
  * Runs the pipeline.
  *
  * `dryRun` (the default) performs the plan, the realizations, the diversity
@@ -2558,7 +2955,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     generationPolicy: policy,
     realizationsPerScenario: options.realizationsPerScenario ?? 1,
     pairedTwins: options.pairedTwins ?? [],
+    ...(options.publicContextDiagnostic ? { publicContextDiagnostic: options.publicContextDiagnostic } : {}),
   });
+  // Validated again before any prompt is rendered, measured or dispatched.
+  const publicSceneContexts = publicSceneContextsFor(plan, options.publicContextDiagnostic);
   if (!dryRun && !options.store) throw new PipelineRefusal("execution-not-authorized", ["executing generation requires a run store"]);
   if (options.store && !dryRun && options.store.runId !== options.runId) throw new PipelineRefusal("execution-not-authorized", ["run-store identity differs from pipeline run"]);
   if (!dryRun) {
@@ -2782,7 +3182,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         } else {
           stages.sanitized = sanitized.sanitized;
           try {
-          const targetGate = dispatchGate(unit.spec, sanitized.sanitized);
+          const targetGate = dispatchGate(unit.spec, sanitized.sanitized, publicSceneContexts.get(unit.unitId));
           // Gates inspect the new assistant target; training and certification
           // bind its actual prompt context as well, with historical turns masked.
           const context = unit.preference ? unit.preference.prompt : unit.realization.context;
@@ -2843,6 +3243,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
       const runnerSourceDigests = { generationPlan: plan.digest, splitAssignment: plan.splitAssignmentDigest,
         sealedAttestation: policy.attestationDigest, realization: unit.realization.digest,
         tokenizerPolicy: tokenizer.policyDigest ?? sha256Hex(`test-or-custom-policy:${tokenizer.name}`),
+        // Both arms bind the frozen manifest; the observation arm also binds the
+        // exact source revision its facts were projected from.
+        ...(unit.publicContext ? { publicSceneManifest: unit.publicContext.manifestDigest } : {}),
+        ...(unit.publicContext && unit.publicContext.publicContext === "observations" ? { publicSceneSource: unit.publicContext.sourceCanonicalDigest } : {}),
         ...(unit.authoredSource ? { authoredTwinSource: unit.authoredSource.sourceDigest } : {}),
         ...(unit.twinInstrumentation ? { selectiveTwin: sha256Hex(stableStringify(unit.twinInstrumentation)) } : {}) };
       Object.assign(refusalProvenance.sourceDigests, runnerSourceDigests);
@@ -2864,6 +3268,19 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         retainArtifact(preprocessing);
       } else artifacts[runnerSourceDigests.tokenizerPolicy] = `test-or-custom-policy:${tokenizer.name}`;
       if (unit.authoredSource) retainArtifact({ spec: unit.authoredSource.spec, counterfactualReceipts: unit.authoredSource.counterfactualReceipts, lineage: unit.authoredSource.lineage });
+      // Source and manifest bytes, for BOTH arms and for refusals as well as
+      // admissions: the provenance digests must resolve to readable bytes.
+      if (unit.publicContext && options.publicContextDiagnostic) {
+        const manifestBody = publicContextDiagnosticManifestBody(options.publicContextDiagnostic.manifest);
+        artifacts[unit.publicContext.manifestDigest] = stableStringify(manifestBody);
+        if (unit.publicContext.publicContext === "observations") {
+          const source = options.publicContextDiagnostic.manifest.sources.find((entry) => entry.sourceId === unit.publicContext!.sourceId);
+          if (!source || source.canonicalDigest !== unit.publicContext.sourceCanonicalDigest) {
+            throw new PipelineRefusal("execution-not-authorized", ["a planned public-context unit does not resolve to its frozen source bytes"]);
+          }
+          artifacts[source.canonicalDigest] = stableStringify(publicObservationSourceBody(source));
+        }
+      }
       retainArtifact({ hiddenFacts: unit.spec.oracle.hiddenFacts, receipts: unit.spec.oracle.receipts,
         sections: unit.spec.oracle.sections, candidates: unit.spec.oracle.advertisedCandidates });
       retainArtifact(planBody);

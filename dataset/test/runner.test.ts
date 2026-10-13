@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { planRun, runPipeline, scenarioSpec, twinSourceDigest, type PipelineOptions, type ScheduledTwinInput, type TokenizerPort } from "../src/generate.js";
+import { createPublicContextDiagnosticManifest, planRun, PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION, runPipeline, scenarioSpec, twinSourceDigest, type PipelineOptions, type ScheduledTwinInput, type TokenizerPort } from "../src/generate.js";
+import { parsePublicObservationSource, publicContextDiagnosticManifestBody, publicContextDiagnosticManifestDigest,
+  publicObservationSourceDigest, type PublicContextDiagnosticManifest } from "../src/publicSceneFacts.js";
 import { assertGeneratedSplits, loadGenerationPolicy } from "../src/generationPolicy.js";
 import { openRunStore, RunLockError, type OpenRunStoreOptions } from "../src/runstore.js";
 import { inspectPipelineCheckpoint, PipelineJournal, UncertainDispatchError } from "../src/pipelineJournal.js";
@@ -86,7 +88,8 @@ function setup(t: { after(fn: () => void): void }, overrides: Partial<PipelineOp
   const options: PipelineOptions = { runId: "runner", seed: "runner-seed", units: 2, families: ["roleplay-conversation"],
     tokenizer, generator, reviewer, maxRepairs: 1, maxCompletionTokens: 128, gitCommit: null, execute: true, ...overrides };
   const plan = planRun({ seed: options.seed, units: options.units!, families: options.families!,
-    realizationsPerScenario: options.realizationsPerScenario ?? 1, pairedTwins: options.pairedTwins ?? [] });
+    realizationsPerScenario: options.realizationsPerScenario ?? 1, pairedTwins: options.pairedTwins ?? [],
+    ...(options.publicContextDiagnostic ? { publicContextDiagnostic: options.publicContextDiagnostic } : {}) });
   const storeOptions: OpenRunStoreOptions = { runId: options.runId, seed: options.seed, artifactRoot: root, sourceDigest: "fixture-source-digest",
     corpusFreezeDigest: policy.corpusDigest, splitAssignmentDigest: plan.splitAssignmentDigest, totalUnits: plan.units.length,
     generator: { provider: options.generator.identity.provider, model: options.generator.model, baseUrlDigest: options.generator.baseUrlDigest,
@@ -878,4 +881,239 @@ test("the real CPU tokenizer measures full runner context and both preference br
   assert.throws(() => preprocessTrainingExport({ outputDir: exported.outputDir, checksumDigest, approvedRegistry, tokenizer: alternate }), /preprocessing policy/);
   writeFileSync(exported.trainingPath, "tampered\n");
   assert.throws(() => preprocessTrainingExport({ outputDir: exported.outputDir, checksumDigest, approvedRegistry, tokenizer: bridge }), /changed training/);
+});
+
+const DIAGNOSTIC_SEED = "public-context-runner-test-1";
+
+interface ScenePayload {
+  readonly sceneId: string;
+  readonly turnId: string;
+  readonly subjects: readonly { subjectId: string; kind: string; displayName: string }[];
+  readonly observations: readonly { factId: string; subjectId: string; predicate: string; value: string }[];
+}
+
+/** The structured public scene input actually supplied to this attempt. */
+function suppliedScene(request: TeacherCompletionRequest): ScenePayload | null {
+  const match = / PUBLIC SCENE OBSERVATIONS\n(\{[\s\S]*?\}) NARRATION SUBMISSION CONTRACT/.exec(request.system);
+  return match ? JSON.parse(match[1]!) as ScenePayload : null;
+}
+
+/** One complete observation sentence per supplied fact, using the registered labels. */
+function sceneSentences(scene: ScenePayload): string[] {
+  return scene.observations.map((observation) => {
+    const subject = scene.subjects.find((entry) => entry.subjectId === observation.subjectId)!.displayName;
+    return observation.predicate === "light-colour" ? `${subject} has an ${observation.value} hue.` : `${subject} are ${observation.value}.`;
+  });
+}
+
+/** A narration fixture, not a quality claim: full mechanical coverage, plus the
+ * supplied observations when this attempt was given them. */
+function diagnosticNarration(request: TeacherCompletionRequest, options: { observationsOnly?: boolean } = {}): string {
+  const scene = suppliedScene(request);
+  const system = request.system.replace(/ PUBLIC SCENE OBSERVATIONS\n[\s\S]*?\} NARRATION SUBMISSION CONTRACT/, " NARRATION SUBMISSION CONTRACT");
+  const beat = guidedReceiptNarration({ ...request, system });
+  if (options.observationsOnly) {
+    // Exactly what the arm was shown, and nothing mechanical: optional scene
+    // usage must never stand in for a requested receipt.
+    return scene && sceneSentences(scene).length > 0 ? sceneSentences(scene).join(" ") : beat.split(/ the attacker /i)[0]!;
+  }
+  return scene && sceneSentences(scene).length > 0 ? `${beat} ${sceneSentences(scene).join(" ")}` : beat;
+}
+
+// ---------------------------------------------------------------------------
+// Opt-in public-context diagnostic: planning, runner forwarding and provenance
+// ---------------------------------------------------------------------------
+// The frozen ordinary inventories are pinned here: adding the diagnostic must
+// not move one byte of the pilot or the matched v7 calibration plan.
+
+const ORDINARY_PILOT_PLAN_DIGEST = "f633ead229d265f97da0420fd0583dc7f8b21e6349fb5e150e7968a8b05233c2";
+const MATCHED_V7_PLAN_DIGEST = "4ba77018ff32497f1e431508f4ffc602f37179efac1782170fa9b78d29b38e04";
+
+test("the ordinary and pilot plan digests are unchanged when the diagnostic option is absent", () => {
+  assert.equal(planRun({ seed: "pilot-1", units: 175, realizationsPerScenario: 3 }).digest, ORDINARY_PILOT_PLAN_DIGEST);
+  const matched = planRun({ seed: "calibration-grounding-2026-10-13-6", units: 13, realizationsPerScenario: 1,
+    families: ["grounded-narration", "tool-selection"] });
+  assert.equal(matched.digest, MATCHED_V7_PLAN_DIGEST);
+  assert.equal(matched.publicContextDiagnostic, undefined);
+  assert.deepEqual(stableStringify(matched.units[0]!.spec.oracle.publicSceneFacts ?? null), "null");
+  assert.equal(matched.units[0]!.spec.oracle.publicSceneScope, undefined);
+});
+
+test("three frozen bases become six matched arms whose only public difference is the observation projection", () => {
+  const manifest = createPublicContextDiagnosticManifest(DIAGNOSTIC_SEED);
+  const option = { manifest, expectedManifestDigest: manifest.manifestDigest };
+  const plan = planRun({ seed: DIAGNOSTIC_SEED, units: 3, realizationsPerScenario: 1, families: ["grounded-narration"],
+    publicContextDiagnostic: option });
+  assert.equal(plan.units.length, 6);
+  assert.equal(plan.scenarioCount, 3, "three base scenarios expand to two context arms each");
+  assert.equal(plan.realizationsPerScenario, 1, "the second arm is not a stochastic realization");
+  assert.deepEqual(plan.splitCounts, { train: 6, dev: 0, "sealed-test": 0 });
+  assert.equal(plan.publicContextDiagnostic!.manifestDigest, manifest.manifestDigest);
+  assert.equal(plan.publicContextDiagnostic!.schedule.length, 6);
+  assert.deepEqual(planRun({ seed: DIAGNOSTIC_SEED, units: 3, realizationsPerScenario: 1, families: ["grounded-narration"],
+    publicContextDiagnostic: option }), plan, "the diagnostic plan is a pure function of its frozen inputs");
+
+  const pairs = new Map<string, typeof plan.units>();
+  for (const unit of plan.units) pairs.set(unit.scenarioUnitId, [...(pairs.get(unit.scenarioUnitId) ?? []), unit]);
+  assert.equal(pairs.size, 3);
+  const voices = new Map<string, string>();
+  for (const [pairId, arms] of pairs) {
+    assert.equal(arms.length, 2, pairId);
+    const [control = arms[0]!, observed = arms[1]!] = [...arms].sort((left, right) => left.unitId.localeCompare(right.unitId));
+    assert.equal(control.publicContext!.publicContext, "none");
+    assert.equal(observed.publicContext!.publicContext, "observations");
+    assert.equal(control.publicContext!.pairId, observed.publicContext!.pairId);
+    assert.equal(control.publicContext!.sourceId, observed.publicContext!.sourceId);
+    assert.equal(control.publicContext!.baseUnitId, observed.publicContext!.baseUnitId);
+    assert.equal(control.realizationOrdinal, 0);
+    assert.equal(observed.realizationOrdinal, 0);
+    // Identical pair mechanics, voice, split, lineage and cluster.
+    assert.equal(stableStringify(control.spec.oracle.receipts), stableStringify(observed.spec.oracle.receipts));
+    assert.equal(stableStringify(control.spec.slots), stableStringify(observed.spec.slots));
+    assert.equal(control.realization.slots.tone, observed.realization.slots.tone);
+    assert.equal(stableStringify(control.spec.split), stableStringify(observed.spec.split));
+    assert.equal(stableStringify(control.spec.lineage), stableStringify(observed.spec.lineage));
+    assert.equal(control.realization.clusterId, observed.realization.clusterId);
+    assert.deepEqual(control.spec.advertisedTools, observed.spec.advertisedTools);
+    assert.equal(control.realization.context[1]!.content, observed.realization.context[1]!.content, "the task wording is identical");
+    // A CONTEXT ABLATION: no preference and no twin group is fabricated.
+    assert.equal(control.preference, undefined);
+    assert.equal(observed.preference, undefined);
+    assert.equal(control.twinGroupId, undefined);
+    assert.equal(observed.twinGroupId, undefined);
+    assert.equal(control.spec.oracle.authorizedConsequences.length, 0);
+    assert.equal(observed.spec.oracle.authorizedConsequences.length, 0);
+    // Only the supplied observation payload differs, and only in the observation arm.
+    const strip = (system: string): string => system.replace(/ PUBLIC SCENE OBSERVATIONS\n[\s\S]*?\} /, " <scene> ");
+    assert.equal(strip(control.realization.context[0]!.content), strip(observed.realization.context[0]!.content));
+    assert.match(control.realization.context[0]!.content, /PUBLIC SCENE OBSERVATIONS\n\{"observations":\[\],"sceneId":"public-scene-/);
+    assert.match(observed.realization.context[0]!.content, /"observations":\[\{"factId":"scene-fact-/);
+    assert.equal(control.spec.oracle.publicSceneFacts!.length, 0);
+    assert.equal(observed.spec.oracle.publicSceneFacts!.length, 2);
+    assert.equal(observed.spec.oracle.publicSceneScope!.sceneId, control.spec.oracle.publicSceneScope!.sceneId);
+    // Each overlay carries its own recomputed digest: copying the frozen base
+    // digest after changing the oracle would leave the two equal.
+    const baseSpec = scenarioSpec(control.spec.seed, { family: "grounded-narration" });
+    assert.notEqual(control.spec.digest, observed.spec.digest);
+    assert.notEqual(control.spec.digest, baseSpec.digest);
+    assert.notEqual(observed.spec.digest, baseSpec.digest);
+    assert.equal(control.spec.templateVersion, PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION);
+    assert.notEqual(control.spec.specId, baseSpec.specId);
+    voices.set(pairId, observed.realization.slots.tone!);
+  }
+  // The three frozen bases are the selected v6 voices, in frozen plan order.
+  assert.deepEqual([...voices.values()], ["warm but evasive", "low-register and wary", "terse and procedural"]);
+  assert.deepEqual(plan.units.map((unit) => unit.publicContext!.baseUnitId),
+    ["unit-8c28b0ce238d1727", "unit-98bf7c802f569a5e", "unit-6b1501d2ec6a7a77"].flatMap((base) => [base, base]));
+});
+
+test("the diagnostic refuses conflicting units, K, families, twins, seeds, pins and mutated frozen bytes", () => {
+  const manifest = createPublicContextDiagnosticManifest(DIAGNOSTIC_SEED);
+  const option = { manifest, expectedManifestDigest: manifest.manifestDigest };
+  const plan = (overrides: Partial<Parameters<typeof planRun>[0]>) => planRun({
+    seed: DIAGNOSTIC_SEED, units: 3, realizationsPerScenario: 1, families: ["grounded-narration"],
+    publicContextDiagnostic: option, ...overrides });
+  assert.throws(() => plan({ units: 4 }), /units: 3/);
+  assert.throws(() => plan({ realizationsPerScenario: 2 }), /realizationsPerScenario: 1/);
+  assert.throws(() => plan({ families: ["grounded-narration", "tool-selection"] }), /only the grounded-narration family/);
+  assert.throws(() => plan({ pairedTwins: [twinInput()] }), /paired twins are not part/);
+  assert.throws(() => plan({ seed: "some-other-seed" }), /must be the manifest's diagnostic seed/);
+  assert.throws(() => plan({ publicContextDiagnostic: { ...option, expectedManifestDigest: "0".repeat(64) } }),
+    /manifest-pin-mismatch/);
+  // A re-pinned manifest whose source bytes were edited never plans: the frozen
+  // source is reconstructed from the resolved base slots and compared.
+  const unsigned = manifest.sources[0]!.observations.map((observation) => (observation.predicate === "light-colour"
+    ? { ...observation, value: "white" as const } : observation));
+  const editedBody = { ...manifest.sources[0]!, observations: unsigned };
+  const edited: PublicContextDiagnosticManifest = { ...manifest, sources: manifest.sources.map((source, index) => (index === 0
+    ? parsePublicObservationSource({ ...editedBody, canonicalDigest: publicObservationSourceDigest(editedBody) }, "edited") : source)) };
+  const resigned = { ...edited, manifestDigest: publicContextDiagnosticManifestDigest({ ...edited, manifestDigest: "" }) };
+  assert.notEqual(resigned.manifestDigest, manifest.manifestDigest);
+  assert.throws(() => planRun({ seed: DIAGNOSTIC_SEED, units: 3, realizationsPerScenario: 1, families: ["grounded-narration"],
+    publicContextDiagnostic: { manifest: resigned as typeof manifest, expectedManifestDigest: resigned.manifestDigest } }),
+    /frozen source reconstructed from its resolved base slots/);
+  // The same edit left unsigned is refused by the source contract itself.
+  const unsignedManifest = { ...edited, sources: [{ ...manifest.sources[0]!, observations: unsigned }, ...manifest.sources.slice(1)] };
+  assert.throws(() => planRun({ seed: DIAGNOSTIC_SEED, units: 3, realizationsPerScenario: 1, families: ["grounded-narration"],
+    publicContextDiagnostic: { manifest: unsignedManifest as PublicContextDiagnosticManifest,
+      expectedManifestDigest: publicContextDiagnosticManifestDigest({ ...unsignedManifest, manifestDigest: "" }) } }),
+    /source-digest-mismatch/);
+  // A base whose retained mechanics no longer match is refused as well.
+  const mutatedBase: PublicContextDiagnosticManifest = { ...manifest, bases: manifest.bases.map((base, index) => (index === 1
+    ? { ...base, receiptsDigest: "0".repeat(64) } : base)) };
+  const resignedBase = { ...mutatedBase, manifestDigest: publicContextDiagnosticManifestDigest({ ...mutatedBase, manifestDigest: "" }) };
+  assert.throws(() => planRun({ seed: DIAGNOSTIC_SEED, units: 3, realizationsPerScenario: 1, families: ["grounded-narration"],
+    publicContextDiagnostic: { manifest: resignedBase as typeof manifest, expectedManifestDigest: resignedBase.manifestDigest } }),
+    /frozen mechanics, slots, split, lineage or cluster/);
+});
+
+test("runPipeline forwards the option: six arms, real source provenance, resolvable source bytes and a clean resume", async (t) => {
+  const manifest = createPublicContextDiagnosticManifest(DIAGNOSTIC_SEED);
+  const generated: string[] = [];
+  const generator = outputClient((request) => {
+    generated.push(request.attemptId);
+    return { content: "", toolCalls: [{ id: request.attemptId, type: "function",
+      function: { name: "submit_adventure_narration", arguments: { narration: diagnosticNarration(request) } } }] };
+  });
+  const run = setup(t, { seed: DIAGNOSTIC_SEED, units: 3, families: ["grounded-narration"], maxRepairs: 0, generator,
+    publicContextDiagnostic: { manifest, expectedManifestDigest: manifest.manifestDigest } });
+  assert.equal(run.plan.units.length, 6);
+  assert.equal(run.store.config().totalUnits, 6);
+  const first = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(first.units, 6);
+  assert.equal(first.admitted, 6, JSON.stringify(first.unitOutcomes.map((outcome) => outcome.refusedAt)));
+  assert.equal(first.complete, true);
+  for (const outcome of first.unitOutcomes) {
+    const unit = run.plan.units.find((entry) => entry.unitId === outcome.unitId)!;
+    const record = run.store.readAdmittedRecord(outcome.admittedAttemptId!)!;
+    assert.equal(record.provenance.sourceDigests.publicSceneManifest, manifest.manifestDigest);
+    assert.equal(record.provenance.validatorVersions["binding-grounding"], "grounding-binding-v6+public-scene-v1");
+    const artifactDigests = inspectPipelineCheckpoint<{ artifactDigests: string[] }>(run.store, `validation:${outcome.admittedAttemptId}`)!.artifactDigests;
+    const artifacts = new Map(artifactDigests.map((digest) => [digest, inspectPipelineCheckpoint<string>(run.store, `artifact:${digest}`)!]));
+    assert.ok(artifacts.has(manifest.manifestDigest), "the frozen manifest bytes resolve for every arm");
+    assert.equal(stableStringify(JSON.parse(artifacts.get(manifest.manifestDigest)!)), stableStringify(publicContextDiagnosticManifestBody(manifest)));
+    if (unit.publicContext!.publicContext === "observations") {
+      assert.equal(record.provenance.sourceDigests.publicSceneSource, unit.publicContext!.sourceCanonicalDigest);
+      assert.ok(artifacts.has(unit.publicContext!.sourceCanonicalDigest), "the frozen source bytes resolve");
+      assert.match(artifacts.get(unit.publicContext!.sourceCanonicalDigest)!, /light-colour/);
+    } else {
+      assert.equal(record.provenance.sourceDigests.publicSceneSource, undefined, "the control arm is bound to the manifest, not to a source it was never shown");
+    }
+    // The supplied payload reached the teacher, and the caption survived into the record.
+    assert.match(record.messages[0]!.content, /PUBLIC SCENE OBSERVATIONS/);
+  }
+  const calls = [...run.calls];
+  assert.deepEqual(generated, run.plan.units.map((unit) => `${unit.unitId}-a0`), "the option reached execution, not just preflight");
+  assert.equal(run.calls.length, 6, "six independent reviews on the fixture reviewer");
+  const resumed = await runPipeline({ ...run.options, store: run.reopen() });
+  assert.deepEqual(resumed, first);
+  assert.deepEqual(run.calls, calls, "resume replays the durable bytes and dispatches nothing new");
+  assert.equal(generated.length, 6, "a resumed run sends no new generation");
+});
+
+test("observations cannot cover an omitted receipt in either arm, and refusals still retain the source bytes", async (t) => {
+  const manifest = createPublicContextDiagnosticManifest(DIAGNOSTIC_SEED);
+  const generator = outputClient((request) => ({ content: "", toolCalls: [{ id: request.attemptId, type: "function",
+    function: { name: "submit_adventure_narration", arguments: { narration: diagnosticNarration(request, { observationsOnly: true }) } } }] }));
+  const run = setup(t, { seed: DIAGNOSTIC_SEED, units: 3, families: ["grounded-narration"], maxRepairs: 0, generator,
+    publicContextDiagnostic: { manifest, expectedManifestDigest: manifest.manifestDigest } });
+  const report = await runPipeline({ ...run.options, store: run.store });
+  assert.equal(report.admitted, 0);
+  for (const outcome of report.unitOutcomes) {
+    assert.match(outcome.refusedAt!, /receipt-provenance/, "a dropped damage receipt is refused even when observations are correct");
+    const validation = inspectPipelineCheckpoint<{ artifactDigests: string[]; runs: { validator: string; passed: boolean }[] }>(
+      run.store, `validation:${outcome.unitId}-a0`)!;
+    assert.ok(validation.runs.some((run_) => run_.validator === "receipt-provenance" && !run_.passed));
+    const artifacts = new Map(validation.artifactDigests.map((digest) => [digest, inspectPipelineCheckpoint<string>(run.store, `artifact:${digest}`)!]));
+    assert.ok(artifacts.has(manifest.manifestDigest), "a refusal still carries the frozen manifest bytes");
+    const record = run.store.readCandidate(`${outcome.unitId}-a0`)!;
+    assert.equal(record.admission.status, "pending-review");
+    assert.equal(record.provenance.sourceDigests.publicSceneManifest, manifest.manifestDigest);
+  }
+  // Any other diagnostic identity -- a different frozen seed here -- refuses
+  // before a single dispatch, so this store can never be reused for it.
+  const other = createPublicContextDiagnosticManifest(`${DIAGNOSTIC_SEED}-other`);
+  await assert.rejects(() => runPipeline({ ...run.options, store: run.reopen(),
+    publicContextDiagnostic: { manifest: other, expectedManifestDigest: other.manifestDigest } }),
+    /public-context diagnostic refused: the plan seed must be the manifest's diagnostic seed/);
 });

@@ -260,3 +260,13 @@ cannot establish rich persistent storytelling from sparse receipts. **Pilot HOLD
 until actual quality and functional evidence clear the existing gates. Any
 remaining voice/naturalness failure in the warm/wary challenges triggers a
 source-bound public-context diagnostic instead of another prompt-tuning loop.
+
+## Public-context follow-up
+
+The v7 warm/wary stop rule was triggered. The next opt-in diagnostic and its
+source-authority, inventory, measurement and stopping rules are specified in
+[`PUBLIC_CONTEXT_PROTOCOL.md`](PUBLIC_CONTEXT_PROTOCOL.md). It schedules three
+matched base pairs/six initial tasks with receipt-only and supplied-observation
+arms. Implementation and source-manifest pinning are complete; independent
+pre-dispatch review is pending. Real-CPU preflight made zero generation/review
+attempts; no request has been dispatched for that diagnostic.

@@ -566,3 +566,60 @@ composition diagnostic, finding no new blocking bug, answer leak or causal-scope
 regression. Report: `/tmp/opencode/foundry-v7-precalibration-review.md`.
 The pilot remains held; warm/wary voice or naturalness failures trigger the
 source-bound public-context diagnostic rather than another prompt-only loop.
+
+## Version 7 observed public-context trigger
+
+The matched live diagnostic completed with thirteen admissions from nineteen
+generation attempts, thirteen reviews, thirty-two captured responses and 1,540
+measured supervised labels (989 admitted, 551 refused). The twelve-output complete
+grounded-prose census was judged in fresh blinded contexts and locked before
+functional inspection: eight style passes, four failures, no ungradeable capture.
+
+Warm/wary voice/naturalness failures persist. Several passing attempts use richer
+wording that the functional gate refused; all-attempt style yield cannot be applied
+to admitted targets. Independent census/functional reconciliation is pending.
+The frozen stop rule activates a source-bound public-context diagnostic, with no
+additional prompt-only loop or retrospective regrading. Pilot remains held.
+
+Independent v7 inspection verified all nineteen generations, thirteen certificates/
+review contracts, thirty-two responses and the canonical prose-ledger pin. Final
+joint style/function quality is **3/7 narration targets**, with **2/6** paired
+check/damage targets; warm/evasive and wary each remain **0/2**. Five style-passing
+initials were refused: three for unsupported prose, two for unrecognized
+present-tense check grammar. Selected labels: 897 train, 92 dev. Reviews: twelve
+accept and one accept-with-notes. The no-tool decision is legitimate, but its
+room/scene details are unverified; the reviewer calling them observed facts is
+not source authority. All historical refusals and grades remain immutable.
+
+## Public-context adapter implemented, then held on integrity defects
+
+The typed public-observation source, opt-in six-surface planning branch, whole-clause
+scene grammar and separated mechanical/scene coverage sets were implemented and
+focused-tested: 592 tests across the affected files, 590 passing with two
+Python-gated skips, then closed with the real CPU tokenizer. The owning typecheck
+passed and a real-CPU preflight produced **zero generation or review attempts**.
+Global generator-v9 plans were not bumped; the pilot digest
+`f633ead229d265f97da0420fd0583dc7f8b21e6349fb5e150e7968a8b05233c2` and matched
+v7 digest `4ba77018ff32497f1e431508f4ffc602f37179efac1782170fa9b78d29b38e04`
+remain byte-identical with the option absent. The source manifest
+(`c07754537a920d4a7acbb09fd5951ee4974273224f1925fa845f6d38647d6c58`) and plan
+(`ed615621bcf3fd5ecc005a3e22ccc0a2ec9b76a68637c0faab197be263ebd83f`) were frozen
+before any dispatch, with all six arms compared against the retained v6 public plan.
+
+Independent pre-dispatch review then reproduced four defects and held dispatch:
+
+1. **P1 connector loss.** A scene-containing sentence whose semicolon sibling is
+   mechanical re-enters the legacy lossy splitter; `while`, `but` and `however`
+   connectors and question marks disappear and the paragraph verifies with complete
+   mechanical coverage. Scene questions also bind as asserted observations.
+2. **P1 mutable/copyable authority.** The issued registry exposes a mutable map,
+   and the enumerable brand survives object spread. A self-rehashed replacement
+   source and a forged control-arm upgrade both resolved under the original pin.
+3. **P2 silent digest repair.** A wrong declared manifest digest is recomputed and
+   returned instead of refused.
+4. **P2 schedule drift.** A valid noncontiguous schedule executes grouped while the
+   plan reports the supplied order.
+
+A nonblocking false contradiction for identical repeated scene subjects was also
+reported. All four are being fixed with narrow provider-free regressions before any
+request. No historical ledger, grade or refusal is changed by this work.

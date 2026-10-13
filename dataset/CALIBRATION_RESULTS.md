@@ -307,3 +307,79 @@ Artifacts: `.dataset/measurements/calibration-2026-10-13-v6/` and matching run s
 **Pilot HOLD:** grounded prose does not meet the inherited style floor. Preserve
 the locked ratings and historical attempts while correcting the narration
 guidance and measuring fresh outputs. No training has run.
+
+## Version 7 — composed-beat diagnostic, public-context stop rule triggered
+
+Run `calibration-2026-10-13-v7`, producer
+`2711ea60b00497aceb8dd2f30fd8039c2089037b`, thirteen matched seeds/K=1.
+Receipts, identities, requested voices, slots, lineage and splits match v6;
+the generator-v9 composition guide is the intervention.
+
+| Family | Planned | Attempts | Initial admissions | Final admissions |
+|---|---:|---:|---:|---:|
+| Grounded narration | 6 | 11 | 1 | 6 |
+| Tool selection | 7 | 8 | 6 | 7 |
+| **Total** | **13** | **19** | **7** | **13** |
+
+Producer outcomes: all four tool subtypes admitted, thirteen selected records,
+six content repairs, **32** physical/logical captured responses (19 generations
++ 13 reviews). Parsing **13/13 initial**, **19/19 all attempts**. All-attempt
+supervised-label spend **1,540**, comprising **989 admitted + 551 refused labels**.
+Independent reconciliation confirms **897 selected train labels and 92 dev labels**.
+Reviews are **12 accept + one accept-with-notes**; all thirteen are usable.
+No unresolved/unmeasured outcome remains in the report. Event-level failure counts
+are five binding-grounding failures and one tool argument-binding failure; the
+derived summary retains validator-row diagnostics separately.
+
+The complete `generated-grounded` census includes **12 captured, gradeable outputs**:
+seven planned initial narration outputs and five actual grounded repairs.
+Locked style: **eight pass, four fail**, coverage **12/12**, conditional quality
+and acceptable yield **8/12**. The loader's all-attempt cohort floor is `meets`.
+This is not the style rate of admitted targets: some passing attempts contain
+richer wording that the functional pipeline refused. The functional/style
+intersection requires separate reconciliation; rejected attempts cannot make a
+later admitted target style-clean. Independent inspection reconciles the actual
+final intersection:
+
+| Final narration measure | v6 | v7 |
+|---|---:|---:|
+| Receipt-grounded narrations | 7/7 | 7/7 |
+| Joint style/function passes | 1/7 | 3/7 |
+| Paired check/damage joint passes | 0/6 | 2/6 |
+| Warm/evasive joint passes | 0/2 | 0/2 |
+| Wary joint passes | 0/2 | 0/2 |
+
+All five refused grounded initials pass style: three add unsupported
+scene/perception details, while two preserve the facts but use unrecognized
+present-tense check grammar. Refusal reasons and grades stay unchanged. Final
+improvements are confined to transactional Maren and procedural Oswin, plus the
+already-passing check-only tool output.
+
+Warm/wary challenges still have voice or naturalness failures. The preregistered
+stop rule therefore triggers the **source-bound public-context diagnostic**, not
+another prompt-only tuning loop. No ratings are replaced, no historical refusal
+is readmitted, and the matched comparison is not controlled student retention.
+No ordinary-RP or twin-parity samples were scheduled.
+
+Frozen prose ledger:
+`a4097368e0de07551c2cc0977f9092f8419f28cef1e96f3a92b4b705c0b6f98e`.
+Independent inspection confirmed this canonical pin, all nineteen generations,
+thirteen certificates/review contracts, thirty-two captured responses and all
+seven final receipt narrations. Actor/target, check, damage, HP and stable status
+bindings are sound; complete actual admitted outputs are preserved. The no-tool
+decision is correct, but room/furnishings/window/door/street/silence details are
+unsupported observations. The reviewer calling them observed facts does not
+establish public authority. Twelve fresh non-forked Astra contexts and ledger
+lock before functional unblinding were independently verified.
+
+Physical responses report 43,019 provider tokens, separate from label counts and
+not a dollar-cost estimate. Manifest zero-spend fields remain unused projections.
+Independent reports: `/tmp/opencode/foundry-calibration-v7-independent-review.md`
+and `/tmp/opencode/foundry-calibration-v7-independent-review.json`.
+
+Bindings: plan
+`4ba77018ff32497f1e431508f4ffc602f37179efac1782170fa9b78d29b38e04`;
+report `9ab75ee8e19c797aebb9f99527dbab46ff02eccd6441009ee31959ff8ed117af`;
+selection `ae54afaf780e9d15e3a78622fde35a2cec35bec2c774dfde726ba4730ee86e01`.
+Artifacts: `.dataset/measurements/calibration-2026-10-13-v7/` and matching run store.
+**Pilot HOLD; no training or export approval follows from these results.**

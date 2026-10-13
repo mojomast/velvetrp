@@ -18,8 +18,20 @@
  */
 import { analyzeClaimReceipts } from "../../scripts/audit-adventure-consistency.js";
 import type { providerNarrationMatchesReceipts } from "../../server/src/routes/rpg/v1/adventureTurns.js";
+import {
+  resolvePublicSceneFacts,
+  type BoundSceneObservation,
+  type PublicContextMode,
+  type PublicSceneFact,
+  type ScenePredicate,
+  type SceneScope,
+  type SceneValue,
+  type VerifiedPublicSceneAuthority,
+} from "./publicSceneFacts.js";
 
 export const GROUNDING_VALIDATOR_VERSION = "grounding-binding-v6";
+/** The opt-in path adds source-bound public observations: a different grammar. */
+export const PUBLIC_SCENE_GROUNDING_VALIDATOR_VERSION = `${GROUNDING_VALIDATOR_VERSION}+public-scene-v1`;
 
 type ProductionReceipt = Parameters<typeof providerNarrationMatchesReceipts>[1][number];
 type CombatStatus = "active" | "unconscious" | "stable" | "defeated" | "dead";
@@ -87,6 +99,30 @@ interface VerdictEvidence {
   facts: readonly AuthoritativeFact[];
   bindings: readonly ClauseBinding[];
   bindingsChecked: number;
+  /** Present only on the opt-in public-scene path; absent otherwise, byte for byte. */
+  sceneProvenance?: PublicSceneGroundingProvenance;
+}
+/**
+ * Three DISTINCT sets, never collapsed into `bindingsChecked`: the receipts this
+ * task requires, the scene facts this arm was actually exposed, and their union.
+ * An optional observation must never be counted as mechanical coverage, and
+ * mechanical coverage must never be excused by an observation.
+ */
+export interface PublicSceneGroundingProvenance {
+  readonly manifestDigest: string;
+  readonly mode: PublicContextMode;
+  readonly sourceId: string;
+  readonly sourceCanonicalDigest: string;
+  readonly scope: SceneScope;
+  readonly requiredMechanicalIds: readonly string[];
+  readonly allowedSceneFactIds: readonly string[];
+  readonly knownBindingIds: readonly string[];
+  readonly unknownBindings: readonly string[];
+  readonly missingMechanical: readonly string[];
+  readonly usedSceneFactIds: readonly string[];
+  readonly mechanicalBindingsChecked: number;
+  readonly observationBindingsChecked: number;
+  readonly observations: readonly BoundSceneObservation[];
 }
 export type GroundingVerdict = VerdictEvidence & (
   | { verdict: "verified"; ok: true }
@@ -112,10 +148,26 @@ export class GroundingAdjudicationRequired extends GroundingFailure {
   }
 }
 
+/**
+ * The validated scene context of one scheduled unit. Resolved and re-validated
+ * inside the evaluator: carrying these fields on an oracle is not wiring.
+ */
+export interface PublicSceneGroundingContext {
+  readonly unitId: string;
+  readonly scope: SceneScope;
+  readonly facts: readonly PublicSceneFact[];
+  readonly authority: VerifiedPublicSceneAuthority;
+}
+
 export interface GroundingOptions {
   /** Exact, atomic public clauses established by the world, not keyword licenses. */
   authorizedConsequences?: readonly string[];
   forbiddenConsequences?: readonly string[];
+  /**
+   * Opt-in source-bound public observations. Additive: when absent the existing
+   * grammar and evidence bytes are exactly what they were.
+   */
+  publicScene?: PublicSceneGroundingContext;
 }
 
 const normalize = (text: string): string => text.toLocaleLowerCase("en-US").replace(/[’]/g, "'").replace(/\s+/g, " ").trim();
@@ -158,23 +210,25 @@ export function authoritativeFacts(receipts: readonly GroundingReceipt[]): Autho
   });
 }
 
+/** Recursive mechanical clause splitter. Shared by both grammar paths. */
+function splitClauses(text: string): string[] {
+  const clause = text.trim();
+  if (!clause) return [];
+  if (parseClause(clause)) return [clause];
+  for (const boundary of [/[;:]+/u, /,+/u, /\b(?:and|but|yet|however|whereas|while)\b/iu]) {
+    const parts = clause.split(boundary);
+    if (parts.length > 1) return parts.flatMap(splitClauses);
+  }
+  return [clause];
+}
+
 /** Keep complete mechanical schemas intact before considering clause boundaries. */
 function clausesOf(text: string): string[] {
-  const split = (text: string): string[] => {
-    const clause = text.trim();
-    if (!clause) return [];
-    if (parseClause(clause)) return [clause];
-    for (const boundary of [/[;:]+/u, /,+/u, /\b(?:and|but|yet|however|whereas|while)\b/iu]) {
-      const parts = clause.split(boundary);
-      if (parts.length > 1) return parts.flatMap(split);
-    }
-    return [clause];
-  };
   return text.split(/\n\s*\n/u).flatMap(recordScopes).flatMap((paragraph) => {
     // A field record is one scope even when its fields are period-separated.
     // An unknown field must not be dropped by retrying its known fragments.
     if (recordHeader(paragraph.trim())) return [paragraph.trim()];
-    return paragraph.split(/[!?\n]+|\.(?!\d)/u).flatMap(split);
+    return paragraph.split(/[!?\n]+|\.(?!\d)/u).flatMap(splitClauses);
   });
 }
 
@@ -783,6 +837,169 @@ function atomicFocus(assertion: Claim): "event" | "target" | null {
 }
 
 /**
+ * Opt-in public scene observations.
+ *
+ * The grammar is a whole-clause one: a source-resolved subject label, one
+ * declared copula and one DECLARED value, or exactly two such clauses joined by
+ * a bare additive `and`. Values are parsed independently of the source so an
+ * opposition is a specific value contradiction, while an unknown word, modifier,
+ * prefix, negation or connector is not a licence and stays adjudication-required.
+ *
+ * The legacy splitter cannot be reused here: it discards `and`, `but`, `while`,
+ * `however` and `whereas`, so splitting first would silently authorize prose
+ * whose connective meaning was thrown away.
+ */
+interface SceneAtom {
+  readonly subjectId: string;
+  readonly displayName: string;
+  readonly factId: string;
+  readonly predicate: ScenePredicate;
+  readonly value: SceneValue;
+}
+interface SceneGrammar {
+  readonly atoms: readonly SceneAtom[];
+}
+/** Case and whitespace only. It never changes a word, adds an article or a quote. */
+const sceneLabel = (text: string): string => normalize(text).replace(/[,;]+$/u, "").trim();
+
+function sceneGrammarOf(observations: readonly BoundSceneObservation[]): SceneGrammar {
+  return { atoms: observations.map((observation) => ({
+    subjectId: observation.subjectId, displayName: observation.displayName, factId: observation.factId,
+    predicate: observation.predicate, value: observation.value,
+  })) };
+}
+
+/** A public observation fact is never a check or damage receipt. */
+function sceneAuthoritativeFact(fact: PublicSceneFact): AuthoritativeFact {
+  return {
+    receiptId: fact.factId, family: "public-observation", actor: null, target: null, action: fact.predicate,
+    damageType: null, difficulty: null, subject: fact.subjectId, values: [], outcome: null, status: null,
+    visibility: "public", implemented: true,
+  };
+}
+
+/** Declared surface values only. `shut` is the one accepted synonym, per the guide.
+ * A Map, not an object-literal lookup: an inherited key is not a declared value. */
+const LIGHT_VALUES: ReadonlyMap<string, SceneValue> = new Map([["amber", "amber"], ["white", "white"]]);
+const SHUTTER_VALUES: ReadonlyMap<string, SceneValue> = new Map([["closed", "closed"], ["shut", "closed"], ["open", "open"]]);
+
+interface SceneAtomClaim {
+  readonly atom: SceneAtom;
+  readonly statedValue: SceneValue;
+}
+
+function parseSceneAtom(clause: string, grammar: SceneGrammar): SceneAtomClaim | null {
+  const text = sceneLabel(clause);
+  for (const atom of grammar.atoms) {
+    const label = sceneLabel(atom.displayName);
+    if (!text.startsWith(`${label} `)) continue;
+    const rest = text.slice(label.length).trim();
+    const values = atom.predicate === "light-colour" ? LIGHT_VALUES : SHUTTER_VALUES;
+    // `[lamplight] is [colour]` and `[shutters] are [state]` are the declared
+    // copulas. A mismatched subject never borrows the other's predicate.
+    let match = new RegExp(`^${atom.predicate === "light-colour" ? "is" : "are"}\\s+(\\S+)$`, "u").exec(rest);
+    if (!match && atom.predicate === "light-colour") match = /^has\s+(?:an?|the)\s+(\S+)\s+hue$/u.exec(rest);
+    if (!match) return null;
+    const statedValue = values.get(match[1]!);
+    if (statedValue === undefined) return null;
+    return { atom, statedValue };
+  }
+  return null;
+}
+
+/** Two complete observation clauses joined by a bare additive `and` (comma allowed). */
+function parseSceneClause(clause: string, grammar: SceneGrammar): SceneAtomClaim[] | null {
+  const single = parseSceneAtom(clause, grammar);
+  if (single) return [single];
+  if (grammar.atoms.length === 0) return null;
+  const splits: SceneAtomClaim[][] = [];
+  for (const match of clause.matchAll(/\band\b/giu)) {
+    const index = match.index;
+    if (index === undefined) continue;
+    // Bare connector only: it must stand alone between whitespace, optionally
+    // after a comma. Anything else (`and yet`, `brand`) is not a conjunction.
+    if (!/[\s,]/u.test(clause.charAt(index - 1)) || !/\s/u.test(clause.charAt(index + 3))) continue;
+    const left = parseSceneAtom(clause.slice(0, index), grammar);
+    const right = parseSceneAtom(clause.slice(index + 3), grammar);
+    if (left && right) splits.push([left, right]);
+  }
+  return splits.length === 1 ? splits[0]! : null;
+}
+
+function mentionsScene(text: string, grammar: SceneGrammar): boolean {
+  if (grammar.atoms.length === 0) return false;
+  const haystack = ` ${sceneLabel(text)} `;
+  return grammar.atoms.some((atom) => haystack.includes(` ${sceneLabel(atom.displayName)} `));
+}
+
+interface NarrationSegment {
+  readonly clause: string;
+  /** A clause naming a scene subject stays whole and on the scene grammar. */
+  readonly sceneBound: boolean;
+}
+
+/**
+ * A scene-containing span is divided ONLY by semicolons into independently
+ * verified clauses. A clause that names a scene subject is never retried through
+ * the mechanical splitter, so no modifier, connective or suffix can disappear.
+ */
+function sceneSegmentsOf(text: string, grammar: SceneGrammar): NarrationSegment[] {
+  const segments: NarrationSegment[] = [];
+  for (const paragraph of text.split(/\n\s*\n/u).flatMap(recordScopes)) {
+    if (recordHeader(paragraph.trim())) {
+      segments.push({ clause: paragraph.trim(), sceneBound: mentionsScene(paragraph, grammar) });
+      continue;
+    }
+    for (const sentence of paragraph.split(/[!?\n]+|\.(?!\d)/u)) {
+      const span = sentence.trim();
+      if (!span) continue;
+      if (!mentionsScene(span, grammar)) {
+        for (const clause of splitClauses(span)) segments.push({ clause, sceneBound: false });
+        continue;
+      }
+      for (const part of span.split(/;/u)) {
+        const piece = part.trim();
+        if (!piece) continue;
+        if (mentionsScene(piece, grammar)) segments.push({ clause: piece, sceneBound: true });
+        else for (const clause of splitClauses(piece)) segments.push({ clause, sceneBound: false });
+      }
+    }
+  }
+  return segments;
+}
+
+function bindSceneClause(
+  clause: string,
+  scene: { readonly grammar: SceneGrammar },
+  bindings: ClauseBinding[],
+  violations: BindingViolation[],
+  adjudications: GroundingAdjudication[],
+): void {
+  const claims = parseSceneClause(clause, scene.grammar);
+  if (!claims) {
+    adjudications.push({
+      code: "unrecognized-clause",
+      detail: "this scene clause carries tokens the public-observation grammar does not cover; no part of it is authorized",
+      excerpt: clause,
+      resolution: "Use a supplied subject with its declared predicate and value, join two supplied observations with a bare 'and' or ';', and keep modifiers, causes, negation and player-attention verbs out of the clause.",
+    });
+    return;
+  }
+  if (new Set(claims.map((claim) => claim.atom.subjectId)).size !== claims.length) {
+    violations.push({ code: "scene-observation-contradicted", detail: "one public subject is asserted twice with different values in a single clause", excerpt: clause });
+    return;
+  }
+  for (const claim of claims) {
+    if (claim.statedValue !== claim.atom.value) {
+      violations.push({ code: "scene-value-contradicted",
+        detail: `the source records ${claim.atom.predicate}=${claim.atom.value}, not ${claim.statedValue}`, excerpt: clause, receiptId: claim.atom.factId });
+      continue;
+    }
+    bindings.push({ clause, receiptId: claim.atom.factId, roles: ["scene-subject", "scene-predicate", "scene-value"] });
+  }
+}
+
+/**
  * Rich verdict API. Unknown clauses and unsupported families fail closed. This
  * intentionally does not claim to prove arbitrary natural-language entailment.
  * Production's presence predicate is not called here: it cannot prove bindings,
@@ -793,7 +1010,45 @@ export function evaluateGroundedNarration(text: string, receipts: readonly Groun
   const violations: BindingViolation[] = [];
   const adjudications: GroundingAdjudication[] = [];
   const bindings: ClauseBinding[] = [];
-  const clauses = clausesOf(text);
+  const sceneOption = options.publicScene ?? null;
+  // A legacy string allowlist and the frozen source registry are two different
+  // authorities. Mixing them in one evaluation is refused, not merged.
+  const mixedAuthority = sceneOption !== null && (options.authorizedConsequences ?? []).length > 0;
+  if (mixedAuthority) {
+    violations.push({ code: "mixed-scene-authority", detail: "legacy authorizedConsequences and the public-scene source registry cannot both authorize a clause", excerpt: "" });
+  }
+  let scene: {
+    readonly grammar: SceneGrammar;
+    readonly mode: PublicContextMode;
+    readonly manifestDigest: string;
+    readonly sourceId: string;
+    readonly sourceCanonicalDigest: string;
+    readonly scope: SceneScope;
+    readonly observations: readonly BoundSceneObservation[];
+    readonly factIds: readonly string[];
+  } | null = null;
+  if (sceneOption && !mixedAuthority) {
+    // Resolved and re-validated here: before any clause is authorized and
+    // before any observation fact exists.
+    const resolved = resolvePublicSceneFacts({
+      unitId: sceneOption.unitId, scope: sceneOption.scope, facts: sceneOption.facts, authority: sceneOption.authority,
+    });
+    if (!resolved.ok) {
+      return {
+        facts, bindings, bindingsChecked: 0, verdict: "rejected", ok: false, adjudications,
+        violations: [...violations, ...resolved.refusals.map((refusal) => ({ code: refusal.code, detail: refusal.detail, excerpt: text.slice(0, 200) }))],
+      };
+    }
+    scene = {
+      grammar: sceneGrammarOf(resolved.observations), mode: resolved.mode, manifestDigest: resolved.manifestDigest,
+      sourceId: resolved.sourceId, sourceCanonicalDigest: resolved.sourceCanonicalDigest,
+      scope: resolved.scope, observations: resolved.observations, factIds: resolved.factIds,
+    };
+    for (const fact of resolved.facts) facts.push(sceneAuthoritativeFact(fact));
+  }
+  const clauses = scene
+    ? sceneSegmentsOf(text, scene.grammar)
+    : clausesOf(text).map((clause) => ({ clause, sceneBound: false as const }));
   if (clauses.length === 0) violations.push({ code: "empty-narration", detail: "there is no narration to verify", excerpt: text });
   const ids = new Set<string>();
   for (const fact of facts) {
@@ -814,7 +1069,16 @@ export function evaluateGroundedNarration(text: string, receipts: readonly Groun
   }
   let previous: AuthoritativeFact | null = null;
   let focus: "event" | "target" | null = null;
-  for (const clause of clauses) {
+  for (const segment of clauses) {
+    const clause = segment.clause;
+    if (segment.sceneBound && scene) {
+      bindSceneClause(clause, scene, bindings, violations, adjudications);
+      // An observation is a scene property, not a mechanical continuation: it
+      // clears the focus so no later fragment can borrow the attack referent.
+      previous = null;
+      focus = null;
+      continue;
+    }
     const citation = /^receipt\s+([\w-]+)$/i.exec(clause);
     if (citation) {
       if (previous && previous.receiptId === citation[1]) bindings.push({ clause, receiptId: previous.receiptId, roles: ["receipt-id"] });
@@ -853,6 +1117,27 @@ export function evaluateGroundedNarration(text: string, receipts: readonly Groun
     focus = null;
   }
   const evidence: VerdictEvidence = { facts, bindings, bindingsChecked: new Set(bindings.map((binding) => binding.receiptId)).size };
+  if (scene) {
+    const requiredMechanicalIds = facts.filter((fact) => fact.family !== "public-observation").map((fact) => fact.receiptId);
+    const allowedSceneFactIds = [...scene.factIds];
+    const knownBindingIds = new Set([...requiredMechanicalIds, ...allowedSceneFactIds]);
+    evidence.sceneProvenance = {
+      manifestDigest: scene.manifestDigest,
+      mode: scene.mode,
+      sourceId: scene.sourceId,
+      sourceCanonicalDigest: scene.sourceCanonicalDigest,
+      scope: { ...scene.scope },
+      requiredMechanicalIds,
+      allowedSceneFactIds,
+      knownBindingIds: [...knownBindingIds],
+      unknownBindings: bindings.filter((binding) => !knownBindingIds.has(binding.receiptId)).map((binding) => binding.clause),
+      missingMechanical: requiredMechanicalIds.filter((receiptId) => !bindings.some((binding) => binding.receiptId === receiptId)),
+      usedSceneFactIds: [...new Set(bindings.filter((binding) => allowedSceneFactIds.includes(binding.receiptId)).map((binding) => binding.receiptId))],
+      mechanicalBindingsChecked: new Set(bindings.filter((binding) => requiredMechanicalIds.includes(binding.receiptId)).map((binding) => binding.receiptId)).size,
+      observationBindingsChecked: new Set(bindings.filter((binding) => allowedSceneFactIds.includes(binding.receiptId)).map((binding) => binding.receiptId)).size,
+      observations: scene.observations,
+    };
+  }
   if (violations.length > 0) return { ...evidence, verdict: "rejected", ok: false, violations, adjudications };
   if (adjudications.length > 0) return { ...evidence, verdict: "adjudication-required", ok: false, adjudications };
   return { ...evidence, verdict: "verified", ok: true };

@@ -32,18 +32,55 @@ The committed corpus has 106 dev and 107 sealed cases, with frozen identity
 `22eb78976caa9ca91102f75576ea19eeb8cef8d594435275630542b7ddef8e58`.
 Sealed content stays outside the repository.
 
-## Generation status
+## Current status: pilot HELD
 
-Live calibration is underway. The completed v2 campaign admitted 4/20 scenarios;
-all four passed independent functional inspection and exact export/CPU-label
-approval. Completed v5 calibration admitted fourteen sound records, including five
-world targets. Focused v6 produced thirteen functional admissions, including all
-six grounded scenarios and all four tool subtypes. Its separate blinded narration
-census passed only one of seven gradeable outputs, so the 175-seed pilot remains
-held on prose quality. Actual yields, blinded prose
-coverage and immutable artifact pins are in
+**No model training has run, and no pilot generation has been dispatched.**
+
+The pipeline is operational and independently inspected, but the data it produces
+is not yet good enough to train on. The blocker is **prose quality alongside
+factual correctness**, not infrastructure.
+
+Latest measured position:
+
+| Campaign | Functional admissions | Blinded narration style | Gate |
+|---|---:|---|---|
+| v5 (20 seeds) | 14/20 approved | 1/1 ordinary RP sample passed | Held on grounding |
+| v6 (13 seeds) | 13/13 approved | 1 pass / 6 fail / 1 ungradeable | Held on prose |
+| v7 (13 seeds, matched) | 13/13 approved | 3/7 final targets pass style **and** function | Held on warm/wary prose |
+
+v7's improvements are confined to transactional and procedural narration.
+**Warm/evasive and wary narration remain 0/2 each**, because the model either
+writes mechanical checklists or becomes more natural by adding unsupported
+details that the fact checks then reject.
+
+That triggered the preregistered stop rule: the next step is a small
+**source-bound public-context diagnostic**, specified in
+[`PUBLIC_CONTEXT_PROTOCOL.md`](PUBLIC_CONTEXT_PROTOCOL.md). It tests whether two
+independently authored observations (an amber lamplight, closed shutters) let the
+model write naturally without inventing facts.
+
+Actual yields, blinded prose coverage and immutable artifact pins are in
 [`CALIBRATION_RESULTS.md`](CALIBRATION_RESULTS.md); frozen campaign settings are
-in [`CALIBRATION_PROTOCOL.md`](CALIBRATION_PROTOCOL.md). No model training has run.
+in [`CALIBRATION_PROTOCOL.md`](CALIBRATION_PROTOCOL.md); the chronological
+remediation record is in [`CORRECTIONS_LOG.md`](CORRECTIONS_LOG.md).
+
+### Current blocker in the context adapter
+
+The public-context adapter is implemented and its source manifest and plan are
+frozen, but **independent pre-dispatch review holds it on three reproduced
+defects** that must fail closed before any request is sent:
+
+1. **Connector loss.** At a semicolon boundary, a mechanical sibling re-entering
+   the lossy clause splitter can shed `while`/`but`/`however` or a question mark
+   and still verify with complete mechanical coverage.
+2. **Copyable runtime authority.** The issued registry is mutable and its brand
+   survives object spread, so a changed source or an upgraded control arm could be
+   authorized under the original pin.
+3. **Schedule drift.** A valid noncontiguous manifest order executes in grouped
+   order, disagreeing with the frozen schedule it reports.
+
+Fixes and regressions are in progress. This branch is a **checkpoint**, not an
+approved next dispatch.
 
 ```bash
 npm run foundry -- generate --execute --units 175 --seed pilot-1
@@ -89,6 +126,8 @@ Modules:
 | `src/teacherRights.ts`, `rights/` | Inspected upstream training-use permission and operator-confirmed relay identity |
 | `src/proseMeasurement.ts` | Frozen blinded inventories and independently pinned offline judgment ledgers |
 | `src/preprocessExport.ts` | Checksummed export reload with exact selected SFT labels and explicit preference masks |
+| `src/grounding.ts` | Typed receipt/sentence binding, scene-observation grammar and full-surface fail-closed verification |
+| `src/publicSceneFacts.ts` | Frozen toy public-observation source, manifest validation and the runtime scene-authority boundary (opt-in diagnostic) |
 
 ### Teacher configuration
 
@@ -184,6 +223,15 @@ Before a production run:
 Then run the 150–200-seed pilot and inspect measured fidelity, repair rates,
 diversity and prose retention before scaling. No training data has been generated.
 
+## Branch status
+
+`feat/foundry-context-diagnostic` is a **checkpoint branch**. It carries the v7
+results, the public-context protocol, and the first implementation of the typed
+scene-fact source and grammar. That adapter is **held by independent review on
+three reproduced integrity defects** (see Current status above) and is not
+authorized for dispatch. The 175-seed pilot remains held regardless; no training
+data has been generated.
+
 ## Validation
 
 ```bash
@@ -197,8 +245,27 @@ Use focused files during iteration. The full foundry suite is a serial wave-boun
 check: `npm run test:foundry`. See `BASELINE_SIGNAL.md`, `CORRECTIONS_LOG.md`, and
 `eval/CORPUS_HANDOFF.md` for measured baseline results, fixes, and benchmark handoff.
 
-Latest runner integration validation: owning typecheck passed; **373 foundry tests
-passed, 0 failed, 0 skipped**, including the live CPU bridge and runner/export
-integration. The 175-seed K=3 plan schedules 525 rows; the six-row Flash/Kimi dry
-run makes zero attempts. The corpus verifies through the CLI. These are infrastructure checks,
-not teacher-generated data or model-quality scores.
+Two checks are gated on the measured CPU tokenizer environment and skip without it:
+
+```bash
+FOUNDRY_TOKENIZER_PYTHON=/path/to/pinned/venv/bin/python npm run test:foundry
+```
+
+Latest recorded validation checkpoints:
+
+| Check | Result |
+|---|---|
+| Generator-v9 readiness (committed, serial) | 570 passed, 0 failed, 0 skipped |
+| Public-context adapter + focused files (serial) | 590 passed, 0 failed, 2 Python-gated |
+| Public-context real-CPU closure | 2 gated checks passed with the tokenizer enabled |
+| Owning typecheck (`typecheck:foundry`) | passed |
+| Context-diagnostic preflight (real CPU, six units) | 0 generation/review attempts |
+
+The 175-seed K=3 plan schedules 525 rows; the six-row Flash/Kimi dry run makes zero
+attempts. The corpus verifies through the CLI. These are infrastructure checks, not
+teacher-generated data or model-quality scores.
+
+Note on test counts: a *serial full-suite* checkpoint is 570 tests at the committed
+generator-v9 tree. The public-context diagnostic adds new files, so its focused-file
+count (592) is not comparable to the full-suite number. Only the most recent full
+serial run is a whole-tree claim; everything else is a focused-file result.
