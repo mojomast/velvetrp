@@ -88,9 +88,37 @@ LoraConfig(
   training run comparable to a future unquantized reference and distinct from the
   Windows 8 GB quantized baseline (see §7).
 - Sequence length **4096** matches the foundry's preprocessing policy. The
-  foundry uses **no packing and no truncation**; if you enable either, record it,
-  because it changes effective supervision.
+  foundry uses **no packing and no truncation**. Measured against the real
+  Qwen3-8B tokenizer, the admitted creative conversations run **733–1393 tokens
+  total**, so they fit with ample margin; deeper conversations would not, and
+  would be refused rather than silently truncated.
 - Keep the base model frozen; train adapters only.
+
+### Train a smoke test before scaling
+
+This is the highest expected-value step and it is cheap. No model has been
+trained on any of this data yet, and the evidence base says **curation and
+diversity dominate volume**. Before spending a large generation budget:
+
+1. Train a small LoRA on the data that already exists (a few thousand supervised
+   labels is enough to see whether the format is learnable at all).
+2. Compare against a **same-runtime BF16 stock** baseline, not the quantized
+   Windows one.
+3. Check for interference: does structured training degrade the creative arm?
+
+Only scale generation after that answers whether the direction is right.
+
+### Separate adapters, not one blend
+
+There is measured evidence that function-calling / structured SFT degrades
+general instruction ability (a controlled result reports roughly a 7% relative
+drop on a comparable model after function-calling fine-tuning). LoRA forgets less
+than full fine-tuning but also learns less.
+
+The safer structure is **three arms**: a structured-only adapter, a
+creative-only adapter, and a blended adapter for comparison. That makes the
+"does structured training hurt roleplay?" question answerable instead of assumed,
+which is exactly why the export separates the categories.
 
 ## 5. Category mixing
 
@@ -104,8 +132,21 @@ bundle supports three consumptions:
 
 No optimal ratio is asserted. The foundry deliberately did **not** claim one,
 because whether structured training degrades roleplay quality is exactly the
-question a controlled comparison should answer. Choose a ratio, record it, and
-compare against the single-category runs.
+question a controlled comparison should answer.
+
+### Two weightings the evidence says to change
+
+- **Roleplay is scheduled at only 6% of generation.** That was reasonable when
+  roleplay was a retention tranche, but roleplay is now a primary stated goal and
+  the creative stream is the only thing that produces engaging prose. At 6% a
+  corpus is dominated by JSON and tool envelopes, which is the opposite of what
+  the roleplay goal needs. Re-weight before generating at scale.
+- **Consider excluding grounded narration from any creative or blended arm.**
+  SFT mainly teaches format and register. Its measured joint style+function rate
+  is at best 3/7 and 1/9 in the context diagnostic, and training on
+  checklist-register prose risks teaching that register and bleeding it into
+  roleplay. It remains valuable for the **structured** arm, where mechanical
+  accuracy is the objective.
 
 ## 6. Checkpointing and evaluation
 
@@ -113,8 +154,26 @@ compare against the single-category runs.
   but a long run should survive interruption.
 - Hold out the bundle's `dev` rows. Evaluate with the frozen dev corpus used by
   the benchmarking workstream, not with a fresh ad-hoc set.
-- Report training loss separately from task metrics. A falling loss does not
-  demonstrate roleplay quality.
+
+### Three ways this evaluation can fool you
+
+The foundry's blinded prose grading has specific weaknesses that carry into any
+evaluation built on it. Design around them:
+
+1. **The judge shares a family with the generator.** The independent reviewer and
+   the blinded style judge are both GPT-6 Astra; self-enhancement bias is a
+   documented effect. Use a **different model family** as the judge for the
+   training comparison.
+2. **The dev set is in-domain.** It shares the foundry's frozen plan and style.
+   Add an **independently authored out-of-domain creative set**, or the result
+   measures memorisation of the foundry's own conventions.
+3. **Single-digit pass rates are within sampling noise.** `3/5`, `1/7` and `3/7`
+   cannot be distinguished without interval estimates. Use **paired comparisons
+   and bootstrap confidence intervals**, and randomize presentation order with
+   length controls.
+
+Report training loss separately from task metrics. A falling loss does not
+demonstrate roleplay quality.
 
 ## 7. Comparing against the separate stock baseline
 
