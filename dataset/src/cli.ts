@@ -32,6 +32,7 @@ Plan/generate options:
 Generate options:
   --execute           Explicitly permit teacher calls.
   --max-repairs <n>   Repair attempts per unit (default 2).
+  --max-completion-tokens <n> Teacher response limit (default 2048 for Flash).
   --run-id <s>         Stable run identity (default foundry-<seed>).
   --artifact-root <dir> Run storage root (default .dataset).
   --cluster-cap <n>    Selected records per cluster (default 8; twins consume 2).
@@ -66,6 +67,7 @@ interface Arguments {
   artifactRoot?: string;
   clusterCap: number;
   maxSupervisedTokens: number;
+  maxCompletionTokens?: number;
 }
 
 class UsageError extends Error {}
@@ -92,7 +94,7 @@ function parseArgs(argv: readonly string[]): Arguments {
     const value = argv[index + 1];
     const planning = command === "plan" || command === "generate";
     const allowed = (planning && ["--units", "--seed", "--families", "--k"].includes(flag))
-      || (command === "generate" && ["--max-repairs", "--run-id", "--artifact-root", "--cluster-cap", "--max-supervised-tokens"].includes(flag))
+      || (command === "generate" && ["--max-repairs", "--max-completion-tokens", "--run-id", "--artifact-root", "--cluster-cap", "--max-supervised-tokens"].includes(flag))
       || (["generate", "tokenizer-check"].includes(command) && ["--python", "--assets"].includes(flag))
       || (command === "verify" && flag === "--sealed-source");
     if (!allowed) throw new UsageError("unexpected argument; use help for available options");
@@ -103,7 +105,8 @@ function parseArgs(argv: readonly string[]): Arguments {
       case "--max-repairs":
       case "--k":
       case "--cluster-cap":
-      case "--max-supervised-tokens": {
+      case "--max-supervised-tokens":
+      case "--max-completion-tokens": {
         const number = Number(value);
         const minimum = ["--max-repairs", "--max-supervised-tokens"].includes(flag) ? 0 : 1;
         if (!/^\d+$/.test(value) || !Number.isSafeInteger(number) || number < minimum) {
@@ -113,6 +116,7 @@ function parseArgs(argv: readonly string[]): Arguments {
         else if (flag === "--max-repairs") args.maxRepairs = number;
         else if (flag === "--k") args.k = number;
         else if (flag === "--cluster-cap") args.clusterCap = number;
+        else if (flag === "--max-completion-tokens") args.maxCompletionTokens = number;
         else args.maxSupervisedTokens = number;
         break;
       }
@@ -210,6 +214,9 @@ export async function main(argv: readonly string[], dependencies: CliDependencie
       execute: args.execute, maxRepairs: args.maxRepairs, tokenizer, generator, reviewer,
       generationPolicy: policy, selectionPolicy: { maxRecordsPerCluster: args.clusterCap },
       budget: { ...DEFAULT_TOKEN_BUDGET, maxSupervisedAssistantTokens: args.maxSupervisedTokens },
+      ...(generator.model === "deepseek-v4-flash" ? { teacherThinking: "disabled" as const, maxCompletionTokens: args.maxCompletionTokens ?? 2048 }
+        : args.maxCompletionTokens ? { maxCompletionTokens: args.maxCompletionTokens } : {}),
+      ...(["kimi:k3", "kimi-k3"].includes(reviewer.model) ? { reviewerTemperature: null, reviewerReasoningEffort: "low" as const, reviewerMaxCompletionTokens: 4096 } : {}),
       ...(!dependencies.generator ? { teacherRights: loadTeacherRights() } : {}),
       ...(args.families ? { families: args.families } : {}),
       ...(store ? { store } : {}),

@@ -26,6 +26,15 @@ The RouteTok credit balance is funded; provider billing accounting
 is optional. Neither the implementation tests nor the tokenizer checks spend
 teacher credit.
 
+The CLI configures `deepseek-v4-flash` with explicit disabled thinking and a
+2048-token response limit (`--max-completion-tokens` can override the limit).
+Kimi K3 review omits its fixed-temperature parameter, requests low reasoning
+effort and allows 4096 response tokens. These settings are retained in requests
+and the immutable resume binding. Reasoning content stays out of student targets.
+The first live calibration exposed the upstream defaults; see
+[`CALIBRATION_PROTOCOL.md`](CALIBRATION_PROTOCOL.md) for retained failures and the
+versioned correction.
+
 `--units` means scenario seeds. `--k` means realizations of each seed. K defaults
 to one and supports at most 30 voice/beat combinations. Realizations preserve
 scenario entity identities, receipts, lineage and split. Both tool-selection

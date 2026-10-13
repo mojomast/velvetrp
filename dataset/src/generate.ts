@@ -2304,6 +2304,11 @@ export interface PipelineOptions {
   readonly generationPolicy?: GenerationPolicy;
   readonly selectionPolicy?: SelectionPolicy;
   readonly teacherRights?: VerifiedTeacherRights;
+  readonly teacherThinking?: "enabled" | "disabled";
+  /** null omits temperature for upstream models with a fixed supported value. */
+  readonly reviewerTemperature?: number | null;
+  readonly reviewerReasoningEffort?: "low" | "high" | "max";
+  readonly reviewerMaxCompletionTokens?: number;
 }
 
 export type PipelineEvent =
@@ -2493,11 +2498,17 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
   const maxRepairs = options.maxRepairs ?? 2;
   const maxCompletionTokens = options.maxCompletionTokens ?? 512;
   const temperature = options.temperature ?? 0.7;
+  const reviewerTemperature = options.reviewerTemperature === undefined ? 0 : options.reviewerTemperature;
+  const reviewerMaxCompletionTokens = options.reviewerMaxCompletionTokens ?? 256;
   const budget = options.budget ?? DEFAULT_TOKEN_BUDGET;
   const gitCommit = options.gitCommit === undefined ? readGitCommit() : options.gitCommit;
   if (!Number.isSafeInteger(maxRepairs) || maxRepairs < 0 || !Number.isSafeInteger(maxCompletionTokens) || maxCompletionTokens < 1
     || !Number.isFinite(temperature) || temperature < 0 || !Number.isSafeInteger(budget.maxSupervisedAssistantTokens)
-    || budget.maxSupervisedAssistantTokens < 0 || Object.values(budget.perTarget ?? {}).some((cap) => !Number.isSafeInteger(cap) || cap! < 0)) {
+    || budget.maxSupervisedAssistantTokens < 0 || Object.values(budget.perTarget ?? {}).some((cap) => !Number.isSafeInteger(cap) || cap! < 0)
+    || (reviewerTemperature !== null && (!Number.isFinite(reviewerTemperature) || reviewerTemperature < 0))
+    || !Number.isSafeInteger(reviewerMaxCompletionTokens) || reviewerMaxCompletionTokens < 1
+    || (options.teacherThinking !== undefined && !["enabled", "disabled"].includes(options.teacherThinking))
+    || (options.reviewerReasoningEffort !== undefined && !["low", "high", "max"].includes(options.reviewerReasoningEffort))) {
     throw new PipelineRefusal("execution-not-authorized", ["invalid repair, completion, temperature or supervised-budget configuration"]);
   }
 
@@ -2555,6 +2566,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     teacherRights: rights?.receiptDigest ?? null,
     generator: options.generator.identity, reviewer: options.reviewer.identity,
     maxRepairs, maxCompletionTokens, temperature, selectionPolicy,
+    teacherThinking: options.teacherThinking ?? null, reviewerTemperature,
+    reviewerReasoningEffort: options.reviewerReasoningEffort ?? null, reviewerMaxCompletionTokens,
     proseScorer: options.proseQualityScorer ? { id: options.proseQualityScorer.scorerId, version: options.proseQualityScorer.version } : null,
   }) : null;
   const ledger = createBudgetLedger();
@@ -2714,6 +2727,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         maxTokens: maxCompletionTokens,
         seed: attemptOrdinal,
         responseFormat: "text" as const,
+        ...(options.teacherThinking ? { thinking: options.teacherThinking } : {}),
       };
       const completion: TeacherCompletion = unit.preference ? {
         content: unit.preference.chosen.map((message) => message.content).join("\n"), toolCalls: [],
@@ -2915,8 +2929,9 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
         attemptId: `${attemptId}-review`,
         system: reviewPrompt,
         messages: [],
-        temperature: 0,
-        maxTokens: 256,
+        ...(reviewerTemperature === null ? {} : { temperature: reviewerTemperature }),
+        ...(options.reviewerReasoningEffort ? { reasoningEffort: options.reviewerReasoningEffort } : {}),
+        maxTokens: reviewerMaxCompletionTokens,
         responseFormat: "json",
       });
       const scores = parseReviewScores(reviewCompletion.content);

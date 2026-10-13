@@ -390,6 +390,22 @@ test("unmeasurable candidate is durably quarantined, never assigned zero measure
   assert.deepEqual(resumed, report);
 });
 
+test("teacher/reviewer inference settings bind requests and reject resume drift", async (t) => {
+  let generated: TeacherCompletionRequest | null = null;
+  let reviewed: TeacherCompletionRequest | null = null;
+  const generator = client("fixture-teacher", (request) => { generated = request; return "The lantern gutters beside the closed ledger."; });
+  const reviewer = client("fixture-reviewer", (request) => { reviewed = request; return ACCEPT; });
+  const run = setup(t, { units: 1, generator, reviewer, teacherThinking: "disabled", maxCompletionTokens: 2048,
+    reviewerTemperature: null, reviewerReasoningEffort: "low", reviewerMaxCompletionTokens: 4096 });
+  assert.equal((await runPipeline({ ...run.options, store: run.store })).admitted, 1);
+  assert.equal(generated!.thinking, "disabled");
+  assert.equal(generated!.maxTokens, 2048);
+  assert.equal(reviewed!.temperature, undefined);
+  assert.equal(reviewed!.reasoningEffort, "low");
+  assert.equal(reviewed!.maxTokens, 4096);
+  await assert.rejects(() => runPipeline({ ...run.options, store: run.reopen(), teacherThinking: "enabled" }), /configuration\/plan drift/);
+});
+
 test("teacher rights provenance retains the matching inspected terms and exact source bytes", async (t) => {
   const rights = loadTeacherRights();
   const base = client(rights.teacher.model, () => "The lantern gutters beside the closed ledger.");

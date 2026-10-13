@@ -112,6 +112,26 @@ function completionBody(content: string, extra: Record<string, unknown> = {}): s
 
 const noSleep = async (): Promise<void> => {};
 
+test("explicit thinking/reasoning modes are sent upstream, digest-bound and kept out of assistant targets", async () => {
+  const raw = completionBody("Final answer only.", { choices: [{ message: { role: "assistant", content: "Final answer only.", reasoning_content: "fixture private reasoning" }, finish_reason: "stop" }] });
+  const { transport, recorded } = fakeTransport([{ status: 200, body: raw }]);
+  const client = createTeacherClient({ credentials: CREDENTIALS, transport, sleep: noSleep });
+  const request = { attemptId: "inference-mode", system: "fixture", messages: [] };
+  const ordinary = await client.complete(request);
+  const flash = await client.complete({ ...request, thinking: "disabled", temperature: 0.7, maxTokens: 2048 });
+  const kimi = await client.complete({ ...request, reasoningEffort: "low", maxTokens: 4096 });
+  const flashBody = JSON.parse(recorded.requests[1]!.body);
+  const kimiBody = JSON.parse(recorded.requests[2]!.body);
+  assert.deepEqual(flashBody.thinking, { type: "disabled" });
+  assert.equal(kimiBody.reasoning_effort, "low");
+  assert.equal(Object.hasOwn(kimiBody, "temperature"), false);
+  assert.equal(kimiBody.max_tokens, 4096);
+  assert.notEqual(flash.requestDigest, ordinary.requestDigest);
+  assert.notEqual(kimi.requestDigest, ordinary.requestDigest);
+  assert.equal(flash.content, "Final answer only.");
+  assert.doesNotMatch(JSON.stringify(flash), /fixture private reasoning/);
+});
+
 // --- 1. Credential presence -------------------------------------------------------------------
 
 test("1. constructing a client with no credential is refused, not defaulted", () => {

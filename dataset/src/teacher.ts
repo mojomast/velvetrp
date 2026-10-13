@@ -484,6 +484,9 @@ export interface TeacherCompletionRequest {
   readonly temperature?: number | undefined;
   readonly maxTokens?: number | undefined;
   readonly seed?: number | undefined;
+  /** Explicit upstream inference mode; reasoning never becomes a student target. */
+  readonly thinking?: "enabled" | "disabled" | undefined;
+  readonly reasoningEffort?: "low" | "high" | "max" | undefined;
   /** `json` requests an object response where the relay supports it. */
   readonly responseFormat?: "text" | "json" | undefined;
   readonly timeoutMs?: number | undefined;
@@ -708,6 +711,8 @@ function buildRequestBody(request: TeacherCompletionRequest, model: string): str
     ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
     ...(request.maxTokens === undefined ? {} : { max_tokens: request.maxTokens }),
     ...(request.seed === undefined ? {} : { seed: request.seed }),
+    ...(request.thinking === undefined ? {} : { thinking: { type: request.thinking } }),
+    ...(request.reasoningEffort === undefined ? {} : { reasoning_effort: request.reasoningEffort }),
     ...(request.responseFormat === "json" ? { response_format: { type: "json_object" } } : {}),
   });
 }

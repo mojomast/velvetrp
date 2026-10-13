@@ -392,3 +392,19 @@ synced. The final independent verdict supports bounded 20-seed calibration under
 the documented operating conditions; no new concrete blocker was found.
 Final checkpoint after those fixes: **440/440 serial foundry tests passed, zero
 failures/skips**, with the real CPU tokenizer enabled; owning typecheck clean.
+
+## First live calibration: inference-default correction
+
+The first 20-seed campaign at `14192e1` stopped before completion. Captured Flash
+responses showed default-enabled reasoning consuming the 512-token response
+budget (eight empty final answers among ten generation responses). The first
+Kimi K3 review returned HTTP 400 because temperature 0 is unsupported; it fixes
+temperature at 1. No records were admitted before the stop, and the ordinary RP
+scenario had not run. No quality/retention score is inferred from this attempt.
+
+Upstream documentation confirms explicit Flash `thinking.type=disabled` and K3's
+always-on reasoning with `reasoning_effort=low/high/max`. The CLI now sends disabled
+Flash thinking with 2048 response tokens and omits K3 temperature, requesting low
+effort with 4096 response tokens. Settings join request and resume digests; final
+answers alone become training targets. A fresh version-2 calibration keeps the
+same preregistered scenario inventory and preserves all version-1 failures.

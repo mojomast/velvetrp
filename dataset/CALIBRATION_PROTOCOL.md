@@ -76,3 +76,29 @@ VELVET_REVIEWER_MODEL=kimi:k3 npm run foundry -- generate --execute \
 The final training-ready SFT materializer checks pinned export checksums and exact
 loss labels. Preference training additionally requires an actual consumer that
 honors the explicit branch masks. Dataset collection does not run that trainer.
+
+## Version 2 inference correction (frozen before second campaign)
+
+Version 1 stopped on the first Kimi review: HTTP 400, `invalid temperature: only
+1 is allowed for this model`. Ten Flash responses had been captured across four
+scenarios; eight had empty final answers, one was partial world JSON, and one was
+a correctly bound tool candidate awaiting review. The empty answers exhausted
+the 512-token limit in reasoning. These retained failures are not prose grades or
+an acceptable calibration yield; the remaining initial attempts were not run.
+
+The second campaign uses a fresh run `calibration-2026-10-13-v2`, the same frozen
+20-scenario seed `calibration-2026-10-13-v1`/plan digest, and these explicit settings:
+
+- Flash: `thinking: { type: "disabled" }`, temperature 0.7, 2048 response tokens.
+- Kimi K3: temperature omitted (upstream fixed at 1), `reasoning_effort: "low"`,
+  4096 response tokens. K3 cannot disable thinking; its reasoning is retained only
+  in raw audit artifacts and never copied into student targets.
+- All mode/limit choices are request-digest- and resume-binding-bound. Changes
+  cannot quietly alter an existing run. Known version-1 outcomes remain preserved.
+
+Official configuration sources checked 2026-10-13:
+[DeepSeek thinking mode](https://api-docs.deepseek.com/guides/thinking_mode),
+[Kimi model parameters](https://platform.kimi.ai/docs/api/models-overview).
+They specify Flash's default-enabled thinking toggle and K3's fixed temperature,
+always-on reasoning and supported low/high/max efforts. The operator relay's
+actual captured responses remain the evidence that settings were honored.

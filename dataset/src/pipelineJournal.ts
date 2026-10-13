@@ -129,6 +129,8 @@ function requestIdentity(request: TeacherCompletionRequest): Record<string, unkn
     ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
     ...(request.maxTokens === undefined ? {} : { maxTokens: request.maxTokens }),
     ...(request.seed === undefined ? {} : { seed: request.seed }),
+    ...(request.thinking === undefined ? {} : { thinking: request.thinking }),
+    ...(request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort }),
     ...(request.responseFormat === undefined ? {} : { responseFormat: request.responseFormat }),
     ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
     ...(request.maxAttempts === undefined ? {} : { maxAttempts: request.maxAttempts }),
