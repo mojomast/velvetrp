@@ -30,10 +30,14 @@ import { createTokenizerBridge } from "../src/tokenizer.js";
 import { stableStringify } from "../src/spec.js";
 
 /** Frozen preregistration identity. Changing any value here is a protocol change. */
-export const CREATIVE_RUN_ID = "creative-2026-10-13-v1";
-export const CREATIVE_SEED = "creative-2026-10-13-1";
+export const CREATIVE_RUN_ID = "creative-2026-10-13-v2";
+export const CREATIVE_SEED = "creative-2026-10-13-2";
 export const CREATIVE_UNITS = 10;
 export const CREATIVE_MAX_REPAIRS = 2;
+/** Multi-turn conversations need far more output room than a single narration.
+ * The CLI default of 2048 is consumed by longer plans before any content is
+ * emitted, which showed up live as empty completions. */
+export const CREATIVE_MAX_COMPLETION_TOKENS = 4096;
 
 const datasetRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repositoryRoot = resolve(datasetRoot, "..");
@@ -105,7 +109,7 @@ async function dispatch(command: "--preflight" | "--execute", expectedPlanDigest
     const report = await runPipeline({
       runId: CREATIVE_RUN_ID, seed: CREATIVE_SEED, units: CREATIVE_UNITS,
       creativeStream, execute, maxRepairs: CREATIVE_MAX_REPAIRS,
-      maxCompletionTokens: 2048, teacherThinking: "disabled", temperature: 0.7,
+      maxCompletionTokens: CREATIVE_MAX_COMPLETION_TOKENS, teacherThinking: "disabled", temperature: 0.7,
       reviewerTemperature: null, reviewerReasoningEffort: "low", reviewerMaxCompletionTokens: 4096,
       tokenizer, generator, reviewer,
       generationPolicy: loadGenerationPolicy(),
