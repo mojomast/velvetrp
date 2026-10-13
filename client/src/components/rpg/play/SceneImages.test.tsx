@@ -341,12 +341,12 @@ describe("CampaignPlayPage scene image availability", () => {
   it("offers Scene images to owner/GM only when the images flag is on", async () => {
     const gm = pageApi();
     vi.mocked(gm.getCampaignPlayBootstrap).mockResolvedValue({ ...bootstrap, principal: { role: "gm", control: "all" }, capabilities: { campaignDice: { canView: true, canRoll: true } } });
-    const first = render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={gm} sceneImageApi={sceneApi()} imagesEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const first = render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} surface="center" api={gm} sceneImageApi={sceneApi()} imagesEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
     const setup = await screen.findByRole("group", { name: "Table setup and administration" });
     expect(within(setup).getByRole("button", { name: "Scene images" })).toBeTruthy();
     first.unmount();
 
-    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={pageApi()} sceneImageApi={sceneApi()} imagesEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} surface="center" api={pageApi()} sceneImageApi={sceneApi()} imagesEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: "Adventure room" });
     expect(screen.queryByRole("button", { name: "Scene images" })).toBeNull();
   });
