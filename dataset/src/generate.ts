@@ -85,6 +85,7 @@ import {
   type PublicContextDiagnosticManifest,
   type PublicContextMode,
   type PublicContextScheduleRow,
+  type PublicObservationSource,
   type PublicSceneFact,
   type SceneScope,
   type VerifiedPublicSceneAuthority,
@@ -1217,6 +1218,12 @@ function planPublicContextDiagnostic(options: {
   const units: PlannedUnit[] = [];
   const splitCounts = emptySplitCounts();
   const pairs: PublicContextDiagnosticBinding["pairs"][number][] = [];
+  // Pass one: validate and reconstruct each pair exactly once. This is pure
+  // verification and produces no unit, so it cannot itself impose an order.
+  const validated = new Map<string, {
+    readonly base: FrozenBaseChallenge;
+    readonly source: PublicObservationSource;
+  }>();
   for (const pairId of [...new Set(manifest.schedule.map((row) => row.pairId))]) {
     const rows = manifest.schedule.filter((row) => row.pairId === pairId);
     const base = manifest.bases.find((entry) => entry.baseUnitId === rows[0]!.baseUnitId);
@@ -1243,47 +1250,63 @@ function planPublicContextDiagnostic(options: {
       refusePublicContext(`pair ${pairId} does not carry the frozen source reconstructed from its resolved base slots`);
     }
     pairs.push({ pairId, baseUnitId: base.baseUnitId, sourceId: source.sourceId, modes: rows.map((row) => row.publicContext) });
-    for (const row of rows) {
-      const mode = row.publicContext;
-      const facts = mode === "observations" ? projectPublicSceneFacts(source) : [];
-      const specId = `spec-${sha256Hex(`${base.baseUnitId}|public-context|${mode}`).slice(0, 20)}`;
-      const oracle: ScenarioOracle = { ...spec.oracle, publicSceneFacts: facts, publicSceneScope: { ...source.scope } };
-      const motive = TURN_MOTIVES[Number(realization.slots.lens)] ?? TURN_MOTIVES[0]!;
-      // Recomputed over the COMPLETE derived body plus the declared overlay and
-      // base identity: a stale base digest copied after changing the oracle
-      // would not bind this unit.
-      const body = {
-        specId, seed: base.scenarioSeed, family: PUBLIC_CONTEXT_FAMILY, split: spec.split,
-        lineage: spec.lineage, clusterFamily: spec.clusterFamily, templateVersion: PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION,
-        baseUnitId: base.baseUnitId, publicContext: mode, tone: spec.slots.tone, slots: spec.slots, motive, oracle,
-      };
-      const overlaySpec: ScenarioSpec = Object.freeze({
-        specId, seed: base.scenarioSeed, family: PUBLIC_CONTEXT_FAMILY, split: spec.split,
-        lineage: spec.lineage, clusterFamily: spec.clusterFamily,
-        templateVersion: PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION,
-        slots: Object.freeze({ ...spec.slots }), advertisedTools: publicContextDiagnosticTools(),
-        oracle, digest: sha256Hex(stableStringify(body)),
-      });
-      const slots: Record<string, string> = { ...realization.slots };
-      const context = buildContext(overlaySpec, slots, motive, publicSceneOverlayFor(mode, source, facts));
-      const overlayRealization: Realization = Object.freeze({
-        realizationId: `${specId}-r000`, specId, clusterId: realization.clusterId,
-        slots: Object.freeze({ ...slots }), context: Object.freeze(context),
-        digest: sha256Hex(stableStringify({ specId, context })),
-      });
-      units.push({
-        unitId: row.unitId, spec: overlaySpec, realization: overlayRealization,
-        // The pair is the shared scenario identity; the realization ordinal, the
-        // split, the lineage and the cluster are the base's.
-        scenarioUnitId: pairId, realizationOrdinal: 0, target: targetsFor(PUBLIC_CONTEXT_FAMILY)[0]!,
-        publicContext: {
-          manifestDigest: manifest.manifestDigest, pairId, baseUnitId: base.baseUnitId, baseScenarioSeed: base.scenarioSeed,
-          publicContext: mode, sourceId: source.sourceId, sourceCanonicalDigest: source.canonicalDigest,
-          scope: { ...source.scope }, factIds: facts.map((fact) => fact.factId),
-        },
-      });
-      splitCounts[overlaySpec.split] += 1;
-    }
+    validated.set(pairId, { base, source });
+  }
+  // Pass two: materialize in the FROZEN ROW ORDER of the schedule itself. The
+  // schedule is what is reported, so it must also be what executes; an
+  // interleaved or counterbalanced order is executed exactly as declared.
+  for (const row of manifest.schedule) {
+    const pairId = row.pairId;
+    const pair = validated.get(pairId);
+    if (!pair) refusePublicContext(`schedule row ${row.unitId} names an unvalidated pair ${pairId}`);
+    const { base, source } = pair;
+    const { spec, realization } = frozenBaseFor(base.baseIndex);
+    const mode = row.publicContext;
+    const facts = mode === "observations" ? projectPublicSceneFacts(source) : [];
+    const specId = `spec-${sha256Hex(`${base.baseUnitId}|public-context|${mode}`).slice(0, 20)}`;
+    const oracle: ScenarioOracle = { ...spec.oracle, publicSceneFacts: facts, publicSceneScope: { ...source.scope } };
+    const motive = TURN_MOTIVES[Number(realization.slots.lens)] ?? TURN_MOTIVES[0]!;
+    // Recomputed over the COMPLETE derived body plus the declared overlay and
+    // base identity: a stale base digest copied after changing the oracle
+    // would not bind this unit.
+    const body = {
+      specId, seed: base.scenarioSeed, family: PUBLIC_CONTEXT_FAMILY, split: spec.split,
+      lineage: spec.lineage, clusterFamily: spec.clusterFamily, templateVersion: PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION,
+      baseUnitId: base.baseUnitId, publicContext: mode, tone: spec.slots.tone, slots: spec.slots, motive, oracle,
+    };
+    const overlaySpec: ScenarioSpec = Object.freeze({
+      specId, seed: base.scenarioSeed, family: PUBLIC_CONTEXT_FAMILY, split: spec.split,
+      lineage: spec.lineage, clusterFamily: spec.clusterFamily,
+      templateVersion: PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION,
+      slots: Object.freeze({ ...spec.slots }), advertisedTools: publicContextDiagnosticTools(),
+      oracle, digest: sha256Hex(stableStringify(body)),
+    });
+    const slots: Record<string, string> = { ...realization.slots };
+    const context = buildContext(overlaySpec, slots, motive, publicSceneOverlayFor(mode, source, facts));
+    const overlayRealization: Realization = Object.freeze({
+      realizationId: `${specId}-r000`, specId, clusterId: realization.clusterId,
+      slots: Object.freeze({ ...slots }), context: Object.freeze(context),
+      digest: sha256Hex(stableStringify({ specId, context })),
+    });
+    units.push({
+      unitId: row.unitId, spec: overlaySpec, realization: overlayRealization,
+      // The pair is the shared scenario identity; the realization ordinal, the
+      // split, the lineage and the cluster are the base's.
+      scenarioUnitId: pairId, realizationOrdinal: 0, target: targetsFor(PUBLIC_CONTEXT_FAMILY)[0]!,
+      publicContext: {
+        manifestDigest: manifest.manifestDigest, pairId, baseUnitId: base.baseUnitId, baseScenarioSeed: base.scenarioSeed,
+        publicContext: mode, sourceId: source.sourceId, sourceCanonicalDigest: source.canonicalDigest,
+        scope: { ...source.scope }, factIds: facts.map((fact) => fact.factId),
+      },
+    });
+    splitCounts[overlaySpec.split] += 1;
+  }
+  // Execution order IS the frozen schedule order. Reporting one order and
+  // dispatching another would make the frozen schedule a fiction.
+  const executedUnitIds = units.map((unit) => unit.unitId);
+  const scheduledUnitIds = manifest.schedule.map((row) => row.unitId);
+  if (stableStringify(executedUnitIds) !== stableStringify(scheduledUnitIds)) {
+    refusePublicContext(`planned units execute in [${executedUnitIds.join(", ")}] but the frozen schedule is [${scheduledUnitIds.join(", ")}]`);
   }
   assertGeneratedSplits(units, options.policy);
   const splitAssignmentDigest = sha256Hex(stableStringify({

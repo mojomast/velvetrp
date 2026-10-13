@@ -3,30 +3,25 @@
 Status: implemented; **independent pre-dispatch review HOLD**. The 175-seed pilot
 remains held. This diagnostic changes no model weights and authorizes no export.
 
-### Adapter defects that block dispatch
+### Adapter defects that blocked dispatch — now fixed
 
-Independent review reproduced three failures that must fail closed before any
-request is sent. Report:
+Independent review reproduced four failures that had to fail closed before any
+request could be sent. Report:
 `/tmp/opencode/foundry-public-context-precalibration-review.md`.
 
-1. **Connector loss (P1).** A scene-containing sentence whose semicolon sibling
-   is mechanical returns that sibling to the legacy lossy splitter. `but`, `while`
-   and `however` connectors, and question marks, are then dropped and the text
-   verifies with complete mechanical coverage. Scene questions must not bind as
-   assertions.
-2. **Mutable/copyable authority (P1).** The exposed map can be mutated with a
-   re-hashed replacement source, and object spread copies the enumerable brand, so
-   a forged control-arm upgrade passes issuance under the original pin. Authority
-   must resolve only from module-private storage keyed by the exact issued object.
-3. **Schedule drift (P2).** A valid noncontiguous manifest schedule executes in
-   grouped order while the plan still reports the supplied order.
+| # | Severity | Defect | Correction |
+|---|---|---|---|
+| F1 | P1 | Connector loss: a scene sentence's mechanical semicolon sibling re-entered the legacy lossy splitter, dropping `but`/`while`/`however` and question marks, and still verified with complete mechanical coverage | Scene-containing sentences keep their terminator; a sibling is never re-split on word connectives; question/exclamation spans adjudicate and bind nothing |
+| F2 | P1 | Mutable/copyable authority: the issued registry was exposed as a mutable map and its brand survived object spread, so a re-hashed source or a forged control-arm upgrade resolved under the original pin | Authoritative entries live in module-private storage keyed by the exact issued handle; the handle is a frozen shell whose `entries` getter returns a fresh copy; nested manifest/source data is deep-frozen |
+| F3 | P2 | A wrong declared manifest digest was silently recomputed instead of refused | Declared digest must reproduce the canonical body, else `manifest-digest-mismatch` |
+| F4 | P2 | A valid noncontiguous schedule executed grouped while the plan reported the supplied order | Units materialize in manifest row order; a post-condition requires `plan.units` order to equal the frozen schedule |
 
-Also outstanding: silent replacement of an invalid declared manifest digest, and
-an incorrect "asserted twice with different values" rejection for identical
-repeated scene subjects.
+A related nonblocking false contradiction for identical repeated scene subjects
+was also corrected: contradiction is now decided on value, not repetition.
 
 The present-tense check-grammar false refusal found in the v7 audit
-(`You succeed on ...`) remains a separate known mechanical-grammar gap.
+(`You succeed on ...`) remains a separate known mechanical-grammar gap and is
+not repaired by this work.
 
 ## Preregistered execution identity
 

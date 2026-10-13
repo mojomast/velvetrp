@@ -6,7 +6,9 @@ import {
   projectPublicSceneFacts,
   publicObservationSourceBody,
   publicObservationSourceDigest,
+  publicContextDiagnosticManifestDigest,
   publicSceneFactId,
+  parsePublicContextDiagnosticManifest,
   parsePublicObservationSource,
   PublicSceneSourceError,
   resolvePublicSceneFacts,
@@ -156,6 +158,60 @@ test("authority is issued only against the frozen pin, and a manifest is not aut
   const loaded = load();
   assert.equal(loaded.manifestDigest, manifest.manifestDigest);
   assert.equal(loaded.entries.size, 6);
+});
+
+test("a declared manifest digest that does not match the bytes is refused, never repaired", () => {
+  for (const wrong of ["0".repeat(64), publicContextDiagnosticManifestDigest({ ...manifest, seed: `${manifest.seed}-other` })]) {
+    assert.throws(() => parsePublicContextDiagnosticManifest({ ...manifest, manifestDigest: wrong }),
+      (error: unknown) => error instanceof PublicSceneSourceError
+        && error.refusals.some((refusal) => refusal.code === "manifest-digest-mismatch"),
+      `declared digest ${wrong} was silently replaced`);
+    assert.throws(() => loadPublicSceneAuthority({ manifest: { ...manifest, manifestDigest: wrong } as PublicContextDiagnosticManifest,
+      expectedManifestDigest: manifest.manifestDigest }),
+    (error: unknown) => error instanceof PublicSceneSourceError
+      && error.refusals.some((refusal) => refusal.code === "manifest-digest-mismatch"));
+  }
+  // The genuine identity is unchanged by the comparison.
+  assert.equal(parsePublicContextDiagnosticManifest(manifest).manifestDigest, manifest.manifestDigest);
+});
+
+test("the issued authority is unforgeable and immutable, and the genuine arms still resolve", () => {
+  const authority = load();
+  const observedUnit = row("observations").unitId;
+  const controlUnit = row("none").unitId;
+  const entry = authority.entries.get(observedUnit)!;
+  const [light, shutters] = armFacts("observations");
+  const facts = [light!, shutters!];
+  // The genuine authority resolves BOTH valid arms: full projection, and the
+  // control's own empty projection.
+  assert.equal(resolve({ facts, authority }).ok, true);
+  assert.equal(resolve({ unitId: controlUnit, facts: [], authority }).ok, true);
+  // Mutating the exposed inspection copy cannot reach the registry.
+  (authority.entries as Map<string, unknown>).set(observedUnit, { ...entry, sourceId: "public-observation-source-elsewhere" });
+  assert.equal(resolve({ facts, authority }).ok, true, "entries.set on the exposed copy must not affect resolution");
+  assert.equal(authority.entries.get(observedUnit)!.sourceId, entry.sourceId);
+  // A self-rehashed source under the ORIGINAL pin still refuses.
+  const whited = { ...(publicObservationSourceBody(entry.source) as unknown as Record<string, unknown>),
+    observations: (publicObservationSourceBody(entry.source).observations as readonly Record<string, unknown>[])
+      .map((observation) => (observation.predicate === "light-colour" ? { ...observation, value: "white" } : observation)) };
+  const changed = parsePublicObservationSource({ ...whited, canonicalDigest: publicObservationSourceDigest(whited as never) }, "changed");
+  assert.notEqual(changed.canonicalDigest, entry.source.canonicalDigest);
+  assert.deepEqual(refusalCode(resolve({ facts: projectPublicSceneFacts(changed), authority })), ["source-digest-mismatch"]);
+  // A spread copy, and a copy carrying the reflected brand symbol, are not the
+  // issued object, so they are not authority.
+  const spread = { ...authority, entries: new Map(authority.entries) };
+  const reflected = { manifestDigest: authority.manifestDigest, manifest: authority.manifest, entries: new Map(authority.entries) };
+  for (const symbol of Object.getOwnPropertySymbols(authority)) (reflected as Record<symbol, unknown>)[symbol] = true;
+  for (const forged of [spread, reflected, JSON.parse(JSON.stringify(authority))]) {
+    assert.ok(refusalCode(resolve({ facts, authority: forged })).includes("authority-not-verified"));
+  }
+  // Copying the brand cannot upgrade the CONTROL arm to observations.
+  const elevated = { ...spread, entries: new Map(spread.entries) };
+  (elevated.entries as Map<string, unknown>).set(controlUnit, { ...entry, unitId: controlUnit, publicContext: "observations" });
+  assert.ok(refusalCode(resolve({ unitId: controlUnit, scope: entry.scope, facts, authority: elevated })).includes("authority-not-verified"));
+  // Even under the genuine authority, the control arm exposes nothing.
+  assert.deepEqual(refusalCode(resolve({ unitId: controlUnit, scope: entry.scope, facts, authority })), ["projection-mismatch"]);
+  assert.equal(authority.entries.get(controlUnit)!.permittedFactIds.length, 0);
 });
 
 test("the registered exact facts resolve, and every mutation or wrong projection refuses", () => {

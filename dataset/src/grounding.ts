@@ -936,12 +936,65 @@ interface NarrationSegment {
   readonly clause: string;
   /** A clause naming a scene subject stays whole and on the scene grammar. */
   readonly sceneBound: boolean;
+  /**
+   * The span kept its question/exclamation terminator. An interrogative span is
+   * never an asserted observation, whatever it also contains.
+   */
+  readonly question?: boolean;
+}
+
+interface SentenceSpan {
+  readonly span: string;
+  /** The exact terminator the sentence ended with, or "" at the end of input. */
+  readonly terminator: string;
+}
+
+/** The legacy sentence boundary, with the terminator reported instead of dropped. */
+function sentenceSpans(paragraph: string): SentenceSpan[] {
+  const spans: SentenceSpan[] = [];
+  let start = 0;
+  for (const match of paragraph.matchAll(/[!?\n]+|\.(?!\d)/gu)) {
+    const index = match.index ?? 0;
+    const span = paragraph.slice(start, index).trim();
+    if (span) spans.push({ span, terminator: match[0] });
+    start = index + match[0].length;
+  }
+  const tail = paragraph.slice(start).trim();
+  if (tail) spans.push({ span: tail, terminator: "" });
+  return spans;
 }
 
 /**
- * A scene-containing span is divided ONLY by semicolons into independently
- * verified clauses. A clause that names a scene subject is never retried through
- * the mechanical splitter, so no modifier, connective or suffix can disappear.
+ * A mechanical clause sharing a sentence with a scene observation.
+ *
+ * The same completeness-first discipline as the legacy splitter, but its
+ * recursion uses PUNCTUATION boundaries only. A word boundary here would delete
+ * the connective itself (`but`, `while`, `however`, `whereas`, `yet`, `and`) and
+ * promote the surviving fragment to a standalone assertion.
+ */
+function splitMechanicalSibling(text: string): string[] {
+  const clause = text.trim();
+  if (!clause) return [];
+  if (parseClause(clause)) return [clause];
+  for (const boundary of [/[;:]+/u, /,+/u]) {
+    const parts = clause.split(boundary);
+    if (parts.length > 1) return parts.flatMap(splitMechanicalSibling);
+  }
+  return [clause];
+}
+
+/**
+ * A scene-containing span keeps its COMPLETE source text.
+ *
+ * Only two boundaries are recognised inside such a sentence: its terminator and
+ * its semicolons. A semicolon may separate genuinely independent complete
+ * clauses, so it is honoured; the terminator is retained verbatim, because a
+ * `?` is not a period and this grammar has no question semantics to lose.
+ *
+ * A mechanical sibling is never retried through the lossy word-boundary
+ * splitter. That would silently erase the relation the author wrote and let the
+ * surviving fragment bind as if it stood alone, so the sibling keeps its own
+ * words and is either one complete clause or adjudication evidence.
  */
 function sceneSegmentsOf(text: string, grammar: SceneGrammar): NarrationSegment[] {
   const segments: NarrationSegment[] = [];
@@ -950,18 +1003,20 @@ function sceneSegmentsOf(text: string, grammar: SceneGrammar): NarrationSegment[
       segments.push({ clause: paragraph.trim(), sceneBound: mentionsScene(paragraph, grammar) });
       continue;
     }
-    for (const sentence of paragraph.split(/[!?\n]+|\.(?!\d)/u)) {
-      const span = sentence.trim();
-      if (!span) continue;
+    for (const { span, terminator } of sentenceSpans(paragraph)) {
       if (!mentionsScene(span, grammar)) {
         for (const clause of splitClauses(span)) segments.push({ clause, sceneBound: false });
         continue;
       }
+      // Interrogative or exclamatory: the complete span, punctuation included,
+      // is evidence. No part of a question may be authorized.
+      if (/[?!]/u.test(terminator)) {
+        segments.push({ clause: `${span}${terminator}`, sceneBound: true, question: true });
+        continue;
+      }
       for (const part of span.split(/;/u)) {
         const piece = part.trim();
-        if (!piece) continue;
-        if (mentionsScene(piece, grammar)) segments.push({ clause: piece, sceneBound: true });
-        else for (const clause of splitClauses(piece)) segments.push({ clause, sceneBound: false });
+        if (piece) segments.push({ clause: piece, sceneBound: mentionsScene(piece, grammar) });
       }
     }
   }
@@ -985,9 +1040,19 @@ function bindSceneClause(
     });
     return;
   }
-  if (new Set(claims.map((claim) => claim.atom.subjectId)).size !== claims.length) {
-    violations.push({ code: "scene-observation-contradicted", detail: "one public subject is asserted twice with different values in a single clause", excerpt: clause });
-    return;
+  // Repetition is a style question, not a factual one: only a DIFFERENT value for
+  // the same subject is a contradiction. Two consistent occurrences both verify
+  // and bind their real fact.
+  const stated = new Map<string, SceneValue>();
+  for (const item of claims) {
+    const earlier = stated.get(item.atom.subjectId);
+    if (earlier !== undefined && earlier !== item.statedValue) {
+      violations.push({ code: "scene-observation-contradicted",
+        detail: `one public subject is asserted as both ${earlier} and ${item.statedValue} in a single clause`,
+        excerpt: clause, receiptId: item.atom.factId });
+      return;
+    }
+    stated.set(item.atom.subjectId, item.statedValue);
   }
   for (const claim of claims) {
     if (claim.statedValue !== claim.atom.value) {
@@ -1072,7 +1137,16 @@ export function evaluateGroundedNarration(text: string, receipts: readonly Groun
   for (const segment of clauses) {
     const clause = segment.clause;
     if (segment.sceneBound && scene) {
-      bindSceneClause(clause, scene, bindings, violations, adjudications);
+      // A question asks; it does not assert. The grammar below has no question
+      // semantics, so the span is evidence with its punctuation intact.
+      if (segment.question) {
+        adjudications.push({
+          code: "unrecognized-clause",
+          detail: "an interrogative span is not an asserted observation; the public-observation grammar has no question semantics",
+          excerpt: clause,
+          resolution: "State the supplied observation as a plain assertion, or leave it out; a question never authorizes a scene fact here.",
+        });
+      } else bindSceneClause(clause, scene, bindings, violations, adjudications);
       // An observation is a scene property, not a mechanical continuation: it
       // clears the focus so no later fragment can borrow the attack referent.
       previous = null;

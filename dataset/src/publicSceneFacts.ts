@@ -580,7 +580,6 @@ export function parsePublicContextDiagnosticManifest(value: unknown): PublicCont
   if (typeof manifest.manifestDigest !== "string" || !/^[0-9a-f]{64}$/.test(manifest.manifestDigest)) {
     refusals.push({ code: "invalid-digest", detail: "manifest.manifestDigest is not a sha-256 digest" });
   }
-  if (refusals.length > 0) throw new PublicSceneSourceError(refusals);
   const body: PublicContextDiagnosticManifestBody = {
     version: PUBLIC_CONTEXT_MANIFEST_VERSION,
     sourceRecipeVersion: PUBLIC_SOURCE_RECIPE_VERSION,
@@ -590,14 +589,27 @@ export function parsePublicContextDiagnosticManifest(value: unknown): PublicCont
     sources,
     schedule,
   };
-  return { ...body, manifestDigest: publicContextDiagnosticManifestDigest({ ...body, manifestDigest: "" }) };
+  // The declared digest is COMPARED against these exact bytes, never silently
+  // replaced by a recomputed one: a repaired identity would let a caller believe
+  // a manifest it actually altered had been pinned.
+  const recomputed = publicContextDiagnosticManifestDigest({ ...body, manifestDigest: "" });
+  if (manifest.manifestDigest !== recomputed) {
+    refusals.push({ code: "manifest-digest-mismatch",
+      detail: `manifest.manifestDigest ${String(manifest.manifestDigest)} does not reproduce the frozen manifest bytes (${recomputed})` });
+  }
+  if (refusals.length > 0) throw new PublicSceneSourceError(refusals);
+  return { ...body, manifestDigest: recomputed };
 }
 
 // ---------------------------------------------------------------------------
 // Authority and resolution
 // ---------------------------------------------------------------------------
 
-/** Module-local brand: only this module can construct a verified authority. */
+/**
+ * Module-local brand. It is defined NON-ENUMERABLE, so object spread does not
+ * copy it, and it is never the issuance proof on its own: possession of the
+ * property proves nothing, only registry membership does.
+ */
 const publicSceneAuthorityBrand: unique symbol = Symbol("velvet.public-scene-authority-v1");
 
 export interface PublicSceneAuthorityEntry {
@@ -613,7 +625,19 @@ export interface PublicSceneAuthorityEntry {
 }
 
 export interface VerifiedPublicSceneAuthority {
-  readonly [publicSceneAuthorityBrand]: true;
+  readonly version: typeof PUBLIC_CONTEXT_MANIFEST_VERSION;
+  readonly manifestDigest: string;
+  readonly manifest: PublicContextDiagnosticManifest;
+  /**
+   * A DETACHED inspection copy, rebuilt per read from the private snapshot.
+   * Mutating it -- `entries.set`, or any other write -- cannot reach the
+   * registry, because resolution never reads this property.
+   */
+  readonly entries: ReadonlyMap<string, PublicSceneAuthorityEntry>;
+}
+
+/** The authoritative contents. Only reachable through the private registry. */
+interface AuthoritySnapshot {
   readonly version: typeof PUBLIC_CONTEXT_MANIFEST_VERSION;
   readonly manifestDigest: string;
   readonly manifest: PublicContextDiagnosticManifest;
@@ -621,22 +645,49 @@ export interface VerifiedPublicSceneAuthority {
 }
 
 /**
+ * THE issuance registry, keyed by the identity of the exact object handed out.
+ *
+ * Nothing is authoritative because of a property it carries: a cast, a spread
+ * copy, a reflected brand symbol, a re-hashed source or a rewritten manifest all
+ * produce a different object identity, which is absent here. The weak key lets
+ * an unreferenced authority be collected without retaining it.
+ */
+const issuedAuthorities = new WeakMap<object, AuthoritySnapshot>();
+
+/** Recursively freeze plain objects and arrays. Authority data is never mutable. */
+function deepFreeze<T>(value: T): T {
+  if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value;
+  Object.freeze(value);
+  for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+  return value;
+}
+
+/** The exact snapshot for an issued authority, or null for anything else. */
+function snapshotOf(value: unknown): AuthoritySnapshot | null {
+  if (typeof value !== "object" || value === null) return null;
+  return issuedAuthorities.get(value) ?? null;
+}
+
+/**
  * Issue the runtime authority. A manifest alone is not authority: it must be
  * complete, internally consistent, and equal to the trusted caller's
- * pre-dispatch pin. The result is a frozen, branded registry.
+ * pre-dispatch pin.
+ *
+ * The returned handle is a frozen shell over a frozen snapshot registered in the
+ * module-private registry. The handle carries no authoritative data of its own,
+ * so there is nothing on it to mutate, copy or replay.
  */
 export function loadPublicSceneAuthority(input: {
   readonly manifest: PublicContextDiagnosticManifest;
   readonly expectedManifestDigest: string;
 }): VerifiedPublicSceneAuthority {
+  // The parser already refuses a declared digest that does not reproduce the
+  // frozen bytes; the pin is checked here against the parsed identity.
   const manifest = parsePublicContextDiagnosticManifest(input.manifest);
-  const refusals: PublicSceneRefusal[] = [];
-  const recomputed = publicContextDiagnosticManifestDigest(manifest);
-  if (manifest.manifestDigest !== recomputed) refusals.push({ code: "source-digest-mismatch", detail: "manifest digest does not reproduce the frozen manifest bytes" });
   if (input.expectedManifestDigest !== manifest.manifestDigest) {
-    refusals.push({ code: "manifest-pin-mismatch", detail: "the trusted pre-dispatch manifest pin does not match this manifest" });
+    throw new PublicSceneSourceError([{ code: "manifest-pin-mismatch",
+      detail: "the trusted pre-dispatch manifest pin does not match this manifest" }]);
   }
-  if (refusals.length > 0) throw new PublicSceneSourceError(refusals);
 
   const sources = new Map(manifest.sources.map((source) => [source.sourceId, source]));
   const entries = new Map<string, PublicSceneAuthorityEntry>();
@@ -655,24 +706,44 @@ export function loadPublicSceneAuthority(input: {
         : []),
     }));
   }
-  return Object.freeze({
-    [publicSceneAuthorityBrand]: true as const,
+  // Nested manifest records, sources, scopes and recipes are frozen too, so no
+  // held reference can be edited into a different source under this authority.
+  const frozenManifest = deepFreeze({
+    ...manifest,
+    bases: manifest.bases.map((base) => deepFreeze(base)),
+    sources: manifest.sources,
+    schedule: manifest.schedule,
+  });
+  const snapshot: AuthoritySnapshot = {
     version: PUBLIC_CONTEXT_MANIFEST_VERSION,
     manifestDigest: manifest.manifestDigest,
-    manifest: Object.freeze({ ...manifest, bases: Object.freeze(manifest.bases.map((base) => Object.freeze(base))),
-      sources: Object.freeze(manifest.sources), schedule: Object.freeze(manifest.schedule) }),
+    manifest: frozenManifest,
     entries,
-  });
+  };
+  const handle: VerifiedPublicSceneAuthority = {
+    version: PUBLIC_CONTEXT_MANIFEST_VERSION,
+    get manifestDigest(): string { return snapshot.manifestDigest; },
+    get manifest(): PublicContextDiagnosticManifest { return snapshot.manifest; },
+    get entries(): ReadonlyMap<string, PublicSceneAuthorityEntry> { return new Map(snapshot.entries); },
+  };
+  Object.defineProperty(handle, publicSceneAuthorityBrand, { value: true, enumerable: false });
+  Object.freeze(handle);
+  issuedAuthorities.set(handle, snapshot);
+  return handle;
 }
 
-/** Brand check: a JSON manifest, a cast or a hand-built object is never authority. */
+/**
+ * Issuance check by MEMBERSHIP, not by shape. A JSON manifest, a cast, a hand-
+ * built object, a spread copy of a genuine authority, or an object that merely
+ * carries the brand symbol is not authority: only the object the loader issued
+ * is in the registry.
+ */
 export function assertVerifiedPublicSceneAuthority(value: unknown): VerifiedPublicSceneAuthority {
-  if (!isPlainObject(value) || (value as Record<symbol, unknown>)[publicSceneAuthorityBrand] !== true
-    || !isPlainObject(value.entries) || typeof value.manifestDigest !== "string") {
+  if (!snapshotOf(value)) {
     throw new PublicSceneSourceError([{ code: "authority-not-verified",
-      detail: "public scene authority must be issued by loadPublicSceneAuthority against a pinned frozen manifest" }]);
+      detail: "public scene authority must be the exact object issued by loadPublicSceneAuthority against a pinned frozen manifest" }]);
   }
-  return value as unknown as VerifiedPublicSceneAuthority;
+  return value as VerifiedPublicSceneAuthority;
 }
 
 export interface BoundSceneObservation {
@@ -731,7 +802,11 @@ export function resolvePublicSceneFacts(input: {
     return { ok: false, refusals: error instanceof PublicSceneSourceError ? error.refusals
       : [{ code: "authority-not-verified", detail: "public scene authority is not verified" }] };
   }
-  const entry = authority.entries.get(input.unitId);
+  // Resolve ONLY from the private snapshot of the issued authority. The handle's
+  // public properties are never consulted, so a caller cannot change which
+  // source, scope or permitted projection an issued authority resolves to.
+  const snapshot = snapshotOf(authority)!;
+  const entry = snapshot.entries.get(input.unitId);
   if (!entry) refuse("unit-not-registered", `unit ${input.unitId} is not a registered scheduled arm of the frozen manifest`);
   const expectedScope: SceneScope | null = strictKeys(input.scope, ["observerId", "sceneId", "turnId"], "publicScene.scope", refusals)
     ? { sceneId: String(input.scope.sceneId), turnId: String(input.scope.turnId), observerId: input.scope.observerId as "player" }
@@ -810,7 +885,7 @@ export function resolvePublicSceneFacts(input: {
     scope: { ...known.scope },
     sourceId: known.source.sourceId,
     sourceCanonicalDigest: known.source.canonicalDigest,
-    manifestDigest: authority.manifestDigest,
+    manifestDigest: snapshot.manifestDigest,
     facts: Object.freeze(facts),
     factIds: Object.freeze(facts.map((fact) => fact.factId)),
     observations: Object.freeze(facts.map((fact) => Object.freeze({

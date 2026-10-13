@@ -621,5 +621,36 @@ Independent pre-dispatch review then reproduced four defects and held dispatch:
    plan reports the supplied order.
 
 A nonblocking false contradiction for identical repeated scene subjects was also
-reported. All four are being fixed with narrow provider-free regressions before any
-request. No historical ledger, grade or refusal is changed by this work.
+reported.
+
+## All four adapter defects corrected and re-probed
+
+Every reproduced bypass now fails closed, confirmed by reverting each fix and
+observing its regression fail:
+
+- **F1.** Scene-containing sentences retain their terminator; a sibling is never
+  re-split on word connectives, so `; but`, `; while` and `; however` adjudicate with
+  the connective preserved verbatim. Question/exclamation spans adjudicate and bind
+  no fact. Bare-semicolon separation of independent complete clauses still verifies
+  with complete mechanical coverage. The legacy non-scene splitter is unchanged.
+- **F2.** Authoritative entries moved to module-private storage keyed by the exact
+  issued handle. The handle is a frozen shell whose `entries` getter returns a fresh
+  copy; issuance is decided by registry membership, not a copyable symbol. Nested
+  manifest, source and schedule data are deep-frozen.
+- **F3.** A declared digest that does not reproduce the canonical body is refused.
+- **F4.** Units materialize in manifest row order, with a post-condition requiring
+  plan order to equal the frozen schedule.
+- Identical repeated scene subjects now bind both occurrences; conflicting values
+  still reject.
+
+Independent parent-side provider-free probes over the reported reproductions:
+**28/28 passed**, covering all four defects plus positive controls, unexposed
+control-arm facts, observation/mechanical coverage separation and the two frozen
+plan digests. Focused serial validation across the source, grammar, grounding,
+composition and runner files with the real CPU tokenizer enabled: **305 passed, 0
+failed, 0 skipped**. Owning typecheck passed. Real-CPU preflight again produced
+**0 generation or review attempts** at the frozen plan
+`ed615621bcf3fd5ecc005a3e22ccc0a2ec9b76a68637c0faab197be263ebd83f`.
+
+No historical ledger, grade or refusal is changed by this work. The v7
+present-tense mechanical-grammar false refusal remains open.

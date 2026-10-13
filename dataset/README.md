@@ -64,23 +64,34 @@ Actual yields, blinded prose coverage and immutable artifact pins are in
 in [`CALIBRATION_PROTOCOL.md`](CALIBRATION_PROTOCOL.md); the chronological
 remediation record is in [`CORRECTIONS_LOG.md`](CORRECTIONS_LOG.md).
 
-### Current blocker in the context adapter
+### Adapter integrity status
 
-The public-context adapter is implemented and its source manifest and plan are
-frozen, but **independent pre-dispatch review holds it on three reproduced
-defects** that must fail closed before any request is sent:
+The context adapter's source manifest and plan are frozen. Its first
+pre-dispatch review returned a **HOLD** on reproduced integrity defects that had
+to fail closed before any request could be sent:
 
 1. **Connector loss.** At a semicolon boundary, a mechanical sibling re-entering
-   the lossy clause splitter can shed `while`/`but`/`however` or a question mark
+   the lossy clause splitter could shed `while`/`but`/`however` or a question mark
    and still verify with complete mechanical coverage.
-2. **Copyable runtime authority.** The issued registry is mutable and its brand
-   survives object spread, so a changed source or an upgraded control arm could be
+2. **Copyable runtime authority.** The issued registry was mutable and its brand
+   survived object spread, so a changed source or an upgraded control arm could be
    authorized under the original pin.
-3. **Schedule drift.** A valid noncontiguous manifest order executes in grouped
-   order, disagreeing with the frozen schedule it reports.
+3. **Schedule drift.** A valid noncontiguous manifest order executed in grouped
+   order, disagreeing with the frozen schedule it reported.
+4. Plus a silent manifest-digest repair and one false contradiction.
 
-Fixes and regressions are in progress. This branch is a **checkpoint**, not an
-approved next dispatch.
+**All four are now fixed.** Each was verified by reverting the fix and observing
+its regression fail, then re-probed independently: **28/28 probes pass**,
+**305 focused tests pass** with the real CPU tokenizer enabled, typecheck is
+clean, and preflight still makes **zero generation or review attempts**.
+
+Independent re-review of the corrected tree and the live caller is still
+required before dispatch, and the 175-seed pilot remains held regardless. This
+branch remains a **checkpoint**, not an approved dispatch.
+
+One known mechanical-grammar gap remains open: a factually correct
+present-tense check narration ("You succeed on the ... check ...") is refused as
+unrecognized.
 
 ```bash
 npm run foundry -- generate --execute --units 175 --seed pilot-1
@@ -256,8 +267,8 @@ Latest recorded validation checkpoints:
 | Check | Result |
 |---|---|
 | Generator-v9 readiness (committed, serial) | 570 passed, 0 failed, 0 skipped |
-| Public-context adapter + focused files (serial) | 590 passed, 0 failed, 2 Python-gated |
-| Public-context real-CPU closure | 2 gated checks passed with the tokenizer enabled |
+| Public-context adapter, corrected, focused files (serial, real CPU) | 305 passed, 0 failed, 0 skipped |
+| Parent re-probes of every reported bypass | 28/28 passed |
 | Owning typecheck (`typecheck:foundry`) | passed |
 | Context-diagnostic preflight (real CPU, six units) | 0 generation/review attempts |
 

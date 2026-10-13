@@ -7,7 +7,8 @@ import {
   PUBLIC_CONTEXT_OVERLAY_TEMPLATE_VERSION,
   type PlannedUnit,
 } from "../src/generate.js";
-import { loadPublicSceneAuthority, type VerifiedPublicSceneAuthority } from "../src/publicSceneFacts.js";
+import { loadPublicSceneAuthority, publicContextDiagnosticManifestDigest,
+  type VerifiedPublicSceneAuthority } from "../src/publicSceneFacts.js";
 
 // Whole-clause grammar, source/context ablation and coverage accounting for the
 // opt-in public-scene path. Nothing here claims style or entailment: it claims
@@ -158,6 +159,42 @@ test("no connective meaning is lost: causal, contrast and temporal joins, suffix
   assert.equal(evaluate(`${mechanical()} The lamplight is amber, the shutters are closed.`).verdict, "adjudication-required");
 });
 
+test("a scene/mechanical semicolon boundary never loses a connective, and a question never asserts", () => {
+  const attack = `the attacker hits ${NPC} with a ${damage.outcome.damageType} attack for ${damage.outcome.applied} damage`;
+  // The bare semicolon is the valid control: two genuinely independent complete
+  // clauses, both fully bound, with nothing left over.
+  const control = verified(`${mechanical()} The lamplight is amber; ${attack}.`);
+  assert.deepEqual(control.sceneProvenance!.missingMechanical, []);
+  assert.deepEqual(control.sceneProvenance!.usedSceneFactIds, [observed.facts[0]!.factId]);
+  // The same sentence with a relation-bearing connective is NOT the control. The
+  // mechanical sibling keeps its own words, so the fragment behind the
+  // connective is never promoted to a standalone assertion.
+  for (const [connector, kept] of [["; but ", "but"], ["; while ", "while"], ["; however, ", "however"]] as const) {
+    const text = `${mechanical()} The lamplight is amber${connector}${attack}.`;
+    const result = evaluate(text);
+    assert.equal(result.verdict, "adjudication-required", `${text} -> ${JSON.stringify(result)}`);
+    // The exact offending connective survives into the evidence, verbatim.
+    const evidence = result.adjudications.map((issue) => issue.excerpt);
+    assert.ok(evidence.some((excerpt) => excerpt.includes(kept)), `${text} -> ${JSON.stringify(evidence)}`);
+    assert.ok(!evidence.some((excerpt) => excerpt === attack), "the connective-free fragment must not stand alone");
+  }
+  // A scene question is not an asserted observation; the statement it mirrors is.
+  const question = evaluate(`The lamplight is amber? ${NPC} is ${damage.outcome.statusAfter}.`);
+  assert.equal(question.verdict, "adjudication-required");
+  assert.ok(question.adjudications.some((issue) => issue.excerpt.includes("?")),
+    JSON.stringify(question.adjudications));
+  assert.deepEqual(question.sceneProvenance!.usedSceneFactIds, []);
+  verified(`The lamplight is amber. ${NPC} is ${damage.outcome.statusAfter}.`);
+});
+
+test("a repeated scene subject with the same value is repetition, not a contradiction", () => {
+  const light = observed.facts[0]!.factId;
+  const bound = verified("The lamplight is amber and the lamplight is amber.");
+  assert.deepEqual(bound.sceneProvenance!.usedSceneFactIds, [light]);
+  // A genuinely different value for the same subject is still a contradiction.
+  rejection("The lamplight is amber and the lamplight is white.", "scene-observation-contradicted");
+});
+
 test("an observation clears the mechanical continuation and never becomes an attack actor", () => {
   const unscoped = adjudication("The attacker attacks Haug. The lamplight is amber. It hits.", "unscoped-continuation");
   assert.deepEqual(unscoped.sceneProvenance!.usedSceneFactIds, [observed.facts[0]!.factId]);
@@ -237,4 +274,24 @@ test("the frozen plan carries the diagnostic overlay identity without changing t
   assert.equal(control.facts.length, 0);
   assert.equal(plan.publicContextDiagnostic!.pairs.length, 3);
   assert.equal(plan.publicContextDiagnostic!.schedule.length, 6);
+});
+
+test("execution order IS the frozen schedule order, including a noncontiguous one", () => {
+  // The schedule is what is reported, so it must also be what executes. An
+  // interleaved order is accepted and executed exactly as declared: the planner
+  // may not regroup rows by pair and then report the supplied order.
+  for (const schedule of [manifest.schedule,
+    [...manifest.schedule].sort((left, right) => left.publicContext.localeCompare(right.publicContext))]) {
+    const repinned = { ...manifest, manifestDigest: "" };
+    const pinned = { ...repinned, manifestDigest: publicContextDiagnosticManifestDigest(repinned) };
+    const repinnedPlan = planRun({ seed: SEED, units: 3, realizationsPerScenario: 1, families: ["grounded-narration"],
+      publicContextDiagnostic: { manifest: pinned, expectedManifestDigest: pinned.manifestDigest } });
+    assert.deepEqual(repinnedPlan.units.map((unit) => unit.unitId), pinned.schedule.map((row) => row.unitId));
+    assert.deepEqual(repinnedPlan.publicContextDiagnostic!.schedule.map((row) => row.unitId), pinned.schedule.map((row) => row.unitId));
+    // Every arm still carries the projection its own mode schedules.
+    assert.equal(repinnedPlan.units.filter((unit) => unit.publicContext!.publicContext === "observations").length, 3);
+    assert.equal(repinnedPlan.units.filter((unit) => unit.publicContext!.publicContext === "none").length, 3);
+  }
+  // The default builder's contiguous order is what the plan already executes.
+  assert.deepEqual(plan.units.map((unit) => unit.unitId), manifest.schedule.map((row) => row.unitId));
 });
