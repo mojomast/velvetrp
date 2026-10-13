@@ -30,14 +30,17 @@ import { createTokenizerBridge } from "../src/tokenizer.js";
 import { stableStringify } from "../src/spec.js";
 
 /** Frozen preregistration identity. Changing any value here is a protocol change. */
-export const CREATIVE_RUN_ID = "creative-2026-10-13-v2";
-export const CREATIVE_SEED = "creative-2026-10-13-2";
+export const CREATIVE_RUN_ID = "creative-2026-10-13-v3";
+export const CREATIVE_SEED = "creative-2026-10-13-3";
 export const CREATIVE_UNITS = 10;
 export const CREATIVE_MAX_REPAIRS = 2;
 /** Multi-turn conversations need far more output room than a single narration.
+ * The provider advertises a 128k output ceiling; 16384 gives an 8-exchange
+ * conversation ample room and avoids the truncation that produced
+ * transcript-not-json refusals at 4096.
  * The CLI default of 2048 is consumed by longer plans before any content is
  * emitted, which showed up live as empty completions. */
-export const CREATIVE_MAX_COMPLETION_TOKENS = 4096;
+export const CREATIVE_MAX_COMPLETION_TOKENS = 16384;
 
 const datasetRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repositoryRoot = resolve(datasetRoot, "..");
