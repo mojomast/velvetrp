@@ -20,6 +20,28 @@ marks it clearly where it does not.
 The allocation reflects measured stock-model weaknesses, not an optimum. It is
 deliberately non-uniform: the structured weaknesses were measured first.
 
+**The corpus campaign overrode these weights per-plan, never globally.** A scoped
+`familyWeights` option lets a single run re-weight without touching `FAMILY_WEIGHTS`,
+so the frozen pilot's digests stay byte-identical. The corpus used:
+
+| Target | Global | Corpus |
+|---|---:|---:|
+| `world-generation` | 0.28 | 0.35 |
+| `tool-selection:argument-binding` | 0.18 | 0.20 |
+| `tool-selection:initiation` | 0.12 | 0.10 |
+| `boundary-recovery` | 0.14 | 0.20 |
+| `grounded-narration` | 0.22 | **0.15** |
+| `roleplay-conversation` (legacy scaffold) | 0.06 | **0.00** |
+
+The frozen values live in `CORPUS_FAMILY_WEIGHTS` in
+`dataset/scripts/runCorpusCampaign.ts`.
+
+Two deliberate changes: grounded narration was **capped**, because it fails the
+style floor and a high share would bake a known-weak tranche into the dataset; and
+the legacy three-message `roleplay-conversation` scaffold was set to **zero**,
+because the creative stream supersedes it. Creative roleplay runs as its **own
+campaign** (`runCreativeCalibration.ts`), not as a weight in the structured plan.
+
 ## 2. Two separate prose cohorts
 
 Prose is measured in **two cohorts that are never pooled**:
@@ -89,8 +111,15 @@ Summary of the current position:
 | Tool selection | Independently approved (v5–v7) | n/a (tool calls) |
 | Boundary recovery | Independently approved (v5) | n/a (in-character) |
 | Grounded narration | Functionally admitted | **Below the style floor** |
-| Creative roleplay | Admitted in calibration | Measured separately |
+| Creative roleplay | Admitted in calibration; corpus 22/30 | **3/5** independent sample |
 | Ordinary RP (legacy scaffold) | Admitted | Superseded by the creative stream |
+
+The **exported corpus** (`corpus-2026-10-13-v1`) covers all five families at the
+record counts in [`CORPUS_EXPORT_V1.md`](CORPUS_EXPORT_V1.md): world 46, tool 39,
+boundary 30, narration 21, creative 19. Coverage of the creative settings,
+characters, relationship stances and arc shapes is reported mechanically by
+`creativeBatchDiversity`, `creativeCoverageReport` and `selectCreativeMix`; the
+corpus admitted 8+ distinct character lineages per creative run.
 
 ## 6. What is deliberately absent
 

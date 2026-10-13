@@ -476,6 +476,15 @@ family produces the kind of prose the project is actually for.
 | v2 | 4 | 5 | 15 | Output budget 4096 still truncated longer conversations |
 | v3 | 6 | **0** | 13 | Budget 16384 fixed truncation entirely |
 | v4 | **8 / 10** | 0 | 11 | Exact-turn-count demand relaxed to a valid range |
+| v5 | **partial** | — | — | Abandoned, not failed: see below |
+| v6 | **22 / 30** | 0 | 34 | The creative half of the exported corpus |
+
+**v5 is recorded as a partial run, not a result.** It stopped at 14 attempts /
+6 admitted after a `fetch failed` on `creative-unit-6bb0aa1b3f484370-a2-review`.
+Resume was refused because the tree had changed, which is the journal doing its
+job: a run whose source has moved is not resumable. Its store is preserved and it
+is **never** counted as an admitted-yield measurement. v6 is a fresh run id with
+the same 30-unit plan, and it is the run the exported creative records come from.
 
 ### v4 detail
 
@@ -528,11 +537,11 @@ response to the creative-coverage gap**, not a proposal. Independent creative
 quality is **3/5 on a stratified sample**, not a high score but a real one, on a
 family that previously could not be evaluated at all.
 
-Not established: that training on it improves a model. The sample is five
-conversations, not a corpus. This is a calibration yield, not a production
-dataset. And the detector gap above means structural admission is **not**
-sufficient evidence of player-agency preservation; independent review found a
-case the pipeline admitted.
+Not established: that training on it improves a model. This section reports the
+calibration yield (v4, 8/10). The **corpus campaign below** is the production
+artifact; it is a separate, larger run. And the detector gap above means
+structural admission is **not** sufficient evidence of player-agency
+preservation; independent review found a case the pipeline admitted.
 
 ## Corpus campaign — the first real training corpus
 
@@ -582,6 +591,10 @@ The structured yield is consistent across independent shards (59/60, 58/60,
 
 ### What this is and is not
 
-This is a real corpus, not a calibration. It is **not yet exported**: export
-requires an independent approval of the specific records, and that review is a
-separate step. Nothing here demonstrates that training on it improves a model.
+This is a real corpus, not a calibration. **It has since been exported** under an
+independently issued, digest-pinned approval — 155 train records and 39,435
+supervised tokens, approval
+`2abc5e6d829809c65e1c62a0482a5968191850b4ed8a4d0eadccc2d4a6207e14`. The export
+pins and the approval history are in [`CORPUS_EXPORT_V1.md`](CORPUS_EXPORT_V1.md).
+The approval authorizes **export only**; nothing here demonstrates that training
+on it improves a model.

@@ -100,6 +100,12 @@ character lineages**, **8/8 multi-turn**, 3,882 admitted labels. Remaining
 refusals are teacher non-compliance (impersonation 9, speaker-alternation 9,
 turn-count 2, grading-metadata 1), not pipeline defects.
 
+The **corpus run** (`creative-2026-10-13-v6`, 30 units) admitted **22 / 30** and
+contributes the 19 creative train records in the exported bundle. Its 34
+transcript refusals are all teacher non-compliance against the fail-closed
+contract, not detector bugs. See
+[`CALIBRATION_RESULTS.md`](CALIBRATION_RESULTS.md) for the full run record.
+
 **Independent creative review: 3 pass / 2 fail** on a stratified sample of five
 conversations, judged in fresh contexts against a nine-criterion creative rubric
 with the player's turns marked as not targets. This is a real measured score for a
@@ -117,7 +123,37 @@ Two caveats that matter:
 
 No claim is made that training on these conversations improves a model.
 
-## 6. What is explicitly NOT established
+## 6. The exported corpus
+
+The corpus campaign produced a real dataset, and it was exported under an
+independently issued approval.
+
+| Measure | Value |
+|---|---:|
+| Train records | **155** |
+| Supervised (loss-bearing) tokens | **39,435** |
+| Families | world 46 · tool 39 · boundary 30 · narration 21 · creative 19 |
+| Excluded | 21 dev and 20 sealed-test rows are **not** in the bundle |
+
+Per-record supervision is skewed: median 158 labels, p75 415, max 895. World
+generation and creative roleplay carry most of the signal.
+
+**Independent approval took five submissions.** Four were rejected, every
+rejection correct, and every one concerned **approval provenance rather than
+record content**: a gate-result blob masquerading as a validator implementation;
+a validator mapped to the wrong module; a composite digest computed but never
+registered, which would have failed all 155 records at export; and an
+implementation closure reaching outside `dataset/src`. The resolution pins the
+inspected commit's git tree object, so completeness is true by construction.
+
+Across every round the reviewer's content checks passed identically: 155 records
+matched to admitted train records, 155 accepted reviews matched to certificate
+scores, 210 disjoint planned lineages, zero duplicates, and an offline tokenizer
+replay of all 155 records reproducing **39,435 supervised tokens** exactly.
+
+Pins, checksums and the approval history: [`CORPUS_EXPORT_V1.md`](CORPUS_EXPORT_V1.md).
+
+## 7. What is explicitly NOT established
 
 - **No student-retention measurement.** The historical raw stock answers needed
   to ground the inherited 4/8 policy floor were never recovered. 4/8 is a policy
@@ -133,10 +169,14 @@ No claim is made that training on these conversations improves a model.
   exactly the question a controlled comparison should answer, so no ratio is
   asserted in advance.
 
-## 7. Honest summary
+## 8. Honest summary
 
 The infrastructure is strong, independently inspected, and fails closed. The
-structured families are genuinely usable. **The creative-prose half of the goal
-is not yet met**, and the one remedy that was preregistered and tested did not
-work. A truthful HOLD with validated reusable infrastructure is preferable to
-contaminated training data.
+structured families are genuinely usable, and a **155-record corpus has been
+exported under independent approval**. The grounded-narration prose floor is
+still unmet, and the one remedy that was preregistered and tested did not work.
+The creative stream is the strongest answer to the roleplay goal but is only
+**3/5** on a small independent sample, with one player-agency violation the
+structural gate admitted. No model has been trained, so nothing here
+demonstrates improvement. A truthful, measured position with validated reusable
+infrastructure is preferable to contaminated training data.

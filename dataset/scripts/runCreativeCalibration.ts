@@ -30,8 +30,8 @@ import { createTokenizerBridge } from "../src/tokenizer.js";
 import { stableStringify } from "../src/spec.js";
 
 /** Frozen preregistration identity. Changing any value here is a protocol change. */
-export const CREATIVE_RUN_ID = "creative-2026-10-13-v5";
-export const CREATIVE_SEED = "creative-2026-10-13-5";
+export const CREATIVE_RUN_ID = "creative-2026-10-13-v6";
+export const CREATIVE_SEED = "creative-2026-10-13-6";
 export const CREATIVE_UNITS = 30;
 export const CREATIVE_MAX_REPAIRS = 2;
 /** Multi-turn conversations need far more output room than a single narration.

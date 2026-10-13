@@ -12,7 +12,24 @@ claims belong to the dataset reports, not to a trained model.
 ## 1. What you are given
 
 A bundle produced by `dataset/src/export.ts` and materialised by
-`dataset/src/preprocessExport.ts`:
+`dataset/src/preprocessExport.ts`.
+
+**The corpus that exists today** is `corpus-2026-10-13-v1`: **155 train records /
+39,435 supervised tokens**, exported under an independently issued, digest-pinned
+approval. Its full identity is in [`CORPUS_EXPORT_V1.md`](CORPUS_EXPORT_V1.md):
+
+| Item | Value |
+|---|---|
+| Bundle | `.dataset/exports/corpus-2026-10-13-v1/` |
+| `training.jsonl` | SHA-256 `83c8ade8b29c9db97c88e42409fd2662c3f8e04d67a2ff429d5e1056cc0fb154` |
+| `provenance.json` | SHA-256 `43daee55c89196c51aab3a4a7b824c64b2cc42be4cb372a773c12a19125bbd7c` |
+| `checksumDigest` | `6f14e9d57d215961b16208437ce278b0402a477049c6f48e6aa561aab198e1f8` |
+| Tokenizer policy | `a691ea3d219fb2faaef1c2694599589b711ed09a44ad10dfa73f40a69a683053` |
+| Approval | `dataset/frozen/corpus-2026-10-13-v1-approval.json`, SHA-256 `2abc5e6d829809c65e1c62a0482a5968191850b4ed8a4d0eadccc2d4a6207e14` |
+
+The bundle lives under `.dataset/`, which is **not committed**. Transfer
+`training.jsonl`, `provenance.json` and `checksums.json` as bytes and re-verify
+against `checksums.json` on arrival.
 
 | File | Contents |
 |---|---|
@@ -23,6 +40,8 @@ A bundle produced by `dataset/src/export.ts` and materialised by
 
 **Train on `split == "train"` rows only.** `dev` and generated-test rows exist for
 evaluation. The externally sealed evaluation corpus is never part of any bundle.
+In `corpus-2026-10-13-v1` every exported row is `train`; the 21 dev and 20
+sealed-test records from the campaign are deliberately excluded.
 
 ## 2. Tokenizer and chat template
 
@@ -100,8 +119,9 @@ This is the highest expected-value step and it is cheap. No model has been
 trained on any of this data yet, and the evidence base says **curation and
 diversity dominate volume**. Before spending a large generation budget:
 
-1. Train a small LoRA on the data that already exists (a few thousand supervised
-   labels is enough to see whether the format is learnable at all).
+1. Train a small LoRA on the data that already exists. **39,435 supervised labels
+   is enough to see whether the format is learnable at all**, and to detect
+   interference between the arms.
 2. Compare against a **same-runtime BF16 stock** baseline, not the quantized
    Windows one.
 3. Check for interference: does structured training degrade the creative arm?

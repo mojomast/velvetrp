@@ -654,3 +654,45 @@ failed, 0 skipped**. Owning typecheck passed. Real-CPU preflight again produced
 
 No historical ledger, grade or refusal is changed by this work. The v7
 present-tense mechanical-grammar false refusal remains open.
+
+## Corpus export — approval-provenance defects found by independent review
+
+The corpus export required an independent approval of the specific records. Five
+submissions were made; **four were rejected, and every rejection was correct**.
+Every defect was in **how the approval proved provenance**, never in the record
+content. Recorded here because the export would have been invalid without the
+corrections.
+
+- **A1 — gate-result bytes pinned as validator implementation.** Each
+  `validators.*.implementationDigest` resolved to a per-record gate-RESULT blob.
+  The bytes hashed correctly, so the exporter's registry check accepted them, but
+  a result cannot authenticate the code that produced it, and
+  `implementationArtifacts` was empty. Fixed: pin real implementation source, and
+  throw rather than fall back to a result blob.
+- **A2 — a validator mapped to the wrong module.** `production-grounding-predicate`
+  pointed at `grounding.ts`, which supplies its inputs but does not implement the
+  predicate (`productionPredicateRun` is in `generate.ts`). A plausible-but-wrong
+  pin authenticates nothing. Fixed: map to the implementing module.
+- **A3 — composite digest computed but never registered.** The exporter recomputed
+  a composite implementation digest but never retained its bytes, so
+  `admission.ts` could not resolve it and **all 155 records failed registry
+  verification**. This was a regression introduced while fixing A2. Fixed: retain
+  the composite bytes under its digest.
+- **A4 — implementation closure extends outside `dataset/src`.** Per-validator file
+  lists cannot be complete: the closure is transitive, and the foundry genuinely
+  reaches into `server/src/routes/rpg/v1/` and `@velvet/contracts`. Fixed by
+  pinning the inspected commit's **git tree object** — a Merkle root over every
+  path, mode and blob — so completeness is true by construction. A 1361-file blob
+  manifest was attempted first and abandoned: it required 1361 git invocations and
+  blew the subprocess buffer.
+
+Verified after correction with a machinery probe that rebuilds the approved
+registry exactly as the exporter does: **155/155 records pass `assertExportable`**.
+The reviewer independently reproduced, across every round, 4 report digests, 531
+source-artifact entries, 450 gate-evidence entries, 198 review-prompt mappings,
+155 train records with matching integrity digests, 155 accepted reviews matched to
+certificate scores, 210 disjoint lineages, zero duplicates, and an offline
+tokenizer replay of all 155 records reproducing **39,435 supervised tokens**.
+
+No historical record, digest, grade or admission is changed by this work. The
+export is authorized **for export only**; no training is authorized.

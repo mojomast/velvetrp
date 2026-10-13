@@ -1,5 +1,9 @@
 # VelvetRP training-data foundry
 
+> **Picking this up? Start with [`HANDOFF.md`](HANDOFF.md).** It states the
+> current position, the deliverable and its pins, what is done, what is not, and
+> what to do next.
+
 Target: **Qwen3-8B**, with creative roleplay retention alongside structured RPG
 tasks. This repository provides dataset infrastructure and a frozen evaluation
 corpus. Model training and hardware benchmarking are separate tasks.
@@ -32,32 +36,40 @@ The committed corpus has 106 dev and 107 sealed cases, with frozen identity
 `22eb78976caa9ca91102f75576ea19eeb8cef8d594435275630542b7ddef8e58`.
 Sealed content stays outside the repository.
 
-## Current status: pilot HELD
+## Current status: corpus exported, pilot still held
 
-**No model training has run, and no pilot generation has been dispatched.**
+**No model training has run.** Calibration campaigns and a corpus campaign have
+been dispatched, and their output has been exported under independent approval.
 
-The pipeline is operational and independently inspected, but the data it produces
-is not yet good enough to train on. The blocker is **prose quality alongside
-factual correctness**, not infrastructure.
+| Milestone | State |
+|---|---|
+| Public-context diagnostic (v8) | Run and decided: the intervention did **not** fix prose (0/4 vs 1/5 control) |
+| Creative stream | Implemented, wired in, calibrated v1–v6 |
+| Corpus campaign | **Complete**: 210 planned, 196 admitted, 48,920 admitted labels |
+| Exported corpus | **155 train records / 39,435 supervised tokens**, approval `2abc5e6d…` |
+| Frozen 175-seed `pilot-1` | **Still HELD** — see below |
+| Model training | **Not run** |
 
-Latest measured position:
+The frozen pilot remains held because 22% of its rows are grounded narration,
+which fails the style floor, and the one preregistered remedy was tested in v8 and
+did not work. What ran instead was a **separately versioned re-weighted corpus
+campaign** that never presents itself as `pilot-1` and leaves its frozen digests
+byte-identical.
 
-| Campaign | Functional admissions | Blinded narration style | Gate |
-|---|---:|---|---|
-| v5 (20 seeds) | 14/20 approved | 1/1 ordinary RP sample passed | Held on grounding |
-| v6 (13 seeds) | 13/13 approved | 1 pass / 6 fail / 1 ungradeable | Held on prose |
-| v7 (13 seeds, matched) | 13/13 approved | 3/7 final targets pass style **and** function | Held on warm/wary prose |
+The blocker for *scale* is unchanged: **prose quality alongside factual
+correctness**. The corpus is real and exported; the grounded-narration tranche is
+mechanically sound but below the prose floor, and the creative stream is the
+strongest answer to the roleplay goal at a measured **3/5** on a small independent
+sample.
 
-v7's improvements are confined to transactional and procedural narration.
-**Warm/evasive and wary narration remain 0/2 each**, because the model either
-writes mechanical checklists or becomes more natural by adding unsupported
-details that the fact checks then reject.
-
-That triggered the preregistered stop rule: the next step is a small
-**source-bound public-context diagnostic**, specified in
-[`PUBLIC_CONTEXT_PROTOCOL.md`](PUBLIC_CONTEXT_PROTOCOL.md). It tests whether two
+The public-context diagnostic was specified in
+[`PUBLIC_CONTEXT_PROTOCOL.md`](PUBLIC_CONTEXT_PROTOCOL.md). It tested whether two
 independently authored observations (an amber lamplight, closed shutters) let the
-model write naturally without inventing facts.
+model write naturally without inventing facts. **They did not**, and no further
+tuning against those frozen cases is authorized.
+
+Full corpus identity and pins: [`CORPUS_EXPORT_V1.md`](CORPUS_EXPORT_V1.md).
+Training instructions: [`COLAB_TRAINING_HANDOFF.md`](COLAB_TRAINING_HANDOFF.md).
 
 Actual yields, blinded prose coverage and immutable artifact pins are in
 [`CALIBRATION_RESULTS.md`](CALIBRATION_RESULTS.md); frozen campaign settings are
@@ -92,9 +104,12 @@ then held on three further blockers, all fixed in `b41712b`:
    both modes (no network call), and `dataset/scripts` is included in the foundry
    typecheck so the error class cannot recur.
 
-A **third independent clearance** is in progress. Until it returns GO, the
-diagnostic is not dispatched. The 175-seed pilot is held regardless and this
-branch remains a **checkpoint**.
+The adapter review process completed and the diagnostic was **dispatched as v8**.
+Its outcome is recorded: the observations were used in every observation-arm
+output (integration works) but the arm passed **0/4** against a **1/5** control,
+so the preregistered intervention is closed and no further prompt tuning against
+those frozen cases is authorized. The frozen 175-seed pilot is held regardless,
+and this branch remains a **checkpoint**.
 
 The known present-tense check-grammar gap is **fixed**; the grounding validator
 is now `grounding-binding-v7`.
@@ -218,10 +233,11 @@ the fact change, not from mechanically padding a rejected answer.
 Repeated answers therefore reduce output diversity even if prompts are varied.
 Provenance records the real generation temperature and reviewer provider.
 
-## Remaining live-pilot integration
+## Remaining work before a production run
 
-The merged modules are exercised infrastructure; the live pilot has not run.
-Before a production run:
+The merged modules are exercised infrastructure, and a **corpus has been generated
+and exported**. The frozen 175-seed pilot has still not run. Before a production
+run:
 
 - Use the measured Qwen3 profile and local tokenizer runtime. Actual mask/prefix
   evidence is committed and satisfies the template export gate; record/certificate
@@ -241,17 +257,20 @@ Before a production run:
   log-probability masks. The eventual DPO consumer must honor those masks; stock
   `DPOTrainer` compatibility has not been asserted or measured.
 
-Then run the 150–200-seed pilot and inspect measured fidelity, repair rates,
-diversity and prose retention before scaling. No training data has been generated.
+**The next experiment is not more generation.** It is a smoke-test LoRA on the
+exported corpus against a same-runtime BF16 stock baseline, to answer whether the
+direction works before spending more budget. See
+[`COLAB_TRAINING_HANDOFF.md`](COLAB_TRAINING_HANDOFF.md). Then, if it holds up,
+run the 150–200-seed pilot and inspect measured fidelity, repair rates, diversity
+and prose retention before scaling. **No model training has been run.**
 
 ## Branch status
 
-`feat/foundry-context-diagnostic` is a **checkpoint branch**. It carries the v7
-results, the public-context protocol, and the first implementation of the typed
-scene-fact source and grammar. That adapter is **held by independent review on
-three reproduced integrity defects** (see Current status above) and is not
-authorized for dispatch. The 175-seed pilot remains held regardless; no training
-data has been generated.
+`feat/foundry-context-diagnostic` is a **checkpoint branch**. It carries the v7/v8
+results, the public-context protocol and its closed decision, the typed scene-fact
+source and grammar, the creative stream, and the exported corpus. The adapter's
+review findings were closed and the diagnostic was dispatched and decided. The
+175-seed pilot remains held regardless. **No model training has been run.**
 
 ## Validation
 
