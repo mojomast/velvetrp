@@ -73,9 +73,14 @@ category.
 
 ### Anchor design
 
-- **2-3 per case, not 3-5.** The corpus sits at 0.69 anchors/case. 3-5 is a large intensification of
-  a metric already failing 40 times; at that density the cheapest available optimisation becomes
+- **2-3 per case, not 3-5.** The corpus carries **124 anchors across 106 cases, a true
+  density of 1.17 anchors/case** (verified 2026-10-13 against
+  `bench/stock-baseline-findings`). 3-5 is therefore a large intensification of a metric
+  already failing 40 times; at that density the cheapest available optimisation becomes
   stuffing capitalised nouns until the substring check passes.
+  *Correction: an earlier revision of this line read "0.69 anchors/case". That figure is the
+  fraction of cases carrying at least one anchor (73/106), not density. The anchor-design
+  argument is unchanged, but the stated quantity was mislabelled.*
 - **Span all three classes** in roughly corpus proportions (named ~55%, numeric 20%, concrete object
   ~25%) with the **numeric share weighted up**. All 14 numeric anchors already sit in the two receipt
   categories.
