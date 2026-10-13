@@ -142,7 +142,7 @@ missed.
 
 ## 5. What data was generated and admitted
 
-Measured, not estimated:
+### Calibration runs (measured, not estimated)
 
 | Run | Planned | Attempts | Admitted | All-attempt labels | Admitted labels |
 |---|---:|---:|---:|---:|---:|
@@ -150,49 +150,72 @@ Measured, not estimated:
 | v7 | 13 | 19 | 13 | 1,540 | 989 |
 | v8 | 6 | 9 | 6 | 764 | 503 |
 
-No unresolved or unmeasured attempt exists in any of these runs.
+### Corpus campaign — the exported dataset
+
+Four independent runs executed concurrently:
+
+| Run | Planned | Admitted | Admitted labels |
+|---|---:|---:|---:|
+| `corpus-structured-2026-10-13-v1` | 60 | 59 | 13,205 |
+| `…-v1-shard2` | 60 | 58 | 12,117 |
+| `…-v1-shard3` | 60 | 57 | 12,928 |
+| `creative-2026-10-13-v6` | 30 | 22 | 10,670 |
+| **Total** | **210** | **196** | **48,920** |
+
+**Exported under independent approval: 155 train records, 39,435 supervised
+tokens** — world 46, tool 39, boundary 30, narration 21, creative 19. For scale,
+the previously approved export was 4 records and 806 labels.
+
+Approval `2abc5e6d829809c65e1c62a0482a5968191850b4ed8a4d0eadccc2d4a6207e14`
+(export only, training not authorized). Full pins:
+[`CORPUS_EXPORT_V1.md`](CORPUS_EXPORT_V1.md).
 
 ## 6. Decision
 
-**HOLD on the frozen 175-seed pilot.** An explicit, evidence-backed decision, not
-an infrastructure limitation.
+**The frozen 175-seed pilot remains HELD. The corpus campaign was executed
+instead, and its output is exported.**
 
-Reasons:
+Reasons the frozen pilot is still held:
 
 1. **The pilot's frozen allocation gives 22% of its rows to grounded narration,
    which fails the style floor**, and the preregistered remedy for that was tested
    in v8 and did not work. Running it unchanged would bake a known-weak tranche
    into the dataset with no mechanism to repair it.
 2. The remaining 78% — world generation, tool selection, boundary recovery and
-   creative roleplay — **is validated**. So this is a HOLD on one tranche, not on
-   the pipeline.
-3. The creative stream, which is the substantive answer to the "engaging roleplay"
-   half of the goal, only became functional late in this phase. Its independent
-   creative quality is 3/5 on a small sample, and a structural false negative was
-   found there. It needs a larger sample before it anchors a production corpus.
+   creative roleplay — **is validated**.
 
-**Recommended next step (a separate, explicitly versioned decision):** a
-re-weighted pilot that adds the creative stream at a meaningful share and reduces
-or excludes the grounded-narration tranche, with the narration prose problem
-addressed by a newly identified mechanism rather than a retry. That is a new
-frozen plan and must not be presented as the frozen `pilot-1`.
+**What was done instead:** a re-weighted corpus campaign with an explicit
+opt-in weight override, so the frozen pilot is untouched. Grounded narration was
+capped at 0.15 rather than 0.22, the legacy roleplay scaffold was excluded
+entirely (the creative stream supersedes it), and the creative stream ran as its
+own campaign. The result is **155 independently approved train records / 39,435
+supervised labels**, exported under a digest-pinned approval.
 
-This is a truthful HOLD with validated, reusable infrastructure and a working
-creative stream, which the mission states is preferable to contaminated training
-data.
+**Recommended next step, and it is not mine to run:** a small smoke-test LoRA on
+this bundle against a same-runtime BF16 stock baseline, before spending more
+generation budget. See
+[`SYNTHETIC_DATA_BEST_PRACTICE.md`](SYNTHETIC_DATA_BEST_PRACTICE.md) and
+[`COLAB_TRAINING_HANDOFF.md`](COLAB_TRAINING_HANDOFF.md).
 
 ## 7. Limitations that remain
 
 - No controlled stock-versus-candidate retention comparison. The historical raw
   stock answers were never recovered, so the inherited 4/8 floor remains a policy
   threshold, not a measurement.
-- No trained model exists. Nothing here demonstrates that training on this data
-  improves roleplay or task accuracy.
+- **No trained model exists.** Nothing here demonstrates that training on this
+  corpus improves roleplay or task accuracy. That is the next experiment.
+- 155 records is a real corpus but a small one. The evidence says curation beats
+  volume, but this is a first handoff, not a production-scale dataset.
+- The creative stream's independent creative quality is **3/5** on a stratified
+  sample of five conversations. Two failures were real: one over-polished
+  register, and one player-agency violation the structural gate **admitted**.
 - The Qwen3.5-9B baseline is uncontrolled and no comparison is claimed.
 - Server-resolved declared journeys are not indexed under recall's `travel-receipt`
   source. Real, out of scope, and deliberately not patched speculatively.
 - `My <skill> check …` is a known false refusal of the same class as the
   present-tense gap. Recorded; historical outputs were not re-admitted.
+- The corpus export approval pins **tracked source**, not untracked or dirty files
+  or installed dependency bytes.
 
 ## 8. Reproducing this
 
