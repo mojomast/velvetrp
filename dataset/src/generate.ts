@@ -2709,6 +2709,15 @@ export function planRun(options: {
   readonly publicContextDiagnostic?: PublicContextDiagnosticOption | undefined;
   /** Opt-in creative character-roleplay stream. Absent means the ordinary inventory. */
   readonly creativeStream?: CreativeStreamOption | undefined;
+  /**
+   * Opt-in per-plan family weights. Absent means the module default
+   * (`FAMILY_WEIGHTS`), so every existing plan stays byte-identical. Present
+   * means this plan allocates by the supplied weights only; the frozen pilot is
+   * never affected. The effective weights are reflected in the scheduled units,
+   * so a re-weighted plan has its own distinct digest with no change to the plan
+   * body shape.
+   */
+  readonly familyWeights?: Readonly<Record<WeightTarget, number>> | undefined;
 }): RunPlan {
   const { seed, units } = options;
   if (options.publicContextDiagnostic) {
@@ -2736,7 +2745,7 @@ export function planRun(options: {
     targetsFor(family).map((target) => [target, family] as const),
   );
   const weightOf = (target: GenerationTarget): number =>
-    target === "tool-selection" ? 0 : FAMILY_WEIGHTS[target];
+    target === "tool-selection" ? 0 : (options.familyWeights ?? FAMILY_WEIGHTS)[target];
   const totalWeight = available.reduce((sum, [target]) => sum + weightOf(target), 0);
   if (totalWeight <= 0) {
     throw new PipelineRefusal("execution-not-authorized", ["the requested families carry zero weight"]);
@@ -3051,6 +3060,8 @@ export interface PipelineOptions {
   readonly publicContextDiagnostic?: PublicContextDiagnosticOption | undefined;
   /** Opt-in creative character-roleplay stream. Forwarded into the internal planRun. */
   readonly creativeStream?: CreativeStreamOption | undefined;
+  /** Opt-in per-plan family weights. Forwarded into the internal planRun. */
+  readonly familyWeights?: Readonly<Record<WeightTarget, number>> | undefined;
   readonly proseQualityScorer?: ProseQualityScorer;
   readonly generationPolicy?: GenerationPolicy;
   readonly selectionPolicy?: SelectionPolicy;
@@ -3381,6 +3392,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     pairedTwins: options.pairedTwins ?? [],
     ...(options.publicContextDiagnostic ? { publicContextDiagnostic: options.publicContextDiagnostic } : {}),
     ...(options.creativeStream ? { creativeStream: options.creativeStream } : {}),
+    ...(options.familyWeights ? { familyWeights: options.familyWeights } : {}),
   });
   // Validated again before any prompt is rendered, measured or dispatched.
   const publicSceneContexts = publicSceneContextsFor(plan, options.publicContextDiagnostic);
@@ -4065,7 +4077,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PilotReport
     reviewerIndependent: options.generator.model !== options.reviewer.model,
     units: plan.units.length,
     splitCounts: plan.splitCounts,
-    familyWeights: FAMILY_WEIGHTS,
+    familyWeights: options.familyWeights ?? FAMILY_WEIGHTS,
     diversity: {
       plannedPrompts: measureDiversity(plannedPrompts),
       beforeValidation: measureDiversity(diversityBefore),
