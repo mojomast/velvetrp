@@ -36,15 +36,24 @@ Sealed content stays outside the repository.
 npm run foundry -- generate --execute --units 175 --seed pilot-1
 ```
 
-This currently **refuses before resolving credentials or making teacher calls**:
-the CLI has no production tokenizer port. The default is also a refusal for
-`generate` without `--execute`; use `plan` for provider-free planning.
+The measured CPU tokenizer bridge is available. Prepare its pinned local
+environment/assets using [`tokenizer/README.md`](tokenizer/README.md), then run:
+
+```bash
+npm run foundry -- tokenizer-check --python .dataset/tokenizer/venv/bin/python
+VELVET_REVIEWER_MODEL=kimi:k3 npm run foundry -- generate \
+  --python .dataset/tokenizer/venv/bin/python --units 3
+```
+
+The second command is a zero-dispatch dry run. Missing/unconfigured tokenizer
+assets still refuse before teacher calls. Actual execution additionally requires
+a configured run store through the embedding API and the remaining pilot wiring.
 
 `runPipeline()` is the injectable orchestration API. With test transports it
 exercises scenario realization, teacher completion, parsing/sanitization, family
 gates, bounded repairs, independent review, certified admission, and persisted
-attempts. `main()` accepts injectable ports for embedding; no test token counter
-is shipped as a production CLI implementation.
+attempts. `main()` accepts injectable ports for embedding. The configured production
+port uses real final TRL labels; no test token counter ships as a CLI implementation.
 
 Modules:
 
@@ -58,6 +67,7 @@ Modules:
 | `src/runstore.ts` | Immutable attempts, supersession, certified reads, reservation/settlement primitives |
 | `src/export.ts` | Atomic training JSONL export plus separate provenance/checksum manifests |
 | `src/templateProfiles.ts` | Pinned model templates and measured-tokenizer export gate |
+| `src/tokenizer.ts` | Local CPU tokenizer bridge, measured-profile loader and registry integration |
 
 ### Teacher configuration
 
@@ -121,8 +131,9 @@ Provenance records the real generation temperature and reviewer provider.
 The merged modules are exercised infrastructure; the live pilot has not run.
 Before a production run:
 
-- Supply pinned TRL/Transformers measurements for supervised-token counting,
-  masks and prefix preservation. Export remains closed without that evidence.
+- Use the measured Qwen3 profile and local tokenizer runtime. Actual mask/prefix
+  evidence is committed and satisfies the template export gate; record/certificate
+  approvals remain independently required.
 - Complete orchestration resume/finalization, K-realization scheduling, paired-twin
   scheduling and cluster-capped selection. The primitives exist; the batch runner
   currently schedules one realization per unit.
@@ -147,6 +158,7 @@ Use focused files during iteration. The full foundry suite is a serial wave-boun
 check: `npm run test:foundry`. See `BASELINE_SIGNAL.md`, `CORRECTIONS_LOG.md`, and
 `eval/CORPUS_HANDOFF.md` for measured baseline results, fixes, and benchmark handoff.
 
-Latest integration validation: owning typecheck passed; **340 foundry tests passed,
-0 failed**; the dev corpus verified through the CLI. These are infrastructure
-checks with synthetic test transports, not teacher-generated data or model scores.
+Latest integration validation: owning typecheck passed; **352 foundry tests passed,
+0 failed, 0 skipped**, including the live CPU bridge; **8 real Python runtime tests
+passed**. The corpus verifies through the CLI. These are infrastructure checks,
+not teacher-generated data or model-quality scores.

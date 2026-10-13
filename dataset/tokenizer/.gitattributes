@@ -1,0 +1,6 @@
+# These bytes are content-addressed in the measurement bundle.
+*.py text eol=lf
+*.txt text eol=lf
+*.lock text eol=lf
+evidence/*.json text eol=lf
+evidence/*.jinja text eol=lf

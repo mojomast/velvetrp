@@ -1,0 +1,7 @@
+{
+  "version": "qwen3-tokenizer-evidence-v1",
+  "files": {
+    "qwen3-8b.json": "0427e6f4ca7647ad6bca540f002b536a689154cfaef8c6c113d44ee5130eb13d",
+    "qwen3_training.jinja": "1d944ff8f268b611abb296cdd24d0f51981eef1c8647ac321c3a0258f61eb6c9"
+  }
+}

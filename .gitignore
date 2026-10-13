@@ -10,3 +10,4 @@ playwright-report/
 
 # Synthetic training data foundry artifacts (regenerable, may be large)
 .dataset/
+dataset/tokenizer/__pycache__/

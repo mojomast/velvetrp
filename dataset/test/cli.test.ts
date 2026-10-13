@@ -9,6 +9,7 @@ async function invoke(argv: string[], dependencies: CliDependencies = {}) {
   let out = "";
   let err = "";
   const code = await main(argv, {
+    env: {},
     ...dependencies,
     stdout: (text) => { out += text; },
     stderr: (text) => { err += text; },

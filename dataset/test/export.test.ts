@@ -12,6 +12,7 @@ import {
 } from "../src/admission.js";
 import { exportTrainingJsonl, type ExportChecksumManifest } from "../src/export.js";
 import { FIXTURE_TEMPLATE, fixtureProfile } from "./template-contract.fixtures.js";
+import { withMeasuredQwen3Template } from "../src/tokenizer.js";
 
 const digest = (bytes: string): string => createHash("sha256").update(bytes).digest("hex");
 const SOURCE = "export test inspected source";
@@ -153,6 +154,16 @@ test("a certified commit survives resume and exports directly from the store", (
   assert.deepEqual(restored, record);
   const result = exportTrainingJsonl([restored], { outputDir: join(root, "export"), approvedRegistry: registryFor([record]) });
   assert.equal(result.checksums.recordCount, 1);
+});
+
+test("real measured Qwen3 evidence unlocks template validation without bypassing certificate approval", () => {
+  const record = admitted();
+  const approved = registryFor([record]);
+  const measured = withMeasuredQwen3Template({ ...approved, templateProfiles: [] });
+  const result = exportTrainingJsonl([record], { outputDir: join(rootFor(), "measured-export"), approvedRegistry: measured });
+  assert.equal(result.checksums.recordCount, 1);
+  assert.throws(() => exportTrainingJsonl([record], { outputDir: join(rootFor(), "unapproved-export"),
+    approvedRegistry: { ...measured, certificates: new Map() } }), /not pinned/);
 });
 
 test("a certificate altered after admission fails verification and cannot replay as admitted", (t) => {

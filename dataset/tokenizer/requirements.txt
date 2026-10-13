@@ -1,0 +1,6 @@
+# CPU-only runtime; install with --extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
+transformers==5.19.0
+trl==1.15.0
+tokenizers==0.23.3
+Jinja2==3.1.6

@@ -231,6 +231,34 @@ message now states that requirement accurately and points to the provider-free
 
 ---
 
+## Measured tokenizer bridge
+
+The tokenizer gate now has real CPU evidence: Qwen3 tokenizer revision
+`b968826d9c46dd6066d109eabc6255188de91218`, the existing pinned TRL training
+template, Transformers 5.19.0, TRL 1.15.0, tokenizers 0.23.3, and PyTorch
+2.14.1+cpu. The downloaded template matched its recorded SHA-256.
+
+Eight provider-free fixtures were rendered/tokenized with real assistant masks,
+then collated with the actual TRL collator. Both assistant-to-tool-result prefix
+probes preserved text and tokens, both overlength context/target probes refused,
+and padding remained masked. Unicode offsets are converted to JavaScript UTF-16.
+
+The upstream assistant mask includes empty thinking scaffolding and unapproved
+assistant history. The bridge explicitly masks those before collation and counts
+actual final labels under loss. Tool syntax, numeric values, closing delimiters,
+and the real `<|im_end|>` special token receive loss for approved targets.
+
+The measured profile passes `assertTemplateReadyForExport()` and a certified test
+record exports using that profile. Missing certificate approval still rejects.
+The unmeasured static profile remains closed; consumers explicitly load the
+measured artifacts. No dataset generation or model training has run.
+
+Reproduction instructions, exact runtime pins, raw token/label traces and checksums
+are in `tokenizer/README.md` and `tokenizer/evidence/`. The CLI can verify the local
+runtime and perform a zero-dispatch generation dry run with the measured port.
+
+---
+
 ## Corpus identity
 
 ```

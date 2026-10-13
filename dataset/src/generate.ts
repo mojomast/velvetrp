@@ -290,10 +290,9 @@ export interface SupervisedExample {
 }
 
 /**
- * Pluggable token measurement. There is deliberately NO built-in implementation:
- * the template profiles in `templateProfiles.ts` fail the export gate until real
- * TRL/Transformers measurements land, so any token count produced here would be
- * a guess wearing a number's clothes.
+ * Pluggable token measurement. The production implementation in `tokenizer.ts`
+ * binds local assets and runtime versions to measured TRL/Transformers evidence.
+ * A run must supply that port explicitly; tests may inject labeled test doubles.
  */
 export interface TokenizerPort {
   /** Recorded in `provenance.tokenCount.tokenizer`. */

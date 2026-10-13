@@ -5,6 +5,7 @@ import { planRun, requireTokenizer, runPipeline, type PipelineOptions } from "./
 import { createTeacherClient, requireTeacherCredentials, requireReviewerCredentials } from "./teacher.js";
 import { verifyCorpus } from "./verifyCorpus.js";
 import { isTrainingFamily, TRAINING_FAMILIES, type TrainingFamily } from "./spec.js";
+import { createTokenizerBridge, TokenizerBridgeError } from "./tokenizer.js";
 
 const USAGE = `Velvet training-data foundry
 
@@ -15,6 +16,7 @@ Commands:
   verify     Verify frozen corpus hashes, identity, and lineage.
              Optional: --sealed-source <directory>
   plan       Print a deterministic, provider-free scenario plan.
+  tokenizer-check  Reproduce the pinned CPU tokenizer evidence locally.
   generate   Run pipeline preflight; dry run unless --execute is supplied.
 
 Plan/generate options:
@@ -26,31 +28,37 @@ Generate options:
   --execute           Explicitly permit teacher calls.
   --max-repairs <n>   Repair attempts per unit (default 2).
 
+Tokenizer-check/generate options:
+  --python <path>     Pinned Python environment (or FOUNDRY_TOKENIZER_PYTHON).
+  --assets <dir>      Local tokenizer assets (default .dataset/tokenizer/qwen3-8b).
+
 Examples:
   npm run foundry -- verify
   npm run foundry -- plan --units 175 --seed pilot-1
   npm run foundry -- generate --execute --units 175 --seed pilot-1
 
-Generation currently refuses before credential resolution or teacher calls:
-the production tokenizer port is awaiting measured TRL/Transformers evidence.
-Use plan to inspect scenarios while that gate is closed.
+Generation requires the configured measured tokenizer runtime. The evidence is
+committed; prepare the local CPU environment and assets as described in
+dataset/tokenizer/README.md. Use plan for planning without a Python runtime.
 `;
 
 interface Arguments {
-  command: "help" | "verify" | "plan" | "generate";
+  command: "help" | "verify" | "plan" | "generate" | "tokenizer-check";
   execute: boolean;
   units: number;
   seed: string;
   families?: TrainingFamily[];
   maxRepairs: number;
   sealedSource?: string;
+  python?: string;
+  assets?: string;
 }
 
 class UsageError extends Error {}
 
 function parseArgs(argv: readonly string[]): Arguments {
   const command = argv[0] ?? "help";
-  if (!["help", "verify", "plan", "generate"].includes(command)) {
+  if (!["help", "verify", "plan", "generate", "tokenizer-check"].includes(command)) {
     throw new UsageError("unknown command; use help for available commands");
   }
   const args: Arguments = {
@@ -71,6 +79,7 @@ function parseArgs(argv: readonly string[]): Arguments {
     const planning = command === "plan" || command === "generate";
     const allowed = (planning && ["--units", "--seed", "--families"].includes(flag))
       || (command === "generate" && flag === "--max-repairs")
+      || (["generate", "tokenizer-check"].includes(command) && ["--python", "--assets"].includes(flag))
       || (command === "verify" && flag === "--sealed-source");
     if (!allowed) throw new UsageError("unexpected argument; use help for available options");
     if (!value?.trim() || value.startsWith("--")) throw new UsageError(`${flag} needs a value`);
@@ -89,6 +98,8 @@ function parseArgs(argv: readonly string[]): Arguments {
       }
       case "--seed": args.seed = value; break;
       case "--sealed-source": args.sealedSource = value; break;
+      case "--python": args.python = value; break;
+      case "--assets": args.assets = value; break;
       case "--families": {
         const requested = value.split(",").map((family) => family.trim());
         if (!requested.every(isTrainingFamily)) {
@@ -104,6 +115,7 @@ function parseArgs(argv: readonly string[]): Arguments {
 
 /** Ports can be supplied by an embedding application. No test tokenizer ships in the CLI. */
 export interface CliDependencies {
+  env?: Readonly<Record<string, string | undefined>>;
   stdout?: (text: string) => void;
   stderr?: (text: string) => void;
   tokenizer?: PipelineOptions["tokenizer"];
@@ -113,6 +125,7 @@ export interface CliDependencies {
 }
 
 export async function main(argv: readonly string[], dependencies: CliDependencies = {}): Promise<number> {
+  const env = dependencies.env ?? process.env;
   const stdout = dependencies.stdout ?? ((text: string) => { process.stdout.write(text); });
   const stderr = dependencies.stderr ?? ((text: string) => { process.stderr.write(text); });
   let args: Arguments;
@@ -138,20 +151,32 @@ export async function main(argv: readonly string[], dependencies: CliDependencie
     return 0;
   }
 
-  // This preflight precedes even credential resolution. The shipped CLI has no
-  // production tokenizer; an embedding application must supply a measured port.
-  if (!dependencies.tokenizer) {
-    stderr("REFUSED: no measured tokenizer port is available. Budgets require supervised assistant tokens after masking.\n"
-      + "Supply TRL/Transformers-backed measurements before generation. No teacher calls were made.\n");
+  const python = args.python ?? env.FOUNDRY_TOKENIZER_PYTHON;
+  let configured = dependencies.tokenizer;
+  if (!configured && python) {
+    try {
+      configured = createTokenizerBridge({ python, assetsDir: args.assets ?? env.FOUNDRY_TOKENIZER_ASSETS ?? ".dataset/tokenizer/qwen3-8b" });
+    } catch (error) {
+      stderr(`REFUSED: ${error instanceof TokenizerBridgeError ? error.message : "measured tokenizer evidence or local assets are unavailable"}. No teacher calls were made.\n`);
+      return 1;
+    }
+  }
+  if (!configured) {
+    stderr("REFUSED: no measured tokenizer runtime is configured. Budgets require supervised assistant tokens after masking.\n"
+      + "Set --python or FOUNDRY_TOKENIZER_PYTHON using dataset/tokenizer/README.md. No teacher calls were made.\n");
     return 1;
   }
-  const tokenizer = requireTokenizer(dependencies.tokenizer);
+  const tokenizer = requireTokenizer(configured);
+  if (args.command === "tokenizer-check") {
+    stdout(`tokenizer: verified (${tokenizer.name})\n`);
+    return 0;
+  }
   if (args.execute && !dependencies.store) {
     stderr("REFUSED: execution requires a configured run store. No teacher calls were made.\n");
     return 1;
   }
-  const generator = dependencies.generator ?? createTeacherClient({ credentials: requireTeacherCredentials() });
-  const reviewer = dependencies.reviewer ?? createTeacherClient({ credentials: requireReviewerCredentials(generator.model) });
+  const generator = dependencies.generator ?? createTeacherClient({ credentials: requireTeacherCredentials({ env }) });
+  const reviewer = dependencies.reviewer ?? createTeacherClient({ credentials: requireReviewerCredentials(generator.model, { env }) });
   const report = await runPipeline({
     runId: `foundry-${args.seed}`, seed: args.seed, units: args.units,
     execute: args.execute, maxRepairs: args.maxRepairs, tokenizer, generator, reviewer,
