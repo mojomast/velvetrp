@@ -17,6 +17,20 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stableStringify } from "../src/spec.js";
 import { isReviewScores, parseReviewScores } from "../src/generate.js";
+import { parseCreativeReview } from "../src/creativeRoleplay.js";
+
+/**
+ * A review verdict in either contract. The legacy schema has six scores and the
+ * creative schema has ten criteria; both end in an accept/accept-with-notes/
+ * revise/reject verdict. The creative stream uses the creative schema, so a
+ * summarizer that only understood the legacy one reported zero accepted reviews
+ * for a run that had admitted every unit.
+ */
+function reviewVerdict(raw: string): "accept" | "accept-with-notes" | "revise" | "reject" | null {
+  const legacy = parseReviewScores(raw);
+  if (isReviewScores(legacy)) return legacy.verdict;
+  try { return parseCreativeReview(raw).verdict; } catch { return null; }
+}
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const runId = process.argv[2] ?? "calibration-2026-10-13-v1";
@@ -99,14 +113,12 @@ for (const [key, value] of entries) {
       const lastAttemptId = contract?.attempts?.at(-1) ?? `${id}-review`;
       const review = entries.get(`response:${lastAttemptId}`) as { content?: string } | undefined;
       if (review) {
-        const decoded = parseReviewScores(review.content ?? "");
-        if (isReviewScores(decoded)) {
-          if (decoded.verdict === "accept" || decoded.verdict === "accept-with-notes") {
-            reviewAccepted += 1;
-            cohort.reviewAccepted += 1;
-          }
-        } else {
+        const verdict = reviewVerdict(review.content ?? "");
+        if (verdict === null) {
           problems["review-json-unusable"] = (problems["review-json-unusable"] ?? 0) + 1;
+        } else if (verdict === "accept" || verdict === "accept-with-notes") {
+          reviewAccepted += 1;
+          cohort.reviewAccepted += 1;
         }
       }
     }
