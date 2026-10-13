@@ -533,3 +533,55 @@ conversations, not a corpus. This is a calibration yield, not a production
 dataset. And the detector gap above means structural admission is **not**
 sufficient evidence of player-agency preservation; independent review found a
 case the pipeline admitted.
+
+## Corpus campaign — the first real training corpus
+
+Four independent runs were executed concurrently. The pipeline is deliberately
+serial per unit for durable journaling, so throughput came from running separate
+frozen plans in parallel rather than from parallelising one run.
+
+| Run | Planned | Attempts | Admitted | Admitted labels | All-attempt labels |
+|---|---:|---:|---:|---:|---:|
+| `corpus-structured-2026-10-13-v1` | 60 | 84 | **59** | 13,205 | 19,266 |
+| `…-v1-shard2` | 60 | 84 | **58** | 12,117 | 17,769 |
+| `…-v1-shard3` | 60 | 86 | **57** | 12,928 | — |
+| `creative-2026-10-13-v6` | 30 | 56 | **22** | 10,670 | 42,827 |
+| **Total** | **210** | **310** | **196** | **48,920** | **98,656** |
+
+Train split: **155 records, 39,435 supervised labels** (21 dev, 20 sealed-test).
+For scale, the entire previously approved export was 4 records and 806 labels.
+
+### By family (admitted / planned)
+
+| Family | Admitted | Rate |
+|---|---:|---:|
+| Boundary recovery | 36 / 36 | 100% |
+| Tool selection | 54 / 54 | 100% |
+| Grounded narration | 27 / 27 | 100% |
+| World generation | 57 / 63 | 90% |
+| Creative roleplay | 22 / 30 | 73% |
+
+The structured yield is consistent across independent shards (59/60, 58/60,
+57/60), which is evidence it is not a lucky seed.
+
+### Findings from the campaign
+
+1. **World JSON was truncated at the 2048 output budget.** Twelve refusals
+   captured `finishReason: max_tokens` with unterminated JSON. The repair loop
+   recovered most of them, but each truncation wastes a dispatch. The structured
+   runner now requests 4096.
+2. **Creative generation is materially more expensive per admitted record.**
+   42,827 labels across all attempts against 10,670 admitted: roughly 75% of
+   spend goes to refused attempts, because the initial yield is 13/30 and repairs
+   are costly on long multi-turn outputs. Not a correctness problem — refusals are
+   correct and charged honestly — but it belongs in any scaling plan.
+3. **Remaining refusals are real and varied:** world reference-closure (dangling
+   references), argument-binding, grounding adjudications, and creative transcript
+   contract violations. No false admission was identified by the campaign itself;
+   independent approval is the check for that.
+
+### What this is and is not
+
+This is a real corpus, not a calibration. It is **not yet exported**: export
+requires an independent approval of the specific records, and that review is a
+separate step. Nothing here demonstrates that training on it improves a model.
