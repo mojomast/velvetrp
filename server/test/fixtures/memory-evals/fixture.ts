@@ -98,7 +98,12 @@ export async function createMemoryEvalFixture(dataDir: string, contextInspection
   world.createLocation(OWNER, { campaignId: campaign.id, locationId: "memory-eval-destination", name: "Memory Destination", description: "Public destination.", visibility: "public" });
   world.createLocationConnection(OWNER, { campaignId: campaign.id, locationConnectionId: "memory-eval-route", fromLocationId: "memory-eval-origin", toLocationId: "memory-eval-destination", visibility: "public" });
   world.placeActor(OWNER, aster.actorId, { campaignId: campaign.id, locationId: "memory-eval-origin", expectedRevision: world.getCampaignWorld(OWNER, campaign.id).revision, idempotencyKey: "memory-eval:travel:place" });
-  const travelTurn = repo.createAdventureTurn(OWNER, { campaignId: campaign.id, sessionId: session.id, timelineId: activeTimelineId(), actorId: aster.actorId, declaration: "I travel to Memory Destination.", expectedCampaignRevision: repo.getCampaignAdministration(OWNER, campaign.id)!.revision, idempotencyKey: "memory-eval:travel:turn" });
+  // Destination + origin is deliberate: a bare "I travel to Memory Destination." is now intercepted by the
+  // server-resolved declared-journey lane, whose `kind:"journey"` receipt is a distinct projection that the
+  // bound `travel-receipt` recall source asserted for "travel-hydration-v1" does not index. This wording
+  // leaves the server-resolved journey lane (which requires a single "to <destination>" form) and drives the
+  // stubbed `exact_actor_travel.select` selection below, producing the bound exact-travel receipt the corpus labels.
+  const travelTurn = repo.createAdventureTurn(OWNER, { campaignId: campaign.id, sessionId: session.id, timelineId: activeTimelineId(), actorId: aster.actorId, declaration: "Travel from Memory Origin to Memory Destination.", expectedCampaignRevision: repo.getCampaignAdministration(OWNER, campaign.id)!.revision, idempotencyKey: "memory-eval:travel:turn" });
   let travelCalls = 0;
   const travelResult = await orchestrateAdventureTurn(repo, travelTurn.turnId, { ...questDeps, complete: async input => {
     travelCalls += 1;
