@@ -383,3 +383,83 @@ report `9ab75ee8e19c797aebb9f99527dbab46ff02eccd6441009ee31959ff8ed117af`;
 selection `ae54afaf780e9d15e3a78622fde35a2cec35bec2c774dfde726ba4730ee86e01`.
 Artifacts: `.dataset/measurements/calibration-2026-10-13-v7/` and matching run store.
 **Pilot HOLD; no training or export approval follows from these results.**
+
+## Version 8 — public-context diagnostic: the intervention does not fix prose
+
+Run `calibration-public-context-2026-10-13-v8`, producer tree `d2dd8c0`
+(source digest `86585a80f0c8dc6f74296decfe01da66963699341907a9fcf5116a9af8edad76`),
+three matched base pairs / six initial tasks, K=1.
+
+Each pair compares a receipt-only narration against the same narration with two
+independently authored public observations (amber lamplight, closed shutters).
+
+| Measure | Value |
+|---|---:|
+| Planned initial tasks | 6 |
+| Total generation attempts | 9 |
+| Final admissions / selected | 6 / 6 |
+| Bounded repairs | 3 (all `binding-grounding`, i.e. functional) |
+| Captured logical responses | 15 (9 generations + 6 reviews) |
+| Independent review verdicts | 6 accept |
+| Supervised labels, all attempts | 764 (503 admitted + 261 refused) |
+| Unmeasured attempts | 0 |
+
+Repairs were authorized only by genuine functional failures, confirming the
+`functional-only` repair policy in a live run. No style-driven regeneration
+occurred.
+
+### Blinded prose census (all 9 surfaces, 6 initial + 3 repairs)
+
+| Arm | Surfaces | Style passes |
+|---|---:|---:|
+| Receipt-only control | 5 | 1 |
+| Observations supplied | 4 | 0 |
+| **Total** | **9** | **1** |
+
+Coverage 9/9, conditional quality and acceptable yield **1/9**. Ledger floor
+state `below`. Frozen ledger:
+`106a9cf086b680011986ad06b19967e3d7beea4ad7aa6b68c975c8ae19fdfba1`.
+
+**The observations were used in every observation-arm output**, so the
+integration works. It did not help: the observation arm passed 0/4 against the
+control arm's 1/5, and the failure rationale is unchanged — checklist cadence,
+voice absent, `naturalness` 0. The one pass is again the plain procedural Oswin
+check-and-damage narration.
+
+### What the diagnostic actually established
+
+1. Registered public observations can be integrated into grounded narration
+   coherently while mechanical coverage stays intact. That narrow claim holds.
+2. **Supplying two inert observations does not remedy warm/evasive or wary
+   narration.** The model writes the same mechanical report; when it does reach
+   for a richer register it adds claims the receipts do not establish, which the
+   grounding gate correctly refuses.
+3. A repair that follows a functional refusal can also strip expressive wording:
+   the warm/evasive attempt `unit-8c28b0ce238d1727-pc-observations-a0`
+   ("…whatever you were reaching for stayed out of reach…") was refused and its
+   replacement was plainer. This is correct fail-closed behaviour, but it shows
+   the grounding constraint and the requested register are in direct tension for
+   this task shape.
+
+### Decision
+
+**The public-context intervention is closed as tested and does not clear the
+quality gate.** Per the preregistered stop rule, the pilot remains on **HOLD**.
+No further prompt tuning against these six frozen cases is authorized; a further
+intervention would require a newly versioned experiment with an identified
+mechanism, not a retry.
+
+### New false refusal found in this run
+
+Three first attempts used a first-person check form the validator rejects:
+
+```text
+My Survival check comes to 9 against DC 15: a failure.
+```
+
+`My <skill> check` binds to the player but is refused (`subject-binding-mismatch`
+for the possessive form; `I failed on …` is refused as `actor-binding-mismatch`).
+The model produces this naturally. It is the same class of defect as the
+present-tense gap closed in `edf834b`, and it was not repaired here: this run
+used the grammar as frozen. It is recorded as a known false refusal, not
+retroactively re-admitted.
