@@ -34,45 +34,50 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".
  * `implementationArtifacts`, and the exporter resolves each one with
  * `git show <inspectedCommit>:<path>`.
  */
-const VALIDATOR_IMPLEMENTATION: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  // The binding logic is evaluateGroundedNarration in grounding.ts; groundingRuns
-  // in generate.ts dispatches it. Both authenticate the check.
-  "binding-grounding": ["dataset/src/grounding.ts", "dataset/src/generate.ts"],
-  // productionPredicateRun lives entirely in generate.ts.
-  "production-grounding-predicate": ["dataset/src/generate.ts"],
-  "creative-transcript-contract": ["dataset/src/creativeRoleplay.ts", "dataset/src/generate.ts"],
-  "boundary-leakage": ["dataset/src/generate.ts"],
-  "player-agency": ["dataset/src/generate.ts"],
-  "receipt-provenance": ["dataset/src/generate.ts"],
-  "advertised-candidate-binding": ["dataset/src/generate.ts"],
-  "tool-envelope": ["dataset/src/generate.ts"],
-  "reference-closure": ["dataset/src/generate.ts"],
-  "catalog-pinning": ["dataset/src/generate.ts"],
-  "requested-section-schema": ["dataset/src/generate.ts"],
-  "abstention-correctness": ["dataset/src/generate.ts"],
-  "authority-respected": ["dataset/src/generate.ts"],
-  "selective-fidelity": ["dataset/src/generate.ts"],
-  "prose-quality-retention": ["dataset/src/generate.ts"],
-});
-
+/**
+ * Implementation evidence is the COMPLETE foundry source at the inspected commit,
+ * not a per-validator file list.
+ *
+ * Two independent reviews rejected per-validator pinning, correctly: a validator's
+ * true implementation is a transitive closure (for example
+ * `production-grounding-predicate` depends on `authoritativeFacts` in
+ * `grounding.ts`, and `advertised-candidate-binding` on `scoreSelection` in
+ * `worldGeneration.ts`). Any hand-written list is either incomplete or, if it
+ * grows to cover every helper, an unmaintainable restatement of the module graph.
+ *
+ * Pinning every `dataset/src` source file at the inspected commit makes
+ * completeness true by construction: the digest changes if ANY implementation file
+ * changes, and the per-validator `implementationPaths` below are retained only as
+ * documentation of where each check is primarily implemented.
+ */
 const blobAt = (commit: string, path: string): string =>
   execFileSync("git", ["show", `${commit}:${path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }).toString("utf8");
 
-/**
- * A validator's implementation pin is a digest over the EXACT SET of source files
- * that implement and dispatch it, not a single file.
- *
- * Two independent reviews found pinning defects here: first a gate-RESULT blob
- * masquerading as an implementation, then a plausible-but-wrong single file
- * (`production-grounding-predicate` was pointed at `grounding.ts`, which supplies
- * its inputs but does not implement the predicate). Pinning the whole set, and
- * recomputing it from `git show` at export time, makes both classes impossible:
- * the digest only matches if every listed file is byte-identical.
- */
-function implementationDigestFor(commit: string, paths: readonly string[]): string {
-  const entries = paths.map((path) => ({ path, digest: hash(blobAt(commit, path)) }));
-  return hash(stableStringify(entries));
+function implementationManifest(commit: string): Array<{ path: string; digest: string }> {
+  const paths = execFileSync("git", ["ls-tree", "-r", "--name-only", `${commit}:dataset/src`], { cwd: repositoryRoot })
+    .toString("utf8").trim().split("\n").filter((path) => path.endsWith(".ts")).sort();
+  if (paths.length === 0) throw new Error("no dataset/src sources at the inspected commit");
+  return paths.map((relative) => ({ path: `dataset/src/${relative}`, digest: hash(blobAt(commit, `dataset/src/${relative}`)) }));
 }
+
+/** Documentation only: the file that primarily implements each check. */
+const VALIDATOR_PRIMARY_FILE: Readonly<Record<string, string>> = Object.freeze({
+  "binding-grounding": "dataset/src/grounding.ts",
+  "production-grounding-predicate": "dataset/src/generate.ts",
+  "creative-transcript-contract": "dataset/src/creativeRoleplay.ts",
+  "advertised-candidate-binding": "dataset/src/worldGeneration.ts",
+  "boundary-leakage": "dataset/src/generate.ts",
+  "player-agency": "dataset/src/generate.ts",
+  "receipt-provenance": "dataset/src/generate.ts",
+  "tool-envelope": "dataset/src/generate.ts",
+  "reference-closure": "dataset/src/generate.ts",
+  "catalog-pinning": "dataset/src/generate.ts",
+  "requested-section-schema": "dataset/src/generate.ts",
+  "abstention-correctness": "dataset/src/generate.ts",
+  "authority-respected": "dataset/src/generate.ts",
+  "selective-fidelity": "dataset/src/generate.ts",
+  "prose-quality-retention": "dataset/src/generate.ts",
+});
 
 const outPath = process.argv[2];
 const runIds = process.argv.slice(3);
@@ -91,6 +96,8 @@ interface RunSection {
 }
 interface RecordEntry { unitId: string; runId: string; family: string; split: string; certificateDigest: string; payloadDigest: string; labels: number }
 
+const implementationSourceManifest = implementationManifest(inspectedGitCommit);
+const implementationSourceDigest = hash(stableStringify(implementationSourceManifest));
 const validators: Record<string, { version: string; implementationDigest: string; implementationPaths: string[] }> = {};
 const implementationArtifacts: Record<string, { kind: string; commit: string; path: string }> = {};
 const runs: RunSection[] = [];
@@ -130,20 +137,15 @@ for (const runId of runIds) {
       sourceArtifactDigests.add(digest);
     }
     for (const item of record.admissionCertificate.evidence) {
-      const implementationPaths = VALIDATOR_IMPLEMENTATION[item.validator];
-      if (!implementationPaths) {
+      if (!VALIDATOR_PRIMARY_FILE[item.validator]) {
         throw new Error(`no implementation mapping for validator "${item.validator}"; refusing to pin a result blob as an implementation`);
       }
-      for (const path of implementationPaths) {
-        const digest = hash(blobAt(inspectedGitCommit, path));
-        implementationArtifacts[digest] = { kind: "git-blob", commit: inspectedGitCommit, path };
-      }
-      const implementationDigest = implementationDigestFor(inspectedGitCommit, implementationPaths);
       const existing = validators[item.validator];
-      if (existing && existing.implementationDigest !== implementationDigest) {
-        throw new Error(`validator "${item.validator}" resolved to two different implementations`);
+      if (existing && existing.version !== item.version) {
+        throw new Error(`validator "${item.validator}" appears with two versions`);
       }
-      validators[item.validator] ??= { version: item.version, implementationDigest, implementationPaths: [...implementationPaths] };
+      validators[item.validator] ??= { version: item.version, implementationDigest: implementationSourceDigest,
+        implementationPaths: [VALIDATOR_PRIMARY_FILE[item.validator]!] };
       // The per-record gate RESULT is evidence, never an implementation pin.
       gateEvidenceArtifactDigests.add(item.evidenceDigest);
     }
@@ -182,6 +184,8 @@ const approval = {
   trainingAuthorized: false,
   inspectedGitCommit,
   measuredTemplateEvidenceDigest: evidence.bundleDigest,
+  implementationSourceDigest,
+  implementationSourceManifest,
   validators,
   implementationArtifacts,
   runs,
@@ -193,6 +197,8 @@ process.stdout.write(stableStringify({
   runs: runs.length, records: records.length,
   trainLabels: records.reduce((sum, record) => sum + record.labels, 0),
   validators: Object.keys(validators).length,
+  implementationSourceDigest,
+  implementationSourceFiles: implementationSourceManifest.length,
   sourceArtifactDigests: runs.reduce((sum, run) => sum + run.sourceArtifactDigests.length, 0),
   reviewPromptArtifacts: runs.reduce((sum, run) => sum + Object.keys(run.reviewPromptArtifacts).length, 0),
 }, 2) + "\n");

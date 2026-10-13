@@ -58,6 +58,8 @@ interface Approval {
   trainingAuthorized: boolean;
   inspectedGitCommit: string;
   measuredTemplateEvidenceDigest: string;
+  implementationSourceDigest: string;
+  implementationSourceManifest: Array<{ path: string; digest: string }>;
   validators: Record<string, { version: string; implementationDigest: string; implementationPaths: string[] }>;
   implementationArtifacts: Record<string, { kind: string; commit: string; path: string }>;
   runs: RunSection[];
@@ -121,25 +123,30 @@ function main(argv: readonly string[]): void {
     }
   }
 
+  // Implementation evidence is the COMPLETE foundry source at the inspected commit.
+  // Recompute the manifest digest from the git blobs and REGISTER the manifest
+  // bytes, because admission.ts resolves each validator's implementationDigest
+  // through the artifact registry. Computing the digest without registering the
+  // bytes made every record fail registry verification.
+  const manifest = approval.implementationSourceManifest;
+  if (!Array.isArray(manifest) || manifest.length === 0) throw new Error("approval has no implementation source manifest");
+  for (const entry of manifest) {
+    const actual = hash(execFileSync("git", ["show", `${approval.inspectedGitCommit}:${entry.path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }));
+    if (actual !== entry.digest) throw new Error(`implementation source differs at the inspected commit: ${entry.path}`);
+  }
+  const manifestBytes = stableStringify(manifest);
+  const manifestDigest = hash(manifestBytes);
+  if (manifestDigest !== approval.implementationSourceDigest) throw new Error("implementation source digest does not reproduce from its manifest");
+  retain(manifestDigest, manifestBytes);
+  for (const [name, validator] of Object.entries(approval.validators)) {
+    if (validator.implementationDigest !== manifestDigest) {
+      throw new Error(`validator "${name}" does not pin the approved implementation source`);
+    }
+  }
+
   for (const [digest, source] of Object.entries(approval.implementationArtifacts)) {
     if (source.kind !== "git-blob" || source.commit !== approval.inspectedGitCommit) throw new Error("unexpected implementation resolution");
     retain(digest, execFileSync("git", ["show", `${source.commit}:${source.path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }));
-  }
-
-  // A validator's implementation pin is a digest over the EXACT SET of source
-  // files that implement and dispatch it. Recompute it here rather than trusting
-  // the stored value: a plausible-but-wrong single file, or a gate-result blob,
-  // would otherwise authenticate nothing.
-  const implementationDigestFor = (paths: readonly string[]): string =>
-    hash(stableStringify(paths.map((path) => ({ path,
-      digest: hash(execFileSync("git", ["show", `${approval.inspectedGitCommit}:${path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 })) }))));
-  for (const [name, validator] of Object.entries(approval.validators)) {
-    if (!Array.isArray(validator.implementationPaths) || validator.implementationPaths.length === 0) {
-      throw new Error(`validator "${name}" has no implementation paths`);
-    }
-    if (implementationDigestFor(validator.implementationPaths) !== validator.implementationDigest) {
-      throw new Error(`validator "${name}" implementation pin does not reproduce from its declared source files`);
-    }
   }
 
   const python = process.env.FOUNDRY_TOKENIZER_PYTHON;
