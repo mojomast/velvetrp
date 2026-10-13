@@ -29,7 +29,7 @@ import {
   type VerifiedPublicSceneAuthority,
 } from "./publicSceneFacts.js";
 
-export const GROUNDING_VALIDATOR_VERSION = "grounding-binding-v6";
+export const GROUNDING_VALIDATOR_VERSION = "grounding-binding-v7";
 /** The opt-in path adds source-bound public observations: a different grammar. */
 export const PUBLIC_SCENE_GROUNDING_VALIDATOR_VERSION = `${GROUNDING_VALIDATOR_VERSION}+public-scene-v1`;
 
@@ -322,7 +322,14 @@ const HP_PAIR = new RegExp(`^(${NAME})['’]s\\s+hit points\\s*:?\\s*${NUMBER}\\
 const HP_POSSESSIVE = new RegExp(`^(${NAME})['’]s\\s+hit points\\s+(before|after)(?: the (?:attack|damage))?\\s+(?:are|were|is|was)\\s+${NUMBER}$`, "iu");
 const STATUS_POSSESSIVE = new RegExp(`^(${NAME})['’]s\\s+status after(?: the (?:attack|damage))?(?:\\s+(?:is|was)\\s+|\\s*:\\s*)${STATUS}$`, "iu");
 const PASSIVE_DAMAGE = new RegExp(`^${NUMBER}\\s+${DAMAGE_TYPE}\\s+damage (?:was|is) applied to\\s+(${NAME})(?:\\s+by\\s+(${NAME}))?$`, "iu");
-const CHECK_RESOLUTION = new RegExp(`^(${NAME})\\s+(succeeded|succeeds|failed|fails) on (?:an?|the)\\s+(${NAME})\\s+check against DC\\s+${NUMBER}\\s*,?\\s*with a total of\\s+${NUMBER}$`, "iu");
+// The verb alternation carries every inflection the same clause admits: past
+// (succeeded/failed), third-person present (succeeds/fails) and the plain present
+// base form a narrator actually writes (succeed/fail). The bare base forms were
+// missing, so a factually correct answer like "You succeed on the Insight check
+// against DC 12, with a total of 15." fell through to unrecognized-clause
+// adjudication. Everything after the verb is unchanged: actor, skill, DC, total
+// and the outcome polarity still bind to one receipt or the clause is refused.
+const CHECK_RESOLUTION = new RegExp(`^(${NAME})\\s+(succeed(?:s|ed)?|fail(?:s|ed)?) on (?:an?|the)\\s+(${NAME})\\s+check against DC\\s+${NUMBER}\\s*,?\\s*with a total of\\s+${NUMBER}$`, "iu");
 const ATTACK_DAMAGE = new RegExp(`^(${NAME})\\s+(hit|hits|missed|misses)\\s+(${NAME})\\s+with a\\s+${DAMAGE_TYPE}\\s+attack for\\s+${NUMBER}\\s+damage$`, "iu");
 const ATTACK_RESOLUTION = new RegExp(`^(${NAME})\\s+(?:attacked|attacks)\\s+(${NAME})\\s+and (hit|hits|missed|misses),?\\s+dealing\\s+${NUMBER}\\s+${DAMAGE_TYPE}\\s+damage$`, "iu");
 

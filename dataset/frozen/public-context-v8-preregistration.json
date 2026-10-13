@@ -1,0 +1,15 @@
+{
+  "bases": 3,
+  "initialTasks": 6,
+  "k": 1,
+  "manifestDigest": "c07754537a920d4a7acbb09fd5951ee4974273224f1925fa845f6d38647d6c58",
+  "manifestPath": "/home/mojo/projects/velvet-mvp/.dataset/measurements/calibration-public-context-2026-10-13-v8/public-context-manifest.json",
+  "planDigest": "ed615621bcf3fd5ecc005a3e22ccc0a2ec9b76a68637c0faab197be263ebd83f",
+  "runId": "calibration-public-context-2026-10-13-v8",
+  "seed": "calibration-public-context-2026-10-13-8",
+  "splitCounts": {
+    "dev": 0,
+    "sealed-test": 0,
+    "train": 6
+  }
+}

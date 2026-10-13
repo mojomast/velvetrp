@@ -8,7 +8,7 @@ import { parsePublicObservationSource, publicContextDiagnosticManifestBody, publ
 import { assertGeneratedSplits, loadGenerationPolicy } from "../src/generationPolicy.js";
 import { openRunStore, RunLockError, type OpenRunStoreOptions } from "../src/runstore.js";
 import { inspectPipelineCheckpoint, PipelineJournal, UncertainDispatchError } from "../src/pipelineJournal.js";
-import { authoritativeFacts, type GroundingReceipt } from "../src/grounding.js";
+import { authoritativeFacts, PUBLIC_SCENE_GROUNDING_VALIDATOR_VERSION, type GroundingReceipt } from "../src/grounding.js";
 import { anchorCandidates, type ProseQualityScorer } from "../src/twins.js";
 import { selectAdmittedRecords } from "../src/selection.js";
 import { verifyAdmissionCertificate, type ApprovedAdmissionRegistry } from "../src/admission.js";
@@ -1067,7 +1067,9 @@ test("runPipeline forwards the option: six arms, real source provenance, resolva
     const unit = run.plan.units.find((entry) => entry.unitId === outcome.unitId)!;
     const record = run.store.readAdmittedRecord(outcome.admittedAttemptId!)!;
     assert.equal(record.provenance.sourceDigests.publicSceneManifest, manifest.manifestDigest);
-    assert.equal(record.provenance.validatorVersions["binding-grounding"], "grounding-binding-v6+public-scene-v1");
+    // Assert the derived constant rather than a hardcoded literal, so a future
+    // intentional grounding-validator bump does not silently strand this pin.
+    assert.equal(record.provenance.validatorVersions["binding-grounding"], PUBLIC_SCENE_GROUNDING_VALIDATOR_VERSION);
     const artifactDigests = inspectPipelineCheckpoint<{ artifactDigests: string[] }>(run.store, `validation:${outcome.admittedAttemptId}`)!.artifactDigests;
     const artifacts = new Map(artifactDigests.map((digest) => [digest, inspectPipelineCheckpoint<string>(run.store, `artifact:${digest}`)!]));
     assert.ok(artifacts.has(manifest.manifestDigest), "the frozen manifest bytes resolve for every arm");

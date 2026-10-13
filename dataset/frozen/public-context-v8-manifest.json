@@ -1,0 +1,295 @@
+{
+  "bases": [
+    {
+      "baseIndex": 0,
+      "baseUnitId": "unit-8c28b0ce238d1727",
+      "clusterFamily": "a river-fort town that changes hands every season",
+      "clusterId": "9a1d92b4a1d4",
+      "comparisonDigest": "6a4792168d80062a2949064623ed5c0c1fca6b522d7a9562ea306a95e6d91114",
+      "lineage": {
+        "characterFamily": "char-bec785d5f885",
+        "scenarioFamily": "scen-fa6d13d6a556",
+        "worldFamily": "world-4afd1301a0ec"
+      },
+      "realizationSeed": "calibration-grounding-2026-10-13-6|realize|0",
+      "realizationSlots": {
+        "guild": "the Harbour Guild",
+        "lens": "the immediate scene",
+        "npc": "Haug",
+        "object": "the ledger",
+        "place": "the Weeping Gate",
+        "tone": "warm but evasive"
+      },
+      "receiptsDigest": "950f303595e19bdbb885a68ca32fa19f9af8f813b07e8bd26087c9bba4319152",
+      "scenarioSeed": "calibration-grounding-2026-10-13-6|unit|0|grounded-narration",
+      "slots": {
+        "guild": "the Harbour Guild",
+        "npc": "Haug",
+        "object": "the ledger",
+        "place": "the Weeping Gate",
+        "tone": "flatly transactional"
+      },
+      "split": "train"
+    },
+    {
+      "baseIndex": 4,
+      "baseUnitId": "unit-98bf7c802f569a5e",
+      "clusterFamily": "a cliff town reachable only at low tide",
+      "clusterId": "e647fa55f25e",
+      "comparisonDigest": "106913b0a80a75bd8384810635acc51a90865a6e74e80ba47e09a23cf64b6d0f",
+      "lineage": {
+        "characterFamily": "char-ab1009554c16",
+        "scenarioFamily": "scen-bd0d2639f2c0",
+        "worldFamily": "world-c70606d76ed7"
+      },
+      "realizationSeed": "calibration-grounding-2026-10-13-6|realize|4",
+      "realizationSlots": {
+        "guild": "the Harbour Guild",
+        "lens": "the established setting",
+        "npc": "Sable",
+        "object": "a sealed writ",
+        "place": "Tallow Street",
+        "tone": "low-register and wary"
+      },
+      "receiptsDigest": "f974753502ec78abf0baf6418f245221665a32364edae9b65bff8a498c5f005d",
+      "scenarioSeed": "calibration-grounding-2026-10-13-6|unit|4|grounded-narration",
+      "slots": {
+        "guild": "the Harbour Guild",
+        "npc": "Sable",
+        "object": "a sealed writ",
+        "place": "Tallow Street",
+        "tone": "warm but evasive"
+      },
+      "split": "train"
+    },
+    {
+      "baseIndex": 11,
+      "baseUnitId": "unit-6b1501d2ec6a7a77",
+      "clusterFamily": "a salt-mine town whose lower levels are sealed by guild decree",
+      "clusterId": "c848257b4671",
+      "comparisonDigest": "eb3336d9a9273cf76fa4914ca87fab386f529afead0041e3579f1260dfda8580",
+      "lineage": {
+        "characterFamily": "char-e588f31aefad",
+        "scenarioFamily": "scen-e23f16db82f1",
+        "worldFamily": "world-1507a9d4e9f2"
+      },
+      "realizationSeed": "calibration-grounding-2026-10-13-6|realize|11",
+      "realizationSlots": {
+        "guild": "the Harbour Guild",
+        "lens": "the public exchange",
+        "npc": "Oswin",
+        "object": "the manifest",
+        "place": "Tallow Street",
+        "tone": "terse and procedural"
+      },
+      "receiptsDigest": "74d45bcbf59e65758b4d2e786b593b8d585939c310ba508106c649760bd6e3ab",
+      "scenarioSeed": "calibration-grounding-2026-10-13-6|unit|11|grounded-narration",
+      "slots": {
+        "guild": "the Harbour Guild",
+        "npc": "Oswin",
+        "object": "the manifest",
+        "place": "Tallow Street",
+        "tone": "low-register and wary"
+      },
+      "split": "train"
+    }
+  ],
+  "manifestDigest": "c07754537a920d4a7acbb09fd5951ee4974273224f1925fa845f6d38647d6c58",
+  "overlayTemplateVersion": "generator-v9/public-context-v1",
+  "schedule": [
+    {
+      "baseUnitId": "unit-8c28b0ce238d1727",
+      "pairId": "pc-pair-17d2141a3d75",
+      "publicContext": "none",
+      "sourceId": "public-observation-source-cf600614eda0017d",
+      "unitId": "unit-8c28b0ce238d1727-pc-none"
+    },
+    {
+      "baseUnitId": "unit-8c28b0ce238d1727",
+      "pairId": "pc-pair-17d2141a3d75",
+      "publicContext": "observations",
+      "sourceId": "public-observation-source-cf600614eda0017d",
+      "unitId": "unit-8c28b0ce238d1727-pc-observations"
+    },
+    {
+      "baseUnitId": "unit-98bf7c802f569a5e",
+      "pairId": "pc-pair-039894fc89dc",
+      "publicContext": "none",
+      "sourceId": "public-observation-source-218982eb4ab0416d",
+      "unitId": "unit-98bf7c802f569a5e-pc-none"
+    },
+    {
+      "baseUnitId": "unit-98bf7c802f569a5e",
+      "pairId": "pc-pair-039894fc89dc",
+      "publicContext": "observations",
+      "sourceId": "public-observation-source-218982eb4ab0416d",
+      "unitId": "unit-98bf7c802f569a5e-pc-observations"
+    },
+    {
+      "baseUnitId": "unit-6b1501d2ec6a7a77",
+      "pairId": "pc-pair-f491dcb8839a",
+      "publicContext": "none",
+      "sourceId": "public-observation-source-c9afde4e4060ddc7",
+      "unitId": "unit-6b1501d2ec6a7a77-pc-none"
+    },
+    {
+      "baseUnitId": "unit-6b1501d2ec6a7a77",
+      "pairId": "pc-pair-f491dcb8839a",
+      "publicContext": "observations",
+      "sourceId": "public-observation-source-c9afde4e4060ddc7",
+      "unitId": "unit-6b1501d2ec6a7a77-pc-observations"
+    }
+  ],
+  "seed": "calibration-public-context-2026-10-13-8",
+  "sourceRecipeVersion": "toy-public-observations-v1",
+  "sources": [
+    {
+      "canonicalDigest": "fc27eb7c5314cac68d5f5d3d8ddf07e034383a38eab76d9982752d30097b74c2",
+      "observations": [
+        {
+          "atomKey": "light",
+          "predicate": "light-colour",
+          "subjectId": "scene-subject-a72cd6aaa59c",
+          "value": "amber"
+        },
+        {
+          "atomKey": "shutters",
+          "predicate": "shutter-state",
+          "subjectId": "scene-subject-c4266d8132d1",
+          "value": "closed"
+        }
+      ],
+      "observedBy": "player",
+      "origin": {
+        "placeDisplayName": "the Weeping Gate",
+        "placeEntityId": "place-16b9b97cca75",
+        "scenarioSeed": "calibration-grounding-2026-10-13-6|unit|0|grounded-narration"
+      },
+      "scope": {
+        "observerId": "player",
+        "sceneId": "public-scene-798ef04e0f47d78e",
+        "turnId": "committed-turn-dd8b1409317ff418"
+      },
+      "sourceId": "public-observation-source-cf600614eda0017d",
+      "subjects": [
+        {
+          "displayName": "the lamplight",
+          "kind": "lamplight",
+          "observedBy": "player",
+          "sceneId": "public-scene-798ef04e0f47d78e",
+          "subjectId": "scene-subject-a72cd6aaa59c",
+          "visibility": "public"
+        },
+        {
+          "displayName": "the shutters",
+          "kind": "shutters",
+          "observedBy": "player",
+          "sceneId": "public-scene-798ef04e0f47d78e",
+          "subjectId": "scene-subject-c4266d8132d1",
+          "visibility": "public"
+        }
+      ],
+      "version": "toy-public-observations-v1",
+      "visibility": "public"
+    },
+    {
+      "canonicalDigest": "e6594a76e622801daa5be03afa86152a4e0e3bd15a0e99cfa31e97ff780bf851",
+      "observations": [
+        {
+          "atomKey": "light",
+          "predicate": "light-colour",
+          "subjectId": "scene-subject-86e496b12af2",
+          "value": "amber"
+        },
+        {
+          "atomKey": "shutters",
+          "predicate": "shutter-state",
+          "subjectId": "scene-subject-8db1805b4984",
+          "value": "closed"
+        }
+      ],
+      "observedBy": "player",
+      "origin": {
+        "placeDisplayName": "Tallow Street",
+        "placeEntityId": "place-d8c15393b2cd",
+        "scenarioSeed": "calibration-grounding-2026-10-13-6|unit|4|grounded-narration"
+      },
+      "scope": {
+        "observerId": "player",
+        "sceneId": "public-scene-f61a1c58a87dc708",
+        "turnId": "committed-turn-652c1175b6f48ded"
+      },
+      "sourceId": "public-observation-source-218982eb4ab0416d",
+      "subjects": [
+        {
+          "displayName": "the lamplight",
+          "kind": "lamplight",
+          "observedBy": "player",
+          "sceneId": "public-scene-f61a1c58a87dc708",
+          "subjectId": "scene-subject-86e496b12af2",
+          "visibility": "public"
+        },
+        {
+          "displayName": "the shutters",
+          "kind": "shutters",
+          "observedBy": "player",
+          "sceneId": "public-scene-f61a1c58a87dc708",
+          "subjectId": "scene-subject-8db1805b4984",
+          "visibility": "public"
+        }
+      ],
+      "version": "toy-public-observations-v1",
+      "visibility": "public"
+    },
+    {
+      "canonicalDigest": "a187b20bcb6dcbd3cce2b450af99103503cba8f8a3d7c66f999104cfa5b9caec",
+      "observations": [
+        {
+          "atomKey": "light",
+          "predicate": "light-colour",
+          "subjectId": "scene-subject-207f55ee476d",
+          "value": "amber"
+        },
+        {
+          "atomKey": "shutters",
+          "predicate": "shutter-state",
+          "subjectId": "scene-subject-f270c4eecc9e",
+          "value": "closed"
+        }
+      ],
+      "observedBy": "player",
+      "origin": {
+        "placeDisplayName": "Tallow Street",
+        "placeEntityId": "place-e6879cdf5234",
+        "scenarioSeed": "calibration-grounding-2026-10-13-6|unit|11|grounded-narration"
+      },
+      "scope": {
+        "observerId": "player",
+        "sceneId": "public-scene-ad1a2856b73d3e55",
+        "turnId": "committed-turn-76d4202ec3e03822"
+      },
+      "sourceId": "public-observation-source-c9afde4e4060ddc7",
+      "subjects": [
+        {
+          "displayName": "the lamplight",
+          "kind": "lamplight",
+          "observedBy": "player",
+          "sceneId": "public-scene-ad1a2856b73d3e55",
+          "subjectId": "scene-subject-207f55ee476d",
+          "visibility": "public"
+        },
+        {
+          "displayName": "the shutters",
+          "kind": "shutters",
+          "observedBy": "player",
+          "sceneId": "public-scene-ad1a2856b73d3e55",
+          "subjectId": "scene-subject-f270c4eecc9e",
+          "visibility": "public"
+        }
+      ],
+      "version": "toy-public-observations-v1",
+      "visibility": "public"
+    }
+  ],
+  "version": "public-context-diagnostic-v1"
+}
