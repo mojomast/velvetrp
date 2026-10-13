@@ -61,12 +61,27 @@ export const CORPUS_FAMILY_WEIGHTS: Readonly<Record<WeightTarget, number>> = Obj
 
 const datasetRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repositoryRoot = resolve(datasetRoot, "..");
-const measurements = join(repositoryRoot, ".dataset", "measurements", CORPUS_RUN_ID);
+
+/**
+ * Optional sharding. Independent runs may execute concurrently: each shard has
+ * its own seed, so its lineage and split assignment are disjoint from the others
+ * and the union is a valid corpus. A shard never changes the base plan; it is a
+ * separate frozen plan with its own digest.
+ *
+ *   --shard <n>   run seed `<CORPUS_SEED>-shard<n>`
+ */
+const shardArgIndex = process.argv.indexOf("--shard");
+const shard = shardArgIndex >= 0 ? Number(process.argv[shardArgIndex + 1]) : null;
+if (shard !== null && (!Number.isSafeInteger(shard) || shard < 1)) throw new Error("--shard must be a positive integer");
+const effectiveSeed = shard === null ? CORPUS_SEED : `${CORPUS_SEED}-shard${shard}`;
+const effectiveRunId = shard === null ? CORPUS_RUN_ID : `${CORPUS_RUN_ID}-shard${shard}`;
+
+const measurements = join(repositoryRoot, ".dataset", "measurements", effectiveRunId);
 const registrationPath = join(measurements, "preregistration.json");
 
 function frozenPlan() {
   return planRun({
-    seed: CORPUS_SEED,
+    seed: effectiveSeed,
     units: CORPUS_UNITS,
     generationPolicy: loadGenerationPolicy(),
     familyWeights: CORPUS_FAMILY_WEIGHTS,
@@ -82,7 +97,7 @@ function freeze(): void {
   mkdirSync(measurements, { recursive: true });
   if (existsSync(registrationPath)) throw new Error("corpus registration already exists; refusing to rebuild it");
   const registration = {
-    runId: CORPUS_RUN_ID, seed: CORPUS_SEED, units: CORPUS_UNITS, planDigest: plan.digest,
+    runId: effectiveRunId, seed: effectiveSeed, units: CORPUS_UNITS, planDigest: plan.digest,
     splitCounts: plan.splitCounts, familyCounts: families, familyWeights: CORPUS_FAMILY_WEIGHTS,
     scenarioCount: plan.scenarioCount, realizationsPerScenario: plan.realizationsPerScenario,
   };
@@ -115,7 +130,7 @@ async function dispatch(command: "--preflight" | "--execute", expectedPlanDigest
   const execute = command === "--execute";
   const store = execute
     ? openRunStore({
-      runId: CORPUS_RUN_ID, seed: CORPUS_SEED,
+      runId: effectiveRunId, seed: effectiveSeed,
       sourceDigest: sourceTreeDigest(datasetRoot, { skip: ["__pycache__"] }),
       splitAssignmentDigest: plan.splitAssignmentDigest,
       corpusFreezeDigest: loadGenerationPolicy().corpusDigest,
@@ -127,7 +142,7 @@ async function dispatch(command: "--preflight" | "--execute", expectedPlanDigest
     : undefined;
   try {
     const report = await runPipeline({
-      runId: CORPUS_RUN_ID, seed: CORPUS_SEED, units: CORPUS_UNITS,
+      runId: effectiveRunId, seed: effectiveSeed, units: CORPUS_UNITS,
       familyWeights: CORPUS_FAMILY_WEIGHTS,
       execute, maxRepairs: CORPUS_MAX_REPAIRS,
       maxCompletionTokens: CORPUS_MAX_COMPLETION_TOKENS, teacherThinking: "disabled", temperature: 0.7,
