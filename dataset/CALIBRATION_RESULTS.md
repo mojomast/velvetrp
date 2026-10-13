@@ -243,3 +243,67 @@ machine verdicts: `/tmp/opencode/foundry-calibration-v5-independent-review.machi
 **Pilot HOLD:** focused grounded/tool calibration is appropriate after the remaining
 scope corrections pass validation, with separate grounded-prose grading. Full
 artifact/certificate export approval for v5 remains a separate pending check.
+
+## Version 6 — functional yield recovered, grounded prose quality held
+
+Run `calibration-2026-10-13-v6`, producer
+`c8f0a10246c7fbdeee444fe27cfb6866a6689613`, thirteen seeds/K=1.
+
+| Family | Planned | Attempts | Initial admissions | Final admissions |
+|---|---:|---:|---:|---:|
+| Grounded narration | 6 | 7 | 5 | 6 |
+| Tool selection | 7 | 8 | 6 | 7 |
+| **Total** | **13** | **15** | **11** | **13** |
+
+All four tool subtypes admitted: four exact-candidate, one narration-submit,
+one read-tool and one no-tool. Thirteen selected records span twelve clusters;
+the planned split is twelve train and one dev. Parsing: **13/13 initial** and
+**15/15 all attempts**. Actual captured physical/logical responses: **28**
+(15 generations + 13 reviews). Two content repairs, **1,092** measured supervised
+labels spent, no unresolved/unmeasured outcome in the producer report.
+Independent reconciliation confirms **969 admitted labels** (877 train, 92 dev)
+plus **123 refused-attempt labels**; the all-attempt spend remains 1,092. Thirteen
+review contracts have usable `accept` verdicts, with no `accept-with-notes`.
+
+The complete separately blinded **generated-grounded** census contains eight
+captured outputs, including the actual grounded repair and narration-submit.
+Seven were gradeable: **one pass, six fail**; one was ungradeable because its
+capture mixed assistant content with a tool call. Coverage **7/8**, conditional
+style quality **1/7**, acceptable yield **1/8**. All six style failures have
+naturalness zero; four also have voice zero. The repeated short actor/attack/HP
+sentences read as checklists rather than cohesive roleplay narration. The one
+passing check-only output is not evidence that the six combat scenes have
+acceptable style. No ordinary RP or twin-parity observations were scheduled.
+
+Frozen prose ledger:
+`f9d80aa2cb086b12e676ee5ae868f0672016ec36da401ea4e58c1c7f6b66650a`.
+Independent functional/census inspection confirms this canonical ledger pin,
+all thirteen certificates and final receipt-backed answers, all fifteen generation
+outputs and all twenty-eight captured responses. Both mixed-content attempts
+were refused and freshly regenerated; no admitted target silently loses assistant
+text. The no-tool decision is legitimate, but its invented room details are not
+source-verified observations. No export/training authorization is granted.
+
+Reporting qualifications: the original summary counted failed validator rows and
+omitted the separate narration-transport refusal. The retained
+`summary-corrected-stage-failures.json` counts both actual stage failures from the
+immutable event log and keeps validator-row diagnostics separate. The read-tool
+failure was extra assistant text, not incorrect function/argument values.
+`manifest.json.spend` is an unpopulated zero projection; measured spend and dispatch
+counts come from retained label measurements and the physical journal. Reviewer
+prompt bytes resolve through dispatch checkpoints; a future export registry must
+include those inspected bytes rather than assuming every source is an `artifact:*`
+entry. Historical producer reports and admissions remain unchanged.
+
+Independent report: `/tmp/opencode/foundry-calibration-v6-independent-review.md`;
+machine verdicts: `/tmp/opencode/foundry-calibration-v6-independent-review.json`.
+
+Bindings: plan
+`d07529276a23a5f1be1e3bea3a04c34226adfb7dfc4f995e19b117865fdf6b46`;
+report `acdcc40b7a0cbdb7bc4c0f330b1bdef5c7cd54c4d3f302698b8e1d85f99a040a`;
+selection `1d4fe9b776fc14c626bd1cd5bca38722c5e9746d1a6b5240264fc823e98bd3ab`.
+Artifacts: `.dataset/measurements/calibration-2026-10-13-v6/` and matching run store.
+
+**Pilot HOLD:** grounded prose does not meet the inherited style floor. Preserve
+the locked ratings and historical attempts while correcting the narration
+guidance and measuring fresh outputs. No training has run.

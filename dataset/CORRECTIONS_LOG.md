@@ -520,3 +520,49 @@ Final independent follow-up resolved the original seven recipient-focus probes
 and found no remaining concrete variant. **570/570 serial foundry tests passed,
 zero failures/skips**, including real CPU tokenization/export reload; owning
 typecheck passed. The frozen thirteen-seed/K=1 v6 calibration received GO.
+
+## Version 6 observed quality hold
+
+The live focused campaign completed at producer `c8f0a10`: thirteen admissions
+from fifteen generation attempts, thirteen reviews, twenty-eight captured
+physical/logical responses and 1,092 measured supervised labels. All six grounded
+scenarios and all four tool subtypes admitted under the functional pipeline.
+
+Fresh blinded style judgments were locked before independent functional review.
+The complete eight-output `generated-grounded` census has one pass, six failures
+and one ungradeable mixed-content capture. All six failures have naturalness zero;
+four also fail voice. The value-free guide repaired checkability but induced a
+repetitive report cadence. Grounded style results remain separate from ordinary
+RP. Expansion stays held while a fresh guidance correction is designed and
+measured; these locked judgments are not replaced with revised ratings.
+
+Independent v6 inspection confirmed all thirteen certificates, receipt-backed
+answers and the prose-ledger pin, and inspected all fifteen generations and
+twenty-eight captured responses. Both transport-mixed attempts were refused
+and separately regenerated. The selected labels total 969 (877 train, 92 dev),
+with 123 refused-attempt labels; manifest's zero spend projection is not used.
+The no-tool decision is legitimate but its invented room details are unverified.
+Corrected derived summaries include event-level transport failures, preserving
+the original summary and all producer evidence. Export registry construction
+must include exact reviewer-prompt bytes from dispatch checkpoints.
+
+## Version 7 composed-beat diagnostic readiness
+
+Generator-v9 replaces the short-sentence script with alternative, already-supported
+combined check/attack forms and semicolon-bound HP/status clauses. Requested voices,
+public receipts, native-call/empty-content obligations, whole-clause grounding and
+the style rubric are preserved. The thirteen-scenario v7 challenge matches v6's
+unit IDs, seeds, receipts, slots, subtypes, splits and lineage. This is a matched
+prompt intervention, not an independent sample or student-retention measurement.
+
+Validation: the affected runner file passed 57 tests with its existing CPU check
+env-gated; that CPU check then passed separately with the real tokenizer enabled.
+Four composed binding tests cover both check outcomes, zero-damage/equal-HP misses,
+role/value/status mutations and unsupported suffixes. Owning typecheck passed.
+No full-suite rerun was needed for this narration-guide-only change.
+
+Independent narrow pre-dispatch review cleared the frozen thirteen-unit
+composition diagnostic, finding no new blocking bug, answer leak or causal-scope
+regression. Report: `/tmp/opencode/foundry-v7-precalibration-review.md`.
+The pilot remains held; warm/wary voice or naturalness failures trigger the
+source-bound public-context diagnostic rather than another prompt-only loop.

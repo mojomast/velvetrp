@@ -212,3 +212,51 @@ clauses do not authorize them. The original reproductions now adjudicate, valid
 guided controls verify, and an independent follow-up cleared the frozen inventory
 before any v6 paid request. This correction changes validator evidence, not the
 already preregistered prompt/plan digest.
+
+## Version 7 composition diagnostic (before generation)
+
+The v6 separate grounded-prose ledger is locked: one pass, six failures, one
+ungradeable capture. Preserve it. The next intervention changes only the
+narration-specific composition guide, using existing fully bound combined
+check/attack forms and semicolon-separated HP/status clauses. It does not supply
+new scene facts, change tone assignments, relax grounding or lower the rubric.
+
+- Run `calibration-2026-10-13-v7`, **13 seeds/K=1**, same public seed
+  `calibration-grounding-2026-10-13-6` and grounded/tool family schedule as v6.
+  The reused seed is a matched challenge, not a fresh independent sample.
+- Generator-v9 plan:
+  `4ba77018ff32497f1e431508f4ffc602f37179efac1782170fa9b78d29b38e04`.
+  The complete public challenge identity was compared to the retained v6 plan:
+  all thirteen unit IDs, scenario seeds, families/subtypes, receipts, slots,
+  splits and lineage groups match. Frozen comparison:
+  `/tmp/opencode/foundry-v7-preregistration.json`.
+- Freeze and verify the same receipts, identities, splits and realization slots
+  against the retained v6 plan before dispatch. The seven initial narration
+  challenges are:
+
+  | Unit suffix | Route | Requested voice |
+  |---|---|---|
+  | `8c28b0ce238d1727` | Grounded | Warm but evasive |
+  | `45f400d219056232` | Grounded | Flatly transactional |
+  | `3296949d536b2210` | Grounded | Warm but evasive |
+  | `98bf7c802f569a5e` | Grounded | Low-register and wary |
+  | `25feff308d8dc08b` | Narration-submit tool | Clipped, almost bureaucratic |
+  | `740bf9a7f9ab06ed` | Grounded | Low-register and wary |
+  | `6b1501d2ec6a7a77` | Grounded | Terse and procedural |
+
+- Keep the six other tool controls; they do not enlarge the prose denominator.
+- Same funded Flash/K3 settings, CPU preprocessing, budgets and immutable repair
+  contracts. At most two content repairs for functional failures; **no style-based
+  generation retries**. All actually dispatched narration repairs join the census.
+- Freeze the complete `generated-grounded` inventory and grade complete surfaces
+  in fresh independent blinded contexts under the unchanged rubric. Lock the
+  ledger before functional unblinding. Report planned, graded, passing, coverage,
+  conditional quality and acceptable yield, including explicit missingness.
+- Independently inspect actual admissions/refusals, accounting and full-surface
+  transport. Compare v6/v7 descriptively; neither is controlled student retention.
+
+This tests the hypothesis that combined factual clauses improve cadence. It
+cannot establish rich persistent storytelling from sparse receipts. **Pilot HOLD**
+until actual quality and functional evidence clear the existing gates. Any
+remaining voice/naturalness failure in the warm/wary challenges triggers a
+source-bound public-context diagnostic instead of another prompt-tuning loop.

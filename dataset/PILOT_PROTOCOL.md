@@ -2,7 +2,7 @@
 
 This freezes the next pilot's inventory and measurement policy before its paid
 requests. Execution depends on acceptable independently inspected v5 calibration
-results plus the focused v6 grounding/tool calibration; this document alone does
+results plus acceptable focused grounding/tool and prose calibration; this document alone does
 not claim those results exist.
 
 ## Generation inventory
@@ -11,10 +11,12 @@ not claim those results exist.
   seed rather than selecting it from observed answer quality.
 - **175 scenario seeds, K=3**, **525 scheduled realizations**. Keep scenario
   identities/receipts/lineage/split stable within each three-realization cluster.
-- Plan digest for the frozen generator-v8 contracts:
-  `72da1f6f3ba2b207ca698e31a29c07d3c054a84f49c44310146f52a0e30a7a91`.
-  This supersedes the generator-v7 pre-dispatch digest after adding value-free
-  narration syntax examples; no pilot requests or observed answers preceded it.
+- Plan digest for the frozen generator-v9 contracts:
+  `f633ead229d265f97da0420fd0583dc7f8b21e6349fb5e150e7968a8b05233c2`.
+  This supersedes the generator-v8 pre-dispatch digest
+  `72da1f6f3ba2b207ca698e31a29c07d3c054a84f49c44310146f52a0e30a7a91`
+  after revising value-free composition options. No pilot requests or observed
+  answers preceded the update; seed, counts and split policy are preserved.
 - Generated splits: **426 train, 51 dev, 48 generated test**. These generated
   test rows are separate from the externally held frozen evaluation corpus.
 - Family rows: 117 grounded narration, 156 tool selection, 147 world generation,
@@ -40,8 +42,11 @@ not claim those results exist.
    interrupted dispatch before further work; unknown outcomes stop dispatch.
 2. Freeze the complete ordinary-RP initial/actually dispatched repair census.
    Grade full captured surfaces in separate fresh, blinded GPT-6 Astra xhigh
-   contexts. Lock style before semantic inspection/unblinding. Missing captures
-   keep explicit missingness; fixture verdicts never enter reported measurements.
+    contexts. Lock style before semantic inspection/unblinding. Missing captures
+    keep explicit missingness; fixture verdicts never enter reported measurements.
+   Freeze and independently grade the separate `generated-grounded` initial and
+   actual-repair census as well, including narration-submit tool scenarios. Its
+   coverage and quality cannot substitute for ordinary-RP or twin-parity evidence.
 3. Independently inspect actual admitted targets against their public contracts
    and private toy oracle. Inspect stratified refused targets for false refusals,
    repair regressions and unsupported claims. Keep style and functional findings

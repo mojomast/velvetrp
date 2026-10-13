@@ -66,11 +66,16 @@ function publicReceiptNarration(request: TeacherCompletionRequest): string {
     : receipt.kind === "combat" && receipt.outcome.kind === "damage" ? `${receipt.target} has ${receipt.outcome.hitPointsAfter} HP remaining.` : "").join(" ");
 }
 
+/** Composed realization of the guided narration contract: one check sentence,
+ * one attack sentence and one semicolon-bound HP/status sentence. The cadence is
+ * a fixture for the transport and grounding gates, never a quality claim. */
 function guidedReceiptNarration(request: TeacherCompletionRequest): string {
   const receipts = JSON.parse(request.system.split("AUTHORITATIVE PUBLIC RECEIPTS\n")[1]!.split(" ADVERTISED")[0]!.split(" NARRATION SUBMISSION CONTRACT\n")[0]!) as GroundingReceipt[];
   return receipts.map((receipt) => receipt.kind === "check"
-    ? `Your ${receipt.skill} check comes to ${receipt.total} against DC ${receipt.dc}: ${receipt.outcome}.`
-    : receipt.kind === "combat" && receipt.outcome.kind === "damage" ? `${receipt.actor} attacks ${receipt.target}. The attack ${receipt.outcome.hit ? "hits" : "misses"}. ${receipt.actor} deals ${receipt.outcome.applied} ${receipt.outcome.damageType} damage to ${receipt.target}. ${receipt.target}'s hit points go from ${receipt.outcome.hitPointsBefore} to ${receipt.outcome.hitPointsAfter}. ${receipt.target} is ${receipt.outcome.statusAfter}.` : "").join(" ");
+    ? `You ${/^success/i.test(receipt.outcome) ? "succeeded" : "failed"} on the ${receipt.skill} check against DC ${receipt.dc}, with a total of ${receipt.total}.`
+    : receipt.kind === "combat" && receipt.outcome.kind === "damage"
+      ? `${receipt.actor} ${receipt.outcome.hit ? "hits" : "misses"} ${receipt.target} with a ${receipt.outcome.damageType} attack for ${receipt.outcome.applied} damage. ${receipt.target}'s hit points go from ${receipt.outcome.hitPointsBefore} to ${receipt.outcome.hitPointsAfter}; ${receipt.target} is ${receipt.outcome.statusAfter}.`
+      : "").join(" ");
 }
 
 function setup(t: { after(fn: () => void): void }, overrides: Partial<PipelineOptions> = {}) {
@@ -446,7 +451,7 @@ test("public actor/target receipts support an on-request grounded happy path", a
   assert.match(run.plan.units[0]!.realization.context[0]!.content, /Leave assistant content empty/);
 });
 
-test("value-free public sentence guide yields fully bound targets across check outcomes and entity identities", async (t) => {
+test("value-free composed sentence guide yields fully bound targets across check outcomes and entity identities", async (t) => {
   const generator = outputClient((request) => ({ content: "", toolCalls: [{ id: request.attemptId, type: "function", function: {
     name: "submit_adventure_narration", arguments: { narration: guidedReceiptNarration(request) } } }] }));
   const run = setup(t, { seed: "guide-realization-matrix", units: 20, families: ["grounded-narration"], generator, maxRepairs: 0 });
@@ -455,7 +460,39 @@ test("value-free public sentence guide yields fully bound targets across check o
   const outcomes = new Set(run.plan.units.map((unit) => unit.spec.oracle.receipts[0]!.kind === "check" ? unit.spec.oracle.receipts[0]!.outcome : null));
   assert.deepEqual(outcomes, new Set(["success", "failure"]));
   assert.ok(new Set(run.plan.units.map((unit) => unit.spec.slots.npc)).size > 1);
-  assert.match(run.plan.units[0]!.realization.context[0]!.content, /bracketed terms below are value-free syntax examples/);
+  assert.match(run.plan.units[0]!.realization.context[0]!.content, /SUPPORTED COMPOSED SENTENCE GUIDE/);
+  assert.match(run.plan.units[0]!.realization.context[0]!.content, /bracketed terms below are value-free grammatical options/);
+  // The composed options are alternatives, not a mandatory concatenation.
+  assert.match(run.plan.units[0]!.realization.context[0]!.content, /choose one applicable realization rather than both alternatives/);
+  assert.match(run.plan.units[0]!.realization.context[0]!.content, /\[target\]'s hit points go from \[HP before\] to \[HP after\]; \[target\] is \[explicit status after\]/);
+});
+
+test("narration-submit tool selection admits the composed native-call surface and still refuses added prose", async (t) => {
+  const seed = "composed-narration-submit";
+  const planned = planRun({ seed, units: 2, families: ["tool-selection"] });
+  const narrationUnit = planned.units.find((unit) => unit.spec.oracle.toolFamily === "narration-submit");
+  assert.ok(narrationUnit, "the plan schedules a narration-submit decision");
+  const candidateUnit = planned.units.find((unit) => unit.spec.oracle.toolFamily === "exact-candidate")!;
+  const chosen = candidateUnit.spec.oracle.advertisedCandidates
+    .find((candidate) => candidateUnit.spec.oracle.allowedCandidateIds.includes(candidate.candidateId))!;
+  const surface = (request: TeacherCompletionRequest, narrationProse = ""): { content: string; toolCalls: StoredToolCall[] } => {
+    const narration = request.system.includes("AUTHORITATIVE PUBLIC RECEIPTS");
+    return { content: narration ? narrationProse : "", toolCalls: [{ id: request.attemptId, type: "function", function: narration
+      ? { name: "submit_adventure_narration", arguments: { narration: guidedReceiptNarration(request) } }
+      : { name: chosen.toolName, arguments: { candidateId: chosen.candidateId, digest: chosen.digest } } }] };
+  };
+  const run = setup(t, { seed, units: 2, families: ["tool-selection"], generator: outputClient((request) => surface(request)), maxRepairs: 0 });
+  assert.equal((await runPipeline({ ...run.options, store: run.store })).admitted, 2);
+  assert.ok(run.plan.units.some((unit) => unit.unitId === narrationUnit.unitId));
+  const context = run.plan.units.find((unit) => unit.unitId === narrationUnit.unitId)!.realization.context[0]!.content;
+  assert.match(context, /SUPPORTED COMPOSED SENTENCE GUIDE/);
+  assert.match(context, /exactly one native submit_adventure_narration function call/);
+  assert.equal(narrationUnit.spec.oracle.receipts.length, 1, "the check-only receipt set composes into one sentence");
+  const mixed = setup(t, { seed, units: 2, families: ["tool-selection"],
+    generator: outputClient((request) => surface(request, "The turn is committed.")), maxRepairs: 0 });
+  const refused = await runPipeline({ ...mixed.options, store: mixed.store });
+  assert.equal(refused.admitted, 1);
+  assert.match(refused.unitOutcomes.find((outcome) => outcome.unitId === narrationUnit.unitId)!.refusedAt!, /narration-transport/);
 });
 
 for (const correct of [false, true]) test(`tool selection independently checks intent for ${correct ? "correct" : "wrong but advertised"} candidates`, async (t) => {
