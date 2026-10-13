@@ -141,8 +141,18 @@ async function assertIndirectOffer(page: Page, finalName: string) {
 }
 
 async function submitDeclaration(page: Page, declaration: string) {
-  const request = page.waitForRequest((candidate) =>
-    candidate.method() === "POST" && new URL(candidate.url()).pathname === "/api/rpg/v1/adventure-turns/stream");
+  // Match the declaration stream only. The client also streams to this endpoint
+  // automatically (narration-retry on reload, token resume), and those derivative
+  // requests are not reconcilable by an initial idempotency key. Capturing one of
+  // them instead of our declaration made the reconcile assert non-deterministically
+  // null, so bind the waiter to the exact declaration payload we are about to send.
+  const request = page.waitForRequest((candidate) => {
+    if (candidate.method() !== "POST" || new URL(candidate.url()).pathname !== "/api/rpg/v1/adventure-turns/stream") return false;
+    let body: { declaration?: unknown; variant?: unknown; resumeToken?: unknown };
+    try { body = candidate.postDataJSON() as typeof body; } catch { return false; }
+    return typeof body?.declaration === "string" && body.declaration === declaration
+      && body.variant === undefined && body.resumeToken === undefined;
+  });
   await page.getByLabel("What do you do?").fill(declaration);
   await page.getByRole("button", { name: "Send action" }).click();
   const body = (await request).postDataJSON() as { actorId: string; idempotencyKey: string };
