@@ -36,7 +36,7 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".
  */
 const VALIDATOR_IMPLEMENTATION: Readonly<Record<string, string>> = Object.freeze({
   "binding-grounding": "dataset/src/grounding.ts",
-  "production-grounding-predicate": "dataset/src/grounding.ts",
+  "production-grounding-predicate": "dataset/src/generate.ts",
   "creative-transcript-contract": "dataset/src/creativeRoleplay.ts",
   "boundary-leakage": "dataset/src/generate.ts",
   "player-agency": "dataset/src/generate.ts",
@@ -54,6 +54,21 @@ const VALIDATOR_IMPLEMENTATION: Readonly<Record<string, string>> = Object.freeze
 
 const blobAt = (commit: string, path: string): string =>
   execFileSync("git", ["show", `${commit}:${path}`], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 }).toString("utf8");
+
+/**
+ * The mapped file must actually NAME the validator. A wrong-but-plausible
+ * mapping (for example pointing a predicate at the module that supplies its
+ * inputs rather than the module that implements the check) otherwise pins
+ * perfectly valid source that does not authenticate anything. Independent
+ * review caught exactly that once.
+ */
+function assertImplementationNamesValidator(commit: string, path: string, validator: string): string {
+  const source = blobAt(commit, path);
+  if (!source.includes(`"${validator}"`)) {
+    throw new Error(`validator "${validator}" is not named in its mapped implementation ${path}; refusing a plausible but unverified pin`);
+  }
+  return source;
+}
 
 const outPath = process.argv[2];
 const runIds = process.argv.slice(3);
@@ -115,7 +130,7 @@ for (const runId of runIds) {
       if (!implementationPath) {
         throw new Error(`no implementation mapping for validator "${item.validator}"; refusing to pin a result blob as an implementation`);
       }
-      const implementationBytes = blobAt(inspectedGitCommit, implementationPath);
+      const implementationBytes = assertImplementationNamesValidator(inspectedGitCommit, implementationPath, item.validator);
       const implementationDigest = hash(implementationBytes);
       implementationArtifacts[implementationDigest] = { kind: "git-blob", commit: inspectedGitCommit, path: implementationPath };
       const existing = validators[item.validator];
