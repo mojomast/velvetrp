@@ -175,7 +175,10 @@ test("declaration recalls an old exchange across HTTP without private memory or 
     expect(calls).toHaveLength(2);
   } finally {
     await page.goto("about:blank").catch(() => {});
-    await page.unrouteAll({ behavior: "wait" }).catch(() => {});
+    // Every assertion has run. Handlers still in flight for requests the navigation just cancelled
+    // can never settle their routes, and waiting for them can hang cleanup until the test timeout
+    // (seen intermittently in CI). Drop the route without waiting; it no longer affects results.
+    await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {});
     await request?.dispose();
     await app.close(); f.repo.close(); closeRepo();
     rmSync(dataDir, { recursive: true, force: true });
