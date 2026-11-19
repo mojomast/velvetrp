@@ -104,7 +104,8 @@ export async function getCampaignContextInspection(campaignId: string, sessionId
 }
 import { createClientId } from "./utils/clientId";
 import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, idempotencyKeySchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
-import type { ApiProblem, CampaignAccess as ContractCampaignAccess, CampaignCharacterCreateRequest, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignCharacterWorkspaceResponse, CampaignCreateRequest, CampaignCreateResponse, CampaignDetail as ContractCampaignDetail, CampaignDetailResponse as ContractCampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollRequest, CampaignDiceRollResponse, CampaignListResponse as ContractCampaignListResponse, CampaignRenameRequest, CampaignRenameResponse, CampaignRoomAttachRequest, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, RoleplayFeatureFlags, RpgFeatureFlags } from "@velvet/contracts";
+import type { ApiProblem, CampaignAccess as ContractCampaignAccess, CampaignCharacterCreateRequest, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignCharacterWorkspaceResponse, CampaignCreateRequest, CampaignCreateResponse, CampaignDetail as ContractCampaignDetail, CampaignDetailResponse as ContractCampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollRequest, CampaignDiceRollResponse, CampaignListResponse as ContractCampaignListResponse, CampaignRenameRequest, CampaignRenameResponse, CampaignRoomAttachRequest, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, QuickAdventureCreateRequest, QuickAdventureCreateResponse, RoleplayFeatureFlags, RpgFeatureFlags } from "@velvet/contracts";
+import { quickAdventureCreateRequestSchema, quickAdventureCreateResponseSchema } from "@velvet/contracts";
 import {
   campaignAdministrationHttpArchiveRequestSchema,
   campaignAdministrationHttpArchiveResponseSchema,
@@ -1377,6 +1378,17 @@ export async function listCampaigns(): Promise<CampaignListResponse> {
   const success = await requestResponse<unknown>("/rpg/v1/campaigns", { cache: "no-store" });
   requireStatus(success, 200, "Campaign list");
   return campaignListResponseSchema.parse(success.body);
+}
+
+export async function createQuickAdventure(input: QuickAdventureCreateRequest): Promise<QuickAdventureCreateResponse> {
+  const body = parseApiInput(() => quickAdventureCreateRequestSchema.parse(input));
+  const success = await requestResponse<unknown>("/rpg/v1/quick-adventures", {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  if (success.status !== 200 && success.status !== 201) throw new Error("Quick adventure status was not confirmed");
+  return quickAdventureCreateResponseSchema.parse(success.body);
 }
 
 export async function getCampaignDetail(campaignId: string): Promise<CampaignDetailResponse> {
