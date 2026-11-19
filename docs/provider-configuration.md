@@ -14,7 +14,7 @@ When no provider row exists, defaults are resolved at runtime in this order:
 | HTTP referer | `OPENROUTER_HTTP_REFERER` | None | blank |
 | App title | `OPENROUTER_APP_TITLE` | None | `Velvet` |
 
-Reads construct environment/built-in defaults first and overlay the stored provider JSON. Each field present in a stored row therefore wins; fields absent from an older partial row inherit current defaults. Normal API saves write the complete profile, so changing environment variables does not replace saved settings. Update the stored profile through the UI/API, or use a fresh data directory, when changing bootstrap defaults.
+Reads construct environment/built-in defaults first and overlay the stored provider JSON. For every field except the API key, a value present in a stored row wins; fields absent from an older partial row inherit current defaults. The API key is different: the environment key is read at call time and always wins when non-empty, and the stored key is only used as a fallback. Normal API saves write the complete profile except that they never copy the environment key into it, so changing the environment key takes effect immediately without rewriting settings.
 
 Environment-family precedence uses defined-value semantics, not a nonblank test. An explicitly empty `OPENROUTER_BASE_URL`, `OPENROUTER_MODEL`, or `OPENROUTER_API_KEY` therefore suppresses the corresponding nonempty `OPENAI_*` fallback. Unset or remove the OpenRouter assignment to use that fallback.
 
@@ -31,8 +31,8 @@ Do not source an untrusted environment file. Keep `.env` out of version control.
 
 ## API and fields
 
-- `GET /api/provider` returns public settings and `hasApiKey`; it never returns `apiKey`.
-- `PUT /api/provider` updates supplied fields. Omit `apiKey` to retain it; send `apiKey: ""` to clear it.
+- `GET /api/provider` returns public settings, `hasApiKey`, `apiKeySource`, and `apiKeyWarning`; it never returns `apiKey`.
+- `PUT /api/provider` updates supplied fields. Omit `apiKey` to retain the stored key; send `apiKey: ""` to clear it. A non-empty `apiKey` requires `VELVET_PROVIDER_KEY_STORAGE=database` and otherwise returns HTTP 400 `PROVIDER_KEY_STORAGE_DISABLED`.
 - `POST /api/provider/preflight` is the only capability probe. It accepts `{}`, performs one schema-bound function-tool request and one strict-JSON-Schema request, and is initiated only by the settings button or another explicit caller. It reports DM-play compatibility (usable function tool calls) separately from campaign-generation compatibility (strict JSON Schema response format). It is `no-store` and may incur provider charges.
 - Send `baseUrl: ""` to deliberately disable outbound generation and use the local deterministic stub.
 - A nonblank malformed or disallowed `baseUrl` receives HTTP 400. HTTPS is accepted; HTTP is accepted only for `localhost`, `*.localhost`, `127.x`, `::1`, or the expanded IPv6 loopback form.
@@ -68,7 +68,13 @@ Adventure planning and narration reserve the configured per-call `samplers.maxTo
 
 ## Credentials and backups
 
-The API key is stored as plain JSON inside the `provider` table in `<resolved data directory>/velvet.sqlite`. It is not encrypted at rest. See [Data directory and current schema](operations.md#data-directory-and-current-schema) for resolution rules. Database files, SQLite online backups, copied data directories, filesystem snapshots, and live-E2E source databases therefore contain the key and must be protected as secrets.
+Provider keys come from the environment by default. Set `OPENROUTER_API_KEY` (preferred) or `OPENAI_API_KEY` in the server process environment; Velvet reads it at call time, uses it for completions, and never writes it to the database. `GET /api/provider` reports `apiKeySource` as `environment`, `database`, or `none` and sets `hasApiKey` from the effective key. It never returns the key itself.
+
+Storing a key in the database is an explicit opt-in. Set `VELVET_PROVIDER_KEY_STORAGE=database` to allow `PUT /api/provider` to persist a supplied `apiKey`; without that opt-in a non-empty `apiKey` is rejected with HTTP 400 `PROVIDER_KEY_STORAGE_DISABLED` and nothing is written. Sending `apiKey: ""` always clears the stored key. When both a stored key and an environment key exist, the environment key wins.
+
+A key saved before this policy (or saved with the opt-in) is still used when no environment key is set, so legacy profiles keep working. In that state `GET /api/provider` reports `apiKeySource: "database"` and a non-empty `apiKeyWarning` explaining that the key is stored in plain text; the warning is empty when database storage is opted in. Move such a key to the environment to remove the warning.
+
+The stored API key is plain JSON inside the `provider` table in `<resolved data directory>/velvet.sqlite`. It is not encrypted at rest. See [Data directory and current schema](operations.md#data-directory-and-current-schema) for resolution rules. Database files, SQLite online backups, copied data directories, filesystem snapshots, and live-E2E source databases therefore contain any stored key and must be protected as secrets.
 
 Restrict data-directory and backup permissions, avoid syncing them to untrusted storage, and rotate the provider key after suspected disclosure. `GET /api/provider` redacts the key, but that does not protect direct database access.
 
