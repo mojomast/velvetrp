@@ -141,8 +141,14 @@ async function assertIndirectOffer(page: Page, finalName: string) {
 }
 
 async function submitDeclaration(page: Page, declaration: string) {
-  const request = page.waitForRequest((candidate) =>
-    candidate.method() === "POST" && new URL(candidate.url()).pathname === "/api/rpg/v1/adventure-turns/stream");
+  // Match this declaration's initial request only. The page also POSTs to this endpoint for narration
+  // variants and, after a reload, to resume delivering the previous turn ({ resumeToken }). Capturing one
+  // of those instead yields another turn's key or none, and initial reconciliation then finds no turn.
+  const request = page.waitForRequest((candidate) => {
+    if (candidate.method() !== "POST" || new URL(candidate.url()).pathname !== "/api/rpg/v1/adventure-turns/stream") return false;
+    const body = candidate.postDataJSON() as { declaration?: unknown } | null;
+    return body?.declaration === declaration;
+  });
   await page.getByLabel("What do you do?").fill(declaration);
   await page.getByRole("button", { name: "Send action" }).click();
   const body = (await request).postDataJSON() as { actorId: string; idempotencyKey: string };
