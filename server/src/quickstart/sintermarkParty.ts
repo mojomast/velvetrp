@@ -1,11 +1,11 @@
 /**
  * Sintermark party seeder.
  *
- * Exports `createSintermarkParty(repository, campaignId)` for the main world
- * hydrator to call against an already-created, SRD-configured `dnd-5e@1.0.0`
- * campaign. The helper is deliberately provider-free, commit-only, and makes
- * no rules claims beyond what the pinned `srd-5.1:rules:starter-v1` catalog and
- * the `dnd-5e@1.0.0` module actually execute.
+ * Exports `createSintermarkParty(repository, ownerId, campaignId, keyPrefix)` for
+ * the main world builder to call against an already-created, SRD-configured
+ * `dnd-5e@1.0.0` campaign. The helper is deliberately provider-free, commit-only,
+ * and makes no rules claims beyond what the pinned `srd-5.1:rules:starter-v1`
+ * catalog and the `dnd-5e@1.0.0` module actually execute.
  *
  * Reality check on this codebase (documented so nobody re-litigates it):
  *  - The owned `mutateInventoryForActor` public method ONLY exposes
@@ -13,19 +13,14 @@
  *    even though the private `mutate()` switch handles that command. This file
  *    therefore does not call it with an unsupported `kind` and never hides a
  *    type mismatch behind `as never`.
- *  - Non-stackable item grants go through the owned deterministic fixture seam
- *    `createDeterministicE2ERepository(...).fixtures.materializeInventoryEntry`,
- *    which validates campaign ownership + M1.5 revision, pins the exact public
- *    catalog definition for execution, and inserts an instanced quantity-1 row.
+ *  - Non-stackable item grants use the caller's configured repository database
+ *    as a narrowly scoped authoring seam: campaign ownership and a public pin
+ *    are checked, then an instanced quantity-1 row is inserted. No private
+ *    connection is opened.
  *  - Stackable grants (potions x10, ammunition, torches, rations) need a real
- *    stackable row and a quantity the fixture seam cannot express. That is the
- *    one scoped SQL authoring seam in this file: `materializeStackableEntry`
- *    opens its own short-lived connection to the same `velvet.sqlite`, verifies
- *    the campaign is owned by `local-owner`, that the exact definition is
- *    publicly pinned, and that `mechanics.stackable === true`, then inserts the
- *    stackable row. The item is pinned for execution through
- *    `fixtures.materializePinnedItemExecution` (the owned helper), so no
- *    production repository code is modified and no catalog content is invented.
+ *    stackable row and a quantity. The same repository-database seam verifies
+ *    the campaign is owned by `ownerId`, that the exact definition is publicly
+ *    pinned, and that `mechanics.stackable === true`, then inserts the row.
  *  - Magic items are catalog metadata/reference only in this build: charges,
  *    granted powers, and passive modifiers are not executed by the persisted
  *    runtime. They are carried as references, never equipped.
@@ -36,8 +31,7 @@
  * and resource overrides (documented "overpowered" overlay), not invented rules.
  */
 
-import path from "node:path";
-import Database from "better-sqlite3";
+import { createHash } from "node:crypto";
 import {
   CHARACTER_BUILDER_STANDARD_ARRAY,
   SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS,
@@ -54,11 +48,9 @@ import {
 import {
   SRD_5_1_STARTER_CATALOG,
   type Repository,
-} from "../server/src/repo/index.js";
-import { createDeterministicE2ERepository } from "../server/src/repo/testing/deterministicE2EFixtureRepo.js";
+} from "../repo/index.js";
+import { getRepositoryDatabase } from "../repo/repoContext.js";
 
-const OWNER = "local-owner";
-const SEED_PREFIX = "sintermark.v1";
 const TARGET_LEVEL = 3;
 const TARGET_XP = 900;
 
@@ -252,6 +244,13 @@ const DEFINITIONS = new Map<string, CatalogDefinition>(
   ]),
 );
 
+/** Keeps composed command keys inside the repository's 128-character limit. */
+function scopedKey(prefix: string, ...parts: string[]): string {
+  const raw = [prefix, ...parts].join(".");
+  if (raw.length <= 128) return raw;
+  return `${prefix.slice(0, 32)}.${createHash("sha256").update(raw).digest("hex")}`;
+}
+
 function requireValue<T>(value: T | null | undefined, message: string): T {
   if (value === null || value === undefined) throw new Error(message);
   return value;
@@ -311,11 +310,11 @@ function selectionForChoice(choice: ProgressionPendingChoice): ProgressionSelect
 }
 
 /** Finds an existing campaign character by persona display name, if the seed is re-run. */
-function findExisting(repository: Repository, campaignId: string, name: string) {
-  const roster = repository.getCampaignCharacterRoster(OWNER, campaignId);
+function findExisting(repository: Repository, ownerId: string, campaignId: string, name: string) {
+  const roster = repository.getCampaignCharacterRoster(ownerId, campaignId);
   const entry = roster?.characters.find((character) => character.name === name);
   if (!entry) return null;
-  const characters = repository.listCampaignCharacters(OWNER, campaignId);
+  const characters = repository.listCampaignCharacters(ownerId, campaignId);
   const found = characters.find((character) => character.projection.campaignCharacter.id === entry.id);
   if (!found) return null;
   return {
@@ -326,7 +325,7 @@ function findExisting(repository: Repository, campaignId: string, name: string) 
   };
 }
 
-function createPersona(repository: Repository, hero: HeroSpec): string {
+function createPersona(repository: Repository, ownerId: string, hero: HeroSpec): string {
   const persona = repository.createCharacter({
     name: hero.name,
     age: hero.age,
@@ -339,45 +338,45 @@ function createPersona(repository: Repository, hero: HeroSpec): string {
 }
 
 /** Advances the character to the SRD starter cap (level 3) through real progression commands. */
-function advanceToTargetLevel(repository: Repository, campaignCharacterId: string, key: string): void {
-  let state = requireValue(repository.getCharacterProgression(OWNER, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
+function advanceToTargetLevel(repository: Repository, ownerId: string, campaignCharacterId: string, keyPrefix: string, key: string): void {
+  let state = requireValue(repository.getCharacterProgression(ownerId, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
   if (state.totalXp < TARGET_XP) {
-    repository.grantCharacterXp(OWNER, campaignCharacterId, {
+    repository.grantCharacterXp(ownerId, campaignCharacterId, {
       amount: TARGET_XP - state.totalXp,
       reason: "Sintermark seed: advance to the supported SRD starter level cap",
       expectedRevision: state.revision,
-      idempotencyKey: `${SEED_PREFIX}.${key}.xp`,
+      idempotencyKey: `${keyPrefix}.${key}.xp`,
     });
   }
   for (let guard = 0; guard < 8; guard += 1) {
-    state = requireValue(repository.getCharacterProgression(OWNER, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
+    state = requireValue(repository.getCharacterProgression(ownerId, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
     if (state.level >= TARGET_LEVEL) return;
-    const preview = requireValue(repository.previewCharacterProgression(OWNER, campaignCharacterId), `Sintermark: ${key} progression preview is unavailable`);
-    repository.applyCharacterProgression(OWNER, campaignCharacterId, {
+    const preview = requireValue(repository.previewCharacterProgression(ownerId, campaignCharacterId), `Sintermark: ${key} progression preview is unavailable`);
+    repository.applyCharacterProgression(ownerId, campaignCharacterId, {
       previewRevision: preview.revision,
       previewToken: preview.token,
       selections: preview.pendingChoices.map(selectionForChoice),
-      idempotencyKey: `${SEED_PREFIX}.${key}.apply.${guard}`,
+      idempotencyKey: `${keyPrefix}.${key}.apply.${guard}`,
     });
   }
-  const finalState = requireValue(repository.getCharacterProgression(OWNER, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
+  const finalState = requireValue(repository.getCharacterProgression(ownerId, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
   if (finalState.level !== TARGET_LEVEL) throw new Error(`Sintermark: ${key} reached level ${finalState.level}, expected ${TARGET_LEVEL}`);
 }
 
 /** Reads the active campaign timeline revision for the GM command envelope seam. */
-function activeTimeline(repository: Repository, campaignId: string): { timelineId: string; revision: number } {
-  const administration = requireValue(repository.getCampaignAdministration(OWNER, campaignId), "Sintermark: campaign administration is unavailable");
+function activeTimeline(repository: Repository, ownerId: string, campaignId: string): { timelineId: string; revision: number } {
+  const administration = requireValue(repository.getCampaignAdministration(ownerId, campaignId), "Sintermark: campaign administration is unavailable");
   const timeline = requireValue(
-    repository.getCampaignTimeline(OWNER, campaignId, administration.activeTimelineId),
+    repository.getCampaignTimeline(ownerId, campaignId, administration.activeTimelineId),
     "Sintermark: active campaign timeline is unavailable",
   );
   return { timelineId: timeline.id, revision: timeline.revision };
 }
 
 /** GM override: set one ability score absolutely, after leveling. */
-function setActorAttribute(repository: Repository, campaignId: string, actorId: string, key: string, attributeId: SrdAttributeId, value: number): void {
-  const timeline = activeTimeline(repository, campaignId);
-  const commandId = `${SEED_PREFIX}.attr.${key}.${attributeId}`;
+function setActorAttribute(repository: Repository, ownerId: string, campaignId: string, actorId: string, keyPrefix: string, key: string, attributeId: SrdAttributeId, value: number): void {
+  const timeline = activeTimeline(repository, ownerId, campaignId);
+  const commandId = `${keyPrefix}.attr.${key}.${attributeId}`;
   const envelope: CommandEnvelope = {
     commandId,
     idempotencyKey: commandId,
@@ -388,13 +387,13 @@ function setActorAttribute(repository: Repository, campaignId: string, actorId: 
     sourceTurnId: null,
     command: { type: "set_actor_attribute", payload: { attributeId, value } },
   };
-  repository.executeSetActorAttribute(OWNER, envelope);
+  repository.executeSetActorAttribute(ownerId, envelope);
 }
 
 /** Creates an actor resource row that does not yet exist (GM initialize seam). */
-function initializeResource(repository: Repository, campaignId: string, actorId: string, key: string, name: string, amount: number): void {
-  const timeline = activeTimeline(repository, campaignId);
-  const commandId = `${SEED_PREFIX}.res.${key}.${name}`;
+function initializeResource(repository: Repository, ownerId: string, campaignId: string, actorId: string, keyPrefix: string, key: string, name: string, amount: number): void {
+  const timeline = activeTimeline(repository, ownerId, campaignId);
+  const commandId = `${keyPrefix}.res.${key}.${name}`;
   const envelope: CommandEnvelope = {
     commandId,
     idempotencyKey: commandId,
@@ -405,20 +404,20 @@ function initializeResource(repository: Repository, campaignId: string, actorId:
     sourceTurnId: null,
     command: { type: "initialize_actor_resource", payload: { name, current: amount, max: amount } },
   };
-  repository.executeInitializeActorResource(OWNER, envelope);
+  repository.executeInitializeActorResource(ownerId, envelope);
 }
 
 /**
  * Raises an existing resource through the public actor-resource mutator
  * (set capacity, then set current), or initializes it when absent.
  */
-function ensureResourceAt(repository: Repository, campaignId: string, actorId: string, key: string, name: string, amount: number): void {
-  const resources = repository.getM15ActorResources(OWNER, campaignId, actorId);
+function ensureResourceAt(repository: Repository, ownerId: string, campaignId: string, actorId: string, keyPrefix: string, key: string, name: string, amount: number): void {
+  const resources = repository.getM15ActorResources(ownerId, campaignId, actorId);
   if (!resources.some((resource) => resource.resourceId === name)) {
-    initializeResource(repository, campaignId, actorId, key, name, amount);
+    initializeResource(repository, ownerId, campaignId, actorId, keyPrefix, key, name, amount);
     return;
   }
-  const before = requireValue(repository.getActorResourceSnapshot(OWNER, campaignId, actorId), "Sintermark: actor resource snapshot is unavailable");
+  const before = requireValue(repository.getActorResourceSnapshot(ownerId, campaignId, actorId), "Sintermark: actor resource snapshot is unavailable");
   const capacityCommand: ActorResourceCommand = {
     type: "set_actor_resource_capacity",
     campaignId,
@@ -426,10 +425,10 @@ function ensureResourceAt(repository: Repository, campaignId: string, actorId: s
     resourceId: name,
     capacity: amount,
     expectedRevision: before.revision,
-    idempotencyKey: `${SEED_PREFIX}.res.${key}.${name}.cap`,
+    idempotencyKey: `${keyPrefix}.res.${key}.${name}.cap`,
   };
-  repository.mutateActorResource(OWNER, capacityCommand);
-  const afterCapacity = requireValue(repository.getActorResourceSnapshot(OWNER, campaignId, actorId), "Sintermark: actor resource snapshot is unavailable");
+  repository.mutateActorResource(ownerId, capacityCommand);
+  const afterCapacity = requireValue(repository.getActorResourceSnapshot(ownerId, campaignId, actorId), "Sintermark: actor resource snapshot is unavailable");
   const currentCommand: ActorResourceCommand = {
     type: "set_actor_resource",
     campaignId,
@@ -437,102 +436,145 @@ function ensureResourceAt(repository: Repository, campaignId: string, actorId: s
     resourceId: name,
     current: amount,
     expectedRevision: afterCapacity.revision,
-    idempotencyKey: `${SEED_PREFIX}.res.${key}.${name}.cur`,
+    idempotencyKey: `${keyPrefix}.res.${key}.${name}.cur`,
   };
-  repository.mutateActorResource(OWNER, currentCommand);
+  repository.mutateActorResource(ownerId, currentCommand);
 }
 
 /**
- * Scoped SQL authoring seam for stackable rows (potions x10, ammunition, etc).
+ * Scoped repository-database authoring seams for inventory rows.
  *
- * The owned fixture `materializeInventoryEntry` only writes instanced quantity-1
- * rows and the owned `materializeConsumableEntry` is a healing-consumable
- * quantity-1 fixture that also mutates health; neither expresses a quantity.
- * This helper is strictly limited to a campaign owned by `local-owner`, an actor
- * in that campaign, and an exact item definition already publicly pinned in the
- * SRD pack with `mechanics.stackable === true`. It opens its own connection and
- * closes it immediately. It does not invent catalog content and does not touch
- * production repository code.
+ * The owned `mutateInventoryForActor` public method does not expose
+ * `add_inventory_item`, so starter grants use the caller's configured repository
+ * database directly. Each transaction checks that the campaign and actor are
+ * owned by `ownerId`, that the exact definition is publicly pinned, and (for
+ * stackable rows) that `mechanics.stackable === true`. No private connection is
+ * opened and no catalog content is invented.
  */
+function withRepositoryDatabase<T>(operation: (db: ReturnType<typeof getRepositoryDatabase>) => T): T {
+  const db = getRepositoryDatabase();
+  return db.transaction(() => operation(db)).immediate();
+}
+
+function requireOwnedActor(
+  db: ReturnType<typeof getRepositoryDatabase>,
+  ownerId: string,
+  campaignId: string,
+  actorId: string,
+  message: string,
+): void {
+  const owned = db.prepare(`SELECT 1 FROM campaigns campaign
+    JOIN campaign_memberships membership ON membership.campaign_id=campaign.id
+      AND membership.principal_id=? AND membership.role='owner'
+    JOIN campaign_actors actor ON actor.campaign_id=campaign.id AND actor.id=?
+    WHERE campaign.id=? AND campaign.owner_principal_id=?`)
+    .get(ownerId, actorId, campaignId, ownerId);
+  if (!owned) throw new Error(message);
+}
+
+/** Pins an exact public item for execution using the campaign's existing pin. */
+function pinItemExecution(
+  db: ReturnType<typeof getRepositoryDatabase>,
+  campaignId: string,
+  item: ItemRef,
+): void {
+  const publicPin = db.prepare(`SELECT 1 FROM campaign_catalog_current_pins pin
+    JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
+    WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='item' AND definition.definition_id=?`)
+    .get(campaignId, item.packId, item.packVersion, item.definitionId);
+  if (!publicPin) throw new Error(`Sintermark: item ${item.definitionId} is not publicly pinned`);
+  const existing = db.prepare(`SELECT 1 FROM rpg_campaign_catalog_definitions_v25
+    WHERE campaign_id=? AND pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`)
+    .get(campaignId, item.packId, item.packVersion, item.definitionId);
+  if (!existing) db.prepare(`INSERT INTO rpg_campaign_catalog_definitions_v25
+    (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?, 'item',?)`)
+    .run(campaignId, item.packId, item.packVersion, item.definitionId);
+}
+
+function materializeInstancedEntry(input: {
+  ownerId: string;
+  campaignId: string;
+  actorId: string;
+  entryId: string;
+  item: ItemRef;
+}): void {
+  withRepositoryDatabase((db) => {
+    requireOwnedActor(db, input.ownerId, input.campaignId, input.actorId, "Sintermark: instanced authoring target is not an owned campaign actor");
+    pinItemExecution(db, input.campaignId, input.item);
+    const existing = db.prepare("SELECT entry_id FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(input.entryId);
+    if (existing) return;
+    db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,
+      item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
+      VALUES(?,?,?,?,?,'item',?,'instanced',1,?,NULL,0,?)`)
+      .run(input.entryId, input.campaignId, input.actorId, input.item.packId, input.item.packVersion,
+        input.item.definitionId, input.entryId, new Date().toISOString());
+  });
+}
+
 function materializeStackableEntry(input: {
-  dataDir: string;
+  ownerId: string;
   campaignId: string;
   actorId: string;
   entryId: string;
   item: ItemRef;
   quantity: number;
 }): void {
-  const db = new Database(path.join(input.dataDir, "velvet.sqlite"));
-  try {
-    db.pragma("foreign_keys = ON");
-    db.pragma("busy_timeout = 5000");
-    db.transaction(() => {
-      const owned = db.prepare(`SELECT 1 FROM campaigns campaign
-        JOIN campaign_memberships membership ON membership.campaign_id=campaign.id
-          AND membership.principal_id=? AND membership.role='owner'
-        JOIN campaign_actors actor ON actor.campaign_id=campaign.id AND actor.id=?
-        WHERE campaign.id=? AND campaign.owner_principal_id=?`)
-        .get(OWNER, input.actorId, input.campaignId, OWNER);
-      if (!owned) throw new Error("Sintermark: stackable authoring target is not an owned campaign actor");
+  withRepositoryDatabase((db) => {
+    requireOwnedActor(db, input.ownerId, input.campaignId, input.actorId, "Sintermark: stackable authoring target is not an owned campaign actor");
+    pinItemExecution(db, input.campaignId, input.item);
 
-      const row = db.prepare(`SELECT definition.definition_json json FROM campaign_catalog_current_pins pin
-        JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
-        WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='item' AND definition.definition_id=?`)
-        .get(input.campaignId, input.item.packId, input.item.packVersion, input.item.definitionId) as { json: string } | undefined;
-      if (!row) throw new Error(`Sintermark: item ${input.item.definitionId} is not publicly pinned`);
-      const definition = itemCatalogDefinitionSchema.parse(JSON.parse(row.json));
-      if (definition.mechanics.stackable !== true) {
-        throw new Error(`Sintermark: item ${input.item.definitionId} is not stackable`);
-      }
+    const row = db.prepare(`SELECT definition.definition_json json FROM campaign_catalog_current_pins pin
+      JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
+      WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='item' AND definition.definition_id=?`)
+      .get(input.campaignId, input.item.packId, input.item.packVersion, input.item.definitionId) as { json: string } | undefined;
+    if (!row) throw new Error(`Sintermark: item ${input.item.definitionId} is not publicly pinned`);
+    const definition = itemCatalogDefinitionSchema.parse(JSON.parse(row.json));
+    if (definition.mechanics.stackable !== true) {
+      throw new Error(`Sintermark: item ${input.item.definitionId} is not stackable`);
+    }
 
-      const executionPin = db.prepare(`SELECT 1 FROM rpg_campaign_catalog_definitions_v25
-        WHERE campaign_id=? AND pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`)
-        .get(input.campaignId, input.item.packId, input.item.packVersion, input.item.definitionId);
-      if (!executionPin) throw new Error(`Sintermark: item ${input.item.definitionId} execution pin is unavailable`);
+    const existing = db.prepare("SELECT entry_id FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(input.entryId);
+    if (existing) return;
 
-      const existing = db.prepare("SELECT entry_id FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(input.entryId);
-      if (existing) return;
-
-      db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,
-        item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
-        VALUES(?,?,?,?,?,'item',?,'stackable',?,NULL,NULL,0,?)`)
-        .run(input.entryId, input.campaignId, input.actorId, input.item.packId, input.item.packVersion,
-          input.item.definitionId, input.quantity, new Date().toISOString());
-    }).immediate();
-  } finally {
-    db.close();
-  }
+    db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,
+      item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
+      VALUES(?,?,?,?,?,'item',?,'stackable',?,NULL,NULL,0,?)`)
+      .run(input.entryId, input.campaignId, input.actorId, input.item.packId, input.item.packVersion,
+        input.item.definitionId, input.quantity, new Date().toISOString());
+  });
 }
 
 /** Equips a real-profile item, unequipping any conflicting starter entry first. */
 function equipItem(
   repository: Repository,
+  ownerId: string,
   campaignId: string,
   actorId: string,
+  keyPrefix: string,
   key: string,
   entryId: string,
   equip: NonNullable<InstancedItemPlan["equip"]>,
 ): void {
-  const snapshot = requireValue(repository.getActorInventorySnapshot(OWNER, campaignId, actorId), "Sintermark: inventory snapshot is unavailable");
+  const snapshot = requireValue(repository.getActorInventorySnapshot(ownerId, campaignId, actorId), "Sintermark: inventory snapshot is unavailable");
   const conflict = snapshot.equipment.find((entry) =>
     entry.slot === equip.slot && (equip.slot !== "hand" || entry.hand === equip.hand) && entry.entryId !== entryId);
   if (conflict) {
-    repository.mutateInventoryForActor(OWNER, campaignId, actorId, {
+    repository.mutateInventoryForActor(ownerId, campaignId, actorId, {
       kind: "unequip",
       slot: conflict.slot,
       expectedRevision: snapshot.revision,
-      idempotencyKey: `${SEED_PREFIX}.${key}.unequip.${conflict.entryId}`,
+      idempotencyKey: scopedKey(keyPrefix, key, "unequip", conflict.entryId),
     });
   }
-  const current = requireValue(repository.getActorInventorySnapshot(OWNER, campaignId, actorId), "Sintermark: inventory snapshot is unavailable");
-  repository.mutateInventoryForActor(OWNER, campaignId, actorId, {
+  const current = requireValue(repository.getActorInventorySnapshot(ownerId, campaignId, actorId), "Sintermark: inventory snapshot is unavailable");
+  repository.mutateInventoryForActor(ownerId, campaignId, actorId, {
     kind: "equip",
     entryId,
     slot: equip.slot,
     ...(equip.hand ? { hand: equip.hand } : {}),
     ...(equip.grip ? { grip: equip.grip } : {}),
     expectedRevision: current.revision,
-    idempotencyKey: `${SEED_PREFIX}.${key}.equip.${entryId}`,
+    idempotencyKey: scopedKey(keyPrefix, key, "equip", entryId),
   });
 }
 
@@ -550,10 +592,10 @@ export const SINTERMARK_PARTY_GUIDE = Object.freeze({
       "The SRD starter progression profile thresholds are [0, 300, 900]; level 3 is the highest level reachable through supported progression commands.",
   },
   controls:
-    "Owner principal local-owner runs the hydrator; both actors are owner-controlled player characters. Gear is granted through the owned fixture seam (instanced) and one scoped SQL seam (stackable). No provider, network, or test call is made by this helper.",
+    "The owner principal runs the builder; both actors are owner-controlled player characters. Gear is granted through scoped repository-database seams (instanced and stackable). No provider, network, or test call is made by this helper.",
   seamNotes: [
     "mutateInventoryForActor supports equip/unequip/consume/drop/gift only; add_inventory_item is not exposed and is not faked here.",
-    "Non-stackable grants use createDeterministicE2ERepository(...).fixtures.materializeInventoryEntry.",
+    "Non-stackable grants use materializeInstancedEntry: owned campaign + public pin checked before insert.",
     "Stackable grants use materializeStackableEntry: owned campaign + public pin + stackable definition checked before insert.",
     "Magic items are carried reference metadata only; charges, granted powers, and passive modifiers do not execute and magic items are never equipped.",
   ],
@@ -582,34 +624,31 @@ export const SINTERMARK_PARTY_GUIDE = Object.freeze({
 /**
  * Creates and returns the two Sintermark heroes on an already-configured
  * `dnd-5e@1.0.0` campaign. Idempotent per persona name and deterministic per
- * command key. No file outside this module is modified.
+ * command key. No file or provider outside this module is touched.
  */
 export async function createSintermarkParty(
   repository: Repository,
+  ownerId: string,
   campaignId: string,
+  keyPrefix: string,
 ): Promise<Array<{ personaId: string; actorId: string; campaignCharacterId: string; name: string }>> {
-  const dataDir = process.env.VELVET_DATA_DIR;
-  if (!dataDir || dataDir.trim() === "") {
-    throw new Error("Sintermark: VELVET_DATA_DIR is required for the deterministic fixture seam");
-  }
-
   const party: Array<{ personaId: string; actorId: string; campaignCharacterId: string; name: string }> = [];
 
   for (const hero of HEROES) {
-    const existing = findExisting(repository, campaignId, hero.name);
+    const existing = findExisting(repository, ownerId, campaignId, hero.name);
     if (existing) {
       party.push(existing);
       continue;
     }
 
-    const personaId = createPersona(repository, hero);
+    const personaId = createPersona(repository, ownerId, hero);
 
-    const draft = repository.createCharacterDraft(OWNER, campaignId, {
+    const draft = repository.createCharacterDraft(ownerId, campaignId, {
       personaId,
-      controllerPrincipalId: OWNER,
+      controllerPrincipalId: ownerId,
       durability: "durable",
       allocation: { method: "standard-array", scores: standardArrayFor(hero.primaryAttribute) },
-      idempotencyKey: `${SEED_PREFIX}.${hero.key}.draft`,
+      idempotencyKey: `${keyPrefix}.${hero.key}.draft`,
     });
     const selections: UpdateCharacterDraftInput["selections"] = {
       race: referenceOf("race", hero.ancestryDefinitionId) as RaceRef,
@@ -618,19 +657,19 @@ export async function createSintermarkParty(
       starterGrant: "kit",
       preparedSpells: hero.preparedSpells.map(spellRefFor),
     };
-    const selected = repository.updateCharacterDraft(OWNER, draft.draft.id, {
+    const selected = repository.updateCharacterDraft(ownerId, draft.draft.id, {
       expectedRevision: draft.draft.revision,
-      idempotencyKey: `${SEED_PREFIX}.${hero.key}.select`,
+      idempotencyKey: `${keyPrefix}.${hero.key}.select`,
       selections,
     });
-    const finalized = repository.finalizeCharacterDraft(OWNER, draft.draft.id, {
+    const finalized = repository.finalizeCharacterDraft(ownerId, draft.draft.id, {
       expectedRevision: selected.draft.revision,
-      idempotencyKey: `${SEED_PREFIX}.${hero.key}.finalize`,
+      idempotencyKey: `${keyPrefix}.${hero.key}.finalize`,
     });
     const campaignCharacterId = finalized.receipt.campaignCharacterId;
     const actorId = finalized.receipt.actorId;
 
-    advanceToTargetLevel(repository, campaignCharacterId, hero.key);
+    advanceToTargetLevel(repository, ownerId, campaignCharacterId, keyPrefix, hero.key);
     party.push({ personaId, actorId, campaignCharacterId, name: hero.name });
   }
 
@@ -639,45 +678,35 @@ export async function createSintermarkParty(
   for (const hero of HEROES) {
     const entry = party.find((candidate) => candidate.name === hero.name)!;
     for (const attributeId of SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS) {
-      setActorAttribute(repository, campaignId, entry.actorId, hero.key, attributeId, hero.targetScores[attributeId]);
+      setActorAttribute(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, attributeId, hero.targetScores[attributeId]);
     }
-    ensureResourceAt(repository, campaignId, entry.actorId, hero.key, "health", 1000);
-    ensureResourceAt(repository, campaignId, entry.actorId, hero.key, "focus", 100);
-    ensureResourceAt(repository, campaignId, entry.actorId, hero.key, "slot-1", 100);
-    ensureResourceAt(repository, campaignId, entry.actorId, hero.key, "slot-2", 100);
+    ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "health", 1000);
+    ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "focus", 100);
+    ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "slot-1", 100);
+    ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "slot-2", 100);
   }
 
-  // Inventory authoring through the owned fixture composition. It shares the
-  // same velvet.sqlite as the caller's repository and is closed when finished.
-  const fixture = createDeterministicE2ERepository({ dataDir });
-  try {
-    for (const hero of HEROES) {
-      const entry = party.find((candidate) => candidate.name === hero.name)!;
-      const expectedRevision = repository.getActorResourceSnapshot(OWNER, campaignId, entry.actorId)?.revision ?? 0;
+  // Inventory authoring through scoped repository-database transactions.
+  for (const hero of HEROES) {
+    const entry = party.find((candidate) => candidate.name === hero.name)!;
 
-      for (const item of hero.instancedItems) {
-        const definition = itemDefinitionOf(item.definitionId);
-        const entryId = `${SEED_PREFIX}.${hero.key}.item.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
-        fixture.fixtures.materializeInventoryEntry({
-          principalId: OWNER,
-          campaignId,
-          actorId: entry.actorId,
-          expectedRevision,
-          entryId,
-          item: definition.reference as ItemRef,
-        });
-      }
-
-      for (const item of hero.stackableItems) {
-        const reference = itemRefFor(item.definitionId);
-        const entryId = `${SEED_PREFIX}.${hero.key}.stack.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
-        // Pin through the owned fixture helper, then author the quantity row.
-        fixture.fixtures.materializePinnedItemExecution({ principalId: OWNER, campaignId, item: reference });
-        materializeStackableEntry({ dataDir, campaignId, actorId: entry.actorId, entryId, item: reference, quantity: item.quantity });
-      }
+    for (const item of hero.instancedItems) {
+      const definition = itemDefinitionOf(item.definitionId);
+      const entryId = `${keyPrefix}.${hero.key}.item.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
+      materializeInstancedEntry({
+        ownerId,
+        campaignId,
+        actorId: entry.actorId,
+        entryId,
+        item: definition.reference as ItemRef,
+      });
     }
-  } finally {
-    fixture.repository.close();
+
+    for (const item of hero.stackableItems) {
+      const reference = itemRefFor(item.definitionId);
+      const entryId = `${keyPrefix}.${hero.key}.stack.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
+      materializeStackableEntry({ ownerId, campaignId, actorId: entry.actorId, entryId, item: reference, quantity: item.quantity });
+    }
   }
 
   // Equip only real-profile equipment through the public inventory command.
@@ -689,8 +718,8 @@ export async function createSintermarkParty(
       if (!definition.mechanics.engineDetails?.equipmentProfile) {
         throw new Error(`Sintermark: ${item.definitionId} has no SRD equipment profile and cannot be equipped`);
       }
-      const entryId = `${SEED_PREFIX}.${hero.key}.item.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
-      equipItem(repository, campaignId, entry.actorId, hero.key, entryId, item.equip);
+      const entryId = `${keyPrefix}.${hero.key}.item.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
+      equipItem(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, entryId, item.equip);
     }
   }
 
