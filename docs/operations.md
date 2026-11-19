@@ -157,8 +157,8 @@ database missing **more than one** generation (for example, both an older
 receipt-action gate and a later status widening) therefore upgrades in bounded
 passes instead of failing the current-schema gate. A genuinely unknown, modified,
 or partially upgraded inventory still matches no plan and is rejected with no
-partial upgrade, so long-lived development stores remain disposable per the rule
-above.
+partial upgrade, so such a store is refused at startup and must be exported with
+`npm run db:export` per the rule above.
 
 ## Build and start
 

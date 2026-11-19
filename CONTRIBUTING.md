@@ -44,7 +44,7 @@ It uses a temporary backup with the configured provider and may incur cost. Do n
 ## Contracts, Routes, And Persistence
 
 - Prefer additive shared contracts. Do not silently weaken strict schemas or overwrite historical data.
-- Keep `currentSchema.sql`, fresh-database creation, exact-schema checks, and repository queries aligned. Development databases are disposable after schema changes.
+- Keep `currentSchema.sql`, fresh-database creation, exact-schema checks, and repository queries aligned. Development databases are kept across schema changes: append a numbered migration as described in [Database schema migrations](docs/migrations.md).
 - Route changes require matching contracts, feature-dependency checks, safe problem responses, authorization/projection tests, client handling where applicable, and updates to `docs/api.md`.
 - Retry-sensitive mutations must preserve revisions, idempotency, atomic writes, immutable events/receipts, and authoritative reconciliation after ambiguous delivery.
 - Never add arbitrary filesystem paths, SQL, network access, permission changes, or hidden-state exposure to RPG/provider tool surfaces.
