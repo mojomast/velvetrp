@@ -18,6 +18,12 @@ jobs:
       - name: Build
         if: ${{ !cancelled() }}
         run: npm run build
+      - name: Smoke production server
+        if: ${{ !cancelled() }}
+        run: npm --workspace velvet-mvp-server run build && npm --workspace velvet-mvp-server run smoke:dist
+      - name: Test build scripts
+        if: ${{ !cancelled() }}
+        run: node --test scripts/test/run-all-tests.test.mjs server/scripts/test/build-assets.test.mjs
       - name: Test contracts
         if: ${{ !cancelled() }}
         run: npm run test --workspace @velvet/contracts
