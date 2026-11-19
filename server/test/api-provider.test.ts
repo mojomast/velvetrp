@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { useTmpDataDir } from "./helpers.js";
 
@@ -8,6 +8,12 @@ for (const name of ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENROUTER_BASE_URL
   delete process.env[name];
 }
 useTmpDataDir();
+const ORIGINAL_PROVIDER_KEY_STORAGE = process.env.VELVET_PROVIDER_KEY_STORAGE;
+beforeAll(() => { process.env.VELVET_PROVIDER_KEY_STORAGE = "database"; });
+afterAll(() => {
+  if (ORIGINAL_PROVIDER_KEY_STORAGE === undefined) delete process.env.VELVET_PROVIDER_KEY_STORAGE;
+  else process.env.VELVET_PROVIDER_KEY_STORAGE = ORIGINAL_PROVIDER_KEY_STORAGE;
+});
 
 const rawJson = (payload: string) => ({
   headers: { "content-type": "application/json" },
@@ -53,7 +59,7 @@ describe("provider api compatibility", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["x-request-id"]).toBe("provider-characterization");
     expect(Object.keys(body)).toEqual([
-      "id", "providerType", "baseUrl", "model", "hasApiKey", "streaming", "httpReferer", "appTitle",
+      "id", "providerType", "baseUrl", "model", "hasApiKey", "apiKeySource", "apiKeyWarning", "streaming", "httpReferer", "appTitle",
       "requireParameters", "allowFallbacks", "routingSort", "dataCollection", "zdr", "requestTimeoutSeconds",
       "pricing", "adventureTurnBudget", "samplers", "updatedAt",
     ]);

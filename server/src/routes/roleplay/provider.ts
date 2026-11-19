@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import { PROVIDER_KEY_STORAGE_DISABLED_MESSAGE, isProviderKeyStorageEnabled } from "../../defaults.js";
 import { validateProviderBaseUrl } from "../../llm.js";
 import { checkUserMessage, sanitizeInjectionText } from "../../policy.js";
 import { getPublicProviderSettings, updateProviderSettings } from "../../repo/index.js";
@@ -46,6 +47,14 @@ export const roleplayProviderRoutes: FastifyPluginAsync = async (app) => {
     if (typeof body.httpReferer === "string" && body.httpReferer.trim() !== "") {
       const validation = validateProviderBaseUrl(body.httpReferer);
       if (!validation.ok) return reply.code(400).send({ error: "invalid httpReferer", reason: validation.reason });
+    }
+    if (typeof body.apiKey === "string" && body.apiKey.trim() !== "" && !isProviderKeyStorageEnabled()) {
+      await getPublicProviderSettings();
+      return reply.code(400).send({
+        error: "provider key storage is disabled",
+        code: "PROVIDER_KEY_STORAGE_DISABLED",
+        message: PROVIDER_KEY_STORAGE_DISABLED_MESSAGE,
+      });
     }
     const sanitized: Partial<UpdateProviderInput> = { ...body };
     if (typeof body.samplers?.startReplyWith === "string" && body.samplers.startReplyWith.trim() !== "") {

@@ -316,12 +316,16 @@ export interface ProviderSettings {
   updatedAt: string;
 }
 
+export type ProviderApiKeySource = "environment" | "database" | "none";
+
 export interface PublicProviderSettings {
   id: "provider";
   providerType: ProviderType;
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
+  apiKeySource: ProviderApiKeySource;
+  apiKeyWarning: string;
   streaming: boolean;
   httpReferer: string;
   appTitle: string;
