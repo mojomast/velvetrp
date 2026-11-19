@@ -81,13 +81,15 @@ describe("tactical map generation", () => {
       }
       if (invalid === "vocabulary") db.prepare("DELETE FROM rpg_effect_modifier_vocabulary_v26 WHERE modifier_kind='flat'").run();
       db.pragma("foreign_keys = ON");
-      db.pragma("user_version = 58");
+      // Exact legacy stores predate schema versioning, so they are unstamped (user_version 0). A nonzero
+      // stamp now means a versioned store, and one newer than this build is refused before validation.
+      expect(db.pragma("user_version", { simple: true })).toBe(0);
       const before = db.serialize();
       const schema = db.prepare("SELECT * FROM sqlite_master ORDER BY type,name").all();
       expect(db.prepare("PRAGMA foreign_key_check").get()).toBeUndefined();
       expect(() => ensureCurrentSchema(db, "isolated-invalid-legacy")).toThrow(invalid === "vocabulary" ? /required effect modifier vocabulary is invalid/ : /required local ownership data is missing/);
       expect(db.prepare("SELECT * FROM sqlite_master ORDER BY type,name").all()).toEqual(schema);
-      expect(db.pragma("user_version", { simple: true })).toBe(58);
+      expect(db.pragma("user_version", { simple: true })).toBe(0);
       expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
       expect(db.inTransaction).toBe(false);
       expect(db.serialize().equals(before)).toBe(true);

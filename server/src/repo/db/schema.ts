@@ -4,6 +4,9 @@ import path from "node:path";
 import { upgradeTacticalMapSchema } from "../../map/schemaUpgrade.js";
 import { upgradeCampaignDmSchema } from "./campaignDmUpgrade.js";
 import { upgradeFactionRelationsSchema } from "./factionRelationUpgrade.js";
+import {
+  BASELINE_SCHEMA_VERSION, MIGRATIONS, SCHEMA_VERSION, applyMigrations,
+} from "./migrations/index.js";
 
 /**
  * The exact turn-economy update guard published before Dash could extend the
@@ -795,7 +798,13 @@ function assertIntermediateDatabase(db: DatabaseDriver.Database): void {
   if (foreignKeyIssue) throw new Error(`foreign-key violation in ${foreignKeyIssue.table}`);
 }
 
-export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
+/**
+ * Brings a pre-versioning (or unstamped) database onto the baseline schema using
+ * only the exact-predecessor recognizers. Behaviour is unchanged from the
+ * original `ensureCurrentSchema` body; version stamping and migrations are
+ * handled by the caller.
+ */
+function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
       db.transaction(() => {
@@ -933,6 +942,40 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
         probe.close();
       }
     }
+  } catch (error) {
+    if (error instanceof CurrentSchemaError) throw error;
+    const reason = error instanceof Error ? error.message : "SQLite validation failed";
+    throw schemaError(databasePath, reason);
+  }
+}
+
+/**
+ * Ensures the database is at the current schema version.
+ *
+ * The stamped `PRAGMA user_version` is authoritative: a database newer than this
+ * build is refused before anything changes, a fresh database is created at
+ * `SCHEMA_VERSION`, and a pre-versioning database is upgraded through the exact
+ * recognizers onto the baseline and then stamped. Registered migrations run
+ * afterwards, each in its own backed-up transaction.
+ */
+export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
+  try {
+    const version = db.pragma("user_version", { simple: true }) as number;
+    if (version > SCHEMA_VERSION) {
+      throw schemaError(databasePath, `database schema version ${version} is newer than this Velvet supports (${SCHEMA_VERSION})`);
+    }
+    if (schemaObjects(db).length === 0) {
+      db.transaction(() => {
+        db.exec(currentSchemaSql);
+        db.pragma(`user_version = ${SCHEMA_VERSION}`);
+        assertCurrentDatabase(db, databasePath);
+      })();
+    } else if (version <= BASELINE_SCHEMA_VERSION) {
+      ensureLegacySchema(db, databasePath);
+      if (version === 0) db.pragma(`user_version = ${BASELINE_SCHEMA_VERSION}`);
+    }
+    applyMigrations(db, MIGRATIONS, { databasePath });
+    assertCurrentDatabase(db, databasePath);
   } catch (error) {
     if (error instanceof CurrentSchemaError) throw error;
     const reason = error instanceof Error ? error.message : "SQLite validation failed";

@@ -29,9 +29,15 @@ export function PromptSettings({ provider, harness, features, onProviderChange, 
   async function saveProvider() { if (!provider) return; try { const value = await updateProvider({ providerType: provider.providerType, baseUrl: provider.baseUrl, model: provider.model, streaming: provider.streaming, httpReferer: provider.httpReferer, appTitle: provider.appTitle, requireParameters: provider.requireParameters, allowFallbacks: provider.allowFallbacks, routingSort: provider.routingSort, dataCollection: provider.dataCollection, zdr: provider.zdr, requestTimeoutSeconds: provider.requestTimeoutSeconds, pricing: provider.pricing, adventureTurnBudget: provider.adventureTurnBudget, samplers: provider.samplers }); onProviderChange(value); setStatus("Provider settings saved."); setPreflightStatus(""); } catch { setStatus("Could not save provider settings."); } }
   async function preflightProvider() { setPreflighting(true); setPreflightStatus("Checking provider capabilities..."); try { const result = await preflightProviderCapabilities(); const details = result.capabilities.map((item) => `${item.capability === "strict-function-tools" ? "function-tools" : item.capability}: ${item.status}${item.failure ? ` (${item.failure.permanence} ${item.failure.code})` : ""}`).join("; "); setPreflightStatus(`DM play function tools: ${result.dmPlayCompatible ? "compatible" : "not compatible"}; campaign generation strict JSON: ${result.campaignGenerationCompatible ? "compatible" : "not compatible"}. ${details}.`); } catch { setPreflightStatus("Capability preflight could not be completed."); } finally { setPreflighting(false); } }
   const numeric = (value: number | null) => value ?? "";
+  const keySource = provider?.apiKeySource;
+  const keyStatus = keySource === "environment" ? "from environment"
+    : keySource === "database" ? "stored in database"
+    : keySource === "none" ? "not configured"
+    : provider?.hasApiKey ? "configured" : "not configured";
   return <section className="prompt-settings">
     <header className="settings-header"><div><p className="eyebrow">CONTROL SURFACE</p><h2>Prompt & settings</h2></div><div className="button-row"><span className="status-pill active">live</span><button className="ghost small" onClick={onClose}>Close</button></div></header>
-    <p className="notice">Changes apply to the next generation. Key: {provider?.hasApiKey ? "configured" : "not configured"}. Voice: {features.voice ? "on" : "off"} · Images: {features.images ? "on" : "off"}.</p>
+    <p className="notice">Changes apply to the next generation. Key: {keyStatus}. Voice: {features.voice ? "on" : "off"} · Images: {features.images ? "on" : "off"}.</p>
+    {provider?.apiKeyWarning ? <p className="notice error">{provider.apiKeyWarning}</p> : null}
     {status && <p className={/saved|reset/.test(status) ? "success" : "error"}>{status}</p>}
     <details open className="settings-group"><summary>Prompt studio <span>{templates.length} layers</span></summary><div className="prompt-studio">
       <label className="field"><span>Underlying prompt layer</span><select aria-label="Underlying prompt layer" value={selectedId} onChange={(event) => choose(event.target.value)}>{templates.map((template) => <option value={template.id} key={template.id}>{template.label}{template.overridden ? " · modified" : ""}</option>)}</select></label>

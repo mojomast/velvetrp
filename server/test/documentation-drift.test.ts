@@ -403,15 +403,15 @@ function documentedEnvironment(): Map<string, string> {
 }
 
 describe("documentation drift guards", () => {
-  it("keeps designated disposable-schema and operation claims aligned", () => {
+  it("keeps designated schema-persistence and operation claims aligned", () => {
     const schemaClaims: Array<[string, string]> = [
       ["README.md", "Development databases are kept, not deleted, when the schema changes"],
-      ["docs/api.md", "Development databases use one current schema and are disposable"],
+      ["docs/api.md", "Development databases use one current schema and are kept, not deleted, when the schema changes"],
       ["docs/operations.md", "Development databases are kept, not deleted, when the schema changes"],
-      ["docs/repo-architecture.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
-      ["docs/ROADMAP.md", "Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
-      ["devplan.md", "Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
-      ["handoff.md", "Persistence: one current disposable development schema"],
+      ["docs/repo-architecture.md", "Development databases are kept, not deleted, when the schema changes: numbered forward-only [migrations](migrations.md) advance stamped stores"],
+      ["docs/ROADMAP.md", "Development persistence uses one current versioned schema with numbered forward-only migrations, the exact pre-grounding tactical-map upgrade to map v2"],
+      ["devplan.md", "Development persistence uses one current versioned schema with numbered forward-only migrations, the exact pre-grounding tactical-map upgrade to map v2"],
+      ["handoff.md", "Persistence: one current versioned development schema with numbered forward-only migrations"],
       ["docs/roleplay-architecture-2026.md", "one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
       ["docs/rpg-integration-plan.md", "one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
       ["docs/operations.md", "Startup recognizes that predecessor only when every schema object exactly matches the current schema minus the map-v2 changes"],

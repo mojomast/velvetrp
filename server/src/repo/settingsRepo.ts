@@ -12,6 +12,7 @@ import {
   isSystemOneAdventurePayloadVariant,
   isSystemOneLaneMode,
   now,
+  providerEnvironmentApiKey,
   toPublicProvider,
   toPublicSystemOne,
 } from "../defaults.js";
@@ -82,22 +83,31 @@ export async function updateHarnessSettings(patch: UpdateHarnessInput): Promise<
   return updateHarnessSettingsSync(getRepositoryDatabase(), systemRuntime.clock, patch);
 }
 
-function readProvider(db: DatabaseDriver.Database): ProviderSettings {
+/** The provider profile exactly as persisted, with no environment key applied. */
+function readStoredProvider(db: DatabaseDriver.Database): ProviderSettings {
+  const defaults = defaultProviderSettings();
   const row = db.prepare("SELECT payload FROM provider WHERE id = 'provider'").get() as { payload: string } | undefined;
-  if (!row) return defaultProviderSettings();
+  if (!row) return { ...defaults, apiKey: "" };
   try {
     const parsed = JSON.parse(row.payload) as Partial<ProviderSettings>;
     return {
-      ...defaultProviderSettings(),
+      ...defaults,
       ...parsed,
       id: "provider",
-      pricing: { ...defaultProviderSettings().pricing, ...(parsed.pricing ?? {}) },
-      adventureTurnBudget: { ...defaultProviderSettings().adventureTurnBudget, ...(parsed.adventureTurnBudget ?? {}) },
+      apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+      pricing: { ...defaults.pricing, ...(parsed.pricing ?? {}) },
+      adventureTurnBudget: { ...defaults.adventureTurnBudget, ...(parsed.adventureTurnBudget ?? {}) },
       samplers: { ...DEFAULT_SAMPLERS, ...(parsed.samplers ?? {}) },
     };
   } catch {
-    return defaultProviderSettings();
+    return { ...defaults, apiKey: "" };
   }
+}
+
+function readProvider(db: DatabaseDriver.Database): ProviderSettings {
+  const stored = readStoredProvider(db);
+  const environmentKey = providerEnvironmentApiKey();
+  return environmentKey === "" ? stored : { ...stored, apiKey: environmentKey };
 }
 
 export async function getProviderSettings(): Promise<ProviderSettings> {
@@ -110,7 +120,7 @@ export async function getPublicProviderSettings(): Promise<PublicProviderSetting
 
 export async function updateProviderSettings(patch: UpdateProviderInput): Promise<PublicProviderSettings> {
   const db = getRepositoryDatabase();
-  const current = readProvider(db);
+  const current = readStoredProvider(db);
   const next: ProviderSettings = {
     ...current,
     pricing: { ...current.pricing, ...(patch.pricing ?? {}) },
@@ -172,7 +182,8 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
   db.prepare(
     "INSERT INTO provider (id, payload) VALUES ('provider', ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload",
   ).run(JSON.stringify(next));
-  return toPublicProvider(next);
+  const environmentKey = providerEnvironmentApiKey();
+  return toPublicProvider(environmentKey === "" ? next : { ...next, apiKey: environmentKey });
 }
 
 /**
