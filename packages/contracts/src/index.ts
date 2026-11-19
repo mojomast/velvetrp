@@ -436,3 +436,8 @@ export type {
   SetActorAttributeCommand,
   SetActorAttributePayload,
 } from "./rpg-commands.js";
+export {
+  quickAdventureCreateRequestSchema,
+  quickAdventureCreateResponseSchema,
+} from "./quick-adventures.js";
+export type { QuickAdventureCreateRequest, QuickAdventureCreateResponse } from "./quick-adventures.js";

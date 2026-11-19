@@ -1,8 +1,9 @@
 # The Sintermark · A Commons of Fire
 
 An original, provider-free D&D 5.1 sandbox for two exceptionally powerful heroes.
-The reviewed world is in `scripts/recipes/sintermark-world.json`; the operator
-entry point is `scripts/hydrate-sintermark-campaign.ts`.
+The reviewed world is in `server/src/quickstart/recipes/sintermark-world.json`;
+the provider-free builder lives in `server/src/quickstart`, and the operator entry
+point is `scripts/hydrate-sintermark-campaign.ts`.
 
 ## A world worth interfering with
 
@@ -53,7 +54,7 @@ acquire executable charges or passive bonuses merely by being in inventory.
 
 ## Begin playing
 
-Live table: [Open The Sintermark](http://100.72.41.9:18895/#/campaign/9dd02c23-94cc-4e5b-9767-6ee3a887edb5/play/5fa030f1-052e-490e-a82b-c68e5da2bdb6).
+Live table: [Open The Sintermark](http://localhost:18895/#/campaign/9dd02c23-94cc-4e5b-9767-6ee3a887edb5/play/5fa030f1-052e-490e-a82b-c68e5da2bdb6).
 
 The verified world contains 26 public locations, 64 directed routes (60 open
 and four closed; one open shortcut is reputation-gated), six factions,
@@ -78,6 +79,15 @@ events are durable story interruptions; they do not by themselves apply damage,
 grant treasure, or start tactical combat. The route cost is the engine's
 abstract 60 minutes per edge.
 
+## Quick adventure
+
+The in-app **Quick adventure** action (`createQuickAdventure` in
+`server/src/quickstart/quickAdventure.ts`) builds this same reviewed world into
+the user's real database as a new campaign. It never reuses an existing campaign,
+never contacts a model provider, and can run any number of times. Every generated
+key is scoped to the new campaign; if a build step fails, the partial campaign is
+archived before the step-named error is returned.
+
 ## Populate and inspect
 
 ```bash
@@ -91,10 +101,11 @@ reviewed static content, repository commands and zero LLM generation calls.
 The report in the target directory records the created campaign, room and actor
 IDs without provider credentials.
 
-The catalog is installed before generation and character creation. World content
+The builder and its recipe are server modules. The catalog is installed before
+generation and character creation. World content
 is accepted in bounded waves; public materials are explicitly published. Wallet
-funding and route-event metadata use narrowly scoped isolated-store authoring
-seams where normal authoring commands are absent.
+funding and route-event metadata use narrowly scoped repository-database
+authoring seams where normal authoring commands are absent.
 
 ### Verification (2026-10-03)
 

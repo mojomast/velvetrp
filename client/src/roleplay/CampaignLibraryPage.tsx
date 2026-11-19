@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { createCampaign, getCampaignAdministration, listCampaigns, type CampaignAccess } from "../api";
+import { createCampaign, createQuickAdventure, getCampaignAdministration, listCampaigns, type CampaignAccess } from "../api";
 import type { CampaignLifecycleStatus } from "@velvet/contracts";
 import { WorldbuildingAgentPanel } from "../components/rpg/campaign/WorldbuildingAgentPanel";
 import "./campaign-library.css";
@@ -26,6 +26,10 @@ export function CampaignLibraryPage({ onBack, onOpen, onContentPacks, focusConte
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState("recent");
   const [generatorOpened, setGeneratorOpened] = useState(false);
+  const [quickBuilding, setQuickBuilding] = useState(false);
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const quickBuildingRef = useRef(false);
+  const quickKeyRef = useRef<string | null>(null);
   const generatorHeadingRef = useRef<HTMLHeadingElement>(null);
   const [statuses, setStatuses] = useState<Record<string, CampaignLifecycleStatus | "unavailable">>({});
   const [focusCampaignId, setFocusCampaignId] = useState<string | null>(null);
@@ -132,6 +136,29 @@ export function CampaignLibraryPage({ onBack, onOpen, onContentPacks, focusConte
     }
   }
 
+  async function startQuickAdventure() {
+    if (quickBuildingRef.current) return;
+    quickBuildingRef.current = true;
+    setQuickBuilding(true);
+    setQuickError(null);
+    const idempotencyKey = quickKeyRef.current ?? `quick-${crypto.randomUUID()}`;
+    quickKeyRef.current = idempotencyKey;
+    try {
+      const result = await createQuickAdventure({ idempotencyKey });
+      quickKeyRef.current = null;
+      if (!mountedRef.current) return;
+      setQuickError(null);
+      if (onOpen) onOpen(result.campaignId, "play");
+      else void load();
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setQuickError(error instanceof Error ? error.message : String(error));
+    } finally {
+      quickBuildingRef.current = false;
+      if (mountedRef.current) setQuickBuilding(false);
+    }
+  }
+
   const visibleCampaigns = campaigns.filter((campaign) => campaign.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
     && (role === "all" || campaign.actorRole === role)
     && (status === "all" || statuses[campaign.id] === status))
@@ -143,6 +170,12 @@ export function CampaignLibraryPage({ onBack, onOpen, onContentPacks, focusConte
     <section className="world-library-start" aria-labelledby="world-library-start-heading">
       <div><h2 id="world-library-start-heading">From an idea to a world</h2><p>Describe your setting to generate a world, cast, and adventure material. Review and edit them before you play.</p></div>
       <button className="primary" aria-expanded={generatorOpened} aria-controls="library-world-generator" onClick={() => { setGeneratorOpened(true); queueMicrotask(() => generatorHeadingRef.current?.focus()); }}>Generate world</button>
+      <div>
+        <p className="meta-text">Or jump straight in with a ready-made starter world, built in seconds.</p>
+        <button className="ghost" aria-label="Start a quick adventure" disabled={quickBuilding} onClick={() => void startQuickAdventure()}>{quickBuilding ? "Building your adventure…" : "Start a quick adventure"}</button>
+        {quickBuilding && <p className="meta-text" role="status">Building your adventure…</p>}
+        {quickError !== null && <p className="form-error" role="alert">The quick adventure could not be started: {quickError}</p>}
+      </div>
     </section>
     {generatorOpened && <section id="library-world-generator" className="world-library-generator" aria-labelledby="library-generator-heading">
       <h2 id="library-generator-heading" ref={generatorHeadingRef} tabIndex={-1}>Generate a new world</h2>
