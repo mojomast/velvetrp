@@ -98,7 +98,7 @@ describe("schema", () => {
     raw.close();
 
     expect(() => createRepository({ dataDir: dir })).toThrow(
-      /does not match the current development schema.*Delete the local database and restart Velvet/s,
+      /does not match the current development schema.*Velvet did not modify it.*db:export/s,
     );
     const unchanged = new DatabaseDriver(databasePath, { readonly: true });
     expect(unchanged.prepare("SELECT * FROM old_schema").all()).toEqual([{ id: "kept" }]);
@@ -112,7 +112,7 @@ describe("schema", () => {
     let raw = new DatabaseDriver(databasePath);
     raw.exec("DROP TRIGGER campaigns_prevent_physical_delete_v22");
     raw.close();
-    expect(() => createRepository({ dataDir: dir })).toThrow(/missing trigger campaigns_prevent_physical_delete_v22.*Delete the local database/s);
+    expect(() => createRepository({ dataDir: dir })).toThrow(/missing trigger campaigns_prevent_physical_delete_v22.*Velvet did not modify it.*db:export/s);
 
     const cleanDir = makeTmpDataDir();
     const cleanPath = path.join(cleanDir, "velvet.sqlite");
@@ -122,7 +122,7 @@ describe("schema", () => {
     raw.prepare(`INSERT INTO sessions
       (id,character_id,title,state,preset_id,created_at) VALUES('orphan','missing','', 'setup','default','2030-01-01T00:00:00.000Z')`).run();
     raw.close();
-    expect(() => createRepository({ dataDir: cleanDir })).toThrow(/foreign-key violation in sessions.*Delete the local database/s);
+    expect(() => createRepository({ dataDir: cleanDir })).toThrow(/foreign-key violation in sessions.*Velvet did not modify it.*db:export/s);
   });
 
   it("keeps drift rejection strict while the corruption fixture seam permits domain assertions", () => {
