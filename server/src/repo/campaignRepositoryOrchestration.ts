@@ -910,6 +910,9 @@ function createRepositoryComposition<T>(
       ? adventureInventoryRepository.getAdventureInventoryNarrationReceipt(principal, turn, command)
       : kind === "commerce-receipt" ? adventureCommerceRepository.getAdventureCommerceNarrationReceipt(principal, turn, command)
       : kind === "travel-receipt" ? exactCandidateProviderBridge.getExactCandidateTravelNarrationReceipt(principal, turn, command)
+        ?? ((journey) => journey ? { kind: "journey", destination: journey.destination, currentLocation: journey.currentLocation,
+          status: journey.status, interruption: journey.interruption ? journey.interruption.event.summary : null,
+          legs: journey.path.length, elapsedMinutes: journey.elapsedMinutes } : null)(worldRepository.getActorJourneyNarrationReceipt(principal, turn, command))
       : kind === "quest-receipt" ? questRepository.getAdventureQuestNarrationReceipt(principal, turn, command)
       : kind === "combat-receipt" ? adventureTurnRepository.getAgentCombatReceipt(principal,
         adventureTurnRepository.getAdventureTurn(principal, turn)!.campaignId, command)?.resolution ?? null
