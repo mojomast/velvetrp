@@ -666,8 +666,10 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       ? repo.getAdventureTurn(OWNER, turn.priorTurnId) : null;
     const originalConversation = turn.mode === "original" && safeReceipts.length === 0
       && turn.toolCalls.length === 0 && declarationAllowsConversationNarration(turn.declaration, presentNpcNames);
-    const conversation = originalConversation || conversationNarrationEligible(turn,
-      priorProjection && "declaration" in priorProjection ? priorProjection : null);
+    // A derivative carries the root's declaration, so it must pass the same declaration gate as the original lane.
+    const conversation = originalConversation || (conversationNarrationEligible(turn,
+      priorProjection && "declaration" in priorProjection ? priorProjection : null)
+      && declarationAllowsConversationNarration(turn.declaration, presentNpcNames));
     const completionLimit = effectiveAdventureTurnMaxTokens(provider);
     const completionInput: ProviderCompletionInput = { provider: { ...provider, samplers: { ...provider.samplers, maxTokens: completionLimit } },
       harness, preset: getPromptPreset("default"), tools: [{ name: NARRATION_TOOL_NAME,
