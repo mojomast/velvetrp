@@ -9,12 +9,13 @@ interface Props {
   provider: ProviderSettings | null;
   harness: HarnessSettings | null;
   features: FeatureFlags;
+  systemOneAvailable?: boolean;
   onProviderChange: (value: ProviderSettings) => void;
   onHarnessChange: (value: HarnessSettings) => void;
   onClose: () => void;
 }
 
-export function PromptSettings({ provider, harness, features, onProviderChange, onHarnessChange, onClose }: Props) {
+export function PromptSettings({ provider, harness, features, systemOneAvailable = false, onProviderChange, onHarnessChange, onClose }: Props) {
   const [templates, setTemplates] = useState<PromptTemplateDefinition[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState("");
@@ -77,6 +78,6 @@ export function PromptSettings({ provider, harness, features, onProviderChange, 
       <button className="ghost full" disabled={preflighting} onClick={() => void preflightProvider()}>{preflighting ? "Checking capabilities..." : "Test provider capabilities"}</button>
       {preflightStatus && <p className="meta-text full" role="status">{preflightStatus}</p>}
     </div></details>}
-    <SystemOneSettings />
+    {systemOneAvailable && <SystemOneSettings />}
   </section>;
 }
