@@ -16,6 +16,7 @@
     "test:serial": "vitest run --no-file-parallelism"
   },
   "dependencies": {
+    "@fastify/static": "^10.1.11",
     "@velvet/contracts": "0.1.0",
     "better-sqlite3": "^13.0.2",
     "fastify": "^5.2.0"

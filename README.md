@@ -82,12 +82,9 @@ The example already supplies OpenRouter's base URL and a model. Add your `OPENRO
 
 ### 3. Start Velvet
 
-Velvet does **not** load `.env` automatically. In Bash or a compatible shell:
+Velvet loads `.env` itself (from `VELVET_ENV_FILE` when set, otherwise the working directory or the repository root); values already exported in your shell win.
 
 ```bash
-set -a
-source .env
-set +a
 npm run dev
 ```
 
@@ -309,7 +306,13 @@ Deterministic E2E uses disposable SQLite and a fake provider, including real gen
 VELVET_E2E_LIVE=1 npm run test:e2e:live -- --workers=1
 ```
 
-After `npm run build`, `npm --workspace velvet-mvp-server start` runs the compiled API server. The client build is in `client/dist`; see [Operations](docs/operations.md) for environment and deployment guidance.
+After `npm run build`, the compiled server serves both the API and the built client (from `client/dist`, overridable with `VELVET_CLIENT_DIST`) at `http://127.0.0.1:8787`. For a production run from the repository root:
+
+```bash
+npm ci && npm run build && npm --workspace velvet-mvp-server start
+```
+
+See [Operations](docs/operations.md) for environment and deployment guidance.
 
 Contributions should preserve strict contracts, authoritative mechanics, and exact recovery. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [engineering handoff](handoff.md).
 
