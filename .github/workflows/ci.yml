@@ -15,6 +15,24 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run typecheck
-      - run: npm run build
-      - run: npm run test
-      - run: npm run test:e2e
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: npm run build
+      - name: Smoke production server
+        if: ${{ !cancelled() }}
+        run: npm --workspace velvet-mvp-server run build && npm --workspace velvet-mvp-server run smoke:dist
+      - name: Test build scripts
+        if: ${{ !cancelled() }}
+        run: node --test scripts/test/run-all-tests.test.mjs server/scripts/test/build-assets.test.mjs
+      - name: Test contracts
+        if: ${{ !cancelled() }}
+        run: npm run test --workspace @velvet/contracts
+      - name: Test server
+        if: ${{ !cancelled() }}
+        run: npm --workspace velvet-mvp-server run test
+      - name: Test client
+        if: ${{ !cancelled() }}
+        run: npm --workspace velvet-mvp-client run test
+      - name: Test e2e
+        if: ${{ !cancelled() }}
+        run: npm run test:e2e

@@ -1,5 +1,15 @@
 # Contributing
 
+## Feature freeze (until launch)
+
+VelvetRP is in a feature freeze until the first public release. Only these land on `main` until then: fixes that get CI green, launch blockers (license, packaging, migrations, the quick-start path), and small cleanups that support them. New features wait until after launch.
+
+These branches are parked as they are. They are not merged, rebased or deleted during the freeze:
+
+- `feat/foundry-context-diagnostic`
+- `feat/training-data-foundry`
+- `bench/stock-baseline-findings`
+
 ## Development Baseline
 
 - Use Node.js 22 and npm workspaces.

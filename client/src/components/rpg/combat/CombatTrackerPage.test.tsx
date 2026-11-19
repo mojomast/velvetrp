@@ -86,8 +86,9 @@ describe("M3.5 server-authoritative combat controls", () => {
     expect(screen.getByRole("heading", { name: "Combat tracker", level: 2 })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Encounter lifecycle" })).toBeNull();
     expect(tacticalRender).not.toHaveBeenCalled();
-    expect(client.getCombat).toHaveBeenCalledWith("combat-one");
-    expect(changed).toHaveBeenCalled();
+    // onStateChange fires from an effect after the combat state commits, which can land after the first button renders.
+    await waitFor(() => expect(client.getCombat).toHaveBeenCalledWith("combat-one"));
+    await waitFor(() => expect(changed).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("button", { name: "End turn" }));
     fireEvent.click(screen.getByRole("button", { name: "Review action" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit once" }));

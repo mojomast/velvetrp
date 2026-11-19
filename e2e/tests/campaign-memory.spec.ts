@@ -120,7 +120,12 @@ test("declaration recalls an old exchange across HTTP without private memory or 
     page.on("request", event => { if (event.method() === "POST") writes.push(new URL(event.url()).pathname); });
     await page.route("**/api/**", async route => {
       const url = new URL(route.request().url());
-      await route.fulfill({ response: await route.fetch({ url: `${origin}${url.pathname}${url.search}` }) });
+      const response = await route.fetch({ url: `${origin}${url.pathname}${url.search}` });
+      // page.reload() below can cancel a request that is still being proxied; Playwright then
+      // settles the route itself. Ignore only that case so every other proxy failure still fails the test.
+      await route.fulfill({ response }).catch((error: unknown) => {
+        if (!String(error).includes("Route is already handled")) throw error;
+      });
     });
     await page.goto("/");
     await page.getByRole("button", { name: `Open campaign ${f.campaign.name}`, exact: true }).click();

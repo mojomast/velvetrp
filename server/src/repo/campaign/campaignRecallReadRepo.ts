@@ -169,6 +169,17 @@ export function createCampaignRecallReadRepository(db: DatabaseDriver.Database, 
             OR EXISTS(SELECT 1 FROM campaign_location_discoveries_v28 discovery WHERE discovery.campaign_id=binding.campaign_id
               AND discovery.actor_id=turn.actor_id AND discovery.location_id=location.location_id))
         UNION ALL
+        SELECT 'travel-receipt','committed-outcome',journey.command_id,turn.session_id,turn.timeline_id,turn.id,turn.actor_id,
+          json_extract(journey.result_json,'$.destination')||' '||location.public_name
+        FROM eligible turn JOIN world_actor_journey_executions_v1 journey
+          ON journey.campaign_id=turn.campaign_id AND journey.turn_id=turn.id
+        JOIN campaign_locations_v28 location ON location.campaign_id=journey.campaign_id
+          AND location.location_id=json_extract(journey.result_json,'$.currentLocationId')
+        WHERE NOT @publicOnly AND turn.principal_id=@principal
+          AND location.visibility IN('public','discovered') AND (location.visibility='public'
+            OR EXISTS(SELECT 1 FROM campaign_location_discoveries_v28 discovery WHERE discovery.campaign_id=journey.campaign_id
+              AND discovery.actor_id=turn.actor_id AND discovery.location_id=location.location_id))
+        UNION ALL
         SELECT 'mechanic-receipt','committed-outcome',event.command_id,turn.session_id,event.timeline_id,event.source_turn_id,event.actor_id,
           json_object('type',event.type,'attribute',event.attribute_id,'resource',event.resource_name,
             'before',event.value_before,'after',event.value_after,'current',event.resource_current,'max',event.resource_max)

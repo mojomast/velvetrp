@@ -10,7 +10,7 @@ import {
 const asset = (name: string) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8");
 const currentSql = () => ["currentSchema.sql", "campaignDmSchema.sql", "recallSchema.sql", "contextInspectionProvenanceSchema.sql",
   "npcKnowledgeSchema.sql", "combatMarkerSchema.sql", "attunementSchema.sql", "combatReadyActionSchema.sql", "systemOneSchema.sql",
-  "combatantLabelSchema.sql"].map(asset).join("\n");
+  "combatantLabelSchema.sql", "actorJourneySchema.sql"].map(asset).join("\n");
 
 const AT = "2036-01-01T00:00:00.000Z";
 
