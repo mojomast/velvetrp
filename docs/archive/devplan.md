@@ -2,7 +2,7 @@
 
 Development persistence uses one current versioned schema with numbered forward-only migrations, the exact pre-grounding tactical-map upgrade to map v2, and the other narrowly recognized exact predecessor upgrades documented in Operations.
 
-This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with narrowly recognized exact predecessor upgrades described in [Operations](docs/operations.md#data-directory-and-current-schema); validation failure rolls back, and all other unknown schemas reject without repair. The checked trusted-local RPG inventory has 178 counted operations plus feature discovery.
+This is a compact delivery ledger. [ROADMAP.md](../ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with narrowly recognized exact predecessor upgrades described in [Operations](../operations.md#data-directory-and-current-schema); validation failure rolls back, and all other unknown schemas reject without repair. The checked trusted-local RPG inventory has 178 counted operations plus feature discovery.
 
 ## Delivered
 
@@ -26,7 +26,7 @@ This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns curr
 - [x] Drift remediation: v53 migration policy/evidence, current API/docs/configuration reconciliation, and executable drift guards.
 - [x] Playability program (Plans 1-5): readiness diagnostics, the reviewed human/AI adventure, measured campaign memory, the living knowledge ledger, and the living Director.
 - [x] Browser-playable client surfaces: character-sheet actions (checks, powers/spells, effects, resources, rests, equipment), vendor sale, bilateral trade accept/cancel, room detach, actor placement and camp, companion administration, and reviewed encounter generation, each covered by the deterministic E2E gate.
-- [x] 2026-10-02 delivery: complete staged worldbuilding over all 14 sections, bounded count/reference validation, searchable campaign library and world/play handoffs, exact interrupted-build recovery, free-form conversation/observation improvements, branch-aware continuity, event-time witnesses, interrupted chat reconciliation, asynchronous advisory routing, and evaluator/hydration repairs. See the [audit](docs/roleplay-worldbuilding-audit-2026-10-02.md) for live evidence and validation limits.
+- [x] 2026-10-02 delivery: complete staged worldbuilding over all 14 sections, bounded count/reference validation, searchable campaign library and world/play handoffs, exact interrupted-build recovery, free-form conversation/observation improvements, branch-aware continuity, event-time witnesses, interrupted chat reconciliation, asynchronous advisory routing, and evaluator/hydration repairs. See the [audit](roleplay-worldbuilding-audit-2026-10-02.md) for live evidence and validation limits.
 
 ## Remaining
 

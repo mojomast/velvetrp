@@ -48,7 +48,7 @@ It uses a temporary backup with the configured provider and may incur cost. Do n
 - Route changes require matching contracts, feature-dependency checks, safe problem responses, authorization/projection tests, client handling where applicable, and updates to `docs/api.md`.
 - Retry-sensitive mutations must preserve revisions, idempotency, atomic writes, immutable events/receipts, and authoritative reconciliation after ambiguous delivery.
 - Never add arbitrary filesystem paths, SQL, network access, permission changes, or hidden-state exposure to RPG/provider tool surfaces.
-- Update `docs/ROADMAP.md`, `devplan.md`, `handoff.md`, and README claims when milestone, schema, operation-count, setup, or security behavior changes.
+- Update `docs/ROADMAP.md` and README claims when milestone, schema, operation-count, setup, or security behavior changes.
 
 ## Commits
 

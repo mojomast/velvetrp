@@ -1,6 +1,6 @@
 # Bounded campaign memory
 
-This implementation note describes bounded campaign recall and its continuity refinements through 2026-10-02. Runtime code and shared contracts remain authoritative. Recall adds no HTTP operation, provider, or campaign state transition. `recallSchema.sql` stores frozen narration dispatch context, not a searchable memory database or new story truth. The [latest audit](roleplay-worldbuilding-audit-2026-10-02.md) records implementation and validation status.
+This implementation note describes bounded campaign recall and its continuity refinements through 2026-10-02. Runtime code and shared contracts remain authoritative. Recall adds no HTTP operation, provider, or campaign state transition. `recallSchema.sql` stores frozen narration dispatch context, not a searchable memory database or new story truth. The [latest audit](archive/roleplay-worldbuilding-audit-2026-10-02.md) records implementation and validation status.
 
 ## Prompt behavior
 

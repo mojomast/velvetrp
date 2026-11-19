@@ -2,7 +2,7 @@
 
 Development persistence uses one current versioned schema with numbered forward-only migrations, the exact pre-grounding tactical-map upgrade to map v2, and the other narrowly recognized exact predecessor upgrades documented in Operations.
 
-This roadmap is the sole owner of current milestone status and remaining scope. It grew from the completed gap analysis in [the historical RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md). Development persistence uses one current disposable schema with narrowly recognized exact predecessor upgrades described in [Operations](operations.md#data-directory-and-current-schema); validation failure rolls back and all other unknown schemas reject without repair. Repository modules live under `server/src/repo/`, shared runtime contracts live under `packages/contracts/src/`, and the checked API inventory contains 178 counted trusted-local RPG HTTP operations plus feature discovery.
+This roadmap is the sole owner of current milestone status and remaining scope. It grew from the completed gap analysis in [the historical RPG integration plan](archive/rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md). Development persistence uses one current disposable schema with narrowly recognized exact predecessor upgrades described in [Operations](operations.md#data-directory-and-current-schema); validation failure rolls back and all other unknown schemas reject without repair. Repository modules live under `server/src/repo/`, shared runtime contracts live under `packages/contracts/src/`, and the checked API inventory contains 178 counted trusted-local RPG HTTP operations plus feature discovery.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
@@ -20,13 +20,13 @@ Implemented in this delivery; deployment remains separate:
 - **Free-form play and continuity:** routine-observation mechanics gate, grounded original conversations, explicit local NPC presence, bounded knowledge, branch-aware chat context, complete Director receipt history and source-actor event-time witnessing.
 - **Responsiveness and evaluation:** interrupted chat recovery, asynchronous room advisory lanes, corrected Jev confidence/binding, sparse CLI recovery and retryable startup, and objective free-form evaluator verdicts.
 
-Live evidence includes a 125-artifact world covering every section and an 18-turn baseline/after comparison. The final observation/presence refinements have a separate one-turn probe. Full results and validation qualifications are in the [audit](roleplay-worldbuilding-audit-2026-10-02.md).
+Live evidence includes a 125-artifact world covering every section and an 18-turn baseline/after comparison. The final observation/presence refinements have a separate one-turn probe. Full results and validation qualifications are in the [audit](archive/roleplay-worldbuilding-audit-2026-10-02.md).
 
 Immediate follow-ups are the observed free-form NPC attack/combat-initiation and short-rest gaps, durable legacy-generation settlement, and cross-device worldbuilding recovery. Prepared content still requires character/room setup; concepts do not themselves create inventory or combat. A fresh complete live comparison is needed to evaluate the final narrow refinements across a full session.
 
 ## Approved post-M4 milestone DAG and status
 
-Planning-board revision 2 (saved 2026-08-11T00:47:24.296Z, ready with no blockers) is preserved as an approved historical execution design. The [revision 2 integration plan](revision-2-integration-plan.md) does not override this roadmap, current contracts, or the active handoff. Its dependency order at that checkpoint was:
+Planning-board revision 2 (saved 2026-08-11T00:47:24.296Z, ready with no blockers) is preserved as an approved historical execution design. The [revision 2 integration plan](archive/revision-2-integration-plan.md) does not override this roadmap, current contracts, or the active handoff. Its dependency order at that checkpoint was:
 
 ```text
 H0.1 migration support ─┐

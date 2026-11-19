@@ -4,14 +4,14 @@ The current boundary retains one disposable schema with only the exact pre-groun
 
 ## Current status (disposable schema; original plan retained as history)
 
-> **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
+> **Normative current sources:** [ROADMAP.md](../ROADMAP.md) owns milestone status and next work, [api.md](../api.md) owns the current HTTP contract, and [repo-architecture.md](../repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
 
-The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
+The canonical current engineering handoff is lowercase [`handoff.md`](handoff.md).
 
 - Current development persistence uses **one disposable schema with narrowly recognized exact predecessor upgrades**, with **161 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
-- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. Later delivered slices include companion transport, bounded consumables, exact travel, character rerolls, reviewed campaign expansion, starter/reward/placement settlement, and explicit material publication. Remaining integration and exclusions are statused only by [ROADMAP.md](ROADMAP.md).
+- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. Later delivered slices include companion transport, bounded consumables, exact travel, character rerolls, reviewed campaign expansion, starter/reward/placement settlement, and explicit material publication. Remaining integration and exclusions are statused only by [ROADMAP.md](../ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Historical migration notes below describe earlier checkpoints only. Current startup accepts the exact current schema or narrowly recognized tactical-map and campaign-director predecessors, validates each upgrade before commit, and rolls back on failure. Director recognition covers exact pre-director schemas with or without map v2 and exact review-authority/narration predecessors, not arbitrary partial upgrades. Every other unknown or partially upgraded schema rejects without repairs; other schema changes require database recreation. See [Operations](operations.md#data-directory-and-current-schema).
+- Historical migration notes below describe earlier checkpoints only. Current startup accepts the exact current schema or narrowly recognized tactical-map and campaign-director predecessors, validates each upgrade before commit, and rolls back on failure. Director recognition covers exact pre-director schemas with or without map v2 and exact review-authority/narration predecessors, not arbitrary partial upgrades. Every other unknown or partially upgraded schema rejects without repairs; other schema changes require database recreation. See [Operations](../operations.md#data-directory-and-current-schema).
 - A campaign NPC's persona reference remains identity metadata. M5.1 can persist an NPC in a running attached session's present cast, with an optional role-visible location, and retains a stopped session's cast as at-stop history. Presence does not make the NPC a legacy session participant or autonomous speaker, does not create a campaign-NPC speech bridge, and does not imply that the full campaign NPC roster is present.
 
 ## Checkpoint language
@@ -44,7 +44,7 @@ The plan was built from parallel reviews of:
 Primary Velvet integration points:
 
 - `server/src/repo/index.ts` (public persistence barrel)
-- `server/src/repo/` domain modules; see [Repository architecture](repo-architecture.md)
+- `server/src/repo/` domain modules; see [Repository architecture](../repo-architecture.md)
 - `server/src/app.ts` (Fastify composition and plugin registration)
 - `server/src/types.ts`
 - `server/src/context.ts`
@@ -564,7 +564,7 @@ Invariants:
 
 ## AI Game Master And Agent Architecture
 
-The agent roles, module paths, tool categories, prompt-template names, limits, and pipeline below originated as conceptual targets and are not a current implementation inventory. The M2.11 fallback limitations were historical; [ROADMAP.md](ROADMAP.md) owns the delivered M4 boundary and subsequent work.
+The agent roles, module paths, tool categories, prompt-template names, limits, and pipeline below originated as conceptual targets and are not a current implementation inventory. The M2.11 fallback limitations were historical; [ROADMAP.md](../ROADMAP.md) owns the delivered M4 boundary and subsequent work.
 
 ### Agent Roles
 
@@ -877,7 +877,7 @@ Key screens:
 
 ## Migration Sequence
 
-The concise sequence below is the original plan's historical migration summary through v47; it is not a current schema or support-window claim. [ROADMAP.md](ROADMAP.md), [operations.md](operations.md), and [repo-architecture.md](repo-architecture.md) are normative for current status and migration policy.
+The concise sequence below is the original plan's historical migration summary through v47; it is not a current schema or support-window claim. [ROADMAP.md](../ROADMAP.md), [operations.md](../operations.md), and [repo-architecture.md](../repo-architecture.md) are normative for current status and migration policy.
 
 | Version | Scope |
 |---|---|
@@ -938,7 +938,7 @@ Migration requirements:
 
 ### Historical 2026-08-09 v37r1 boundary
 
-At this historical checkpoint, current persistence was v37r1, 92 explicit trusted-local RPG operations were implemented through M2.11, M1-M3 were complete, and M4.1 was next. M2.11 provided deterministic adventure-turn fallback and draft-review persistence only: it did not execute the future bounded provider tool bridge, perform provider-backed campaign generation, or apply generated changes to campaign-domain state. See [ROADMAP.md](ROADMAP.md), [api.md](api.md), and [repo-architecture.md](repo-architecture.md) for the normative current descriptions.
+At this historical checkpoint, current persistence was v37r1, 92 explicit trusted-local RPG operations were implemented through M2.11, M1-M3 were complete, and M4.1 was next. M2.11 provided deterministic adventure-turn fallback and draft-review persistence only: it did not execute the future bounded provider tool bridge, perform provider-backed campaign generation, or apply generated changes to campaign-domain state. See [ROADMAP.md](../ROADMAP.md), [api.md](../api.md), and [repo-architecture.md](../repo-architecture.md) for the normative current descriptions.
 
 ### 2026-08-05: Schema v25 M1.5 Resources, Inventory, Economy, and Rest
 
@@ -2902,7 +2902,7 @@ Remaining M0 work:
 
 ## Original Delivery Phases M0-M9 (Superseded)
 
-These phase names and deliverables preserve the original plan and are superseded by the normative milestone structure in [ROADMAP.md](ROADMAP.md). They are not current status labels, literal component commitments, or evidence that similarly numbered current milestones are incomplete.
+These phase names and deliverables preserve the original plan and are superseded by the normative milestone structure in [ROADMAP.md](../ROADMAP.md). They are not current status labels, literal component commitments, or evidence that similarly numbered current milestones are incomplete.
 
 ### Original Phase M0: Architecture Foundation (Superseded)
 
