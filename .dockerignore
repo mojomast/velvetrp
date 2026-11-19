@@ -1,0 +1,22 @@
+# Keep the build context to what the image build needs; never send local data or secrets.
+.git
+**/node_modules
+**/dist
+.env
+.env.*
+!.env.example
+data
+server/data
+.velvet
+*.log
+*.sqlite
+*.sqlite-*
+*.bak
+test-results
+playwright-report
+coverage
+e2e
+planning-board
+docs
+Dockerfile
+.dockerignore

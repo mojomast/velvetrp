@@ -54,6 +54,21 @@ Campaigns live in local SQLite. Choose a compatible hosted or loopback OpenAI-co
 
 The SRD 5.1 starter includes catalog material for twelve classes at levels 1–20, ancestries, spells, equipment, magic items, and monsters. Executable rules are tracked separately in the [coverage matrix](docs/srd-5.1-coverage.md), so catalog breadth is never confused with full rules support.
 
+## Install and run
+
+**Docker (recommended).** One container serves the app and the API on port 8787 and keeps its data in a volume:
+
+```bash
+docker build -t velvetrp .
+docker run -p 127.0.0.1:8787:8787 -v velvet-data:/data --env-file .env velvetrp
+```
+
+Open **[http://127.0.0.1:8787](http://127.0.0.1:8787)**. `--env-file` is optional; use it to pass provider keys such as `OPENROUTER_API_KEY`. Publish the port on `127.0.0.1` as shown: Velvet is a trusted-local app. To reach it through another hostname, add that name to `VELVET_ALLOWED_HOSTS`.
+
+**Release zip.** Each tagged release also has one zip per platform (`linux-x64`, `linux-arm64`, `darwin-arm64`, `darwin-x64`, `win-x64`) with production dependencies already installed. Unzip it, then run `./start.sh` (or `start.cmd` on Windows) with Node.js 22 on your `PATH`.
+
+To develop or run from source, follow the quick start below.
+
 ## Quick start
 
 **Requirements:** Node.js **22**, npm, and a browser. AI narration and world generation need a compatible model provider. Playwright Chromium is needed only for browser tests.
