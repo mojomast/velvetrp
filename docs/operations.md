@@ -60,13 +60,14 @@ Velvet does not auto-load `.env`. Export variables in the shell or configure the
 | `VELVET_ALLOWED_HOSTS` | client-development | Unset | Optional comma-separated extra hostnames the Vite development server accepts for reverse-proxy or tailnet access; entries are trimmed and empties dropped, and it is not embedded in the built client. |
 | `OPENROUTER_BASE_URL` | server-runtime | Unset | Initial provider URL; a defined value takes precedence over `OPENAI_BASE_URL`. |
 | `OPENROUTER_MODEL` | server-runtime | Unset | Initial model; a defined value takes precedence over `OPENAI_MODEL`. |
-| `OPENROUTER_API_KEY` | server-runtime | Unset | Initial key; a defined value takes precedence over `OPENAI_API_KEY`. Keep empty in examples. |
+| `OPENROUTER_API_KEY` | server-runtime | Unset | Provider key, read at call time and never written to the database; a defined value takes precedence over `OPENAI_API_KEY`. Keep empty in examples. |
 | `OPENROUTER_HTTP_REFERER` | server-runtime | Blank | Initial OpenRouter referer. |
 | `OPENROUTER_APP_TITLE` | server-runtime | `Velvet` | Initial OpenRouter title. |
 | `OPENROUTER_USER_AGENT` | server-runtime | Blank | Optional visible-ASCII user agent forwarded only to OpenRouter or a loopback inference gateway. |
 | `OPENAI_BASE_URL` | server-runtime | `https://api.openai.com/v1` | Provider URL fallback. |
 | `OPENAI_MODEL` | server-runtime | `gpt-4o-mini` | Model fallback. |
 | `OPENAI_API_KEY` | server-runtime | Blank | Key fallback. Keep empty in examples. |
+| `VELVET_PROVIDER_KEY_STORAGE` | server-runtime | Unset | Set to `database` to allow `PUT /api/provider` to store a key in plain text in the database; otherwise keys come only from the environment. See [provider configuration](provider-configuration.md#credentials-and-backups). |
 | `FEATURE_VOICE` | server-runtime | Disabled | Voice discovery flag; exact lowercase `true` only. |
 | `VELVET_VOICE_ENABLED` | server-runtime | Disabled | Exact `true` opts into optional campaign narration playback; separate from discovery-only `FEATURE_VOICE`. Requires campaign/mechanics and configured voices. |
 | `OMNIVOICE_BASE_URL` | server-runtime | Unset | Operator-configured Studio HTTP(S) root origin, directly reachable or through a private tunnel; server-side only. |
