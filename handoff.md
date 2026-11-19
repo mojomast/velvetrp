@@ -3,10 +3,10 @@
 ## Current Baseline
 
 - The 2026-10-02 roleplay/worldbuilding delivery builds on commit `51836da` (`fix(rpg): narrate a held turn from its own declaration, not a scene receipt`). It includes the earlier SRD 5.1 parity program, follow-on runtime surfaces, and the implementation and documentation updates summarized below.
-- Persistence: one current disposable development schema; additive late-schema tables install in place and exact-predecessor upgrades are narrowly recognized. Unknown or partially upgraded schemas reject without repair.
+- Persistence: one current versioned development schema with numbered forward-only migrations (`docs/migrations.md`); additive late-schema tables install in place and exact-predecessor upgrades are narrowly recognized. Unknown or partially upgraded schemas reject without repair.
 - HTTP: 177 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
 - Security: the server remains loopback-only with fixed `local-owner`. Feature flags and local ownership are not authentication or remote-safe authorization.
-- Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns disposable-data/configuration guidance, `docs/repo-architecture.md` owns persistence structure, `docs/ROADMAP.md` owns milestone status, and `docs/srd-5.1-coverage.v1.json` + `docs/srd-5.1-coverage.md` own the bounded SRD parity claims.
+- Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns data-directory/configuration guidance, `docs/repo-architecture.md` owns persistence structure, `docs/ROADMAP.md` owns milestone status, and `docs/srd-5.1-coverage.v1.json` + `docs/srd-5.1-coverage.md` own the bounded SRD parity claims.
 
 ## Delivered
 

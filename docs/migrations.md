@@ -28,11 +28,12 @@ touching anything:
 
 ## Legacy unstamped development databases
 
-The first release shipped no stamp. Such a database has `user_version = 0` and is
+Databases created before versioning have `user_version = 0`. Such a database is
 accepted only when the existing exact recognizers map its schema and data onto
-the v1 baseline. This is not a general migration path: a drifted or unknown
-development database is still refused, and its data must be exported and
-re-imported into a fresh data directory.
+the v1 baseline, and is then stamped. This is not a general migration path: a
+drifted or unknown development database is unsupported and refused at startup
+without modification. Keep its data with `npm run db:export` (see
+[Operations](operations.md)) and start with an empty data directory.
 
 ## Adding a migration
 

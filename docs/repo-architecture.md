@@ -1,6 +1,6 @@
 # Repository architecture
 
-This is the normative persistence guide for the single current development schema. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`, except for narrowly recognized exact tactical-map, campaign-director, and pre-recall predecessor upgrades. It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
+This is the normative persistence guide for the single current development schema. Development databases are kept, not deleted, when the schema changes: numbered forward-only [migrations](migrations.md) advance stamped stores, and narrowly recognized exact tactical-map, campaign-director, and pre-recall predecessor upgrades bring unstamped stores onto the baseline. It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
 
 ## Public boundary and composition
 
