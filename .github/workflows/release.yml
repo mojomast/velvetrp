@@ -1,0 +1,147 @@
+name: release
+
+# A version tag (v*) builds the Docker image and one runtime zip per platform, smoke-tests each,
+# and publishes them: the image to GHCR and the zips to a GitHub release for that tag.
+# Pull requests that touch packaging run the same builds and smoke tests without publishing.
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - scripts/release/**
+      - .github/workflows/release.yml
+      - package-lock.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zip:
+    name: zip (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-x64, runner: ubuntu-24.04 }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm }
+          - { target: darwin-arm64, runner: macos-15 }
+          - { target: darwin-x64, runner: macos-15-intel }
+          # windows-2022, not windows-2025: the 2025 image ships Visual Studio 2026, which the node-gyp bundled
+          # with Node 22's npm does not detect, and npm still runs better-sqlite3's node-gyp build on install.
+          - { target: win-x64, runner: windows-2022 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Stage runtime (npm ci --omit=dev on this runner)
+        run: node scripts/release/stage.mjs dist-release/velvetrp
+      - name: Smoke staged runtime
+        run: node scripts/release/smoke.mjs dist-release/velvetrp
+      - name: Zip
+        shell: bash
+        run: |
+          name="velvetrp-${GITHUB_REF_NAME//\//-}-${{ matrix.target }}"
+          cd dist-release
+          mv velvetrp "$name"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a -tzip "$name.zip" "$name" > /dev/null
+          else
+            zip -qry "$name.zip" "$name"
+          fi
+          echo "ZIP_NAME=$name.zip" >> "$GITHUB_ENV"
+          echo "ZIP_DIR=$name" >> "$GITHUB_ENV"
+      - name: Smoke the unzipped archive
+        shell: bash
+        run: |
+          mkdir -p unzip-check && cd unzip-check
+          if [ "$RUNNER_OS" = "Windows" ]; then 7z x "../dist-release/$ZIP_NAME" > /dev/null; else unzip -q "../dist-release/$ZIP_NAME"; fi
+          node ../scripts/release/smoke.mjs "$ZIP_DIR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: dist-release/${{ env.ZIP_NAME }}
+          if-no-files-found: error
+
+  docker:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: velvetrp:smoke
+      - name: Smoke image
+        run: |
+          docker volume create velvet-smoke-data
+          docker run -d --name velvet-smoke -p 127.0.0.1:8787:8787 -v velvet-smoke-data:/data velvetrp:smoke
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8787/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS -o /dev/null -w "GET / %{http_code} %{content_type}\n" http://127.0.0.1:8787/ | tee /tmp/home.txt
+          grep -q "200 text/html" /tmp/home.txt
+          curl -fsS http://127.0.0.1:8787/api/rpg/v1/features | grep -q '"campaign":true'
+          docker exec velvet-smoke test -f /data/velvet.sqlite
+          status=""
+          for i in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' velvet-smoke)
+            [ "$status" = healthy ] && break
+            sleep 2
+          done
+          echo "health: $status"
+          docker logs velvet-smoke | tail -20
+          docker rm -f velvet-smoke
+      - name: Log in to GHCR
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - name: Publish multi-arch image
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [zip, docker]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: zips
+          merge-multiple: true
+      - name: Create GitHub release with the platform zips
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" zips/*.zip --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes --draft

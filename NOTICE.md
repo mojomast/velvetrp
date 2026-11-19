@@ -1,3 +1,11 @@
+# VelvetRP
+
+Copyright 2026 the VelvetRP authors.
+
+This product is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+
+Material from the System Reference Document 5.1 described below is licensed separately under CC BY 4.0, not under the Apache License.
+
 # Third-Party Notices
 
 ## SRD 5.1

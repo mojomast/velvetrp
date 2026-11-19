@@ -6,7 +6,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 - Runtime code and shared Zod contracts own executable behavior and wire validation.
 - [API reference](api.md) owns current HTTP behavior and the sole parseable RPG operation inventory.
-- [Operations](operations.md) owns setup, configuration classification, disposable development data, and release-gate guidance.
+- [Operations](operations.md) owns setup, configuration classification, development data, and release-gate guidance.
 - [Repository architecture](repo-architecture.md) owns current persistence structure, schema ownership, module ownership, and transaction conventions.
 - [RPG roadmap](ROADMAP.md) alone owns current milestone status and remaining product scope.
 - Root [`devplan.md`](../devplan.md) is a compact delivered/pending ledger; it cannot override the roadmap.
@@ -27,7 +27,8 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 ## Operational guides
 
-- [Operations](operations.md) - Node 22 setup, environment, local deployment, disposable storage, testing, and troubleshooting.
+- [Operations](operations.md) - Node 22 setup, environment, local deployment, storage, testing, and troubleshooting.
+- [Database schema migrations](migrations.md) - schema versioning, the forward-only migration registry, backups, and how to add a migration.
 - [Provider configuration](provider-configuration.md) - Provider precedence, credentials, outbound privacy, live tests, and troubleshooting.
 - [Provider hardening](provider-hardening.md) - Provider failure classification, privacy, and retry boundaries.
 - [System One decision review](system-one-decision-review.md) - Read-only human review of the immutable System One decision log, turning incorrect verdicts into negative examples for a lane's evaluation corpus.
