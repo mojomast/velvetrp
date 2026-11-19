@@ -121,6 +121,7 @@ import { freeformEncounterHttpRoutes } from "./freeformEncounter.js";
 import { freeformFactionHttpRoutes } from "./freeformFaction.js";
 import { freeformShopHttpRoutes } from "./freeformShop.js";
 import { campaignStartupHttpRoutes } from "./campaignStartup.js";
+import { quickAdventureHttpRoutes } from "./quickAdventures.js";
 import { campaignStartingLocationHttpRoutes } from "./campaignStartingLocation.js";
 import type { CampaignStartingLocationRepository } from "../../../repo/campaignStartingLocationRepo.js";
 import { generationDraftsHttpRoutes } from "./generationDrafts.js";
@@ -948,6 +949,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     sceneImageInstallationEnabled,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}),
   });
+  await app.register(quickAdventureHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
   await app.register(campaignContextInspectionHttpRoutes, { repositoryAccessor: () => {
     const repository = getCampaignRepository();
     if (typeof repository.inspectCampaignContext !== "function"
