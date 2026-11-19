@@ -57,7 +57,7 @@ Velvet does not auto-load `.env`. Export variables in the shell or configure the
 | `VELVET_DATA_DIR` | server-runtime | `<process.cwd()>/data` | SQLite data directory. Set an absolute path explicitly. |
 | `VELVET_SSE_HEARTBEAT_MS` | server-runtime | `15000` | Legacy token and durable-adventure heartbeat input; use a positive finite integer. Room SSE has no heartbeat. |
 | `VELVET_API_URL` | client-development | `http://localhost:8787` | Vite development proxy target; not embedded in the built client. |
-| `VELVET_ALLOWED_HOSTS` | client-development | Unset | Optional comma-separated extra hostnames the Vite development server accepts for reverse-proxy or tailnet access; entries are trimmed and empties dropped, and it is not embedded in the built client. |
+| `VELVET_ALLOWED_HOSTS` | server-runtime | Unset | Optional comma-separated extra hostnames accepted by the API server's Host/Origin allowlist and the Vite development server, for reverse-proxy or tailnet access. Loopback names are always allowed; a leading dot (`.example.test`) also allows subdomains. Other Host headers get 403, as do writes (anything but GET, HEAD and OPTIONS) whose `Origin` is present and not allowed. Entries are trimmed and empties dropped, and it is not embedded in the built client. |
 | `OPENROUTER_BASE_URL` | server-runtime | Unset | Initial provider URL; a defined value takes precedence over `OPENAI_BASE_URL`. |
 | `OPENROUTER_MODEL` | server-runtime | Unset | Initial model; a defined value takes precedence over `OPENAI_MODEL`. |
 | `OPENROUTER_API_KEY` | server-runtime | Unset | Initial key; a defined value takes precedence over `OPENAI_API_KEY`. Keep empty in examples. |
