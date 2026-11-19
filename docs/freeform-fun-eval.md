@@ -205,7 +205,7 @@ threshold. `--baseline=<artifact.json>` overrides it.
 
 ### Latest comparison (2026-10-02)
 
-The [roleplay/worldbuilding audit](roleplay-worldbuilding-audit-2026-10-02.md#live-free-form-evidence)
+The [roleplay/worldbuilding audit](archive/roleplay-worldbuilding-audit-2026-10-02.md#live-free-form-evidence)
 records separate fresh-world 18-turn baseline/after runs: 3/3 labeled probes and
 6/6 Director beats passed in both, provider-assisted narration rose from 11 to 13,
 and narration-failure turns fell from 3 to 1. Each run encountered one provider error.

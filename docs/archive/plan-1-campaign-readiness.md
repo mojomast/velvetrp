@@ -27,7 +27,7 @@ section. Its administration revision is not a revision for all game domains.
 - [Fate's four outcomes](https://fate-srd.com/fate-core/four-outcomes) illustrate
   complications and success at a cost rather than dead ends. Borrow preparation
   ideas, not Fate mechanics or permission for prose to grant success.
-- [Existing AI-DM research](ai-dungeon-master.md#research-and-evidence) supports
+- [Existing AI-DM research](../ai-dungeon-master.md#research-and-evidence) supports
   separation of creative assistance, mechanical adjudication, and disclosure.
   A readiness report must retain that separation.
 

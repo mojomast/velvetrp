@@ -3,14 +3,14 @@
 Status: historical research and evaluation design. The observation ledger,
 bounded propagation, disclosure gates and narration integration are now implemented;
 the per-agent belief projection and other deferred proposals below are not.
-See [Plan 4](plan-4-living-knowledge.md) for the delivered scope and
+See [Plan 4](archive/plan-4-living-knowledge.md) for the delivered scope and
 [campaign memory](campaign-memory.md) for current witness/presence behavior.
 The original proposal describes how Velvet can move from a rigid
 harness to a living world by giving NPCs bounded, attributable, privacy-safe
 knowledge of campaign events — including the motivating example of an NPC
 bringing up a lost bet that another character heard about and laughed at.
 Milestone sequencing, ownership, and gates live in
-[Plan 4: Living knowledge and rumors](plan-4-living-knowledge.md).
+[Plan 4: Living knowledge and rumors](archive/plan-4-living-knowledge.md).
 
 ## Goal and outcome
 

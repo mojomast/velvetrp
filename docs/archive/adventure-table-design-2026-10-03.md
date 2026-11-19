@@ -12,13 +12,13 @@ comparisons and design recommendations are not measurements of Velvet's usabilit
 
 | Area | Current behavior | Implementation |
 | --- | --- | --- |
-| Default entry | Fresh navigation opens Campaigns & worlds when campaign features are enabled. Campaign library entry leads to the next-step overview. Saved room navigation defaults to Adventure Table unless it explicitly selects legacy Atlas. | [App](../client/src/App.tsx), [navigation](../client/src/roleplay/navigation.ts) |
-| Play hierarchy | The full campaign rail and management toolbar are absent during play. Story/Map tabs, Character, Journal, Dice, and one action composer form the primary surface. | [CampaignShell](../client/src/components/rpg/shell/CampaignShell.tsx), [AdventureTable](../client/src/components/rpg/play/AdventureTable.tsx) |
-| One story | Public Director openings/continuations and durable player turns share a chronological story. Private proposals remain in Director. Legacy room messages are labelled read-only history. | [CampaignConversation](../client/src/components/rpg/play/CampaignConversation.tsx) |
-| Stable views | Story and Map remain mounted while the inactive panel is hidden. One composer serves both tabs. Sending or returning from sheet context selects Story. | [CampaignPlayPage](../client/src/components/rpg/play/CampaignPlayPage.tsx), [AdventureTable](../client/src/components/rpg/play/AdventureTable.tsx) |
-| First turn | Look around, Introduce myself, and Find a lead prepare editable intentions. Existing text prompts Append suggestion / Replace declaration / Cancel. Nothing is sent until Send action. | [FirstTurnGuide](../client/src/components/rpg/play/AdventureTable.tsx), [composer](../client/src/components/rpg/play/AdventureActionComposer.tsx) |
-| Progressive disclosure | Character, Journal (accessible name Field journal), and Dice are primary. The native Table tools dialog contains Director, Travel, Combat & rewards, Help, role-appropriate GM tools, Display, Replay this session, voice controls, and campaign navigation. | [AdventureTable](../client/src/components/rpg/play/AdventureTable.tsx), [CampaignPlayPage](../client/src/components/rpg/play/CampaignPlayPage.tsx) |
-| Combat | Compact round/turn status remains visible. End turn prepares text; Review encounter completion opens the existing combat review/recovery controller. The story-surface bar does not dispatch direct completion or enemy-turn commands. | [CombatCommandBar](../client/src/components/rpg/play/CombatCommandBar.tsx) |
+| Default entry | Fresh navigation opens Campaigns & worlds when campaign features are enabled. Campaign library entry leads to the next-step overview. Saved room navigation defaults to Adventure Table unless it explicitly selects legacy Atlas. | [App](../../client/src/App.tsx), [navigation](../../client/src/roleplay/navigation.ts) |
+| Play hierarchy | The full campaign rail and management toolbar are absent during play. Story/Map tabs, Character, Journal, Dice, and one action composer form the primary surface. | [CampaignShell](../../client/src/components/rpg/shell/CampaignShell.tsx), [AdventureTable](../../client/src/components/rpg/play/AdventureTable.tsx) |
+| One story | Public Director openings/continuations and durable player turns share a chronological story. Private proposals remain in Director. Legacy room messages are labelled read-only history. | [CampaignConversation](../../client/src/components/rpg/play/CampaignConversation.tsx) |
+| Stable views | Story and Map remain mounted while the inactive panel is hidden. One composer serves both tabs. Sending or returning from sheet context selects Story. | [CampaignPlayPage](../../client/src/components/rpg/play/CampaignPlayPage.tsx), [AdventureTable](../../client/src/components/rpg/play/AdventureTable.tsx) |
+| First turn | Look around, Introduce myself, and Find a lead prepare editable intentions. Existing text prompts Append suggestion / Replace declaration / Cancel. Nothing is sent until Send action. | [FirstTurnGuide](../../client/src/components/rpg/play/AdventureTable.tsx), [composer](../../client/src/components/rpg/play/AdventureActionComposer.tsx) |
+| Progressive disclosure | Character, Journal (accessible name Field journal), and Dice are primary. The native Table tools dialog contains Director, Travel, Combat & rewards, Help, role-appropriate GM tools, Display, Replay this session, voice controls, and campaign navigation. | [AdventureTable](../../client/src/components/rpg/play/AdventureTable.tsx), [CampaignPlayPage](../../client/src/components/rpg/play/CampaignPlayPage.tsx) |
+| Combat | Compact round/turn status remains visible. End turn prepares text; Review encounter completion opens the existing combat review/recovery controller. The story-surface bar does not dispatch direct completion or enemy-turn commands. | [CombatCommandBar](../../client/src/components/rpg/play/CombatCommandBar.tsx) |
 
 The older Living Atlas remains an optional `surface="atlas"` presentation, including
 explicit saved `playSurface: "atlas"` navigation. The multi-column Command Center is
@@ -26,7 +26,7 @@ retained internally for an explicit `surface="center"` compatibility/test path.
 
 ### Readiness without automatic activation
 
-[CampaignOverviewPage](../client/src/components/rpg/overview/CampaignOverviewPage.tsx)
+[CampaignOverviewPage](../../client/src/components/rpg/overview/CampaignOverviewPage.tsx)
 shows next-step guidance, sessions, and the party roster. Owner/GM room cards read
 activation readiness automatically on arrival and window focus. Blockers link to
 preparation, starting-location selection, or character building.
@@ -64,7 +64,7 @@ natural document flow; the recent-story log is a bounded, keyboard-scrollable ar
 so a long campaign does not push the composer below its entire history. The composer
 is not a fixed mobile overlay.
 
-[adventureTable.css](../client/src/components/rpg/play/adventureTable.css) provides
+[adventureTable.css](../../client/src/components/rpg/play/adventureTable.css) provides
 light/dark/high-contrast variables, visible focus outlines, reduced-motion rules,
 forced-colors treatment for selected tabs, and 44px minimum heights for table buttons,
 selects, and inputs. Rendered checks are recorded below.
@@ -123,10 +123,10 @@ dispatch; draft text and character selections belong only to its fresh browser c
 
 | Capture | File |
 | --- | --- |
-| Default Story and composer | [adventure-table.png](images/adventure-table.png) |
-| Map with the shared composer | [adventure-table-map.png](images/adventure-table-map.png) |
-| Fully referenceable character sheet | [adventure-table-character.png](images/adventure-table-character.png) |
-| Narrow/mobile play | [adventure-table-mobile.png](images/adventure-table-mobile.png) |
+| Default Story and composer | [adventure-table.png](../images/adventure-table.png) |
+| Map with the shared composer | [adventure-table-map.png](../images/adventure-table-map.png) |
+| Fully referenceable character sheet | [adventure-table-character.png](../images/adventure-table-character.png) |
+| Narrow/mobile play | [adventure-table-mobile.png](../images/adventure-table-mobile.png) |
 
 Desktop captures use **1600 × 1100 CSS pixels**, phone capture **390 × 844**, both at
 **1.5× device scale** with reduced motion. The phone image captures the full document.
@@ -140,7 +140,7 @@ node scripts/capture-readme-screenshots.mjs \
   --reference "Waylamp (1)" --out docs/images
 ```
 
-The [README gallery](../README.md#screenshots) distinguishes these play images from
+The [README gallery](../../README.md#screenshots) distinguishes these play images from
 earlier worldbuilding, character-mechanics, Director, and campaign-management captures.
 
 ## Validation record
@@ -210,4 +210,4 @@ phone software-keyboard session remain follow-up usability work. The redesign di
 not dispatch a new live-model evaluation.
 
 Relevant checks and browser files are listed in the
-[control-plane validation inventory](frontend-control-plane.md#validation).
+[control-plane validation inventory](../frontend-control-plane.md#validation).

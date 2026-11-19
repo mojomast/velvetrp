@@ -20,11 +20,11 @@ than adding complexity just to close a checkbox.
 
 ## Research decisions
 
-- [Framework evaluation](memory-framework-evaluation.md) compares SQLite, LangGraph,
+- [Framework evaluation](../memory-framework-evaluation.md) compares SQLite, LangGraph,
   Mem0, Graphiti/Zep, and Letta. Velvet already owns orchestration and authoritative
   storage. Framework memory does not automatically enforce actor knowledge,
   campaign timelines, or receipt authority.
-- [Context and memory research](campaign-memory.md#sources-read) supports selective
+- [Context and memory research](../campaign-memory.md#sources-read) supports selective
   context, retained original sources, temporal/abstention evaluation, and separating
   retrieval from model reading. Vendor/benchmark gains are not Velvet targets.
 - [SQLite FTS5](https://sqlite.org/fts5.html) supplies lexical indexing, not semantic

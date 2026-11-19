@@ -6,7 +6,7 @@ security, prompting, and verification. The inference host itself is run from
 [Supra2 service deployment](supra2-service-deployment.md); the original design rationale and
 model facts are in [Image generation integration (proposed)](image-generation-integration.md),
 and the historical handoff that stood the service up is
-[Supra2-IMG inference setup prompt](supra2-inference-setup-prompt.md).
+[Supra2-IMG inference setup prompt](archive/supra2-inference-setup-prompt.md).
 
 Two rules frame everything else:
 
@@ -334,7 +334,7 @@ observation that proves it.
 - [Supra2 service deployment](supra2-service-deployment.md) - runbook for the inference host.
 - [Image generation integration (proposed)](image-generation-integration.md) - design
   rationale, model facts, and phased plan this implementation follows.
-- [Supra2-IMG inference setup prompt](supra2-inference-setup-prompt.md) - the historical
+- [Supra2-IMG inference setup prompt](archive/supra2-inference-setup-prompt.md) - the historical
   handoff prompt used to stand up the service; its bearer-token/base64 contract is superseded
   by the current service API.
 - [Operations](operations.md#environment) - environment classification and setup.

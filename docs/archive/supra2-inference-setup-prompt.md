@@ -3,7 +3,7 @@
 Status: paste-ready handoff for an agent on another tailnet machine (target hardware: AMD Ryzen
 AI MAX+ 395 "Strix Halo" with unified memory) to self-host the
 `SupraLabs/Supra2-IMG` text-to-image service used by the image generation plan
-([image-generation-integration.md](image-generation-integration.md)). It is written to be copied
+([image-generation-integration.md](../image-generation-integration.md)). It is written to be copied
 verbatim into that agent's session. The service is private to the Tailscale tailnet, token
 authenticated, and matches the phase-1 client contract in
 `server/src/provider/imageGeneration.ts` (`POST /generate`, `GET /health`, bounded fields, PNG

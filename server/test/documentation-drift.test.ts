@@ -50,7 +50,7 @@ function documentedOperations(): DocumentedOperation[] {
 }
 
 function markdownFiles(): string[] {
-  const rootFiles = ["AGENTS.md", "README.md", "CONTRIBUTING.md", "devplan.md", "handoff.md", "todo.md", "drift-remediation-plan.md"];
+  const rootFiles = ["AGENTS.md", "README.md", "CONTRIBUTING.md", "drift-remediation-plan.md"];
   const docs = readdirSync(path.join(ROOT, "docs"), { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) => path.posix.join("docs", entry.name));
@@ -410,10 +410,7 @@ describe("documentation drift guards", () => {
       ["docs/operations.md", "Development databases are kept, not deleted, when the schema changes"],
       ["docs/repo-architecture.md", "Development databases are kept, not deleted, when the schema changes: numbered forward-only [migrations](migrations.md) advance stamped stores"],
       ["docs/ROADMAP.md", "Development persistence uses one current versioned schema with numbered forward-only migrations, the exact pre-grounding tactical-map upgrade to map v2"],
-      ["devplan.md", "Development persistence uses one current versioned schema with numbered forward-only migrations, the exact pre-grounding tactical-map upgrade to map v2"],
-      ["handoff.md", "Persistence: one current versioned development schema with numbered forward-only migrations"],
       ["docs/roleplay-architecture-2026.md", "one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
-      ["docs/rpg-integration-plan.md", "one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
       ["docs/operations.md", "Startup recognizes that predecessor only when every schema object exactly matches the current schema minus the map-v2 changes"],
       ["docs/operations.md", "The upgrade uses one independent immediate transaction"],
       ["docs/operations.md", "an explicit foreign-key check plus complete current-schema, SQLite quick-check, local-ownership, and effect-vocabulary validation must succeed before commit"],
@@ -425,8 +422,24 @@ describe("documentation drift guards", () => {
     const operations = documentedOperations();
     const count = operations.filter((operation) => operation.inventoryClass === "operation").length;
     expect(count).toBe(178);
-    const countClaims = ["README.md", "docs/api.md", "docs/operations.md", "docs/ROADMAP.md", "devplan.md", "handoff.md"];
+    const countClaims = ["README.md", "docs/api.md", "docs/operations.md", "docs/ROADMAP.md"];
     for (const relativePath of countClaims) expect(read(relativePath), relativePath).toContain(`${count} counted`);
+  });
+
+  it("keeps agent-era plans, handoffs and progress reports in docs/archive, outside the maintained set", () => {
+    const archived = [
+      "plan-1-campaign-readiness.md", "plan-2-reviewed-adventure.md", "plan-3-memory-evaluation.md", "plan-4-living-knowledge.md", "plan-5-living-director.md",
+      "playability-execution.md", "playability-progress.md", "playability-next-agent-handoff.txt",
+      "jev-deadline-shadow-followup.txt", "jev-next-agent-handoff.txt", "jev-shortlist-coverage.txt",
+      "revision-2-integration-plan.md", "rpg-integration-plan.md", "harness-wars-campaign-report.md", "supra2-inference-setup-prompt.md",
+      "adventure-table-design-2026-10-03.md", "play-sheet-context-audit-2026-10-02.md", "roleplay-worldbuilding-audit-2026-10-02.md",
+      "handoff.md", "devplan.md", "todo.md",
+    ];
+    const misplaced = archived.filter((name) => existsSync(path.join(ROOT, name)) || existsSync(path.join(ROOT, "docs", name)));
+    const missing = archived.filter((name) => !existsSync(path.join(ROOT, "docs", "archive", name)));
+    expect({ misplaced, missing }).toEqual({ misplaced: [], missing: [] });
+    expect(existsSync(path.join(ROOT, "docs", "archive", "README.md"))).toBe(true);
+    expect(read("docs/README.md")).toContain("(archive/README.md)");
   });
 
   it("matches explicit Fastify RPG registration without runtime side effects", async () => {

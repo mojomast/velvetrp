@@ -8,7 +8,7 @@ Engineering-focused, non-explicit design notes for consensual adult fictional ro
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. If this design/history document conflicts with one of those sources about present behavior, the normative source wins.
 
-The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
+The former engineering handoff is preserved in [`docs/archive/handoff.md`](archive/handoff.md); the roadmap owns current status.
 
 - Current development persistence uses **one disposable schema with narrowly recognized exact predecessor upgrades**, with **161 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. The boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
 - Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. Later delivered slices include companion transport, bounded consumables, provider/adventure exact travel, rerolls, campaign generation/expansion, starter and reward settlement, actor placement, generated story materialization, and explicit material publication. Remaining exclusions and next work are statused only by [ROADMAP.md](ROADMAP.md).

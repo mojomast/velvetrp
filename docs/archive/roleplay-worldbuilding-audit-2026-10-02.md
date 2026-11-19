@@ -11,8 +11,8 @@
 - **Responsiveness:** room turn shadow/unpromoted Jev calls and record-only advisory lanes no longer block primary generation. Speaker confidence belongs to the selected option; an unavailable deterministic cost route cannot be selected.
 - **Interrupted chat:** single-speaker streams reject premature EOF and stop at the first terminal. Canceled/error sends and swipes refresh the saved session transcript, preserve acknowledged user messages, and ignore late results after navigation.
 
-Research rationale and source links are in [backend generation](world-generation-backend-research.md),
-[worldbuilding workflow](worldbuilding-workflow-research.md), and [library workflow](world-library-workflow-research.md).
+Research rationale and source links are in [backend generation](../world-generation-backend-research.md),
+[worldbuilding workflow](../worldbuilding-workflow-research.md), and [library workflow](../world-library-workflow-research.md).
 The Flash review used source excerpts fetched by the parent because tool-history replay failed on the proxy;
 the successful synthesis did not perform independent browsing.
 
