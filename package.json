@@ -38,12 +38,15 @@
     "test:e2e:live": "playwright test --config=playwright.live.config.ts",
     "probe:routetok": "node e2e/support/routetok-probe.mjs",
     "health": "npm run typecheck && npm run build && npm test && npm run test:e2e",
-    "ci": "npm ci && npm run typecheck && npm run build && npm run test"
+    "ci": "npm ci && npm run typecheck && npm run build && npm run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.54.1",
     "@types/node": "^22.10.0",
+    "prettier": "3.10.1",
     "typescript": "^5.7.0"
   }
 }

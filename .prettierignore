@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+test-results
+playwright-report
+data
+package-lock.json
+# Documentation, generated reports and fixtures keep their own formatting.
+docs
+*.md
+*.sql
+# Vendored or generated content.
+packages/contracts/dist
+client/dist
+server/dist
