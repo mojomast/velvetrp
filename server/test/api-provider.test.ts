@@ -3,9 +3,10 @@ import { buildApp } from "../src/app.js";
 import { useTmpDataDir } from "./helpers.js";
 
 process.env.NODE_ENV = "test";
-// The suite must never use a real provider key.
-delete process.env.OPENROUTER_API_KEY;
-delete process.env.OPENAI_API_KEY;
+// The suite must never use a real provider key or a developer's provider endpoint.
+for (const name of ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENROUTER_BASE_URL", "OPENAI_BASE_URL", "OPENROUTER_MODEL", "OPENAI_MODEL"]) {
+  delete process.env[name];
+}
 useTmpDataDir();
 
 const rawJson = (payload: string) => ({
