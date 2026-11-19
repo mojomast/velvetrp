@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { stage } from "../release/stage.mjs";
+import { materializeWorkspaceLinks, stage } from "../release/stage.mjs";
 
 function fakeCheckout() {
   const root = mkdtempSync(path.join(tmpdir(), "velvet-stage-src-"));
@@ -52,5 +52,30 @@ test("stage refuses an unbuilt checkout", () => {
   } finally {
     rmSync(from, { recursive: true, force: true });
     rmSync(path.dirname(out), { recursive: true, force: true });
+  }
+});
+
+test("workspace links become a real contracts copy so the output can move", () => {
+  const out = mkdtempSync(path.join(tmpdir(), "velvet-stage-links-"));
+  try {
+    for (const workspace of ["packages/contracts", "server", "client"]) {
+      mkdirSync(path.join(out, workspace, "dist"), { recursive: true });
+      writeFileSync(path.join(out, workspace, "package.json"), "{}");
+      writeFileSync(path.join(out, workspace, "dist", "index.js"), "export {};");
+    }
+    mkdirSync(path.join(out, "node_modules", "@velvet"), { recursive: true });
+    const type = process.platform === "win32" ? "junction" : "dir";
+    symlinkSync(path.join(out, "packages", "contracts"), path.join(out, "node_modules", "@velvet", "contracts"), type);
+    symlinkSync(path.join(out, "server"), path.join(out, "node_modules", "velvet-mvp-server"), type);
+    symlinkSync(path.join(out, "client"), path.join(out, "node_modules", "velvet-mvp-client"), type);
+    materializeWorkspaceLinks(out);
+    const contracts = path.join(out, "node_modules", "@velvet", "contracts");
+    assert.equal(lstatSync(contracts).isSymbolicLink(), false);
+    assert.ok(existsSync(path.join(contracts, "dist", "index.js")));
+    assert.ok(!existsSync(path.join(out, "node_modules", "velvet-mvp-server")));
+    assert.ok(!existsSync(path.join(out, "node_modules", "velvet-mvp-client")));
+    assert.ok(existsSync(path.join(out, "server", "dist", "index.js")), "link targets are untouched");
+  } finally {
+    rmSync(out, { recursive: true, force: true });
   }
 });
