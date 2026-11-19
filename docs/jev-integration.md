@@ -1,5 +1,13 @@
 # Jev (TypeSafe System One) integration
 
+## Enabling System One (optional)
+
+System One is off by default. Set `FEATURE_SYSTEM_ONE=true` (the exact string `true`) in the
+server environment or `.env` and restart; the Settings panel then shows System One, where you
+configure the base URL, key, and lane modes. With the flag off the panel is hidden, no System
+One call is made, and turns behave exactly as without it; lanes start in shadow (record-only)
+mode.
+
 Status: design plus **W0 scaffolding and the first promoted lane**. The transport lane,
 strict schemas, second settings profile, feature flag, confidence-policy module, fake
 adapter, and settings/preflight HTTP routes are implemented and tested. The **L5
