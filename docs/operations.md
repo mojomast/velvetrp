@@ -48,15 +48,17 @@ Hosted CI mirrors the same four health phases exactly once each, in order and fa
 
 ## Environment
 
-Velvet does not auto-load `.env`. Export variables in the shell or configure them in the process supervisor before startup.
+Velvet loads `.env` itself at startup: `VELVET_ENV_FILE` when set, otherwise `.env` in the working directory and then the repository root. Values already present in the environment win over file values; variables can also be exported in the shell or configured in the process supervisor.
 
 | Variable | Category | Default | Operational meaning |
 | --- | --- | --- | --- |
+| `VELVET_ENV_FILE` | server-runtime | Unset | Optional explicit env-file path loaded at startup; when unset, `.env` is read from the working directory, then the repository root. |
 | `HOST` | server-runtime | `127.0.0.1` | API bind address. Keep loopback. |
 | `PORT` | server-runtime | `8787` | API port. |
 | `VELVET_DATA_DIR` | server-runtime | `<process.cwd()>/data` | SQLite data directory. Set an absolute path explicitly. |
 | `VELVET_SSE_HEARTBEAT_MS` | server-runtime | `15000` | Legacy token and durable-adventure heartbeat input; use a positive finite integer. Room SSE has no heartbeat. |
 | `VELVET_API_URL` | client-development | `http://localhost:8787` | Vite development proxy target; not embedded in the built client. |
+| `VELVET_CLIENT_DIST` | server-runtime | `<repository>/client/dist` | Optional built-client directory served at `/`; startup stays API-only when it has no `index.html`. |
 | `VELVET_ALLOWED_HOSTS` | client-development | Unset | Optional comma-separated extra hostnames the Vite development server accepts for reverse-proxy or tailnet access; entries are trimmed and empties dropped, and it is not embedded in the built client. |
 | `OPENROUTER_BASE_URL` | server-runtime | Unset | Initial provider URL; a defined value takes precedence over `OPENAI_BASE_URL`. |
 | `OPENROUTER_MODEL` | server-runtime | Unset | Initial model; a defined value takes precedence over `OPENAI_MODEL`. |
@@ -86,10 +88,10 @@ Velvet does not auto-load `.env`. Export variables in the shell or configure the
 | `VELVET_SCENE_IMAGES_TIMEOUT_MS` | server-runtime | `120000` | Per-request deadline bounded to 1000–600000 ms; an ambiguous submission is never retried automatically. |
 | `VELVET_SCENE_IMAGES_MAX_BYTES` | server-runtime | `8388608` | Decoded PNG byte budget bounded to 1024–67108864 bytes. |
 | `VELVET_NARRATION_DEBUG` | server-runtime | Disabled | Exact `1` logs a bounded narration failure reason (error name and message only, never campaign content) to the server console; diagnostic only. |
-| `FEATURE_RPG_CAMPAIGN` | server-runtime | Disabled | Base RPG campaign/API rollout flag. |
-| `FEATURE_RPG_MECHANICS` | server-runtime | Disabled | Mechanics routes require this and campaign. |
-| `FEATURE_RPG_COMBAT` | server-runtime | Disabled | Combat routes require combat, mechanics, and campaign. |
-| `FEATURE_RPG_STUDIO` | server-runtime | Disabled | Studio UI rollout flag; useful only with campaign and mechanics. |
+| `FEATURE_RPG_CAMPAIGN` | server-runtime | Enabled | Base RPG campaign/API rollout flag; defaults on and an explicitly set value enables only for exact lowercase `true`. |
+| `FEATURE_RPG_MECHANICS` | server-runtime | Enabled | Mechanics routes require this and campaign; defaults on. |
+| `FEATURE_RPG_COMBAT` | server-runtime | Enabled | Combat routes require combat, mechanics, and campaign; defaults on. |
+| `FEATURE_RPG_STUDIO` | server-runtime | Enabled | Studio UI rollout flag; useful only with campaign and mechanics; defaults on. |
 | `FEATURE_REMOTE_AUTHENTICATION` | server-runtime | Disabled | Discovery flag only. It adds no authentication and does not make deployment remote-safe. |
 | `FEATURE_SYSTEM_ONE` | server-runtime | Disabled | Exact `true` advertises optional System One (Jev) decision lanes; rollout control only. The promoted speaker-routing lane can change room routing when its lane mode is `active` and it is promoted, and the promoted adventure-selection lane can commit SRD check candidates and raise rest proposals (which still require the normal confirmation flow) under the same conditions; the director, narration-verification, cost-router, guardrails, and memory-reranking lanes are wired in `shadow` (record-only). Every lane falls back deterministically, and none mutates campaign state outside its committed candidate path. |
 | `TYPESAFE_BASE_URL` | server-runtime | `https://api.typesafe.ai/v1` | Initial System One base URL; must be HTTPS or loopback HTTP. |
