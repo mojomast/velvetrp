@@ -1,10 +1,17 @@
 import { Writable } from "node:stream";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { systemRuntime } from "../src/runtime.js";
 import { startFakeProvider, useTmpDataDir, type FakeProvider } from "./helpers.js";
 
 process.env.NODE_ENV = "test";
+
+const ORIGINAL_PROVIDER_KEY_STORAGE = process.env.VELVET_PROVIDER_KEY_STORAGE;
+beforeAll(() => { process.env.VELVET_PROVIDER_KEY_STORAGE = "database"; });
+afterAll(() => {
+  if (ORIGINAL_PROVIDER_KEY_STORAGE === undefined) delete process.env.VELVET_PROVIDER_KEY_STORAGE;
+  else process.env.VELVET_PROVIDER_KEY_STORAGE = ORIGINAL_PROVIDER_KEY_STORAGE;
+});
 
 useTmpDataDir();
 

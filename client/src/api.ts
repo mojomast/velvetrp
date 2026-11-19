@@ -3409,6 +3409,8 @@ export interface ProviderSettings {
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
+  apiKeySource?: "environment" | "database" | "none";
+  apiKeyWarning?: string;
   streaming: boolean;
   httpReferer: string;
   appTitle: string;
