@@ -55,3 +55,7 @@ It uses a temporary backup with the configured provider and may incur cost. Do n
 - Keep commits focused and describe the owning area, for example `feat(rpg): ...`, `fix(repo): ...`, or `docs: ...`.
 - Do not commit provider keys, `.env`, databases, traces, temporary directories, or unrelated workspace changes.
 - Run `git diff --check` before committing and report any intentionally skipped validation.
+
+## License
+
+By contributing, you agree that your contributions are licensed under the [Apache License 2.0](LICENSE), the same license as the project.
