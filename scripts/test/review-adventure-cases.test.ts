@@ -47,12 +47,14 @@ function makeProposal(overrides: Partial<HarvestProposal> = {}): HarvestProposal
     status: "confirmed",
     state: {
       declaration: "I test the reviewed declaration.",
-      candidates: [{
-        candidateId: "candidate-1",
-        digest: "digest-1",
-        kind: "exact_srd_check.select",
-        label: "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal",
-      }],
+      candidates: [
+        {
+          candidateId: "candidate-1",
+          digest: "digest-1",
+          kind: "exact_srd_check.select",
+          label: "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal",
+        },
+      ],
     },
     expected: { candidateId: "candidate-1" },
     note: "agent review note",
@@ -171,8 +173,14 @@ test("orderCasesForReview orders tiers first, then proposalId, then the limit", 
   const defer = makeProposal({ proposalId: "p-d", expected: { candidateId: null } });
 
   const ordered = orderCasesForReview([defer, corrected, receiptB, receiptA]);
-  assert.deepEqual(ordered.map((proposal) => proposal.proposalId), ["p-a", "p-b", "p-c", "p-d"]);
-  assert.deepEqual(orderCasesForReview([receiptA, receiptB, corrected, defer], 2).map((entry) => entry.proposalId), ["p-a", "p-b"]);
+  assert.deepEqual(
+    ordered.map((proposal) => proposal.proposalId),
+    ["p-a", "p-b", "p-c", "p-d"],
+  );
+  assert.deepEqual(
+    orderCasesForReview([receiptA, receiptB, corrected, defer], 2).map((entry) => entry.proposalId),
+    ["p-a", "p-b"],
+  );
   assert.deepEqual(["b", "a"].sort(compareStrings), ["a", "b"]);
 });
 
@@ -196,7 +204,10 @@ test("summarizeReviewCases counts tiers and provenance", () => {
 });
 
 test("expectedPickOf decodes pick, defer, and unusable expectations", () => {
-  assert.deepEqual(expectedPickOf(makeProposal({ expected: { candidateId: "c-1" } })), { kind: "pick", candidateId: "c-1" });
+  assert.deepEqual(expectedPickOf(makeProposal({ expected: { candidateId: "c-1" } })), {
+    kind: "pick",
+    candidateId: "c-1",
+  });
   assert.deepEqual(expectedPickOf(makeProposal({ expected: { candidateId: null } })), { kind: "defer" });
   assert.deepEqual(expectedPickOf(makeProposal({ expected: null })), { kind: "missing" });
   assert.deepEqual(expectedPickOf(makeProposal({ expected: { candidateId: 7 } })), { kind: "missing" });
@@ -228,12 +239,14 @@ test("renderReviewPacket shows candidates and flags a missing expected candidate
       proposalId: "p-missing",
       state: {
         declaration: "I drink the potion.",
-        candidates: [{
-          candidateId: "candidate-9",
-          digest: "digest-9",
-          kind: "exact_inventory_action.select",
-          label: "Use item: potion of healing",
-        }],
+        candidates: [
+          {
+            candidateId: "candidate-9",
+            digest: "digest-9",
+            kind: "exact_inventory_action.select",
+            label: "Use item: potion of healing",
+          },
+        ],
       },
       expected: { candidateId: "candidate-ghost" },
       note: "the lane missed a committed pick",
@@ -304,10 +317,7 @@ test("renderReviewPacket trims long text deterministically", () => {
 });
 
 test("buildAnnotationsSkeleton keys entries in packet order and round-trips", () => {
-  const skeleton = buildAnnotationsSkeleton([
-    makeProposal({ proposalId: "p-a" }),
-    makeProposal({ proposalId: "p-b" }),
-  ]);
+  const skeleton = buildAnnotationsSkeleton([makeProposal({ proposalId: "p-a" }), makeProposal({ proposalId: "p-b" })]);
   assert.deepEqual(Object.keys(skeleton), ["p-a", "p-b"]);
   assert.deepEqual(skeleton["p-a"], { verdict: "", reviewer: "human", note: "" });
   const serialized = serializeAnnotationsSkeleton(skeleton);
@@ -338,9 +348,10 @@ test("parseReviewAnnotations accepts filled human verdicts and collects unfilled
 test("parseReviewAnnotations rejects non-human reviewers with a clear error", () => {
   assert.throws(
     () => parseReviewAnnotations({ "p-1": { verdict: "correct", reviewer: "agent" } }),
-    (error: unknown) => error instanceof Error
-      && error.message.includes("p-1")
-      && /reviewer must be exactly "human", received "agent"/.test(error.message),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.message.includes("p-1") &&
+      /reviewer must be exactly "human", received "agent"/.test(error.message),
   );
   assert.throws(
     () => parseReviewAnnotations({ "p-1": { verdict: "correct" } }),
@@ -381,7 +392,10 @@ test("planPromotions promotes correct human verdicts and ignores incorrect and u
   const plan = planPromotions(fixture, parsed);
 
   assert.equal(plan.totalCases, 4);
-  assert.deepEqual(plan.promoted.map((entry) => entry.proposalId), ["p-correct", "p-no-note"]);
+  assert.deepEqual(
+    plan.promoted.map((entry) => entry.proposalId),
+    ["p-correct", "p-no-note"],
+  );
   assert.equal(plan.promoted[0]!.fromProvenance, "agent-review");
   assert.equal(plan.promoted[0]!.humanNote, "  matches the transcript  ");
   assert.equal(plan.promoted[0]!.note, "agent evidence\n\nHuman review: matches the transcript");
@@ -405,7 +419,10 @@ test("planPromotions reports unknown ids, unfilled entries, and already human-re
   });
   const plan = planPromotions(fixture, parsed);
 
-  assert.deepEqual(plan.promoted.map((entry) => entry.proposalId), ["p-known"]);
+  assert.deepEqual(
+    plan.promoted.map((entry) => entry.proposalId),
+    ["p-known"],
+  );
   assert.deepEqual(plan.alreadyReviewed, ["p-human"]);
   assert.deepEqual(plan.unknownIds, ["p-ghost"]);
   assert.deepEqual(plan.unfilled, ["p-blank"]);
@@ -461,7 +478,10 @@ test("applyPromotionPlan is deterministic and a second identical run is a no-op"
   const second = applyPromotionPlan(fixture, planPromotions(fixture, parseReviewAnnotations(annotations)));
 
   assert.equal(serializeReviewFixture(first), serializeReviewFixture(second));
-  assert.deepEqual(first.proposals.map((entry) => entry.proposalId), ["p-a", "p-m", "p-z"]);
+  assert.deepEqual(
+    first.proposals.map((entry) => entry.proposalId),
+    ["p-a", "p-m", "p-z"],
+  );
 
   const rerunPlan = planPromotions(first, parseReviewAnnotations(annotations));
   assert.deepEqual(rerunPlan.promoted, []);

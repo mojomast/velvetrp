@@ -6,12 +6,16 @@ import type { SystemOneConfidenceThresholds, SystemOneLane, SystemOneSettings } 
  */
 export const SYSTEM_ONE_EXECUTION_CONTRACTS = {
   "speaker-routing": {
-    questionVersion: "room-routing-v1", compositionVersion: "room-routing-v2",
-    candidateStrategy: "room-participants-v1", stateVersion: "room-routing-v1",
+    questionVersion: "room-routing-v1",
+    compositionVersion: "room-routing-v2",
+    candidateStrategy: "room-participants-v1",
+    stateVersion: "room-routing-v1",
   },
   "adventure-selection": {
-    questionVersion: "adventure-grouped-v1", compositionVersion: "adventure-grouped-v1",
-    candidateStrategy: "family-round-robin-32-legacy-v1", stateVersion: "adventure-declaration-candidates-v1",
+    questionVersion: "adventure-grouped-v1",
+    compositionVersion: "adventure-grouped-v1",
+    candidateStrategy: "family-round-robin-32-legacy-v1",
+    stateVersion: "adventure-declaration-candidates-v1",
   },
   // The only action this lane may ever authorize is selecting one candidate the server already
   // authored (a location/NPC/encounter/shop/clue/faction/quest/rumor materialization). It can
@@ -28,8 +32,10 @@ export const SYSTEM_ONE_EXECUTION_CONTRACTS = {
   // to `-v2`. The candidate strategy is unchanged (still a server-authored closed set), so it
   // keeps `-v1`. Any evaluation binding recorded before this revision no longer matches.
   "freeform-materialization": {
-    questionVersion: "freeform-materialization-v2", compositionVersion: "freeform-materialization-v2",
-    candidateStrategy: "server-authored-freeform-candidates-v1", stateVersion: "freeform-materialization-state-v2",
+    questionVersion: "freeform-materialization-v2",
+    compositionVersion: "freeform-materialization-v2",
+    candidateStrategy: "server-authored-freeform-candidates-v1",
+    stateVersion: "freeform-materialization-state-v2",
   },
 } as const;
 
@@ -60,34 +66,65 @@ export function systemOneEvaluationBinding(
   settings: SystemOneSettings,
   responseModel: string | null | undefined,
   actionFamily: string,
-  overrides: Partial<Pick<SystemOneEvaluationBinding,
-    "questionVersion" | "compositionVersion" | "candidateStrategy" | "stateVersion">> = {},
+  overrides: Partial<
+    Pick<SystemOneEvaluationBinding, "questionVersion" | "compositionVersion" | "candidateStrategy" | "stateVersion">
+  > = {},
   thresholds: SystemOneConfidenceThresholds = settings.confidencePolicy[lane],
 ): SystemOneEvaluationBinding {
   return {
-    schemaVersion: 1, lane, provider: "typesafe", baseUrl: settings.baseUrl,
-    requestedModel: settings.model, responseModel: responseModel ?? "",
-    ...SYSTEM_ONE_EXECUTION_CONTRACTS[lane], ...overrides, actionFamily,
-    actionThreshold: thresholds.actionThreshold, reviewThreshold: thresholds.reviewThreshold,
+    schemaVersion: 1,
+    lane,
+    provider: "typesafe",
+    baseUrl: settings.baseUrl,
+    requestedModel: settings.model,
+    responseModel: responseModel ?? "",
+    ...SYSTEM_ONE_EXECUTION_CONTRACTS[lane],
+    ...overrides,
+    actionFamily,
+    actionThreshold: thresholds.actionThreshold,
+    reviewThreshold: thresholds.reviewThreshold,
     calibrationA: settings.confidenceCalibration[lane].a,
     calibrationB: settings.confidenceCalibration[lane].b,
   };
 }
 
-const fields = ["schemaVersion", "lane", "provider", "baseUrl", "requestedModel", "responseModel",
-  "questionVersion", "compositionVersion", "candidateStrategy", "stateVersion", "actionFamily",
-  "actionThreshold", "reviewThreshold", "calibrationA", "calibrationB"] as const;
+const fields = [
+  "schemaVersion",
+  "lane",
+  "provider",
+  "baseUrl",
+  "requestedModel",
+  "responseModel",
+  "questionVersion",
+  "compositionVersion",
+  "candidateStrategy",
+  "stateVersion",
+  "actionFamily",
+  "actionThreshold",
+  "reviewThreshold",
+  "calibrationA",
+  "calibrationB",
+] as const;
 
 function valid(binding: SystemOneEvaluationBinding): boolean {
-  return binding.schemaVersion === 1 && binding.provider === "typesafe"
-    && fields.every(key => typeof binding[key] === "number"
-      ? Number.isFinite(binding[key]) : typeof binding[key] === "string" && binding[key].trim().length > 0)
-    && binding.reviewThreshold >= 0 && binding.actionThreshold <= 1
-    && binding.reviewThreshold <= binding.actionThreshold;
+  return (
+    binding.schemaVersion === 1 &&
+    binding.provider === "typesafe" &&
+    fields.every((key) =>
+      typeof binding[key] === "number"
+        ? Number.isFinite(binding[key])
+        : typeof binding[key] === "string" && binding[key].trim().length > 0,
+    ) &&
+    binding.reviewThreshold >= 0 &&
+    binding.actionThreshold <= 1 &&
+    binding.reviewThreshold <= binding.actionThreshold
+  );
 }
 
 /** Exact, order-independent field comparison. No wildcards, cross-family or alias approvals. */
-export function matchesSystemOneBinding(evaluated: SystemOneEvaluationBinding,
-  current: SystemOneEvaluationBinding): boolean {
-  return valid(evaluated) && valid(current) && fields.every(key => evaluated[key] === current[key]);
+export function matchesSystemOneBinding(
+  evaluated: SystemOneEvaluationBinding,
+  current: SystemOneEvaluationBinding,
+): boolean {
+  return valid(evaluated) && valid(current) && fields.every((key) => evaluated[key] === current[key]);
 }

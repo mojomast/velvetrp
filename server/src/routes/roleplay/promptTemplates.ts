@@ -17,7 +17,8 @@ export const roleplayPromptTemplateRoutes: FastifyPluginAsync = async (app) => {
     if (typeof body.template === "string") {
       if (body.template.length > 64_000) return reply.code(400).send({ error: "template is too long" });
       const unknownPlaceholders = validatePromptTemplate(request.params.id, body.template);
-      if (unknownPlaceholders.length > 0) return reply.code(400).send({ error: "unknown prompt placeholders", unknownPlaceholders });
+      if (unknownPlaceholders.length > 0)
+        return reply.code(400).send({ error: "unknown prompt placeholders", unknownPlaceholders });
     }
     const harness = await getHarnessSettings();
     const promptOverrides = { ...harness.promptOverrides };

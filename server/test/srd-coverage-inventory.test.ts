@@ -62,23 +62,32 @@ describe("SRD 5.1 coverage inventory", () => {
 
     for (const domain of coverage.domains) {
       expect(STATUSES.has(domain.status), `${domain.id} status`).toBe(true);
-      expect(domain.runtimeEvidence.length + domain.apiEvidence.length, `${domain.id} implementation evidence`).toBeGreaterThan(0);
+      expect(
+        domain.runtimeEvidence.length + domain.apiEvidence.length,
+        `${domain.id} implementation evidence`,
+      ).toBeGreaterThan(0);
       if (domain.status !== "implemented") expect(domain.complete, `${domain.id} completeness`).toBe(false);
       if (domain.status === "implemented") expect(domain.complete, `${domain.id} completeness`).toBe(true);
       if (domain.status === "not-applicable") expect(domain.sourceSections, `${domain.id} SRD sources`).toEqual([]);
       else expect(domain.sourceSections.length, `${domain.id} SRD sources`).toBeGreaterThan(0);
       for (const source of domain.sourceSections) {
         expect(source.id, `${domain.id} source section ID`).toMatch(/^SRD5\.1:/);
-        expect(source.url, `${domain.id} official source URL`).toMatch(new RegExp(`^${PDF_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}#page=\\d+$`));
+        expect(source.url, `${domain.id} official source URL`).toMatch(
+          new RegExp(`^${PDF_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}#page=\\d+$`),
+        );
       }
       for (const reference of domain.runtimeEvidence) {
-        expect(existsSync(path.join(ROOT, reference.split("#", 1)[0]!)), `${domain.id} evidence ${reference}`).toBe(true);
+        expect(existsSync(path.join(ROOT, reference.split("#", 1)[0]!)), `${domain.id} evidence ${reference}`).toBe(
+          true,
+        );
       }
     }
 
-    const incompleteCapabilityIds = new Set(coverage.domains
-      .filter(({ status }) => status === "partial" || status === "unsupported")
-      .flatMap(({ capabilityEvidence }) => capabilityEvidence.map(({ id }) => id)));
+    const incompleteCapabilityIds = new Set(
+      coverage.domains
+        .filter(({ status }) => status === "partial" || status === "unsupported")
+        .flatMap(({ capabilityEvidence }) => capabilityEvidence.map(({ id }) => id)),
+    );
     for (const capability of DND_5E_RULESET_DESCRIPTOR.capabilities ?? []) {
       if (capability.status === "partial" || capability.status === "unsupported") {
         expect(incompleteCapabilityIds.has(capability.id), `${capability.id} incomplete evidence`).toBe(true);
@@ -92,7 +101,12 @@ describe("SRD 5.1 coverage inventory", () => {
     const coverageGuide = read("docs/srd-5.1-coverage.md");
 
     expect(coverage.officialSource.url).toBe(PDF_URL);
-    expect(coverage.license).toMatchObject({ id: "CC-BY-4.0", url: LICENSE_URL, attributionFile: "NOTICE.md", modified: true });
+    expect(coverage.license).toMatchObject({
+      id: "CC-BY-4.0",
+      url: LICENSE_URL,
+      attributionFile: "NOTICE.md",
+      modified: true,
+    });
     for (const releaseText of [notice, coverageGuide]) {
       expect(releaseText).toContain(PDF_URL);
       expect(releaseText).toContain("Creative Commons Attribution 4.0 International");

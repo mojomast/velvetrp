@@ -57,15 +57,24 @@ describe("reviewCandidates", () => {
     const records = [
       record({ decisionId: "act", confidenceBand: "act" }),
       record({ decisionId: "confirm", confidenceBand: "confirm", selection: { flags: ["hazard"] } }),
-      record({ decisionId: "fallback-flagged", confidenceBand: "fallback", selection: { topSignal: 0.1, flags: ["hazard"] } }),
+      record({
+        decisionId: "fallback-flagged",
+        confidenceBand: "fallback",
+        selection: { topSignal: 0.1, flags: ["hazard"] },
+      }),
       record({ decisionId: "fallback-empty", confidenceBand: "fallback", selection: { topSignal: 0.2, flags: [] } }),
       record({ decisionId: "fallback-plain", confidenceBand: "fallback", selection: { topSignal: 0.3 } }),
-      record({ decisionId: "fallback-nonarray", confidenceBand: "fallback", selection: { topSignal: 0.4, flags: "hazard" } }),
+      record({
+        decisionId: "fallback-nonarray",
+        confidenceBand: "fallback",
+        selection: { topSignal: 0.4, flags: "hazard" },
+      }),
     ];
 
     expect(reviewCandidates(records).map((candidate) => candidate.decisionId)).toEqual(["act"]);
-    expect(reviewCandidates(records, { includeFlaggedFallbacks: true }).map((candidate) => candidate.decisionId))
-      .toEqual(["fallback-flagged", "act"]);
+    expect(
+      reviewCandidates(records, { includeFlaggedFallbacks: true }).map((candidate) => candidate.decisionId),
+    ).toEqual(["fallback-flagged", "act"]);
   });
 
   it("filters by lane", () => {
@@ -87,19 +96,23 @@ describe("reviewCandidates", () => {
       record({ decisionId: "nonnumeric", selection: { topSignal: "5" } }),
       record({ decisionId: "infinite", selection: { topSignal: Number.POSITIVE_INFINITY } }),
     ];
-    expect(reviewCandidates(records, { maxSignal: 5 }).map((candidate) => candidate.decisionId))
-      .toEqual(["low", "bound"]);
+    expect(reviewCandidates(records, { maxSignal: 5 }).map((candidate) => candidate.decisionId)).toEqual([
+      "low",
+      "bound",
+    ]);
   });
 
   it("reads topSignal from selection.topSignal and yields null otherwise", () => {
-    const byId = new Map(reviewCandidates([
-      record({ decisionId: "numeric", selection: { topSignal: 0.42 } }),
-      record({ decisionId: "absent", selection: { other: 1 } }),
-      record({ decisionId: "nonnumeric", selection: { topSignal: "0.42" } }),
-      record({ decisionId: "nan", selection: { topSignal: Number.NaN } }),
-      record({ decisionId: "primitive", selection: 7 }),
-      record({ decisionId: "null-selection", selection: null }),
-    ]).map((candidate) => [candidate.decisionId, candidate.topSignal]));
+    const byId = new Map(
+      reviewCandidates([
+        record({ decisionId: "numeric", selection: { topSignal: 0.42 } }),
+        record({ decisionId: "absent", selection: { other: 1 } }),
+        record({ decisionId: "nonnumeric", selection: { topSignal: "0.42" } }),
+        record({ decisionId: "nan", selection: { topSignal: Number.NaN } }),
+        record({ decisionId: "primitive", selection: 7 }),
+        record({ decisionId: "null-selection", selection: null }),
+      ]).map((candidate) => [candidate.decisionId, candidate.topSignal]),
+    );
 
     expect(byId.get("numeric")).toBe(0.42);
     expect(byId.get("absent")).toBeNull();
@@ -139,11 +152,13 @@ describe("reviewCandidates", () => {
 
   it("clamps a limit above MAX_REVIEW_LIMIT and retains the lowest signals", () => {
     expect(MAX_REVIEW_LIMIT).toBe(200);
-    const records = Array.from({ length: 205 }, (_, index) => record({
-      decisionId: `bulk-${String(index).padStart(3, "0")}`,
-      selection: { topSignal: index },
-      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
-    }));
+    const records = Array.from({ length: 205 }, (_, index) =>
+      record({
+        decisionId: `bulk-${String(index).padStart(3, "0")}`,
+        selection: { topSignal: index },
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+      }),
+    );
 
     const retained = reviewCandidates(records, { limit: 500 });
     expect(retained).toHaveLength(MAX_REVIEW_LIMIT);

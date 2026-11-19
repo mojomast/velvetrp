@@ -51,69 +51,91 @@ const noneReasonSchema = z.enum([
 
 const boundingText = (max: number) => z.string().min(1).max(max);
 
-const candidateSchema = z.object({
-  candidateId: boundingText(128),
-  locationKey: boundingText(128),
-  connectionKey: boundingText(128),
-  fromLocationKey: boundingText(128),
-  fromLocationId: boundingText(128),
-  fromLocationName: boundingText(MAX_LOCATION_LABEL_LENGTH),
-  name: boundingText(MAX_DESTINATION_LENGTH),
-  description: boundingText(MAX_DESCRIPTION_LENGTH),
-  visibility: z.literal("public"),
-}).strict();
+const candidateSchema = z
+  .object({
+    candidateId: boundingText(128),
+    locationKey: boundingText(128),
+    connectionKey: boundingText(128),
+    fromLocationKey: boundingText(128),
+    fromLocationId: boundingText(128),
+    fromLocationName: boundingText(MAX_LOCATION_LABEL_LENGTH),
+    name: boundingText(MAX_DESTINATION_LENGTH),
+    description: boundingText(MAX_DESCRIPTION_LENGTH),
+    visibility: z.literal("public"),
+  })
+  .strict();
 
 const classificationSchema = z.discriminatedUnion("intent", [
-  z.object({
-    intent: z.literal("none"),
-    reason: noneReasonSchema,
-    locationId: boundingText(128).optional(),
-  }).strict(),
-  z.object({
-    intent: z.literal("materialize-location"),
-    destinationName: boundingText(MAX_DESTINATION_LENGTH),
-    candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
-  }).strict(),
+  z
+    .object({
+      intent: z.literal("none"),
+      reason: noneReasonSchema,
+      locationId: boundingText(128).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      intent: z.literal("materialize-location"),
+      destinationName: boundingText(MAX_DESTINATION_LENGTH),
+      candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
+    })
+    .strict(),
 ]);
 
 const materializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: noneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: z.object({
-      candidateId: boundingText(128),
-      locationKey: boundingText(128),
-      connectionKey: boundingText(128),
-      name: boundingText(MAX_DESTINATION_LENGTH),
-      visibility: z.literal("public"),
-    }).strict(),
-    locationId: boundingText(128),
-    connectionId: boundingText(128),
-    draftId: boundingText(128),
-    contentReceiptId: boundingText(128).nullable(),
-    world: z.object({
-      commandId: boundingText(128),
-      revisionBefore: z.number().int().min(0),
-      revisionAfter: z.number().int().min(0),
-      occurredAt: boundingText(64),
-    }).strict(),
-    discoveries: z.array(z.object({
-      actorId: boundingText(128),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: z
+        .object({
+          candidateId: boundingText(128),
+          locationKey: boundingText(128),
+          connectionKey: boundingText(128),
+          name: boundingText(MAX_DESTINATION_LENGTH),
+          visibility: z.literal("public"),
+        })
+        .strict(),
       locationId: boundingText(128),
-      discoveredAt: boundingText(64),
-    }).strict()).max(MAX_DISCOVERIES),
-  }).strict(),
+      connectionId: boundingText(128),
+      draftId: boundingText(128),
+      contentReceiptId: boundingText(128).nullable(),
+      world: z
+        .object({
+          commandId: boundingText(128),
+          revisionBefore: z.number().int().min(0),
+          revisionAfter: z.number().int().min(0),
+          occurredAt: boundingText(64),
+        })
+        .strict(),
+      discoveries: z
+        .array(
+          z
+            .object({
+              actorId: boundingText(128),
+              locationId: boundingText(128),
+              discoveredAt: boundingText(64),
+            })
+            .strict(),
+        )
+        .max(MAX_DISCOVERIES),
+    })
+    .strict(),
 ]);
 
-const requestSchema = z.object({
-  text: boundingText(MAX_TEXT_LENGTH),
-  candidateId: boundingText(128).optional(),
-}).strict();
+const requestSchema = z
+  .object({
+    text: boundingText(MAX_TEXT_LENGTH),
+    candidateId: boundingText(128).optional(),
+  })
+  .strict();
 
-const responseSchema = z.object({
-  classification: classificationSchema,
-  materialization: materializationSchema.optional(),
-}).strict();
+const responseSchema = z
+  .object({
+    classification: classificationSchema,
+    materialization: materializationSchema.optional(),
+  })
+  .strict();
 
 export interface FreeformTravelHttpOptions {
   repositoryAccessor: () => FreeformTravelRepository;
@@ -136,13 +158,25 @@ function failure(error: unknown, request: FastifyRequest, reply: FastifyReply): 
     return unavailable(request, reply);
   }
   if (error instanceof FreeformTravelConflictError) {
-    return sendApiProblem(request, reply, 409, "RPG_FREEFORM_TRAVEL_CONFLICT",
-      "Freeform travel conflicts with current state; refresh before retrying");
+    return sendApiProblem(
+      request,
+      reply,
+      409,
+      "RPG_FREEFORM_TRAVEL_CONFLICT",
+      "Freeform travel conflicts with current state; refresh before retrying",
+    );
   }
-  request.log.error({ operation: "freeform-travel", method: request.method, route: request.routeOptions.url },
-    "freeform travel command failed");
-  return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR",
-    "Freeform travel outcome may be unknown; reconcile before retrying");
+  request.log.error(
+    { operation: "freeform-travel", method: request.method, route: request.routeOptions.url },
+    "freeform travel command failed",
+  );
+  return sendApiProblem(
+    request,
+    reply,
+    500,
+    "RPG_INTERNAL_ERROR",
+    "Freeform travel outcome may be unknown; reconcile before retrying",
+  );
 }
 
 export const freeformTravelHttpRoutes: FastifyPluginAsync<FreeformTravelHttpOptions> = async (app, options) => {
@@ -156,8 +190,17 @@ export const freeformTravelHttpRoutes: FastifyPluginAsync<FreeformTravelHttpOpti
           await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
           return;
         }
-        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0) {
-          await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Freeform travel does not accept query parameters");
+        if (
+          (request.raw.url ?? request.url).includes("?") ||
+          Object.keys(request.query as Record<string, unknown>).length > 0
+        ) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Freeform travel does not accept query parameters",
+          );
           return;
         }
         if (Object.values(request.params).some((value) => !resourceIdSchema.safeParse(value).success)) {
@@ -166,7 +209,13 @@ export const freeformTravelHttpRoutes: FastifyPluginAsync<FreeformTravelHttpOpti
         }
         const contentType = request.headers["content-type"];
         if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Freeform travel requires application/json");
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Freeform travel requires application/json",
+          );
         }
       },
       errorHandler: (_error, request, reply) =>
@@ -180,12 +229,24 @@ export const freeformTravelHttpRoutes: FastifyPluginAsync<FreeformTravelHttpOpti
       try {
         const repository = options.repositoryAccessor();
         const { campaignId, sessionId, actorId } = request.params;
-        const classification = repository.classifyFreeformTravelIntent(PRINCIPAL, campaignId, sessionId, actorId, body.data.text);
+        const classification = repository.classifyFreeformTravelIntent(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.text,
+        );
         if (classification.intent === "none") {
           return reply.code(200).send(responseSchema.parse({ classification }));
         }
-        const materialization = repository.materializeFreeformTravel(PRINCIPAL, campaignId, sessionId, actorId, body.data.text,
-          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {});
+        const materialization = repository.materializeFreeformTravel(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.text,
+          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {},
+        );
         return reply.code(200).send(responseSchema.parse({ classification, materialization }));
       } catch (error) {
         return failure(error, request, reply);

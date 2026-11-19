@@ -16,19 +16,28 @@ function seed(): void {
   createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }).close();
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys = ON");
-  db.prepare(`INSERT INTO principals VALUES
+  db.prepare(
+    `INSERT INTO principals VALUES
     ('gm','GM',0),('player','Player',0),('observer','Observer',0),
-    ('outsider','Outsider',0),('app-owner','App owner',0)`).run();
+    ('outsider','Outsider',0),('app-owner','App owner',0)`,
+  ).run();
   db.prepare("UPDATE application_owner SET principal_id='app-owner' WHERE singleton=1").run();
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns (id,name,active_timeline_id,owner_principal_id,created_at,updated_at)
+    db.prepare(
+      `INSERT INTO campaigns (id,name,active_timeline_id,owner_principal_id,created_at,updated_at)
       VALUES ('campaign','Campaign','timeline-old','local-owner',?,?),
-        ('campaign-other','Other','timeline-other','local-owner',?,?)`).run(BEFORE, BEFORE, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO campaign_timelines (id,campaign_id,created_at) VALUES
+        ('campaign-other','Other','timeline-other','local-owner',?,?)`,
+    ).run(BEFORE, BEFORE, BEFORE, BEFORE);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id,campaign_id,created_at) VALUES
       ('timeline-old','campaign',?),('timeline-new','campaign',?),
-      ('timeline-other','campaign-other',?)`).run(BEFORE, BEFORE, BEFORE);
+      ('timeline-other','campaign-other',?)`,
+    ).run(BEFORE, BEFORE, BEFORE);
     for (const [principal, role] of [
-      ["local-owner", "owner"], ["gm", "gm"], ["player", "player"], ["observer", "observer"],
+      ["local-owner", "owner"],
+      ["gm", "gm"],
+      ["player", "player"],
+      ["observer", "observer"],
     ] as const) {
       db.prepare("INSERT INTO campaign_memberships VALUES ('campaign',?,?,?)").run(principal, role, BEFORE);
     }
@@ -43,11 +52,15 @@ function seed(): void {
   db.prepare("INSERT INTO campaign_rules_profiles VALUES ('campaign','profile')").run();
   db.prepare("INSERT INTO campaign_content_packs VALUES ('campaign','core','1','profile')").run();
   db.prepare("INSERT INTO campaign_characters VALUES ('cc','campaign','persona',?,?)").run(BEFORE, BEFORE);
-  db.prepare(`INSERT INTO rpg_campaign_sheets VALUES
-    ('sheet','campaign','cc','core','1','race','human','core','1','background','sage',?,?)`).run(BEFORE, BEFORE);
+  db.prepare(
+    `INSERT INTO rpg_campaign_sheets VALUES
+    ('sheet','campaign','cc','core','1','race','human','core','1','background','sage',?,?)`,
+  ).run(BEFORE, BEFORE);
   db.prepare("INSERT INTO rpg_character_attributes VALUES ('campaign','sheet',0,'strength',10)").run();
-  db.prepare(`INSERT INTO campaign_actors VALUES
-    ('actor','campaign','cc','sheet','player-character','principal',?,?)`).run(BEFORE, BEFORE);
+  db.prepare(
+    `INSERT INTO campaign_actors VALUES
+    ('actor','campaign','cc','sheet','player-character','principal',?,?)`,
+  ).run(BEFORE, BEFORE);
   db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor','campaign','local-owner','secret')").run();
   db.close();
 }
@@ -109,9 +122,10 @@ describe("listCampaignEvents dice projection", () => {
       clock: { now: () => new Date(AT) },
     });
     for (let revision = 0; revision < 21; revision += 1) {
-      repository.executeRollActorDice("local-owner", envelope(
-        revision === 0 ? "100d6" : "1d6", revision, `recent-command-${revision}`,
-      ));
+      repository.executeRollActorDice(
+        "local-owner",
+        envelope(revision === 0 ? "100d6" : "1d6", revision, `recent-command-${revision}`),
+      );
     }
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     try {
@@ -120,7 +134,9 @@ describe("listCampaignEvents dice projection", () => {
       expect(recent.map((item) => item.revision)).toEqual(Array.from({ length: 20 }, (_, index) => 21 - index));
       expect(prepare).toHaveBeenCalledTimes(2);
       const sql = prepare.mock.calls[1]![0] as string;
-      expect(sql).toMatch(/type = 'actor_dice_rolled'[\s\S]*ORDER BY revision DESC[\s\S]*LIMIT 20[\s\S]*LEFT JOIN rpg_dice_terms/);
+      expect(sql).toMatch(
+        /type = 'actor_dice_rolled'[\s\S]*ORDER BY revision DESC[\s\S]*LIMIT 20[\s\S]*LEFT JOIN rpg_dice_terms/,
+      );
     } finally {
       prepare.mockRestore();
       repository.close();
@@ -143,21 +159,38 @@ describe("listCampaignEvents dice projection", () => {
 
     const db = new DatabaseDriver(dbPath());
     db.transaction(() => {
-      db.prepare("INSERT INTO campaign_timelines (id,campaign_id,created_at,revision) VALUES ('timeline-derived','campaign',?,21)")
-        .run(AT);
-      db.prepare(`INSERT INTO campaign_timeline_history
+      db.prepare(
+        "INSERT INTO campaign_timelines (id,campaign_id,created_at,revision) VALUES ('timeline-derived','campaign',?,21)",
+      ).run(AT);
+      db.prepare(
+        `INSERT INTO campaign_timeline_history
         (campaign_id,timeline_id,source_timeline_id,parent_timeline_id,created_by_command_id,forked_from_revision)
-        VALUES ('campaign','timeline-derived','timeline-derived','timeline-old',NULL,10)`).run();
-      db.prepare(`INSERT INTO campaign_timeline_events (campaign_id,timeline_id,revision,event_id,inherited)
+        VALUES ('campaign','timeline-derived','timeline-derived','timeline-old',NULL,10)`,
+      ).run();
+      db.prepare(
+        `INSERT INTO campaign_timeline_events (campaign_id,timeline_id,revision,event_id,inherited)
         SELECT campaign_id,'timeline-derived',revision,event_id,1 FROM campaign_timeline_events
-        WHERE campaign_id='campaign' AND timeline_id='timeline-old'`).run();
+        WHERE campaign_id='campaign' AND timeline_id='timeline-old'`,
+      ).run();
       const insertImported = db.prepare(`INSERT INTO campaign_imported_timeline_events
         (campaign_id,timeline_id,revision,source_event_id,source_command_id,actor_id,source_turn_id,type,occurred_at,public_data)
         VALUES ('campaign','timeline-derived',?,?,?,?,?,'actor_dice_rolled',?,?)`);
       for (let revision = 11; revision <= 21; revision += 1) {
-        insertImported.run(revision, `imported-event-${revision}`, `imported-command-${revision}`, "actor", null, AT,
-          JSON.stringify({ expression: "1d6", normalized: { count: 1, sides: 6, selection: { type: "all" }, modifier: 0 },
-            terms: [{ value: 6, kept: true }], modifier: 0, total: 6 }));
+        insertImported.run(
+          revision,
+          `imported-event-${revision}`,
+          `imported-command-${revision}`,
+          "actor",
+          null,
+          AT,
+          JSON.stringify({
+            expression: "1d6",
+            normalized: { count: 1, sides: 6, selection: { type: "all" }, modifier: 0 },
+            terms: [{ value: 6, kept: true }],
+            modifier: 0,
+            total: 6,
+          }),
+        );
       }
     })();
     db.close();
@@ -186,8 +219,9 @@ describe("listCampaignEvents dice projection", () => {
     repository.close();
     corrupt("UPDATE campaign_commands SET dice_count=2 WHERE command_id='window-command-0'");
     const guarded = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
-    expect(() => guarded.listRecentCampaignDiceEvents("local-owner", "campaign", "timeline-old"))
-      .toThrow("audit record is incomplete");
+    expect(() => guarded.listRecentCampaignDiceEvents("local-owner", "campaign", "timeline-old")).toThrow(
+      "audit record is incomplete",
+    );
     expect(guarded.listRecentCampaignDiceEvents("outsider", "campaign", "timeline-old")).toEqual([]);
     guarded.close();
   });
@@ -221,8 +255,16 @@ describe("listCampaignEvents dice projection", () => {
       },
     });
     expect(Object.keys(event)).toEqual([
-      "eventId", "commandId", "campaignId", "timelineId", "actorId", "sourceTurnId",
-      "type", "revision", "occurredAt", "data",
+      "eventId",
+      "commandId",
+      "campaignId",
+      "timelineId",
+      "actorId",
+      "sourceTurnId",
+      "type",
+      "revision",
+      "occurredAt",
+      "data",
     ]);
     expect(JSON.stringify(event)).not.toMatch(/idempotency|controller|private|notes|payload/i);
     repository.close();
@@ -230,7 +272,10 @@ describe("listCampaignEvents dice projection", () => {
 
   it("returns one event rather than one per each of 100 ordered terms", () => {
     seed();
-    execute("100d1000kh1+1000", Array.from({ length: 100 }, (_, index) => index + 1));
+    execute(
+      "100d1000kh1+1000",
+      Array.from({ length: 100 }, (_, index) => index + 1),
+    );
     const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     const events = repository.listCampaignEvents("player", "campaign", "timeline-old");
     expect(events).toHaveLength(1);
@@ -254,17 +299,24 @@ describe("listCampaignEvents dice projection", () => {
     });
     repository.executeRollActorDice("gm", envelope("1d6", 0, "dice-command"));
     repository.executeSetActorAttribute("local-owner", {
-      commandId: "attribute-command", idempotencyKey: "attribute-key", campaignId: "campaign",
-      timelineId: "timeline-old", actorId: "actor", expectedRevision: 1, sourceTurnId: null,
+      commandId: "attribute-command",
+      idempotencyKey: "attribute-key",
+      campaignId: "campaign",
+      timelineId: "timeline-old",
+      actorId: "actor",
+      expectedRevision: 1,
+      sourceTurnId: null,
       command: { type: "set_actor_attribute", payload: { attributeId: "strength", value: 11 } },
     });
     const db = new DatabaseDriver(dbPath());
     db.prepare("UPDATE campaigns SET active_timeline_id='timeline-new' WHERE id='campaign'").run();
     db.close();
     for (const principal of ["local-owner", "gm", "player", "observer"]) {
-      expect(repository.listCampaignEvents(principal, "campaign", "timeline-old").map((event) => [
-        event.eventId, event.type, event.revision,
-      ])).toEqual([
+      expect(
+        repository
+          .listCampaignEvents(principal, "campaign", "timeline-old")
+          .map((event) => [event.eventId, event.type, event.revision]),
+      ).toEqual([
         ["event-z", "actor_dice_rolled", 1],
         ["event-a", "actor_attribute_set", 2],
       ]);
@@ -286,31 +338,44 @@ describe("listCampaignEvents dice projection", () => {
   });
 
   it("denies a stale owner identity while retaining GM access and outsider masking", () => {
-    seed(); execute(); corrupt("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign'");
-    const repository=createCorruptionTestRepository({dataDir:process.env.VELVET_DATA_DIR as string});
-    expect(repository.listCampaignEvents("local-owner","campaign","timeline-old")).toEqual([]);
-    expect(repository.listCampaignEvents("gm","campaign","timeline-old")).toHaveLength(1);
-    expect(repository.listCampaignEvents("outsider","campaign","timeline-old")).toEqual([]);
+    seed();
+    execute();
+    corrupt("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign'");
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    expect(repository.listCampaignEvents("local-owner", "campaign", "timeline-old")).toEqual([]);
+    expect(repository.listCampaignEvents("gm", "campaign", "timeline-old")).toHaveLength(1);
+    expect(repository.listCampaignEvents("outsider", "campaign", "timeline-old")).toEqual([]);
     repository.close();
   });
 
   it.each([
-    ["orphan receipt", `INSERT INTO command_receipts VALUES
-      ('campaign-other','command-0',0,1,'event-dice')`],
-    ["orphan roll", `INSERT INTO rpg_dice_rolls VALUES
-      ('orphan-roll','campaign-other','orphan-command','1d6',1,6,'all',NULL,0,4)`],
-    ["receipt-attributable orphan term", `INSERT INTO command_receipts VALUES
+    [
+      "orphan receipt",
+      `INSERT INTO command_receipts VALUES
+      ('campaign-other','command-0',0,1,'event-dice')`,
+    ],
+    [
+      "orphan roll",
+      `INSERT INTO rpg_dice_rolls VALUES
+      ('orphan-roll','campaign-other','orphan-command','1d6',1,6,'all',NULL,0,4)`,
+    ],
+    [
+      "receipt-attributable orphan term",
+      `INSERT INTO command_receipts VALUES
       ('campaign-other','term-command',0,1,'orphan-term');
-      INSERT INTO rpg_dice_terms VALUES ('orphan-term',0,4,1)`],
-  ])("isolates cross-campaign %s corruption", (_label,mutation) => {
-    seed(); execute(); corrupt(mutation);
-    const repository=createCorruptionTestRepository({dataDir:process.env.VELVET_DATA_DIR as string});
-    expect(repository.listCampaignEvents("local-owner","campaign","timeline-old"))
-      .toHaveLength(1);
-    expect(() => repository.listCampaignEvents("local-owner","campaign-other","timeline-other"))
-      .toThrow("audit record is incomplete");
-    for (const principal of ["outsider","app-owner"]) {
-      expect(repository.listCampaignEvents(principal,"campaign-other","timeline-other")).toEqual([]);
+      INSERT INTO rpg_dice_terms VALUES ('orphan-term',0,4,1)`,
+    ],
+  ])("isolates cross-campaign %s corruption", (_label, mutation) => {
+    seed();
+    execute();
+    corrupt(mutation);
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    expect(repository.listCampaignEvents("local-owner", "campaign", "timeline-old")).toHaveLength(1);
+    expect(() => repository.listCampaignEvents("local-owner", "campaign-other", "timeline-other")).toThrow(
+      "audit record is incomplete",
+    );
+    for (const principal of ["outsider", "app-owner"]) {
+      expect(repository.listCampaignEvents(principal, "campaign-other", "timeline-other")).toEqual([]);
     }
     repository.close();
   });
@@ -321,8 +386,12 @@ describe("listCampaignEvents dice projection", () => {
     const rng = vi.fn(() => 1);
     const id = vi.fn(() => "unused");
     const clock = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
-      rng: { integer: rng }, ids: { nextId: id }, clock: { now: clock } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      rng: { integer: rng },
+      ids: { nextId: id },
+      clock: { now: clock },
+    });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
     try {
@@ -355,11 +424,11 @@ describe("listCampaignEvents dice projection", () => {
     repository.transaction((unit) => {
       expired = unit;
       expect(unit.listCampaignEvents("player", "campaign", "timeline-old")).toHaveLength(1);
-      expect(unit.getCommandReceipt("player", "campaign", "command-0")?.events[0]?.type)
-        .toBe("actor_dice_rolled");
+      expect(unit.getCommandReceipt("player", "campaign", "command-0")?.events[0]?.type).toBe("actor_dice_rolled");
     });
-    expect(() => expired!.listCampaignEvents("bad actor", "bad campaign", "bad timeline"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.listCampaignEvents("bad actor", "bad campaign", "bad timeline")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
   });
 
@@ -378,22 +447,32 @@ describe("listCampaignEvents dice projection", () => {
     ["missing timeline parent", "DELETE FROM campaign_timelines WHERE id='timeline-old'"],
     ["missing actor parent", "DELETE FROM campaign_actors WHERE id='actor'"],
     ["incomplete timeline history", "UPDATE campaign_timelines SET revision=2 WHERE id='timeline-old'"],
-    ["attributable roll without event", `DELETE FROM command_receipts;
+    [
+      "attributable roll without event",
+      `DELETE FROM command_receipts;
       DELETE FROM campaign_events;
-      UPDATE campaign_timelines SET revision=0 WHERE id='timeline-old'`],
-    ["fully orphaned receipt at reset revision", `DELETE FROM rpg_dice_terms; DELETE FROM rpg_dice_rolls;
+      UPDATE campaign_timelines SET revision=0 WHERE id='timeline-old'`,
+    ],
+    [
+      "fully orphaned receipt at reset revision",
+      `DELETE FROM rpg_dice_terms; DELETE FROM rpg_dice_rolls;
       DELETE FROM campaign_events; DELETE FROM campaign_commands;
-      UPDATE campaign_timelines SET revision=0 WHERE id='timeline-old'`],
-    ["fully orphaned roll at reset revision", `DELETE FROM command_receipts; DELETE FROM campaign_events;
-      DELETE FROM campaign_commands; UPDATE campaign_timelines SET revision=0 WHERE id='timeline-old'`],
+      UPDATE campaign_timelines SET revision=0 WHERE id='timeline-old'`,
+    ],
+    [
+      "fully orphaned roll at reset revision",
+      `DELETE FROM command_receipts; DELETE FROM campaign_events;
+      DELETE FROM campaign_commands; UPDATE campaign_timelines SET revision=0 WHERE id='timeline-old'`,
+    ],
     ["safely attributable orphan term", "DELETE FROM rpg_dice_rolls"],
   ])("fails loudly for authorized %s corruption while masking outsiders", (_label, mutation) => {
     seed();
     execute();
     corrupt(mutation);
     const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
-    expect(() => repository.listCampaignEvents("observer", "campaign", "timeline-old"))
-      .toThrow("audit record is incomplete");
+    expect(() => repository.listCampaignEvents("observer", "campaign", "timeline-old")).toThrow(
+      "audit record is incomplete",
+    );
     expect(repository.listCampaignEvents("outsider", "campaign", "timeline-old")).toEqual([]);
     repository.close();
   });

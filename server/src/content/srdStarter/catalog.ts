@@ -1,7 +1,4 @@
-import {
-  publishContentCatalogInputSchema,
-  type PublishContentCatalogInput,
-} from "@velvet/contracts";
+import { publishContentCatalogInputSchema, type PublishContentCatalogInput } from "@velvet/contracts";
 import { buildManifest } from "./manifest.js";
 import { createStarterReferences } from "./references.js";
 import { buildRaces } from "./races.js";

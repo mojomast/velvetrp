@@ -20,7 +20,8 @@ const band = cr4Band(refs);
 const abilities = band.abilities as CatalogDefinition[];
 const enemies = band.enemies as CatalogDefinition[];
 
-const referenceKey = (reference: Reference) => `${reference.packId}\0${reference.packVersion}\0${reference.kind}\0${reference.definitionId}`;
+const referenceKey = (reference: Reference) =>
+  `${reference.packId}\0${reference.packVersion}\0${reference.kind}\0${reference.definitionId}`;
 
 describe("SRD 5.1 monsters, challenge rating 4", () => {
   it("defines at least eight unique namespaced CR-4 enemy templates and abilities", () => {
@@ -57,13 +58,20 @@ describe("SRD 5.1 monsters, challenge rating 4", () => {
     for (const enemy of enemies) {
       const parsed = enemyTemplateCatalogDefinitionSchema.parse(enemy);
       expect(parsed.mechanics.tier, `${parsed.name} tier`).toBeGreaterThanOrEqual(1);
-      expect(parsed.mechanics.combatProfile?.kind, `${parsed.name} combat profile`).toBe("dnd-5e-pinned-basic-attack-v1");
+      expect(parsed.mechanics.combatProfile?.kind, `${parsed.name} combat profile`).toBe(
+        "dnd-5e-pinned-basic-attack-v1",
+      );
 
       const attack = parsed.mechanics.combatProfile?.attack;
       expect(attack, `${parsed.name} pinned attack`).toBeDefined();
       if (!attack) continue;
-      expect(abilityKeys.has(referenceKey(attack.abilityRef)), `${parsed.name} -> ${attack.abilityRef.definitionId}`).toBe(true);
-      expect(parsed.mechanics.abilityRefs.some((abilityRef) => referenceKey(abilityRef) === referenceKey(attack.abilityRef))).toBe(true);
+      expect(
+        abilityKeys.has(referenceKey(attack.abilityRef)),
+        `${parsed.name} -> ${attack.abilityRef.definitionId}`,
+      ).toBe(true);
+      expect(
+        parsed.mechanics.abilityRefs.some((abilityRef) => referenceKey(abilityRef) === referenceKey(attack.abilityRef)),
+      ).toBe(true);
     }
   });
 

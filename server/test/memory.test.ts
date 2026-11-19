@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildEpisodeSummary, buildTurnMemories, extractContextualCharacterMemory, extractExplicitMemories, extractImplicitMemories, shouldUpdateSummary } from "../src/memory.js";
+import {
+  buildEpisodeSummary,
+  buildTurnMemories,
+  extractContextualCharacterMemory,
+  extractExplicitMemories,
+  extractImplicitMemories,
+  shouldUpdateSummary,
+} from "../src/memory.js";
 import type { Message } from "../src/types.js";
 
 function msg(role: Message["role"], content: string, id = Math.random().toString(36)): Message {
@@ -22,7 +29,12 @@ describe("extractExplicitMemories", () => {
   it("extracts facts from a remember instruction", () => {
     const facts = extractExplicitMemories("remember that I prefer slow pacing", "turn-1");
     expect(facts).toHaveLength(1);
-    expect(facts[0]).toMatchObject({ kind: "preference", content: "I prefer slow pacing", sourceTurnId: "turn-1", userApproved: true });
+    expect(facts[0]).toMatchObject({
+      kind: "preference",
+      content: "I prefer slow pacing",
+      sourceTurnId: "turn-1",
+      userApproved: true,
+    });
   });
 
   it("splits multiple facts on semicolons", () => {
@@ -60,8 +72,14 @@ describe("implicit and contextual memory", () => {
 
   it("snapshots recent self-established character details on explicit request", () => {
     const history = [
-      { ...msg("character", "*I lift my sheet.* My character is Vesper, a tiefling bard with a cursed lute."), speakerCharacterId: "c1" },
-      { ...msg("character", "My oath follows a chained dragon, and my holy symbol is rusting."), speakerCharacterId: "c2" },
+      {
+        ...msg("character", "*I lift my sheet.* My character is Vesper, a tiefling bard with a cursed lute."),
+        speakerCharacterId: "c1",
+      },
+      {
+        ...msg("character", "My oath follows a chained dragon, and my holy symbol is rusting."),
+        speakerCharacterId: "c2",
+      },
     ];
     const facts = extractContextualCharacterMemory("please remember your characters", "turn-1", history, "c1");
     expect(facts).toEqual([expect.objectContaining({ kind: "event", userApproved: true })]);

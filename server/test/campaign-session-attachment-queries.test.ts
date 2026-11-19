@@ -35,9 +35,11 @@ function seed(): void {
       db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(id, id);
     }
     db.prepare("UPDATE application_owner SET principal_id = ? WHERE singleton = 1").run(applicationOwner);
-    db.prepare(`INSERT INTO characters VALUES
+    db.prepare(
+      `INSERT INTO characters VALUES
       ('attachment-read-character', 'Private character', 30, 'secret archetype',
-       'private boundaries', 1, 0, '2031-01-01T00:00:00.000Z')`).run();
+       'private boundaries', 1, 0, '2031-01-01T00:00:00.000Z')`,
+    ).run();
 
     const insertSession = db.prepare(`INSERT INTO sessions
       (id, character_id, title, state, preset_id, active_leaf_id, created_at, stopped_at, stop_reason)
@@ -58,20 +60,29 @@ function seed(): void {
       VALUES (?, ?, ?, ?, '2031-01-01T00:00:00.000Z', '2031-01-01T00:00:00.000Z')`);
     const insertTimeline = db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at)
       VALUES (?, ?, '2031-01-01T00:00:00.000Z')`);
-    for (const [campaignId, ownerId] of [[campaignA, ownerA], [campaignB, ownerB]] as const) {
+    for (const [campaignId, ownerId] of [
+      [campaignA, ownerA],
+      [campaignB, ownerB],
+    ] as const) {
       insertCampaign.run(campaignId, campaignId, `timeline-${campaignId}`, ownerId);
       insertTimeline.run(`timeline-${campaignId}`, campaignId);
-      db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-        VALUES (?, ?, 'owner', '2031-01-01T00:00:00.000Z')`).run(campaignId, ownerId);
+      db.prepare(
+        `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+        VALUES (?, ?, 'owner', '2031-01-01T00:00:00.000Z')`,
+      ).run(campaignId, ownerId);
     }
     for (const role of ["gm", "player", "observer"] as const) {
       const principalId = role === "gm" ? gm : `attachment-read-${role}`;
       if (role !== "gm") {
-        db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)")
-          .run(principalId, principalId);
+        db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(
+          principalId,
+          principalId,
+        );
       }
-      db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-        VALUES (?, ?, ?, '2031-01-01T00:00:00.000Z')`).run(campaignA, principalId, role);
+      db.prepare(
+        `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+        VALUES (?, ?, ?, '2031-01-01T00:00:00.000Z')`,
+      ).run(campaignA, principalId, role);
     }
 
     const insertAttachment = db.prepare(`INSERT INTO campaign_sessions
@@ -145,12 +156,18 @@ describe("campaign session attachment queries", () => {
 
   it.each([
     ["owner disagreement", `UPDATE campaigns SET owner_principal_id = '${gm}' WHERE id = '${campaignA}'`],
-    ["non-owner actor membership", `UPDATE campaign_memberships SET role = 'observer'
-      WHERE campaign_id = '${campaignA}' AND principal_id = '${ownerA}'`],
+    [
+      "non-owner actor membership",
+      `UPDATE campaign_memberships SET role = 'observer'
+      WHERE campaign_id = '${campaignA}' AND principal_id = '${ownerA}'`,
+    ],
     ["missing actor principal", `DELETE FROM principals WHERE id = '${ownerA}'`],
-    ["duplicate owner", `DROP INDEX idx_campaign_memberships_one_owner;
+    [
+      "duplicate owner",
+      `DROP INDEX idx_campaign_memberships_one_owner;
       UPDATE campaign_memberships SET role = 'owner'
-      WHERE campaign_id = '${campaignA}' AND principal_id = '${gm}'`],
+      WHERE campaign_id = '${campaignA}' AND principal_id = '${gm}'`,
+    ],
   ])("denies invalid campaign-owner authority: %s", (_label, mutation) => {
     seed();
     corrupt(mutation);
@@ -161,17 +178,22 @@ describe("campaign session attachment queries", () => {
   });
 
   it.each([
-    ["malformed timestamp", `UPDATE campaign_sessions SET attached_at = 'invalid'
-      WHERE session_id = '${firstSession}'`],
+    [
+      "malformed timestamp",
+      `UPDATE campaign_sessions SET attached_at = 'invalid'
+      WHERE session_id = '${firstSession}'`,
+    ],
     ["orphaned session parent", `DELETE FROM sessions WHERE id = '${firstSession}'`],
   ])("fails loudly for an authorized selected %s but masks outsiders", (_label, mutation) => {
     seed();
     corrupt(mutation);
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
-    expect(() => repository.listCampaignSessionAttachments(ownerA, campaignA))
-      .toThrow("campaign session attachment is malformed");
-    expect(() => repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession))
-      .toThrow("campaign session attachment is malformed");
+    expect(() => repository.listCampaignSessionAttachments(ownerA, campaignA)).toThrow(
+      "campaign session attachment is malformed",
+    );
+    expect(() => repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession)).toThrow(
+      "campaign session attachment is malformed",
+    );
     expect(repository.listCampaignSessionAttachments(applicationOwner, campaignA)).toEqual([]);
     expect(repository.getCampaignSessionAttachment(applicationOwner, campaignA, firstSession)).toBeNull();
     expect(repository.listCampaignSessionAttachments(ownerB, campaignA)).toEqual([]);
@@ -183,10 +205,12 @@ describe("campaign session attachment queries", () => {
     corrupt(`UPDATE campaign_memberships SET created_at = 'invalid-owner-time'
       WHERE campaign_id = '${campaignA}' AND principal_id = '${ownerA}'`);
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
-    expect(() => repository.listCampaignSessionAttachments(ownerA, campaignA))
-      .toThrow("campaign session attachment is malformed");
-    expect(() => repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession))
-      .toThrow("campaign session attachment is malformed");
+    expect(() => repository.listCampaignSessionAttachments(ownerA, campaignA)).toThrow(
+      "campaign session attachment is malformed",
+    );
+    expect(() => repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession)).toThrow(
+      "campaign session attachment is malformed",
+    );
     expect(repository.listCampaignSessionAttachments(applicationOwner, campaignA)).toEqual([]);
     repository.close();
   });
@@ -198,8 +222,9 @@ describe("campaign session attachment queries", () => {
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(repository.listCampaignSessionAttachments(ownerA, campaignA)).toHaveLength(3);
     expect(repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession)?.sessionId).toBe(firstSession);
-    expect(() => repository.listCampaignSessionAttachments(ownerB, campaignB))
-      .toThrow("campaign session attachment is malformed");
+    expect(() => repository.listCampaignSessionAttachments(ownerB, campaignB)).toThrow(
+      "campaign session attachment is malformed",
+    );
     expect(repository.listCampaignSessionAttachments(ownerA, campaignB)).toEqual([]);
     repository.close();
   });
@@ -212,8 +237,10 @@ describe("campaign session attachment queries", () => {
     db.close();
     const repository = createRepository({ dataDir: dataDir() });
     expect(repository.getCampaignSessionAttachment(ownerA, campaignA, stoppedSession)).toBeNull();
-    expect(repository.listCampaignSessionAttachments(ownerA, campaignA).map(({ sessionId }) => sessionId))
-      .toEqual([firstSession, laterSession]);
+    expect(repository.listCampaignSessionAttachments(ownerA, campaignA).map(({ sessionId }) => sessionId)).toEqual([
+      firstSession,
+      laterSession,
+    ]);
     repository.close();
   });
 
@@ -222,12 +249,14 @@ describe("campaign session attachment queries", () => {
     const db = new DatabaseDriver(databasePath());
     db.pragma("foreign_keys = ON");
     db.transaction(() => {
-      deleteCampaignForCorruptionTest(db,campaignA);db.prepare("DELETE FROM campaigns WHERE id = ?").run(campaignA);
+      deleteCampaignForCorruptionTest(db, campaignA);
+      db.prepare("DELETE FROM campaigns WHERE id = ?").run(campaignA);
     }).immediate();
-    expect(db.prepare("SELECT id FROM sessions WHERE id IN (?, ?, ?) ORDER BY id COLLATE BINARY")
-      .all(firstSession, stoppedSession, laterSession)).toEqual([
-        { id: laterSession }, { id: firstSession }, { id: stoppedSession },
-      ]);
+    expect(
+      db
+        .prepare("SELECT id FROM sessions WHERE id IN (?, ?, ?) ORDER BY id COLLATE BINARY")
+        .all(firstSession, stoppedSession, laterSession),
+    ).toEqual([{ id: laterSession }, { id: firstSession }, { id: stoppedSession }]);
     expect(db.prepare("SELECT campaign_id, session_id FROM campaign_sessions").all()).toEqual([
       { campaign_id: campaignB, session_id: otherSession },
     ]);
@@ -252,8 +281,15 @@ describe("campaign session attachment queries", () => {
       expect(listSql).toContain("attachment.session_id COLLATE BINARY ASC");
       expect(listSql).not.toMatch(/SELECT\s+\*/i);
       for (const privateColumn of [
-        "title", "character_id", "preset_id", "target_session.state", "stopped_at", "stop_reason",
-        "session_characters", "messages", "session_context",
+        "title",
+        "character_id",
+        "preset_id",
+        "target_session.state",
+        "stopped_at",
+        "stop_reason",
+        "session_characters",
+        "messages",
+        "session_context",
       ]) {
         expect(listSql).not.toContain(privateColumn);
       }
@@ -280,7 +316,10 @@ describe("campaign session attachment queries", () => {
     const nextId = vi.fn(() => "unused");
     const integer = vi.fn(() => 0);
     const repository = createRepository({
-      dataDir: dataDir(), clock: { now }, ids: { nextId }, rng: { integer },
+      dataDir: dataDir(),
+      clock: { now },
+      ids: { nextId },
+      rng: { integer },
     });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     expect(() => repository.listCampaignSessionAttachments("bad actor", campaignA)).toThrow();
@@ -303,17 +342,22 @@ describe("campaign session attachment queries", () => {
     repository.transaction((unitOfWork) => {
       expired = unitOfWork;
       expect(unitOfWork.listCampaignSessionAttachments(ownerA, campaignA)).toHaveLength(3);
-      expect(unitOfWork.getCampaignSessionAttachment(ownerA, campaignA, stoppedSession)?.sessionId)
-        .toBe(stoppedSession);
+      expect(unitOfWork.getCampaignSessionAttachment(ownerA, campaignA, stoppedSession)?.sessionId).toBe(
+        stoppedSession,
+      );
     });
-    expect(() => expired!.listCampaignSessionAttachments("bad actor", "bad campaign"))
-      .toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getCampaignSessionAttachment("bad actor", "bad campaign", ""))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.listCampaignSessionAttachments("bad actor", "bad campaign")).toThrow(
+      "transaction unit of work is no longer active",
+    );
+    expect(() => expired!.getCampaignSessionAttachment("bad actor", "bad campaign", "")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
-    expect(() => repository.listCampaignSessionAttachments("bad actor", "bad campaign"))
-      .toThrow("repository is closed");
-    expect(() => repository.getCampaignSessionAttachment("bad actor", "bad campaign", ""))
-      .toThrow("repository is closed");
+    expect(() => repository.listCampaignSessionAttachments("bad actor", "bad campaign")).toThrow(
+      "repository is closed",
+    );
+    expect(() => repository.getCampaignSessionAttachment("bad actor", "bad campaign", "")).toThrow(
+      "repository is closed",
+    );
   });
 });

@@ -4,15 +4,30 @@ import { TacticalMapCanvas } from "./TacticalMapCanvas";
 import type { TacticalMapProjection } from "./models";
 
 const projection: TacticalMapProjection = {
-  mapId: "projected", width: 2, height: 1, grid: { kind: "square", feetPerCell: 5 },
+  mapId: "projected",
+  width: 2,
+  height: 1,
+  grid: { kind: "square", feetPerCell: 5 },
   tiles: [{ position: { x: 0, y: 0 }, terrain: "floor", visibility: "visible" }],
-  tokens: [{ tokenId: "hero", label: "Visible Hero", position: { x: 0, y: 0 }, footprint: { width: 1, height: 1 }, disposition: "friendly" }],
-  authoritativePath: [{ x: 0, y: 0 }], reachable: [{ x: 0, y: 0 }],
+  tokens: [
+    {
+      tokenId: "hero",
+      label: "Visible Hero",
+      position: { x: 0, y: 0 },
+      footprint: { width: 1, height: 1 },
+      disposition: "friendly",
+    },
+  ],
+  authoritativePath: [{ x: 0, y: 0 }],
+  reachable: [{ x: 0, y: 0 }],
 };
 
 describe("TacticalMapCanvas", () => {
   beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null));
-  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it("provides a semantic text equivalent containing projection data only", () => {
     render(<TacticalMapCanvas projection={projection} />);
@@ -40,7 +55,9 @@ describe("TacticalMapCanvas", () => {
 
   it("anchors wheel zoom at the pointer and offers fit, center and native pan controls", () => {
     const onViewChange = vi.fn();
-    const { container } = render(<TacticalMapCanvas projection={projection} controlledTokenId="hero" onViewChange={onViewChange} />);
+    const { container } = render(
+      <TacticalMapCanvas projection={projection} controlledTokenId="hero" onViewChange={onViewChange} />,
+    );
     const canvas = container.querySelector("canvas")!;
     expect(fireEvent.wheel(canvas, { clientX: 120, clientY: 80, deltaY: -1, cancelable: true })).toBe(false);
     const zoomed = onViewChange.mock.calls.at(-1)![0];
@@ -59,8 +76,11 @@ describe("TacticalMapCanvas", () => {
   it("does not invent details for an unprojected cell", () => {
     render(<TacticalMapCanvas projection={projection} />);
     const controls = screen.getByRole("group", { name: "Tactical map controls" });
-    fireEvent.keyDown(controls, { key: "ArrowRight" }); fireEvent.keyDown(controls, { key: "Enter" });
-    expect(screen.getByLabelText("Selected cell details").textContent).toBe("No projected cell details are available for this selection.");
+    fireEvent.keyDown(controls, { key: "ArrowRight" });
+    fireEvent.keyDown(controls, { key: "Enter" });
+    expect(screen.getByLabelText("Selected cell details").textContent).toBe(
+      "No projected cell details are available for this selection.",
+    );
   });
 
   it("keeps secondary controls collapsed and below the primary canvas", () => {
@@ -74,7 +94,19 @@ describe("TacticalMapCanvas", () => {
   });
 
   it("uses a DPR backing store without changing the CSS viewport on redraw", () => {
-    const context = { setTransform: vi.fn(), clearRect: vi.fn(), fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(), beginPath: vi.fn(), ellipse: vi.fn(), fill: vi.fn(), stroke: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn() };
+    const context = {
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fillText: vi.fn(),
+      beginPath: vi.fn(),
+      ellipse: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+    };
     vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(context as unknown as CanvasRenderingContext2D);
     vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
     const { container } = render(<TacticalMapCanvas projection={projection} controlledTokenId="hero" />);

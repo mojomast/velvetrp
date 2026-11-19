@@ -10,7 +10,10 @@ export class SystemOneShadowQueue {
   }
   private readonly waiters: Array<() => void> = [];
 
-  constructor(private readonly concurrency = 4, private readonly capacity = 32) {
+  constructor(
+    private readonly concurrency = 4,
+    private readonly capacity = 32,
+  ) {
     if (!Number.isInteger(concurrency) || concurrency < 1 || !Number.isInteger(capacity) || capacity < concurrency) {
       throw new Error("Invalid shadow queue limits");
     }
@@ -22,7 +25,9 @@ export class SystemOneShadowQueue {
       this.dropped += 1;
       return false;
     }
-    this.tasks.push(async () => { await task(); });
+    this.tasks.push(async () => {
+      await task();
+    });
     this.pump();
     return true;
   }
@@ -37,16 +42,19 @@ export class SystemOneShadowQueue {
     while (this.running < this.concurrency && this.tasks.length > 0) {
       const task = this.tasks.shift()!;
       this.running += 1;
-      void Promise.resolve().then(task).catch(() => {
-        this.failed += 1;
-        // Advisory failures must not become unhandled rejections or gameplay failures.
-      }).finally(() => {
-        this.running -= 1;
-        this.pump();
-        if (this.running === 0 && this.tasks.length === 0) {
-          for (const resolve of this.waiters.splice(0)) resolve();
-        }
-      });
+      void Promise.resolve()
+        .then(task)
+        .catch(() => {
+          this.failed += 1;
+          // Advisory failures must not become unhandled rejections or gameplay failures.
+        })
+        .finally(() => {
+          this.running -= 1;
+          this.pump();
+          if (this.running === 0 && this.tasks.length === 0) {
+            for (const resolve of this.waiters.splice(0)) resolve();
+          }
+        });
     }
   }
 }

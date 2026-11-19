@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
-import { barbarianDefinition, barbarianLevels, barbarianSubclasses } from "../src/content/srdStarter/classes/barbarian.js";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
+import {
+  barbarianDefinition,
+  barbarianLevels,
+  barbarianSubclasses,
+} from "../src/content/srdStarter/classes/barbarian.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
 const refs = createStarterReferences("1.6.0+test");
@@ -35,16 +43,29 @@ describe("SRD 5.1 Barbarian class", () => {
 
   it("grants the d12 hit die and rage capacity at level 1", () => {
     const parsed = classLevelCatalogDefinitionSchema.parse(levels[0]);
-    expect(parsed.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d12", maxIncrease: 1, currentIncrease: 1 });
-    expect(parsed.mechanics.resourceGrants).toContainEqual({ resourceId: "rage", maxIncrease: 2, currentIncrease: 2, recovery: "long-rest" });
-    expect(parsed.mechanics.abilityRefs.map((ability) => ability.definitionId)).toEqual(["srd-5.1:ability:barbarian-rage"]);
+    expect(parsed.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d12",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
+    expect(parsed.mechanics.resourceGrants).toContainEqual({
+      resourceId: "rage",
+      maxIncrease: 2,
+      currentIncrease: 2,
+      recovery: "long-rest",
+    });
+    expect(parsed.mechanics.abilityRefs.map((ability) => ability.definitionId)).toEqual([
+      "srd-5.1:ability:barbarian-rage",
+    ]);
   });
 
   it("points the level 3 subclass choice at Path of the Berserker", () => {
     const parsed = classLevelCatalogDefinitionSchema.parse(levels[2]);
     const choice = parsed.mechanics.progressionChoices?.find((candidate) => candidate.kind === "subclass");
     expect(choice).toMatchObject({ choiceId: "barbarian-subclass", required: true, count: 1, kind: "subclass" });
-    expect(choice?.kind === "subclass" ? choice.options.map((option) => option.definitionId) : []).toEqual(["srd-5.1:subclass:path-of-the-berserker"]);
+    expect(choice?.kind === "subclass" ? choice.options.map((option) => option.definitionId) : []).toEqual([
+      "srd-5.1:subclass:path-of-the-berserker",
+    ]);
   });
 
   it("parses the Path of the Berserker subclass bound to the Barbarian class", () => {

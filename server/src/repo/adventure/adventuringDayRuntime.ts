@@ -72,7 +72,8 @@ export type Dnd5eAdventureDayPlan = Readonly<{
 export function planDnd5eAdventureDay(input: Dnd5eAdventureDayInput): Dnd5eAdventureDayPlan {
   const { state } = input;
   requireNonNegativeInteger(state.exhaustion, "exhaustion");
-  if (state.exhaustion > DND_5E_DEPRIVATION.exhaustionDeathLevel) throw new RangeError("exhaustion must be between 0 and 6");
+  if (state.exhaustion > DND_5E_DEPRIVATION.exhaustionDeathLevel)
+    throw new RangeError("exhaustion must be between 0 and 6");
   requireNonNegativeInteger(state.hitPoints, "hit points");
   requireNonNegativeInteger(state.maxHitPoints, "maximum hit points");
   requireNonNegativeInteger(state.daysWithoutFood, "days without food");
@@ -103,7 +104,8 @@ export function planDnd5eAdventureDay(input: Dnd5eAdventureDayInput): Dnd5eAdven
     });
   }
 
-  const exhaustionGained = forcedMarch.exhaustionLevels + (hazard?.exhaustionGained ?? 0) + (deprivation?.exhaustionGained ?? 0);
+  const exhaustionGained =
+    forcedMarch.exhaustionLevels + (hazard?.exhaustionGained ?? 0) + (deprivation?.exhaustionGained ?? 0);
   const damageTaken = hazard?.damage ?? 0;
   const resultingExhaustion = state.exhaustion + exhaustionGained;
   const resultingHitPoints = Math.max(0, state.hitPoints - damageTaken);
@@ -113,9 +115,11 @@ export function planDnd5eAdventureDay(input: Dnd5eAdventureDayInput): Dnd5eAdven
   if (resultingHitPoints === 0) reasons.push("hit points reached 0");
 
   const segments: string[] = [`traveled ${travel.miles} miles at a ${travel.pace} pace`];
-  if (forcedMarch.forcedHours > 0) segments.push(`forced march: ${forcedMarch.forcedHours} hour(s), ${forcedMarch.exhaustionLevels} exhaustion`);
+  if (forcedMarch.forcedHours > 0)
+    segments.push(`forced march: ${forcedMarch.forcedHours} hour(s), ${forcedMarch.exhaustionLevels} exhaustion`);
   if (hazard) segments.push(`${hazard.name}: ${hazard.exhaustionGained} exhaustion, ${hazard.damage} damage`);
-  if (deprivation) segments.push(`deprivation: ${deprivation.waterRations} water rations, ${deprivation.exhaustionGained} exhaustion`);
+  if (deprivation)
+    segments.push(`deprivation: ${deprivation.waterRations} water rations, ${deprivation.exhaustionGained} exhaustion`);
   if (exhaustionGained > 0) segments.push(`gained ${exhaustionGained} exhaustion level(s)`);
   if (damageTaken > 0) segments.push(`took ${damageTaken} damage`);
 

@@ -1,17 +1,177 @@
-import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CSSProperties,
+  FormEvent,
+  PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import {
-  ApiError, Character, CharacterSpec, ChatMessage, FeatureFlags, HarnessSettings, ProviderSettings, SessionContextBasket, UsageSummary,
-  Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
-  applyCampaignImport, castActorSpell, changeActorResource, claimCombatReward, commandActorCheck, commandActorEconomy, commandActorEffect,
-  commandActorAttunement, commandActorInventory, commandActorPower, commandActorRest, commandCombatConsumable, commandFactionReputation, commandFactionRelation, commandActorFactionMembership, commandNpcFactionMembership, commandFactionReaction, commandFreeformFaction, commandFreeformQuest, commandFreeformRumor, commandFreeformShop, commandNpcRelationship, commandQuest, commandStoryline, confirmAdventureTurn, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorAttunements, getActorInventory, getActorPowers, getActorResources, getActorWallet, getAdventureTurn, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignGeneratedPlanning, getCampaignNpcShop, getCampaignPlayBootstrap, getCampaignPresentCast, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatConsumableActions, getCombatConsumableResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession, grantCharacterXp, requestVendorSaleQuote,
-   getSessionContext, getSiblings, getUsage, getAdventureTurnTranscript, getCampaignDiceHistory, rollCampaignDice, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession, getDirectCombatPowerActions, commandDirectCombatPower, getDirectCombatPowerResult, getCampaignContextInspectionReferences, getCampaignContextInspection,
-  generateSceneImage, getSceneImageGallery, getSceneImageJob, getSceneImageSettings, putSceneImageSettings, sceneImageAssetUrl, selectSceneImage,
-  commandCompanionAdministration, getCompanionAdministration, listCampaignMemberships, listCampaignRooms,
-  endCombat, establishActorCamp, generateTacticalMap, getTacticalMap, listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, listCombatRewards, moveTacticalMapToken, placeActor, previewTacticalMapMove, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, reconcileInitialAdventureTurn, rerollCharacterDraft, resolveCombatAction, startEncounter, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateSessionContext, validateContentPackDraft,
+  ApiError,
+  Character,
+  CharacterSpec,
+  ChatMessage,
+  FeatureFlags,
+  HarnessSettings,
+  ProviderSettings,
+  SessionContextBasket,
+  UsageSummary,
+  Session,
+  SiblingsResponse,
+  StreamHandle,
+  activateMessage,
+  branchMessage,
+  continueSession,
+  applyCampaignImport,
+  castActorSpell,
+  changeActorResource,
+  claimCombatReward,
+  commandActorCheck,
+  commandActorEconomy,
+  commandActorEffect,
+  commandActorAttunement,
+  commandActorInventory,
+  commandActorPower,
+  commandActorRest,
+  commandCombatConsumable,
+  commandFactionReputation,
+  commandFactionRelation,
+  commandActorFactionMembership,
+  commandNpcFactionMembership,
+  commandFactionReaction,
+  commandFreeformFaction,
+  commandFreeformQuest,
+  commandFreeformRumor,
+  commandFreeformShop,
+  commandNpcRelationship,
+  commandQuest,
+  commandStoryline,
+  confirmAdventureTurn,
+  createCampaignFaction,
+  createCampaignNpc,
+  createCampaignQuest,
+  createCampaignRecap,
+  createCampaignStoryline,
+  createCharacter,
+  createCharacterDraft,
+  deleteCharacter,
+  deleteSession,
+  dryRunCampaignImport,
+  exportCharacter,
+  finalizeCharacterDraft,
+  getActorEffects,
+  getActorAttunements,
+  getActorInventory,
+  getActorPowers,
+  getActorResources,
+  getActorWallet,
+  getAdventureTurn,
+  getCampaignAdministration,
+  getCampaignCommandReceipt,
+  getCampaignContent,
+  getCampaignContentPack,
+  getCampaignDetail,
+  getCampaignExport,
+  getCampaignGeneratedPlanning,
+  getCampaignNpcShop,
+  getCampaignPlayBootstrap,
+  getCampaignPresentCast,
+  getCampaignShop,
+  getCampaignStory,
+  getCampaignWorld,
+  getCharacterDraft,
+  getCharacterSheet,
+  getCombatCommandResult,
+  getCombatConsumableActions,
+  getCombatConsumableResult,
+  getCombatLog,
+  getCombatState,
+  getContentPackPublication,
+  getFeatures,
+  getHarness,
+  getProvider,
+  getRpgFeatures,
+  getSession,
+  grantCharacterXp,
+  requestVendorSaleQuote,
+  getSessionContext,
+  getSiblings,
+  getUsage,
+  getAdventureTurnTranscript,
+  getCampaignDiceHistory,
+  rollCampaignDice,
+  importCharacter,
+  listCharacters,
+  listSessions,
+  openSoloSession,
+  sendMessage,
+  startSession,
+  stopSession,
+  getDirectCombatPowerActions,
+  commandDirectCombatPower,
+  getDirectCombatPowerResult,
+  getCampaignContextInspectionReferences,
+  getCampaignContextInspection,
+  generateSceneImage,
+  getSceneImageGallery,
+  getSceneImageJob,
+  getSceneImageSettings,
+  putSceneImageSettings,
+  sceneImageAssetUrl,
+  selectSceneImage,
+  commandCompanionAdministration,
+  getCompanionAdministration,
+  listCampaignMemberships,
+  listCampaignRooms,
+  endCombat,
+  establishActorCamp,
+  generateTacticalMap,
+  getTacticalMap,
+  listAllContentPackPublications,
+  listCampaignCheckpoints,
+  listCampaignEncounters,
+  listCampaignEvents,
+  listCampaignFactions,
+  listCampaignNpcs,
+  listCampaignQuests,
+  listCampaignRecaps,
+  listCampaignTimelines,
+  listCombatRewards,
+  moveTacticalMapToken,
+  placeActor,
+  previewTacticalMapMove,
+  projectFactionsForPlayers,
+  projectNpcsForPlayers,
+  projectQuestsForPlayers,
+  projectStoryForPlayers,
+  publishContentPack,
+  reconcileInitialAdventureTurn,
+  rerollCharacterDraft,
+  resolveCombatAction,
+  startEncounter,
+  streamAdventureTurn,
+  streamMessage,
+  streamRoomContinuation,
+  streamRoomMessage,
+  streamSwipe,
+  swipeMessage,
+  travelActor,
+  updateCharacter,
+  updateCharacterDraft,
+  updateSessionContext,
+  validateContentPackDraft,
 } from "./api";
 import { getCombatRewardClaimResult } from "./api";
-import { getActorGameplaySheet, listCampaignCharacters, getCharacterProgression, previewCharacterProgression, applyCharacterProgression } from "./api";
+import {
+  getActorGameplaySheet,
+  listCampaignCharacters,
+  getCharacterProgression,
+  previewCharacterProgression,
+  applyCharacterProgression,
+} from "./api";
 import type { AtlasAdvancementApi } from "./components/rpg/play/AtlasAdvancement";
 import { CharacterForm } from "./components/CharacterForm";
 import { LoreManager } from "./components/LoreManager";
@@ -44,12 +204,18 @@ import { CampaignShell, useCampaignShell, type CampaignDestination } from "./com
 import { CampaignOverviewPage } from "./components/rpg/overview/CampaignOverviewPage";
 import { CampaignCreatePage } from "./components/rpg/generation/CampaignCreatePage";
 
-function messageFor(error: unknown, fallback: string) { return error instanceof ApiError ? error.message : fallback; }
+function messageFor(error: unknown, fallback: string) {
+  return error instanceof ApiError ? error.message : fallback;
+}
 
 function isExactRequestedSoloSession(session: Session, characterId: string): boolean {
   if (typeof session.id !== "string" || session.id.trim().length < 1) return false;
-  if (!Array.isArray(session.participants) || session.participants.length !== 1
-    || session.participants[0]?.id !== characterId) return false;
+  if (
+    !Array.isArray(session.participants) ||
+    session.participants.length !== 1 ||
+    session.participants[0]?.id !== characterId
+  )
+    return false;
   if (session.primaryCharacterId !== characterId) return false;
   // characterId is the legacy compatibility alias. Older payloads may omit
   // it, but whenever it is present it must bind to the same requested solo.
@@ -63,8 +229,12 @@ const contentPackLibraryApi: ContentPackLibraryApi = {
   publish: publishContentPack,
 };
 const characterBuilderApi: CharacterBuilderApi = {
-  create: createCharacterDraft, get: getCharacterDraft, update: updateCharacterDraft, reroll: rerollCharacterDraft,
-  finalize: finalizeCharacterDraft, getSheet: getCharacterSheet,
+  create: createCharacterDraft,
+  get: getCharacterDraft,
+  update: updateCharacterDraft,
+  reroll: rerollCharacterDraft,
+  finalize: finalizeCharacterDraft,
+  getSheet: getCharacterSheet,
 };
 const rpgCharacterSheetApi: RpgCharacterSheetApi = {
   getSheet: getCharacterSheet,
@@ -89,42 +259,208 @@ const rpgCharacterSheetApi: RpgCharacterSheetApi = {
   commandActorAttunement,
 };
 const combatTrackerApi: CombatTrackerApi = {
-  listEncounters: listCampaignEncounters, getCombat: getCombatState, getCombatLog, resolveAction: resolveCombatAction,
-  getCommandResult: getCombatCommandResult, getPowers: getActorPowers, getEffects: getActorEffects,
-  getResources: getActorResources, usePower: commandActorPower,
-   getConsumableActions:getCombatConsumableActions,useConsumable:commandCombatConsumable,getConsumableResult:getCombatConsumableResult,
-   getCombatPowerActions:getDirectCombatPowerActions,useCombatPower:commandDirectCombatPower,getCombatPowerResult:getDirectCombatPowerResult,
-  listRewards:listCombatRewards,claimReward:claimCombatReward,getRewardClaimResult:getCombatRewardClaimResult,getWallet:getActorWallet,startEncounter,endCombat,
+  listEncounters: listCampaignEncounters,
+  getCombat: getCombatState,
+  getCombatLog,
+  resolveAction: resolveCombatAction,
+  getCommandResult: getCombatCommandResult,
+  getPowers: getActorPowers,
+  getEffects: getActorEffects,
+  getResources: getActorResources,
+  usePower: commandActorPower,
+  getConsumableActions: getCombatConsumableActions,
+  useConsumable: commandCombatConsumable,
+  getConsumableResult: getCombatConsumableResult,
+  getCombatPowerActions: getDirectCombatPowerActions,
+  useCombatPower: commandDirectCombatPower,
+  getCombatPowerResult: getDirectCombatPowerResult,
+  listRewards: listCombatRewards,
+  claimReward: claimCombatReward,
+  getRewardClaimResult: getCombatRewardClaimResult,
+  getWallet: getActorWallet,
+  startEncounter,
+  endCombat,
 };
-const worldExplorerApi:WorldExplorerApi={getWorld:getCampaignWorld,travel:travelActor,place:placeActor,camp:establishActorCamp};
-const atlasAdvancementApi: AtlasAdvancementApi = { listCharacters: listCampaignCharacters, getProgression: getCharacterProgression, preview: previewCharacterProgression, apply: applyCharacterProgression, getSheet: getCharacterSheet, grantXp: grantCharacterXp };
-const castStudioApi:CastStudioApi={listNpcs:listCampaignNpcs,listFactions:listCampaignFactions,createNpc:createCampaignNpc,relationship:commandNpcRelationship,createFaction:createCampaignFaction,reputation:commandFactionReputation,relation:commandFactionRelation,actorMembership:commandActorFactionMembership,npcMembership:commandNpcFactionMembership,reaction:commandFactionReaction,previewNpcs:projectNpcsForPlayers,previewFactions:projectFactionsForPlayers,getCompanion:getCompanionAdministration,commandCompanion:commandCompanionAdministration,listMemberships:listCampaignMemberships,listRooms:listCampaignRooms};
-const questJournalApi:QuestJournalApi={list:listCampaignQuests,create:createCampaignQuest,command:commandQuest,preview:projectQuestsForPlayers};
-const storyStudioApi:StoryStudioApi={get:getCampaignStory,create:createCampaignStoryline,command:commandStoryline,preview:projectStoryForPlayers};
-const campaignHistoryApi: CampaignHistoryApi = { administration: getCampaignAdministration, timelines: listCampaignTimelines, checkpoints: listCampaignCheckpoints, events: listCampaignEvents, recaps: listCampaignRecaps, receipt: getCampaignCommandReceipt, createRecap: createCampaignRecap };
+const worldExplorerApi: WorldExplorerApi = {
+  getWorld: getCampaignWorld,
+  travel: travelActor,
+  place: placeActor,
+  camp: establishActorCamp,
+};
+const atlasAdvancementApi: AtlasAdvancementApi = {
+  listCharacters: listCampaignCharacters,
+  getProgression: getCharacterProgression,
+  preview: previewCharacterProgression,
+  apply: applyCharacterProgression,
+  getSheet: getCharacterSheet,
+  grantXp: grantCharacterXp,
+};
+const castStudioApi: CastStudioApi = {
+  listNpcs: listCampaignNpcs,
+  listFactions: listCampaignFactions,
+  createNpc: createCampaignNpc,
+  relationship: commandNpcRelationship,
+  createFaction: createCampaignFaction,
+  reputation: commandFactionReputation,
+  relation: commandFactionRelation,
+  actorMembership: commandActorFactionMembership,
+  npcMembership: commandNpcFactionMembership,
+  reaction: commandFactionReaction,
+  previewNpcs: projectNpcsForPlayers,
+  previewFactions: projectFactionsForPlayers,
+  getCompanion: getCompanionAdministration,
+  commandCompanion: commandCompanionAdministration,
+  listMemberships: listCampaignMemberships,
+  listRooms: listCampaignRooms,
+};
+const questJournalApi: QuestJournalApi = {
+  list: listCampaignQuests,
+  create: createCampaignQuest,
+  command: commandQuest,
+  preview: projectQuestsForPlayers,
+};
+const storyStudioApi: StoryStudioApi = {
+  get: getCampaignStory,
+  create: createCampaignStoryline,
+  command: commandStoryline,
+  preview: projectStoryForPlayers,
+};
+const campaignHistoryApi: CampaignHistoryApi = {
+  administration: getCampaignAdministration,
+  timelines: listCampaignTimelines,
+  checkpoints: listCampaignCheckpoints,
+  events: listCampaignEvents,
+  recaps: listCampaignRecaps,
+  receipt: getCampaignCommandReceipt,
+  createRecap: createCampaignRecap,
+};
 const campaignImportApi: CampaignImportApi = { dryRun: dryRunCampaignImport, apply: applyCampaignImport };
 const campaignExportApi: CampaignExportApi = { export: getCampaignExport };
-const campaignPlayApi: CampaignPlayApi = { dm: { ...campaignDmApi, getCampaignContextInspectionReferences, getCampaignContextInspection }, getCampaignPlayBootstrap, streamAdventureTurn, getAdventureTurn, getAdventureTurnTranscript, reconcileInitialAdventureTurn, confirmAdventureTurn,
-  getCampaignCommandReceipt, getCampaignWorld, listCampaignNpcs, listCampaignQuests, getActorResources, getActorGameplaySheet,
-  listCampaignEncounters, getCombatState, getTacticalMap, generateTacticalMap, previewTacticalMapMove, moveTacticalMapToken,
-  visitMerchant: commandFreeformShop, getNpcShop: getCampaignNpcShop, getShop: getCampaignShop, getWallet: getActorWallet, economyCommand: commandActorEconomy,
-  getCampaignPresentCast, listCampaignFactions, getCampaignGeneratedPlanning,
-  seekFreeformFaction: commandFreeformFaction, seekFreeformQuest: commandFreeformQuest, seekFreeformRumor: commandFreeformRumor,
-  getCampaignDiceHistory, rollCampaignDice };
+const campaignPlayApi: CampaignPlayApi = {
+  dm: { ...campaignDmApi, getCampaignContextInspectionReferences, getCampaignContextInspection },
+  getCampaignPlayBootstrap,
+  streamAdventureTurn,
+  getAdventureTurn,
+  getAdventureTurnTranscript,
+  reconcileInitialAdventureTurn,
+  confirmAdventureTurn,
+  getCampaignCommandReceipt,
+  getCampaignWorld,
+  listCampaignNpcs,
+  listCampaignQuests,
+  getActorResources,
+  getActorGameplaySheet,
+  listCampaignEncounters,
+  getCombatState,
+  getTacticalMap,
+  generateTacticalMap,
+  previewTacticalMapMove,
+  moveTacticalMapToken,
+  visitMerchant: commandFreeformShop,
+  getNpcShop: getCampaignNpcShop,
+  getShop: getCampaignShop,
+  getWallet: getActorWallet,
+  economyCommand: commandActorEconomy,
+  getCampaignPresentCast,
+  listCampaignFactions,
+  getCampaignGeneratedPlanning,
+  seekFreeformFaction: commandFreeformFaction,
+  seekFreeformQuest: commandFreeformQuest,
+  seekFreeformRumor: commandFreeformRumor,
+  getCampaignDiceHistory,
+  rollCampaignDice,
+};
 const sceneImageApi: SceneImageApi = {
-  getSettings: getSceneImageSettings, putSettings: putSceneImageSettings, generate: generateSceneImage,
-  getGallery: getSceneImageGallery, select: selectSceneImage, getJob: getSceneImageJob, assetUrl: sceneImageAssetUrl,
+  getSettings: getSceneImageSettings,
+  putSettings: putSceneImageSettings,
+  generate: generateSceneImage,
+  getGallery: getSceneImageGallery,
+  select: selectSceneImage,
+  getJob: getSceneImageJob,
+  assetUrl: sceneImageAssetUrl,
 };
 
-function CampaignAuthorizationGate({campaignId,onUnavailable,children}:{campaignId:string;onUnavailable:()=>void;children:(authorization:StudioAuthorization)=>ReactNode}){
+function CampaignAuthorizationGate({
+  campaignId,
+  onUnavailable,
+  children,
+}: {
+  campaignId: string;
+  onUnavailable: () => void;
+  children: (authorization: StudioAuthorization) => ReactNode;
+}) {
   const { report } = useCampaignShell();
-  const [authorization,setAuthorization]=useState<StudioAuthorization|null>(null),[failed,setFailed]=useState(false);
-  const unavailableRef=useRef(onUnavailable),generationRef=useRef(0),mountedRef=useRef(true),authorizationRef=useRef<StudioAuthorization|null>(null);unavailableRef.current=onUnavailable;authorizationRef.current=authorization;
-  const reauthorize=useCallback(async():Promise<StudioAuthorization>=>{const requestGeneration=++generationRef.current;setFailed(false);report(null);try{const {campaign}=await getCampaignDetail(campaignId);if(!mountedRef.current||requestGeneration!==generationRef.current)throw new Error("Studio authorization was superseded");const previous=authorizationRef.current,audience=campaign.actorRole==="owner"||campaign.actorRole==="gm"?"gm":"player",changed=previous!==null&&(previous.role!==campaign.actorRole||previous.audience!==audience);if(changed)sanitizeCampaignNarrativeMutations(campaignId);const next:StudioAuthorization={role:campaign.actorRole,audience,generation:changed||previous===null?requestGeneration:previous.generation,reauthorize};authorizationRef.current=next;setAuthorization(next);report(campaign);return next;}catch(error){if(!mountedRef.current||requestGeneration!==generationRef.current)throw error;sanitizeCampaignNarrativeMutations(campaignId);authorizationRef.current=null;setAuthorization(null);if(error instanceof ApiError&&error.status===404)unavailableRef.current();else setFailed(true);throw error;}},[campaignId,report]);
-  useEffect(()=>{mountedRef.current=true;void reauthorize().catch(()=>undefined);return()=>{mountedRef.current=false;generationRef.current+=1}},[reauthorize]);
-  useEffect(()=>{const focus=()=>void reauthorize().catch(()=>undefined);window.addEventListener("focus",focus);return()=>window.removeEventListener("focus",focus)},[reauthorize]);
-   if(failed)return <main className="studio-page"><section className="studio-shell" role="alert"><h1>Campaign unavailable</h1><p>Campaign authority could not be refreshed.</p><button onClick={onUnavailable}>Return to campaign</button></section></main>;
-  if(authorization===null)return <main className="studio-page"><section className="studio-shell" role="status">Checking campaign role…</section></main>;
+  const [authorization, setAuthorization] = useState<StudioAuthorization | null>(null),
+    [failed, setFailed] = useState(false);
+  const unavailableRef = useRef(onUnavailable),
+    generationRef = useRef(0),
+    mountedRef = useRef(true),
+    authorizationRef = useRef<StudioAuthorization | null>(null);
+  unavailableRef.current = onUnavailable;
+  authorizationRef.current = authorization;
+  const reauthorize = useCallback(async (): Promise<StudioAuthorization> => {
+    const requestGeneration = ++generationRef.current;
+    setFailed(false);
+    report(null);
+    try {
+      const { campaign } = await getCampaignDetail(campaignId);
+      if (!mountedRef.current || requestGeneration !== generationRef.current)
+        throw new Error("Studio authorization was superseded");
+      const previous = authorizationRef.current,
+        audience = campaign.actorRole === "owner" || campaign.actorRole === "gm" ? "gm" : "player",
+        changed = previous !== null && (previous.role !== campaign.actorRole || previous.audience !== audience);
+      if (changed) sanitizeCampaignNarrativeMutations(campaignId);
+      const next: StudioAuthorization = {
+        role: campaign.actorRole,
+        audience,
+        generation: changed || previous === null ? requestGeneration : previous.generation,
+        reauthorize,
+      };
+      authorizationRef.current = next;
+      setAuthorization(next);
+      report(campaign);
+      return next;
+    } catch (error) {
+      if (!mountedRef.current || requestGeneration !== generationRef.current) throw error;
+      sanitizeCampaignNarrativeMutations(campaignId);
+      authorizationRef.current = null;
+      setAuthorization(null);
+      if (error instanceof ApiError && error.status === 404) unavailableRef.current();
+      else setFailed(true);
+      throw error;
+    }
+  }, [campaignId, report]);
+  useEffect(() => {
+    mountedRef.current = true;
+    void reauthorize().catch(() => undefined);
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+    };
+  }, [reauthorize]);
+  useEffect(() => {
+    const focus = () => void reauthorize().catch(() => undefined);
+    window.addEventListener("focus", focus);
+    return () => window.removeEventListener("focus", focus);
+  }, [reauthorize]);
+  if (failed)
+    return (
+      <main className="studio-page">
+        <section className="studio-shell" role="alert">
+          <h1>Campaign unavailable</h1>
+          <p>Campaign authority could not be refreshed.</p>
+          <button onClick={onUnavailable}>Return to campaign</button>
+        </section>
+      </main>
+    );
+  if (authorization === null)
+    return (
+      <main className="studio-page">
+        <section className="studio-shell" role="status">
+          Checking campaign role…
+        </section>
+      </main>
+    );
   return <StudioAuthorizationProvider value={authorization}>{children(authorization)}</StudioAuthorizationProvider>;
 }
 
@@ -134,29 +470,55 @@ function clearCampaignPlayPersistence(campaignId: string, sessionId?: string, tu
     localStorage.removeItem(`velvet.campaign-play.v1:${campaignId}:${sessionId}`);
     localStorage.removeItem(`velvet.campaign-play-submit.v1:${campaignId}:${sessionId}`);
     if (turnId) localStorage.removeItem(`velvet.adventure-confirm.v1:${turnId}`);
-  } catch { /* optional safe locator persistence */ }
+  } catch {
+    /* optional safe locator persistence */
+  }
 }
 
 export default function App() {
-  const freshNavigation = useRef((() => { try { return localStorage.getItem("velvet.navigation.v1") === null; } catch { return true; } })()).current;
+  const freshNavigation = useRef(
+    (() => {
+      try {
+        return localStorage.getItem("velvet.navigation.v1") === null;
+      } catch {
+        return true;
+      }
+    })(),
+  ).current;
   // A non-empty campaign route is a deliberate deep link. It wins only on a
   // fresh install or over the default home surface so an already-open workspace
   // is never silently replaced by a stale hash. Empty hashes keep local restore.
-  const forcedDeepLink = useRef((() => { try { return new URLSearchParams(window.location.search).has("deepLink"); } catch { return false; } })()).current;
+  const forcedDeepLink = useRef(
+    (() => {
+      try {
+        return new URLSearchParams(window.location.search).has("deepLink");
+      } catch {
+        return false;
+      }
+    })(),
+  ).current;
   // A non-empty campaign route is a deliberate deep link. It wins only on a
   // fresh install, over the default home surface, or when the URL carries the
   // explicit ?deepLink marker used by shared room links, so an already-open
   // workspace is never silently replaced by a stale hash. Empty hashes keep
   // local restore.
-  const stored = useRef<StoredNavigation>((() => {
-    const local = readNavigation();
-    const fromHash = window.location.hash ? navigationFromRoute(window.location.hash) : null;
-    return fromHash && (freshNavigation || local.view === "home" || forcedDeepLink) ? fromHash : local;
-  })()).current;
+  const stored = useRef<StoredNavigation>(
+    (() => {
+      const local = readNavigation();
+      const fromHash = window.location.hash ? navigationFromRoute(window.location.hash) : null;
+      return fromHash && (freshNavigation || local.view === "home" || forcedDeepLink) ? fromHash : local;
+    })(),
+  ).current;
   const campaignEntryRef = useRef(stored.campaignEntry === "overview");
-  const [shellSelection, setShellSelection] = useState<{ destination: CampaignDestination; view: View; request: number } | null>(null);
+  const [shellSelection, setShellSelection] = useState<{
+    destination: CampaignDestination;
+    view: View;
+    request: number;
+  } | null>(null);
   const [view, setView] = useState<View>(stored.view ?? "home");
-  useEffect(() => { if (shellSelection && shellSelection.view !== view) setShellSelection(null); }, [shellSelection, view]);
+  useEffect(() => {
+    if (shellSelection && shellSelection.view !== view) setShellSelection(null);
+  }, [shellSelection, view]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>(stored.selectedIds ?? []);
@@ -172,7 +534,9 @@ export default function App() {
   const [chatReturnCampaignId, setChatReturnCampaignId] = useState(stored.chatReturnCampaignId ?? "");
   const [roomsRefreshRequest, setRoomsRefreshRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [roomOpenPending, setRoomOpenPending] = useState<{ campaignId: string; request: number } | null>(null);
-  const [roomOpenFailure, setRoomOpenFailure] = useState<{ campaignId: string; request: number; text: string } | null>(null);
+  const [roomOpenFailure, setRoomOpenFailure] = useState<{ campaignId: string; request: number; text: string } | null>(
+    null,
+  );
   const transitionRequestRef = useRef(0);
   const roomOpenRequestRef = useRef(0);
   const privateOpenRequestRef = useRef(0);
@@ -186,24 +550,57 @@ export default function App() {
   const characterBuilderEntryRef = useRef(0);
   const characterSheetEntryRef = useRef(stored.view === "campaign-character-sheet" ? 1 : 0);
   const combatEntryRef = useRef(stored.view === "campaign-combat" ? 1 : 0);
-  const studioEntryRef = useRef(["campaign-world","campaign-cast","campaign-journal","campaign-story"].includes(stored.view) ? 1 : 0);
-  const [combatReturnView, setCombatReturnView] = useState<"campaign-detail" | "campaign-character-sheet" | "campaign-play">(stored.combatReturnView ?? "campaign-detail");
+  const studioEntryRef = useRef(
+    ["campaign-world", "campaign-cast", "campaign-journal", "campaign-story"].includes(stored.view) ? 1 : 0,
+  );
+  const [combatReturnView, setCombatReturnView] = useState<
+    "campaign-detail" | "campaign-character-sheet" | "campaign-play"
+  >(stored.combatReturnView ?? "campaign-detail");
   const [combatActorRole, setCombatActorRole] = useState(stored.combatActorRole);
   const [combatControlledActorId, setCombatControlledActorId] = useState(stored.combatControlledActorId ?? "");
   const [initialCombatId, setInitialCombatId] = useState(stored.combatId ?? "");
-  const [playCombatReturnFocus, setPlayCombatReturnFocus] = useState<{ pane: "scene" | "conversation" | "character" | "context"; focus: "navigation" | "open-controls" | "prepare" | "rewards" } | null>(() =>
-    stored.combatReturnView === "campaign-play" && stored.combatReturnPane && stored.combatReturnFocus ? { pane: stored.combatReturnPane, focus: stored.combatReturnFocus } : null);
+  const [playCombatReturnFocus, setPlayCombatReturnFocus] = useState<{
+    pane: "scene" | "conversation" | "character" | "context";
+    focus: "navigation" | "open-controls" | "prepare" | "rewards";
+  } | null>(() =>
+    stored.combatReturnView === "campaign-play" && stored.combatReturnPane && stored.combatReturnFocus
+      ? { pane: stored.combatReturnPane, focus: stored.combatReturnFocus }
+      : null,
+  );
   const [combatReturnFocusRequest, setCombatReturnFocusRequest] = useState<number | null>(null);
-  const [studioReturnFocusRequest,setStudioReturnFocusRequest]=useState<{view:"world"|"cast"|"journal"|"story";request:number}|null>(null);
-  const [campaignHeadingFocusRequest, setCampaignHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
-  const [workspaceHeadingFocusRequest, setWorkspaceHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(null);
-  const [administrationHeadingFocusRequest, setAdministrationHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
+  const [studioReturnFocusRequest, setStudioReturnFocusRequest] = useState<{
+    view: "world" | "cast" | "journal" | "story";
+    request: number;
+  } | null>(null);
+  const [campaignHeadingFocusRequest, setCampaignHeadingFocusRequest] = useState<{
+    campaignId: string;
+    request: number;
+  } | null>(null);
+  const [workspaceHeadingFocusRequest, setWorkspaceHeadingFocusRequest] = useState<{
+    campaignId: string;
+    campaignCharacterId: string;
+    request: number;
+  } | null>(null);
+  const [administrationHeadingFocusRequest, setAdministrationHeadingFocusRequest] = useState<{
+    campaignId: string;
+    request: number;
+  } | null>(null);
   const [contentHeadingFocusRequest, setContentHeadingFocusRequest] = useState<number | null>(null);
   const [contentReturnFocusRequest, setContentReturnFocusRequest] = useState<number | null>(null);
-  const [sheetReturnFocusRequest, setSheetReturnFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(null);
-  const [sheetHeadingFocusRequest, setSheetHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(() =>
+  const [sheetReturnFocusRequest, setSheetReturnFocusRequest] = useState<{
+    campaignId: string;
+    campaignCharacterId: string;
+    request: number;
+  } | null>(null);
+  const [sheetHeadingFocusRequest, setSheetHeadingFocusRequest] = useState<{
+    campaignId: string;
+    campaignCharacterId: string;
+    request: number;
+  } | null>(() =>
     stored.view === "campaign-character-sheet" && stored.campaignId && stored.campaignCharacterId
-      ? { campaignId: stored.campaignId, campaignCharacterId: stored.campaignCharacterId, request: 1 } : null);
+      ? { campaignId: stored.campaignId, campaignCharacterId: stored.campaignCharacterId, request: 1 }
+      : null,
+  );
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,9 +616,11 @@ export default function App() {
   const [campaignMechanicsAvailable, setCampaignMechanicsAvailable] = useState(false);
   const [combatAvailable, setCombatAvailable] = useState(false);
   const [contentStudioAvailable, setContentStudioAvailable] = useState(false);
-  const [narrativeStudioAvailable,setNarrativeStudioAvailable]=useState(false);
+  const [narrativeStudioAvailable, setNarrativeStudioAvailable] = useState(false);
   const [campaignExportOpen, setCampaignExportOpen] = useState(false);
-  const [campaignAuxReturnView, setCampaignAuxReturnView] = useState<"campaign-detail" | "campaign-administration">("campaign-detail");
+  const [campaignAuxReturnView, setCampaignAuxReturnView] = useState<"campaign-detail" | "campaign-administration">(
+    "campaign-detail",
+  );
   const [provider, setProvider] = useState<ProviderSettings | null>(null);
   const [harness, setHarness] = useState<HarnessSettings | null>(null);
   const currentNavigationRef = useRef({ view, campaignId: activeCampaignId, chatReturnCampaignId });
@@ -231,14 +630,38 @@ export default function App() {
   const previousViewRef = useRef(view);
 
   useEffect(() => {
-    if (["campaign-overview", "campaign-rooms", "campaign-party", "campaign-create"].includes(view)) campaignEntryRef.current = true;
+    if (["campaign-overview", "campaign-rooms", "campaign-party", "campaign-create"].includes(view))
+      campaignEntryRef.current = true;
     else if (view === "campaign-detail") campaignEntryRef.current = false;
   }, [view]);
 
   useEffect(() => {
     const campaignName = activeCampaignName ? `${activeCampaignName} | ` : "";
-    const labels: Partial<Record<View, string>> = { home: "Characters", campaigns: "Campaigns", "campaign-detail": "Campaign command center", "campaign-play": "Adventure room", "campaign-character": "Character", "campaign-character-sheet": "Character sheet", "campaign-character-builder": "Character builder", "campaign-administration": "Campaign administration", "campaign-history": "Campaign history", "campaign-transfer": "Campaign transfer", "campaign-combat": "Combat tracker", "campaign-world": "World explorer", "campaign-cast": "Cast & factions", "campaign-journal": "Quest journal", "campaign-story": "Story studio", "content-packs": "Content packs", chat: session?.title || "Room" };
-    Object.assign(labels, { "campaign-overview": "Campaign overview", "campaign-rooms": "Rooms", "campaign-party": "Party", "campaign-create": "Create your campaign" });
+    const labels: Partial<Record<View, string>> = {
+      home: "Characters",
+      campaigns: "Campaigns",
+      "campaign-detail": "Campaign command center",
+      "campaign-play": "Adventure room",
+      "campaign-character": "Character",
+      "campaign-character-sheet": "Character sheet",
+      "campaign-character-builder": "Character builder",
+      "campaign-administration": "Campaign administration",
+      "campaign-history": "Campaign history",
+      "campaign-transfer": "Campaign transfer",
+      "campaign-combat": "Combat tracker",
+      "campaign-world": "World explorer",
+      "campaign-cast": "Cast & factions",
+      "campaign-journal": "Quest journal",
+      "campaign-story": "Story studio",
+      "content-packs": "Content packs",
+      chat: session?.title || "Room",
+    };
+    Object.assign(labels, {
+      "campaign-overview": "Campaign overview",
+      "campaign-rooms": "Rooms",
+      "campaign-party": "Party",
+      "campaign-create": "Create your campaign",
+    });
     document.title = `${campaignName}${labels[view] ?? "Velvet"} | Velvet`;
   }, [activeCampaignName, session?.title, view]);
 
@@ -251,33 +674,98 @@ export default function App() {
     navigationEpochRef.current += 1;
   }, [view]);
 
-  useEffect(()=>{const open=(event:Event)=>{const studio=(event as CustomEvent<{studio?:"world"|"cast"|"journal"|"story"}>).detail?.studio;if(!studio||!narrativeStudioAvailable||currentNavigationRef.current.view!=="campaign-detail"||!activeCampaignId)return;cancelRoomOpenForNavigation();const request=++transitionRequestRef.current;studioEntryRef.current=request;const destination:Record<typeof studio,View>={world:"campaign-world",cast:"campaign-cast",journal:"campaign-journal",story:"campaign-story"};currentNavigationRef.current={view:destination[studio],campaignId:activeCampaignId,chatReturnCampaignId:""};setView(destination[studio]);};window.addEventListener("velvet:open-campaign-studio",open);return()=>window.removeEventListener("velvet:open-campaign-studio",open);},[activeCampaignId,narrativeStudioAvailable]);
+  useEffect(() => {
+    const open = (event: Event) => {
+      const studio = (event as CustomEvent<{ studio?: "world" | "cast" | "journal" | "story" }>).detail?.studio;
+      if (
+        !studio ||
+        !narrativeStudioAvailable ||
+        currentNavigationRef.current.view !== "campaign-detail" ||
+        !activeCampaignId
+      )
+        return;
+      cancelRoomOpenForNavigation();
+      const request = ++transitionRequestRef.current;
+      studioEntryRef.current = request;
+      const destination: Record<typeof studio, View> = {
+        world: "campaign-world",
+        cast: "campaign-cast",
+        journal: "campaign-journal",
+        story: "campaign-story",
+      };
+      currentNavigationRef.current = {
+        view: destination[studio],
+        campaignId: activeCampaignId,
+        chatReturnCampaignId: "",
+      };
+      setView(destination[studio]);
+    };
+    window.addEventListener("velvet:open-campaign-studio", open);
+    return () => window.removeEventListener("velvet:open-campaign-studio", open);
+  }, [activeCampaignId, narrativeStudioAvailable]);
   useEffect(() => {
     const open = (event: Event) => {
       const current = currentNavigationRef.current;
-      if (!campaignLibraryAvailable || !activeCampaignId || (current.view !== "campaign-detail" && current.view !== "campaign-administration")) return;
+      if (
+        !campaignLibraryAvailable ||
+        !activeCampaignId ||
+        (current.view !== "campaign-detail" && current.view !== "campaign-administration")
+      )
+        return;
       const transfer = event.type === "velvet:open-campaign-transfer";
       const name = (event as CustomEvent<{ campaignName?: string }>).detail?.campaignName;
       if (name) setActiveCampaignName(name);
-      setCampaignAuxReturnView(current.view); cancelRoomOpenForNavigation();
+      setCampaignAuxReturnView(current.view);
+      cancelRoomOpenForNavigation();
       const destination: View = transfer ? "campaign-transfer" : "campaign-history";
-      currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView(destination);
+      currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" };
+      setView(destination);
     };
-    window.addEventListener("velvet:open-campaign-history", open); window.addEventListener("velvet:open-campaign-transfer", open);
-    return () => { window.removeEventListener("velvet:open-campaign-history", open); window.removeEventListener("velvet:open-campaign-transfer", open); };
+    window.addEventListener("velvet:open-campaign-history", open);
+    window.addEventListener("velvet:open-campaign-transfer", open);
+    return () => {
+      window.removeEventListener("velvet:open-campaign-history", open);
+      window.removeEventListener("velvet:open-campaign-transfer", open);
+    };
   }, [activeCampaignId, campaignLibraryAvailable]);
-  useEffect(()=>{if(view!=="campaign-detail"||!studioReturnFocusRequest)return;let active=true,attempts=0;const focus=()=>{if(!active)return;const target=document.querySelector<HTMLButtonElement>(`[data-campaign-studio="${studioReturnFocusRequest.view}"]`);if(target){target.focus();setStudioReturnFocusRequest(null);}else if(attempts++<40)window.setTimeout(focus,25);};queueMicrotask(focus);return()=>{active=false}},[view,studioReturnFocusRequest]);
+  useEffect(() => {
+    if (view !== "campaign-detail" || !studioReturnFocusRequest) return;
+    let active = true,
+      attempts = 0;
+    const focus = () => {
+      if (!active) return;
+      const target = document.querySelector<HTMLButtonElement>(
+        `[data-campaign-studio="${studioReturnFocusRequest.view}"]`,
+      );
+      if (target) {
+        target.focus();
+        setStudioReturnFocusRequest(null);
+      } else if (attempts++ < 40) window.setTimeout(focus, 25);
+    };
+    queueMicrotask(focus);
+    return () => {
+      active = false;
+    };
+  }, [view, studioReturnFocusRequest]);
   useEffect(() => {
     if (view !== "campaign-play" || !playCombatReturnFocus) return;
-    let active = true, attempts = 0;
+    let active = true,
+      attempts = 0;
     const restore = () => {
       if (!active) return;
       // Previously persisted standalone combat routes return to the new in-room entry.
-      const target = document.querySelector<HTMLButtonElement>('.table-menu-button') ?? document.querySelector<HTMLButtonElement>('[data-atlas-tool="combat"]');
-      if (target) { target.focus(); setPlayCombatReturnFocus(null); }
-      else if (attempts++ < 40) window.setTimeout(restore, 25);
+      const target =
+        document.querySelector<HTMLButtonElement>(".table-menu-button") ??
+        document.querySelector<HTMLButtonElement>('[data-atlas-tool="combat"]');
+      if (target) {
+        target.focus();
+        setPlayCombatReturnFocus(null);
+      } else if (attempts++ < 40) window.setTimeout(restore, 25);
     };
-    queueMicrotask(restore); return () => { active = false; };
+    queueMicrotask(restore);
+    return () => {
+      active = false;
+    };
   }, [playCombatReturnFocus, view]);
 
   function cancelRoomOpenForNavigation() {
@@ -295,7 +783,8 @@ export default function App() {
   async function refreshLibrary(isCurrent: () => boolean = () => true) {
     const [characterData, sessionData] = await Promise.all([listCharacters(), listSessions()]);
     if (!isCurrent()) return null;
-    setCharacters(characterData.characters); setSessions(sessionData.sessions);
+    setCharacters(characterData.characters);
+    setSessions(sessionData.sessions);
     return { characters: characterData.characters, sessions: sessionData.sessions };
   }
 
@@ -304,7 +793,14 @@ export default function App() {
     // Optional RPG discovery is intentionally independent: a slow or legacy
     // server endpoint must never hold the character library or restored chat.
     void getRpgFeatures()
-      .catch(() => ({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false }))
+      .catch(() => ({
+        campaign: false,
+        mechanics: false,
+        combat: false,
+        studio: false,
+        remoteAuthentication: false,
+        systemOne: false,
+      }))
       .then((rpgFeatureData) => {
         if (!mounted) return;
         campaignAvailabilityRef.current = rpgFeatureData.campaign;
@@ -314,14 +810,31 @@ export default function App() {
         setCombatAvailable(rpgFeatureData.campaign && rpgFeatureData.mechanics && rpgFeatureData.combat);
         setContentStudioAvailable(rpgFeatureData.campaign && rpgFeatureData.mechanics);
         setSystemOneAvailable(rpgFeatureData.systemOne);
-        const narrativeAvailable=rpgFeatureData.campaign&&rpgFeatureData.mechanics&&rpgFeatureData.studio;setNarrativeStudioAvailable(narrativeAvailable);setCampaignStudioRolloutAvailable(narrativeAvailable);
+        const narrativeAvailable = rpgFeatureData.campaign && rpgFeatureData.mechanics && rpgFeatureData.studio;
+        setNarrativeStudioAvailable(narrativeAvailable);
+        setCampaignStudioRolloutAvailable(narrativeAvailable);
         const current = currentNavigationRef.current;
         if (freshNavigation && rpgFeatureData.campaign && current.view === "home" && navigationEpochRef.current === 0) {
           currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" };
           setView("campaigns");
         }
-        const campaignRelated = current.view.startsWith("campaign-") || current.view === "campaigns" || current.view === "campaign-detail" || current.view === "campaign-play" || current.view === "campaign-administration" || current.view === "campaign-history" || current.view === "campaign-transfer" || current.view === "campaign-character-builder" || current.view === "campaign-world" || current.view === "campaign-cast" || current.view === "campaign-journal" || current.view === "campaign-story"
-          || current.view === "campaign-character" || current.view === "campaign-character-sheet" || current.view === "campaign-combat" || (current.view === "chat" && Boolean(current.chatReturnCampaignId));
+        const campaignRelated =
+          current.view.startsWith("campaign-") ||
+          current.view === "campaigns" ||
+          current.view === "campaign-detail" ||
+          current.view === "campaign-play" ||
+          current.view === "campaign-administration" ||
+          current.view === "campaign-history" ||
+          current.view === "campaign-transfer" ||
+          current.view === "campaign-character-builder" ||
+          current.view === "campaign-world" ||
+          current.view === "campaign-cast" ||
+          current.view === "campaign-journal" ||
+          current.view === "campaign-story" ||
+          current.view === "campaign-character" ||
+          current.view === "campaign-character-sheet" ||
+          current.view === "campaign-combat" ||
+          (current.view === "chat" && Boolean(current.chatReturnCampaignId));
         if (campaignRelated && !rpgFeatureData.campaign) {
           cancelRoomOpenForNavigation();
           currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" };
@@ -338,77 +851,173 @@ export default function App() {
           setView("home");
         }
         if (current.view === "campaign-character-builder" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
-          currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
+          currentNavigationRef.current = {
+            view: "campaign-detail",
+            campaignId: current.campaignId,
+            chatReturnCampaignId: "",
+          };
           setView(current.campaignId ? "campaign-detail" : "campaigns");
         }
-        if (current.view === "campaign-create" && rpgFeatureData.campaign && !(rpgFeatureData.mechanics && rpgFeatureData.combat)) {
-          currentNavigationRef.current = { view: "campaign-overview", campaignId: current.campaignId, chatReturnCampaignId: "" };
+        if (
+          current.view === "campaign-create" &&
+          rpgFeatureData.campaign &&
+          !(rpgFeatureData.mechanics && rpgFeatureData.combat)
+        ) {
+          currentNavigationRef.current = {
+            view: "campaign-overview",
+            campaignId: current.campaignId,
+            chatReturnCampaignId: "",
+          };
           setView(current.campaignId ? "campaign-overview" : "campaigns");
         }
         if (current.view === "campaign-play" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
-          clearCampaignPlayPersistence(current.campaignId, currentSessionRef.current?.id ?? stored.sessionId, playTurnId); setPlayTurnId(""); setPlaySelectedActorId("");
-          currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
-          const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request;
-          if (current.campaignId) setCampaignHeadingFocusRequest({ campaignId: current.campaignId, request });
-          setSession(null); setMessages([]); setView(current.campaignId ? "campaign-detail" : "campaigns");
-        }
-        if (current.view === "campaign-character-sheet" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
-          currentNavigationRef.current = { view: "campaign-character", campaignId: current.campaignId, chatReturnCampaignId: "" };
+          clearCampaignPlayPersistence(
+            current.campaignId,
+            currentSessionRef.current?.id ?? stored.sessionId,
+            playTurnId,
+          );
+          setPlayTurnId("");
+          setPlaySelectedActorId("");
+          currentNavigationRef.current = {
+            view: "campaign-detail",
+            campaignId: current.campaignId,
+            chatReturnCampaignId: "",
+          };
           const request = ++transitionRequestRef.current;
-          setWorkspaceHeadingFocusRequest({ campaignId: current.campaignId, campaignCharacterId: activeCampaignCharacterId, request });
-          setView(current.campaignId ? "campaign-character" : "campaigns");
-        }
-        if (current.view === "campaign-combat" && !(rpgFeatureData.campaign && rpgFeatureData.mechanics && rpgFeatureData.combat)) {
-          currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
+          campaignDetailEntryRef.current = request;
+          if (current.campaignId) setCampaignHeadingFocusRequest({ campaignId: current.campaignId, request });
+          setSession(null);
+          setMessages([]);
           setView(current.campaignId ? "campaign-detail" : "campaigns");
         }
-        if (["campaign-world","campaign-cast","campaign-journal","campaign-story"].includes(current.view) && !narrativeAvailable) {
-          currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
+        if (current.view === "campaign-character-sheet" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
+          currentNavigationRef.current = {
+            view: "campaign-character",
+            campaignId: current.campaignId,
+            chatReturnCampaignId: "",
+          };
+          const request = ++transitionRequestRef.current;
+          setWorkspaceHeadingFocusRequest({
+            campaignId: current.campaignId,
+            campaignCharacterId: activeCampaignCharacterId,
+            request,
+          });
+          setView(current.campaignId ? "campaign-character" : "campaigns");
+        }
+        if (
+          current.view === "campaign-combat" &&
+          !(rpgFeatureData.campaign && rpgFeatureData.mechanics && rpgFeatureData.combat)
+        ) {
+          currentNavigationRef.current = {
+            view: "campaign-detail",
+            campaignId: current.campaignId,
+            chatReturnCampaignId: "",
+          };
+          setView(current.campaignId ? "campaign-detail" : "campaigns");
+        }
+        if (
+          ["campaign-world", "campaign-cast", "campaign-journal", "campaign-story"].includes(current.view) &&
+          !narrativeAvailable
+        ) {
+          currentNavigationRef.current = {
+            view: "campaign-detail",
+            campaignId: current.campaignId,
+            chatReturnCampaignId: "",
+          };
           setView(current.campaignId ? "campaign-detail" : "campaigns");
         }
       });
-    void Promise.all([refreshLibrary(), getFeatures().catch(() => ({ voice: false, images: false })), getProvider().catch(() => null), getHarness().catch(() => null)])
+    void Promise.all([
+      refreshLibrary(),
+      getFeatures().catch(() => ({ voice: false, images: false })),
+      getProvider().catch(() => null),
+      getHarness().catch(() => null),
+    ])
       .then(async ([library, featureData, providerData, harnessData]) => {
         if (!mounted) return;
         if (!library) return;
-        setFeatures(featureData); setProvider(providerData); setHarness(harnessData);
+        setFeatures(featureData);
+        setProvider(providerData);
+        setHarness(harnessData);
         const valid = new Set(library.characters.map((character) => character.id));
         const validSelected = selectedIds.filter((id) => valid.has(id));
-        setSelectedIds(validSelected); setPrimaryId(validSelected.includes(primaryId) ? primaryId : validSelected[0] ?? "");
-        if (activeCharacterId && !valid.has(activeCharacterId)) { setActiveCharacterId(""); if (["edit", "memory"].includes(view)) setView("home"); }
+        setSelectedIds(validSelected);
+        setPrimaryId(validSelected.includes(primaryId) ? primaryId : (validSelected[0] ?? ""));
+        if (activeCharacterId && !valid.has(activeCharacterId)) {
+          setActiveCharacterId("");
+          if (["edit", "memory"].includes(view)) setView("home");
+        }
         const combatRoomIsRestorable = stored.view === "campaign-combat" && stored.combatReturnView === "campaign-play";
-        const sessionIsRestorable = Boolean(stored.sessionId && (library.sessions.some((item) => item.id === stored.sessionId)
-          || stored.chatReturnCampaignId || stored.view === "campaign-play" || combatRoomIsRestorable));
-        if (stored.sessionId && sessionIsRestorable && (stored.view === "chat" || stored.view === "campaign-play" || combatRoomIsRestorable)
-          && !(stored.view === "campaign-play" && mechanicsAvailabilityRef.current === false)) {
+        const sessionIsRestorable = Boolean(
+          stored.sessionId &&
+          (library.sessions.some((item) => item.id === stored.sessionId) ||
+            stored.chatReturnCampaignId ||
+            stored.view === "campaign-play" ||
+            combatRoomIsRestorable),
+        );
+        if (
+          stored.sessionId &&
+          sessionIsRestorable &&
+          (stored.view === "chat" || stored.view === "campaign-play" || combatRoomIsRestorable) &&
+          !(stored.view === "campaign-play" && mechanicsAvailabilityRef.current === false)
+        ) {
           const restorationEpoch = navigationEpochRef.current;
           try {
             const hydrated = await getSession(stored.sessionId);
             // Session IDs are opaque and exact. A valid-looking response for a
             // different room must never inherit the persisted campaign origin.
-            if (hydrated.session.id !== stored.sessionId) throw new Error("Session response did not match the requested room");
-            if (mounted && restorationEpoch === navigationEpochRef.current
-              && !(stored.chatReturnCampaignId && campaignAvailabilityRef.current === false)) {
-              chatEntryRef.current += 1; currentSessionRef.current = hydrated.session;
-              setSession(hydrated.session); setMessages(hydrated.messages); setView(stored.view);
+            if (hydrated.session.id !== stored.sessionId)
+              throw new Error("Session response did not match the requested room");
+            if (
+              mounted &&
+              restorationEpoch === navigationEpochRef.current &&
+              !(stored.chatReturnCampaignId && campaignAvailabilityRef.current === false)
+            ) {
+              chatEntryRef.current += 1;
+              currentSessionRef.current = hydrated.session;
+              setSession(hydrated.session);
+              setMessages(hydrated.messages);
+              setView(stored.view);
             }
           } catch {
             if (!mounted || restorationEpoch !== navigationEpochRef.current) return;
-            if ((stored.chatReturnCampaignId || stored.view === "campaign-play" || combatRoomIsRestorable) && stored.campaignId && campaignAvailabilityRef.current !== false) {
+            if (
+              (stored.chatReturnCampaignId || stored.view === "campaign-play" || combatRoomIsRestorable) &&
+              stored.campaignId &&
+              campaignAvailabilityRef.current !== false
+            ) {
               const request = ++transitionRequestRef.current;
               campaignDetailEntryRef.current = request;
-              currentNavigationRef.current = { view: "campaign-detail", campaignId: stored.campaignId, chatReturnCampaignId: "" };
+              currentNavigationRef.current = {
+                view: "campaign-detail",
+                campaignId: stored.campaignId,
+                chatReturnCampaignId: "",
+              };
               setActiveCampaignId(stored.campaignId);
               setChatReturnCampaignId("");
-              setRoomOpenFailure({ campaignId: stored.campaignId, request, text: "Room could not be opened. Please try again." });
-              setSession(null); setMessages([]); setView("campaign-detail");
-            } else { setChatReturnCampaignId(""); setView("home"); }
+              setRoomOpenFailure({
+                campaignId: stored.campaignId,
+                request,
+                text: "Room could not be opened. Please try again.",
+              });
+              setSession(null);
+              setMessages([]);
+              setView("campaign-detail");
+            } else {
+              setChatReturnCampaignId("");
+              setView("home");
+            }
           }
-        } else if (stored.view === "chat" || stored.view === "campaign-play") { setChatReturnCampaignId(""); setView(stored.view === "campaign-play" && stored.campaignId ? "campaign-detail" : "home"); }
+        } else if (stored.view === "chat" || stored.view === "campaign-play") {
+          setChatReturnCampaignId("");
+          setView(stored.view === "campaign-play" && stored.campaignId ? "campaign-detail" : "home");
+        }
       })
       .catch((err) => setError(messageFor(err, "Could not load your library. Is the backend running on port 8787?")))
       .finally(() => mounted && setLoading(false));
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
     // Initial restoration intentionally runs once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -419,30 +1028,86 @@ export default function App() {
     if (route === null) return;
     const url = `${window.location.pathname}${window.location.search}${route}`;
     const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    if (url === current) { routeSyncStartedRef.current = true; return; }
+    if (url === current) {
+      routeSyncStartedRef.current = true;
+      return;
+    }
     try {
       // The first sync adopts the existing URL; later destination changes are real history entries.
       if (!routeSyncStartedRef.current) window.history.replaceState(null, "", url);
       else window.history.pushState(null, "", url);
-    } catch { /* URL sync is a convenience and must never block navigation */ }
+    } catch {
+      /* URL sync is a convenience and must never block navigation */
+    }
     routeSyncStartedRef.current = true;
   }, []);
 
   useEffect(() => {
     const entry = campaignEntryRef.current ? { campaignEntry: "overview" as const } : {};
-    const navigation: StoredNavigation = view === "campaign-play"
-      ? { ...entry, view, campaignId: activeCampaignId || undefined, sessionId: session?.id,
-        adventureTurnId: playTurnId || undefined, playSelectedActorId: playSelectedActorId || undefined,
-        ...(playSurface === "atlas" ? { playSurface } : {}) }
-      : { ...entry, view, characterId: activeCharacterId || undefined, sessionId: session?.id, selectedIds, primaryId, campaignId: activeCampaignId || undefined, campaignCharacterId: activeCampaignCharacterId || undefined, characterDraftIds: Object.keys(characterDraftIds).length ? characterDraftIds : undefined, chatReturnCampaignId: view === "chat" && session && chatReturnCampaignId ? chatReturnCampaignId : undefined, combatReturnView: view === "campaign-combat" ? combatReturnView : undefined,
-        combatActorRole: view === "campaign-combat" && combatReturnView === "campaign-play" ? combatActorRole : undefined,
-        combatControlledActorId: view === "campaign-combat" && combatReturnView === "campaign-play" ? combatControlledActorId || undefined : undefined,
-        combatId: view === "campaign-combat" && combatReturnView === "campaign-play" ? initialCombatId || undefined : undefined,
-        combatReturnPane: view === "campaign-combat" && combatReturnView === "campaign-play" ? playCombatReturnFocus?.pane : undefined,
-        combatReturnFocus: view === "campaign-combat" && combatReturnView === "campaign-play" ? playCombatReturnFocus?.focus : undefined } satisfies StoredNavigation;
+    const navigation: StoredNavigation =
+      view === "campaign-play"
+        ? {
+            ...entry,
+            view,
+            campaignId: activeCampaignId || undefined,
+            sessionId: session?.id,
+            adventureTurnId: playTurnId || undefined,
+            playSelectedActorId: playSelectedActorId || undefined,
+            ...(playSurface === "atlas" ? { playSurface } : {}),
+          }
+        : ({
+            ...entry,
+            view,
+            characterId: activeCharacterId || undefined,
+            sessionId: session?.id,
+            selectedIds,
+            primaryId,
+            campaignId: activeCampaignId || undefined,
+            campaignCharacterId: activeCampaignCharacterId || undefined,
+            characterDraftIds: Object.keys(characterDraftIds).length ? characterDraftIds : undefined,
+            chatReturnCampaignId: view === "chat" && session && chatReturnCampaignId ? chatReturnCampaignId : undefined,
+            combatReturnView: view === "campaign-combat" ? combatReturnView : undefined,
+            combatActorRole:
+              view === "campaign-combat" && combatReturnView === "campaign-play" ? combatActorRole : undefined,
+            combatControlledActorId:
+              view === "campaign-combat" && combatReturnView === "campaign-play"
+                ? combatControlledActorId || undefined
+                : undefined,
+            combatId:
+              view === "campaign-combat" && combatReturnView === "campaign-play"
+                ? initialCombatId || undefined
+                : undefined,
+            combatReturnPane:
+              view === "campaign-combat" && combatReturnView === "campaign-play"
+                ? playCombatReturnFocus?.pane
+                : undefined,
+            combatReturnFocus:
+              view === "campaign-combat" && combatReturnView === "campaign-play"
+                ? playCombatReturnFocus?.focus
+                : undefined,
+          } satisfies StoredNavigation);
     writeNavigation(navigation);
     syncRoute(navigation);
-  }, [view, activeCharacterId, session?.id, selectedIds, primaryId, activeCampaignId, activeCampaignCharacterId, characterDraftIds, chatReturnCampaignId, combatReturnView, combatActorRole, combatControlledActorId, initialCombatId, playCombatReturnFocus, playSelectedActorId, playTurnId, playSurface, syncRoute]);
+  }, [
+    view,
+    activeCharacterId,
+    session?.id,
+    selectedIds,
+    primaryId,
+    activeCampaignId,
+    activeCampaignCharacterId,
+    characterDraftIds,
+    chatReturnCampaignId,
+    combatReturnView,
+    combatActorRole,
+    combatControlledActorId,
+    initialCombatId,
+    playCombatReturnFocus,
+    playSelectedActorId,
+    playTurnId,
+    playSurface,
+    syncRoute,
+  ]);
 
   const applyRoute = useCallback((navigation: StoredNavigation) => {
     cancelRoomOpenForNavigation();
@@ -452,31 +1117,61 @@ export default function App() {
     campaignAdministrationEntryRef.current = request;
     studioEntryRef.current = request;
     combatEntryRef.current = request;
-    setChatReturnCampaignId(navigation.view === "chat" ? navigation.chatReturnCampaignId ?? navigation.campaignId ?? "" : "");
+    setChatReturnCampaignId(
+      navigation.view === "chat" ? (navigation.chatReturnCampaignId ?? navigation.campaignId ?? "") : "",
+    );
     setActiveCampaignCharacterId(navigation.campaignCharacterId ?? "");
     setPlaySurface(navigation.view === "campaign-play" && navigation.playSurface === "atlas" ? "atlas" : "story");
     setCombatReturnView("campaign-detail");
-    setCombatActorRole(undefined); setCombatControlledActorId(""); setInitialCombatId(""); setPlayCombatReturnFocus(null);
-    if ((navigation.view === "campaign-play" || navigation.view === "chat") && navigation.campaignId && navigation.sessionId) {
-      const campaignId = navigation.campaignId, sessionId = navigation.sessionId, destination = navigation.view;
+    setCombatActorRole(undefined);
+    setCombatControlledActorId("");
+    setInitialCombatId("");
+    setPlayCombatReturnFocus(null);
+    if (
+      (navigation.view === "campaign-play" || navigation.view === "chat") &&
+      navigation.campaignId &&
+      navigation.sessionId
+    ) {
+      const campaignId = navigation.campaignId,
+        sessionId = navigation.sessionId,
+        destination = navigation.view;
       setBusy(true);
-      void getSession(sessionId).then((data) => {
-        if (epoch !== navigationEpochRef.current || data.session.id !== sessionId) return;
-        chatEntryRef.current += 1; currentSessionRef.current = data.session;
-        setActiveCampaignId(campaignId);
-        currentNavigationRef.current = { view: destination, campaignId, chatReturnCampaignId: destination === "chat" ? campaignId : "" };
-        setSession(data.session); setMessages(data.messages); setView(destination);
-      }).catch(() => {
-        if (epoch !== navigationEpochRef.current) return;
-        setActiveCampaignId(campaignId);
-        currentNavigationRef.current = { view: "campaign-overview", campaignId, chatReturnCampaignId: "" };
-        setSession(null); setMessages([]); setView("campaign-overview");
-      }).finally(() => { if (epoch === navigationEpochRef.current) setBusy(false); });
+      void getSession(sessionId)
+        .then((data) => {
+          if (epoch !== navigationEpochRef.current || data.session.id !== sessionId) return;
+          chatEntryRef.current += 1;
+          currentSessionRef.current = data.session;
+          setActiveCampaignId(campaignId);
+          currentNavigationRef.current = {
+            view: destination,
+            campaignId,
+            chatReturnCampaignId: destination === "chat" ? campaignId : "",
+          };
+          setSession(data.session);
+          setMessages(data.messages);
+          setView(destination);
+        })
+        .catch(() => {
+          if (epoch !== navigationEpochRef.current) return;
+          setActiveCampaignId(campaignId);
+          currentNavigationRef.current = { view: "campaign-overview", campaignId, chatReturnCampaignId: "" };
+          setSession(null);
+          setMessages([]);
+          setView("campaign-overview");
+        })
+        .finally(() => {
+          if (epoch === navigationEpochRef.current) setBusy(false);
+        });
       return;
     }
     setActiveCampaignId(navigation.campaignId ?? "");
-    setSession(null); setMessages([]);
-    currentNavigationRef.current = { view: navigation.view, campaignId: navigation.campaignId ?? "", chatReturnCampaignId: "" };
+    setSession(null);
+    setMessages([]);
+    currentNavigationRef.current = {
+      view: navigation.view,
+      campaignId: navigation.campaignId ?? "",
+      chatReturnCampaignId: "",
+    };
     setView(navigation.view);
   }, []);
 
@@ -495,27 +1190,43 @@ export default function App() {
     };
   }, [applyRoute]);
 
-  function goHome() { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" }; setChatReturnCampaignId(""); setView("home"); setSession(null); setMessages([]); setError(null); }
+  function goHome() {
+    cancelRoomOpenForNavigation();
+    currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" };
+    setChatReturnCampaignId("");
+    setView("home");
+    setSession(null);
+    setMessages([]);
+    setError(null);
+  }
   async function openSession(id: string) {
     cancelRoomOpenForNavigation();
     const request = ++ordinaryOpenRequestRef.current;
     const navigationEpoch = navigationEpochRef.current;
-    const isCurrent = () => request === ordinaryOpenRequestRef.current
-      && navigationEpoch === navigationEpochRef.current
-      && currentNavigationRef.current.view === "home";
-    setChatReturnCampaignId(""); setBusy(true); setError(null);
+    const isCurrent = () =>
+      request === ordinaryOpenRequestRef.current &&
+      navigationEpoch === navigationEpochRef.current &&
+      currentNavigationRef.current.view === "home";
+    setChatReturnCampaignId("");
+    setBusy(true);
+    setError(null);
     try {
       const data = await getSession(id);
       if (!isCurrent()) return;
       if (data.session.id !== id) throw new Error("Session response did not match the request");
-      chatEntryRef.current += 1; currentSessionRef.current = data.session;
+      chatEntryRef.current += 1;
+      currentSessionRef.current = data.session;
       currentNavigationRef.current = { view: "chat", campaignId: "", chatReturnCampaignId: "" };
-      setSession(data.session); setMessages(data.messages); setView("chat");
+      setSession(data.session);
+      setMessages(data.messages);
+      setView("chat");
     } catch (err) {
       if (!isCurrent()) return;
       setError(messageFor(err, "Could not resume session."));
       await refreshLibrary(isCurrent).catch(() => undefined);
-    } finally { if (request === ordinaryOpenRequestRef.current) setBusy(false); }
+    } finally {
+      if (request === ordinaryOpenRequestRef.current) setBusy(false);
+    }
   }
   async function openPrivateSession(characterId: string) {
     const request = ++privateOpenRequestRef.current;
@@ -525,12 +1236,14 @@ export default function App() {
     // Do not clear campaign return state while this request is uncertain. The
     // existing room and Back origin remain authoritative until latest success.
     roomOpenRequestRef.current += 1;
-    setBusy(true); setError(null);
-    const isCurrent = () => request === privateOpenRequestRef.current
-      && navigationEpoch === navigationEpochRef.current
-      && (currentNavigationRef.current.view === "chat" || currentNavigationRef.current.view === "campaign-play")
-      && chatEntryRef.current === sourceEntry
-      && currentSessionRef.current?.id === sourceSessionId;
+    setBusy(true);
+    setError(null);
+    const isCurrent = () =>
+      request === privateOpenRequestRef.current &&
+      navigationEpoch === navigationEpochRef.current &&
+      (currentNavigationRef.current.view === "chat" || currentNavigationRef.current.view === "campaign-play") &&
+      chatEntryRef.current === sourceEntry &&
+      currentSessionRef.current?.id === sourceSessionId;
     try {
       const data = await openSoloSession(characterId);
       if (!isCurrent()) return;
@@ -538,9 +1251,13 @@ export default function App() {
         throw new Error("Solo session response did not match the request");
       }
       navigationEpochRef.current += 1;
-      chatEntryRef.current += 1; currentSessionRef.current = data.session;
+      chatEntryRef.current += 1;
+      currentSessionRef.current = data.session;
       currentNavigationRef.current = { view: "chat", campaignId: "", chatReturnCampaignId: "" };
-      setChatReturnCampaignId(""); setSession(data.session); setMessages(data.messages); setView("chat");
+      setChatReturnCampaignId("");
+      setSession(data.session);
+      setMessages(data.messages);
+      setView("chat");
       // Library refresh is ancillary and cannot turn a successful navigation
       // into a stale failure that restores or overwrites its prior origin.
       void refreshLibrary().catch(() => undefined);
@@ -556,12 +1273,14 @@ export default function App() {
     const sourceView = currentNavigationRef.current.view;
     const sourceCharacterId = activeCharacterId;
     let saveCompleted = false;
-    const isCurrent = () => request === saveCharacterRequestRef.current
-      && navigationEpoch === navigationEpochRef.current
-      && currentNavigationRef.current.view === sourceView
-      && (sourceView === "create" || sourceView === "edit")
-      && activeCharacterId === sourceCharacterId;
-    setBusy(true); setError(null);
+    const isCurrent = () =>
+      request === saveCharacterRequestRef.current &&
+      navigationEpoch === navigationEpochRef.current &&
+      currentNavigationRef.current.view === sourceView &&
+      (sourceView === "create" || sourceView === "edit") &&
+      activeCharacterId === sourceCharacterId;
+    setBusy(true);
+    setError(null);
     try {
       const current = characters.find((item) => item.id === activeCharacterId);
       const saved = current ? await updateCharacter(current.id, spec) : await createCharacter(spec);
@@ -576,36 +1295,67 @@ export default function App() {
         const hydrated = await getSession(created.id);
         if (!isCurrent()) return;
         if (hydrated.session.id !== created.id) throw new Error("Session response did not match the created session");
-        chatEntryRef.current += 1; currentSessionRef.current = hydrated.session;
+        chatEntryRef.current += 1;
+        currentSessionRef.current = hydrated.session;
         currentNavigationRef.current = { view: "chat", campaignId: "", chatReturnCampaignId: "" };
-        setChatReturnCampaignId(""); setSession(hydrated.session); setMessages(hydrated.messages); setView("chat");
+        setChatReturnCampaignId("");
+        setSession(hydrated.session);
+        setMessages(hydrated.messages);
+        setView("chat");
+      } else {
+        currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" };
+        setView("home");
       }
-      else { currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" }; setView("home"); }
     } catch (err) {
       if (!isCurrent()) return;
-      if (saveCompleted) { currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" }; setView("home"); }
+      if (saveCompleted) {
+        currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" };
+        setView("home");
+      }
       setError(messageFor(err, "Could not save character."));
-    } finally { if (request === saveCharacterRequestRef.current) setBusy(false); }
+    } finally {
+      if (request === saveCharacterRequestRef.current) setBusy(false);
+    }
   }
   async function createSelectedSession(title: string) {
     if (!selectedIds.length || !primaryId) return;
-    setChatReturnCampaignId(""); setBusy(true); setError(null);
-    try { const created = await startSession({ characterIds: selectedIds, primaryCharacterId: primaryId, ...(title.trim() ? { title: title.trim() } : {}) }); await refreshLibrary(); await openSession(created.id); }
-    catch (err) { setError(messageFor(err, "Could not start session.")); setBusy(false); }
+    setChatReturnCampaignId("");
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await startSession({
+        characterIds: selectedIds,
+        primaryCharacterId: primaryId,
+        ...(title.trim() ? { title: title.trim() } : {}),
+      });
+      await refreshLibrary();
+      await openSession(created.id);
+    } catch (err) {
+      setError(messageFor(err, "Could not start session."));
+      setBusy(false);
+    }
   }
 
   async function openCampaignRoom(campaignId: string, sessionId: string) {
     const current = currentNavigationRef.current;
     const sourceView = current.view;
-    if (!["campaign-detail", "campaign-overview", "campaign-rooms"].includes(sourceView) || current.campaignId !== campaignId) return;
+    if (
+      !["campaign-detail", "campaign-overview", "campaign-rooms"].includes(sourceView) ||
+      current.campaignId !== campaignId
+    )
+      return;
     const request = ++roomOpenRequestRef.current;
     const navigationEpoch = navigationEpochRef.current;
     setRoomOpenPending({ campaignId, request });
     setRoomOpenFailure(null);
     const isCurrent = () => {
       const navigation = currentNavigationRef.current;
-      return request === roomOpenRequestRef.current && navigationEpoch === navigationEpochRef.current
-        && navigation.view === sourceView && navigation.campaignId === campaignId;
+      return (
+        request === roomOpenRequestRef.current &&
+        navigationEpoch === navigationEpochRef.current &&
+        navigation.view === sourceView &&
+        navigation.campaignId === campaignId
+      );
     };
     let hydratingSession = false;
     try {
@@ -619,18 +1369,44 @@ export default function App() {
       if (data.session.id !== sessionId) throw new Error("Session response did not match the requested room");
       // Persist the explicit origin before rendering chat so an immediate
       // reload cannot observe the prior detail navigation snapshot.
-       const destination: View = campaignMechanicsAvailable && campaign.content.status === "configured" ? "campaign-play" : "chat";
-       const entry = campaignEntryRef.current ? { campaignEntry: "overview" as const } : {};
-       writeNavigation(destination === "campaign-play" ? { ...entry, view: destination, sessionId: data.session.id, campaignId }
-         : { ...entry, view: destination, sessionId: data.session.id, selectedIds, primaryId, campaignId, chatReturnCampaignId: campaignId });
+      const destination: View =
+        campaignMechanicsAvailable && campaign.content.status === "configured" ? "campaign-play" : "chat";
+      const entry = campaignEntryRef.current ? { campaignEntry: "overview" as const } : {};
+      writeNavigation(
+        destination === "campaign-play"
+          ? { ...entry, view: destination, sessionId: data.session.id, campaignId }
+          : {
+              ...entry,
+              view: destination,
+              sessionId: data.session.id,
+              selectedIds,
+              primaryId,
+              campaignId,
+              chatReturnCampaignId: campaignId,
+            },
+      );
       navigationEpochRef.current += 1;
-      chatEntryRef.current += 1; currentSessionRef.current = data.session;
-       currentNavigationRef.current = { view: destination, campaignId, chatReturnCampaignId: destination === "chat" ? campaignId : "" };
-       setChatReturnCampaignId(destination === "chat" ? campaignId : ""); setPlayTurnId(""); setPlaySelectedActorId("");
-       if (destination === "campaign-play") { setCombatReturnView("campaign-detail"); setCombatActorRole(undefined); setCombatControlledActorId(""); setInitialCombatId(""); setPlayCombatReturnFocus(null); }
-       setSession(data.session); setMessages(data.messages); setView(destination);
-    }
-    catch (err) {
+      chatEntryRef.current += 1;
+      currentSessionRef.current = data.session;
+      currentNavigationRef.current = {
+        view: destination,
+        campaignId,
+        chatReturnCampaignId: destination === "chat" ? campaignId : "",
+      };
+      setChatReturnCampaignId(destination === "chat" ? campaignId : "");
+      setPlayTurnId("");
+      setPlaySelectedActorId("");
+      if (destination === "campaign-play") {
+        setCombatReturnView("campaign-detail");
+        setCombatActorRole(undefined);
+        setCombatControlledActorId("");
+        setInitialCombatId("");
+        setPlayCombatReturnFocus(null);
+      }
+      setSession(data.session);
+      setMessages(data.messages);
+      setView(destination);
+    } catch (err) {
       if (!isCurrent()) return;
       if (!hydratingSession && err instanceof ApiError && err.status === 404) {
         cancelRoomOpenForNavigation();
@@ -650,9 +1426,9 @@ export default function App() {
           : "Room could not be opened. Please try again.",
       });
       if (missing) setRoomsRefreshRequest({ campaignId, request: ++transitionRequestRef.current });
-    }
-    finally {
-      if (request === roomOpenRequestRef.current) setRoomOpenPending((pending) => pending?.request === request ? null : pending);
+    } finally {
+      if (request === roomOpenRequestRef.current)
+        setRoomOpenPending((pending) => (pending?.request === request ? null : pending));
     }
   }
 
@@ -661,10 +1437,17 @@ export default function App() {
     cancelRoomOpenForNavigation();
     const request = ++transitionRequestRef.current;
     const targets: Record<CampaignDestination, View> = {
-      overview: "campaign-overview", play: "campaign-rooms", characters: "campaign-party",
-      world: "campaign-world", journal: narrativeStudioAvailable ? "campaign-journal" : "campaign-history",
-      create: "campaign-create", manage: "campaign-administration", combat: "campaign-combat",
-      cast: "campaign-cast", story: "campaign-story", history: "campaign-history",
+      overview: "campaign-overview",
+      play: "campaign-rooms",
+      characters: "campaign-party",
+      world: "campaign-world",
+      journal: narrativeStudioAvailable ? "campaign-journal" : "campaign-history",
+      create: "campaign-create",
+      manage: "campaign-administration",
+      combat: "campaign-combat",
+      cast: "campaign-cast",
+      story: "campaign-story",
+      history: "campaign-history",
     };
     const target = targets[destination];
     campaignDetailEntryRef.current = request;
@@ -672,7 +1455,9 @@ export default function App() {
     studioEntryRef.current = request;
     combatEntryRef.current = request;
     setCombatReturnView("campaign-detail");
-    setCombatActorRole(undefined); setCombatControlledActorId(""); setInitialCombatId("");
+    setCombatActorRole(undefined);
+    setCombatControlledActorId("");
+    setInitialCombatId("");
     setCampaignAuxReturnView("campaign-detail");
     setShellSelection({ destination, view: target, request });
     currentNavigationRef.current = { view: target, campaignId: activeCampaignId, chatReturnCampaignId: "" };
@@ -682,8 +1467,12 @@ export default function App() {
 
   function openLibraryCampaign(campaignId: string, destination?: "world" | "play") {
     cancelRoomOpenForNavigation();
-    const target: View = destination === "world" && campaignMechanicsAvailable && narrativeStudioAvailable ? "campaign-world"
-      : destination === "play" ? "campaign-rooms" : "campaign-overview";
+    const target: View =
+      destination === "world" && campaignMechanicsAvailable && narrativeStudioAvailable
+        ? "campaign-world"
+        : destination === "play"
+          ? "campaign-rooms"
+          : "campaign-overview";
     const request = ++transitionRequestRef.current;
     campaignEntryRef.current = true;
     campaignDetailEntryRef.current = request;
@@ -695,141 +1484,1040 @@ export default function App() {
   }
 
   function renderCurrentView() {
-  const activeCharacter = characters.find((item) => item.id === activeCharacterId) ?? null;
-  if (loading) return <main className="page"><section className="card loading-card"><h1 className="title">Velvet</h1><p className="subtitle">Opening your library…</p></section></main>;
-  if (["campaign-overview", "campaign-rooms", "campaign-party"].includes(view) && campaignLibraryAvailable && activeCampaignId) {
-    const open = (target: View) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: target, campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView(target); };
-    return <CampaignOverviewPage key={`${activeCampaignId}:${view}`} campaignId={activeCampaignId} destination={view === "campaign-rooms" ? "rooms" : view === "campaign-party" ? "party" : "overview"}
-      mechanics={campaignMechanicsAvailable} onAdvanced={() => open("campaign-detail")}
-      onBuilder={() => { characterBuilderEntryRef.current = ++transitionRequestRef.current; open("campaign-character-builder"); }}
-      onCharacter={(id) => { setActiveCampaignCharacterId(id); const request = ++transitionRequestRef.current; characterSheetEntryRef.current = request; setSheetHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId: id, request }); open(campaignMechanicsAvailable ? "campaign-character-sheet" : "campaign-character"); }}
-      onRoom={(id) => void openCampaignRoom(activeCampaignId, id)} roomPending={roomOpenPending?.campaignId === activeCampaignId}
-      roomError={roomOpenFailure?.campaignId === activeCampaignId ? roomOpenFailure.text : undefined} refreshRequest={roomsRefreshRequest?.campaignId === activeCampaignId ? roomsRefreshRequest.request : undefined} />;
-  }
-  if (view === "campaign-create" && campaignLibraryAvailable && combatAvailable && activeCampaignId) return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={() => navigateCampaign("overview")}>{authorization => authorization.role === "owner" || authorization.role === "gm" ? <CampaignCreatePage campaignId={activeCampaignId} onBack={() => navigateCampaign("overview")} /> : <main className="campaign-entry"><h1>Create unavailable</h1><p>Creation requires the current owner or GM role.</p><button onClick={() => navigateCampaign("overview")}>Return to overview</button></main>}</CampaignAuthorizationGate>;
-  if (view === "create" || view === "edit") return <main className="page"><CharacterForm character={view === "edit" ? activeCharacter : null} busy={busy} error={error} onCancel={goHome} onSave={saveCharacter} /></main>;
-  if (view === "memory" && activeCharacter) return <main className="page"><MemoryManager character={activeCharacter} onClose={goHome} /></main>;
-  if (view === "lore") return <main className="page"><LoreManager characters={characters} onClose={goHome} /></main>;
-  if (view === "content-packs" && contentStudioAvailable) return <ContentPackLibraryPage api={contentPackLibraryApi} backLabel="← Campaigns" focusHeadingRequest={contentHeadingFocusRequest === contentStudioEntryRef.current ? contentHeadingFocusRequest : undefined} onHeadingFocused={(request) => setContentHeadingFocusRequest((current) => current === request ? null : current)} onBack={() => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; setContentReturnFocusRequest(request); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; setView("campaigns"); }} />;
-  if (view === "campaigns" && campaignLibraryAvailable) return <CampaignLibraryPage onBack={goHome} focusContentPacksRequest={contentReturnFocusRequest ?? undefined} onContentPacksFocused={(request) => setContentReturnFocusRequest((current) => current === request ? null : current)} onContentPacks={contentStudioAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; contentStudioEntryRef.current = request; setContentHeadingFocusRequest(request); currentNavigationRef.current = { view: "content-packs", campaignId: "", chatReturnCampaignId: "" }; setView("content-packs"); } : undefined} onOpen={openLibraryCampaign} />;
-  if (view === "campaign-detail" && campaignLibraryAvailable && activeCampaignId) {
-    const focusRequest = campaignHeadingFocusRequest?.campaignId === activeCampaignId
-      && campaignHeadingFocusRequest.request === campaignDetailEntryRef.current ? campaignHeadingFocusRequest.request : undefined;
-    const leaveDetail = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; campaignDetailEntryRef.current = ++transitionRequestRef.current; setActiveCampaignId(""); setActiveCampaignCharacterId(""); setView("campaigns"); };
-    return <CampaignDetailPage campaignId={activeCampaignId} mechanicsEnabled={campaignMechanicsAvailable} onOpenCombat={combatAvailable ? () => { cancelRoomOpenForNavigation(); setCombatReturnView("campaign-detail"); combatEntryRef.current = ++transitionRequestRef.current; currentNavigationRef.current = { view: "campaign-combat", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-combat"); } : undefined} focusCombatRequest={combatReturnView === "campaign-detail" ? combatReturnFocusRequest ?? undefined : undefined} onCombatFocused={(request) => setCombatReturnFocusRequest((current) => current === request ? null : current)} focusHeadingRequest={focusRequest} roomsRefreshRequest={roomsRefreshRequest?.campaignId === activeCampaignId ? roomsRefreshRequest.request : undefined} onRoomsRefreshHandled={(request) => setRoomsRefreshRequest((current) => current?.campaignId === activeCampaignId && current.request === request ? null : current)} roomOpenPending={roomOpenPending?.campaignId === activeCampaignId} roomOpenFailure={roomOpenFailure?.campaignId === activeCampaignId ? roomOpenFailure : null} onHeadingFocused={(request) => setCampaignHeadingFocusRequest((current) => current?.campaignId === activeCampaignId && current.request === request && campaignDetailEntryRef.current === request ? null : current)} onBack={leaveDetail} onUnavailable={leaveDetail} onOpenRoom={(sessionId) => void openCampaignRoom(activeCampaignId, sessionId)} onOpenAdministration={(campaignName) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-administration", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignAdministrationEntryRef.current = request; setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request }); setActiveCampaignName(campaignName); setView("campaign-administration"); }} onOpenCharacterBuilder={() => { cancelRoomOpenForNavigation(); setCharacterDraftIds((current) => { const next = { ...current }; delete next[activeCampaignId]; return next; }); characterBuilderEntryRef.current = ++transitionRequestRef.current; currentNavigationRef.current = { view: "campaign-character-builder", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character-builder"); }} onOpenCharacter={(campaignCharacterId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setWorkspaceHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId, request }); setActiveCampaignCharacterId(campaignCharacterId); setView("campaign-character"); }} />;
-  }
-  if (view === "campaign-history" && campaignLibraryAvailable && activeCampaignId) {
-    const back = () => { if (campaignEntryRef.current) { navigateCampaign("overview"); return; } cancelRoomOpenForNavigation(); const destination = campaignAuxReturnView; const request = ++transitionRequestRef.current; currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" }; if (destination === "campaign-detail") { campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); } else { campaignAdministrationEntryRef.current = request; setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request }); } setView(destination); };
-    const unavailable = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; setActiveCampaignId(""); setView("campaigns"); };
-    return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>{() => <CampaignEventLogPage campaignId={activeCampaignId} api={campaignHistoryApi} onBack={back} onUnavailable={unavailable} focusHeadingRequest={transitionRequestRef.current} />}</CampaignAuthorizationGate>;
-  }
-  if (view === "campaign-transfer" && campaignLibraryAvailable && activeCampaignId) {
-    const back = () => { setCampaignExportOpen(false); cancelRoomOpenForNavigation(); const destination = campaignAuxReturnView; const request = ++transitionRequestRef.current; currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" }; if (destination === "campaign-detail") { campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); } else { campaignAdministrationEntryRef.current = request; setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request }); } setView(destination); };
-    const unavailable = () => { setCampaignExportOpen(false); cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-detail"); };
-    return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>{(authorization) => authorization.role !== "owner" ? <main className="studio-page"><section className="studio-shell"><button className="back-link" onClick={back}>← Campaign</button><h1 autoFocus tabIndex={-1}>Transfer tools unavailable</h1><p>Import and export controls are available only to the campaign owner.</p></section></main> : <main className="studio-page transfer-page"><section className="studio-shell" aria-labelledby="transfer-heading"><header className="studio-header"><div><button className="back-link" onClick={back}>← Campaign</button><p className="eyebrow">OWNER-ONLY TRANSFER</p><h1 autoFocus tabIndex={-1} id="transfer-heading">Import and export</h1></div><button className="primary" onClick={() => setCampaignExportOpen(true)}>Review campaign export</button></header><CampaignImportWizard api={campaignImportApi} /><CampaignExportDialog campaignId={activeCampaignId} campaignName={activeCampaignName || "campaign"} open={campaignExportOpen} api={campaignExportApi} onClose={() => setCampaignExportOpen(false)} /></section></main>}</CampaignAuthorizationGate>;
-  }
-  if (["campaign-world","campaign-cast","campaign-journal","campaign-story"].includes(view) && campaignLibraryAvailable && campaignMechanicsAvailable && narrativeStudioAvailable && activeCampaignId) {
-    const studioView=view as "campaign-world"|"campaign-cast"|"campaign-journal"|"campaign-story";
-    const returnToCampaign=()=>{if(campaignEntryRef.current){navigateCampaign("overview");return;}cancelRoomOpenForNavigation();const studio=studioView.replace("campaign-","") as "world"|"cast"|"journal"|"story";const request=++transitionRequestRef.current;setStudioReturnFocusRequest({view:studio,request});campaignDetailEntryRef.current=request;currentNavigationRef.current={view:"campaign-detail",campaignId:activeCampaignId,chatReturnCampaignId:""};setView("campaign-detail")};
-    const unavailable=()=>{cancelRoomOpenForNavigation();currentNavigationRef.current={view:"campaigns",campaignId:"",chatReturnCampaignId:""};setActiveCampaignId("");setView("campaigns")};
-    return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>{(authorization)=>studioView==="campaign-world"?<WorldExplorerPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={worldExplorerApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:studioView==="campaign-cast"?<NpcRosterPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={castStudioApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:studioView==="campaign-journal"?<QuestJournalPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={questJournalApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:<StoryStudioPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={storyStudioApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>}</CampaignAuthorizationGate>;
-  }
-  if (view === "campaign-administration" && campaignLibraryAvailable && activeCampaignId) {
-    const returnToCampaign = () => { if (campaignEntryRef.current) { navigateCampaign("overview"); return; } cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setView("campaign-detail"); };
-    const focusRequest = administrationHeadingFocusRequest?.campaignId === activeCampaignId
-      && administrationHeadingFocusRequest.request === campaignAdministrationEntryRef.current ? administrationHeadingFocusRequest.request : undefined;
-    return <CampaignAdministrationPage campaignId={activeCampaignId} campaignName={activeCampaignName} focusHeadingRequest={focusRequest} onHeadingFocused={(request) => setAdministrationHeadingFocusRequest((current) => current?.campaignId === activeCampaignId && current.request === request ? null : current)} onBack={returnToCampaign} onUnavailable={() => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; setActiveCampaignId(""); setActiveCampaignName(""); setView("campaigns"); }} />;
-  }
-  if (view === "campaign-character" && campaignLibraryAvailable && activeCampaignId && activeCampaignCharacterId) {
-    const returnToCampaign = () => { if (campaignEntryRef.current) { navigateCampaign("characters"); return; } cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setActiveCampaignCharacterId(""); setView("campaign-detail"); };
-    return <CampaignCharacterWorkspacePage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} focusHeadingRequest={workspaceHeadingFocusRequest?.campaignId === activeCampaignId && workspaceHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId ? workspaceHeadingFocusRequest.request : undefined} focusSheetRequest={sheetReturnFocusRequest?.campaignId === activeCampaignId && sheetReturnFocusRequest.campaignCharacterId === activeCampaignCharacterId ? sheetReturnFocusRequest.request : undefined} onSheetFocused={(request) => setSheetReturnFocusRequest((current) => current?.campaignId === activeCampaignId && current.campaignCharacterId === activeCampaignCharacterId && current.request === request ? null : current)} onBack={returnToCampaign} onUnavailable={returnToCampaign} onOpenSheet={campaignMechanicsAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; characterSheetEntryRef.current = request; setSheetHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId: activeCampaignCharacterId, request }); currentNavigationRef.current = { view: "campaign-character-sheet", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character-sheet"); } : undefined} />;
-  }
-  if (view === "campaign-character-sheet" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId && activeCampaignCharacterId) {
-    const returnToWorkspace = () => { if (campaignEntryRef.current) { navigateCampaign("characters"); return; } cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setSheetReturnFocusRequest({ campaignId: activeCampaignId, campaignCharacterId: activeCampaignCharacterId, request }); setView("campaign-character"); };
-    const focusRequest = sheetHeadingFocusRequest?.campaignId === activeCampaignId && sheetHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId
-      && sheetHeadingFocusRequest.request === characterSheetEntryRef.current ? sheetHeadingFocusRequest.request : undefined;
-    return <RpgCharacterSheetPage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} api={rpgCharacterSheetApi} focusHeadingRequest={focusRequest} focusCombatRequest={combatReturnView === "campaign-character-sheet" ? combatReturnFocusRequest ?? undefined : undefined} onCombatFocused={(request) => setCombatReturnFocusRequest((current) => current === request ? null : current)} onBack={returnToWorkspace} onUnavailable={returnToWorkspace} onOpenCombat={combatAvailable ? () => { cancelRoomOpenForNavigation(); setCombatReturnView("campaign-character-sheet"); combatEntryRef.current = ++transitionRequestRef.current; currentNavigationRef.current = { view: "campaign-combat", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-combat"); } : undefined} />;
-  }
-  if (view === "campaign-combat" && campaignLibraryAvailable && campaignMechanicsAvailable && combatAvailable && activeCampaignId) {
-    const returnFromCombat = () => {
-      if (combatReturnView === "campaign-play" && session) {
-        cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-play", campaignId: activeCampaignId, chatReturnCampaignId: "" };
-        setView("campaign-play"); return;
-      }
-      if (campaignEntryRef.current && combatReturnView !== "campaign-character-sheet") { navigateCampaign("play"); return; }
-      cancelRoomOpenForNavigation(); const destination = combatReturnView === "campaign-character-sheet" && activeCampaignCharacterId ? "campaign-character-sheet" : "campaign-detail"; currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setCombatReturnFocusRequest(request); setView(destination);
-    };
-    return <CombatTrackerPage api={combatTrackerApi} campaignId={activeCampaignId} sessionId={combatReturnView === "campaign-play" ? session?.id : undefined}
-      actorRole={combatReturnView === "campaign-play" ? combatActorRole : undefined} controlledActorId={combatReturnView === "campaign-play" ? combatControlledActorId || undefined : undefined}
-      initialCombatId={initialCombatId || undefined} onReturnToRoom={combatReturnView === "campaign-play" ? returnFromCombat : undefined}
-      onBack={returnFromCombat} onUnavailable={returnFromCombat} focusHeadingRequest={combatEntryRef.current || undefined} />;
-  }
-  if (view === "campaign-character-builder" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId) {
-    const returnToCampaign = () => { if (campaignEntryRef.current) { navigateCampaign("characters"); return; } cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setView("campaign-detail"); };
-    const setDraftIdentity = (draftId: string | null) => setCharacterDraftIds((current) => { const next = { ...current }; if (draftId) next[activeCampaignId] = draftId; else delete next[activeCampaignId]; return next; });
-    return <CharacterBuilderPage campaignId={activeCampaignId} personas={characters.map((character) => ({ id: character.id, name: character.name }))} initialDraftId={characterDraftIds[activeCampaignId]} api={characterBuilderApi} focusHeadingRequest={characterBuilderEntryRef.current || undefined} onDraftIdentity={setDraftIdentity} onBack={returnToCampaign} onReviewCampaignRoster={returnToCampaign} onUnavailable={returnToCampaign} onEditPersona={(personaId) => { cancelRoomOpenForNavigation(); setActiveCharacterId(personaId); setError(null); setView("edit"); }} onOpenCharacter={(campaignCharacterId) => { cancelRoomOpenForNavigation(); setActiveCampaignCharacterId(campaignCharacterId); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character"); }} />;
-  }
-  if (view === "campaign-play" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId && session) {
-    const returnToCampaign = () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current;
-      setRoomsRefreshRequest({ campaignId: activeCampaignId, request }); setPlayTurnId(""); setPlaySelectedActorId("");
-      if (campaignEntryRef.current) { setSession(null); setMessages([]); navigateCampaign("play"); return; }
-      currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" };
-      setSession(null); setMessages([]); setView("campaign-detail"); };
-    return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={returnToCampaign}>{(authorization) =>
-      <CampaignPlayPage key={authorization.generation} campaignId={activeCampaignId} sessionId={session.id} authorizationGeneration={authorization.generation} api={campaignPlayApi}
-        surface={playSurface} imagesEnabled={features.images} sceneImageApi={sceneImageApi}
-        authorizationCanAct={authorization.role !== "observer"} initialSelectedActorId={playSelectedActorId} initialTurnId={playTurnId || undefined} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
-        onTurnIdChange={(turnId) => setPlayTurnId(turnId ?? "")} focusHeading={combatReturnView !== "campaign-play"} combatAvailable={combatAvailable} combatApi={combatTrackerApi}
-        authorization={authorization} worldApi={campaignMechanicsAvailable ? worldExplorerApi : undefined} actorToolsApi={rpgCharacterSheetApi} advancementApi={atlasAdvancementApi}
-        characterBuilderApi={characterBuilderApi} onNavigate={navigateCampaign} onBack={returnToCampaign} onUnavailable={returnToCampaign} legacyMessages={messages} legacyParticipants={session.participants} />}
-    </CampaignAuthorizationGate>;
-  }
-  if (view === "chat" && session) {
-    const returnCampaignId = chatReturnCampaignId;
-    const returnToCampaign = returnCampaignId ? () => {
-      if (campaignEntryRef.current) { setSession(null); setMessages([]); navigateCampaign("play"); return; }
-      cancelRoomOpenForNavigation();
-      currentNavigationRef.current = { view: "campaign-detail", campaignId: returnCampaignId, chatReturnCampaignId: "" };
-      const request = ++transitionRequestRef.current;
-      setRoomsRefreshRequest({ campaignId: returnCampaignId, request });
-      setActiveCampaignId(returnCampaignId); setChatReturnCampaignId(""); setSession(null); setMessages([]); setView("campaign-detail");
-    } : undefined;
-    const entryToken = chatEntryRef.current;
-    const replaceCurrentSession = (next: Session) => {
-      if (currentNavigationRef.current.view !== "chat" || chatEntryRef.current !== entryToken
-        || currentSessionRef.current?.id !== session.id || next.id !== session.id) return;
-      currentSessionRef.current = next;
-      setSession(next);
-    };
-    return <Chat key={`${session.id}:${entryToken}`} session={session} initialMessages={messages} provider={provider} harness={harness} features={features} systemOneAvailable={systemOneAvailable} externalError={error} navigationBusy={busy} onSessionChange={replaceCurrentSession} onProviderChange={setProvider} onHarnessChange={setHarness} onOpenPrivate={openPrivateSession} backLabel={returnToCampaign ? "← Back to campaign" : "← Library"} onBack={returnToCampaign ?? (async () => { await refreshLibrary().catch(() => undefined); goHome(); })} />;
-  }
+    const activeCharacter = characters.find((item) => item.id === activeCharacterId) ?? null;
+    if (loading)
+      return (
+        <main className="page">
+          <section className="card loading-card">
+            <h1 className="title">Velvet</h1>
+            <p className="subtitle">Opening your library…</p>
+          </section>
+        </main>
+      );
+    if (
+      ["campaign-overview", "campaign-rooms", "campaign-party"].includes(view) &&
+      campaignLibraryAvailable &&
+      activeCampaignId
+    ) {
+      const open = (target: View) => {
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = { view: target, campaignId: activeCampaignId, chatReturnCampaignId: "" };
+        setView(target);
+      };
+      return (
+        <CampaignOverviewPage
+          key={`${activeCampaignId}:${view}`}
+          campaignId={activeCampaignId}
+          destination={view === "campaign-rooms" ? "rooms" : view === "campaign-party" ? "party" : "overview"}
+          mechanics={campaignMechanicsAvailable}
+          onAdvanced={() => open("campaign-detail")}
+          onBuilder={() => {
+            characterBuilderEntryRef.current = ++transitionRequestRef.current;
+            open("campaign-character-builder");
+          }}
+          onCharacter={(id) => {
+            setActiveCampaignCharacterId(id);
+            const request = ++transitionRequestRef.current;
+            characterSheetEntryRef.current = request;
+            setSheetHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId: id, request });
+            open(campaignMechanicsAvailable ? "campaign-character-sheet" : "campaign-character");
+          }}
+          onRoom={(id) => void openCampaignRoom(activeCampaignId, id)}
+          roomPending={roomOpenPending?.campaignId === activeCampaignId}
+          roomError={roomOpenFailure?.campaignId === activeCampaignId ? roomOpenFailure.text : undefined}
+          refreshRequest={
+            roomsRefreshRequest?.campaignId === activeCampaignId ? roomsRefreshRequest.request : undefined
+          }
+        />
+      );
+    }
+    if (view === "campaign-create" && campaignLibraryAvailable && combatAvailable && activeCampaignId)
+      return (
+        <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={() => navigateCampaign("overview")}>
+          {(authorization) =>
+            authorization.role === "owner" || authorization.role === "gm" ? (
+              <CampaignCreatePage campaignId={activeCampaignId} onBack={() => navigateCampaign("overview")} />
+            ) : (
+              <main className="campaign-entry">
+                <h1>Create unavailable</h1>
+                <p>Creation requires the current owner or GM role.</p>
+                <button onClick={() => navigateCampaign("overview")}>Return to overview</button>
+              </main>
+            )
+          }
+        </CampaignAuthorizationGate>
+      );
+    if (view === "create" || view === "edit")
+      return (
+        <main className="page">
+          <CharacterForm
+            character={view === "edit" ? activeCharacter : null}
+            busy={busy}
+            error={error}
+            onCancel={goHome}
+            onSave={saveCharacter}
+          />
+        </main>
+      );
+    if (view === "memory" && activeCharacter)
+      return (
+        <main className="page">
+          <MemoryManager character={activeCharacter} onClose={goHome} />
+        </main>
+      );
+    if (view === "lore")
+      return (
+        <main className="page">
+          <LoreManager characters={characters} onClose={goHome} />
+        </main>
+      );
+    if (view === "content-packs" && contentStudioAvailable)
+      return (
+        <ContentPackLibraryPage
+          api={contentPackLibraryApi}
+          backLabel="← Campaigns"
+          focusHeadingRequest={
+            contentHeadingFocusRequest === contentStudioEntryRef.current ? contentHeadingFocusRequest : undefined
+          }
+          onHeadingFocused={(request) =>
+            setContentHeadingFocusRequest((current) => (current === request ? null : current))
+          }
+          onBack={() => {
+            cancelRoomOpenForNavigation();
+            const request = ++transitionRequestRef.current;
+            setContentReturnFocusRequest(request);
+            currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" };
+            setView("campaigns");
+          }}
+        />
+      );
+    if (view === "campaigns" && campaignLibraryAvailable)
+      return (
+        <CampaignLibraryPage
+          onBack={goHome}
+          focusContentPacksRequest={contentReturnFocusRequest ?? undefined}
+          onContentPacksFocused={(request) =>
+            setContentReturnFocusRequest((current) => (current === request ? null : current))
+          }
+          onContentPacks={
+            contentStudioAvailable
+              ? () => {
+                  cancelRoomOpenForNavigation();
+                  const request = ++transitionRequestRef.current;
+                  contentStudioEntryRef.current = request;
+                  setContentHeadingFocusRequest(request);
+                  currentNavigationRef.current = { view: "content-packs", campaignId: "", chatReturnCampaignId: "" };
+                  setView("content-packs");
+                }
+              : undefined
+          }
+          onOpen={openLibraryCampaign}
+        />
+      );
+    if (view === "campaign-detail" && campaignLibraryAvailable && activeCampaignId) {
+      const focusRequest =
+        campaignHeadingFocusRequest?.campaignId === activeCampaignId &&
+        campaignHeadingFocusRequest.request === campaignDetailEntryRef.current
+          ? campaignHeadingFocusRequest.request
+          : undefined;
+      const leaveDetail = () => {
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" };
+        campaignDetailEntryRef.current = ++transitionRequestRef.current;
+        setActiveCampaignId("");
+        setActiveCampaignCharacterId("");
+        setView("campaigns");
+      };
+      return (
+        <CampaignDetailPage
+          campaignId={activeCampaignId}
+          mechanicsEnabled={campaignMechanicsAvailable}
+          onOpenCombat={
+            combatAvailable
+              ? () => {
+                  cancelRoomOpenForNavigation();
+                  setCombatReturnView("campaign-detail");
+                  combatEntryRef.current = ++transitionRequestRef.current;
+                  currentNavigationRef.current = {
+                    view: "campaign-combat",
+                    campaignId: activeCampaignId,
+                    chatReturnCampaignId: "",
+                  };
+                  setView("campaign-combat");
+                }
+              : undefined
+          }
+          focusCombatRequest={
+            combatReturnView === "campaign-detail" ? (combatReturnFocusRequest ?? undefined) : undefined
+          }
+          onCombatFocused={(request) =>
+            setCombatReturnFocusRequest((current) => (current === request ? null : current))
+          }
+          focusHeadingRequest={focusRequest}
+          roomsRefreshRequest={
+            roomsRefreshRequest?.campaignId === activeCampaignId ? roomsRefreshRequest.request : undefined
+          }
+          onRoomsRefreshHandled={(request) =>
+            setRoomsRefreshRequest((current) =>
+              current?.campaignId === activeCampaignId && current.request === request ? null : current,
+            )
+          }
+          roomOpenPending={roomOpenPending?.campaignId === activeCampaignId}
+          roomOpenFailure={roomOpenFailure?.campaignId === activeCampaignId ? roomOpenFailure : null}
+          onHeadingFocused={(request) =>
+            setCampaignHeadingFocusRequest((current) =>
+              current?.campaignId === activeCampaignId &&
+              current.request === request &&
+              campaignDetailEntryRef.current === request
+                ? null
+                : current,
+            )
+          }
+          onBack={leaveDetail}
+          onUnavailable={leaveDetail}
+          onOpenRoom={(sessionId) => void openCampaignRoom(activeCampaignId, sessionId)}
+          onOpenAdministration={(campaignName) => {
+            cancelRoomOpenForNavigation();
+            currentNavigationRef.current = {
+              view: "campaign-administration",
+              campaignId: activeCampaignId,
+              chatReturnCampaignId: "",
+            };
+            const request = ++transitionRequestRef.current;
+            campaignAdministrationEntryRef.current = request;
+            setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request });
+            setActiveCampaignName(campaignName);
+            setView("campaign-administration");
+          }}
+          onOpenCharacterBuilder={() => {
+            cancelRoomOpenForNavigation();
+            setCharacterDraftIds((current) => {
+              const next = { ...current };
+              delete next[activeCampaignId];
+              return next;
+            });
+            characterBuilderEntryRef.current = ++transitionRequestRef.current;
+            currentNavigationRef.current = {
+              view: "campaign-character-builder",
+              campaignId: activeCampaignId,
+              chatReturnCampaignId: "",
+            };
+            setView("campaign-character-builder");
+          }}
+          onOpenCharacter={(campaignCharacterId) => {
+            cancelRoomOpenForNavigation();
+            currentNavigationRef.current = {
+              view: "campaign-character",
+              campaignId: activeCampaignId,
+              chatReturnCampaignId: "",
+            };
+            const request = ++transitionRequestRef.current;
+            setWorkspaceHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId, request });
+            setActiveCampaignCharacterId(campaignCharacterId);
+            setView("campaign-character");
+          }}
+        />
+      );
+    }
+    if (view === "campaign-history" && campaignLibraryAvailable && activeCampaignId) {
+      const back = () => {
+        if (campaignEntryRef.current) {
+          navigateCampaign("overview");
+          return;
+        }
+        cancelRoomOpenForNavigation();
+        const destination = campaignAuxReturnView;
+        const request = ++transitionRequestRef.current;
+        currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" };
+        if (destination === "campaign-detail") {
+          campaignDetailEntryRef.current = request;
+          setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request });
+        } else {
+          campaignAdministrationEntryRef.current = request;
+          setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request });
+        }
+        setView(destination);
+      };
+      const unavailable = () => {
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" };
+        setActiveCampaignId("");
+        setView("campaigns");
+      };
+      return (
+        <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>
+          {() => (
+            <CampaignEventLogPage
+              campaignId={activeCampaignId}
+              api={campaignHistoryApi}
+              onBack={back}
+              onUnavailable={unavailable}
+              focusHeadingRequest={transitionRequestRef.current}
+            />
+          )}
+        </CampaignAuthorizationGate>
+      );
+    }
+    if (view === "campaign-transfer" && campaignLibraryAvailable && activeCampaignId) {
+      const back = () => {
+        setCampaignExportOpen(false);
+        cancelRoomOpenForNavigation();
+        const destination = campaignAuxReturnView;
+        const request = ++transitionRequestRef.current;
+        currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" };
+        if (destination === "campaign-detail") {
+          campaignDetailEntryRef.current = request;
+          setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request });
+        } else {
+          campaignAdministrationEntryRef.current = request;
+          setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request });
+        }
+        setView(destination);
+      };
+      const unavailable = () => {
+        setCampaignExportOpen(false);
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = {
+          view: "campaign-detail",
+          campaignId: activeCampaignId,
+          chatReturnCampaignId: "",
+        };
+        setView("campaign-detail");
+      };
+      return (
+        <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>
+          {(authorization) =>
+            authorization.role !== "owner" ? (
+              <main className="studio-page">
+                <section className="studio-shell">
+                  <button className="back-link" onClick={back}>
+                    ← Campaign
+                  </button>
+                  <h1 autoFocus tabIndex={-1}>
+                    Transfer tools unavailable
+                  </h1>
+                  <p>Import and export controls are available only to the campaign owner.</p>
+                </section>
+              </main>
+            ) : (
+              <main className="studio-page transfer-page">
+                <section className="studio-shell" aria-labelledby="transfer-heading">
+                  <header className="studio-header">
+                    <div>
+                      <button className="back-link" onClick={back}>
+                        ← Campaign
+                      </button>
+                      <p className="eyebrow">OWNER-ONLY TRANSFER</p>
+                      <h1 autoFocus tabIndex={-1} id="transfer-heading">
+                        Import and export
+                      </h1>
+                    </div>
+                    <button className="primary" onClick={() => setCampaignExportOpen(true)}>
+                      Review campaign export
+                    </button>
+                  </header>
+                  <CampaignImportWizard api={campaignImportApi} />
+                  <CampaignExportDialog
+                    campaignId={activeCampaignId}
+                    campaignName={activeCampaignName || "campaign"}
+                    open={campaignExportOpen}
+                    api={campaignExportApi}
+                    onClose={() => setCampaignExportOpen(false)}
+                  />
+                </section>
+              </main>
+            )
+          }
+        </CampaignAuthorizationGate>
+      );
+    }
+    if (
+      ["campaign-world", "campaign-cast", "campaign-journal", "campaign-story"].includes(view) &&
+      campaignLibraryAvailable &&
+      campaignMechanicsAvailable &&
+      narrativeStudioAvailable &&
+      activeCampaignId
+    ) {
+      const studioView = view as "campaign-world" | "campaign-cast" | "campaign-journal" | "campaign-story";
+      const returnToCampaign = () => {
+        if (campaignEntryRef.current) {
+          navigateCampaign("overview");
+          return;
+        }
+        cancelRoomOpenForNavigation();
+        const studio = studioView.replace("campaign-", "") as "world" | "cast" | "journal" | "story";
+        const request = ++transitionRequestRef.current;
+        setStudioReturnFocusRequest({ view: studio, request });
+        campaignDetailEntryRef.current = request;
+        currentNavigationRef.current = {
+          view: "campaign-detail",
+          campaignId: activeCampaignId,
+          chatReturnCampaignId: "",
+        };
+        setView("campaign-detail");
+      };
+      const unavailable = () => {
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" };
+        setActiveCampaignId("");
+        setView("campaigns");
+      };
+      return (
+        <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>
+          {(authorization) =>
+            studioView === "campaign-world" ? (
+              <WorldExplorerPage
+                key={authorization.generation}
+                campaignId={activeCampaignId}
+                authorization={authorization}
+                api={worldExplorerApi}
+                onBack={returnToCampaign}
+                focusHeadingRequest={studioEntryRef.current}
+              />
+            ) : studioView === "campaign-cast" ? (
+              <NpcRosterPage
+                key={authorization.generation}
+                campaignId={activeCampaignId}
+                authorization={authorization}
+                api={castStudioApi}
+                onBack={returnToCampaign}
+                focusHeadingRequest={studioEntryRef.current}
+              />
+            ) : studioView === "campaign-journal" ? (
+              <QuestJournalPage
+                key={authorization.generation}
+                campaignId={activeCampaignId}
+                authorization={authorization}
+                api={questJournalApi}
+                onBack={returnToCampaign}
+                focusHeadingRequest={studioEntryRef.current}
+              />
+            ) : (
+              <StoryStudioPage
+                key={authorization.generation}
+                campaignId={activeCampaignId}
+                authorization={authorization}
+                api={storyStudioApi}
+                onBack={returnToCampaign}
+                focusHeadingRequest={studioEntryRef.current}
+              />
+            )
+          }
+        </CampaignAuthorizationGate>
+      );
+    }
+    if (view === "campaign-administration" && campaignLibraryAvailable && activeCampaignId) {
+      const returnToCampaign = () => {
+        if (campaignEntryRef.current) {
+          navigateCampaign("overview");
+          return;
+        }
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = {
+          view: "campaign-detail",
+          campaignId: activeCampaignId,
+          chatReturnCampaignId: "",
+        };
+        const request = ++transitionRequestRef.current;
+        campaignDetailEntryRef.current = request;
+        setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request });
+        setView("campaign-detail");
+      };
+      const focusRequest =
+        administrationHeadingFocusRequest?.campaignId === activeCampaignId &&
+        administrationHeadingFocusRequest.request === campaignAdministrationEntryRef.current
+          ? administrationHeadingFocusRequest.request
+          : undefined;
+      return (
+        <CampaignAdministrationPage
+          campaignId={activeCampaignId}
+          campaignName={activeCampaignName}
+          focusHeadingRequest={focusRequest}
+          onHeadingFocused={(request) =>
+            setAdministrationHeadingFocusRequest((current) =>
+              current?.campaignId === activeCampaignId && current.request === request ? null : current,
+            )
+          }
+          onBack={returnToCampaign}
+          onUnavailable={() => {
+            cancelRoomOpenForNavigation();
+            currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" };
+            setActiveCampaignId("");
+            setActiveCampaignName("");
+            setView("campaigns");
+          }}
+        />
+      );
+    }
+    if (view === "campaign-character" && campaignLibraryAvailable && activeCampaignId && activeCampaignCharacterId) {
+      const returnToCampaign = () => {
+        if (campaignEntryRef.current) {
+          navigateCampaign("characters");
+          return;
+        }
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = {
+          view: "campaign-detail",
+          campaignId: activeCampaignId,
+          chatReturnCampaignId: "",
+        };
+        const request = ++transitionRequestRef.current;
+        campaignDetailEntryRef.current = request;
+        setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request });
+        setActiveCampaignCharacterId("");
+        setView("campaign-detail");
+      };
+      return (
+        <CampaignCharacterWorkspacePage
+          campaignId={activeCampaignId}
+          campaignCharacterId={activeCampaignCharacterId}
+          focusHeadingRequest={
+            workspaceHeadingFocusRequest?.campaignId === activeCampaignId &&
+            workspaceHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId
+              ? workspaceHeadingFocusRequest.request
+              : undefined
+          }
+          focusSheetRequest={
+            sheetReturnFocusRequest?.campaignId === activeCampaignId &&
+            sheetReturnFocusRequest.campaignCharacterId === activeCampaignCharacterId
+              ? sheetReturnFocusRequest.request
+              : undefined
+          }
+          onSheetFocused={(request) =>
+            setSheetReturnFocusRequest((current) =>
+              current?.campaignId === activeCampaignId &&
+              current.campaignCharacterId === activeCampaignCharacterId &&
+              current.request === request
+                ? null
+                : current,
+            )
+          }
+          onBack={returnToCampaign}
+          onUnavailable={returnToCampaign}
+          onOpenSheet={
+            campaignMechanicsAvailable
+              ? () => {
+                  cancelRoomOpenForNavigation();
+                  const request = ++transitionRequestRef.current;
+                  characterSheetEntryRef.current = request;
+                  setSheetHeadingFocusRequest({
+                    campaignId: activeCampaignId,
+                    campaignCharacterId: activeCampaignCharacterId,
+                    request,
+                  });
+                  currentNavigationRef.current = {
+                    view: "campaign-character-sheet",
+                    campaignId: activeCampaignId,
+                    chatReturnCampaignId: "",
+                  };
+                  setView("campaign-character-sheet");
+                }
+              : undefined
+          }
+        />
+      );
+    }
+    if (
+      view === "campaign-character-sheet" &&
+      campaignLibraryAvailable &&
+      campaignMechanicsAvailable &&
+      activeCampaignId &&
+      activeCampaignCharacterId
+    ) {
+      const returnToWorkspace = () => {
+        if (campaignEntryRef.current) {
+          navigateCampaign("characters");
+          return;
+        }
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = {
+          view: "campaign-character",
+          campaignId: activeCampaignId,
+          chatReturnCampaignId: "",
+        };
+        const request = ++transitionRequestRef.current;
+        setSheetReturnFocusRequest({
+          campaignId: activeCampaignId,
+          campaignCharacterId: activeCampaignCharacterId,
+          request,
+        });
+        setView("campaign-character");
+      };
+      const focusRequest =
+        sheetHeadingFocusRequest?.campaignId === activeCampaignId &&
+        sheetHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId &&
+        sheetHeadingFocusRequest.request === characterSheetEntryRef.current
+          ? sheetHeadingFocusRequest.request
+          : undefined;
+      return (
+        <RpgCharacterSheetPage
+          campaignId={activeCampaignId}
+          campaignCharacterId={activeCampaignCharacterId}
+          api={rpgCharacterSheetApi}
+          focusHeadingRequest={focusRequest}
+          focusCombatRequest={
+            combatReturnView === "campaign-character-sheet" ? (combatReturnFocusRequest ?? undefined) : undefined
+          }
+          onCombatFocused={(request) =>
+            setCombatReturnFocusRequest((current) => (current === request ? null : current))
+          }
+          onBack={returnToWorkspace}
+          onUnavailable={returnToWorkspace}
+          onOpenCombat={
+            combatAvailable
+              ? () => {
+                  cancelRoomOpenForNavigation();
+                  setCombatReturnView("campaign-character-sheet");
+                  combatEntryRef.current = ++transitionRequestRef.current;
+                  currentNavigationRef.current = {
+                    view: "campaign-combat",
+                    campaignId: activeCampaignId,
+                    chatReturnCampaignId: "",
+                  };
+                  setView("campaign-combat");
+                }
+              : undefined
+          }
+        />
+      );
+    }
+    if (
+      view === "campaign-combat" &&
+      campaignLibraryAvailable &&
+      campaignMechanicsAvailable &&
+      combatAvailable &&
+      activeCampaignId
+    ) {
+      const returnFromCombat = () => {
+        if (combatReturnView === "campaign-play" && session) {
+          cancelRoomOpenForNavigation();
+          currentNavigationRef.current = {
+            view: "campaign-play",
+            campaignId: activeCampaignId,
+            chatReturnCampaignId: "",
+          };
+          setView("campaign-play");
+          return;
+        }
+        if (campaignEntryRef.current && combatReturnView !== "campaign-character-sheet") {
+          navigateCampaign("play");
+          return;
+        }
+        cancelRoomOpenForNavigation();
+        const destination =
+          combatReturnView === "campaign-character-sheet" && activeCampaignCharacterId
+            ? "campaign-character-sheet"
+            : "campaign-detail";
+        currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" };
+        const request = ++transitionRequestRef.current;
+        setCombatReturnFocusRequest(request);
+        setView(destination);
+      };
+      return (
+        <CombatTrackerPage
+          api={combatTrackerApi}
+          campaignId={activeCampaignId}
+          sessionId={combatReturnView === "campaign-play" ? session?.id : undefined}
+          actorRole={combatReturnView === "campaign-play" ? combatActorRole : undefined}
+          controlledActorId={combatReturnView === "campaign-play" ? combatControlledActorId || undefined : undefined}
+          initialCombatId={initialCombatId || undefined}
+          onReturnToRoom={combatReturnView === "campaign-play" ? returnFromCombat : undefined}
+          onBack={returnFromCombat}
+          onUnavailable={returnFromCombat}
+          focusHeadingRequest={combatEntryRef.current || undefined}
+        />
+      );
+    }
+    if (
+      view === "campaign-character-builder" &&
+      campaignLibraryAvailable &&
+      campaignMechanicsAvailable &&
+      activeCampaignId
+    ) {
+      const returnToCampaign = () => {
+        if (campaignEntryRef.current) {
+          navigateCampaign("characters");
+          return;
+        }
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = {
+          view: "campaign-detail",
+          campaignId: activeCampaignId,
+          chatReturnCampaignId: "",
+        };
+        const request = ++transitionRequestRef.current;
+        campaignDetailEntryRef.current = request;
+        setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request });
+        setView("campaign-detail");
+      };
+      const setDraftIdentity = (draftId: string | null) =>
+        setCharacterDraftIds((current) => {
+          const next = { ...current };
+          if (draftId) next[activeCampaignId] = draftId;
+          else delete next[activeCampaignId];
+          return next;
+        });
+      return (
+        <CharacterBuilderPage
+          campaignId={activeCampaignId}
+          personas={characters.map((character) => ({ id: character.id, name: character.name }))}
+          initialDraftId={characterDraftIds[activeCampaignId]}
+          api={characterBuilderApi}
+          focusHeadingRequest={characterBuilderEntryRef.current || undefined}
+          onDraftIdentity={setDraftIdentity}
+          onBack={returnToCampaign}
+          onReviewCampaignRoster={returnToCampaign}
+          onUnavailable={returnToCampaign}
+          onEditPersona={(personaId) => {
+            cancelRoomOpenForNavigation();
+            setActiveCharacterId(personaId);
+            setError(null);
+            setView("edit");
+          }}
+          onOpenCharacter={(campaignCharacterId) => {
+            cancelRoomOpenForNavigation();
+            setActiveCampaignCharacterId(campaignCharacterId);
+            currentNavigationRef.current = {
+              view: "campaign-character",
+              campaignId: activeCampaignId,
+              chatReturnCampaignId: "",
+            };
+            setView("campaign-character");
+          }}
+        />
+      );
+    }
+    if (
+      view === "campaign-play" &&
+      campaignLibraryAvailable &&
+      campaignMechanicsAvailable &&
+      activeCampaignId &&
+      session
+    ) {
+      const returnToCampaign = () => {
+        cancelRoomOpenForNavigation();
+        const request = ++transitionRequestRef.current;
+        setRoomsRefreshRequest({ campaignId: activeCampaignId, request });
+        setPlayTurnId("");
+        setPlaySelectedActorId("");
+        if (campaignEntryRef.current) {
+          setSession(null);
+          setMessages([]);
+          navigateCampaign("play");
+          return;
+        }
+        currentNavigationRef.current = {
+          view: "campaign-detail",
+          campaignId: activeCampaignId,
+          chatReturnCampaignId: "",
+        };
+        setSession(null);
+        setMessages([]);
+        setView("campaign-detail");
+      };
+      return (
+        <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={returnToCampaign}>
+          {(authorization) => (
+            <CampaignPlayPage
+              key={authorization.generation}
+              campaignId={activeCampaignId}
+              sessionId={session.id}
+              authorizationGeneration={authorization.generation}
+              api={campaignPlayApi}
+              surface={playSurface}
+              imagesEnabled={features.images}
+              sceneImageApi={sceneImageApi}
+              authorizationCanAct={authorization.role !== "observer"}
+              initialSelectedActorId={playSelectedActorId}
+              initialTurnId={playTurnId || undefined}
+              onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
+              onTurnIdChange={(turnId) => setPlayTurnId(turnId ?? "")}
+              focusHeading={combatReturnView !== "campaign-play"}
+              combatAvailable={combatAvailable}
+              combatApi={combatTrackerApi}
+              authorization={authorization}
+              worldApi={campaignMechanicsAvailable ? worldExplorerApi : undefined}
+              actorToolsApi={rpgCharacterSheetApi}
+              advancementApi={atlasAdvancementApi}
+              characterBuilderApi={characterBuilderApi}
+              onNavigate={navigateCampaign}
+              onBack={returnToCampaign}
+              onUnavailable={returnToCampaign}
+              legacyMessages={messages}
+              legacyParticipants={session.participants}
+            />
+          )}
+        </CampaignAuthorizationGate>
+      );
+    }
+    if (view === "chat" && session) {
+      const returnCampaignId = chatReturnCampaignId;
+      const returnToCampaign = returnCampaignId
+        ? () => {
+            if (campaignEntryRef.current) {
+              setSession(null);
+              setMessages([]);
+              navigateCampaign("play");
+              return;
+            }
+            cancelRoomOpenForNavigation();
+            currentNavigationRef.current = {
+              view: "campaign-detail",
+              campaignId: returnCampaignId,
+              chatReturnCampaignId: "",
+            };
+            const request = ++transitionRequestRef.current;
+            setRoomsRefreshRequest({ campaignId: returnCampaignId, request });
+            setActiveCampaignId(returnCampaignId);
+            setChatReturnCampaignId("");
+            setSession(null);
+            setMessages([]);
+            setView("campaign-detail");
+          }
+        : undefined;
+      const entryToken = chatEntryRef.current;
+      const replaceCurrentSession = (next: Session) => {
+        if (
+          currentNavigationRef.current.view !== "chat" ||
+          chatEntryRef.current !== entryToken ||
+          currentSessionRef.current?.id !== session.id ||
+          next.id !== session.id
+        )
+          return;
+        currentSessionRef.current = next;
+        setSession(next);
+      };
+      return (
+        <Chat
+          key={`${session.id}:${entryToken}`}
+          session={session}
+          initialMessages={messages}
+          provider={provider}
+          harness={harness}
+          features={features}
+          systemOneAvailable={systemOneAvailable}
+          externalError={error}
+          navigationBusy={busy}
+          onSessionChange={replaceCurrentSession}
+          onProviderChange={setProvider}
+          onHarnessChange={setHarness}
+          onOpenPrivate={openPrivateSession}
+          backLabel={returnToCampaign ? "← Back to campaign" : "← Library"}
+          onBack={
+            returnToCampaign ??
+            (async () => {
+              await refreshLibrary().catch(() => undefined);
+              goHome();
+            })
+          }
+        />
+      );
+    }
 
-  return <Home characters={characters} sessions={sessions} selectedIds={selectedIds} primaryId={primaryId} busy={busy} error={error} provider={provider} campaignLibraryAvailable={campaignLibraryAvailable} onCampaigns={() => { setChatReturnCampaignId(""); setView("campaigns"); }} onSelected={(ids) => { setSelectedIds(ids); setPrimaryId((current) => ids.includes(current) ? current : ids[0] ?? ""); }} onPrimary={setPrimaryId} onCreate={() => { setActiveCharacterId(""); setError(null); setView("create"); }} onEdit={(id) => { setActiveCharacterId(id); setError(null); setView("edit"); }} onMemory={(id) => { setActiveCharacterId(id); setView("memory"); }} onLore={() => setView("lore")} onStart={createSelectedSession} onResume={(id) => void openSession(id)} onDeleteSession={async (item) => { if (!confirm(`Delete session “${item.title || item.participants.map((participant) => participant.name).join(", ")}”? Its messages and summary will be permanently removed.`)) return; setBusy(true); setError(null); try { await deleteSession(item.id); if (session?.id === item.id) { setSession(null); setMessages([]); setView("home"); } await refreshLibrary(); } catch (err) { setError(messageFor(err, "Could not delete session.")); } finally { setBusy(false); } }} onDelete={async (character) => { if (!confirm(`Delete ${character.name}? This cannot be undone.`)) return; setError(null); try { await deleteCharacter(character.id); setSelectedIds((ids) => ids.filter((id) => id !== character.id)); await refreshLibrary(); } catch (err) { setError(messageFor(err, "Could not delete character.")); } }} onExport={async (character) => { try { const data = await exportCharacter(character.id); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); link.download = `${character.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-velvet.json`; link.click(); URL.revokeObjectURL(link.href); } catch (err) { setError(messageFor(err, "Could not export character.")); } }} onImport={async (file) => { setError(null); try { const data: unknown = JSON.parse(await file.text()); await importCharacter(data); await refreshLibrary(); } catch (err) { setError(messageFor(err, "That file is not a valid Velvet character export.")); } }} />;
-}
+    return (
+      <Home
+        characters={characters}
+        sessions={sessions}
+        selectedIds={selectedIds}
+        primaryId={primaryId}
+        busy={busy}
+        error={error}
+        provider={provider}
+        campaignLibraryAvailable={campaignLibraryAvailable}
+        onCampaigns={() => {
+          setChatReturnCampaignId("");
+          setView("campaigns");
+        }}
+        onSelected={(ids) => {
+          setSelectedIds(ids);
+          setPrimaryId((current) => (ids.includes(current) ? current : (ids[0] ?? "")));
+        }}
+        onPrimary={setPrimaryId}
+        onCreate={() => {
+          setActiveCharacterId("");
+          setError(null);
+          setView("create");
+        }}
+        onEdit={(id) => {
+          setActiveCharacterId(id);
+          setError(null);
+          setView("edit");
+        }}
+        onMemory={(id) => {
+          setActiveCharacterId(id);
+          setView("memory");
+        }}
+        onLore={() => setView("lore")}
+        onStart={createSelectedSession}
+        onResume={(id) => void openSession(id)}
+        onDeleteSession={async (item) => {
+          if (
+            !confirm(
+              `Delete session “${item.title || item.participants.map((participant) => participant.name).join(", ")}”? Its messages and summary will be permanently removed.`,
+            )
+          )
+            return;
+          setBusy(true);
+          setError(null);
+          try {
+            await deleteSession(item.id);
+            if (session?.id === item.id) {
+              setSession(null);
+              setMessages([]);
+              setView("home");
+            }
+            await refreshLibrary();
+          } catch (err) {
+            setError(messageFor(err, "Could not delete session."));
+          } finally {
+            setBusy(false);
+          }
+        }}
+        onDelete={async (character) => {
+          if (!confirm(`Delete ${character.name}? This cannot be undone.`)) return;
+          setError(null);
+          try {
+            await deleteCharacter(character.id);
+            setSelectedIds((ids) => ids.filter((id) => id !== character.id));
+            await refreshLibrary();
+          } catch (err) {
+            setError(messageFor(err, "Could not delete character."));
+          }
+        }}
+        onExport={async (character) => {
+          try {
+            const data = await exportCharacter(character.id);
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+            link.download = `${character.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-velvet.json`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+          } catch (err) {
+            setError(messageFor(err, "Could not export character."));
+          }
+        }}
+        onImport={async (file) => {
+          setError(null);
+          try {
+            const data: unknown = JSON.parse(await file.text());
+            await importCharacter(data);
+            await refreshLibrary();
+          } catch (err) {
+            setError(messageFor(err, "That file is not a valid Velvet character export."));
+          }
+        }}
+      />
+    );
+  }
 
   const content = renderCurrentView();
   if (!loading && campaignLibraryAvailable && activeCampaignId && view.startsWith("campaign-")) {
-    return <CampaignShell key={activeCampaignId} campaignId={activeCampaignId} view={view} selection={shellSelection}
-      studio={narrativeStudioAvailable} combat={combatAvailable} onNavigate={navigateCampaign}
-      onCampaigns={() => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; setActiveCampaignId(""); setShellSelection(null); setView("campaigns"); }}>{content}</CampaignShell>;
+    return (
+      <CampaignShell
+        key={activeCampaignId}
+        campaignId={activeCampaignId}
+        view={view}
+        selection={shellSelection}
+        studio={narrativeStudioAvailable}
+        combat={combatAvailable}
+        onNavigate={navigateCampaign}
+        onCampaigns={() => {
+          cancelRoomOpenForNavigation();
+          currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" };
+          setActiveCampaignId("");
+          setShellSelection(null);
+          setView("campaigns");
+        }}
+      >
+        {content}
+      </CampaignShell>
+    );
   }
   return content;
 }
 
-interface ChatProps { embedded?: boolean; session: Session; initialMessages: ChatMessage[]; provider: ProviderSettings | null; harness: HarnessSettings | null; features: FeatureFlags; systemOneAvailable?: boolean; externalError: string | null; navigationBusy: boolean; onSessionChange: (session: Session) => void; onProviderChange: (provider: ProviderSettings) => void; onHarnessChange: (harness: HarnessSettings) => void; onOpenPrivate: (characterId: string) => Promise<void>; backLabel: string; onBack: () => void; }
-function Chat({ embedded = false, session, initialMessages, provider, harness, features, systemOneAvailable = false, externalError, navigationBusy, onSessionChange: updateSession, onProviderChange, onHarnessChange, onOpenPrivate, backLabel, onBack }: ChatProps) {
-  const [messages, setMessages] = useState(initialMessages); const [draft, setDraft] = useState(""); const [targetId, setTargetId] = useState(session.primaryCharacterId); const [sending, setSending] = useState(false); const [roomSending, setRoomSending] = useState(false); const [error, setError] = useState<string | null>(null); const [streamText, setStreamText] = useState(""); const [streamSpeakerId, setStreamSpeakerId] = useState(session.primaryCharacterId); const [swipeInfo, setSwipeInfo] = useState<SiblingsResponse | null>(null); const [settingsOpen, setSettingsOpen] = useState(false);
-  const handleRef = useRef<StreamHandle | null>(null); const streamRef = useRef(""); const scrollRef = useRef<HTMLDivElement>(null); const settingsTriggerRef = useRef<HTMLButtonElement>(null); const mobileSettingsDialogRef = useRef<HTMLDialogElement>(null);
-  const followLatestRef = useRef(true); const [showJumpLatest, setShowJumpLatest] = useState(false);
-  const [settingsWidth, setSettingsWidth] = useState(() => { try { const saved = Number(localStorage.getItem("velvet.settings.width")); return Number.isFinite(saved) && saved >= 320 ? saved : 440; } catch { return 440; } });
-  const [mobileSettings, setMobileSettings] = useState(() => typeof window.matchMedia === "function" && window.matchMedia("(max-width: 800px)").matches);
+interface ChatProps {
+  embedded?: boolean;
+  session: Session;
+  initialMessages: ChatMessage[];
+  provider: ProviderSettings | null;
+  harness: HarnessSettings | null;
+  features: FeatureFlags;
+  systemOneAvailable?: boolean;
+  externalError: string | null;
+  navigationBusy: boolean;
+  onSessionChange: (session: Session) => void;
+  onProviderChange: (provider: ProviderSettings) => void;
+  onHarnessChange: (harness: HarnessSettings) => void;
+  onOpenPrivate: (characterId: string) => Promise<void>;
+  backLabel: string;
+  onBack: () => void;
+}
+function Chat({
+  embedded = false,
+  session,
+  initialMessages,
+  provider,
+  harness,
+  features,
+  systemOneAvailable = false,
+  externalError,
+  navigationBusy,
+  onSessionChange: updateSession,
+  onProviderChange,
+  onHarnessChange,
+  onOpenPrivate,
+  backLabel,
+  onBack,
+}: ChatProps) {
+  const [messages, setMessages] = useState(initialMessages);
+  const [draft, setDraft] = useState("");
+  const [targetId, setTargetId] = useState(session.primaryCharacterId);
+  const [sending, setSending] = useState(false);
+  const [roomSending, setRoomSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [streamText, setStreamText] = useState("");
+  const [streamSpeakerId, setStreamSpeakerId] = useState(session.primaryCharacterId);
+  const [swipeInfo, setSwipeInfo] = useState<SiblingsResponse | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const handleRef = useRef<StreamHandle | null>(null);
+  const streamRef = useRef("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileSettingsDialogRef = useRef<HTMLDialogElement>(null);
+  const followLatestRef = useRef(true);
+  const [showJumpLatest, setShowJumpLatest] = useState(false);
+  const [settingsWidth, setSettingsWidth] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem("velvet.settings.width"));
+      return Number.isFinite(saved) && saved >= 320 ? saved : 440;
+    } catch {
+      return 440;
+    }
+  });
+  const [mobileSettings, setMobileSettings] = useState(
+    () => typeof window.matchMedia === "function" && window.matchMedia("(max-width: 800px)").matches,
+  );
   const [roomMaxSpeakers, setRoomMaxSpeakers] = useState(() => Math.min(4, session.participants.length));
-  const [autoRoomRounds, setAutoRoomRounds] = useState(() => { try { const saved = Number(localStorage.getItem("velvet.room.autoRounds") ?? 1); return Number.isFinite(saved) ? Math.max(0, Math.min(3, saved)) : 1; } catch { return 1; } });
+  const [autoRoomRounds, setAutoRoomRounds] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem("velvet.room.autoRounds") ?? 1);
+      return Number.isFinite(saved) ? Math.max(0, Math.min(3, saved)) : 1;
+    } catch {
+      return 1;
+    }
+  });
   const [autoRunning, setAutoRunning] = useState(false);
   const stopAutoRef = useRef(false);
   const activeChatRef = useRef(true);
   const singleStreamRef = useRef<{ cancelPromise?: Promise<void> } | null>(null);
-  useEffect(() => { activeChatRef.current = true; return () => { activeChatRef.current = false; stopAutoRef.current = true; }; }, []);
+  useEffect(() => {
+    activeChatRef.current = true;
+    return () => {
+      activeChatRef.current = false;
+      stopAutoRef.current = true;
+    };
+  }, []);
   function onSessionChange(next: Session) {
     if (!activeChatRef.current) return;
     if (next.state === "closed" || next.stoppedAt) stopAutoRef.current = true;
@@ -838,50 +2526,155 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
   const [contextBasket, setContextBasket] = useState<SessionContextBasket | null>(null);
   const [contextRevision, setContextRevision] = useState(0);
   const [overallUsage, setOverallUsage] = useState<UsageSummary | null>(null);
-  const [sourceDraft, setSourceDraft] = useState(""); const [savingSource, setSavingSource] = useState(false); const sourceDialogRef = useRef<HTMLDialogElement>(null);
+  const [sourceDraft, setSourceDraft] = useState("");
+  const [savingSource, setSavingSource] = useState(false);
+  const sourceDialogRef = useRef<HTMLDialogElement>(null);
   const closed = session.state === "closed" || Boolean(session.stoppedAt);
-  useEffect(() => { setMessages(initialMessages); }, [initialMessages]);
-  useEffect(() => { if (!session.participants.some((item) => item.id === targetId)) setTargetId(session.primaryCharacterId); }, [session, targetId]);
-  useEffect(() => { const el = scrollRef.current; if (el && followLatestRef.current) el.scrollTo({ top: el.scrollHeight }); }, [messages, streamText]);
-  useEffect(() => { try { localStorage.setItem("velvet.settings.width", String(settingsWidth)); } catch { /* optional UI preference */ } }, [settingsWidth]);
-  useEffect(() => { try { localStorage.setItem("velvet.room.autoRounds", String(autoRoomRounds)); } catch { /* optional UI preference */ } }, [autoRoomRounds]);
+  useEffect(() => {
+    setMessages(initialMessages);
+  }, [initialMessages]);
+  useEffect(() => {
+    if (!session.participants.some((item) => item.id === targetId)) setTargetId(session.primaryCharacterId);
+  }, [session, targetId]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && followLatestRef.current) el.scrollTo({ top: el.scrollHeight });
+  }, [messages, streamText]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("velvet.settings.width", String(settingsWidth));
+    } catch {
+      /* optional UI preference */
+    }
+  }, [settingsWidth]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("velvet.room.autoRounds", String(autoRoomRounds));
+    } catch {
+      /* optional UI preference */
+    }
+  }, [autoRoomRounds]);
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia("(max-width: 800px)"); const update = () => setMobileSettings(query.matches); update();
-    query.addEventListener("change", update); return () => query.removeEventListener("change", update);
+    const query = window.matchMedia("(max-width: 800px)");
+    const update = () => setMobileSettings(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
   }, []);
   useEffect(() => {
-    if (!settingsOpen || !mobileSettings) { mobileSettingsDialogRef.current?.close(); return; }
+    if (!settingsOpen || !mobileSettings) {
+      mobileSettingsDialogRef.current?.close();
+      return;
+    }
     mobileSettingsDialogRef.current?.showModal();
   }, [mobileSettings, settingsOpen]);
-  useEffect(() => { let current = true; void getSessionContext(session.id).then(({ context }) => { if (current) { setContextBasket(context); setSourceDraft(context.editableSource); } }).catch(() => undefined); return () => { current = false; }; }, [session.id, messages.length, contextRevision]);
-  useEffect(() => { let current = true; void getUsage().then(({ usage }) => { if (current) setOverallUsage(usage); }).catch(() => undefined); return () => { current = false; }; }, [messages.length, contextRevision]);
+  useEffect(() => {
+    let current = true;
+    void getSessionContext(session.id)
+      .then(({ context }) => {
+        if (current) {
+          setContextBasket(context);
+          setSourceDraft(context.editableSource);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [session.id, messages.length, contextRevision]);
+  useEffect(() => {
+    let current = true;
+    void getUsage()
+      .then(({ usage }) => {
+        if (current) setOverallUsage(usage);
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [messages.length, contextRevision]);
   function resizeSettings(event: ReactPointerEvent<HTMLDivElement>) {
-    event.preventDefault(); const startX = event.clientX; const startWidth = settingsWidth;
-    const move = (next: PointerEvent) => setSettingsWidth(Math.max(320, Math.min(window.innerWidth * 0.6, startWidth + startX - next.clientX)));
-    const stop = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); };
-    window.addEventListener("pointermove", move); window.addEventListener("pointerup", stop);
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = settingsWidth;
+    const move = (next: PointerEvent) =>
+      setSettingsWidth(Math.max(320, Math.min(window.innerWidth * 0.6, startWidth + startX - next.clientX)));
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
   }
-  const speakerName = (id: string | null | undefined) => session.participants.find((item) => item.id === id)?.name ?? "Character";
+  const speakerName = (id: string | null | undefined) =>
+    session.participants.find((item) => item.id === id)?.name ?? "Character";
   const speakerBubbleStyle = (id: string | null | undefined) => {
-    const index = Math.max(0, session.participants.findIndex((participant) => participant.id === id));
+    const index = Math.max(
+      0,
+      session.participants.findIndex((participant) => participant.id === id),
+    );
     return { "--speaker-hue": String((258 + index * 137.508) % 360) } as CSSProperties;
   };
-  const latestCharacter = useMemo(() => [...messages].reverse().find((item) => item.role === "character") ?? null, [messages]);
-  const latestUserParent = useMemo(() => latestCharacter?.parentId && messages.at(-1)?.id === latestCharacter.id ? messages.find((item) => item.id === latestCharacter.parentId && item.role === "user") ?? null : null, [latestCharacter, messages]);
+  const latestCharacter = useMemo(
+    () => [...messages].reverse().find((item) => item.role === "character") ?? null,
+    [messages],
+  );
+  const latestUserParent = useMemo(
+    () =>
+      latestCharacter?.parentId && messages.at(-1)?.id === latestCharacter.id
+        ? (messages.find((item) => item.id === latestCharacter.parentId && item.role === "user") ?? null)
+        : null,
+    [latestCharacter, messages],
+  );
   useEffect(() => {
     let current = true;
     setSwipeInfo(null);
     if (latestCharacter && latestUserParent) {
-      void getSiblings(session.id, latestCharacter.id).then((result) => { if (current) setSwipeInfo(result); }).catch(() => undefined);
+      void getSiblings(session.id, latestCharacter.id)
+        .then((result) => {
+          if (current) setSwipeInfo(result);
+        })
+        .catch(() => undefined);
     }
-    return () => { current = false; };
+    return () => {
+      current = false;
+    };
   }, [session.id, latestCharacter?.id, latestUserParent?.id]);
   const usage = messages.reduce((total, item) => total + (item.usage?.totalTokens ?? 0), 0);
-  const formatCost = (value: number | null) => value === null ? "Pricing not configured" : value > 0 && value < .0001 ? "< $0.0001" : `$${value.toFixed(4)}`;
-  async function saveSourceOfTruth() { if (navigationBusy) return; setSavingSource(true); setError(null); try { await updateSessionContext(session.id, sourceDraft); const { context } = await getSessionContext(session.id); setContextBasket(context); setSourceDraft(context.editableSource); sourceDialogRef.current?.close(); } catch (err) { setError(messageFor(err, "Could not save the scene source of truth.")); } finally { setSavingSource(false); } }
-  function applyResult(result: { messages?: ChatMessage[]; reply: ChatMessage; session?: Session; providerError?: boolean }) { setMessages((current) => result.messages ?? [...current, result.reply]); setContextRevision((revision) => revision + 1); if (result.session) onSessionChange(result.session); if (result.providerError) setError("The provider could not be reached, so a safe fallback reply was saved."); }
-  async function runSingleStream(start: (handlers: Parameters<typeof streamMessage>[3]) => StreamHandle, optimistic?: ChatMessage) {
+  const formatCost = (value: number | null) =>
+    value === null ? "Pricing not configured" : value > 0 && value < 0.0001 ? "< $0.0001" : `$${value.toFixed(4)}`;
+  async function saveSourceOfTruth() {
+    if (navigationBusy) return;
+    setSavingSource(true);
+    setError(null);
+    try {
+      await updateSessionContext(session.id, sourceDraft);
+      const { context } = await getSessionContext(session.id);
+      setContextBasket(context);
+      setSourceDraft(context.editableSource);
+      sourceDialogRef.current?.close();
+    } catch (err) {
+      setError(messageFor(err, "Could not save the scene source of truth."));
+    } finally {
+      setSavingSource(false);
+    }
+  }
+  function applyResult(result: {
+    messages?: ChatMessage[];
+    reply: ChatMessage;
+    session?: Session;
+    providerError?: boolean;
+  }) {
+    setMessages((current) => result.messages ?? [...current, result.reply]);
+    setContextRevision((revision) => revision + 1);
+    if (result.session) onSessionChange(result.session);
+    if (result.providerError) setError("The provider could not be reached, so a safe fallback reply was saved.");
+  }
+  async function runSingleStream(
+    start: (handlers: Parameters<typeof streamMessage>[3]) => StreamHandle,
+    optimistic?: ChatMessage,
+  ) {
     const operation: { cancelPromise?: Promise<void> } = {};
     singleStreamRef.current = operation;
     const current = () => activeChatRef.current && singleStreamRef.current === operation;
@@ -892,23 +2685,40 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
       onUserMessage: (message) => {
         if (!current()) return;
         receivedUser = true;
-        setMessages((items) => items.map((item) => item.id === optimistic?.id ? message : item));
+        setMessages((items) => items.map((item) => (item.id === optimistic?.id ? message : item)));
       },
-      onDelta: (_seq, text) => { if (current()) { streamRef.current += text; setStreamText(streamRef.current); } },
-      onState: (next) => { if (current() && next) onSessionChange(next); },
-      onDone: (payload) => { if (current()) { completed = true; applyResult(payload); } },
+      onDelta: (_seq, text) => {
+        if (current()) {
+          streamRef.current += text;
+          setStreamText(streamRef.current);
+        }
+      },
+      onState: (next) => {
+        if (current() && next) onSessionChange(next);
+      },
+      onDone: (payload) => {
+        if (current()) {
+          completed = true;
+          applyResult(payload);
+        }
+      },
       onBoundary: (payload) => {
         if (!current()) return;
-        completed = true; setStreamText(""); applyResult(payload);
+        completed = true;
+        setStreamText("");
+        applyResult(payload);
         setError("The reply crossed the agreed boundaries, so a boundary-safe reply was saved instead.");
       },
-      onError: (text, violations) => { if (current()) setError(violations.length ? `${text}: ${violations.join("; ")}` : text); },
+      onError: (text, violations) => {
+        if (current()) setError(violations.length ? `${text}: ${violations.join("; ")}` : text);
+      },
     });
     handleRef.current = handle;
     try {
       await handle.done;
     } catch (err) {
-      if (current() && !(err instanceof Error && err.name === "AbortError")) setError(messageFor(err, "The reply was interrupted."));
+      if (current() && !(err instanceof Error && err.name === "AbortError"))
+        setError(messageFor(err, "The reply was interrupted."));
     } finally {
       // Only this owner finalizes. A delayed cancel response must never finish a newer send.
       await operation.cancelPromise;
@@ -918,28 +2728,51 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
           try {
             const snapshot = await getSession(session.id);
             if (!current()) return;
-            setMessages(snapshot.messages); onSessionChange(snapshot.session);
+            setMessages(snapshot.messages);
+            onSessionChange(snapshot.session);
             setContextRevision((revision) => revision + 1);
-            const savedUser = receivedUser || snapshot.messages.some((message) => !previousIds.has(message.id) && message.role === "user" && message.content === optimistic?.content);
+            const savedUser =
+              receivedUser ||
+              snapshot.messages.some(
+                (message) =>
+                  !previousIds.has(message.id) && message.role === "user" && message.content === optimistic?.content,
+              );
             if (optimistic && !savedUser) setDraft((draft) => draft || optimistic.content);
           } catch {
-            if (current()) setError("The reply was interrupted and saved messages could not be refreshed. Reopen this chat to check what was saved before sending again.");
+            if (current())
+              setError(
+                "The reply was interrupted and saved messages could not be refreshed. Reopen this chat to check what was saved before sending again.",
+              );
           }
         }
         if (current()) {
-          singleStreamRef.current = null; setSending(false); setStreamText(""); streamRef.current = "";
+          singleStreamRef.current = null;
+          setSending(false);
+          setStreamText("");
+          streamRef.current = "";
         }
       }
     }
   }
   function cancelSingleStream() {
-    const operation = singleStreamRef.current; const handle = handleRef.current;
-    if (operation && handle && !operation.cancelPromise) operation.cancelPromise = Promise.resolve().then(() => handle.cancel()).catch(() => undefined);
+    const operation = singleStreamRef.current;
+    const handle = handleRef.current;
+    if (operation && handle && !operation.cancelPromise)
+      operation.cancelPromise = Promise.resolve()
+        .then(() => handle.cancel())
+        .catch(() => undefined);
   }
   const roomHandlers = () => ({
-    onState: (next: Session | undefined) => { if (next) onSessionChange(next); },
+    onState: (next: Session | undefined) => {
+      if (next) onSessionChange(next);
+    },
     onReply: (reply: ChatMessage) => setMessages((current) => [...current, reply]),
-    onDone: (result: { messages: ChatMessage[]; session?: Session; providerError?: boolean }) => { setMessages(result.messages); setContextRevision((revision) => revision + 1); if (result.session) onSessionChange(result.session); if (result.providerError) setError("One or more room replies used the safe provider fallback."); },
+    onDone: (result: { messages: ChatMessage[]; session?: Session; providerError?: boolean }) => {
+      setMessages(result.messages);
+      setContextRevision((revision) => revision + 1);
+      if (result.session) onSessionChange(result.session);
+      if (result.providerError) setError("One or more room replies used the safe provider fallback.");
+    },
     onError: (text: string) => setError(text),
   });
   async function runAutomaticRounds(rounds: number) {
@@ -947,62 +2780,746 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
     setAutoRunning(true);
     try {
       for (let round = 0; round < rounds && activeChatRef.current && !stopAutoRef.current; round++) {
-        await streamRoomContinuation(session.id, roomHandlers(), Math.min(roomMaxSpeakers, session.participants.length));
+        await streamRoomContinuation(
+          session.id,
+          roomHandlers(),
+          Math.min(roomMaxSpeakers, session.participants.length),
+        );
       }
-    } finally { setAutoRunning(false); }
+    } finally {
+      setAutoRunning(false);
+    }
   }
   async function send(event: FormEvent) {
-    event.preventDefault(); const content = draft.trim(); if (!content || sending || navigationBusy || closed) return; setError(null); setSending(true); setStreamSpeakerId(targetId); setDraft("");
+    event.preventDefault();
+    const content = draft.trim();
+    if (!content || sending || navigationBusy || closed) return;
+    setError(null);
+    setSending(true);
+    setStreamSpeakerId(targetId);
+    setDraft("");
     const roomTurn = ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value === "room";
-    const optimistic: ChatMessage = { id: `local-${Date.now()}`, sessionId: session.id, role: "user", speakerCharacterId: null, content, parentId: null, createdAt: new Date().toISOString() };
+    const optimistic: ChatMessage = {
+      id: `local-${Date.now()}`,
+      sessionId: session.id,
+      role: "user",
+      speakerCharacterId: null,
+      content,
+      parentId: null,
+      createdAt: new Date().toISOString(),
+    };
     setMessages((current) => [...current, optimistic]);
     if (roomTurn) {
-      stopAutoRef.current = false; setRoomSending(true); let receivedUser = false;
+      stopAutoRef.current = false;
+      setRoomSending(true);
+      let receivedUser = false;
       try {
-        await streamRoomMessage(session.id, content, {
-          onUserMessage: (message) => { receivedUser = true; setMessages((current) => current.map((item) => item.id === optimistic.id ? message : item)); },
-          onState: (next) => { if (next) onSessionChange(next); },
-          onReply: (reply) => setMessages((current) => [...current, reply]),
-          onDone: (result) => { setMessages(result.messages); setContextRevision((revision) => revision + 1); if (result.session) onSessionChange(result.session); if (result.providerError) setError("One or more room replies used the safe provider fallback."); },
-          onError: (text) => setError(text),
-        }, Math.min(roomMaxSpeakers, session.participants.length));
+        await streamRoomMessage(
+          session.id,
+          content,
+          {
+            onUserMessage: (message) => {
+              receivedUser = true;
+              setMessages((current) => current.map((item) => (item.id === optimistic.id ? message : item)));
+            },
+            onState: (next) => {
+              if (next) onSessionChange(next);
+            },
+            onReply: (reply) => setMessages((current) => [...current, reply]),
+            onDone: (result) => {
+              setMessages(result.messages);
+              setContextRevision((revision) => revision + 1);
+              if (result.session) onSessionChange(result.session);
+              if (result.providerError) setError("One or more room replies used the safe provider fallback.");
+            },
+            onError: (text) => setError(text),
+          },
+          Math.min(roomMaxSpeakers, session.participants.length),
+        );
         setSwipeInfo(null);
         await runAutomaticRounds(autoRoomRounds);
       } catch (err) {
         setError(messageFor(err, "Failed to send message to the room."));
-        if (!receivedUser) { setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); }
-      } finally { setRoomSending(false); setSending(false); }
+        if (!receivedUser) {
+          setMessages((current) => current.filter((item) => item.id !== optimistic.id));
+          setDraft((current) => current || content);
+        }
+      } finally {
+        setRoomSending(false);
+        setSending(false);
+      }
       return;
     }
     if (provider?.streaming) {
-      await runSingleStream((handlers) => streamMessage(session.id, content, targetId, handlers), optimistic); return;
+      await runSingleStream((handlers) => streamMessage(session.id, content, targetId, handlers), optimistic);
+      return;
     }
-    try { applyResult(await sendMessage(session.id, content, targetId)); } catch (err) { setError(messageFor(err, "Failed to send message.")); setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); } finally { setSending(false); }
+    try {
+      applyResult(await sendMessage(session.id, content, targetId));
+    } catch (err) {
+      setError(messageFor(err, "Failed to send message."));
+      setMessages((current) => current.filter((item) => item.id !== optimistic.id));
+      setDraft((current) => current || content);
+    } finally {
+      setSending(false);
+    }
   }
-  async function continueAs() { if (sending || navigationBusy || closed) return; setSending(true); setStreamSpeakerId(targetId); setError(null); try { applyResult(await continueSession(session.id, targetId)); } catch (err) { setError(messageFor(err, "Could not continue the scene.")); } finally { setSending(false); } }
-  async function continueRoomTurn() { if (sending || navigationBusy || closed || session.participants.length < 2 || !latestCharacter) return; setSending(true); setRoomSending(true); setError(null); setSwipeInfo(null); try { await streamRoomContinuation(session.id, roomHandlers(), Math.min(roomMaxSpeakers, session.participants.length)); } catch (err) { setError(messageFor(err, "Could not give the room another turn.")); } finally { setRoomSending(false); setSending(false); } }
-  async function regenerate() { if (!latestCharacter || !latestUserParent || sending || navigationBusy || closed) return; setSending(true); setStreamSpeakerId(targetId); setError(null); if (provider?.streaming) { await runSingleStream((handlers) => streamSwipe(session.id, latestCharacter.id, targetId, handlers)); } else { try { applyResult(await swipeMessage(session.id, latestCharacter.id, targetId)); } catch (err) { setError(messageFor(err, "Failed to regenerate reply.")); } finally { setSending(false); } } }
-  async function retry() { if (!latestCharacter || !latestUserParent || sending || navigationBusy || closed) return; setSending(true); setError(null); try { applyResult(await branchMessage(session.id, latestCharacter.id, latestUserParent.content, targetId)); } catch (err) { setError(messageFor(err, "Failed to retry turn.")); } finally { setSending(false); } }
-  async function navigateSwipe(direction: -1 | 1) { if (!swipeInfo || sending || navigationBusy) return; const sorted = [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0)); const active = swipeInfo.activeMessageId ?? latestCharacter?.id; const target = sorted[sorted.findIndex((item) => item.id === active) + direction]; if (!target) return; setSending(true); setError(null); try { const data = await activateMessage(session.id, target.id); setMessages(data.messages); setContextRevision((revision) => revision + 1); } catch (err) { setError(messageFor(err, "Could not switch reply.")); } finally { setSending(false); } }
-  const sortedSwipes = swipeInfo ? [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0)) : []; const activeSwipe = sortedSwipes.findIndex((item) => item.id === (swipeInfo?.activeMessageId ?? latestCharacter?.id));
-  const chat = <section className={`chat-app ${settingsOpen ? "settings-visible" : ""}`} style={{ "--settings-width": `${settingsWidth}px` } as CSSProperties}>
-    <div className="chat-main"><header className="chat-header"><div><button className="back-link" onClick={onBack}>{backLabel}</button>{embedded ? <h2 className="chat-title">{session.title || session.participants.map((item) => item.name).join(" & ")}</h2> : <h1 className="chat-title">{session.title || session.participants.map((item) => item.name).join(" & ")}</h1>}<p className="chat-meta">{session.participants.map((item) => item.name).join(" · ")} · {session.state}</p><p className="chat-meta token-status">ACTIVE BRANCH // {usage.toLocaleString()} TOKENS{overallUsage ? ` · LIFETIME // ${overallUsage.totalTokens.toLocaleString()} TOKENS · ${formatCost(overallUsage.estimatedCostUsd)}` : ""}</p></div><div className="chat-actions">{handleRef.current && <button className="ghost" disabled={navigationBusy} onClick={() => { if (!navigationBusy) cancelSingleStream(); }}>Stop generating</button>}<button ref={settingsTriggerRef} className="ghost" disabled={navigationBusy} aria-expanded={settingsOpen} onClick={() => { if (!navigationBusy) setSettingsOpen((open) => !open); }}>Prompt & settings</button><button className="danger" disabled={closed || navigationBusy} onClick={() => { if (!navigationBusy) void stopSession(session.id).then(onSessionChange).catch((err) => setError(messageFor(err, "Could not end session."))); }}>End session</button></div></header>
-      {overallUsage && <details className="usage-dashboard"><summary>Overall usage & estimated cost <span>{overallUsage.totalTokens.toLocaleString()} tokens · {formatCost(overallUsage.estimatedCostUsd)}</span></summary><div className="usage-totals"><div><strong>{overallUsage.promptTokens.toLocaleString()}</strong><small>Prompt tokens</small></div><div><strong>{overallUsage.completionTokens.toLocaleString()}</strong><small>Completion tokens</small></div><div><strong>{overallUsage.calls.toLocaleString()}</strong><small>Tracked calls</small></div><div><strong>{formatCost(overallUsage.estimatedCostUsd)}</strong><small>Estimated lifetime cost</small></div></div><p className="meta-text">{overallUsage.providerMeasuredTokens.toLocaleString()} provider-reported tokens · {overallUsage.estimatedTokens.toLocaleString()} locally estimated tokens. Cost uses ${overallUsage.pricing.promptPerMillion ?? "unset"}/M input and ${overallUsage.pricing.completionPerMillion ?? "unset"}/M output.</p><div className="usage-breakdowns"><section><h3>By operation</h3>{overallUsage.byKind.map((item) => <p key={item.kind}><span>{item.kind.replaceAll("_", " ")}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section><section><h3>By model</h3>{overallUsage.byModel.map((item) => <p key={item.model}><span>{item.model}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section><section><h3>Top sessions</h3>{overallUsage.bySession.slice(0, 8).map((item) => <p key={item.sessionId}><span>{item.title || "Untitled session"}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section></div></details>}
-      {closed && <p className="closed-banner">This session is closed{session.stopReason ? ` (${session.stopReason})` : ""}. You can read its history, but it is no longer writable.</p>}
-      {contextBasket && <details className="context-basket" open><summary>Shared context basket <span>{contextBasket.recentEvents.length + contextBasket.rememberedFacts.length + contextBasket.activeLore.length} elements</span></summary><div className="source-truth"><div><span className="eyebrow">AUTHORITATIVE SCENE · LIVE</span><p>{contextBasket.sourceOfTruth}</p><div className="source-timestamps">{contextBasket.sourceUpdatedAt && <small>Manual canon updated {new Date(contextBasket.sourceUpdatedAt).toLocaleString()}</small>}{contextBasket.synthesizedUpdatedAt && <small>Scene facts synthesized {new Date(contextBasket.synthesizedUpdatedAt).toLocaleString()}</small>}</div></div><button className="primary small" disabled={navigationBusy} onClick={() => { if (!navigationBusy) { setSourceDraft(contextBasket.editableSource); sourceDialogRef.current?.showModal(); } }}>Edit manual canon</button></div><div className="context-grid"><section><h3>Participants</h3>{contextBasket.participants.map((participant) => <p key={participant.id}><strong>{participant.name}</strong> · {participant.archetype}</p>)}</section><section><h3>Recent events</h3>{contextBasket.recentEvents.length ? contextBasket.recentEvents.map((event, index) => <p key={index}>{event}</p>) : <p className="meta-text">No events yet.</p>}</section><section><h3>Remembered facts</h3>{contextBasket.rememberedFacts.length ? contextBasket.rememberedFacts.map((fact, index) => <p key={index}>{fact}</p>) : <p className="meta-text">No approved shared memories.</p>}</section><section><h3>Active lore & threads</h3>{contextBasket.activeLore.map((entry, index) => <p key={`lore-${index}`}>{entry}</p>)}{contextBasket.openThreads.map((thread, index) => <p key={`thread-${index}`}>Open: {thread}</p>)}{!contextBasket.activeLore.length && !contextBasket.openThreads.length && <p className="meta-text">Nothing active.</p>}</section></div></details>}
-      <dialog className="scene-dialog" ref={sourceDialogRef} onClose={() => setSourceDraft(contextBasket?.editableSource ?? "")}><form method="dialog" onSubmit={(event) => { event.preventDefault(); void saveSourceOfTruth(); }}><fieldset disabled={navigationBusy}><div className="dialog-heading"><div><p className="eyebrow">SOURCE OF TRUTH</p><h2>Current situation and scene</h2></div><button type="button" className="ghost small" onClick={() => sourceDialogRef.current?.close()}>Close</button></div><p className="meta-text">Edit the highest-priority manual canon. A factual scene synthesizer separately updates locations, conditions, objects, relationships, knowledge, goals, and tensions after completed turns.</p><label className="field"><span>Manual scene canon</span><textarea autoFocus rows={12} maxLength={8000} value={sourceDraft} onChange={(event) => setSourceDraft(event.target.value)} placeholder="Example: It is late evening in the observatory. Mara stands beside the western window, still holding the brass key. Jules knows the door is locked but does not know why…" /></label><div className="dialog-actions"><span className="meta-text">{sourceDraft.length.toLocaleString()} / 8,000</span><button type="submit" className="primary" disabled={savingSource}>{savingSource ? "Saving…" : "Save manual canon"}</button></div></fieldset></form></dialog>
-      <div className="messages" ref={scrollRef} role="log" aria-live="polite" aria-busy={sending} onScroll={(event) => { const el = event.currentTarget; const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48; followLatestRef.current = atBottom; setShowJumpLatest(!atBottom); }}>{messages.length === 0 && <p className="empty-state">The scene is ready. Write the opening message or choose “Continue as…” for a character-led opening.</p>}{messages.map((item) => <div className={`message message-${item.role}`} style={item.role === "character" ? speakerBubbleStyle(item.speakerCharacterId) : undefined} key={item.id}><span className="message-role">{item.role === "user" ? "You" : item.role === "system" ? "System" : speakerName(item.speakerCharacterId)}</span><p>{item.content}</p>{item.usage && <span className="message-usage">{item.usage.source === "estimated" ? "≈" : ""}{item.usage.totalTokens.toLocaleString()} tokens · {item.usage.promptTokens.toLocaleString()} in / {item.usage.completionTokens.toLocaleString()} out</span>}</div>)}{sending && !roomSending && <div className="message message-character message-streaming" style={speakerBubbleStyle(streamSpeakerId)}><span className="message-role">{speakerName(streamSpeakerId)}</span><p>{streamText || "…"}</p></div>}{roomSending && <div className="message message-system room-thinking"><span className="message-role">Room</span><p>Choosing the next speaker…</p></div>}</div>
-      {latestCharacter && latestUserParent && <div className="swipe-controls">{sortedSwipes.length > 0 && <><button className="ghost" aria-label="Previous reply" disabled={sending || navigationBusy || activeSwipe <= 0} onClick={() => void navigateSwipe(-1)}>‹ Prev</button><span className="swipe-position">{activeSwipe + 1}/{sortedSwipes.length}</span><button className="ghost" aria-label="Next reply" disabled={sending || navigationBusy || activeSwipe >= sortedSwipes.length - 1} onClick={() => void navigateSwipe(1)}>Next ›</button></>}<button className="ghost" aria-label="Regenerate reply" disabled={sending || navigationBusy || closed} onClick={() => void regenerate()}>Regenerate</button><button className="ghost" aria-label="Retry last turn" disabled={sending || navigationBusy || closed} onClick={() => void retry()}>Retry</button></div>}
-      {(error || externalError) && <p className="error" role="alert">{error || externalError}</p>}
-      <div className="speaker-controls"><label className="field"><span>Target speaker</span><select value={targetId} onChange={(e) => setTargetId(e.target.value)} disabled={closed || sending || navigationBusy}>{session.participants.map((item) => <option value={item.id} key={item.id}>{item.name}{item.id === session.primaryCharacterId ? " · primary" : ""}</option>)}</select></label>{session.participants.length > 1 && <><label className="field compact-control"><span>Max room responders</span><select aria-label="Max room responders" value={roomMaxSpeakers} disabled={sending || navigationBusy} onChange={(event) => setRoomMaxSpeakers(Number(event.target.value))}>{Array.from({ length: Math.min(6, session.participants.length) }, (_, index) => index + 1).map((count) => <option value={count} key={count}>{count}</option>)}</select></label><label className="field compact-control"><span>Auto follow-up rounds</span><select aria-label="Auto follow-up rounds" value={autoRoomRounds} disabled={sending || navigationBusy} onChange={(event) => setAutoRoomRounds(Number(event.target.value))}><option value={0}>Off</option><option value={1}>1 round</option><option value={2}>2 rounds</option><option value={3}>3 rounds</option></select></label></>}{session.participants.length > 1 && <button className="ghost continue-button" disabled={sending || savingSource || settingsOpen || navigationBusy} onClick={() => void onOpenPrivate(targetId)}>Private chat with {speakerName(targetId)}</button>}{session.participants.length > 1 && <button className="ghost continue-button" disabled={closed || sending || navigationBusy || !latestCharacter} onClick={() => void continueRoomTurn()}>Give room another turn</button>}<button className="ghost continue-button" disabled={closed || sending || navigationBusy} onClick={() => void continueAs()}>Continue as {speakerName(targetId)}</button></div>
-      {session.participants.length > 1 && <p className="room-cost">Current room automation limit: up to {(2 + roomMaxSpeakers) * (1 + autoRoomRounds)} provider calls per room message ({roomMaxSpeakers} replies, routing, and one scene-state update per round).</p>}
-      {autoRunning && <div className="auto-room-status"><span>Automatic room conversation is running. It will stop after this bounded turn.</span><button className="danger subtle small" disabled={navigationBusy} onClick={() => { if (!navigationBusy) stopAutoRef.current = true; }}>Stop auto chat</button></div>}
-      {showJumpLatest && <button type="button" className="ghost jump-to-latest" onClick={() => { followLatestRef.current = true; setShowJumpLatest(false); scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }}>Jump to latest</button>}
-      <form className="composer" onSubmit={send}><label className="sr-only" htmlFor="chat-message">Message for {speakerName(targetId)}</label><input id="chat-message" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={closed ? "Session ended" : "Write a message…"} disabled={closed || sending || navigationBusy} maxLength={1000} />{session.participants.length > 1 && <button type="submit" value="room" className="ghost" disabled={closed || sending || navigationBusy || !draft.trim()} title="Let the room choose up to six pertinent speakers">Send to room</button>}<button type="submit" value="target" className="primary" disabled={closed || sending || navigationBusy || !draft.trim()}>Send to {speakerName(targetId)}</button></form>
-    </div>
-    <div className="settings-separator" role="separator" aria-label="Resize settings pane" aria-orientation="vertical" aria-valuemin={320} aria-valuemax={Math.round(window.innerWidth * .6)} aria-valuenow={Math.round(settingsWidth)} onPointerDown={(event) => { if (!navigationBusy) resizeSettings(event); }} onKeyDown={(event) => { if (navigationBusy) return; if (event.key === "ArrowLeft") setSettingsWidth((width) => Math.min(window.innerWidth * .6, width + (event.shiftKey ? 64 : 16))); if (event.key === "ArrowRight") setSettingsWidth((width) => Math.max(320, width - (event.shiftKey ? 64 : 16))); }} tabIndex={settingsOpen && !navigationBusy ? 0 : -1} />
-    {!mobileSettings && <aside className="settings-pane" aria-hidden={!settingsOpen}><fieldset disabled={navigationBusy}><PromptSettings provider={provider} harness={harness} features={features} systemOneAvailable={systemOneAvailable} onProviderChange={onProviderChange} onHarnessChange={onHarnessChange} onClose={() => { setSettingsOpen(false); queueMicrotask(() => settingsTriggerRef.current?.focus()); }} /></fieldset></aside>}
-    {mobileSettings && <dialog ref={mobileSettingsDialogRef} className="mobile-settings-dialog" onClose={() => { setSettingsOpen(false); queueMicrotask(() => settingsTriggerRef.current?.focus()); }}><fieldset disabled={navigationBusy}><PromptSettings provider={provider} harness={harness} features={features} systemOneAvailable={systemOneAvailable} onProviderChange={onProviderChange} onHarnessChange={onHarnessChange} onClose={() => mobileSettingsDialogRef.current?.close()} /></fieldset></dialog>}
-  </section>;
-  return embedded ? <div className="chat-page embedded-chat-page">{chat}</div> : <main className="chat-page">{chat}</main>;
+  async function continueAs() {
+    if (sending || navigationBusy || closed) return;
+    setSending(true);
+    setStreamSpeakerId(targetId);
+    setError(null);
+    try {
+      applyResult(await continueSession(session.id, targetId));
+    } catch (err) {
+      setError(messageFor(err, "Could not continue the scene."));
+    } finally {
+      setSending(false);
+    }
+  }
+  async function continueRoomTurn() {
+    if (sending || navigationBusy || closed || session.participants.length < 2 || !latestCharacter) return;
+    setSending(true);
+    setRoomSending(true);
+    setError(null);
+    setSwipeInfo(null);
+    try {
+      await streamRoomContinuation(session.id, roomHandlers(), Math.min(roomMaxSpeakers, session.participants.length));
+    } catch (err) {
+      setError(messageFor(err, "Could not give the room another turn."));
+    } finally {
+      setRoomSending(false);
+      setSending(false);
+    }
+  }
+  async function regenerate() {
+    if (!latestCharacter || !latestUserParent || sending || navigationBusy || closed) return;
+    setSending(true);
+    setStreamSpeakerId(targetId);
+    setError(null);
+    if (provider?.streaming) {
+      await runSingleStream((handlers) => streamSwipe(session.id, latestCharacter.id, targetId, handlers));
+    } else {
+      try {
+        applyResult(await swipeMessage(session.id, latestCharacter.id, targetId));
+      } catch (err) {
+        setError(messageFor(err, "Failed to regenerate reply."));
+      } finally {
+        setSending(false);
+      }
+    }
+  }
+  async function retry() {
+    if (!latestCharacter || !latestUserParent || sending || navigationBusy || closed) return;
+    setSending(true);
+    setError(null);
+    try {
+      applyResult(await branchMessage(session.id, latestCharacter.id, latestUserParent.content, targetId));
+    } catch (err) {
+      setError(messageFor(err, "Failed to retry turn."));
+    } finally {
+      setSending(false);
+    }
+  }
+  async function navigateSwipe(direction: -1 | 1) {
+    if (!swipeInfo || sending || navigationBusy) return;
+    const sorted = [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0));
+    const active = swipeInfo.activeMessageId ?? latestCharacter?.id;
+    const target = sorted[sorted.findIndex((item) => item.id === active) + direction];
+    if (!target) return;
+    setSending(true);
+    setError(null);
+    try {
+      const data = await activateMessage(session.id, target.id);
+      setMessages(data.messages);
+      setContextRevision((revision) => revision + 1);
+    } catch (err) {
+      setError(messageFor(err, "Could not switch reply."));
+    } finally {
+      setSending(false);
+    }
+  }
+  const sortedSwipes = swipeInfo
+    ? [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0))
+    : [];
+  const activeSwipe = sortedSwipes.findIndex((item) => item.id === (swipeInfo?.activeMessageId ?? latestCharacter?.id));
+  const chat = (
+    <section
+      className={`chat-app ${settingsOpen ? "settings-visible" : ""}`}
+      style={{ "--settings-width": `${settingsWidth}px` } as CSSProperties}
+    >
+      <div className="chat-main">
+        <header className="chat-header">
+          <div>
+            <button className="back-link" onClick={onBack}>
+              {backLabel}
+            </button>
+            {embedded ? (
+              <h2 className="chat-title">
+                {session.title || session.participants.map((item) => item.name).join(" & ")}
+              </h2>
+            ) : (
+              <h1 className="chat-title">
+                {session.title || session.participants.map((item) => item.name).join(" & ")}
+              </h1>
+            )}
+            <p className="chat-meta">
+              {session.participants.map((item) => item.name).join(" · ")} · {session.state}
+            </p>
+            <p className="chat-meta token-status">
+              ACTIVE BRANCH // {usage.toLocaleString()} TOKENS
+              {overallUsage
+                ? ` · LIFETIME // ${overallUsage.totalTokens.toLocaleString()} TOKENS · ${formatCost(overallUsage.estimatedCostUsd)}`
+                : ""}
+            </p>
+          </div>
+          <div className="chat-actions">
+            {handleRef.current && (
+              <button
+                className="ghost"
+                disabled={navigationBusy}
+                onClick={() => {
+                  if (!navigationBusy) cancelSingleStream();
+                }}
+              >
+                Stop generating
+              </button>
+            )}
+            <button
+              ref={settingsTriggerRef}
+              className="ghost"
+              disabled={navigationBusy}
+              aria-expanded={settingsOpen}
+              onClick={() => {
+                if (!navigationBusy) setSettingsOpen((open) => !open);
+              }}
+            >
+              Prompt & settings
+            </button>
+            <button
+              className="danger"
+              disabled={closed || navigationBusy}
+              onClick={() => {
+                if (!navigationBusy)
+                  void stopSession(session.id)
+                    .then(onSessionChange)
+                    .catch((err) => setError(messageFor(err, "Could not end session.")));
+              }}
+            >
+              End session
+            </button>
+          </div>
+        </header>
+        {overallUsage && (
+          <details className="usage-dashboard">
+            <summary>
+              Overall usage & estimated cost{" "}
+              <span>
+                {overallUsage.totalTokens.toLocaleString()} tokens · {formatCost(overallUsage.estimatedCostUsd)}
+              </span>
+            </summary>
+            <div className="usage-totals">
+              <div>
+                <strong>{overallUsage.promptTokens.toLocaleString()}</strong>
+                <small>Prompt tokens</small>
+              </div>
+              <div>
+                <strong>{overallUsage.completionTokens.toLocaleString()}</strong>
+                <small>Completion tokens</small>
+              </div>
+              <div>
+                <strong>{overallUsage.calls.toLocaleString()}</strong>
+                <small>Tracked calls</small>
+              </div>
+              <div>
+                <strong>{formatCost(overallUsage.estimatedCostUsd)}</strong>
+                <small>Estimated lifetime cost</small>
+              </div>
+            </div>
+            <p className="meta-text">
+              {overallUsage.providerMeasuredTokens.toLocaleString()} provider-reported tokens ·{" "}
+              {overallUsage.estimatedTokens.toLocaleString()} locally estimated tokens. Cost uses $
+              {overallUsage.pricing.promptPerMillion ?? "unset"}/M input and $
+              {overallUsage.pricing.completionPerMillion ?? "unset"}/M output.
+            </p>
+            <div className="usage-breakdowns">
+              <section>
+                <h3>By operation</h3>
+                {overallUsage.byKind.map((item) => (
+                  <p key={item.kind}>
+                    <span>{item.kind.replaceAll("_", " ")}</span>
+                    <strong>
+                      {item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}
+                    </strong>
+                  </p>
+                ))}
+              </section>
+              <section>
+                <h3>By model</h3>
+                {overallUsage.byModel.map((item) => (
+                  <p key={item.model}>
+                    <span>{item.model}</span>
+                    <strong>
+                      {item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}
+                    </strong>
+                  </p>
+                ))}
+              </section>
+              <section>
+                <h3>Top sessions</h3>
+                {overallUsage.bySession.slice(0, 8).map((item) => (
+                  <p key={item.sessionId}>
+                    <span>{item.title || "Untitled session"}</span>
+                    <strong>
+                      {item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}
+                    </strong>
+                  </p>
+                ))}
+              </section>
+            </div>
+          </details>
+        )}
+        {closed && (
+          <p className="closed-banner">
+            This session is closed{session.stopReason ? ` (${session.stopReason})` : ""}. You can read its history, but
+            it is no longer writable.
+          </p>
+        )}
+        {contextBasket && (
+          <details className="context-basket" open>
+            <summary>
+              Shared context basket{" "}
+              <span>
+                {contextBasket.recentEvents.length +
+                  contextBasket.rememberedFacts.length +
+                  contextBasket.activeLore.length}{" "}
+                elements
+              </span>
+            </summary>
+            <div className="source-truth">
+              <div>
+                <span className="eyebrow">AUTHORITATIVE SCENE · LIVE</span>
+                <p>{contextBasket.sourceOfTruth}</p>
+                <div className="source-timestamps">
+                  {contextBasket.sourceUpdatedAt && (
+                    <small>Manual canon updated {new Date(contextBasket.sourceUpdatedAt).toLocaleString()}</small>
+                  )}
+                  {contextBasket.synthesizedUpdatedAt && (
+                    <small>
+                      Scene facts synthesized {new Date(contextBasket.synthesizedUpdatedAt).toLocaleString()}
+                    </small>
+                  )}
+                </div>
+              </div>
+              <button
+                className="primary small"
+                disabled={navigationBusy}
+                onClick={() => {
+                  if (!navigationBusy) {
+                    setSourceDraft(contextBasket.editableSource);
+                    sourceDialogRef.current?.showModal();
+                  }
+                }}
+              >
+                Edit manual canon
+              </button>
+            </div>
+            <div className="context-grid">
+              <section>
+                <h3>Participants</h3>
+                {contextBasket.participants.map((participant) => (
+                  <p key={participant.id}>
+                    <strong>{participant.name}</strong> · {participant.archetype}
+                  </p>
+                ))}
+              </section>
+              <section>
+                <h3>Recent events</h3>
+                {contextBasket.recentEvents.length ? (
+                  contextBasket.recentEvents.map((event, index) => <p key={index}>{event}</p>)
+                ) : (
+                  <p className="meta-text">No events yet.</p>
+                )}
+              </section>
+              <section>
+                <h3>Remembered facts</h3>
+                {contextBasket.rememberedFacts.length ? (
+                  contextBasket.rememberedFacts.map((fact, index) => <p key={index}>{fact}</p>)
+                ) : (
+                  <p className="meta-text">No approved shared memories.</p>
+                )}
+              </section>
+              <section>
+                <h3>Active lore & threads</h3>
+                {contextBasket.activeLore.map((entry, index) => (
+                  <p key={`lore-${index}`}>{entry}</p>
+                ))}
+                {contextBasket.openThreads.map((thread, index) => (
+                  <p key={`thread-${index}`}>Open: {thread}</p>
+                ))}
+                {!contextBasket.activeLore.length && !contextBasket.openThreads.length && (
+                  <p className="meta-text">Nothing active.</p>
+                )}
+              </section>
+            </div>
+          </details>
+        )}
+        <dialog
+          className="scene-dialog"
+          ref={sourceDialogRef}
+          onClose={() => setSourceDraft(contextBasket?.editableSource ?? "")}
+        >
+          <form
+            method="dialog"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveSourceOfTruth();
+            }}
+          >
+            <fieldset disabled={navigationBusy}>
+              <div className="dialog-heading">
+                <div>
+                  <p className="eyebrow">SOURCE OF TRUTH</p>
+                  <h2>Current situation and scene</h2>
+                </div>
+                <button type="button" className="ghost small" onClick={() => sourceDialogRef.current?.close()}>
+                  Close
+                </button>
+              </div>
+              <p className="meta-text">
+                Edit the highest-priority manual canon. A factual scene synthesizer separately updates locations,
+                conditions, objects, relationships, knowledge, goals, and tensions after completed turns.
+              </p>
+              <label className="field">
+                <span>Manual scene canon</span>
+                <textarea
+                  autoFocus
+                  rows={12}
+                  maxLength={8000}
+                  value={sourceDraft}
+                  onChange={(event) => setSourceDraft(event.target.value)}
+                  placeholder="Example: It is late evening in the observatory. Mara stands beside the western window, still holding the brass key. Jules knows the door is locked but does not know why…"
+                />
+              </label>
+              <div className="dialog-actions">
+                <span className="meta-text">{sourceDraft.length.toLocaleString()} / 8,000</span>
+                <button type="submit" className="primary" disabled={savingSource}>
+                  {savingSource ? "Saving…" : "Save manual canon"}
+                </button>
+              </div>
+            </fieldset>
+          </form>
+        </dialog>
+        <div
+          className="messages"
+          ref={scrollRef}
+          role="log"
+          aria-live="polite"
+          aria-busy={sending}
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+            followLatestRef.current = atBottom;
+            setShowJumpLatest(!atBottom);
+          }}
+        >
+          {messages.length === 0 && (
+            <p className="empty-state">
+              The scene is ready. Write the opening message or choose “Continue as…” for a character-led opening.
+            </p>
+          )}
+          {messages.map((item) => (
+            <div
+              className={`message message-${item.role}`}
+              style={item.role === "character" ? speakerBubbleStyle(item.speakerCharacterId) : undefined}
+              key={item.id}
+            >
+              <span className="message-role">
+                {item.role === "user"
+                  ? "You"
+                  : item.role === "system"
+                    ? "System"
+                    : speakerName(item.speakerCharacterId)}
+              </span>
+              <p>{item.content}</p>
+              {item.usage && (
+                <span className="message-usage">
+                  {item.usage.source === "estimated" ? "≈" : ""}
+                  {item.usage.totalTokens.toLocaleString()} tokens · {item.usage.promptTokens.toLocaleString()} in /{" "}
+                  {item.usage.completionTokens.toLocaleString()} out
+                </span>
+              )}
+            </div>
+          ))}
+          {sending && !roomSending && (
+            <div className="message message-character message-streaming" style={speakerBubbleStyle(streamSpeakerId)}>
+              <span className="message-role">{speakerName(streamSpeakerId)}</span>
+              <p>{streamText || "…"}</p>
+            </div>
+          )}
+          {roomSending && (
+            <div className="message message-system room-thinking">
+              <span className="message-role">Room</span>
+              <p>Choosing the next speaker…</p>
+            </div>
+          )}
+        </div>
+        {latestCharacter && latestUserParent && (
+          <div className="swipe-controls">
+            {sortedSwipes.length > 0 && (
+              <>
+                <button
+                  className="ghost"
+                  aria-label="Previous reply"
+                  disabled={sending || navigationBusy || activeSwipe <= 0}
+                  onClick={() => void navigateSwipe(-1)}
+                >
+                  ‹ Prev
+                </button>
+                <span className="swipe-position">
+                  {activeSwipe + 1}/{sortedSwipes.length}
+                </span>
+                <button
+                  className="ghost"
+                  aria-label="Next reply"
+                  disabled={sending || navigationBusy || activeSwipe >= sortedSwipes.length - 1}
+                  onClick={() => void navigateSwipe(1)}
+                >
+                  Next ›
+                </button>
+              </>
+            )}
+            <button
+              className="ghost"
+              aria-label="Regenerate reply"
+              disabled={sending || navigationBusy || closed}
+              onClick={() => void regenerate()}
+            >
+              Regenerate
+            </button>
+            <button
+              className="ghost"
+              aria-label="Retry last turn"
+              disabled={sending || navigationBusy || closed}
+              onClick={() => void retry()}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {(error || externalError) && (
+          <p className="error" role="alert">
+            {error || externalError}
+          </p>
+        )}
+        <div className="speaker-controls">
+          <label className="field">
+            <span>Target speaker</span>
+            <select
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+              disabled={closed || sending || navigationBusy}
+            >
+              {session.participants.map((item) => (
+                <option value={item.id} key={item.id}>
+                  {item.name}
+                  {item.id === session.primaryCharacterId ? " · primary" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          {session.participants.length > 1 && (
+            <>
+              <label className="field compact-control">
+                <span>Max room responders</span>
+                <select
+                  aria-label="Max room responders"
+                  value={roomMaxSpeakers}
+                  disabled={sending || navigationBusy}
+                  onChange={(event) => setRoomMaxSpeakers(Number(event.target.value))}
+                >
+                  {Array.from({ length: Math.min(6, session.participants.length) }, (_, index) => index + 1).map(
+                    (count) => (
+                      <option value={count} key={count}>
+                        {count}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <label className="field compact-control">
+                <span>Auto follow-up rounds</span>
+                <select
+                  aria-label="Auto follow-up rounds"
+                  value={autoRoomRounds}
+                  disabled={sending || navigationBusy}
+                  onChange={(event) => setAutoRoomRounds(Number(event.target.value))}
+                >
+                  <option value={0}>Off</option>
+                  <option value={1}>1 round</option>
+                  <option value={2}>2 rounds</option>
+                  <option value={3}>3 rounds</option>
+                </select>
+              </label>
+            </>
+          )}
+          {session.participants.length > 1 && (
+            <button
+              className="ghost continue-button"
+              disabled={sending || savingSource || settingsOpen || navigationBusy}
+              onClick={() => void onOpenPrivate(targetId)}
+            >
+              Private chat with {speakerName(targetId)}
+            </button>
+          )}
+          {session.participants.length > 1 && (
+            <button
+              className="ghost continue-button"
+              disabled={closed || sending || navigationBusy || !latestCharacter}
+              onClick={() => void continueRoomTurn()}
+            >
+              Give room another turn
+            </button>
+          )}
+          <button
+            className="ghost continue-button"
+            disabled={closed || sending || navigationBusy}
+            onClick={() => void continueAs()}
+          >
+            Continue as {speakerName(targetId)}
+          </button>
+        </div>
+        {session.participants.length > 1 && (
+          <p className="room-cost">
+            Current room automation limit: up to {(2 + roomMaxSpeakers) * (1 + autoRoomRounds)} provider calls per room
+            message ({roomMaxSpeakers} replies, routing, and one scene-state update per round).
+          </p>
+        )}
+        {autoRunning && (
+          <div className="auto-room-status">
+            <span>Automatic room conversation is running. It will stop after this bounded turn.</span>
+            <button
+              className="danger subtle small"
+              disabled={navigationBusy}
+              onClick={() => {
+                if (!navigationBusy) stopAutoRef.current = true;
+              }}
+            >
+              Stop auto chat
+            </button>
+          </div>
+        )}
+        {showJumpLatest && (
+          <button
+            type="button"
+            className="ghost jump-to-latest"
+            onClick={() => {
+              followLatestRef.current = true;
+              setShowJumpLatest(false);
+              scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+            }}
+          >
+            Jump to latest
+          </button>
+        )}
+        <form className="composer" onSubmit={send}>
+          <label className="sr-only" htmlFor="chat-message">
+            Message for {speakerName(targetId)}
+          </label>
+          <input
+            id="chat-message"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={closed ? "Session ended" : "Write a message…"}
+            disabled={closed || sending || navigationBusy}
+            maxLength={1000}
+          />
+          {session.participants.length > 1 && (
+            <button
+              type="submit"
+              value="room"
+              className="ghost"
+              disabled={closed || sending || navigationBusy || !draft.trim()}
+              title="Let the room choose up to six pertinent speakers"
+            >
+              Send to room
+            </button>
+          )}
+          <button
+            type="submit"
+            value="target"
+            className="primary"
+            disabled={closed || sending || navigationBusy || !draft.trim()}
+          >
+            Send to {speakerName(targetId)}
+          </button>
+        </form>
+      </div>
+      <div
+        className="settings-separator"
+        role="separator"
+        aria-label="Resize settings pane"
+        aria-orientation="vertical"
+        aria-valuemin={320}
+        aria-valuemax={Math.round(window.innerWidth * 0.6)}
+        aria-valuenow={Math.round(settingsWidth)}
+        onPointerDown={(event) => {
+          if (!navigationBusy) resizeSettings(event);
+        }}
+        onKeyDown={(event) => {
+          if (navigationBusy) return;
+          if (event.key === "ArrowLeft")
+            setSettingsWidth((width) => Math.min(window.innerWidth * 0.6, width + (event.shiftKey ? 64 : 16)));
+          if (event.key === "ArrowRight")
+            setSettingsWidth((width) => Math.max(320, width - (event.shiftKey ? 64 : 16)));
+        }}
+        tabIndex={settingsOpen && !navigationBusy ? 0 : -1}
+      />
+      {!mobileSettings && (
+        <aside className="settings-pane" aria-hidden={!settingsOpen}>
+          <fieldset disabled={navigationBusy}>
+            <PromptSettings
+              provider={provider}
+              harness={harness}
+              features={features}
+              systemOneAvailable={systemOneAvailable}
+              onProviderChange={onProviderChange}
+              onHarnessChange={onHarnessChange}
+              onClose={() => {
+                setSettingsOpen(false);
+                queueMicrotask(() => settingsTriggerRef.current?.focus());
+              }}
+            />
+          </fieldset>
+        </aside>
+      )}
+      {mobileSettings && (
+        <dialog
+          ref={mobileSettingsDialogRef}
+          className="mobile-settings-dialog"
+          onClose={() => {
+            setSettingsOpen(false);
+            queueMicrotask(() => settingsTriggerRef.current?.focus());
+          }}
+        >
+          <fieldset disabled={navigationBusy}>
+            <PromptSettings
+              provider={provider}
+              harness={harness}
+              features={features}
+              systemOneAvailable={systemOneAvailable}
+              onProviderChange={onProviderChange}
+              onHarnessChange={onHarnessChange}
+              onClose={() => mobileSettingsDialogRef.current?.close()}
+            />
+          </fieldset>
+        </dialog>
+      )}
+    </section>
+  );
+  return embedded ? (
+    <div className="chat-page embedded-chat-page">{chat}</div>
+  ) : (
+    <main className="chat-page">{chat}</main>
+  );
 }

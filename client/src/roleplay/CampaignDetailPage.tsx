@@ -1,8 +1,45 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
-import { campaignDiceRollRequestSchema, campaignRenameRequestSchema, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_PRESENTATION, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
-import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, detachCampaignRoom, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, type CampaignDetail } from "../api";
-import type { CampaignAdministrationHttpResponse, CampaignAdministrationHttpRoomDetachResponse, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollResponse, CampaignPlayBootstrap, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, CampaignRoomSummary } from "@velvet/contracts";
+import {
+  campaignDiceRollRequestSchema,
+  campaignRenameRequestSchema,
+  MECHANICS_STARTER_IDENTITY,
+  ORIGINAL_STARTER_PRESENTATION,
+  SRD_5_1_STARTER_IDENTITY,
+} from "@velvet/contracts";
+import {
+  ApiError,
+  attachCampaignRoom,
+  createOriginalStarterCampaignCharacter,
+  detachCampaignRoom,
+  getCampaignAdministration,
+  getCampaignCharacterCreationOptions,
+  getCampaignDetail,
+  getCampaignDiceHistory,
+  getCampaignPlayBootstrap,
+  listCampaignCharacters,
+  listCampaignRooms,
+  renameCampaign,
+  rollCampaignDice,
+  setupMechanicsStarter,
+  setupOriginalStarter,
+  setupSrd51Starter,
+  type CampaignDetail,
+} from "../api";
+import type {
+  CampaignAdministrationHttpResponse,
+  CampaignAdministrationHttpRoomDetachResponse,
+  CampaignCharacterCreateResponse,
+  CampaignCharacterCreationOptionsResponse,
+  CampaignCharacterListResponse,
+  CampaignDetailResponse,
+  CampaignDiceHistoryResponse,
+  CampaignDiceRollResponse,
+  CampaignPlayBootstrap,
+  CampaignRoomAttachResponse,
+  CampaignRoomLinkingResponse,
+  CampaignRoomSummary,
+} from "@velvet/contracts";
 import { useCampaignShell } from "../components/rpg/shell/CampaignShell";
 import { createClientId } from "../utils/clientId";
 
@@ -44,10 +81,14 @@ export function setCampaignStudioRolloutAvailable(available: boolean): void {
   for (const listener of campaignStudioRolloutListeners) listener();
 }
 function useCampaignStudioRollout(): boolean {
-  return useSyncExternalStore((listener) => {
-    campaignStudioRolloutListeners.add(listener);
-    return () => campaignStudioRolloutListeners.delete(listener);
-  }, () => campaignStudioRollout, () => false);
+  return useSyncExternalStore(
+    (listener) => {
+      campaignStudioRolloutListeners.add(listener);
+      return () => campaignStudioRolloutListeners.delete(listener);
+    },
+    () => campaignStudioRollout,
+    () => false,
+  );
 }
 
 type RenamePhase = "idle" | "writing" | "reconciling";
@@ -149,13 +190,15 @@ let documentMutationWarningInstalled = false;
  * snapshot remains available for the next matching reopen.
  */
 function deferCompletionCleanup<T extends { token: MutationToken }>(
-  completions: Map<string, T>, campaignId: string, token: MutationToken,
+  completions: Map<string, T>,
+  campaignId: string,
+  token: MutationToken,
   cleanupAllowed: () => boolean = () => true,
 ): void {
   void Promise.resolve().then(() => {
     if (!cleanupAllowed()) return;
-    if (!inFlightCampaignMutations.has(campaignId)
-      && completions.get(campaignId)?.token === token) completions.delete(campaignId);
+    if (!inFlightCampaignMutations.has(campaignId) && completions.get(campaignId)?.token === token)
+      completions.delete(campaignId);
   });
 }
 
@@ -226,14 +269,20 @@ function invalidateInitialCharacterReads(campaignId: string): void {
   invalidateInitialOptionsRead(campaignId);
 }
 
-function reusableInitialRead<T>(cache: Map<string, Promise<T>>, campaignId: string, read: () => Promise<T>): Promise<T> {
+function reusableInitialRead<T>(
+  cache: Map<string, Promise<T>>,
+  campaignId: string,
+  read: () => Promise<T>,
+): Promise<T> {
   const existing = cache.get(campaignId);
   if (existing) return existing;
   const promise = read();
   cache.set(campaignId, promise);
-  void promise.finally(() => {
-    if (cache.get(campaignId) === promise) cache.delete(campaignId);
-  }).catch(() => undefined);
+  void promise
+    .finally(() => {
+      if (cache.get(campaignId) === promise) cache.delete(campaignId);
+    })
+    .catch(() => undefined);
   return promise;
 }
 
@@ -242,40 +291,52 @@ function displayRole(role: CampaignDetail["actorRole"]): string {
 }
 
 function isOriginalStarterConfigured(campaign: CampaignDetail): boolean {
-  return campaign.content.status === "configured"
-    && campaign.content.rulesProfileId === ORIGINAL_STARTER_PRESENTATION.rulesProfile.id
-    && campaign.content.contentPacks.length === 1
-    && campaign.content.contentPacks[0]?.packId === ORIGINAL_STARTER_PRESENTATION.pack.id
-    && campaign.content.contentPacks[0]?.packVersion === ORIGINAL_STARTER_PRESENTATION.pack.version;
+  return (
+    campaign.content.status === "configured" &&
+    campaign.content.rulesProfileId === ORIGINAL_STARTER_PRESENTATION.rulesProfile.id &&
+    campaign.content.contentPacks.length === 1 &&
+    campaign.content.contentPacks[0]?.packId === ORIGINAL_STARTER_PRESENTATION.pack.id &&
+    campaign.content.contentPacks[0]?.packVersion === ORIGINAL_STARTER_PRESENTATION.pack.version
+  );
 }
 
 function isMechanicsStarterConfigured(campaign: CampaignDetail): boolean {
-  return campaign.content.status === "configured"
-    && campaign.content.rulesProfileId === MECHANICS_STARTER_IDENTITY.rulesProfileId
-    && campaign.content.contentPacks.length === 1
-    && campaign.content.contentPacks[0]?.packId === MECHANICS_STARTER_IDENTITY.packId
-    && campaign.content.contentPacks[0]?.packVersion === MECHANICS_STARTER_IDENTITY.packVersion;
+  return (
+    campaign.content.status === "configured" &&
+    campaign.content.rulesProfileId === MECHANICS_STARTER_IDENTITY.rulesProfileId &&
+    campaign.content.contentPacks.length === 1 &&
+    campaign.content.contentPacks[0]?.packId === MECHANICS_STARTER_IDENTITY.packId &&
+    campaign.content.contentPacks[0]?.packVersion === MECHANICS_STARTER_IDENTITY.packVersion
+  );
 }
 
 function isSrd51StarterConfigured(campaign: CampaignDetail): boolean {
-  return campaign.content.status === "configured"
-    && campaign.content.rulesProfileId === SRD_5_1_STARTER_IDENTITY.rulesProfileId
-    && campaign.content.contentPacks.length === 1
-    && campaign.content.contentPacks[0]?.packId === SRD_5_1_STARTER_IDENTITY.packId
-    && campaign.content.contentPacks[0]?.packVersion === SRD_5_1_STARTER_IDENTITY.packVersion;
+  return (
+    campaign.content.status === "configured" &&
+    campaign.content.rulesProfileId === SRD_5_1_STARTER_IDENTITY.rulesProfileId &&
+    campaign.content.contentPacks.length === 1 &&
+    campaign.content.contentPacks[0]?.packId === SRD_5_1_STARTER_IDENTITY.packId &&
+    campaign.content.contentPacks[0]?.packVersion === SRD_5_1_STARTER_IDENTITY.packVersion
+  );
 }
 
 function setupChoiceName(choice: SetupChoice): string {
   return choice === "srd" ? "SRD 5.1" : choice === "mechanics" ? "Velvet mechanics" : "Original";
 }
 
-function reconciledPresence(reconciliation: CreateReconciliation): { present: boolean; used: boolean; complete: boolean } {
+function reconciledPresence(reconciliation: CreateReconciliation): {
+  present: boolean;
+  used: boolean;
+  complete: boolean;
+} {
   if (reconciliation.roster.status !== "fulfilled" || reconciliation.options.status !== "fulfilled") {
     return { present: false, used: false, complete: false };
   }
   return {
     present: reconciliation.roster.value.characters.some((entry) => entry.characterId === reconciliation.characterId),
-    used: reconciliation.options.value.personas.some((entry) => entry.characterId === reconciliation.characterId && entry.alreadyUsed),
+    used: reconciliation.options.value.personas.some(
+      (entry) => entry.characterId === reconciliation.characterId && entry.alreadyUsed,
+    ),
     complete: true,
   };
 }
@@ -287,19 +348,34 @@ function createOutcomeMessage(reconciliation: CreateReconciliation): { text: str
     return { text: "Character record created and confirmed by the latest character status.", alert: false };
   }
   if (!validResponse && proof.complete && proof.present && proof.used) {
-    return { text: "The character record is currently present, but it cannot be attributed to this create attempt.", alert: true };
+    return {
+      text: "The character record is currently present, but it cannot be attributed to this create attempt.",
+      alert: true,
+    };
   }
   if (!proof.complete || proof.present !== proof.used) {
-    return { text: "Character creation has only partial reconciliation or unavailable reads. Current status could not be confirmed; the POST was not repeated.", alert: true };
+    return {
+      text: "Character creation has only partial reconciliation or unavailable reads. Current status could not be confirmed; the POST was not repeated.",
+      alert: true,
+    };
   }
   const error = reconciliation.post.status === "rejected" ? reconciliation.post.reason : null;
   if (error instanceof ApiError && error.status === 409) {
-    return { text: "Character creation conflicts with current state. Latest status is shown; the POST was not repeated.", alert: true };
+    return {
+      text: "Character creation conflicts with current state. Latest status is shown; the POST was not repeated.",
+      alert: true,
+    };
   }
   if (error instanceof ApiError && error.status === 404) {
-    return { text: "Character creation is unavailable for this campaign or persona. Latest status is shown; the POST was not repeated.", alert: true };
+    return {
+      text: "Character creation is unavailable for this campaign or persona. Latest status is shown; the POST was not repeated.",
+      alert: true,
+    };
   }
-  return { text: "The selected persona is currently unused, so character creation was not confirmed. The POST was not repeated.", alert: true };
+  return {
+    text: "The selected persona is currently unused, so character creation was not confirmed. The POST was not repeated.",
+    alert: true,
+  };
 }
 
 function diceOutcomeMessage(reconciliation: DiceReconciliation): DiceResult {
@@ -348,24 +424,27 @@ function diceOutcomeMessage(reconciliation: DiceReconciliation): DiceResult {
 
 function refreshedDiceOutcome(kind: DiceOutcomeKind, historyLoaded: boolean): DiceResult {
   const common = { alert: kind !== "committed" || !historyLoaded, ambiguous: kind === "ambiguous", kind };
-  if (kind === "committed") return {
-    ...common,
-    text: historyLoaded
-      ? "The committed roll remains confirmed by the server response. Latest roll history was refreshed."
-      : "The committed roll remains confirmed by the server response, but latest roll history could not be refreshed.",
-  };
-  if (kind === "binding-conflict") return {
-    ...common,
-    text: historyLoaded
-      ? "The roll was not committed because the character selection changed. Latest roll history was refreshed."
-      : "The roll was not committed because the character selection changed. Latest roll history could not be refreshed.",
-  };
-  if (kind === "unavailable") return {
-    ...common,
-    text: historyLoaded
-      ? "The roll was not committed because campaign dice was unavailable. Latest roll history was refreshed."
-      : "The roll was not committed because campaign dice was unavailable. Latest roll history could not be refreshed.",
-  };
+  if (kind === "committed")
+    return {
+      ...common,
+      text: historyLoaded
+        ? "The committed roll remains confirmed by the server response. Latest roll history was refreshed."
+        : "The committed roll remains confirmed by the server response, but latest roll history could not be refreshed.",
+    };
+  if (kind === "binding-conflict")
+    return {
+      ...common,
+      text: historyLoaded
+        ? "The roll was not committed because the character selection changed. Latest roll history was refreshed."
+        : "The roll was not committed because the character selection changed. Latest roll history could not be refreshed.",
+    };
+  if (kind === "unavailable")
+    return {
+      ...common,
+      text: historyLoaded
+        ? "The roll was not committed because campaign dice was unavailable. Latest roll history was refreshed."
+        : "The roll was not committed because campaign dice was unavailable. Latest roll history could not be refreshed.",
+    };
   return {
     ...common,
     text: historyLoaded
@@ -383,25 +462,28 @@ function roomOutcomeMessage(reconciliation: RoomReconciliation): { text: string;
   const detach = reconciliation.kind === "detach";
   const verb = detach ? "detached" : "attached";
   const method = detach ? "DELETE" : "PUT";
-  if (reconciliation.put.status === "fulfilled") return {
-    text: refreshed
-      ? `Room ${verb}. Latest campaign rooms were refreshed.`
-      : `Room ${verb}, but latest campaign rooms could not be loaded.`,
-    alert: !refreshed,
-  };
+  if (reconciliation.put.status === "fulfilled")
+    return {
+      text: refreshed
+        ? `Room ${verb}. Latest campaign rooms were refreshed.`
+        : `Room ${verb}, but latest campaign rooms could not be loaded.`,
+      alert: !refreshed,
+    };
   const error = reconciliation.put.reason;
-  if (error instanceof ApiError && error.status === 409) return {
-    text: refreshed
-      ? `The room could not be ${verb} because its status conflicts with this campaign. Latest rooms are shown; the ${method} was not repeated.`
-      : `The room could not be ${verb} because its status conflicts with this campaign, and latest rooms could not be loaded. The ${method} was not repeated.`,
-    alert: true,
-  };
-  if (error instanceof ApiError && error.status === 404) return {
-    text: refreshed
-      ? `The campaign or room is no longer available. Latest rooms are shown; the ${method} was not repeated.`
-      : `The campaign or room is no longer available, and latest rooms could not be loaded. The ${method} was not repeated.`,
-    alert: true,
-  };
+  if (error instanceof ApiError && error.status === 409)
+    return {
+      text: refreshed
+        ? `The room could not be ${verb} because its status conflicts with this campaign. Latest rooms are shown; the ${method} was not repeated.`
+        : `The room could not be ${verb} because its status conflicts with this campaign, and latest rooms could not be loaded. The ${method} was not repeated.`,
+      alert: true,
+    };
+  if (error instanceof ApiError && error.status === 404)
+    return {
+      text: refreshed
+        ? `The campaign or room is no longer available. Latest rooms are shown; the ${method} was not repeated.`
+        : `The campaign or room is no longer available, and latest rooms could not be loaded. The ${method} was not repeated.`,
+      alert: true,
+    };
   return {
     text: refreshed
       ? `Latest rooms are shown, but the ${detach ? "detachment" : "attachment"} outcome is unknown. The ${method} was not repeated.`
@@ -410,11 +492,38 @@ function roomOutcomeMessage(reconciliation: RoomReconciliation): { text: string;
   };
 }
 
-export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBack, onUnavailable, onOpenCharacter = () => undefined, onOpenCharacterBuilder = () => undefined, onOpenRoom = () => undefined, onOpenAdministration = () => undefined, onOpenHistory = () => window.dispatchEvent(new CustomEvent("velvet:open-campaign-history")), onOpenTransfer = (campaignName) => window.dispatchEvent(new CustomEvent("velvet:open-campaign-transfer", { detail: { campaignName } })), onOpenCombat, onOpenStudio = (studio) => window.dispatchEvent(new CustomEvent("velvet:open-campaign-studio", { detail: { studio } })), focusStudioRequest, onStudioFocused = () => undefined, focusCombatRequest, onCombatFocused = () => undefined, focusHeadingRequest, onHeadingFocused = () => undefined, roomsRefreshRequest, onRoomsRefreshHandled = () => undefined, roomOpenPending = false, roomOpenFailure = null }: CampaignDetailPageProps) {
+export function CampaignDetailPage({
+  campaignId,
+  mechanicsEnabled = false,
+  onBack,
+  onUnavailable,
+  onOpenCharacter = () => undefined,
+  onOpenCharacterBuilder = () => undefined,
+  onOpenRoom = () => undefined,
+  onOpenAdministration = () => undefined,
+  onOpenHistory = () => window.dispatchEvent(new CustomEvent("velvet:open-campaign-history")),
+  onOpenTransfer = (campaignName) =>
+    window.dispatchEvent(new CustomEvent("velvet:open-campaign-transfer", { detail: { campaignName } })),
+  onOpenCombat,
+  onOpenStudio = (studio) =>
+    window.dispatchEvent(new CustomEvent("velvet:open-campaign-studio", { detail: { studio } })),
+  focusStudioRequest,
+  onStudioFocused = () => undefined,
+  focusCombatRequest,
+  onCombatFocused = () => undefined,
+  focusHeadingRequest,
+  onHeadingFocused = () => undefined,
+  roomsRefreshRequest,
+  onRoomsRefreshHandled = () => undefined,
+  roomOpenPending = false,
+  roomOpenFailure = null,
+}: CampaignDetailPageProps) {
   const studioRolloutAvailable = useCampaignStudioRollout();
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const { report, navigate: shellNavigate, generationAvailable, blockNavigation } = useCampaignShell();
-  useEffect(() => { report(campaign); }, [campaign, report]);
+  useEffect(() => {
+    report(campaign);
+  }, [campaign, report]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [draft, setDraft] = useState("");
@@ -446,8 +555,13 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const [roomsPhase, setRoomsPhase] = useState<"loading" | "ready" | "failed">("loading");
   const [administration, setAdministration] = useState<CampaignAdministrationHttpResponse["campaign"] | null>(null);
   const [administrationPhase, setAdministrationPhase] = useState<"loading" | "ready" | "failed">("loading");
-  const [roomPlayability, setRoomPlayability] = useState<{ state: "idle" | "loading" | "ready" | "failed"; rooms: CampaignPlayBootstrap[] }>({ state: "idle", rooms: [] });
-  const [completedRoomsRefresh, setCompletedRoomsRefresh] = useState<{ request: number; succeeded: boolean } | null>(null);
+  const [roomPlayability, setRoomPlayability] = useState<{
+    state: "idle" | "loading" | "ready" | "failed";
+    rooms: CampaignPlayBootstrap[];
+  }>({ state: "idle", rooms: [] });
+  const [completedRoomsRefresh, setCompletedRoomsRefresh] = useState<{ request: number; succeeded: boolean } | null>(
+    null,
+  );
   const [roomResult, setRoomResult] = useState<{ text: string; alert: boolean } | null>(null);
   const [roomActivity, setRoomActivity] = useState<"idle" | "writing" | "reconciling" | "refreshing">("idle");
   const [roomPendingAction, setRoomPendingAction] = useState<"attach" | "detach" | null>(null);
@@ -506,7 +620,12 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const focusedRoomOpenFailureRef = useRef<number | null>(null);
   const appliedRoomTokenRef = useRef<MutationToken | null>(null);
   const handedOffRoomRef = useRef<CompletedRoomReconciliation | null>(null);
-  const roomFocusIntentRef = useRef<{ campaignId: string; token?: MutationToken; request?: number; generation: number } | null>(null);
+  const roomFocusIntentRef = useRef<{
+    campaignId: string;
+    token?: MutationToken;
+    request?: number;
+    generation: number;
+  } | null>(null);
   const handledRoomsRefreshRequestRef = useRef<number | undefined>(undefined);
   const acknowledgedRoomsRefreshRequestRef = useRef<number | undefined>(undefined);
   const diceFocusIntentRef = useRef<{ campaignId: string; token: MutationToken; generation: number } | null>(null);
@@ -534,12 +653,22 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   useEffect(() => {
     if (!campaign || focusCombatRequest === undefined || !onOpenCombat) return;
-    queueMicrotask(() => { if (mountedRef.current) { combatButtonRef.current?.focus(); onCombatFocused(focusCombatRequest); } });
+    queueMicrotask(() => {
+      if (mountedRef.current) {
+        combatButtonRef.current?.focus();
+        onCombatFocused(focusCombatRequest);
+      }
+    });
   }, [campaign, focusCombatRequest, onCombatFocused, onOpenCombat]);
 
   useEffect(() => {
     if (!campaign || !focusStudioRequest || !onOpenStudio) return;
-    queueMicrotask(() => { if (mountedRef.current) { studioButtonRefs.current[focusStudioRequest.view]?.focus(); onStudioFocused(focusStudioRequest.request); } });
+    queueMicrotask(() => {
+      if (mountedRef.current) {
+        studioButtonRefs.current[focusStudioRequest.view]?.focus();
+        onStudioFocused(focusStudioRequest.request);
+      }
+    });
   }, [campaign, focusStudioRequest, onOpenStudio, onStudioFocused]);
 
   const focusRename = useCallback((generation: number) => {
@@ -562,233 +691,336 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     setCreateConfirmed(false);
   }, []);
 
-  const requirePostSetupOptionsRefresh = useCallback((requestedCampaignId: string) => {
-    setupOptionsRefreshCampaigns.add(requestedCampaignId);
-    hideOptionsForSetupReconciliation(requestedCampaignId);
-  }, [hideOptionsForSetupReconciliation]);
+  const requirePostSetupOptionsRefresh = useCallback(
+    (requestedCampaignId: string) => {
+      setupOptionsRefreshCampaigns.add(requestedCampaignId);
+      hideOptionsForSetupReconciliation(requestedCampaignId);
+    },
+    [hideOptionsForSetupReconciliation],
+  );
 
   const markCampaignUnavailable = useCallback((requestedCampaignId: string) => {
     setupOptionsRefreshCampaigns.delete(requestedCampaignId);
     unavailableRef.current();
   }, []);
 
-  const load = useCallback(async (reuseInitialInFlight = false, transitionFocusRequest?: number): Promise<number | null> => {
-    const requestedCampaignId = campaignId;
-    const generation = ++generationRef.current;
-    if (!mountedRef.current) return null;
-    detailFocusIntentRef.current = transitionFocusRequest !== undefined
-      && focusedHeadingRequestRef.current !== transitionFocusRequest
-      ? { campaignId: requestedCampaignId, request: transitionFocusRequest, generation }
-      : null;
-    setCampaign(null);
-    setDraft("");
-    setLoading(true);
-    setFailed(false);
-    setRenameError("");
-    setSetupError("");
-    setSetupConfirmed(false);
-    setSetupChoice(null);
-    setAnnouncement("");
-    try {
-      const response = await (reuseInitialInFlight
-        ? reusableInitialRead(initialDetailReads, campaignId, () => getCampaignDetail(campaignId))
-        : getCampaignDetail(campaignId));
-      if (!mountedRef.current || generation !== generationRef.current) return null;
-      setCampaign(response.campaign);
-      setDraft(response.campaign.name);
-      setSetupChoice(response.campaign.actorRole === "owner" && response.campaign.content.status === "unconfigured"
-        ? mechanicsEnabled ? "srd" : "original" : null);
-      setLoading(false);
-      return generation;
-    } catch (error) {
-      if (!mountedRef.current || generation !== generationRef.current) return null;
-      if (error instanceof ApiError && error.status === 404) {
-        markCampaignUnavailable(campaignId);
+  const load = useCallback(
+    async (reuseInitialInFlight = false, transitionFocusRequest?: number): Promise<number | null> => {
+      const requestedCampaignId = campaignId;
+      const generation = ++generationRef.current;
+      if (!mountedRef.current) return null;
+      detailFocusIntentRef.current =
+        transitionFocusRequest !== undefined && focusedHeadingRequestRef.current !== transitionFocusRequest
+          ? { campaignId: requestedCampaignId, request: transitionFocusRequest, generation }
+          : null;
+      setCampaign(null);
+      setDraft("");
+      setLoading(true);
+      setFailed(false);
+      setRenameError("");
+      setSetupError("");
+      setSetupConfirmed(false);
+      setSetupChoice(null);
+      setAnnouncement("");
+      try {
+        const response = await (reuseInitialInFlight
+          ? reusableInitialRead(initialDetailReads, campaignId, () => getCampaignDetail(campaignId))
+          : getCampaignDetail(campaignId));
+        if (!mountedRef.current || generation !== generationRef.current) return null;
+        setCampaign(response.campaign);
+        setDraft(response.campaign.name);
+        setSetupChoice(
+          response.campaign.actorRole === "owner" && response.campaign.content.status === "unconfigured"
+            ? mechanicsEnabled
+              ? "srd"
+              : "original"
+            : null,
+        );
+        setLoading(false);
+        return generation;
+      } catch (error) {
+        if (!mountedRef.current || generation !== generationRef.current) return null;
+        if (error instanceof ApiError && error.status === 404) {
+          markCampaignUnavailable(campaignId);
+          return null;
+        }
+        setFailed(true);
+        setLoading(false);
         return null;
       }
-      setFailed(true);
-      setLoading(false);
-      return null;
-    }
-  }, [campaignId, markCampaignUnavailable, mechanicsEnabled]);
+    },
+    [campaignId, markCampaignUnavailable, mechanicsEnabled],
+  );
 
-  const loadRoster = useCallback(async (retry = false, reuseInitialInFlight = false) => {
-    const requestedCampaignId = campaignId;
-    const generation = ++rosterGenerationRef.current;
-    if (!mountedRef.current) return;
-    setRoster([]);
-    setRosterPhase("loading");
-    setRosterAnnouncement("");
-    rosterRetryFocusIntentRef.current = retry
-      ? { campaignId: requestedCampaignId, generation, outcome: "pending" }
-      : null;
-    try {
-      const response = await (reuseInitialInFlight
-        ? reusableInitialRead(initialRosterReads, requestedCampaignId, () => listCampaignCharacters(requestedCampaignId))
-        : listCampaignCharacters(requestedCampaignId));
-      if (!mountedRef.current || generation !== rosterGenerationRef.current
-        || activeCampaignRef.current !== requestedCampaignId) return;
-      setRoster(response.characters);
-      setRosterPhase("ready");
-      setRosterAnnouncement(response.characters.length === 0
-        ? "Character roster is empty."
-        : `${response.characters.length} ${response.characters.length === 1 ? "character" : "characters"} loaded.`);
-      const intent = rosterRetryFocusIntentRef.current;
-      if (intent?.campaignId === requestedCampaignId && intent.generation === generation) {
-        intent.outcome = "success";
-      }
-    } catch (error) {
-      if (!mountedRef.current || generation !== rosterGenerationRef.current
-        || activeCampaignRef.current !== requestedCampaignId) return;
-      setRoster([]);
-      // Older compatible servers do not have this read. Its absence says
-      // nothing about detail availability and must never navigate the user.
-      const unsupported = error instanceof ApiError && error.status === 404;
-      setRosterPhase(unsupported ? "unsupported" : "failed");
-      const intent = rosterRetryFocusIntentRef.current;
-      if (unsupported) {
-        rosterRetryFocusIntentRef.current = null;
-      } else if (intent?.campaignId === requestedCampaignId && intent.generation === generation) {
-        intent.outcome = "failure";
-      }
-    }
-  }, [campaignId]);
-
-  const loadOptions = useCallback(async (retry = false, reuseInitialInFlight = false) => {
-    const requestedCampaignId = campaignId;
-    const generation = ++optionsGenerationRef.current;
-    if (!mountedRef.current) return;
-    setOptions(null);
-    setOptionsPhase("loading");
-    setOptionsAnnouncement("");
-    setSelectedCharacterId(null);
-    setCreateConfirmed(false);
-    optionsRetryFocusIntentRef.current = retry
-      ? { campaignId: requestedCampaignId, generation, outcome: "pending" }
-      : null;
-    try {
-      const response = await (reuseInitialInFlight
-        ? reusableInitialRead(initialOptionsReads, requestedCampaignId, () => getCampaignCharacterCreationOptions(requestedCampaignId))
-        : getCampaignCharacterCreationOptions(requestedCampaignId));
-      if (!mountedRef.current || generation !== optionsGenerationRef.current
-        || activeCampaignRef.current !== requestedCampaignId) return;
-      setOptions(response);
-      setOptionsPhase("ready");
-      setOptionsAnnouncement(retry ? "Character creation options loaded." : "");
-      const intent = optionsRetryFocusIntentRef.current;
-      if (intent?.campaignId === requestedCampaignId && intent.generation === generation) {
-        intent.outcome = "success";
-      }
-    } catch (error) {
-      if (!mountedRef.current || generation !== optionsGenerationRef.current
-        || activeCampaignRef.current !== requestedCampaignId) return;
-      setOptions(null);
-      setOptionsPhase(error instanceof ApiError && error.status === 404 ? "unsupported" : "failed");
-      const intent = optionsRetryFocusIntentRef.current;
-      if (intent?.campaignId === requestedCampaignId && intent.generation === generation) {
-        intent.outcome = "failure";
-      }
-    }
-  }, [campaignId]);
-
-  const loadDice = useCallback(async (retry = false, reuseInitialInFlight = false) => {
-    const manualReadToken = retry ? Symbol("manual dice history read") : null;
-    if (manualReadToken && diceManualReadLockRef.current) return;
-    if (manualReadToken) diceManualReadLockRef.current = manualReadToken;
-    const requestedCampaignId = campaignId;
-    const generation = ++diceGenerationRef.current;
-    try {
+  const loadRoster = useCallback(
+    async (retry = false, reuseInitialInFlight = false) => {
+      const requestedCampaignId = campaignId;
+      const generation = ++rosterGenerationRef.current;
       if (!mountedRef.current) return;
-      setDicePhase("loading");
-      setDiceError("");
-      const response = await (reuseInitialInFlight
-        ? reusableInitialRead(initialDiceReads, requestedCampaignId, () => getCampaignDiceHistory(requestedCampaignId))
-        : getCampaignDiceHistory(requestedCampaignId));
-      if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-          || diceGenerationRef.current !== generation) return;
-      setDiceHistory(response);
-      setDiceCharacterPosition((current) => response.characters.some((character) => character.position === current)
-        ? current : response.characters[0]?.position ?? null);
-      setDicePhase("ready");
-      if (retry) queueMicrotask(() => {
-        if (mountedRef.current && activeCampaignRef.current === requestedCampaignId
-            && diceGenerationRef.current === generation) diceHeadingRef.current?.focus();
-      });
-    } catch {
-      if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-          || diceGenerationRef.current !== generation) return;
-      setDiceHistory(null);
-      setDicePhase("failed");
-      setDiceError("Roll history could not be loaded.");
-      if (retry) queueMicrotask(() => {
-        if (mountedRef.current && activeCampaignRef.current === requestedCampaignId
-            && diceGenerationRef.current === generation) diceRetryRef.current?.focus();
-      });
-    } finally {
-      if (manualReadToken && diceManualReadLockRef.current === manualReadToken) {
-        diceManualReadLockRef.current = null;
+      setRoster([]);
+      setRosterPhase("loading");
+      setRosterAnnouncement("");
+      rosterRetryFocusIntentRef.current = retry
+        ? { campaignId: requestedCampaignId, generation, outcome: "pending" }
+        : null;
+      try {
+        const response = await (reuseInitialInFlight
+          ? reusableInitialRead(initialRosterReads, requestedCampaignId, () =>
+              listCampaignCharacters(requestedCampaignId),
+            )
+          : listCampaignCharacters(requestedCampaignId));
+        if (
+          !mountedRef.current ||
+          generation !== rosterGenerationRef.current ||
+          activeCampaignRef.current !== requestedCampaignId
+        )
+          return;
+        setRoster(response.characters);
+        setRosterPhase("ready");
+        setRosterAnnouncement(
+          response.characters.length === 0
+            ? "Character roster is empty."
+            : `${response.characters.length} ${response.characters.length === 1 ? "character" : "characters"} loaded.`,
+        );
+        const intent = rosterRetryFocusIntentRef.current;
+        if (intent?.campaignId === requestedCampaignId && intent.generation === generation) {
+          intent.outcome = "success";
+        }
+      } catch (error) {
+        if (
+          !mountedRef.current ||
+          generation !== rosterGenerationRef.current ||
+          activeCampaignRef.current !== requestedCampaignId
+        )
+          return;
+        setRoster([]);
+        // Older compatible servers do not have this read. Its absence says
+        // nothing about detail availability and must never navigate the user.
+        const unsupported = error instanceof ApiError && error.status === 404;
+        setRosterPhase(unsupported ? "unsupported" : "failed");
+        const intent = rosterRetryFocusIntentRef.current;
+        if (unsupported) {
+          rosterRetryFocusIntentRef.current = null;
+        } else if (intent?.campaignId === requestedCampaignId && intent.generation === generation) {
+          intent.outcome = "failure";
+        }
       }
-    }
-  }, [campaignId]);
+    },
+    [campaignId],
+  );
 
-  const loadRooms = useCallback(async (focus = false, reuseInitialInFlight = false, refreshRequest?: number) => {
-    if (!mountedRef.current || roomLockedRef.current) return;
-    const manualReadToken = focus ? Symbol("manual campaign rooms read") : null;
-    if (manualReadToken && roomManualReadLockRef.current) return;
-    if (manualReadToken) roomManualReadLockRef.current = manualReadToken;
-    const requestedCampaignId = campaignId;
-    const generation = ++roomsGenerationRef.current;
-    if (refreshRequest !== undefined) {
-      handledRoomsRefreshRequestRef.current = refreshRequest;
-      roomFocusIntentRef.current = { campaignId: requestedCampaignId, request: refreshRequest, generation: generationRef.current };
-    }
-    // Manual refresh preserves the current projection so its room actions can
-    // remain visibly disabled until the fresh GET settles.
-    if (!focus) setRoomsPhase("loading");
-    if (focus) setRoomActivity("refreshing");
-    let succeeded = false;
-    try {
-      const response = await (reuseInitialInFlight
-        ? reusableInitialRead(initialRoomReads, requestedCampaignId, () => listCampaignRooms(requestedCampaignId))
-        : listCampaignRooms(requestedCampaignId));
-      if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-        || roomsGenerationRef.current !== generation) return;
-      setRooms(response);
-      setRoomsPhase("ready");
-      succeeded = true;
-    } catch {
-      if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-        || roomsGenerationRef.current !== generation) return;
-      setRooms(null);
-      setRoomsPhase("failed");
-    } finally {
-      if (mountedRef.current && activeCampaignRef.current === requestedCampaignId
-        && roomsGenerationRef.current === generation && focus) setRoomActivity("idle");
-      if (manualReadToken && roomManualReadLockRef.current === manualReadToken) roomManualReadLockRef.current = null;
-    }
-    if (focus) setRoomResult((current) => current ? {
-      text: succeeded
-        ? "Latest campaign rooms were refreshed. No PUT was made; the earlier attachment result is unchanged."
-        : "Latest campaign rooms could not be refreshed. No PUT was made; the earlier attachment result is unchanged.",
-      alert: current.alert || !succeeded,
-    } : null);
-    if (refreshRequest !== undefined && mountedRef.current
-      && activeCampaignRef.current === requestedCampaignId && roomsGenerationRef.current === generation) {
-      // A distinct state transition guarantees focus/acknowledgement runs even
-      // when React batches loading→ready back to the prior visible phase.
-      setCompletedRoomsRefresh({ request: refreshRequest, succeeded });
-    }
-    if (focus) queueMicrotask(() => {
-      if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-        || roomsGenerationRef.current !== generation) return;
-      const target = succeeded ? roomsHeadingRef.current : roomsRetryRef.current;
-      target?.focus();
-    });
-  }, [campaignId]);
+  const loadOptions = useCallback(
+    async (retry = false, reuseInitialInFlight = false) => {
+      const requestedCampaignId = campaignId;
+      const generation = ++optionsGenerationRef.current;
+      if (!mountedRef.current) return;
+      setOptions(null);
+      setOptionsPhase("loading");
+      setOptionsAnnouncement("");
+      setSelectedCharacterId(null);
+      setCreateConfirmed(false);
+      optionsRetryFocusIntentRef.current = retry
+        ? { campaignId: requestedCampaignId, generation, outcome: "pending" }
+        : null;
+      try {
+        const response = await (reuseInitialInFlight
+          ? reusableInitialRead(initialOptionsReads, requestedCampaignId, () =>
+              getCampaignCharacterCreationOptions(requestedCampaignId),
+            )
+          : getCampaignCharacterCreationOptions(requestedCampaignId));
+        if (
+          !mountedRef.current ||
+          generation !== optionsGenerationRef.current ||
+          activeCampaignRef.current !== requestedCampaignId
+        )
+          return;
+        setOptions(response);
+        setOptionsPhase("ready");
+        setOptionsAnnouncement(retry ? "Character creation options loaded." : "");
+        const intent = optionsRetryFocusIntentRef.current;
+        if (intent?.campaignId === requestedCampaignId && intent.generation === generation) {
+          intent.outcome = "success";
+        }
+      } catch (error) {
+        if (
+          !mountedRef.current ||
+          generation !== optionsGenerationRef.current ||
+          activeCampaignRef.current !== requestedCampaignId
+        )
+          return;
+        setOptions(null);
+        setOptionsPhase(error instanceof ApiError && error.status === 404 ? "unsupported" : "failed");
+        const intent = optionsRetryFocusIntentRef.current;
+        if (intent?.campaignId === requestedCampaignId && intent.generation === generation) {
+          intent.outcome = "failure";
+        }
+      }
+    },
+    [campaignId],
+  );
+
+  const loadDice = useCallback(
+    async (retry = false, reuseInitialInFlight = false) => {
+      const manualReadToken = retry ? Symbol("manual dice history read") : null;
+      if (manualReadToken && diceManualReadLockRef.current) return;
+      if (manualReadToken) diceManualReadLockRef.current = manualReadToken;
+      const requestedCampaignId = campaignId;
+      const generation = ++diceGenerationRef.current;
+      try {
+        if (!mountedRef.current) return;
+        setDicePhase("loading");
+        setDiceError("");
+        const response = await (reuseInitialInFlight
+          ? reusableInitialRead(initialDiceReads, requestedCampaignId, () =>
+              getCampaignDiceHistory(requestedCampaignId),
+            )
+          : getCampaignDiceHistory(requestedCampaignId));
+        if (
+          !mountedRef.current ||
+          activeCampaignRef.current !== requestedCampaignId ||
+          diceGenerationRef.current !== generation
+        )
+          return;
+        setDiceHistory(response);
+        setDiceCharacterPosition((current) =>
+          response.characters.some((character) => character.position === current)
+            ? current
+            : (response.characters[0]?.position ?? null),
+        );
+        setDicePhase("ready");
+        if (retry)
+          queueMicrotask(() => {
+            if (
+              mountedRef.current &&
+              activeCampaignRef.current === requestedCampaignId &&
+              diceGenerationRef.current === generation
+            )
+              diceHeadingRef.current?.focus();
+          });
+      } catch {
+        if (
+          !mountedRef.current ||
+          activeCampaignRef.current !== requestedCampaignId ||
+          diceGenerationRef.current !== generation
+        )
+          return;
+        setDiceHistory(null);
+        setDicePhase("failed");
+        setDiceError("Roll history could not be loaded.");
+        if (retry)
+          queueMicrotask(() => {
+            if (
+              mountedRef.current &&
+              activeCampaignRef.current === requestedCampaignId &&
+              diceGenerationRef.current === generation
+            )
+              diceRetryRef.current?.focus();
+          });
+      } finally {
+        if (manualReadToken && diceManualReadLockRef.current === manualReadToken) {
+          diceManualReadLockRef.current = null;
+        }
+      }
+    },
+    [campaignId],
+  );
+
+  const loadRooms = useCallback(
+    async (focus = false, reuseInitialInFlight = false, refreshRequest?: number) => {
+      if (!mountedRef.current || roomLockedRef.current) return;
+      const manualReadToken = focus ? Symbol("manual campaign rooms read") : null;
+      if (manualReadToken && roomManualReadLockRef.current) return;
+      if (manualReadToken) roomManualReadLockRef.current = manualReadToken;
+      const requestedCampaignId = campaignId;
+      const generation = ++roomsGenerationRef.current;
+      if (refreshRequest !== undefined) {
+        handledRoomsRefreshRequestRef.current = refreshRequest;
+        roomFocusIntentRef.current = {
+          campaignId: requestedCampaignId,
+          request: refreshRequest,
+          generation: generationRef.current,
+        };
+      }
+      // Manual refresh preserves the current projection so its room actions can
+      // remain visibly disabled until the fresh GET settles.
+      if (!focus) setRoomsPhase("loading");
+      if (focus) setRoomActivity("refreshing");
+      let succeeded = false;
+      try {
+        const response = await (reuseInitialInFlight
+          ? reusableInitialRead(initialRoomReads, requestedCampaignId, () => listCampaignRooms(requestedCampaignId))
+          : listCampaignRooms(requestedCampaignId));
+        if (
+          !mountedRef.current ||
+          activeCampaignRef.current !== requestedCampaignId ||
+          roomsGenerationRef.current !== generation
+        )
+          return;
+        setRooms(response);
+        setRoomsPhase("ready");
+        succeeded = true;
+      } catch {
+        if (
+          !mountedRef.current ||
+          activeCampaignRef.current !== requestedCampaignId ||
+          roomsGenerationRef.current !== generation
+        )
+          return;
+        setRooms(null);
+        setRoomsPhase("failed");
+      } finally {
+        if (
+          mountedRef.current &&
+          activeCampaignRef.current === requestedCampaignId &&
+          roomsGenerationRef.current === generation &&
+          focus
+        )
+          setRoomActivity("idle");
+        if (manualReadToken && roomManualReadLockRef.current === manualReadToken) roomManualReadLockRef.current = null;
+      }
+      if (focus)
+        setRoomResult((current) =>
+          current
+            ? {
+                text: succeeded
+                  ? "Latest campaign rooms were refreshed. No PUT was made; the earlier attachment result is unchanged."
+                  : "Latest campaign rooms could not be refreshed. No PUT was made; the earlier attachment result is unchanged.",
+                alert: current.alert || !succeeded,
+              }
+            : null,
+        );
+      if (
+        refreshRequest !== undefined &&
+        mountedRef.current &&
+        activeCampaignRef.current === requestedCampaignId &&
+        roomsGenerationRef.current === generation
+      ) {
+        // A distinct state transition guarantees focus/acknowledgement runs even
+        // when React batches loading→ready back to the prior visible phase.
+        setCompletedRoomsRefresh({ request: refreshRequest, succeeded });
+      }
+      if (focus)
+        queueMicrotask(() => {
+          if (
+            !mountedRef.current ||
+            activeCampaignRef.current !== requestedCampaignId ||
+            roomsGenerationRef.current !== generation
+          )
+            return;
+          const target = succeeded ? roomsHeadingRef.current : roomsRetryRef.current;
+          target?.focus();
+        });
+    },
+    [campaignId],
+  );
 
   const applyRoomReconciliation = useCallback((completed: CompletedRoomReconciliation, generation: number) => {
-    if (!mountedRef.current || activeCampaignRef.current !== completed.campaignId
-      || generationRef.current !== generation) return false;
+    if (
+      !mountedRef.current ||
+      activeCampaignRef.current !== completed.campaignId ||
+      generationRef.current !== generation
+    )
+      return false;
     // The operation's reconciliation is authoritative over every room read
     // that started before it. Advancing here also protects listener handoff
     // paths where this component did not acquire the mutation itself.
@@ -812,76 +1044,103 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     return true;
   }, []);
 
-  const applySetupReconciliation = useCallback((
-    reconciliation: SetupReconciliation,
-    requestedCampaignId: string,
-    generation: number,
-  ): boolean => {
-    if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-      || generationRef.current !== generation) return false;
-    setSetupConfirmed(false);
-    if (reconciliation.detail.status === "rejected" || !reconciliation.detail.value?.campaign) {
-      setSetupChoice(reconciliation.choice);
-      const detailReason = reconciliation.detail.status === "rejected" ? reconciliation.detail.reason : null;
-      const putReason = reconciliation.put.status === "rejected" ? reconciliation.put.reason : null;
-      if ((detailReason instanceof ApiError && detailReason.status === 404)
-        || (putReason instanceof ApiError && putReason.status === 404)) {
-        markCampaignUnavailable(requestedCampaignId);
+  const applySetupReconciliation = useCallback(
+    (reconciliation: SetupReconciliation, requestedCampaignId: string, generation: number): boolean => {
+      if (
+        !mountedRef.current ||
+        activeCampaignRef.current !== requestedCampaignId ||
+        generationRef.current !== generation
+      )
+        return false;
+      setSetupConfirmed(false);
+      if (reconciliation.detail.status === "rejected" || !reconciliation.detail.value?.campaign) {
+        setSetupChoice(reconciliation.choice);
+        const detailReason = reconciliation.detail.status === "rejected" ? reconciliation.detail.reason : null;
+        const putReason = reconciliation.put.status === "rejected" ? reconciliation.put.reason : null;
+        if (
+          (detailReason instanceof ApiError && detailReason.status === 404) ||
+          (putReason instanceof ApiError && putReason.status === 404)
+        ) {
+          markCampaignUnavailable(requestedCampaignId);
+          return true;
+        }
+        const putConflict =
+          reconciliation.put.status === "rejected" &&
+          reconciliation.put.reason instanceof ApiError &&
+          reconciliation.put.reason.status === 409;
+        if (reconciliation.put.status === "fulfilled") {
+          setSetupError(
+            `${setupChoiceName(reconciliation.choice)} starter setup completed, but the latest details could not be refreshed. Refresh the campaign to reconcile current configuration; the PUT was not repeated.`,
+          );
+        } else
+          setSetupError(
+            putConflict
+              ? `${setupChoiceName(reconciliation.choice)} starter setup conflicts with current state, and the latest campaign details could not be loaded. The PUT was not repeated.`
+              : "Setup outcome is uncertain and latest details could not be loaded. Setup uses two transactions, so the pack may remain installed (or the catalog may remain published). Refresh before deciding whether to try again; the PUT was not repeated.",
+          );
         return true;
       }
-      const putConflict = reconciliation.put.status === "rejected"
-        && reconciliation.put.reason instanceof ApiError && reconciliation.put.reason.status === 409;
-      if (reconciliation.put.status === "fulfilled") {
-        setSetupError(`${setupChoiceName(reconciliation.choice)} starter setup completed, but the latest details could not be refreshed. Refresh the campaign to reconcile current configuration; the PUT was not repeated.`);
-      } else setSetupError(putConflict
-        ? `${setupChoiceName(reconciliation.choice)} starter setup conflicts with current state, and the latest campaign details could not be loaded. The PUT was not repeated.`
-        : "Setup outcome is uncertain and latest details could not be loaded. Setup uses two transactions, so the pack may remain installed (or the catalog may remain published). Refresh before deciding whether to try again; the PUT was not repeated.");
-      return true;
-    }
 
-    // This successful authoritative post-PUT GET supersedes every detail read
-    // started before it, including a StrictMode cache or same-campaign
-    // reopen/peer read. Failed reconciliation has no state to supersede.
-    initialDetailReads.delete(requestedCampaignId);
-    const authoritativeGeneration = ++generationRef.current;
-    const refreshed = reconciliation.detail.value.campaign;
-    setCampaign(refreshed);
-    setDraft(refreshed.name);
-    setLoading(false);
-    setFailed(false);
-    setSetupChoice(refreshed.content.status === "unconfigured" ? reconciliation.choice : null);
-    const exact = reconciliation.choice === "original"
-      ? isOriginalStarterConfigured(refreshed)
-      : reconciliation.choice === "srd" ? isSrd51StarterConfigured(refreshed) : isMechanicsStarterConfigured(refreshed);
-    if (exact) {
-      if (reconciliation.choice === "original") requirePostSetupOptionsRefresh(requestedCampaignId);
-      else {
-        setupOptionsRefreshCampaigns.delete(requestedCampaignId);
-        hideOptionsForSetupReconciliation(requestedCampaignId);
+      // This successful authoritative post-PUT GET supersedes every detail read
+      // started before it, including a StrictMode cache or same-campaign
+      // reopen/peer read. Failed reconciliation has no state to supersede.
+      initialDetailReads.delete(requestedCampaignId);
+      const authoritativeGeneration = ++generationRef.current;
+      const refreshed = reconciliation.detail.value.campaign;
+      setCampaign(refreshed);
+      setDraft(refreshed.name);
+      setLoading(false);
+      setFailed(false);
+      setSetupChoice(refreshed.content.status === "unconfigured" ? reconciliation.choice : null);
+      const exact =
+        reconciliation.choice === "original"
+          ? isOriginalStarterConfigured(refreshed)
+          : reconciliation.choice === "srd"
+            ? isSrd51StarterConfigured(refreshed)
+            : isMechanicsStarterConfigured(refreshed);
+      if (exact) {
+        if (reconciliation.choice === "original") requirePostSetupOptionsRefresh(requestedCampaignId);
+        else {
+          setupOptionsRefreshCampaigns.delete(requestedCampaignId);
+          hideOptionsForSetupReconciliation(requestedCampaignId);
+        }
+        setSetupError("");
+        setAnnouncement(
+          reconciliation.put.status === "fulfilled"
+            ? `${setupChoiceName(reconciliation.choice)} starter setup is complete. The configured identifiers are now read-only.`
+            : `${setupChoiceName(reconciliation.choice)} starter is currently active. The write response was not authoritative, so campaign detail was reconciled; the PUT was not repeated.`,
+        );
+      } else if (refreshed.content.status === "configured") {
+        setAnnouncement("");
+        setSetupError(
+          "This campaign has a different content configuration. Latest identifiers are shown read-only; setup was not repeated.",
+        );
+      } else {
+        const conflict =
+          reconciliation.put.status === "rejected" &&
+          reconciliation.put.reason instanceof ApiError &&
+          reconciliation.put.reason.status === 409;
+        setAnnouncement("");
+        setSetupError(
+          conflict
+            ? `${setupChoiceName(reconciliation.choice)} starter setup conflicts with reserved starter state or another configuration. The campaign remains unconfigured; setup was not repeated. The PUT was not repeated.`
+            : "Setup could not be confirmed complete. The campaign remains unconfigured. Setup uses two transactions, so the pack may remain installed (or the catalog may remain published) after failure. The PUT was not repeated.",
+        );
       }
-      setSetupError("");
-      setAnnouncement(reconciliation.put.status === "fulfilled"
-        ? `${setupChoiceName(reconciliation.choice)} starter setup is complete. The configured identifiers are now read-only.`
-        : `${setupChoiceName(reconciliation.choice)} starter is currently active. The write response was not authoritative, so campaign detail was reconciled; the PUT was not repeated.`);
-    } else if (refreshed.content.status === "configured") {
-      setAnnouncement("");
-      setSetupError("This campaign has a different content configuration. Latest identifiers are shown read-only; setup was not repeated.");
-    } else {
-      const conflict = reconciliation.put.status === "rejected"
-        && reconciliation.put.reason instanceof ApiError && reconciliation.put.reason.status === 409;
-      setAnnouncement("");
-      setSetupError(conflict
-        ? `${setupChoiceName(reconciliation.choice)} starter setup conflicts with reserved starter state or another configuration. The campaign remains unconfigured; setup was not repeated. The PUT was not repeated.`
-        : "Setup could not be confirmed complete. The campaign remains unconfigured. Setup uses two transactions, so the pack may remain installed (or the catalog may remain published) after failure. The PUT was not repeated.");
-    }
-    mutationFocusAfterReconciliationRef.current = { kind: "setup", generation: authoritativeGeneration };
-    return true;
-  }, [hideOptionsForSetupReconciliation, markCampaignUnavailable, requirePostSetupOptionsRefresh]);
+      mutationFocusAfterReconciliationRef.current = { kind: "setup", generation: authoritativeGeneration };
+      return true;
+    },
+    [hideOptionsForSetupReconciliation, markCampaignUnavailable, requirePostSetupOptionsRefresh],
+  );
 
   const applyDiceReconciliation = useCallback((completed: CompletedDiceReconciliation, generation: number): boolean => {
-    if (!mountedRef.current || activeCampaignRef.current !== completed.campaignId
-        || campaignRef.current?.id !== completed.campaignId
-        || generationRef.current !== generation) return false;
+    if (
+      !mountedRef.current ||
+      activeCampaignRef.current !== completed.campaignId ||
+      campaignRef.current?.id !== completed.campaignId ||
+      generationRef.current !== generation
+    )
+      return false;
     // Supersede every history read/action that started before this operation,
     // including reads owned by another mounted instance of this campaign.
     diceGenerationRef.current += 1;
@@ -894,9 +1153,14 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     const { reconciliation } = completed;
     if (reconciliation.history.status === "fulfilled") {
       setDiceHistory(reconciliation.history.value);
-      setDiceCharacterPosition((current) => reconciliation.history.status === "fulfilled"
-        && reconciliation.history.value.characters.some((character) => character.position === current)
-        ? current : reconciliation.history.status === "fulfilled" ? reconciliation.history.value.characters[0]?.position ?? null : null);
+      setDiceCharacterPosition((current) =>
+        reconciliation.history.status === "fulfilled" &&
+        reconciliation.history.value.characters.some((character) => character.position === current)
+          ? current
+          : reconciliation.history.status === "fulfilled"
+            ? (reconciliation.history.value.characters[0]?.position ?? null)
+            : null,
+      );
       setDicePhase("ready");
       setDiceError("");
     } else {
@@ -908,71 +1172,97 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     setDiceResult(outcome);
     appliedDiceTokenRef.current = completed.token;
     diceFocusIntentRef.current = { campaignId: completed.campaignId, token: completed.token, generation };
-    deferCompletionCleanup(completedDiceReconciliations, completed.campaignId, completed.token,
-      () => pendingDiceDetailCompletions.get(completed.campaignId) !== completed.token);
+    deferCompletionCleanup(
+      completedDiceReconciliations,
+      completed.campaignId,
+      completed.token,
+      () => pendingDiceDetailCompletions.get(completed.campaignId) !== completed.token,
+    );
     return true;
   }, []);
 
-  const applyCreateReconciliation = useCallback((
-    completed: CompletedCreateReconciliation,
-    expectedDetailGeneration: number,
-    focus = true,
-    supersedeCharacterReads = true,
-    allowBeforeDetail = false,
-    requireStoredToken = true,
-  ): boolean => {
-    const latest = completedCreateReconciliations.get(completed.campaignId);
-    if (!mountedRef.current || activeCampaignRef.current !== completed.campaignId
-      || (!allowBeforeDetail && campaignRef.current?.id !== completed.campaignId)
-      || generationRef.current !== expectedDetailGeneration
-      || (requireStoredToken && latest?.token !== completed.token)) return false;
+  const applyCreateReconciliation = useCallback(
+    (
+      completed: CompletedCreateReconciliation,
+      expectedDetailGeneration: number,
+      focus = true,
+      supersedeCharacterReads = true,
+      allowBeforeDetail = false,
+      requireStoredToken = true,
+    ): boolean => {
+      const latest = completedCreateReconciliations.get(completed.campaignId);
+      if (
+        !mountedRef.current ||
+        activeCampaignRef.current !== completed.campaignId ||
+        (!allowBeforeDetail && campaignRef.current?.id !== completed.campaignId) ||
+        generationRef.current !== expectedDetailGeneration ||
+        (requireStoredToken && latest?.token !== completed.token)
+      )
+        return false;
 
-    // A live operation reconciliation is newer than reads that predate its
-    // POST and supersedes them. A completed-operation handoff on reopen is
-    // only interim: the fresh GETs started by that reopen keep their
-    // generations and must be allowed to become authoritative.
-    if (supersedeCharacterReads) {
-      invalidateInitialCharacterReads(completed.campaignId);
-      rosterGenerationRef.current += 1;
-      optionsGenerationRef.current += 1;
-    }
-    const { reconciliation } = completed;
-    if (reconciliation.roster.status === "fulfilled") {
-      setRoster(reconciliation.roster.value.characters);
-      setRosterPhase("ready");
-      setRosterAnnouncement(reconciliation.roster.value.characters.length === 0
-        ? "Character roster is empty."
-        : `${reconciliation.roster.value.characters.length} ${reconciliation.roster.value.characters.length === 1 ? "character" : "characters"} loaded.`);
-    } else {
-      setRoster([]);
-      setRosterPhase(reconciliation.roster.status === "rejected"
-        && reconciliation.roster.reason instanceof ApiError && reconciliation.roster.reason.status === 404 ? "unsupported" : "failed");
-      setRosterAnnouncement("");
-    }
-    if (reconciliation.options.status === "fulfilled") {
-      setOptions(reconciliation.options.value);
-      setOptionsPhase("ready");
-      const selected = reconciliation.options.value.personas.find((persona) => persona.characterId === reconciliation.characterId);
-      setSelectedCharacterId(selected && !selected.alreadyUsed ? reconciliation.characterId : null);
-    } else {
-      setOptions(null);
-      setOptionsPhase(reconciliation.options.status === "rejected"
-        && reconciliation.options.reason instanceof ApiError && reconciliation.options.reason.status === 404 ? "unsupported" : "failed");
-      setSelectedCharacterId(null);
-    }
-    setCreateConfirmed(false);
-    setCreateResult(createOutcomeMessage(reconciliation));
-    setCharacterStatusActivity("idle");
-    setCreatePhase("idle");
-    appliedCreateTokenRef.current = completed.token;
-    if (focus) createFocusIntentRef.current = {
-      campaignId: completed.campaignId,
-      token: completed.token,
-      generation: expectedDetailGeneration,
-    };
-    deferCompletionCleanup(completedCreateReconciliations, completed.campaignId, completed.token);
-    return true;
-  }, []);
+      // A live operation reconciliation is newer than reads that predate its
+      // POST and supersedes them. A completed-operation handoff on reopen is
+      // only interim: the fresh GETs started by that reopen keep their
+      // generations and must be allowed to become authoritative.
+      if (supersedeCharacterReads) {
+        invalidateInitialCharacterReads(completed.campaignId);
+        rosterGenerationRef.current += 1;
+        optionsGenerationRef.current += 1;
+      }
+      const { reconciliation } = completed;
+      if (reconciliation.roster.status === "fulfilled") {
+        setRoster(reconciliation.roster.value.characters);
+        setRosterPhase("ready");
+        setRosterAnnouncement(
+          reconciliation.roster.value.characters.length === 0
+            ? "Character roster is empty."
+            : `${reconciliation.roster.value.characters.length} ${reconciliation.roster.value.characters.length === 1 ? "character" : "characters"} loaded.`,
+        );
+      } else {
+        setRoster([]);
+        setRosterPhase(
+          reconciliation.roster.status === "rejected" &&
+            reconciliation.roster.reason instanceof ApiError &&
+            reconciliation.roster.reason.status === 404
+            ? "unsupported"
+            : "failed",
+        );
+        setRosterAnnouncement("");
+      }
+      if (reconciliation.options.status === "fulfilled") {
+        setOptions(reconciliation.options.value);
+        setOptionsPhase("ready");
+        const selected = reconciliation.options.value.personas.find(
+          (persona) => persona.characterId === reconciliation.characterId,
+        );
+        setSelectedCharacterId(selected && !selected.alreadyUsed ? reconciliation.characterId : null);
+      } else {
+        setOptions(null);
+        setOptionsPhase(
+          reconciliation.options.status === "rejected" &&
+            reconciliation.options.reason instanceof ApiError &&
+            reconciliation.options.reason.status === 404
+            ? "unsupported"
+            : "failed",
+        );
+        setSelectedCharacterId(null);
+      }
+      setCreateConfirmed(false);
+      setCreateResult(createOutcomeMessage(reconciliation));
+      setCharacterStatusActivity("idle");
+      setCreatePhase("idle");
+      appliedCreateTokenRef.current = completed.token;
+      if (focus)
+        createFocusIntentRef.current = {
+          campaignId: completed.campaignId,
+          token: completed.token,
+          generation: expectedDetailGeneration,
+        };
+      deferCompletionCleanup(completedCreateReconciliations, completed.campaignId, completed.token);
+      return true;
+    },
+    [],
+  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1062,14 +1352,27 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       setCharacterStatusActivity("reconciling");
       const freshReads = handoffFreshReadsRef.current.promise;
       void Promise.all([detailLoad, freshReads]).then(([detailGeneration, [roster, freshOptions]]) => {
-        if (detailGeneration === null || !mountedRef.current || activeCampaignRef.current !== campaignId
-          || generationRef.current !== detailGeneration || rosterGenerationRef.current !== rosterGeneration
-          || optionsGenerationRef.current !== optionsGeneration
-          || handedOffCreateRef.current?.token !== handoff.token) return;
-        applyCreateReconciliation({
-          ...handoff,
-          reconciliation: { ...handoff.reconciliation, roster, options: freshOptions },
-        }, detailGeneration, true, false, false, false);
+        if (
+          detailGeneration === null ||
+          !mountedRef.current ||
+          activeCampaignRef.current !== campaignId ||
+          generationRef.current !== detailGeneration ||
+          rosterGenerationRef.current !== rosterGeneration ||
+          optionsGenerationRef.current !== optionsGeneration ||
+          handedOffCreateRef.current?.token !== handoff.token
+        )
+          return;
+        applyCreateReconciliation(
+          {
+            ...handoff,
+            reconciliation: { ...handoff.reconciliation, roster, options: freshOptions },
+          },
+          detailGeneration,
+          true,
+          false,
+          false,
+          false,
+        );
       });
     } else {
       void loadRoster(false, true);
@@ -1099,22 +1402,32 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
         invalidateInitialCharacterReads(campaignId);
       }
     };
-  // A refresh token is request-scoped state, not page identity. The dedicated
-  // effect below consumes later tokens; acknowledging one must not tear down
-  // and reload the entire campaign detail page.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applyCreateReconciliation, applyRoomReconciliation, campaignId, hideOptionsForSetupReconciliation, load, loadOptions, loadRoster, loadRooms]);
+    // A refresh token is request-scoped state, not page identity. The dedicated
+    // effect below consumes later tokens; acknowledging one must not tear down
+    // and reload the entire campaign detail page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    applyCreateReconciliation,
+    applyRoomReconciliation,
+    campaignId,
+    hideOptionsForSetupReconciliation,
+    load,
+    loadOptions,
+    loadRoster,
+    loadRooms,
+  ]);
 
   useEffect(() => {
-    const authorized = mechanicsEnabled && campaign
-      && (campaign.actorRole === "owner" || campaign.actorRole === "gm");
+    const authorized = mechanicsEnabled && campaign && (campaign.actorRole === "owner" || campaign.actorRole === "gm");
     if (!authorized || loading || diceInitializedCampaignRef.current === campaignId) return;
     diceInitializedCampaignRef.current = campaignId;
     const handoff = handedOffDiceRef.current;
     if (handoff?.campaignId === campaignId) {
       handedOffDiceRef.current = null;
-      if (applyDiceReconciliation(handoff, generationRef.current)
-        && pendingDiceDetailCompletions.get(campaignId) === handoff.token) {
+      if (
+        applyDiceReconciliation(handoff, generationRef.current) &&
+        pendingDiceDetailCompletions.get(campaignId) === handoff.token
+      ) {
         pendingDiceDetailCompletions.delete(campaignId);
       }
       return;
@@ -1126,12 +1439,24 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   useEffect(() => {
     const intent = detailFocusIntentRef.current;
-    if (loading || !campaign || !intent || intent.campaignId !== campaignId
-      || intent.generation !== generationRef.current || intent.request !== focusHeadingRequest) return;
+    if (
+      loading ||
+      !campaign ||
+      !intent ||
+      intent.campaignId !== campaignId ||
+      intent.generation !== generationRef.current ||
+      intent.request !== focusHeadingRequest
+    )
+      return;
     detailFocusIntentRef.current = null;
     queueMicrotask(() => {
-      if (!mountedRef.current || activeCampaignRef.current !== intent.campaignId
-        || generationRef.current !== intent.generation || focusHeadingRequest !== intent.request) return;
+      if (
+        !mountedRef.current ||
+        activeCampaignRef.current !== intent.campaignId ||
+        generationRef.current !== intent.generation ||
+        focusHeadingRequest !== intent.request
+      )
+        return;
       const heading = detailHeadingRef.current;
       heading?.focus();
       if (!heading || document.activeElement !== heading) return;
@@ -1149,9 +1474,10 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       setSharedMutationPending(Boolean(next));
       if (observed && !next) {
         const ownership = ownedMutationsRef.current.get(mutation.token);
-        const handlerWillApply = ownership?.campaignId === campaignId
-          && ownership.generation === generationRef.current
-          && activeCampaignRef.current === campaignId;
+        const handlerWillApply =
+          ownership?.campaignId === campaignId &&
+          ownership.generation === generationRef.current &&
+          activeCampaignRef.current === campaignId;
         if (!handlerWillApply) {
           if (mutation.kind === "dice") {
             // Completion is newer than every pre-roll history projection, but
@@ -1169,8 +1495,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
             if (completed?.token === mutation.token) {
               pendingPeerDiceRef.current = completed;
               pendingDiceDetailCompletions.set(campaignId, completed.token);
-              if (campaignRef.current?.id === campaignId
-                && applyDiceReconciliation(completed, generationRef.current)) {
+              if (campaignRef.current?.id === campaignId && applyDiceReconciliation(completed, generationRef.current)) {
                 pendingPeerDiceRef.current = null;
                 if (pendingDiceDetailCompletions.get(campaignId) === completed.token) {
                   pendingDiceDetailCompletions.delete(campaignId);
@@ -1226,31 +1551,43 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
             if (mutation.kind === "setup") {
               requirePostSetupOptionsRefresh(campaignId);
             }
-            void load(false).then((generation) => {
-              if (generation === null) return;
-              mutationFocusAfterReconciliationRef.current = {
-                kind: mutation.kind === "rename" ? "rename" : "setup",
-                generation,
-              };
-            }).finally(() => {
-              if (!mountedRef.current || reconciliationGeneration !== generationRef.current) return;
-              if (mutation.kind === "rename") {
-                renameLockedRef.current = false;
-                setRenamePhase("idle");
-              } else {
-                setupLockedRef.current = false;
-                setSetupPhase("idle");
-                setSetupConfirmed(false);
-              }
-            });
+            void load(false)
+              .then((generation) => {
+                if (generation === null) return;
+                mutationFocusAfterReconciliationRef.current = {
+                  kind: mutation.kind === "rename" ? "rename" : "setup",
+                  generation,
+                };
+              })
+              .finally(() => {
+                if (!mountedRef.current || reconciliationGeneration !== generationRef.current) return;
+                if (mutation.kind === "rename") {
+                  renameLockedRef.current = false;
+                  setRenamePhase("idle");
+                } else {
+                  setupLockedRef.current = false;
+                  setSetupPhase("idle");
+                  setSetupConfirmed(false);
+                }
+              });
           }
         }
       }
       observed = next;
     };
     mutationListeners.add(listener);
-    return () => { mutationListeners.delete(listener); };
-  }, [applyCreateReconciliation, applyDiceReconciliation, applyRoomReconciliation, applySetupReconciliation, campaignId, load, requirePostSetupOptionsRefresh]);
+    return () => {
+      mutationListeners.delete(listener);
+    };
+  }, [
+    applyCreateReconciliation,
+    applyDiceReconciliation,
+    applyRoomReconciliation,
+    applySetupReconciliation,
+    campaignId,
+    load,
+    requirePostSetupOptionsRefresh,
+  ]);
 
   useEffect(() => {
     const pending = pendingPeerDiceRef.current;
@@ -1275,34 +1612,67 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   useEffect(() => {
     if (loading || !campaign || campaign.id !== campaignId) return;
-    let current = true; setAdministration(null); setAdministrationPhase("loading");
-    void getCampaignAdministration(campaignId).then(({ campaign: value }) => { if (current) { setAdministration(value); setAdministrationPhase("ready"); } })
-      .catch(() => { if (current) setAdministrationPhase("failed"); });
-    return () => { current = false; };
+    let current = true;
+    setAdministration(null);
+    setAdministrationPhase("loading");
+    void getCampaignAdministration(campaignId)
+      .then(({ campaign: value }) => {
+        if (current) {
+          setAdministration(value);
+          setAdministrationPhase("ready");
+        }
+      })
+      .catch(() => {
+        if (current) setAdministrationPhase("failed");
+      });
+    return () => {
+      current = false;
+    };
   }, [campaign, campaignId, loading]);
 
   useEffect(() => {
-    const candidates = roomsPhase === "ready" ? rooms?.attached.filter((room) => !room.stopped) ?? [] : [];
-    if (!mechanicsEnabled || candidates.length === 0) { setRoomPlayability({ state: "idle", rooms: [] }); return; }
-    let current = true; setRoomPlayability({ state: "loading", rooms: [] });
-    void Promise.allSettled(candidates.map((room) => getCampaignPlayBootstrap(campaignId, room.sessionId))).then((results) => {
-      if (!current) return;
-      const values = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
-      setRoomPlayability({ state: values.length ? "ready" : "failed", rooms: values });
-    });
-    return () => { current = false; };
+    const candidates = roomsPhase === "ready" ? (rooms?.attached.filter((room) => !room.stopped) ?? []) : [];
+    if (!mechanicsEnabled || candidates.length === 0) {
+      setRoomPlayability({ state: "idle", rooms: [] });
+      return;
+    }
+    let current = true;
+    setRoomPlayability({ state: "loading", rooms: [] });
+    void Promise.allSettled(candidates.map((room) => getCampaignPlayBootstrap(campaignId, room.sessionId))).then(
+      (results) => {
+        if (!current) return;
+        const values = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+        setRoomPlayability({ state: values.length ? "ready" : "failed", rooms: values });
+      },
+    );
+    return () => {
+      current = false;
+    };
   }, [campaignId, mechanicsEnabled, rooms, roomsPhase]);
 
   useEffect(() => {
-    if (!mechanicsEnabled || loading || !campaign || campaign.id !== campaignId || !isOriginalStarterConfigured(campaign)
-      || setupOptionsRefreshCampaigns.has(campaignId) || optionsPhase !== "loading") return;
+    if (
+      !mechanicsEnabled ||
+      loading ||
+      !campaign ||
+      campaign.id !== campaignId ||
+      !isOriginalStarterConfigured(campaign) ||
+      setupOptionsRefreshCampaigns.has(campaignId) ||
+      optionsPhase !== "loading"
+    )
+      return;
     void loadOptions(false, true);
   }, [campaign, campaignId, loadOptions, loading, mechanicsEnabled, optionsPhase]);
 
   useEffect(() => {
-    if (loading || !campaign || campaign.id !== campaignId
-      || !setupOptionsRefreshCampaigns.has(campaignId)
-      || !isOriginalStarterConfigured(campaign)) return;
+    if (
+      loading ||
+      !campaign ||
+      campaign.id !== campaignId ||
+      !setupOptionsRefreshCampaigns.has(campaignId) ||
+      !isOriginalStarterConfigured(campaign)
+    )
+      return;
     // Consume only when this current exact-configured detail success actually
     // starts the uncached options request.
     setupOptionsRefreshCampaigns.delete(campaignId);
@@ -1312,24 +1682,45 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   useEffect(() => {
     const intent = createFocusIntentRef.current;
-    if (!createResult || !intent || intent.campaignId !== campaignId
-      || intent.token !== appliedCreateTokenRef.current || intent.generation !== generationRef.current) return;
+    if (
+      !createResult ||
+      !intent ||
+      intent.campaignId !== campaignId ||
+      intent.token !== appliedCreateTokenRef.current ||
+      intent.generation !== generationRef.current
+    )
+      return;
     createFocusIntentRef.current = null;
     queueMicrotask(() => {
-      if (!mountedRef.current || activeCampaignRef.current !== intent.campaignId
-        || generationRef.current !== intent.generation || appliedCreateTokenRef.current !== intent.token) return;
+      if (
+        !mountedRef.current ||
+        activeCampaignRef.current !== intent.campaignId ||
+        generationRef.current !== intent.generation ||
+        appliedCreateTokenRef.current !== intent.token
+      )
+        return;
       createStatusRef.current?.focus();
     });
   }, [campaignId, createResult]);
 
   useEffect(() => {
     const intent = diceFocusIntentRef.current;
-    if (!diceResult || !intent || intent.campaignId !== campaignId
-        || intent.token !== appliedDiceTokenRef.current || intent.generation !== generationRef.current) return;
+    if (
+      !diceResult ||
+      !intent ||
+      intent.campaignId !== campaignId ||
+      intent.token !== appliedDiceTokenRef.current ||
+      intent.generation !== generationRef.current
+    )
+      return;
     diceFocusIntentRef.current = null;
     queueMicrotask(() => {
-      if (mountedRef.current && activeCampaignRef.current === intent.campaignId
-          && generationRef.current === intent.generation && appliedDiceTokenRef.current === intent.token) {
+      if (
+        mountedRef.current &&
+        activeCampaignRef.current === intent.campaignId &&
+        generationRef.current === intent.generation &&
+        appliedDiceTokenRef.current === intent.token
+      ) {
         diceStatusRef.current?.focus();
       }
     });
@@ -1346,18 +1737,29 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     if (!intent.token && roomsPhase === "loading") return;
     roomFocusIntentRef.current = null;
     queueMicrotask(() => {
-      if (!mountedRef.current || activeCampaignRef.current !== intent.campaignId
-        || generationRef.current !== intent.generation) return;
+      if (
+        !mountedRef.current ||
+        activeCampaignRef.current !== intent.campaignId ||
+        generationRef.current !== intent.generation
+      )
+        return;
       const target = intent.token
         ? roomStatusRef.current
-        : roomsPhase === "ready" ? roomsHeadingRef.current : roomsRetryRef.current;
+        : roomsPhase === "ready"
+          ? roomsHeadingRef.current
+          : roomsRetryRef.current;
       target?.focus();
     });
   }, [campaign, campaignId, loading, roomResult, roomsPhase]);
 
   useEffect(() => {
-    if (!completedRoomsRefresh || loading || !campaign
-      || acknowledgedRoomsRefreshRequestRef.current === completedRoomsRefresh.request) return;
+    if (
+      !completedRoomsRefresh ||
+      loading ||
+      !campaign ||
+      acknowledgedRoomsRefreshRequestRef.current === completedRoomsRefresh.request
+    )
+      return;
     const target = completedRoomsRefresh.succeeded ? roomsHeadingRef.current : roomsRetryRef.current;
     target?.focus();
     if (!target || document.activeElement !== target) return;
@@ -1391,8 +1793,14 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   useEffect(() => {
     const pending = mutationFocusAfterReconciliationRef.current;
-    if (!pending || loading || pending.generation !== generationRef.current
-      || renamePhase !== "idle" || setupPhase !== "idle") return;
+    if (
+      !pending ||
+      loading ||
+      pending.generation !== generationRef.current ||
+      renamePhase !== "idle" ||
+      setupPhase !== "idle"
+    )
+      return;
     mutationFocusAfterReconciliationRef.current = null;
     if (pending.kind === "rename") renameInputRef.current?.focus();
     else if (configuredStatusRef.current) configuredStatusRef.current.focus();
@@ -1401,13 +1809,20 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   useEffect(() => {
     const intent = rosterRetryFocusIntentRef.current;
-    if (intent?.campaignId === campaignId && intent.generation === rosterGenerationRef.current
-      && ((rosterPhase === "ready" && intent.outcome === "success")
-        || (rosterPhase === "failed" && intent.outcome === "failure"))) {
+    if (
+      intent?.campaignId === campaignId &&
+      intent.generation === rosterGenerationRef.current &&
+      ((rosterPhase === "ready" && intent.outcome === "success") ||
+        (rosterPhase === "failed" && intent.outcome === "failure"))
+    ) {
       rosterRetryFocusIntentRef.current = null;
       queueMicrotask(() => {
-        if (!mountedRef.current || activeCampaignRef.current !== intent.campaignId
-          || rosterGenerationRef.current !== intent.generation) return;
+        if (
+          !mountedRef.current ||
+          activeCampaignRef.current !== intent.campaignId ||
+          rosterGenerationRef.current !== intent.generation
+        )
+          return;
         if (intent.outcome === "success") rosterHeadingRef.current?.focus();
         else rosterRetryRef.current?.focus();
       });
@@ -1416,13 +1831,20 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   useEffect(() => {
     const intent = optionsRetryFocusIntentRef.current;
-    if (intent?.campaignId === campaignId && intent.generation === optionsGenerationRef.current
-      && ((optionsPhase === "ready" && intent.outcome === "success")
-        || ((optionsPhase === "failed" || optionsPhase === "unsupported") && intent.outcome === "failure"))) {
+    if (
+      intent?.campaignId === campaignId &&
+      intent.generation === optionsGenerationRef.current &&
+      ((optionsPhase === "ready" && intent.outcome === "success") ||
+        ((optionsPhase === "failed" || optionsPhase === "unsupported") && intent.outcome === "failure"))
+    ) {
       optionsRetryFocusIntentRef.current = null;
       queueMicrotask(() => {
-        if (!mountedRef.current || activeCampaignRef.current !== intent.campaignId
-          || optionsGenerationRef.current !== intent.generation) return;
+        if (
+          !mountedRef.current ||
+          activeCampaignRef.current !== intent.campaignId ||
+          optionsGenerationRef.current !== intent.generation
+        )
+          return;
         if (intent.outcome === "success") {
           if (optionsHeadingRef.current) optionsHeadingRef.current.focus();
           else firstPersonaChoiceRef.current?.focus();
@@ -1436,8 +1858,16 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   async function submitRename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     // State updates are asynchronous, so the ref is the actual duplicate-write lock.
-    if (!campaign || campaign.actorRole !== "owner" || renameLockedRef.current || setupLockedRef.current || createLockedRef.current || diceLockedRef.current
-      || inFlightCampaignMutations.has(campaignId)) return;
+    if (
+      !campaign ||
+      campaign.actorRole !== "owner" ||
+      renameLockedRef.current ||
+      setupLockedRef.current ||
+      createLockedRef.current ||
+      diceLockedRef.current ||
+      inFlightCampaignMutations.has(campaignId)
+    )
+      return;
 
     const parsed = campaignRenameRequestSchema.safeParse({ name: draft, expectedUpdatedAt: campaign.updatedAt });
     if (!parsed.success) {
@@ -1465,9 +1895,11 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       if (!mountedRef.current || generation !== generationRef.current) return;
 
       // The PATCH result is authoritative for the mutation's minimal fields.
-      setCampaign((current) => current?.id === response.campaign.id
-        ? { ...current, name: response.campaign.name, updatedAt: response.campaign.updatedAt }
-        : current);
+      setCampaign((current) =>
+        current?.id === response.campaign.id
+          ? { ...current, name: response.campaign.name, updatedAt: response.campaign.updatedAt }
+          : current,
+      );
       setDraft(response.campaign.name);
       setRenamePhase("reconciling");
 
@@ -1515,9 +1947,11 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
         } else {
           // A GET can reveal current state but cannot attribute a matching name
           // or timestamp to this failed PATCH (names are not unique).
-          setRenameError(refreshed.campaign.name === requestedName
-            ? `The requested name is currently “${requestedName}”, but this rename write could not be confirmed. Your draft was kept.`
-            : `The rename write could not be confirmed. The current name is “${refreshed.campaign.name}”; your draft was kept.`);
+          setRenameError(
+            refreshed.campaign.name === requestedName
+              ? `The requested name is currently “${requestedName}”, but this rename write could not be confirmed. Your draft was kept.`
+              : `The rename write could not be confirmed. The current name is “${refreshed.campaign.name}”; your draft was kept.`,
+          );
         }
       } catch (refreshError) {
         if (!mountedRef.current || generation !== generationRef.current) return;
@@ -1525,9 +1959,11 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
           unavailableRef.current();
           return;
         }
-        setRenameError(stale
-          ? "This campaign changed elsewhere, but the latest details could not be loaded. Your name draft was kept."
-          : "The rename outcome could not be confirmed. Refresh the campaign before trying again; your name draft was kept.");
+        setRenameError(
+          stale
+            ? "This campaign changed elsewhere, but the latest details could not be loaded. Your name draft was kept."
+            : "The rename outcome could not be confirmed. Refresh the campaign before trying again; your name draft was kept.",
+        );
       }
     } finally {
       finishCampaignMutation(campaignId, mutation);
@@ -1542,10 +1978,20 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   async function setupStarter() {
     // React state cannot synchronously serialize clicks, so the ref owns the lock.
-    if (!campaign || campaign.actorRole !== "owner" || campaign.content.status !== "unconfigured"
-      || !setupChoice || (setupChoice !== "original" && !mechanicsEnabled)
-      || !setupConfirmed || setupLockedRef.current || renameLockedRef.current || createLockedRef.current || diceLockedRef.current
-      || inFlightCampaignMutations.has(campaignId)) return;
+    if (
+      !campaign ||
+      campaign.actorRole !== "owner" ||
+      campaign.content.status !== "unconfigured" ||
+      !setupChoice ||
+      (setupChoice !== "original" && !mechanicsEnabled) ||
+      !setupConfirmed ||
+      setupLockedRef.current ||
+      renameLockedRef.current ||
+      createLockedRef.current ||
+      diceLockedRef.current ||
+      inFlightCampaignMutations.has(campaignId)
+    )
+      return;
 
     const operationCampaignId = campaignId;
     const choice = setupChoice;
@@ -1563,14 +2009,23 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
     let put: PromiseSettledResult<CampaignDetailResponse>;
     try {
-      put = { status: "fulfilled", value: choice === "srd"
-        ? await setupSrd51Starter(operationCampaignId)
-        : choice === "mechanics" ? await setupMechanicsStarter(operationCampaignId) : await setupOriginalStarter(operationCampaignId) };
+      put = {
+        status: "fulfilled",
+        value:
+          choice === "srd"
+            ? await setupSrd51Starter(operationCampaignId)
+            : choice === "mechanics"
+              ? await setupMechanicsStarter(operationCampaignId)
+              : await setupOriginalStarter(operationCampaignId),
+      };
     } catch (reason) {
       put = { status: "rejected", reason };
     }
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && generationRef.current === generation) {
+    if (
+      mountedRef.current &&
+      activeCampaignRef.current === operationCampaignId &&
+      generationRef.current === generation
+    ) {
       setSetupPhase("reconciling");
     }
     // Every issued PUT, including every HTTP/network/schema outcome, owns one
@@ -1584,8 +2039,11 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     const reconciliation = { choice, put, detail } satisfies SetupReconciliation;
     mutation.setupReconciliation = reconciliation;
     let settledGeneration = generation;
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && generationRef.current === generation) {
+    if (
+      mountedRef.current &&
+      activeCampaignRef.current === operationCampaignId &&
+      generationRef.current === generation
+    ) {
       if (applySetupReconciliation(reconciliation, operationCampaignId, generation)) {
         settledGeneration = generationRef.current;
         // finish() broadcasts synchronously. Mark this owner as current so its
@@ -1598,8 +2056,11 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     }
     finishCampaignMutation(operationCampaignId, mutation);
     ownedMutationsRef.current.delete(mutation.token);
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && settledGeneration === generationRef.current) {
+    if (
+      mountedRef.current &&
+      activeCampaignRef.current === operationCampaignId &&
+      settledGeneration === generationRef.current
+    ) {
       setupLockedRef.current = false;
       setSetupPhase("idle");
       queueMicrotask(() => {
@@ -1613,9 +2074,20 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   async function createCharacter() {
     const operationCampaignId = campaignId;
     const selected = options?.personas.find((persona) => persona.characterId === selectedCharacterId);
-    if (!campaign || !isOriginalStarterConfigured(campaign) || optionsPhase !== "ready"
-      || !selected || selected.alreadyUsed || !createConfirmed || createLockedRef.current
-      || renameLockedRef.current || setupLockedRef.current || diceLockedRef.current || inFlightCampaignMutations.has(campaignId)) return;
+    if (
+      !campaign ||
+      !isOriginalStarterConfigured(campaign) ||
+      optionsPhase !== "ready" ||
+      !selected ||
+      selected.alreadyUsed ||
+      !createConfirmed ||
+      createLockedRef.current ||
+      renameLockedRef.current ||
+      setupLockedRef.current ||
+      diceLockedRef.current ||
+      inFlightCampaignMutations.has(campaignId)
+    )
+      return;
 
     createLockedRef.current = true;
     const generation = ++generationRef.current;
@@ -1639,15 +2111,22 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
     let post: PromiseSettledResult<CampaignCharacterCreateResponse>;
     try {
-      post = { status: "fulfilled", value: await createOriginalStarterCampaignCharacter(operationCampaignId, { characterId: selected.characterId }) };
+      post = {
+        status: "fulfilled",
+        value: await createOriginalStarterCampaignCharacter(operationCampaignId, { characterId: selected.characterId }),
+      };
     } catch (reason) {
       post = { status: "rejected", reason };
     }
 
     // Confirmation is single-use for every issued POST, whatever its outcome.
-    if (mountedRef.current && generation === generationRef.current && activeCampaignRef.current === operationCampaignId
-      && campaignRef.current?.id === operationCampaignId
-      && inFlightCampaignMutations.get(operationCampaignId)?.token === mutation.token) {
+    if (
+      mountedRef.current &&
+      generation === generationRef.current &&
+      activeCampaignRef.current === operationCampaignId &&
+      campaignRef.current?.id === operationCampaignId &&
+      inFlightCampaignMutations.get(operationCampaignId)?.token === mutation.token
+    ) {
       setCreateConfirmed(false);
       setCreatePhase("reconciling");
       setCharacterStatusActivity("reconciling");
@@ -1675,21 +2154,34 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     completedCreateReconciliations.set(operationCampaignId, completed);
     invalidateInitialCharacterReads(operationCampaignId);
 
-    if (mountedRef.current && generation === generationRef.current
-      && activeCampaignRef.current === operationCampaignId) {
+    if (
+      mountedRef.current &&
+      generation === generationRef.current &&
+      activeCampaignRef.current === operationCampaignId
+    ) {
       applyCreateReconciliation(completed, generation);
     }
     finishCampaignMutation(operationCampaignId, mutation);
     ownedMutationsRef.current.delete(mutation.token);
-    if (mountedRef.current && generation === generationRef.current && activeCampaignRef.current === operationCampaignId) {
+    if (
+      mountedRef.current &&
+      generation === generationRef.current &&
+      activeCampaignRef.current === operationCampaignId
+    ) {
       createLockedRef.current = false;
       setCreatePhase("idle");
     }
   }
 
   async function refreshCharacterStatus() {
-    if (createLockedRef.current || renameLockedRef.current || setupLockedRef.current || diceLockedRef.current
-      || inFlightCampaignMutations.has(campaignId)) return;
+    if (
+      createLockedRef.current ||
+      renameLockedRef.current ||
+      setupLockedRef.current ||
+      diceLockedRef.current ||
+      inFlightCampaignMutations.has(campaignId)
+    )
+      return;
     const requestedCampaignId = campaignId;
     const rosterGeneration = ++rosterGenerationRef.current;
     const optionsGeneration = ++optionsGenerationRef.current;
@@ -1700,37 +2192,56 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       listCampaignCharacters(requestedCampaignId),
       getCampaignCharacterCreationOptions(requestedCampaignId),
     ]);
-    if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-      || rosterGenerationRef.current !== rosterGeneration || optionsGenerationRef.current !== optionsGeneration) return;
+    if (
+      !mountedRef.current ||
+      activeCampaignRef.current !== requestedCampaignId ||
+      rosterGenerationRef.current !== rosterGeneration ||
+      optionsGenerationRef.current !== optionsGeneration
+    )
+      return;
 
     if (freshRoster.status === "fulfilled") {
       setRoster(freshRoster.value.characters);
       setRosterPhase("ready");
-      setRosterAnnouncement(freshRoster.value.characters.length === 0
-        ? "Character roster is empty."
-        : `${freshRoster.value.characters.length} ${freshRoster.value.characters.length === 1 ? "character" : "characters"} loaded.`);
+      setRosterAnnouncement(
+        freshRoster.value.characters.length === 0
+          ? "Character roster is empty."
+          : `${freshRoster.value.characters.length} ${freshRoster.value.characters.length === 1 ? "character" : "characters"} loaded.`,
+      );
     } else {
       setRoster([]);
-      setRosterPhase(freshRoster.reason instanceof ApiError && freshRoster.reason.status === 404 ? "unsupported" : "failed");
+      setRosterPhase(
+        freshRoster.reason instanceof ApiError && freshRoster.reason.status === 404 ? "unsupported" : "failed",
+      );
     }
     if (freshOptions.status === "fulfilled") {
       setOptions(freshOptions.value);
       setOptionsPhase("ready");
-      const stillUnused = freshOptions.value.personas.some((persona) => persona.characterId === previousSelection && !persona.alreadyUsed);
+      const stillUnused = freshOptions.value.personas.some(
+        (persona) => persona.characterId === previousSelection && !persona.alreadyUsed,
+      );
       setSelectedCharacterId(stillUnused ? previousSelection : null);
     } else {
       setOptions(null);
-      setOptionsPhase(freshOptions.reason instanceof ApiError && freshOptions.reason.status === 404 ? "unsupported" : "failed");
+      setOptionsPhase(
+        freshOptions.reason instanceof ApiError && freshOptions.reason.status === 404 ? "unsupported" : "failed",
+      );
       setSelectedCharacterId(null);
     }
     setCreateConfirmed(false);
-    setCreateResult(freshRoster.status === "fulfilled" && freshOptions.status === "fulfilled"
-      ? { text: "Character status refreshed from the authoritative roster and creation options.", alert: false }
-      : { text: "Character status refresh was partial or unavailable. No create request was made.", alert: true });
+    setCreateResult(
+      freshRoster.status === "fulfilled" && freshOptions.status === "fulfilled"
+        ? { text: "Character status refreshed from the authoritative roster and creation options.", alert: false }
+        : { text: "Character status refresh was partial or unavailable. No create request was made.", alert: true },
+    );
     setCharacterStatusActivity("idle");
     queueMicrotask(() => {
-      if (mountedRef.current && activeCampaignRef.current === requestedCampaignId
-        && rosterGenerationRef.current === rosterGeneration && optionsGenerationRef.current === optionsGeneration) {
+      if (
+        mountedRef.current &&
+        activeCampaignRef.current === requestedCampaignId &&
+        rosterGenerationRef.current === rosterGeneration &&
+        optionsGenerationRef.current === optionsGeneration
+      ) {
         createStatusRef.current?.focus();
       }
     });
@@ -1738,9 +2249,18 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
   async function refreshDiceRolls() {
     const priorOutcome = diceResult;
-    if (!priorOutcome || dicePhase === "loading" || diceBusy || renameLockedRef.current
-      || setupLockedRef.current || createLockedRef.current || diceLockedRef.current
-      || diceManualReadLockRef.current || inFlightCampaignMutations.has(campaignId)) return;
+    if (
+      !priorOutcome ||
+      dicePhase === "loading" ||
+      diceBusy ||
+      renameLockedRef.current ||
+      setupLockedRef.current ||
+      createLockedRef.current ||
+      diceLockedRef.current ||
+      diceManualReadLockRef.current ||
+      inFlightCampaignMutations.has(campaignId)
+    )
+      return;
     const manualReadToken = Symbol("manual dice history refresh");
     diceManualReadLockRef.current = manualReadToken;
     const requestedCampaignId = campaignId;
@@ -1749,16 +2269,27 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     setDiceError("");
     try {
       const response = await getCampaignDiceHistory(requestedCampaignId);
-      if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-        || diceGenerationRef.current !== generation) return;
+      if (
+        !mountedRef.current ||
+        activeCampaignRef.current !== requestedCampaignId ||
+        diceGenerationRef.current !== generation
+      )
+        return;
       setDiceHistory(response);
-      setDiceCharacterPosition((current) => response.characters.some((character) => character.position === current)
-        ? current : response.characters[0]?.position ?? null);
+      setDiceCharacterPosition((current) =>
+        response.characters.some((character) => character.position === current)
+          ? current
+          : (response.characters[0]?.position ?? null),
+      );
       setDicePhase("ready");
       setDiceResult(refreshedDiceOutcome(priorOutcome.kind, true));
     } catch {
-      if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
-        || diceGenerationRef.current !== generation) return;
+      if (
+        !mountedRef.current ||
+        activeCampaignRef.current !== requestedCampaignId ||
+        diceGenerationRef.current !== generation
+      )
+        return;
       setDiceHistory(null);
       setDicePhase("failed");
       setDiceError("Roll history could not be loaded.");
@@ -1767,16 +2298,26 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       if (diceManualReadLockRef.current === manualReadToken) diceManualReadLockRef.current = null;
     }
     queueMicrotask(() => {
-      if (mountedRef.current && activeCampaignRef.current === requestedCampaignId
-        && diceGenerationRef.current === generation) diceStatusRef.current?.focus();
+      if (
+        mountedRef.current &&
+        activeCampaignRef.current === requestedCampaignId &&
+        diceGenerationRef.current === generation
+      )
+        diceStatusRef.current?.focus();
     });
   }
 
   async function attachRoom(room: CampaignRoomSummary) {
     const operationCampaignId = campaignId;
-    if (!campaign || campaign.actorRole !== "owner" || roomLockedRef.current
-      || roomManualReadLockRef.current || roomActivity !== "idle"
-      || inFlightCampaignMutations.has(operationCampaignId)) return;
+    if (
+      !campaign ||
+      campaign.actorRole !== "owner" ||
+      roomLockedRef.current ||
+      roomManualReadLockRef.current ||
+      roomActivity !== "idle" ||
+      inFlightCampaignMutations.has(operationCampaignId)
+    )
+      return;
     roomLockedRef.current = true;
     // Acquisition synchronously supersedes all pre-PUT room reads and prevents
     // a cached StrictMode/reopen request from being reused during the write.
@@ -1784,7 +2325,10 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     initialRoomReads.delete(operationCampaignId);
     const generation = ++generationRef.current;
     const mutation = beginCampaignMutation(operationCampaignId, "attach-room");
-    if (!mutation) { roomLockedRef.current = false; return; }
+    if (!mutation) {
+      roomLockedRef.current = false;
+      return;
+    }
     ownedMutationsRef.current.set(mutation.token, { campaignId: operationCampaignId, generation });
     completedRoomReconciliations.delete(operationCampaignId);
     setRoomResult(null);
@@ -1792,12 +2336,15 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     setRoomPendingAction("attach");
     let put: PromiseSettledResult<CampaignRoomAttachResponse>;
     try {
-      put = { status: "fulfilled", value: await attachCampaignRoom(operationCampaignId, { sessionId: room.sessionId }) };
+      put = {
+        status: "fulfilled",
+        value: await attachCampaignRoom(operationCampaignId, { sessionId: room.sessionId }),
+      };
     } catch (reason) {
       put = { status: "rejected", reason };
     }
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && generationRef.current === generation) setRoomActivity("reconciling");
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId && generationRef.current === generation)
+      setRoomActivity("reconciling");
     // Every issued PUT owns exactly one fresh GET, regardless of its outcome.
     let freshRooms: PromiseSettledResult<CampaignRoomLinkingResponse>;
     try {
@@ -1805,27 +2352,41 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     } catch (reason) {
       freshRooms = { status: "rejected", reason };
     }
-    const reconciliation = { kind: "attach", sessionId: room.sessionId, put, rooms: freshRooms } satisfies RoomReconciliation;
+    const reconciliation = {
+      kind: "attach",
+      sessionId: room.sessionId,
+      put,
+      rooms: freshRooms,
+    } satisfies RoomReconciliation;
     mutation.roomReconciliation = reconciliation;
     const completed = { campaignId: operationCampaignId, token: mutation.token, reconciliation };
     completedRoomReconciliations.set(operationCampaignId, completed);
     initialRoomReads.delete(operationCampaignId);
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && generationRef.current === generation) applyRoomReconciliation(completed, generation);
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId && generationRef.current === generation)
+      applyRoomReconciliation(completed, generation);
     finishCampaignMutation(operationCampaignId, mutation);
     ownedMutationsRef.current.delete(mutation.token);
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && generationRef.current === generation) roomLockedRef.current = false;
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId && generationRef.current === generation)
+      roomLockedRef.current = false;
   }
 
   async function detachRoom(room: CampaignRoomSummary) {
     const operationCampaignId = campaignId;
-    if (!campaign || campaign.actorRole !== "owner" || roomLockedRef.current
-      || roomManualReadLockRef.current || roomActivity !== "idle"
-      || inFlightCampaignMutations.has(operationCampaignId)) return;
+    if (
+      !campaign ||
+      campaign.actorRole !== "owner" ||
+      roomLockedRef.current ||
+      roomManualReadLockRef.current ||
+      roomActivity !== "idle" ||
+      inFlightCampaignMutations.has(operationCampaignId)
+    )
+      return;
     const expectedRevision = administration?.revision;
     if (expectedRevision === undefined) {
-      setRoomResult({ text: "The current campaign revision is unavailable. Refresh rooms before detaching.", alert: true });
+      setRoomResult({
+        text: "The current campaign revision is unavailable. Refresh rooms before detaching.",
+        alert: true,
+      });
       return;
     }
     roomLockedRef.current = true;
@@ -1835,7 +2396,10 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     initialRoomReads.delete(operationCampaignId);
     const generation = ++generationRef.current;
     const mutation = beginCampaignMutation(operationCampaignId, "detach-room");
-    if (!mutation) { roomLockedRef.current = false; return; }
+    if (!mutation) {
+      roomLockedRef.current = false;
+      return;
+    }
     ownedMutationsRef.current.set(mutation.token, { campaignId: operationCampaignId, generation });
     completedRoomReconciliations.delete(operationCampaignId);
     setRoomResult(null);
@@ -1843,31 +2407,40 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     setRoomPendingAction("detach");
     let request: PromiseSettledResult<CampaignAdministrationHttpRoomDetachResponse>;
     try {
-      request = { status: "fulfilled", value: await detachCampaignRoom(operationCampaignId, room.sessionId, {
-        expectedRevision, idempotencyKey: createClientId(),
-      }) };
+      request = {
+        status: "fulfilled",
+        value: await detachCampaignRoom(operationCampaignId, room.sessionId, {
+          expectedRevision,
+          idempotencyKey: createClientId(),
+        }),
+      };
     } catch (reason) {
       request = { status: "rejected", reason };
     }
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && generationRef.current === generation) setRoomActivity("reconciling");
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId && generationRef.current === generation)
+      setRoomActivity("reconciling");
     let freshRooms: PromiseSettledResult<CampaignRoomLinkingResponse>;
     try {
       freshRooms = { status: "fulfilled", value: await listCampaignRooms(operationCampaignId) };
     } catch (reason) {
       freshRooms = { status: "rejected", reason };
     }
-    const reconciliation = { kind: "detach", sessionId: room.sessionId, put: request, rooms: freshRooms } satisfies RoomReconciliation;
+    const reconciliation = {
+      kind: "detach",
+      sessionId: room.sessionId,
+      put: request,
+      rooms: freshRooms,
+    } satisfies RoomReconciliation;
     mutation.roomReconciliation = reconciliation;
     const completed = { campaignId: operationCampaignId, token: mutation.token, reconciliation };
     completedRoomReconciliations.set(operationCampaignId, completed);
     initialRoomReads.delete(operationCampaignId);
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && generationRef.current === generation) applyRoomReconciliation(completed, generation);
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId && generationRef.current === generation)
+      applyRoomReconciliation(completed, generation);
     finishCampaignMutation(operationCampaignId, mutation);
     ownedMutationsRef.current.delete(mutation.token);
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-      && generationRef.current === generation) roomLockedRef.current = false;
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId && generationRef.current === generation)
+      roomLockedRef.current = false;
   }
 
   function refreshRooms() {
@@ -1879,13 +2452,25 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     event.preventDefault();
     const operationCampaignId = campaignId;
     const character = diceHistory?.characters.find((entry) => entry.position === diceCharacterPosition);
-    if (!mechanicsEnabled || !campaign || (campaign.actorRole !== "owner" && campaign.actorRole !== "gm")
-        || dicePhase !== "ready" || !character || diceLockedRef.current || renameLockedRef.current
-        || setupLockedRef.current || createLockedRef.current || inFlightCampaignMutations.has(operationCampaignId)) return;
+    if (
+      !mechanicsEnabled ||
+      !campaign ||
+      (campaign.actorRole !== "owner" && campaign.actorRole !== "gm") ||
+      dicePhase !== "ready" ||
+      !character ||
+      diceLockedRef.current ||
+      renameLockedRef.current ||
+      setupLockedRef.current ||
+      createLockedRef.current ||
+      inFlightCampaignMutations.has(operationCampaignId)
+    )
+      return;
 
     const parsed = campaignDiceRollRequestSchema.safeParse({ character, expression: diceExpression });
     if (!parsed.success) {
-      setDiceError("Use canonical dice notation, for example 1d20, 2d6+3, 4d6kh3, 1d20adv, or 1d20dis. Maximums are 100 dice, 1,000 sides, and a modifier of 1,000.");
+      setDiceError(
+        "Use canonical dice notation, for example 1d20, 2d6+3, 4d6kh3, 1d20adv, or 1d20dis. Maximums are 100 dice, 1,000 sides, and a modifier of 1,000.",
+      );
       setDiceResult(null);
       diceExpressionRef.current?.focus();
       return;
@@ -1912,8 +2497,12 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       post = { status: "rejected", reason };
     }
 
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-        && generationRef.current === generation && inFlightCampaignMutations.get(operationCampaignId)?.token === mutation.token) {
+    if (
+      mountedRef.current &&
+      activeCampaignRef.current === operationCampaignId &&
+      generationRef.current === generation &&
+      inFlightCampaignMutations.get(operationCampaignId)?.token === mutation.token
+    ) {
       setDicePhase("reconciling");
     }
     // Every issued POST outcome owns exactly one uncached reconciliation GET.
@@ -1930,14 +2519,17 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     completedDiceReconciliations.set(operationCampaignId, completed);
     initialDiceReads.delete(operationCampaignId);
 
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-        && generationRef.current === generation) {
+    if (
+      mountedRef.current &&
+      activeCampaignRef.current === operationCampaignId &&
+      generationRef.current === generation
+    ) {
       applyDiceReconciliation(completed, generation);
     }
     finishCampaignMutation(operationCampaignId, mutation);
     ownedMutationsRef.current.delete(mutation.token);
-    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
-        && generationRef.current === generation) diceLockedRef.current = false;
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId && generationRef.current === generation)
+      diceLockedRef.current = false;
   }
 
   const renameBusy = renamePhase !== "idle";
@@ -1945,223 +2537,1250 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const createBusy = createPhase !== "idle";
   const diceBusy = dicePhase === "writing" || dicePhase === "reconciling";
   const roomBusy = roomActivity === "writing" || roomActivity === "reconciling";
-  const pageBusy = renameBusy || setupBusy || createBusy || diceBusy || roomBusy || sharedMutationPending || roomOpenPending;
-  useEffect(() => { blockNavigation(pageBusy); return () => blockNavigation(false); }, [blockNavigation, pageBusy]);
+  const pageBusy =
+    renameBusy || setupBusy || createBusy || diceBusy || roomBusy || sharedMutationPending || roomOpenPending;
+  useEffect(() => {
+    blockNavigation(pageBusy);
+    return () => blockNavigation(false);
+  }, [blockNavigation, pageBusy]);
   const configuredForPlay = mechanicsEnabled && campaign?.content.status === "configured";
   const rosterReady = rosterPhase === "ready" && roster.length > 0;
   const activeRooms = rooms?.attached.filter((room) => !room.stopped) ?? [];
   const published = administration?.status === "published";
-  const controlledRoom = roomPlayability.rooms.find((room) => room.principal.control !== "none" && room.playableActors.length > 0);
-  const playableRoom = roomPlayability.rooms.find((room) => room.session.active && room.session.adventureEligible
-    && room.principal.control !== "none" && room.playableActors.length > 0);
-  const readinessReady = configuredForPlay && rosterReady && activeRooms.length > 0 && published && Boolean(playableRoom);
+  const controlledRoom = roomPlayability.rooms.find(
+    (room) => room.principal.control !== "none" && room.playableActors.length > 0,
+  );
+  const playableRoom = roomPlayability.rooms.find(
+    (room) =>
+      room.session.active &&
+      room.session.adventureEligible &&
+      room.principal.control !== "none" &&
+      room.playableActors.length > 0,
+  );
+  const readinessReady =
+    configuredForPlay && rosterReady && activeRooms.length > 0 && published && Boolean(playableRoom);
   const readinessSteps = [
-    { label: "Playable content", ready: configuredForPlay, unknown: false, help: configuredForPlay ? "Mechanics content is configured." : mechanicsEnabled ? "Activate or pin compatible mechanics content." : "Campaign mechanics are unavailable." },
-    { label: "Finalized character", ready: rosterReady, unknown: rosterPhase === "loading" || rosterPhase === "failed" || rosterPhase === "unsupported", help: rosterReady ? "A campaign character exists. Finalization and control are verified by the play bootstrap." : "Build and finalize a campaign character." },
-    { label: "Attached active room", ready: activeRooms.length > 0, unknown: roomsPhase !== "ready", help: activeRooms.length ? `${activeRooms.length} active attached ${activeRooms.length === 1 ? "room" : "rooms"}.` : "Start a Velvet room with the matching persona, then attach it here." },
-    { label: "Published campaign", ready: published, unknown: administrationPhase !== "ready", help: published ? "Campaign lifecycle is published." : administration ? `Current lifecycle: ${administration.status}.` : "Campaign lifecycle could not be verified." },
-    { label: "Controlled actor", ready: Boolean(controlledRoom), unknown: activeRooms.length > 0 && (roomPlayability.state === "loading" || roomPlayability.state === "failed"), help: controlledRoom ? `${controlledRoom.playableActors.length} authorized ${controlledRoom.playableActors.length === 1 ? "actor is" : "actors are"} available in an attached room.` : activeRooms.length === 0 ? "Attach an active room before actor control can be verified." : "Room bootstrap has not verified an authorized actor; this roster does not expose actor or control identities." },
+    {
+      label: "Playable content",
+      ready: configuredForPlay,
+      unknown: false,
+      help: configuredForPlay
+        ? "Mechanics content is configured."
+        : mechanicsEnabled
+          ? "Activate or pin compatible mechanics content."
+          : "Campaign mechanics are unavailable.",
+    },
+    {
+      label: "Finalized character",
+      ready: rosterReady,
+      unknown: rosterPhase === "loading" || rosterPhase === "failed" || rosterPhase === "unsupported",
+      help: rosterReady
+        ? "A campaign character exists. Finalization and control are verified by the play bootstrap."
+        : "Build and finalize a campaign character.",
+    },
+    {
+      label: "Attached active room",
+      ready: activeRooms.length > 0,
+      unknown: roomsPhase !== "ready",
+      help: activeRooms.length
+        ? `${activeRooms.length} active attached ${activeRooms.length === 1 ? "room" : "rooms"}.`
+        : "Start a Velvet room with the matching persona, then attach it here.",
+    },
+    {
+      label: "Published campaign",
+      ready: published,
+      unknown: administrationPhase !== "ready",
+      help: published
+        ? "Campaign lifecycle is published."
+        : administration
+          ? `Current lifecycle: ${administration.status}.`
+          : "Campaign lifecycle could not be verified.",
+    },
+    {
+      label: "Controlled actor",
+      ready: Boolean(controlledRoom),
+      unknown: activeRooms.length > 0 && (roomPlayability.state === "loading" || roomPlayability.state === "failed"),
+      help: controlledRoom
+        ? `${controlledRoom.playableActors.length} authorized ${controlledRoom.playableActors.length === 1 ? "actor is" : "actors are"} available in an attached room.`
+        : activeRooms.length === 0
+          ? "Attach an active room before actor control can be verified."
+          : "Room bootstrap has not verified an authorized actor; this roster does not expose actor or control identities.",
+    },
   ];
-  return <main className="page library-page campaign-page"><section className="campaign-shell" aria-labelledby="campaign-detail-heading">
-    <header className="library-header campaign-command-header"><div><button className="back-link" disabled={pageBusy && !roomOpenPending} onClick={() => { if (!pageBusy || roomOpenPending) onBack(); }}>← Campaigns</button><p className="eyebrow">CAMPAIGN OVERVIEW</p><h1 ref={detailHeadingRef} tabIndex={-1} className="title" id="campaign-detail-heading">{campaign?.name ?? "Campaign detail"}</h1></div>{campaign && <span className={`campaign-readiness-badge ${readinessReady ? "is-ready" : ""}`}>{campaign.actorRole === "observer" ? "Spectator / Read-only" : readinessReady ? "Ready to play" : "Setup required"}</span>}</header>
-    {campaign && <nav className="campaign-command-nav" aria-label="Campaign tools"><span>Play</span>{onOpenCombat && <button ref={combatButtonRef} className="ghost" disabled={pageBusy} onClick={onOpenCombat}>Open combat tracker</button>}<span>World</span>{mechanicsEnabled&&studioRolloutAvailable&&(["world","cast","journal","story"] as const).map((studio)=><button key={studio} data-campaign-studio={studio} ref={(node)=>{studioButtonRefs.current[studio]=node}} className="ghost" disabled={pageBusy} onClick={()=>onOpenStudio(studio)}>{studio==="world"?"World":studio==="cast"?"Cast & factions":studio==="journal"?"Quest journal":"Story studio"}</button>)}<span>Records</span>{onOpenHistory&&<button className="ghost" disabled={pageBusy} onClick={onOpenHistory}>History & recaps</button>}{campaign.actorRole==="owner"&&onOpenTransfer&&<button className="ghost" disabled={pageBusy} onClick={()=>onOpenTransfer(campaign.name)}>Import / export</button>}<button className="ghost" disabled={pageBusy} onClick={() => onOpenAdministration(campaign.name)}>Administration</button></nav>}
-    <section className="library-panel campaign-detail-panel" aria-busy={loading}>
-      {loading && <p className="empty-state" role="status">Loading campaign…</p>}
-      {!loading && failed && <div className="empty-state large" role="alert"><p>Campaign could not be loaded.</p><button className="ghost" onClick={() => void load()}>Retry</button></div>}
-      {!loading && campaign && <>
-        <section className="campaign-launchpad" aria-labelledby="campaign-next-heading">
-          <div className="campaign-launch-intro"><p className="eyebrow">YOUR NEXT CHAPTER</p><h2 id="campaign-next-heading">{campaign.actorRole === "observer" ? "A seat beside the story." : campaign.actorRole === "player" ? "Bring your character to the table." : "A world to prepare. A story to play."}</h2><p>{campaign.actorRole === "observer" ? "Watch attached rooms, read shared history, and explore the known world. Spectator access does not grant gameplay controls." : "Start with the task at hand. Campaign setup, character sheets, and live play stay connected here."}</p></div>
-          <div className="campaign-launch-actions">
-            <article><span className="control-kicker">01 / At the table</span><h3>{campaign.actorRole === "observer" ? "Follow the adventure" : "Enter the adventure"}</h3><p>Choose an attached room for live play, character controls, and available tactical maps.</p><button className="primary" disabled={pageBusy} onClick={() => { roomsHeadingRef.current?.focus(); roomsHeadingRef.current?.scrollIntoView?.({ block: "start" }); }}>Choose a room</button></article>
-            {campaign.actorRole !== "observer" && <article><span className="control-kicker">02 / Your party</span><h3>Characters with a place here</h3><p>Review your roster and sheets, or build a character using this campaign's available rules.</p><button className="ghost" disabled={pageBusy} onClick={() => { rosterHeadingRef.current?.focus(); rosterHeadingRef.current?.scrollIntoView?.({ block: "start" }); }}>Review the party</button>{mechanicsEnabled && <button className="ghost" disabled={pageBusy} onClick={onOpenCharacterBuilder}>Create your character</button>}</article>}
-            {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && mechanicsEnabled && <article className="campaign-create-entry"><span className="control-kicker">03 / Reviewed AI</span><h3>Build the next chapter</h3><p>Start from a brief or guided questions. Review generated world, cast, and story material before adding it to your campaign.</p><button className="ghost" disabled={pageBusy || generationAvailable === false} onClick={() => shellNavigate ? shellNavigate("create") : onOpenAdministration(campaign.name)}>Open campaign generation</button><small>{generationAvailable === false ? "Generation requires the server's combat feature to be enabled." : "Adding canon and delivering player material are separate decisions."}</small></article>}
-          </div>
-        </section>
-        {!["observer"].includes(campaign.actorRole) && <div className="campaign-readiness-section">
-        <section className="campaign-readiness" aria-labelledby="campaign-readiness-heading"><header><div><p className="eyebrow">PLAY READINESS</p><h2 id="campaign-readiness-heading">{readinessReady ? "Campaign ready" : "Path to a playable turn"}</h2></div><span>{readinessSteps.filter((step) => step.ready).length} / {readinessSteps.length}</span></header><ol>{readinessSteps.map((step) => <li className={step.ready ? "is-ready" : step.unknown ? "is-unknown" : "is-blocked"} key={step.label}><span aria-hidden="true">{step.ready ? "Ready" : step.unknown ? "Verify" : "Needed"}</span><div><strong>{step.label}</strong><p>{step.help}</p></div></li>)}</ol><div className="readiness-actions">{!configuredForPlay && mechanicsEnabled && campaign.actorRole === "owner" && campaign.content.status === "unconfigured" && <button className="primary" type="button" onClick={() => { setSetupChoice("srd"); setSetupConfirmed(false); setSetupError(""); document.getElementById("starter-setup-heading")?.scrollIntoView?.({ block: "start" }); }}>Configure SRD 5.1 mechanics</button>}{configuredForPlay && !rosterReady && campaign.actorRole !== "observer" && <button className="primary" type="button" disabled={pageBusy} onClick={onOpenCharacterBuilder}>Build playable character</button>}{configuredForPlay && rosterReady && activeRooms.length === 0 && <button className="primary" type="button" onClick={() => roomsHeadingRef.current?.scrollIntoView({ block: "start" })}>Review rooms</button>}{activeRooms.length > 0 && !published && <button className="primary" type="button" onClick={() => onOpenAdministration(campaign.name)}>Publish in administration</button>}{readinessReady && playableRoom && <button className="primary" type="button" disabled={pageBusy} onClick={() => onOpenRoom(playableRoom.sessionId)}>{roomOpenPending ? "Opening room..." : "Enter command center"}</button>}<button className="ghost" type="button" onClick={() => void Promise.all([load(false), loadRoster(true), loadRooms(true)])}>Refresh readiness</button></div></section>
-        </div>}
-        <details className="campaign-maintenance"><summary>Campaign details & maintenance</summary><div className="campaign-maintenance-content">
-        {campaign.actorRole === "owner" && <form className="campaign-rename" onSubmit={(event) => void submitRename(event)} aria-busy={pageBusy}>
-          <div><label htmlFor="campaign-rename-name">Campaign name</label><input ref={renameInputRef} id="campaign-rename-name" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={200} required disabled={pageBusy} /></div>
-          <button className="primary" type="submit" disabled={pageBusy}>{renamePhase === "writing" ? "Renaming…" : renamePhase === "reconciling" ? "Refreshing…" : "Rename campaign"}</button>
-          {renameError && <p className="form-error" role="alert">{renameError}</p>}
-        </form>}
-        <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
-        <dl className="campaign-detail-list">
-          <div><dt>Role</dt><dd>{displayRole(campaign.actorRole)}</dd></div>
-          <div><dt>Created</dt><dd><time dateTime={campaign.createdAt}>{new Date(campaign.createdAt).toLocaleDateString()}</time></dd></div>
-          <div><dt>Updated</dt><dd><time dateTime={campaign.updatedAt}>{new Date(campaign.updatedAt).toLocaleDateString()}</time></dd></div>
-          {campaign.content.status === "unconfigured" ? <div><dt>Content</dt><dd>Unconfigured</dd></div> : <>
-            <div><dt>Rules profile</dt><dd><code>{campaign.content.rulesProfileId}</code></dd></div>
-            <div><dt>Content packs</dt><dd>{campaign.content.contentPacks.length === 0 ? "None" : <ul className="identifier-list">{campaign.content.contentPacks.map((pack) => <li key={pack.packId}><code>{pack.packId}</code> <span>version</span> <code>{pack.packVersion}</code></li>)}</ul>}</dd></div>
-          </>}
-        </dl>
-        </div></details>
-        <section className="campaign-rooms" aria-labelledby="campaign-rooms-heading" aria-busy={roomsPhase === "loading" || roomActivity !== "idle"}>
-          <div className="campaign-rooms-heading">
-            <h2 ref={roomsHeadingRef} tabIndex={-1} id="campaign-rooms-heading">Rooms</h2>
-            <button className="ghost" type="button" disabled={pageBusy || roomActivity !== "idle"} onClick={refreshRooms}>Refresh rooms</button>
-          </div>
-          <p className="campaign-section-help">Your gateway to gameplay controls and tactical maps. Open a room below; stopped rooms remain readable history.</p>
-          {roomsPhase === "loading" && <p className="rooms-status" role="status">Loading rooms…</p>}
-          {roomsPhase === "failed" && <div className="rooms-error" role="alert"><p>Campaign rooms could not be loaded.</p><button ref={roomsRetryRef} className="ghost" type="button" disabled={pageBusy} onClick={refreshRooms}>Retry rooms</button></div>}
-          {rooms && roomsPhase === "ready" && <>
-            <h3>Attached rooms</h3>
-            {rooms.attached.length === 0 ? <p className="rooms-status">No rooms attached.</p> : <ul className="campaign-room-list" aria-label="Attached campaign rooms">
-              {rooms.attached.map((room, index) => <li key={index}>
-                <div><strong><bdi dir="auto">{roomTitle(room)}</bdi></strong><p>{room.participantNames.map((name, participantIndex) => <span key={participantIndex}><bdi dir="auto">{name}</bdi>{participantIndex < room.participantNames.length - 1 ? " · " : ""}</span>)}</p><small>Created <time dateTime={room.createdAt}>{new Date(room.createdAt).toLocaleDateString()}</time> · Attached <time dateTime={room.attachedAt}>{new Date(room.attachedAt).toLocaleDateString()}</time>{room.stopped ? " · Stopped · Read-only" : ""}</small></div>
-                <div className="room-actions"><button className="ghost room-open" type="button" disabled={pageBusy} aria-label={`Open attached room ${index + 1} of ${rooms.attached.length}`} onClick={() => { if (!pageBusy) onOpenRoom(room.sessionId); }}>{roomOpenPending ? "Opening room…" : "Open room"}</button>{campaign.actorRole === "owner" && <button className="ghost room-detach" type="button" disabled={pageBusy || roomActivity !== "idle"} aria-label={`Detach attached room ${index + 1} of ${rooms.attached.length}`} onClick={() => void detachRoom(room)}>{roomPendingAction === "detach" ? (roomActivity === "writing" ? "Detaching once…" : "Refreshing rooms…") : "Detach room"}</button>}</div>
-              </li>)}
-            </ul>}
-            {campaign.actorRole === "owner" && <div className="eligible-rooms"><h3>Attach a room</h3>{rooms.eligible.length === 0
-              ? <p className="rooms-status">No eligible running rooms.</p>
-              : <ul className="campaign-room-list" aria-label="Eligible campaign rooms">{rooms.eligible.map((room, index) => <li key={index}>
-                <div><strong><bdi dir="auto">{roomTitle(room)}</bdi></strong><p>{room.participantNames.map((name, participantIndex) => <span key={participantIndex}><bdi dir="auto">{name}</bdi>{participantIndex < room.participantNames.length - 1 ? " · " : ""}</span>)}</p><small>Created <time dateTime={room.createdAt}>{new Date(room.createdAt).toLocaleDateString()}</time></small></div>
-                <button className="primary room-attach" type="button" disabled={pageBusy || roomActivity !== "idle"} aria-label={`Attach eligible room ${index + 1} of ${rooms.eligible.length}`} onClick={() => void attachRoom(room)}>{roomPendingAction === "attach" ? (roomActivity === "writing" ? "Attaching once…" : "Refreshing rooms…") : "Attach room"}</button>
-              </li>)}</ul>}</div>}
-          </>}
-          {roomResult && <div className="room-result-actions"><p ref={roomStatusRef} tabIndex={-1} className={roomResult.alert ? "form-error" : "create-success"} role={roomResult.alert ? "alert" : "status"}>{roomResult.text}</p><button className="ghost" type="button" disabled={pageBusy || roomActivity !== "idle"} onClick={refreshRooms}>Refresh rooms</button></div>}
-          {roomOpenFailure && <p ref={roomOpenStatusRef} tabIndex={-1} className="form-error" role="alert">{roomOpenFailure.text}</p>}
-        </section>
-        {rosterPhase !== "unsupported" && <section className="campaign-roster" aria-labelledby="campaign-roster-heading" aria-busy={rosterPhase === "loading"}>
-          <div className="campaign-roster-heading"><h2 ref={rosterHeadingRef} tabIndex={-1} id="campaign-roster-heading">Characters</h2>{mechanicsEnabled && campaign.actorRole !== "observer" && <button className="primary" type="button" disabled={pageBusy} onClick={onOpenCharacterBuilder}>Build playable character</button>}</div>
-          <p className="sr-only" role="status" aria-live="polite">{rosterAnnouncement}</p>
-          {rosterPhase === "loading" && <p className="roster-status" role="status">Loading characters…</p>}
-          {rosterPhase === "failed" && <div className="roster-error" role="alert">
-            <p>Characters could not be loaded.</p>
-            <button ref={rosterRetryRef} className="ghost roster-retry" type="button" onClick={() => void loadRoster(true)}>Retry characters</button>
-          </div>}
-          {rosterPhase === "ready" && (roster.length === 0
-            ? <p className="roster-status">No characters yet.</p>
-            : <ul className="campaign-roster-list" aria-label="Campaign characters">{roster.map((character, index) => <li key={character.id}>
-              <bdi dir="auto">{character.name}</bdi>
-              <button className="ghost roster-open" type="button" disabled={pageBusy} aria-label={`Open character ${character.name}, character ${index + 1} of ${roster.length}`} onClick={() => { if (!pageBusy) onOpenCharacter(character.id); }}>Open character</button>
-            </li>)}</ul>)}
-          </section>}
-        {mechanicsEnabled && (campaign.actorRole === "owner" || campaign.actorRole === "gm") && <section className="campaign-dice" aria-labelledby="campaign-dice-heading" aria-busy={dicePhase === "loading" || diceBusy}>
-          <h2 ref={diceHeadingRef} tabIndex={-1} id="campaign-dice-heading">Dice</h2>
-          {dicePhase === "loading" && <p className="dice-status" role="status">Loading roll history…</p>}
-          {dicePhase === "failed" && <div className="dice-error">
-            <p role="alert">{diceError || "Roll history could not be loaded."}</p>
-            {!diceResult && <button ref={diceRetryRef} className="ghost" type="button" disabled={pageBusy} onClick={() => void loadDice(true, false)}>Retry roll history</button>}
-          </div>}
-          {diceHistory && (dicePhase === "ready" || diceBusy) && <>
-            <form className="dice-form" onSubmit={(event) => void submitDice(event)}>
-              <div className="dice-field"><label htmlFor="dice-character-position">Character</label><select id="dice-character-position" value={diceCharacterPosition ?? ""} disabled={pageBusy || diceHistory.characters.length === 0} onChange={(event) => setDiceCharacterPosition(Number(event.target.value))}>
-                {diceHistory.characters.length === 0 && <option value="">No characters available</option>}
-                {diceHistory.characters.map((character) => <option key={character.position} value={character.position}>Character {character.position} of {diceHistory.characters.length} — {character.name}</option>)}
-              </select></div>
-              <div className="dice-field"><label htmlFor="dice-expression">Expression</label><input id="dice-expression" ref={diceExpressionRef} value={diceExpression} maxLength={24} required disabled={pageBusy || diceHistory.characters.length === 0} onChange={(event) => setDiceExpression(event.target.value)} aria-describedby="dice-expression-help" /></div>
-              <p id="dice-expression-help" className="dice-help">Examples: 1d20, 2d6+3, 4d6kh3, 1d20adv, 1d20dis. Up to 100 dice, 1,000 sides, and ±1,000 modifier.</p>
-              <button className="primary" type="submit" disabled={pageBusy || diceHistory.characters.length === 0}>{dicePhase === "writing" ? "Rolling once…" : dicePhase === "reconciling" ? "Refreshing roll history…" : "Roll dice"}</button>
-            </form>
-            {diceError && dicePhase === "ready" && <p className="form-error" role="alert">{diceError}</p>}
-            <div className="dice-history" aria-labelledby="dice-history-heading">
-              <h3 id="dice-history-heading">Recent rolls</h3>
-              {diceHistory.rolls.length === 0 ? <p className="dice-status">No rolls yet.</p> : <ol aria-label="Recent dice rolls">
-                {diceHistory.rolls.slice(0, 20).map((roll, index) => <li key={`${roll.occurredAt}-${index}`}>
-                  <div className="dice-roll-heading"><strong><bdi dir="auto">{roll.character.name}</bdi></strong><time dateTime={roll.occurredAt}>{new Date(roll.occurredAt).toLocaleString()}</time></div>
-                  <dl>
-                    <div><dt>Expression</dt><dd><code>{roll.result.expression}</code></dd></div>
-                    <div><dt>Physical dice</dt><dd>{roll.result.terms.map((term, termIndex) => <span className="dice-term" key={termIndex}>{term.value} ({term.kept ? "kept" : "discarded"})</span>)}</dd></div>
-                    <div><dt>Modifier</dt><dd>{roll.result.modifier > 0 ? `+${roll.result.modifier}` : roll.result.modifier}</dd></div>
-                    <div><dt>Total</dt><dd><strong>{roll.result.total}</strong></dd></div>
-                  </dl>
-                </li>)}
-              </ol>}
-            </div>
-          </>}
-          {diceResult && <div className="create-result-actions">
-            <p ref={diceStatusRef} tabIndex={-1} className={diceResult.alert ? "dice-warning" : "create-success"} role={diceResult.alert ? "alert" : "status"}>{diceResult.text}</p>
-            <button className="ghost" type="button" disabled={pageBusy || dicePhase === "loading"} onClick={() => void refreshDiceRolls()}>Refresh rolls</button>
-          </div>}
-        </section>}
-        {isOriginalStarterConfigured(campaign) && <section className="character-options" aria-label="Character creation" aria-busy={optionsPhase === "loading" || characterStatusActivity !== "idle"}>
-          {(optionsPhase === "loading" || characterStatusActivity !== "idle") && <p className="character-options-status" role="status" aria-live="polite">
-            {characterStatusActivity === "refreshing" ? "Refreshing character creation options…"
-              : characterStatusActivity === "reconciling" ? "Checking character creation options…"
-                : "Loading character creation options…"}
-          </p>}
-          {(optionsPhase === "failed" || optionsPhase === "unsupported") && <div className="character-options-error" aria-label="Character creation options">
-            <div role="alert"><p>Character creation options could not be loaded.</p></div>
-            <button ref={optionsRetryRef} className="ghost" type="button" disabled={pageBusy} onClick={() => void loadOptions(true, false)}>Retry character options</button>
-          </div>}
-          {optionsAnnouncement && <p className="character-options-status" role="status" aria-live="polite">{optionsAnnouncement}</p>}
-          {optionsPhase === "ready" && options && <form className="starter-character-create" aria-busy={createBusy} onSubmit={(event) => { event.preventDefault(); void createCharacter(); }}>
+  return (
+    <main className="page library-page campaign-page">
+      <section className="campaign-shell" aria-labelledby="campaign-detail-heading">
+        <header className="library-header campaign-command-header">
           <div>
-            <p className="eyebrow">FIXED ORIGINAL STARTER</p>
-            <h2 ref={optionsHeadingRef} tabIndex={-1}>Finalize a character record</h2>
+            <button
+              className="back-link"
+              disabled={pageBusy && !roomOpenPending}
+              onClick={() => {
+                if (!pageBusy || roomOpenPending) onBack();
+              }}
+            >
+              ← Campaigns
+            </button>
+            <p className="eyebrow">CAMPAIGN OVERVIEW</p>
+            <h1 ref={detailHeadingRef} tabIndex={-1} className="title" id="campaign-detail-heading">
+              {campaign?.name ?? "Campaign detail"}
+            </h1>
           </div>
-          <p className="starter-warning"><strong>Final metadata only.</strong> Select one unused existing Velvet persona. The fixed record has no customization and cannot be edited, deleted, rebuilt, or reset here.</p>
-          <dl className="starter-character-metadata" aria-label="Fixed read-only starter metadata">
-            <div><dt>Rules profile</dt><dd><strong>{options.starter.rulesProfile.name}</strong><code>{options.starter.rulesProfile.rulesProfileId}</code></dd></div>
-            <div><dt>Content pack</dt><dd><strong>{options.starter.pack.name}</strong><code>{options.starter.pack.packId}@{options.starter.pack.packVersion}</code></dd></div>
-            <div><dt>Race</dt><dd><strong>{options.starter.race.name}</strong><code>{options.starter.race.reference.definitionId}</code></dd></div>
-            <div><dt>Background</dt><dd><strong>{options.starter.background.name}</strong><code>{options.starter.background.reference.definitionId}</code></dd></div>
-            <div><dt>Class</dt><dd><strong>{options.starter.class.name}, level {options.starter.class.level}</strong><code>{options.starter.class.reference.definitionId}</code></dd></div>
-          </dl>
-          <fieldset className="persona-options" disabled={pageBusy}>
-            <legend>Select one existing persona</legend>
-            {options.personas.length === 0 && <p>No existing personas are available.</p>}
-            {options.personas.map((persona, index) => <label className={persona.alreadyUsed ? "persona-option is-used" : "persona-option"} key={index}>
-              <input ref={index === 0 ? firstPersonaChoiceRef : undefined} type="radio" name="starter-persona" checked={selectedCharacterId === persona.characterId} disabled={persona.alreadyUsed || pageBusy} onChange={() => { if (!persona.alreadyUsed) { setSelectedCharacterId(persona.characterId); setCreateConfirmed(false); } }} />
-              <span><bdi dir="auto">{persona.name}</bdi>{" "}<small>Persona {index + 1} of {options.personas.length}</small>{persona.alreadyUsed && <>{" "}<small>Already used — not selectable</small></>}</span>
-            </label>)}
-          </fieldset>
-          <label className="checkbox starter-confirm create-confirm"><input ref={createConfirmationRef} type="checkbox" required checked={createConfirmed} onChange={(event) => setCreateConfirmed(event.target.checked)} disabled={pageBusy} /><span>I confirm this record is finalized and currently has <strong>NO</strong> derived stats, rules validation, editing, deletion, rebuilding or reset, gameplay or mechanics, inventory, equipment, spells, powers, progression, or AI workflow.</span></label>
-          <button className="primary starter-submit" type="submit" disabled={pageBusy || !selectedCharacterId || !createConfirmed}>{createPhase === "writing" ? "Creating once…" : createPhase === "reconciling" ? "Checking character status…" : "Finalize character record"}</button>
-        </form>}
-          {createResult && <div className="create-result-actions">
-            <p ref={createStatusRef} tabIndex={-1} className={createResult.alert ? "form-error" : "create-success"} role={createResult.alert ? "alert" : "status"}>{createResult.text}</p>
-            <button className="ghost" type="button" disabled={pageBusy || characterStatusActivity !== "idle"} onClick={() => void refreshCharacterStatus()}>Refresh character status</button>
-          </div>}
-        </section>}
-        {campaign.actorRole === "owner" && campaign.content.status === "unconfigured" && <section className="starter-setup" aria-labelledby="starter-setup-heading" aria-busy={setupBusy}>
-          <div className="starter-heading"><div><p className="eyebrow">FIXED STARTER ACTIVATION</p><h2 id="starter-setup-heading">Set up campaign metadata</h2></div></div>
-          <p className="starter-warning"><strong>Choose once.</strong> Starter setup is available only while this campaign is unconfigured. Neither choice can replace, migrate, reset, or add to configured content.</p>
-          <fieldset className="persona-options starter-choice-options" disabled={pageBusy}>
-            <legend>Select one mutually exclusive starter</legend>
-            {mechanicsEnabled && <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "srd"} onChange={() => { setSetupChoice("srd"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>SRD 5.1 starter (recommended)</strong><small> Playable level-one D&amp;D 5e character building, checks, rests, and basic actor attacks.</small></span></label>}
-            <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "original"} onChange={() => { setSetupChoice("original"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>Original metadata starter</strong><small> Narrative identities only; no playable mechanics.</small></span></label>
-            {mechanicsEnabled && <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "mechanics"} onChange={() => { setSetupChoice("mechanics"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>Velvet mechanics starter</strong><small> Enables Velvet's fixed original mechanics catalog.</small></span></label>}
-          </fieldset>
-          {setupChoice === "original" && <>
-            <div className="starter-heading"><div><p className="eyebrow">FIXED ORIGINAL STARTER</p><h3>Original metadata starter</h3></div><code>{ORIGINAL_STARTER_PRESENTATION.starterId}</code></div>
-            <p className="starter-warning"><strong>Metadata scaffolding only.</strong> This starter adds no playable mechanics, gameplay, or character creation. Setup is final and has no reset, change, or add controls.</p>
-            <p className="starter-warning"><strong>Internal local material.</strong> Names are not claimed to be unique; similarity review was limited, and no distribution license is granted. The concepts and wording were originally authored for Velvet.</p>
-            <div className="starter-identities">
-              <article><span>Rules profile</span><h3>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.name}</h3><p>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.description}</p><code>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.id}</code></article>
-              <article><span>Content pack</span><h3>{ORIGINAL_STARTER_PRESENTATION.pack.name}</h3><p>{ORIGINAL_STARTER_PRESENTATION.pack.description}</p><code>{ORIGINAL_STARTER_PRESENTATION.pack.id}@{ORIGINAL_STARTER_PRESENTATION.pack.version}</code></article>
+          {campaign && (
+            <span className={`campaign-readiness-badge ${readinessReady ? "is-ready" : ""}`}>
+              {campaign.actorRole === "observer"
+                ? "Spectator / Read-only"
+                : readinessReady
+                  ? "Ready to play"
+                  : "Setup required"}
+            </span>
+          )}
+        </header>
+        {campaign && (
+          <nav className="campaign-command-nav" aria-label="Campaign tools">
+            <span>Play</span>
+            {onOpenCombat && (
+              <button ref={combatButtonRef} className="ghost" disabled={pageBusy} onClick={onOpenCombat}>
+                Open combat tracker
+              </button>
+            )}
+            <span>World</span>
+            {mechanicsEnabled &&
+              studioRolloutAvailable &&
+              (["world", "cast", "journal", "story"] as const).map((studio) => (
+                <button
+                  key={studio}
+                  data-campaign-studio={studio}
+                  ref={(node) => {
+                    studioButtonRefs.current[studio] = node;
+                  }}
+                  className="ghost"
+                  disabled={pageBusy}
+                  onClick={() => onOpenStudio(studio)}
+                >
+                  {studio === "world"
+                    ? "World"
+                    : studio === "cast"
+                      ? "Cast & factions"
+                      : studio === "journal"
+                        ? "Quest journal"
+                        : "Story studio"}
+                </button>
+              ))}
+            <span>Records</span>
+            {onOpenHistory && (
+              <button className="ghost" disabled={pageBusy} onClick={onOpenHistory}>
+                History & recaps
+              </button>
+            )}
+            {campaign.actorRole === "owner" && onOpenTransfer && (
+              <button className="ghost" disabled={pageBusy} onClick={() => onOpenTransfer(campaign.name)}>
+                Import / export
+              </button>
+            )}
+            <button className="ghost" disabled={pageBusy} onClick={() => onOpenAdministration(campaign.name)}>
+              Administration
+            </button>
+          </nav>
+        )}
+        <section className="library-panel campaign-detail-panel" aria-busy={loading}>
+          {loading && (
+            <p className="empty-state" role="status">
+              Loading campaign…
+            </p>
+          )}
+          {!loading && failed && (
+            <div className="empty-state large" role="alert">
+              <p>Campaign could not be loaded.</p>
+              <button className="ghost" onClick={() => void load()}>
+                Retry
+              </button>
             </div>
-            <div className="starter-definitions">
-              {[{ label: "Race", item: ORIGINAL_STARTER_PRESENTATION.races[0] }, { label: "Background", item: ORIGINAL_STARTER_PRESENTATION.backgrounds[0] }, { label: "Class", item: ORIGINAL_STARTER_PRESENTATION.classes[0] }].map(({ label, item }) => <article key={label}><span>{label}</span><h3>{item.name}</h3><p>{item.description}</p></article>)}
-            </div>
-          </>}
-          {setupChoice === "srd" && <>
-            <div className="starter-heading"><div><p className="eyebrow">RECOMMENDED PLAYABLE STARTER</p><h3>SRD 5.1 Starter</h3></div><code>{SRD_5_1_STARTER_IDENTITY.starterId}</code></div>
-            <p className="starter-warning"><strong>Playable mechanics foundation.</strong> This activates the fixed, bounded SRD 5.1 profile for level-one character building, checks, rests, encounters, and basic actor attacks.</p>
-            <div className="starter-identities">
-              <article><span>Rules profile</span><h3>SRD 5.1 Rules</h3><p>D&amp;D 5e mechanics using the bundled SRD 5.1 foundation.</p><code>{SRD_5_1_STARTER_IDENTITY.rulesProfileId}</code></article>
-              <article><span>Content catalog</span><h3>SRD 5.1 Starter</h3><p>Reviewed Human, Acolyte, Fighter, longsword, equipment, GP, and bounded integration fixtures.</p><code>{SRD_5_1_STARTER_IDENTITY.packId}@{SRD_5_1_STARTER_IDENTITY.packVersion}</code></article>
-            </div>
-          </>}
-          {setupChoice === "mechanics" && <>
-            <div className="starter-heading"><div><p className="eyebrow">FIXED MECHANICS STARTER</p><h3>Velvet Mechanics Starter</h3></div><code>{MECHANICS_STARTER_IDENTITY.starterId}</code></div>
-            <p className="starter-warning"><strong>Future mechanics foundation.</strong> This activates the reviewed fixed catalog for future builder and progression UI. It does not add builder, finalization, progression, or arbitrary content controls in this slice, and it cannot replace any configured content.</p>
-            <div className="starter-identities">
-              <article><span>Rules profile</span><h3>Velvet Starter Rules</h3><p>Closed deterministic mechanics profile for the built-in catalog.</p><code>{MECHANICS_STARTER_IDENTITY.rulesProfileId}</code></article>
-              <article><span>Content catalog</span><h3>Velvet Mechanics Starter</h3><p>Fixed original races, backgrounds, classes, abilities, spells, items, resources, and encounter metadata.</p><code>{MECHANICS_STARTER_IDENTITY.packId}@{MECHANICS_STARTER_IDENTITY.packVersion}</code></article>
-            </div>
-          </>}
-          {setupChoice && <>
-            <p className="starter-warning"><strong>Two-transaction setup:</strong> the {setupChoice === "original" ? "pack is installed" : "catalog is published"} first and the campaign is configured second. If setup fails between them, {setupChoice === "original" ? "the pack may remain installed" : "the catalog may remain published"} without changing this campaign.</p>
-            <label className="checkbox starter-confirm"><input ref={setupConfirmationRef} type="checkbox" checked={setupConfirmed} onChange={(event) => setSetupConfirmed(event.target.checked)} disabled={pageBusy} /><span>{setupChoice === "srd" ? "I explicitly confirm SRD 5.1 starter activation as this campaign's fixed playable mechanics" : setupChoice === "mechanics" ? "I explicitly confirm Velvet mechanics starter activation, knowing it cannot replace configured content" : "I understand this metadata-only setup is final"} and understand the two-transaction outcome.</span></label>
-          </>}
-          <button className="primary starter-submit" type="button" disabled={pageBusy || !setupChoice || !setupConfirmed} onClick={() => void setupStarter()}>{setupPhase === "writing" ? "Setting up once…" : setupPhase === "reconciling" ? "Checking latest details…" : setupChoice === "srd" ? "Activate SRD 5.1 starter" : setupChoice === "mechanics" ? "Activate Velvet mechanics starter" : setupChoice === "original" ? "Set up original starter" : "Select a starter"}</button>
-        </section>}
-        {campaign.content.status === "configured" && <div className="configured-readonly" ref={configuredStatusRef} tabIndex={-1}><strong>Content configuration is read-only.</strong> There are no reset, change, or add controls.</div>}
-        {setupError && <p className="form-error setup-result" role="alert">{setupError}</p>}
-      </>}
-    </section>
-  </section></main>;
+          )}
+          {!loading && campaign && (
+            <>
+              <section className="campaign-launchpad" aria-labelledby="campaign-next-heading">
+                <div className="campaign-launch-intro">
+                  <p className="eyebrow">YOUR NEXT CHAPTER</p>
+                  <h2 id="campaign-next-heading">
+                    {campaign.actorRole === "observer"
+                      ? "A seat beside the story."
+                      : campaign.actorRole === "player"
+                        ? "Bring your character to the table."
+                        : "A world to prepare. A story to play."}
+                  </h2>
+                  <p>
+                    {campaign.actorRole === "observer"
+                      ? "Watch attached rooms, read shared history, and explore the known world. Spectator access does not grant gameplay controls."
+                      : "Start with the task at hand. Campaign setup, character sheets, and live play stay connected here."}
+                  </p>
+                </div>
+                <div className="campaign-launch-actions">
+                  <article>
+                    <span className="control-kicker">01 / At the table</span>
+                    <h3>{campaign.actorRole === "observer" ? "Follow the adventure" : "Enter the adventure"}</h3>
+                    <p>Choose an attached room for live play, character controls, and available tactical maps.</p>
+                    <button
+                      className="primary"
+                      disabled={pageBusy}
+                      onClick={() => {
+                        roomsHeadingRef.current?.focus();
+                        roomsHeadingRef.current?.scrollIntoView?.({ block: "start" });
+                      }}
+                    >
+                      Choose a room
+                    </button>
+                  </article>
+                  {campaign.actorRole !== "observer" && (
+                    <article>
+                      <span className="control-kicker">02 / Your party</span>
+                      <h3>Characters with a place here</h3>
+                      <p>Review your roster and sheets, or build a character using this campaign's available rules.</p>
+                      <button
+                        className="ghost"
+                        disabled={pageBusy}
+                        onClick={() => {
+                          rosterHeadingRef.current?.focus();
+                          rosterHeadingRef.current?.scrollIntoView?.({ block: "start" });
+                        }}
+                      >
+                        Review the party
+                      </button>
+                      {mechanicsEnabled && (
+                        <button className="ghost" disabled={pageBusy} onClick={onOpenCharacterBuilder}>
+                          Create your character
+                        </button>
+                      )}
+                    </article>
+                  )}
+                  {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && mechanicsEnabled && (
+                    <article className="campaign-create-entry">
+                      <span className="control-kicker">03 / Reviewed AI</span>
+                      <h3>Build the next chapter</h3>
+                      <p>
+                        Start from a brief or guided questions. Review generated world, cast, and story material before
+                        adding it to your campaign.
+                      </p>
+                      <button
+                        className="ghost"
+                        disabled={pageBusy || generationAvailable === false}
+                        onClick={() => (shellNavigate ? shellNavigate("create") : onOpenAdministration(campaign.name))}
+                      >
+                        Open campaign generation
+                      </button>
+                      <small>
+                        {generationAvailable === false
+                          ? "Generation requires the server's combat feature to be enabled."
+                          : "Adding canon and delivering player material are separate decisions."}
+                      </small>
+                    </article>
+                  )}
+                </div>
+              </section>
+              {!["observer"].includes(campaign.actorRole) && (
+                <div className="campaign-readiness-section">
+                  <section className="campaign-readiness" aria-labelledby="campaign-readiness-heading">
+                    <header>
+                      <div>
+                        <p className="eyebrow">PLAY READINESS</p>
+                        <h2 id="campaign-readiness-heading">
+                          {readinessReady ? "Campaign ready" : "Path to a playable turn"}
+                        </h2>
+                      </div>
+                      <span>
+                        {readinessSteps.filter((step) => step.ready).length} / {readinessSteps.length}
+                      </span>
+                    </header>
+                    <ol>
+                      {readinessSteps.map((step) => (
+                        <li
+                          className={step.ready ? "is-ready" : step.unknown ? "is-unknown" : "is-blocked"}
+                          key={step.label}
+                        >
+                          <span aria-hidden="true">{step.ready ? "Ready" : step.unknown ? "Verify" : "Needed"}</span>
+                          <div>
+                            <strong>{step.label}</strong>
+                            <p>{step.help}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                    <div className="readiness-actions">
+                      {!configuredForPlay &&
+                        mechanicsEnabled &&
+                        campaign.actorRole === "owner" &&
+                        campaign.content.status === "unconfigured" && (
+                          <button
+                            className="primary"
+                            type="button"
+                            onClick={() => {
+                              setSetupChoice("srd");
+                              setSetupConfirmed(false);
+                              setSetupError("");
+                              document.getElementById("starter-setup-heading")?.scrollIntoView?.({ block: "start" });
+                            }}
+                          >
+                            Configure SRD 5.1 mechanics
+                          </button>
+                        )}
+                      {configuredForPlay && !rosterReady && campaign.actorRole !== "observer" && (
+                        <button className="primary" type="button" disabled={pageBusy} onClick={onOpenCharacterBuilder}>
+                          Build playable character
+                        </button>
+                      )}
+                      {configuredForPlay && rosterReady && activeRooms.length === 0 && (
+                        <button
+                          className="primary"
+                          type="button"
+                          onClick={() => roomsHeadingRef.current?.scrollIntoView({ block: "start" })}
+                        >
+                          Review rooms
+                        </button>
+                      )}
+                      {activeRooms.length > 0 && !published && (
+                        <button className="primary" type="button" onClick={() => onOpenAdministration(campaign.name)}>
+                          Publish in administration
+                        </button>
+                      )}
+                      {readinessReady && playableRoom && (
+                        <button
+                          className="primary"
+                          type="button"
+                          disabled={pageBusy}
+                          onClick={() => onOpenRoom(playableRoom.sessionId)}
+                        >
+                          {roomOpenPending ? "Opening room..." : "Enter command center"}
+                        </button>
+                      )}
+                      <button
+                        className="ghost"
+                        type="button"
+                        onClick={() => void Promise.all([load(false), loadRoster(true), loadRooms(true)])}
+                      >
+                        Refresh readiness
+                      </button>
+                    </div>
+                  </section>
+                </div>
+              )}
+              <details className="campaign-maintenance">
+                <summary>Campaign details & maintenance</summary>
+                <div className="campaign-maintenance-content">
+                  {campaign.actorRole === "owner" && (
+                    <form
+                      className="campaign-rename"
+                      onSubmit={(event) => void submitRename(event)}
+                      aria-busy={pageBusy}
+                    >
+                      <div>
+                        <label htmlFor="campaign-rename-name">Campaign name</label>
+                        <input
+                          ref={renameInputRef}
+                          id="campaign-rename-name"
+                          value={draft}
+                          onChange={(event) => setDraft(event.target.value)}
+                          maxLength={200}
+                          required
+                          disabled={pageBusy}
+                        />
+                      </div>
+                      <button className="primary" type="submit" disabled={pageBusy}>
+                        {renamePhase === "writing"
+                          ? "Renaming…"
+                          : renamePhase === "reconciling"
+                            ? "Refreshing…"
+                            : "Rename campaign"}
+                      </button>
+                      {renameError && (
+                        <p className="form-error" role="alert">
+                          {renameError}
+                        </p>
+                      )}
+                    </form>
+                  )}
+                  <p className="sr-only" role="status" aria-live="polite">
+                    {announcement}
+                  </p>
+                  <dl className="campaign-detail-list">
+                    <div>
+                      <dt>Role</dt>
+                      <dd>{displayRole(campaign.actorRole)}</dd>
+                    </div>
+                    <div>
+                      <dt>Created</dt>
+                      <dd>
+                        <time dateTime={campaign.createdAt}>{new Date(campaign.createdAt).toLocaleDateString()}</time>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Updated</dt>
+                      <dd>
+                        <time dateTime={campaign.updatedAt}>{new Date(campaign.updatedAt).toLocaleDateString()}</time>
+                      </dd>
+                    </div>
+                    {campaign.content.status === "unconfigured" ? (
+                      <div>
+                        <dt>Content</dt>
+                        <dd>Unconfigured</dd>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <dt>Rules profile</dt>
+                          <dd>
+                            <code>{campaign.content.rulesProfileId}</code>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Content packs</dt>
+                          <dd>
+                            {campaign.content.contentPacks.length === 0 ? (
+                              "None"
+                            ) : (
+                              <ul className="identifier-list">
+                                {campaign.content.contentPacks.map((pack) => (
+                                  <li key={pack.packId}>
+                                    <code>{pack.packId}</code> <span>version</span> <code>{pack.packVersion}</code>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </dd>
+                        </div>
+                      </>
+                    )}
+                  </dl>
+                </div>
+              </details>
+              <section
+                className="campaign-rooms"
+                aria-labelledby="campaign-rooms-heading"
+                aria-busy={roomsPhase === "loading" || roomActivity !== "idle"}
+              >
+                <div className="campaign-rooms-heading">
+                  <h2 ref={roomsHeadingRef} tabIndex={-1} id="campaign-rooms-heading">
+                    Rooms
+                  </h2>
+                  <button
+                    className="ghost"
+                    type="button"
+                    disabled={pageBusy || roomActivity !== "idle"}
+                    onClick={refreshRooms}
+                  >
+                    Refresh rooms
+                  </button>
+                </div>
+                <p className="campaign-section-help">
+                  Your gateway to gameplay controls and tactical maps. Open a room below; stopped rooms remain readable
+                  history.
+                </p>
+                {roomsPhase === "loading" && (
+                  <p className="rooms-status" role="status">
+                    Loading rooms…
+                  </p>
+                )}
+                {roomsPhase === "failed" && (
+                  <div className="rooms-error" role="alert">
+                    <p>Campaign rooms could not be loaded.</p>
+                    <button
+                      ref={roomsRetryRef}
+                      className="ghost"
+                      type="button"
+                      disabled={pageBusy}
+                      onClick={refreshRooms}
+                    >
+                      Retry rooms
+                    </button>
+                  </div>
+                )}
+                {rooms && roomsPhase === "ready" && (
+                  <>
+                    <h3>Attached rooms</h3>
+                    {rooms.attached.length === 0 ? (
+                      <p className="rooms-status">No rooms attached.</p>
+                    ) : (
+                      <ul className="campaign-room-list" aria-label="Attached campaign rooms">
+                        {rooms.attached.map((room, index) => (
+                          <li key={index}>
+                            <div>
+                              <strong>
+                                <bdi dir="auto">{roomTitle(room)}</bdi>
+                              </strong>
+                              <p>
+                                {room.participantNames.map((name, participantIndex) => (
+                                  <span key={participantIndex}>
+                                    <bdi dir="auto">{name}</bdi>
+                                    {participantIndex < room.participantNames.length - 1 ? " · " : ""}
+                                  </span>
+                                ))}
+                              </p>
+                              <small>
+                                Created{" "}
+                                <time dateTime={room.createdAt}>{new Date(room.createdAt).toLocaleDateString()}</time> ·
+                                Attached{" "}
+                                <time dateTime={room.attachedAt}>{new Date(room.attachedAt).toLocaleDateString()}</time>
+                                {room.stopped ? " · Stopped · Read-only" : ""}
+                              </small>
+                            </div>
+                            <div className="room-actions">
+                              <button
+                                className="ghost room-open"
+                                type="button"
+                                disabled={pageBusy}
+                                aria-label={`Open attached room ${index + 1} of ${rooms.attached.length}`}
+                                onClick={() => {
+                                  if (!pageBusy) onOpenRoom(room.sessionId);
+                                }}
+                              >
+                                {roomOpenPending ? "Opening room…" : "Open room"}
+                              </button>
+                              {campaign.actorRole === "owner" && (
+                                <button
+                                  className="ghost room-detach"
+                                  type="button"
+                                  disabled={pageBusy || roomActivity !== "idle"}
+                                  aria-label={`Detach attached room ${index + 1} of ${rooms.attached.length}`}
+                                  onClick={() => void detachRoom(room)}
+                                >
+                                  {roomPendingAction === "detach"
+                                    ? roomActivity === "writing"
+                                      ? "Detaching once…"
+                                      : "Refreshing rooms…"
+                                    : "Detach room"}
+                                </button>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {campaign.actorRole === "owner" && (
+                      <div className="eligible-rooms">
+                        <h3>Attach a room</h3>
+                        {rooms.eligible.length === 0 ? (
+                          <p className="rooms-status">No eligible running rooms.</p>
+                        ) : (
+                          <ul className="campaign-room-list" aria-label="Eligible campaign rooms">
+                            {rooms.eligible.map((room, index) => (
+                              <li key={index}>
+                                <div>
+                                  <strong>
+                                    <bdi dir="auto">{roomTitle(room)}</bdi>
+                                  </strong>
+                                  <p>
+                                    {room.participantNames.map((name, participantIndex) => (
+                                      <span key={participantIndex}>
+                                        <bdi dir="auto">{name}</bdi>
+                                        {participantIndex < room.participantNames.length - 1 ? " · " : ""}
+                                      </span>
+                                    ))}
+                                  </p>
+                                  <small>
+                                    Created{" "}
+                                    <time dateTime={room.createdAt}>
+                                      {new Date(room.createdAt).toLocaleDateString()}
+                                    </time>
+                                  </small>
+                                </div>
+                                <button
+                                  className="primary room-attach"
+                                  type="button"
+                                  disabled={pageBusy || roomActivity !== "idle"}
+                                  aria-label={`Attach eligible room ${index + 1} of ${rooms.eligible.length}`}
+                                  onClick={() => void attachRoom(room)}
+                                >
+                                  {roomPendingAction === "attach"
+                                    ? roomActivity === "writing"
+                                      ? "Attaching once…"
+                                      : "Refreshing rooms…"
+                                    : "Attach room"}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+                {roomResult && (
+                  <div className="room-result-actions">
+                    <p
+                      ref={roomStatusRef}
+                      tabIndex={-1}
+                      className={roomResult.alert ? "form-error" : "create-success"}
+                      role={roomResult.alert ? "alert" : "status"}
+                    >
+                      {roomResult.text}
+                    </p>
+                    <button
+                      className="ghost"
+                      type="button"
+                      disabled={pageBusy || roomActivity !== "idle"}
+                      onClick={refreshRooms}
+                    >
+                      Refresh rooms
+                    </button>
+                  </div>
+                )}
+                {roomOpenFailure && (
+                  <p ref={roomOpenStatusRef} tabIndex={-1} className="form-error" role="alert">
+                    {roomOpenFailure.text}
+                  </p>
+                )}
+              </section>
+              {rosterPhase !== "unsupported" && (
+                <section
+                  className="campaign-roster"
+                  aria-labelledby="campaign-roster-heading"
+                  aria-busy={rosterPhase === "loading"}
+                >
+                  <div className="campaign-roster-heading">
+                    <h2 ref={rosterHeadingRef} tabIndex={-1} id="campaign-roster-heading">
+                      Characters
+                    </h2>
+                    {mechanicsEnabled && campaign.actorRole !== "observer" && (
+                      <button className="primary" type="button" disabled={pageBusy} onClick={onOpenCharacterBuilder}>
+                        Build playable character
+                      </button>
+                    )}
+                  </div>
+                  <p className="sr-only" role="status" aria-live="polite">
+                    {rosterAnnouncement}
+                  </p>
+                  {rosterPhase === "loading" && (
+                    <p className="roster-status" role="status">
+                      Loading characters…
+                    </p>
+                  )}
+                  {rosterPhase === "failed" && (
+                    <div className="roster-error" role="alert">
+                      <p>Characters could not be loaded.</p>
+                      <button
+                        ref={rosterRetryRef}
+                        className="ghost roster-retry"
+                        type="button"
+                        onClick={() => void loadRoster(true)}
+                      >
+                        Retry characters
+                      </button>
+                    </div>
+                  )}
+                  {rosterPhase === "ready" &&
+                    (roster.length === 0 ? (
+                      <p className="roster-status">No characters yet.</p>
+                    ) : (
+                      <ul className="campaign-roster-list" aria-label="Campaign characters">
+                        {roster.map((character, index) => (
+                          <li key={character.id}>
+                            <bdi dir="auto">{character.name}</bdi>
+                            <button
+                              className="ghost roster-open"
+                              type="button"
+                              disabled={pageBusy}
+                              aria-label={`Open character ${character.name}, character ${index + 1} of ${roster.length}`}
+                              onClick={() => {
+                                if (!pageBusy) onOpenCharacter(character.id);
+                              }}
+                            >
+                              Open character
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ))}
+                </section>
+              )}
+              {mechanicsEnabled && (campaign.actorRole === "owner" || campaign.actorRole === "gm") && (
+                <section
+                  className="campaign-dice"
+                  aria-labelledby="campaign-dice-heading"
+                  aria-busy={dicePhase === "loading" || diceBusy}
+                >
+                  <h2 ref={diceHeadingRef} tabIndex={-1} id="campaign-dice-heading">
+                    Dice
+                  </h2>
+                  {dicePhase === "loading" && (
+                    <p className="dice-status" role="status">
+                      Loading roll history…
+                    </p>
+                  )}
+                  {dicePhase === "failed" && (
+                    <div className="dice-error">
+                      <p role="alert">{diceError || "Roll history could not be loaded."}</p>
+                      {!diceResult && (
+                        <button
+                          ref={diceRetryRef}
+                          className="ghost"
+                          type="button"
+                          disabled={pageBusy}
+                          onClick={() => void loadDice(true, false)}
+                        >
+                          Retry roll history
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {diceHistory && (dicePhase === "ready" || diceBusy) && (
+                    <>
+                      <form className="dice-form" onSubmit={(event) => void submitDice(event)}>
+                        <div className="dice-field">
+                          <label htmlFor="dice-character-position">Character</label>
+                          <select
+                            id="dice-character-position"
+                            value={diceCharacterPosition ?? ""}
+                            disabled={pageBusy || diceHistory.characters.length === 0}
+                            onChange={(event) => setDiceCharacterPosition(Number(event.target.value))}
+                          >
+                            {diceHistory.characters.length === 0 && <option value="">No characters available</option>}
+                            {diceHistory.characters.map((character) => (
+                              <option key={character.position} value={character.position}>
+                                Character {character.position} of {diceHistory.characters.length} — {character.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="dice-field">
+                          <label htmlFor="dice-expression">Expression</label>
+                          <input
+                            id="dice-expression"
+                            ref={diceExpressionRef}
+                            value={diceExpression}
+                            maxLength={24}
+                            required
+                            disabled={pageBusy || diceHistory.characters.length === 0}
+                            onChange={(event) => setDiceExpression(event.target.value)}
+                            aria-describedby="dice-expression-help"
+                          />
+                        </div>
+                        <p id="dice-expression-help" className="dice-help">
+                          Examples: 1d20, 2d6+3, 4d6kh3, 1d20adv, 1d20dis. Up to 100 dice, 1,000 sides, and ±1,000
+                          modifier.
+                        </p>
+                        <button
+                          className="primary"
+                          type="submit"
+                          disabled={pageBusy || diceHistory.characters.length === 0}
+                        >
+                          {dicePhase === "writing"
+                            ? "Rolling once…"
+                            : dicePhase === "reconciling"
+                              ? "Refreshing roll history…"
+                              : "Roll dice"}
+                        </button>
+                      </form>
+                      {diceError && dicePhase === "ready" && (
+                        <p className="form-error" role="alert">
+                          {diceError}
+                        </p>
+                      )}
+                      <div className="dice-history" aria-labelledby="dice-history-heading">
+                        <h3 id="dice-history-heading">Recent rolls</h3>
+                        {diceHistory.rolls.length === 0 ? (
+                          <p className="dice-status">No rolls yet.</p>
+                        ) : (
+                          <ol aria-label="Recent dice rolls">
+                            {diceHistory.rolls.slice(0, 20).map((roll, index) => (
+                              <li key={`${roll.occurredAt}-${index}`}>
+                                <div className="dice-roll-heading">
+                                  <strong>
+                                    <bdi dir="auto">{roll.character.name}</bdi>
+                                  </strong>
+                                  <time dateTime={roll.occurredAt}>{new Date(roll.occurredAt).toLocaleString()}</time>
+                                </div>
+                                <dl>
+                                  <div>
+                                    <dt>Expression</dt>
+                                    <dd>
+                                      <code>{roll.result.expression}</code>
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Physical dice</dt>
+                                    <dd>
+                                      {roll.result.terms.map((term, termIndex) => (
+                                        <span className="dice-term" key={termIndex}>
+                                          {term.value} ({term.kept ? "kept" : "discarded"})
+                                        </span>
+                                      ))}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Modifier</dt>
+                                    <dd>
+                                      {roll.result.modifier > 0 ? `+${roll.result.modifier}` : roll.result.modifier}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Total</dt>
+                                    <dd>
+                                      <strong>{roll.result.total}</strong>
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {diceResult && (
+                    <div className="create-result-actions">
+                      <p
+                        ref={diceStatusRef}
+                        tabIndex={-1}
+                        className={diceResult.alert ? "dice-warning" : "create-success"}
+                        role={diceResult.alert ? "alert" : "status"}
+                      >
+                        {diceResult.text}
+                      </p>
+                      <button
+                        className="ghost"
+                        type="button"
+                        disabled={pageBusy || dicePhase === "loading"}
+                        onClick={() => void refreshDiceRolls()}
+                      >
+                        Refresh rolls
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
+              {isOriginalStarterConfigured(campaign) && (
+                <section
+                  className="character-options"
+                  aria-label="Character creation"
+                  aria-busy={optionsPhase === "loading" || characterStatusActivity !== "idle"}
+                >
+                  {(optionsPhase === "loading" || characterStatusActivity !== "idle") && (
+                    <p className="character-options-status" role="status" aria-live="polite">
+                      {characterStatusActivity === "refreshing"
+                        ? "Refreshing character creation options…"
+                        : characterStatusActivity === "reconciling"
+                          ? "Checking character creation options…"
+                          : "Loading character creation options…"}
+                    </p>
+                  )}
+                  {(optionsPhase === "failed" || optionsPhase === "unsupported") && (
+                    <div className="character-options-error" aria-label="Character creation options">
+                      <div role="alert">
+                        <p>Character creation options could not be loaded.</p>
+                      </div>
+                      <button
+                        ref={optionsRetryRef}
+                        className="ghost"
+                        type="button"
+                        disabled={pageBusy}
+                        onClick={() => void loadOptions(true, false)}
+                      >
+                        Retry character options
+                      </button>
+                    </div>
+                  )}
+                  {optionsAnnouncement && (
+                    <p className="character-options-status" role="status" aria-live="polite">
+                      {optionsAnnouncement}
+                    </p>
+                  )}
+                  {optionsPhase === "ready" && options && (
+                    <form
+                      className="starter-character-create"
+                      aria-busy={createBusy}
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void createCharacter();
+                      }}
+                    >
+                      <div>
+                        <p className="eyebrow">FIXED ORIGINAL STARTER</p>
+                        <h2 ref={optionsHeadingRef} tabIndex={-1}>
+                          Finalize a character record
+                        </h2>
+                      </div>
+                      <p className="starter-warning">
+                        <strong>Final metadata only.</strong> Select one unused existing Velvet persona. The fixed
+                        record has no customization and cannot be edited, deleted, rebuilt, or reset here.
+                      </p>
+                      <dl className="starter-character-metadata" aria-label="Fixed read-only starter metadata">
+                        <div>
+                          <dt>Rules profile</dt>
+                          <dd>
+                            <strong>{options.starter.rulesProfile.name}</strong>
+                            <code>{options.starter.rulesProfile.rulesProfileId}</code>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Content pack</dt>
+                          <dd>
+                            <strong>{options.starter.pack.name}</strong>
+                            <code>
+                              {options.starter.pack.packId}@{options.starter.pack.packVersion}
+                            </code>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Race</dt>
+                          <dd>
+                            <strong>{options.starter.race.name}</strong>
+                            <code>{options.starter.race.reference.definitionId}</code>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Background</dt>
+                          <dd>
+                            <strong>{options.starter.background.name}</strong>
+                            <code>{options.starter.background.reference.definitionId}</code>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Class</dt>
+                          <dd>
+                            <strong>
+                              {options.starter.class.name}, level {options.starter.class.level}
+                            </strong>
+                            <code>{options.starter.class.reference.definitionId}</code>
+                          </dd>
+                        </div>
+                      </dl>
+                      <fieldset className="persona-options" disabled={pageBusy}>
+                        <legend>Select one existing persona</legend>
+                        {options.personas.length === 0 && <p>No existing personas are available.</p>}
+                        {options.personas.map((persona, index) => (
+                          <label
+                            className={persona.alreadyUsed ? "persona-option is-used" : "persona-option"}
+                            key={index}
+                          >
+                            <input
+                              ref={index === 0 ? firstPersonaChoiceRef : undefined}
+                              type="radio"
+                              name="starter-persona"
+                              checked={selectedCharacterId === persona.characterId}
+                              disabled={persona.alreadyUsed || pageBusy}
+                              onChange={() => {
+                                if (!persona.alreadyUsed) {
+                                  setSelectedCharacterId(persona.characterId);
+                                  setCreateConfirmed(false);
+                                }
+                              }}
+                            />
+                            <span>
+                              <bdi dir="auto">{persona.name}</bdi>{" "}
+                              <small>
+                                Persona {index + 1} of {options.personas.length}
+                              </small>
+                              {persona.alreadyUsed && (
+                                <>
+                                  {" "}
+                                  <small>Already used — not selectable</small>
+                                </>
+                              )}
+                            </span>
+                          </label>
+                        ))}
+                      </fieldset>
+                      <label className="checkbox starter-confirm create-confirm">
+                        <input
+                          ref={createConfirmationRef}
+                          type="checkbox"
+                          required
+                          checked={createConfirmed}
+                          onChange={(event) => setCreateConfirmed(event.target.checked)}
+                          disabled={pageBusy}
+                        />
+                        <span>
+                          I confirm this record is finalized and currently has <strong>NO</strong> derived stats, rules
+                          validation, editing, deletion, rebuilding or reset, gameplay or mechanics, inventory,
+                          equipment, spells, powers, progression, or AI workflow.
+                        </span>
+                      </label>
+                      <button
+                        className="primary starter-submit"
+                        type="submit"
+                        disabled={pageBusy || !selectedCharacterId || !createConfirmed}
+                      >
+                        {createPhase === "writing"
+                          ? "Creating once…"
+                          : createPhase === "reconciling"
+                            ? "Checking character status…"
+                            : "Finalize character record"}
+                      </button>
+                    </form>
+                  )}
+                  {createResult && (
+                    <div className="create-result-actions">
+                      <p
+                        ref={createStatusRef}
+                        tabIndex={-1}
+                        className={createResult.alert ? "form-error" : "create-success"}
+                        role={createResult.alert ? "alert" : "status"}
+                      >
+                        {createResult.text}
+                      </p>
+                      <button
+                        className="ghost"
+                        type="button"
+                        disabled={pageBusy || characterStatusActivity !== "idle"}
+                        onClick={() => void refreshCharacterStatus()}
+                      >
+                        Refresh character status
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
+              {campaign.actorRole === "owner" && campaign.content.status === "unconfigured" && (
+                <section className="starter-setup" aria-labelledby="starter-setup-heading" aria-busy={setupBusy}>
+                  <div className="starter-heading">
+                    <div>
+                      <p className="eyebrow">FIXED STARTER ACTIVATION</p>
+                      <h2 id="starter-setup-heading">Set up campaign metadata</h2>
+                    </div>
+                  </div>
+                  <p className="starter-warning">
+                    <strong>Choose once.</strong> Starter setup is available only while this campaign is unconfigured.
+                    Neither choice can replace, migrate, reset, or add to configured content.
+                  </p>
+                  <fieldset className="persona-options starter-choice-options" disabled={pageBusy}>
+                    <legend>Select one mutually exclusive starter</legend>
+                    {mechanicsEnabled && (
+                      <label className="persona-option">
+                        <input
+                          type="radio"
+                          name="campaign-starter-choice"
+                          checked={setupChoice === "srd"}
+                          onChange={() => {
+                            setSetupChoice("srd");
+                            setSetupConfirmed(false);
+                            setSetupError("");
+                          }}
+                        />
+                        <span>
+                          <strong>SRD 5.1 starter (recommended)</strong>
+                          <small>
+                            {" "}
+                            Playable level-one D&amp;D 5e character building, checks, rests, and basic actor attacks.
+                          </small>
+                        </span>
+                      </label>
+                    )}
+                    <label className="persona-option">
+                      <input
+                        type="radio"
+                        name="campaign-starter-choice"
+                        checked={setupChoice === "original"}
+                        onChange={() => {
+                          setSetupChoice("original");
+                          setSetupConfirmed(false);
+                          setSetupError("");
+                        }}
+                      />
+                      <span>
+                        <strong>Original metadata starter</strong>
+                        <small> Narrative identities only; no playable mechanics.</small>
+                      </span>
+                    </label>
+                    {mechanicsEnabled && (
+                      <label className="persona-option">
+                        <input
+                          type="radio"
+                          name="campaign-starter-choice"
+                          checked={setupChoice === "mechanics"}
+                          onChange={() => {
+                            setSetupChoice("mechanics");
+                            setSetupConfirmed(false);
+                            setSetupError("");
+                          }}
+                        />
+                        <span>
+                          <strong>Velvet mechanics starter</strong>
+                          <small> Enables Velvet's fixed original mechanics catalog.</small>
+                        </span>
+                      </label>
+                    )}
+                  </fieldset>
+                  {setupChoice === "original" && (
+                    <>
+                      <div className="starter-heading">
+                        <div>
+                          <p className="eyebrow">FIXED ORIGINAL STARTER</p>
+                          <h3>Original metadata starter</h3>
+                        </div>
+                        <code>{ORIGINAL_STARTER_PRESENTATION.starterId}</code>
+                      </div>
+                      <p className="starter-warning">
+                        <strong>Metadata scaffolding only.</strong> This starter adds no playable mechanics, gameplay,
+                        or character creation. Setup is final and has no reset, change, or add controls.
+                      </p>
+                      <p className="starter-warning">
+                        <strong>Internal local material.</strong> Names are not claimed to be unique; similarity review
+                        was limited, and no distribution license is granted. The concepts and wording were originally
+                        authored for Velvet.
+                      </p>
+                      <div className="starter-identities">
+                        <article>
+                          <span>Rules profile</span>
+                          <h3>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.name}</h3>
+                          <p>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.description}</p>
+                          <code>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.id}</code>
+                        </article>
+                        <article>
+                          <span>Content pack</span>
+                          <h3>{ORIGINAL_STARTER_PRESENTATION.pack.name}</h3>
+                          <p>{ORIGINAL_STARTER_PRESENTATION.pack.description}</p>
+                          <code>
+                            {ORIGINAL_STARTER_PRESENTATION.pack.id}@{ORIGINAL_STARTER_PRESENTATION.pack.version}
+                          </code>
+                        </article>
+                      </div>
+                      <div className="starter-definitions">
+                        {[
+                          { label: "Race", item: ORIGINAL_STARTER_PRESENTATION.races[0] },
+                          { label: "Background", item: ORIGINAL_STARTER_PRESENTATION.backgrounds[0] },
+                          { label: "Class", item: ORIGINAL_STARTER_PRESENTATION.classes[0] },
+                        ].map(({ label, item }) => (
+                          <article key={label}>
+                            <span>{label}</span>
+                            <h3>{item.name}</h3>
+                            <p>{item.description}</p>
+                          </article>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {setupChoice === "srd" && (
+                    <>
+                      <div className="starter-heading">
+                        <div>
+                          <p className="eyebrow">RECOMMENDED PLAYABLE STARTER</p>
+                          <h3>SRD 5.1 Starter</h3>
+                        </div>
+                        <code>{SRD_5_1_STARTER_IDENTITY.starterId}</code>
+                      </div>
+                      <p className="starter-warning">
+                        <strong>Playable mechanics foundation.</strong> This activates the fixed, bounded SRD 5.1
+                        profile for level-one character building, checks, rests, encounters, and basic actor attacks.
+                      </p>
+                      <div className="starter-identities">
+                        <article>
+                          <span>Rules profile</span>
+                          <h3>SRD 5.1 Rules</h3>
+                          <p>D&amp;D 5e mechanics using the bundled SRD 5.1 foundation.</p>
+                          <code>{SRD_5_1_STARTER_IDENTITY.rulesProfileId}</code>
+                        </article>
+                        <article>
+                          <span>Content catalog</span>
+                          <h3>SRD 5.1 Starter</h3>
+                          <p>
+                            Reviewed Human, Acolyte, Fighter, longsword, equipment, GP, and bounded integration
+                            fixtures.
+                          </p>
+                          <code>
+                            {SRD_5_1_STARTER_IDENTITY.packId}@{SRD_5_1_STARTER_IDENTITY.packVersion}
+                          </code>
+                        </article>
+                      </div>
+                    </>
+                  )}
+                  {setupChoice === "mechanics" && (
+                    <>
+                      <div className="starter-heading">
+                        <div>
+                          <p className="eyebrow">FIXED MECHANICS STARTER</p>
+                          <h3>Velvet Mechanics Starter</h3>
+                        </div>
+                        <code>{MECHANICS_STARTER_IDENTITY.starterId}</code>
+                      </div>
+                      <p className="starter-warning">
+                        <strong>Future mechanics foundation.</strong> This activates the reviewed fixed catalog for
+                        future builder and progression UI. It does not add builder, finalization, progression, or
+                        arbitrary content controls in this slice, and it cannot replace any configured content.
+                      </p>
+                      <div className="starter-identities">
+                        <article>
+                          <span>Rules profile</span>
+                          <h3>Velvet Starter Rules</h3>
+                          <p>Closed deterministic mechanics profile for the built-in catalog.</p>
+                          <code>{MECHANICS_STARTER_IDENTITY.rulesProfileId}</code>
+                        </article>
+                        <article>
+                          <span>Content catalog</span>
+                          <h3>Velvet Mechanics Starter</h3>
+                          <p>
+                            Fixed original races, backgrounds, classes, abilities, spells, items, resources, and
+                            encounter metadata.
+                          </p>
+                          <code>
+                            {MECHANICS_STARTER_IDENTITY.packId}@{MECHANICS_STARTER_IDENTITY.packVersion}
+                          </code>
+                        </article>
+                      </div>
+                    </>
+                  )}
+                  {setupChoice && (
+                    <>
+                      <p className="starter-warning">
+                        <strong>Two-transaction setup:</strong> the{" "}
+                        {setupChoice === "original" ? "pack is installed" : "catalog is published"} first and the
+                        campaign is configured second. If setup fails between them,{" "}
+                        {setupChoice === "original"
+                          ? "the pack may remain installed"
+                          : "the catalog may remain published"}{" "}
+                        without changing this campaign.
+                      </p>
+                      <label className="checkbox starter-confirm">
+                        <input
+                          ref={setupConfirmationRef}
+                          type="checkbox"
+                          checked={setupConfirmed}
+                          onChange={(event) => setSetupConfirmed(event.target.checked)}
+                          disabled={pageBusy}
+                        />
+                        <span>
+                          {setupChoice === "srd"
+                            ? "I explicitly confirm SRD 5.1 starter activation as this campaign's fixed playable mechanics"
+                            : setupChoice === "mechanics"
+                              ? "I explicitly confirm Velvet mechanics starter activation, knowing it cannot replace configured content"
+                              : "I understand this metadata-only setup is final"}{" "}
+                          and understand the two-transaction outcome.
+                        </span>
+                      </label>
+                    </>
+                  )}
+                  <button
+                    className="primary starter-submit"
+                    type="button"
+                    disabled={pageBusy || !setupChoice || !setupConfirmed}
+                    onClick={() => void setupStarter()}
+                  >
+                    {setupPhase === "writing"
+                      ? "Setting up once…"
+                      : setupPhase === "reconciling"
+                        ? "Checking latest details…"
+                        : setupChoice === "srd"
+                          ? "Activate SRD 5.1 starter"
+                          : setupChoice === "mechanics"
+                            ? "Activate Velvet mechanics starter"
+                            : setupChoice === "original"
+                              ? "Set up original starter"
+                              : "Select a starter"}
+                  </button>
+                </section>
+              )}
+              {campaign.content.status === "configured" && (
+                <div className="configured-readonly" ref={configuredStatusRef} tabIndex={-1}>
+                  <strong>Content configuration is read-only.</strong> There are no reset, change, or add controls.
+                </div>
+              )}
+              {setupError && (
+                <p className="form-error setup-result" role="alert">
+                  {setupError}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      </section>
+    </main>
+  );
 }

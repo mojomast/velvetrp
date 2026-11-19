@@ -53,9 +53,9 @@ export function checkUserMessage(content: string): PolicyResult {
  */
 export function checkAssistantOutput(content: string): PolicyResult {
   const normalized = content.toLowerCase();
-  const violations = ASSISTANT_OUTPUT_BLOCKLIST
-    .filter((phrase) => normalized.includes(phrase))
-    .map(() => "boundary-or-refusal-bypass");
+  const violations = ASSISTANT_OUTPUT_BLOCKLIST.filter((phrase) => normalized.includes(phrase)).map(
+    () => "boundary-or-refusal-bypass",
+  );
 
   return { allowed: violations.length === 0, violations };
 }

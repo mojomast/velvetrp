@@ -1,10 +1,5 @@
 import type { StarterReferences } from "../references.js";
-import {
-  monsterAttack,
-  monsterTrait,
-  monsterTemplate,
-  type MonsterBand,
-} from "./enemyBuilder.js";
+import { monsterAttack, monsterTrait, monsterTemplate, type MonsterBand } from "./enemyBuilder.js";
 
 /**
  * SRD 5.1 Challenge Rating 4 monsters as bounded starter catalog content. Each
@@ -66,7 +61,11 @@ export function cr4Band(refs: StarterReferences): MonsterBand {
     speed: 20,
     attackBonus: 5,
     primaryAttack: blackPuddingPseudopod.reference,
-    traitRefs: [blackPuddingAmorphous.reference, blackPuddingCorrosiveForm.reference, blackPuddingSpiderClimb.reference],
+    traitRefs: [
+      blackPuddingAmorphous.reference,
+      blackPuddingCorrosiveForm.reference,
+      blackPuddingSpiderClimb.reference,
+    ],
     immunities: ["cold", "storm", "slashing"],
   });
 
@@ -244,7 +243,12 @@ export function cr4Band(refs: StarterReferences): MonsterBand {
     speed: 40,
     attackBonus: 5,
     primaryAttack: ghostWitheringTouch.reference,
-    traitRefs: [ghostEtherealSight.reference, ghostIncorporealMovement.reference, ghostHorrifyingVisage.reference, ghostPossession.reference],
+    traitRefs: [
+      ghostEtherealSight.reference,
+      ghostIncorporealMovement.reference,
+      ghostHorrifyingVisage.reference,
+      ghostPossession.reference,
+    ],
     resistances: ["fire", "storm", "physical"],
     immunities: ["cold"],
   });
@@ -350,7 +354,12 @@ export function cr4Band(refs: StarterReferences): MonsterBand {
     speed: 30,
     attackBonus: 5,
     primaryAttack: succubusIncubusClaw.reference,
-    traitRefs: [succubusIncubusShapechanger.reference, succubusIncubusTelepathicBond.reference, succubusIncubusCharm.reference, succubusIncubusDrainingKiss.reference],
+    traitRefs: [
+      succubusIncubusShapechanger.reference,
+      succubusIncubusTelepathicBond.reference,
+      succubusIncubusCharm.reference,
+      succubusIncubusDrainingKiss.reference,
+    ],
     resistances: ["cold", "fire", "storm", "physical"],
   });
 
@@ -392,7 +401,12 @@ export function cr4Band(refs: StarterReferences): MonsterBand {
     speed: 30,
     attackBonus: 5,
     primaryAttack: wereboarMaul.reference,
-    traitRefs: [wereboarShapechanger.reference, wereboarCharge.reference, wereboarRelentless.reference, wereboarMultiattack.reference],
+    traitRefs: [
+      wereboarShapechanger.reference,
+      wereboarCharge.reference,
+      wereboarRelentless.reference,
+      wereboarMultiattack.reference,
+    ],
     immunities: ["physical"],
   });
 
@@ -434,7 +448,12 @@ export function cr4Band(refs: StarterReferences): MonsterBand {
     speed: 30,
     attackBonus: 5,
     primaryAttack: weretigerBite.reference,
-    traitRefs: [weretigerShapechanger.reference, weretigerKeenHearingAndSmell.reference, weretigerPounce.reference, weretigerMultiattack.reference],
+    traitRefs: [
+      weretigerShapechanger.reference,
+      weretigerKeenHearingAndSmell.reference,
+      weretigerPounce.reference,
+      weretigerMultiattack.reference,
+    ],
     immunities: ["physical"],
   });
 

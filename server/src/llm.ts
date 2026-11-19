@@ -29,7 +29,8 @@ export { isLoopbackHost, validateProviderBaseUrl } from "./provider/providerTran
 
 function stubReply(userContent: string, memoryCount: number, loreCount: number): string {
   const trimmed = userContent.trim().replace(/\s+/g, " ").slice(0, 80);
-  const memoryNote = memoryCount > 0 ? ` I also remember ${memoryCount} approved detail${memoryCount === 1 ? "" : "s"}.` : "";
+  const memoryNote =
+    memoryCount > 0 ? ` I also remember ${memoryCount} approved detail${memoryCount === 1 ? "" : "s"}.` : "";
   const loreNote = loreCount > 0 ? ` ${loreCount} lore note${loreCount === 1 ? "" : "s"} is active.` : "";
   return `[local stub — provider not fully configured] (staying in character) I hear you: "${trimmed}".${memoryNote}${loreNote} Let's continue, keeping everything consensual and between adults.`;
 }
@@ -56,7 +57,21 @@ type PreparedGeneration =
   | { kind: "request"; url: string; headers: Record<string, string>; messages: OrchestratedMessage[] };
 
 function prepareGeneration(args: GenerationArgs): PreparedGeneration {
-  const { character, participants, session, history, memories, summary, preset, lore, harness, provider, userContent, sharedContext, campaignContext } = args;
+  const {
+    character,
+    participants,
+    session,
+    history,
+    memories,
+    summary,
+    preset,
+    lore,
+    harness,
+    provider,
+    userContent,
+    sharedContext,
+    campaignContext,
+  } = args;
   const baseUrl = provider.baseUrl.replace(/\/+$/, "");
 
   const messages = buildOrchestratedMessages({
@@ -78,7 +93,9 @@ function prepareGeneration(args: GenerationArgs): PreparedGeneration {
   if (provider.samplers.startReplyWith.trim()) {
     messages.splice(messages.length - 1, 0, {
       role: "system",
-      content: resolvePromptTemplate("provider.startReply", harness.promptOverrides, { "reply.start": provider.samplers.startReplyWith.trim() }),
+      content: resolvePromptTemplate("provider.startReply", harness.promptOverrides, {
+        "reply.start": provider.samplers.startReplyWith.trim(),
+      }),
     });
   }
 
@@ -86,7 +103,12 @@ function prepareGeneration(args: GenerationArgs): PreparedGeneration {
     return { kind: "stub", text: stubReply(userContent, memories.length, lore.length) };
   }
 
-  return { kind: "request", url: `${baseUrl}/chat/completions`, headers: buildProviderHeaders(baseUrl, provider), messages };
+  return {
+    kind: "request",
+    url: `${baseUrl}/chat/completions`,
+    headers: buildProviderHeaders(baseUrl, provider),
+    messages,
+  };
 }
 
 export interface RoomSpeakerSelection {
@@ -148,13 +170,21 @@ async function trySystemOneRoomRouting(input: {
   const { systemOne, participants, history, userContent, maxSpeakers } = input;
   if (!systemOne || !systemOne.settings.enabled || !canUseSystemOne(systemOne.settings)) return null;
   if (systemOneLaneMode(systemOne.settings, "speaker-routing") === "off") return null;
-  const projection = participants.map((participant) => ({ id: participant.id, name: participant.name, archetype: participant.archetype }));
+  const projection = participants.map((participant) => ({
+    id: participant.id,
+    name: participant.name,
+    archetype: participant.archetype,
+  }));
   const thresholds = systemOne.thresholds ?? systemOne.settings.confidencePolicy["speaker-routing"];
   const names = new Map(participants.map((participant) => [participant.id, participant.name]));
-  const recent = history.slice(-8).map((message) => {
-    const speaker = message.role === "character" ? names.get(message.speakerCharacterId ?? "") ?? "Character" : "User";
-    return `${speaker}: ${message.content.slice(0, 300)}`;
-  }).join("\n");
+  const recent = history
+    .slice(-8)
+    .map((message) => {
+      const speaker =
+        message.role === "character" ? (names.get(message.speakerCharacterId ?? "") ?? "Character") : "User";
+      return `${speaker}: ${message.content.slice(0, 300)}`;
+    })
+    .join("\n");
   const questions = buildRoomRoutingQuestions(projection, userContent, recent);
   const state = {
     user_message: userContent,
@@ -175,14 +205,31 @@ async function trySystemOneRoomRouting(input: {
   const startedAt = performance.now();
   try {
     const result = await systemOne.caller({ settings: systemOne.settings, state, questions });
-    const usage = result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null;
-    systemOneLaneBudgets.settle("speaker-routing", usage ?? { inputTokens: 0, outputTokens: 0 }, reservation.reservationId);
+    const usage = result.usage
+      ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens }
+      : null;
+    systemOneLaneBudgets.settle(
+      "speaker-routing",
+      usage ?? { inputTokens: 0, outputTokens: 0 },
+      reservation.reservationId,
+    );
     const composed = composeRoomRoutingSelection(projection, result.answers, thresholds, maxSpeakers);
     // A lane changes behavior only when it is `active` and has a recorded, passing promotion.
     // Otherwise it still records the would-be decision.
-    const active = !input.advisoryOnly && systemOneLaneMode(systemOne.settings, "speaker-routing") === "active"
-      && isLanePromoted("speaker-routing", systemOneEvaluationBinding("speaker-routing",
-        systemOne.settings, result.model.responseModel, "room-speaker-selection", {}, thresholds));
+    const active =
+      !input.advisoryOnly &&
+      systemOneLaneMode(systemOne.settings, "speaker-routing") === "active" &&
+      isLanePromoted(
+        "speaker-routing",
+        systemOneEvaluationBinding(
+          "speaker-routing",
+          systemOne.settings,
+          result.model.responseModel,
+          "room-speaker-selection",
+          {},
+          thresholds,
+        ),
+      );
     const decision: SystemOneRoomRoutingDecision = {
       lane: "speaker-routing",
       provider: "typesafe",
@@ -191,7 +238,11 @@ async function trySystemOneRoomRouting(input: {
       state,
       questions,
       answers: result.answers,
-      selection: { method: composed.method, speakerIds: composed.speakerIds, topSignal: calibrateTopSignal(composed.topSignal, systemOne.settings.confidenceCalibration["speaker-routing"]) },
+      selection: {
+        method: composed.method,
+        speakerIds: composed.speakerIds,
+        topSignal: calibrateTopSignal(composed.topSignal, systemOne.settings.confidenceCalibration["speaker-routing"]),
+      },
       confidenceBand: composed.band,
       fallbackUsed: !active || composed.band !== "act",
       shadow: !active,
@@ -236,17 +287,23 @@ export async function synthesizeSceneState(input: {
   const { session, history, manualCanon, previousState, provider, harness, preset } = input;
   if (!canUseProvider(provider) || history.length === 0) return null;
   const names = new Map(session.participants.map((participant) => [participant.id, participant.name]));
-  const recent = history.slice(-10).map((message) => {
-    const speaker = message.role === "user" ? "User" : names.get(message.speakerCharacterId ?? "") ?? "Character";
-    return `${speaker}: ${message.content.replace(/\s+/g, " ").trim().slice(0, 1200)}`;
-  }).join("\n");
+  const recent = history
+    .slice(-10)
+    .map((message) => {
+      const speaker = message.role === "user" ? "User" : (names.get(message.speakerCharacterId ?? "") ?? "Character");
+      return `${speaker}: ${message.content.replace(/\s+/g, " ").trim().slice(0, 1200)}`;
+    })
+    .join("\n");
   const messages: OrchestratedMessage[] = [
     { role: "system", content: resolvePromptTemplate("scene.synthesizer.system", harness.promptOverrides, {}) },
-    { role: "user", content: resolvePromptTemplate("scene.synthesizer.user", harness.promptOverrides, {
-      "scene.manual": manualCanon.trim() || "none set",
-      "scene.previous": previousState.trim() || "none yet",
-      "scene.recent": recent,
-    }) },
+    {
+      role: "user",
+      content: resolvePromptTemplate("scene.synthesizer.user", harness.promptOverrides, {
+        "scene.manual": manualCanon.trim() || "none set",
+        "scene.previous": previousState.trim() || "none yet",
+        "scene.recent": recent,
+      }),
+    },
   ];
   const baseUrl = provider.baseUrl.replace(/\/+$/, "");
   const body = buildRequestBody(provider, { ...harness, temperature: 0.1 }, preset, messages, false);
@@ -259,20 +316,34 @@ export async function synthesizeSceneState(input: {
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(`scene synthesis failed: ${response.status}`);
-  const payload = await response.json() as { model?: string; usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown }; choices?: Array<{ message?: { content?: unknown } }> };
+  const payload = (await response.json()) as {
+    model?: string;
+    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
+    choices?: Array<{ message?: { content?: unknown } }>;
+  };
   const raw = payload.choices?.[0]?.message?.content;
   if (typeof raw !== "string") throw new Error("scene synthesis returned no text");
-  const cleaned = raw.replace(/^```(?:markdown|text)?\s*/i, "").replace(/\s*```$/, "").trim().slice(0, 8000);
+  const cleaned = raw
+    .replace(/^```(?:markdown|text)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim()
+    .slice(0, 8000);
   return cleaned ? { text: cleaned, usage: normalizeUsage(payload as StreamChunk, provider.model) } : null;
 }
 
 function requestedGroupSize(content: string, maxSpeakers: number): number {
-  if (/\b(?:everyone|everybody|all of you|you all|the whole (?:room|group)|your characters)\b/i.test(content)) return maxSpeakers;
+  if (/\b(?:everyone|everybody|all of you|you all|the whole (?:room|group)|your characters)\b/i.test(content))
+    return maxSpeakers;
   if (/\b(?:you two|u 2|both|guys|gang|room)\b/i.test(content)) return Math.min(2, maxSpeakers);
   return 0;
 }
 
-export function ensureGroupSpeakers(speakerIds: string[], participants: Character[], content: string, maxSpeakers: number): string[] {
+export function ensureGroupSpeakers(
+  speakerIds: string[],
+  participants: Character[],
+  content: string,
+  maxSpeakers: number,
+): string[] {
   const result = [...speakerIds];
   const minimum = requestedGroupSize(content, maxSpeakers);
   if (minimum > 0) {
@@ -284,10 +355,17 @@ export function ensureGroupSpeakers(speakerIds: string[], participants: Characte
   return result.slice(0, maxSpeakers);
 }
 
-export function fallbackRoomSpeakers(participants: Character[], primaryCharacterId: string, content: string, maxSpeakers: number): string[] {
+export function fallbackRoomSpeakers(
+  participants: Character[],
+  primaryCharacterId: string,
+  content: string,
+  maxSpeakers: number,
+): string[] {
   const lower = content.toLocaleLowerCase();
   const mentioned = participants.filter((participant) => lower.includes(participant.name.toLocaleLowerCase()));
-  const selected = (mentioned.length > 0 ? mentioned : participants.filter((participant) => participant.id === primaryCharacterId))
+  const selected = (
+    mentioned.length > 0 ? mentioned : participants.filter((participant) => participant.id === primaryCharacterId)
+  )
     .slice(0, maxSpeakers)
     .map((participant) => participant.id);
   return ensureGroupSpeakers(selected, participants, content, maxSpeakers);
@@ -307,24 +385,49 @@ export async function selectRoomSpeakers(input: {
 }): Promise<RoomSpeakerSelection> {
   const { participants, primaryCharacterId, history, userContent, maxSpeakers, provider, harness, preset } = input;
   const fallback = fallbackRoomSpeakers(participants, primaryCharacterId, userContent, maxSpeakers);
-  const withDecision = (selection: RoomSpeakerSelection, decision: SystemOneRoomRoutingDecision | undefined): RoomSpeakerSelection =>
-    decision ? { ...selection, systemOneDecision: decision } : selection;
+  const withDecision = (
+    selection: RoomSpeakerSelection,
+    decision: SystemOneRoomRoutingDecision | undefined,
+  ): RoomSpeakerSelection => (decision ? { ...selection, systemOneDecision: decision } : selection);
   const fallbackSelection: RoomSpeakerSelection = { speakerIds: fallback, source: "fallback", usage: null };
   if (participants.length === 1) return fallbackSelection;
   const systemOne = input.systemOne;
   // Response aliases are only known after inference. Wait only when at least one
   // evaluated response binding could authorize this exact request configuration;
   // trySystemOneRoomRouting still validates the actual response binding afterward.
-  const canAct = systemOne && systemOneLaneMode(systemOne.settings, "speaker-routing") === "active"
-    && promotionRecord("speaker-routing")?.evaluatedBindings?.some((binding) =>
-      isLanePromoted("speaker-routing", systemOneEvaluationBinding("speaker-routing", systemOne.settings,
-        binding.responseModel, "room-speaker-selection", {}, systemOne.thresholds ?? systemOne.settings.confidencePolicy["speaker-routing"])));
+  const canAct =
+    systemOne &&
+    systemOneLaneMode(systemOne.settings, "speaker-routing") === "active" &&
+    promotionRecord("speaker-routing")?.evaluatedBindings?.some((binding) =>
+      isLanePromoted(
+        "speaker-routing",
+        systemOneEvaluationBinding(
+          "speaker-routing",
+          systemOne.settings,
+          binding.responseModel,
+          "room-speaker-selection",
+          {},
+          systemOne.thresholds ?? systemOne.settings.confidencePolicy["speaker-routing"],
+        ),
+      ),
+    );
   const detached = Boolean(systemOne?.onAdvisoryDecision && !canAct);
-  const pending = trySystemOneRoomRouting({ systemOne, participants, history, userContent, maxSpeakers, advisoryOnly: detached });
+  const pending = trySystemOneRoomRouting({
+    systemOne,
+    participants,
+    history,
+    userContent,
+    maxSpeakers,
+    advisoryOnly: detached,
+  });
   if (detached) {
-    void pending.then(async (result) => {
-      if (result?.kind === "shadow") await systemOne?.onAdvisoryDecision?.(result.decision);
-    }).catch(() => { /* Advisory recording must never affect routing or cause an unhandled rejection. */ });
+    void pending
+      .then(async (result) => {
+        if (result?.kind === "shadow") await systemOne?.onAdvisoryDecision?.(result.decision);
+      })
+      .catch(() => {
+        /* Advisory recording must never affect routing or cause an unhandled rejection. */
+      });
   }
   const outcome = detached ? null : await pending;
   if (outcome?.kind === "selection") return outcome.selection;
@@ -337,22 +440,31 @@ export async function selectRoomSpeakers(input: {
     participantByToken.set(participant.name.toLocaleLowerCase(), participant.id);
   }
   const names = new Map(participants.map((participant) => [participant.id, participant.name]));
-  const recent = history.slice(-8).map((message) => {
-    const speaker = message.role === "character" ? names.get(message.speakerCharacterId ?? "") ?? "Character" : "User";
-    return `${speaker}: ${message.content.slice(0, 300)}`;
-  }).join("\n");
+  const recent = history
+    .slice(-8)
+    .map((message) => {
+      const speaker =
+        message.role === "character" ? (names.get(message.speakerCharacterId ?? "") ?? "Character") : "User";
+      return `${speaker}: ${message.content.slice(0, 300)}`;
+    })
+    .join("\n");
   const messages: OrchestratedMessage[] = [
     {
       role: "system",
       content: resolvePromptTemplate("room.router.system", harness.promptOverrides, {
         "room.maxSpeakers": maxSpeakers,
-        "participants.routing": participants.map((participant) => `- ${participant.id}: ${participant.name} — ${participant.archetype}`).join("\n"),
+        "participants.routing": participants
+          .map((participant) => `- ${participant.id}: ${participant.name} — ${participant.archetype}`)
+          .join("\n"),
       }),
     },
-    { role: "user", content: resolvePromptTemplate("room.router.user", harness.promptOverrides, {
-      "history.recent": recent ? `Recent room history:\n${recent}` : "",
-      "user.content": userContent,
-    }) },
+    {
+      role: "user",
+      content: resolvePromptTemplate("room.router.user", harness.promptOverrides, {
+        "history.recent": recent ? `Recent room history:\n${recent}` : "",
+        "user.content": userContent,
+      }),
+    },
   ];
   const baseUrl = provider.baseUrl.replace(/\/+$/, "");
   const requestBody = {
@@ -370,7 +482,11 @@ export async function selectRoomSpeakers(input: {
     body: JSON.stringify(requestBody),
   });
   if (!response.ok) throw new Error(`room routing request failed: ${response.status}`);
-  const payload = await response.json() as { model?: string; usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown }; choices?: Array<{ message?: { content?: unknown } }> };
+  const payload = (await response.json()) as {
+    model?: string;
+    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
+    choices?: Array<{ message?: { content?: unknown } }>;
+  };
   const text = payload.choices?.[0]?.message?.content;
   if (typeof text !== "string") throw new Error("room routing response had no text");
   const start = text.indexOf("[");
@@ -378,13 +494,25 @@ export async function selectRoomSpeakers(input: {
   if (start < 0 || end < start) throw new Error("room routing response was not a JSON array");
   const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
   if (!Array.isArray(parsed)) throw new Error("room routing response was not an array");
-  const speakerIds = ensureGroupSpeakers([...new Set(parsed.flatMap((value) => {
-    if (typeof value !== "string") return [];
-    const id = participantByToken.get(value.trim().toLocaleLowerCase());
-    return id ? [id] : [];
-  }))], participants, userContent, maxSpeakers);
+  const speakerIds = ensureGroupSpeakers(
+    [
+      ...new Set(
+        parsed.flatMap((value) => {
+          if (typeof value !== "string") return [];
+          const id = participantByToken.get(value.trim().toLocaleLowerCase());
+          return id ? [id] : [];
+        }),
+      ),
+    ],
+    participants,
+    userContent,
+    maxSpeakers,
+  );
   if (speakerIds.length === 0) throw new Error("room routing selected no valid participants");
-  return withDecision({ speakerIds, source: "model", kind: "llm", usage: normalizeUsage(payload as StreamChunk, provider.model) }, shadowDecision);
+  return withDecision(
+    { speakerIds, source: "model", kind: "llm", usage: normalizeUsage(payload as StreamChunk, provider.model) },
+    shadowDecision,
+  );
 }
 
 export function buildRequestBody(
@@ -422,7 +550,9 @@ export function buildRequestBody(
     ...(provider.samplers.topP !== null ? { top_p: provider.samplers.topP } : {}),
     ...(provider.samplers.topK !== null ? { top_k: provider.samplers.topK } : {}),
     ...(provider.samplers.minP !== null ? { min_p: provider.samplers.minP } : {}),
-    ...(provider.samplers.repetitionPenalty !== null ? { repetition_penalty: provider.samplers.repetitionPenalty } : {}),
+    ...(provider.samplers.repetitionPenalty !== null
+      ? { repetition_penalty: provider.samplers.repetitionPenalty }
+      : {}),
     ...(provider.samplers.frequencyPenalty !== null ? { frequency_penalty: provider.samplers.frequencyPenalty } : {}),
     ...(provider.samplers.presencePenalty !== null ? { presence_penalty: provider.samplers.presencePenalty } : {}),
     ...(provider.samplers.seed !== null ? { seed: provider.samplers.seed } : {}),
@@ -480,12 +610,17 @@ function estimateTokens(text: string): number {
 }
 
 function estimateUsage(messages: OrchestratedMessage[], text: string, model: string): TokenUsage {
-  const promptTokens = 3 + messages.reduce((sum, message) => sum + 4 + estimateTokens(message.role) + estimateTokens(message.content), 0);
+  const promptTokens =
+    3 + messages.reduce((sum, message) => sum + 4 + estimateTokens(message.role) + estimateTokens(message.content), 0);
   const completionTokens = estimateTokens(text);
   return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, source: "estimated", model };
 }
 
-export async function streamReply(args: GenerationArgs, onDelta: (delta: string) => void, signal?: AbortSignal): Promise<GenerationResult> {
+export async function streamReply(
+  args: GenerationArgs,
+  onDelta: (delta: string) => void,
+  signal?: AbortSignal,
+): Promise<GenerationResult> {
   const prepared = prepareGeneration(args);
   if (prepared.kind === "stub") {
     onDelta(prepared.text);
@@ -546,17 +681,17 @@ export async function streamReply(args: GenerationArgs, onDelta: (delta: string)
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       let newline = buffer.indexOf("\n");
-        while (newline !== -1) {
-          const line = buffer.slice(0, newline);
-          buffer = buffer.slice(newline + 1);
-          newline = buffer.indexOf("\n");
-          processLine(line);
-          if (finished) break;
-        }
+      while (newline !== -1) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        newline = buffer.indexOf("\n");
+        processLine(line);
+        if (finished) break;
       }
-      buffer += decoder.decode();
-      if (!finished && buffer) processLine(buffer);
-    } finally {
+    }
+    buffer += decoder.decode();
+    if (!finished && buffer) processLine(buffer);
+  } finally {
     await reader.cancel().catch(() => undefined);
   }
   return {
@@ -581,7 +716,21 @@ export async function generateReply(
   campaignContext?: CampaignAgentContextBasket,
 ): Promise<GenerationResult> {
   return streamReply(
-    { character, ...(participants ? { participants } : {}), session, history, memories, summary, preset, lore, harness, provider, userContent, ...(sharedContext ? { sharedContext } : {}), ...(campaignContext ? { campaignContext } : {}) },
+    {
+      character,
+      ...(participants ? { participants } : {}),
+      session,
+      history,
+      memories,
+      summary,
+      preset,
+      lore,
+      harness,
+      provider,
+      userContent,
+      ...(sharedContext ? { sharedContext } : {}),
+      ...(campaignContext ? { campaignContext } : {}),
+    },
     () => undefined,
   );
 }

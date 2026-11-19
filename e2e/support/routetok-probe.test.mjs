@@ -11,11 +11,29 @@ test("probe payloads always round-trip as valid JSON without strict model routin
 });
 
 test("planning probes require the intended pair-coupled candidate", () => {
-  const response = (name, args) => ({ choices: [{ message: { tool_calls: [{ function: { name, arguments: JSON.stringify(args) } }] } }] });
-  assert.equal(validateProbeResponse("planning-travel", response("exact_actor_travel.select", {
-    candidateId: "candidate-place", kind: "actor.travel", version: "v1", choices: [],
-  })).valid, true);
-  assert.equal(validateProbeResponse("planning-inventory", response("exact_inventory_action.select", {
-    candidateId: "candidate-unequip", digest: "b".repeat(64),
-  })).valid, false);
+  const response = (name, args) => ({
+    choices: [{ message: { tool_calls: [{ function: { name, arguments: JSON.stringify(args) } }] } }],
+  });
+  assert.equal(
+    validateProbeResponse(
+      "planning-travel",
+      response("exact_actor_travel.select", {
+        candidateId: "candidate-place",
+        kind: "actor.travel",
+        version: "v1",
+        choices: [],
+      }),
+    ).valid,
+    true,
+  );
+  assert.equal(
+    validateProbeResponse(
+      "planning-inventory",
+      response("exact_inventory_action.select", {
+        candidateId: "candidate-unequip",
+        digest: "b".repeat(64),
+      }),
+    ).valid,
+    false,
+  );
 });

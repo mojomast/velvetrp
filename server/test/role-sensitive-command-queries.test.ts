@@ -40,20 +40,29 @@ function seed() {
   createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }).close();
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys = ON");
-  db.prepare(`INSERT INTO principals VALUES
+  db.prepare(
+    `INSERT INTO principals VALUES
     ('gm', 'GM', 0), ('player', 'Player', 0), ('observer', 'Observer', 0),
-    ('nonmember', 'Nonmember', 0), ('application-only', 'Application only', 0)`).run();
+    ('nonmember', 'Nonmember', 0), ('application-only', 'Application only', 0)`,
+  ).run();
   db.prepare("UPDATE application_owner SET principal_id = 'application-only' WHERE singleton = 1").run();
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at) VALUES
       (?, 'Audit', 'timeline-old', 'local-owner', ?, ?),
-      ('campaign-other', 'Other', 'timeline-other', 'local-owner', ?, ?)`).run(campaignId, BEFORE, BEFORE, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES
+      ('campaign-other', 'Other', 'timeline-other', 'local-owner', ?, ?)`,
+    ).run(campaignId, BEFORE, BEFORE, BEFORE, BEFORE);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES
       ('timeline-old', ?, ?), ('timeline-new', ?, ?),
-      ('timeline-other', 'campaign-other', ?)`).run(campaignId, BEFORE, campaignId, BEFORE, BEFORE);
+      ('timeline-other', 'campaign-other', ?)`,
+    ).run(campaignId, BEFORE, campaignId, BEFORE, BEFORE);
     for (const [principal, role] of [
-      ["local-owner", "owner"], ["gm", "gm"], ["player", "player"], ["observer", "observer"],
+      ["local-owner", "owner"],
+      ["gm", "gm"],
+      ["player", "player"],
+      ["observer", "observer"],
     ] as const) {
       db.prepare("INSERT INTO campaign_memberships VALUES (?, ?, ?, ?)").run(campaignId, principal, role, BEFORE);
     }
@@ -63,18 +72,30 @@ function seed() {
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Description', '[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core', '1', 'profile', 'Core', 'Description', '[]', 0)").run();
   db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', 'race', 'human', 'Human', 'Description', '[]')").run();
-  db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', 'background', 'sage', 'Sage', 'Description', '[]')").run();
+  db.prepare(
+    "INSERT INTO rpg_definitions VALUES ('core', '1', 'background', 'sage', 'Sage', 'Description', '[]')",
+  ).run();
   db.prepare("UPDATE rpg_content_packs SET sealed = 1").run();
   db.prepare("INSERT INTO campaign_rules_profiles VALUES (?, 'profile')").run(campaignId);
   db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'core', '1', 'profile')").run(campaignId);
-  db.prepare("INSERT INTO campaign_characters VALUES ('cc-audit', ?, 'persona-audit', ?, ?)").run(campaignId, BEFORE, BEFORE);
-  db.prepare(`INSERT INTO rpg_campaign_sheets VALUES
+  db.prepare("INSERT INTO campaign_characters VALUES ('cc-audit', ?, 'persona-audit', ?, ?)").run(
+    campaignId,
+    BEFORE,
+    BEFORE,
+  );
+  db.prepare(
+    `INSERT INTO rpg_campaign_sheets VALUES
     ('sheet-audit', ?, 'cc-audit', 'core', '1', 'race', 'human',
-     'core', '1', 'background', 'sage', ?, ?)`).run(campaignId, BEFORE, BEFORE);
+     'core', '1', 'background', 'sage', ?, ?)`,
+  ).run(campaignId, BEFORE, BEFORE);
   db.prepare("INSERT INTO rpg_character_attributes VALUES (?, 'sheet-audit', 0, 'strength', 10)").run(campaignId);
-  db.prepare(`INSERT INTO campaign_actors VALUES
-    ('actor-audit', ?, 'cc-audit', 'sheet-audit', 'player-character', 'principal', ?, ?)`).run(campaignId, BEFORE, BEFORE);
-  db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor-audit', ?, 'local-owner', 'secret notes')").run(campaignId);
+  db.prepare(
+    `INSERT INTO campaign_actors VALUES
+    ('actor-audit', ?, 'cc-audit', 'sheet-audit', 'player-character', 'principal', ?, ?)`,
+  ).run(campaignId, BEFORE, BEFORE);
+  db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor-audit', ?, 'local-owner', 'secret notes')").run(
+    campaignId,
+  );
   db.close();
 
   const ids = ["event-b", "event-a", "event-new"];
@@ -97,16 +118,28 @@ describe("role-sensitive command event and receipt queries", () => {
     const repository = seed();
     for (const principal of ["local-owner", "gm", "player", "observer"]) {
       const events = repository.listCampaignEvents(principal, campaignId, "timeline-old");
-      expect(events.map(({ eventId, revision }) => [eventId, revision])).toEqual([["event-b", 1], ["event-a", 2]]);
-      expect(repository.listCampaignEvents(principal, campaignId, "timeline-new").map((event) => event.eventId))
-        .toEqual(["event-new"]);
+      expect(events.map(({ eventId, revision }) => [eventId, revision])).toEqual([
+        ["event-b", 1],
+        ["event-a", 2],
+      ]);
+      expect(
+        repository.listCampaignEvents(principal, campaignId, "timeline-new").map((event) => event.eventId),
+      ).toEqual(["event-new"]);
       expect(repository.getCommandReceipt(principal, campaignId, "command-a")?.events[0]?.sourceTurnId).toBeNull();
     }
 
     const event = repository.listCampaignEvents("observer", campaignId, "timeline-old")[0]!;
     expect(Object.keys(event)).toEqual([
-      "eventId", "commandId", "campaignId", "timelineId", "actorId", "sourceTurnId",
-      "type", "revision", "occurredAt", "data",
+      "eventId",
+      "commandId",
+      "campaignId",
+      "timelineId",
+      "actorId",
+      "sourceTurnId",
+      "type",
+      "revision",
+      "occurredAt",
+      "data",
     ]);
     expect(Object.keys(event.data)).toEqual(["attributeId", "valueBefore", "valueAfter"]);
     const receipt = repository.getCommandReceipt("player", campaignId, "command-b")!;
@@ -133,7 +166,9 @@ describe("role-sensitive command event and receipt queries", () => {
     const now = vi.fn(() => new Date(AT));
     const nextId = vi.fn(() => "unused");
     const repository = createRepository({
-      dataDir: process.env.VELVET_DATA_DIR as string, clock: { now }, ids: { nextId },
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      clock: { now },
+      ids: { nextId },
     });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
@@ -176,17 +211,21 @@ describe("role-sensitive command event and receipt queries", () => {
       expect(unit.listCampaignEvents("observer", campaignId, "timeline-old")).toHaveLength(2);
       expect(unit.getCommandReceipt("observer", campaignId, "command-b")?.commandId).toBe("command-b");
     });
-    expect(() => expired!.listCampaignEvents("bad actor", "bad campaign", "bad timeline"))
-      .toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getCommandReceipt("bad actor", "bad campaign", "bad command"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.listCampaignEvents("bad actor", "bad campaign", "bad timeline")).toThrow(
+      "transaction unit of work is no longer active",
+    );
+    expect(() => expired!.getCommandReceipt("bad actor", "bad campaign", "bad command")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     expect(repoModule).not.toHaveProperty("listCampaignEvents");
     expect(repoModule).not.toHaveProperty("getCommandReceipt");
     repository.close();
-    expect(() => repository.listCampaignEvents("bad actor", "bad campaign", "bad timeline"))
-      .toThrow("repository is closed");
-    expect(() => repository.getCommandReceipt("bad actor", "bad campaign", "bad command"))
-      .toThrow("repository is closed");
+    expect(() => repository.listCampaignEvents("bad actor", "bad campaign", "bad timeline")).toThrow(
+      "repository is closed",
+    );
+    expect(() => repository.getCommandReceipt("bad actor", "bad campaign", "bad command")).toThrow(
+      "repository is closed",
+    );
   });
 
   it("fails loudly for authorized incomplete or malformed audit rows but discloses nothing to outsiders", () => {
@@ -195,7 +234,9 @@ describe("role-sensitive command event and receipt queries", () => {
     db.pragma("foreign_keys = OFF");
     db.exec("DROP TRIGGER command_receipts_prevent_delete");
     db.prepare("DELETE FROM command_receipts WHERE campaign_id = ? AND command_id = 'command-b'").run(campaignId);
-    expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-old")).toThrow("audit record is incomplete");
+    expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-old")).toThrow(
+      "audit record is incomplete",
+    );
     expect(() => repository.getCommandReceipt("player", campaignId, "command-b")).toThrow("audit record is incomplete");
     expect(repository.listCampaignEvents("nonmember", campaignId, "timeline-old")).toEqual([]);
     expect(repository.getCommandReceipt("nonmember", campaignId, "command-b")).toBeNull();
@@ -210,9 +251,21 @@ describe("role-sensitive command event and receipt queries", () => {
   });
 
   it.each([
-    ["command only", "DELETE FROM command_receipts WHERE command_id = 'command-new'; DELETE FROM campaign_events WHERE command_id = 'command-new'", true],
-    ["event only", "DELETE FROM command_receipts WHERE command_id = 'command-new'; DELETE FROM campaign_commands WHERE command_id = 'command-new'", true],
-    ["receipt only", "DELETE FROM campaign_events WHERE command_id = 'command-new'; DELETE FROM campaign_commands WHERE command_id = 'command-new'", false],
+    [
+      "command only",
+      "DELETE FROM command_receipts WHERE command_id = 'command-new'; DELETE FROM campaign_events WHERE command_id = 'command-new'",
+      true,
+    ],
+    [
+      "event only",
+      "DELETE FROM command_receipts WHERE command_id = 'command-new'; DELETE FROM campaign_commands WHERE command_id = 'command-new'",
+      true,
+    ],
+    [
+      "receipt only",
+      "DELETE FROM campaign_events WHERE command_id = 'command-new'; DELETE FROM campaign_commands WHERE command_id = 'command-new'",
+      false,
+    ],
     ["command and event", "DELETE FROM command_receipts WHERE command_id = 'command-new'", true],
     ["command and receipt", "DELETE FROM campaign_events WHERE command_id = 'command-new'", true],
     ["event and receipt", "DELETE FROM campaign_commands WHERE command_id = 'command-new'", true],
@@ -228,16 +281,19 @@ describe("role-sensitive command event and receipt queries", () => {
     `);
     db.close();
 
-    expect(() => repository.getCommandReceipt("observer", campaignId, "command-new"))
-      .toThrow("audit record is incomplete");
+    expect(() => repository.getCommandReceipt("observer", campaignId, "command-new")).toThrow(
+      "audit record is incomplete",
+    );
     if (listHasIdentity) {
-      expect(() => repository.listCampaignEvents("player", campaignId, "timeline-new"))
-        .toThrow("audit record is incomplete");
+      expect(() => repository.listCampaignEvents("player", campaignId, "timeline-new")).toThrow(
+        "audit record is incomplete",
+      );
     } else {
       // The receipt has no timeline identity, but the existing timeline's
       // revision proves that its now-empty event history is corrupt.
-      expect(() => repository.listCampaignEvents("player", campaignId, "timeline-new"))
-        .toThrow("audit record is incomplete");
+      expect(() => repository.listCampaignEvents("player", campaignId, "timeline-new")).toThrow(
+        "audit record is incomplete",
+      );
     }
     expect(repository.getCommandReceipt("nonmember", campaignId, "command-new")).toBeNull();
     expect(repository.listCampaignEvents("nonmember", campaignId, "timeline-new")).toEqual([]);
@@ -248,8 +304,9 @@ describe("role-sensitive command event and receipt queries", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("ignore_check_constraints = ON");
-    db.prepare("UPDATE campaign_memberships SET role = 'administrator' WHERE campaign_id = ? AND principal_id = 'observer'")
-      .run(campaignId);
+    db.prepare(
+      "UPDATE campaign_memberships SET role = 'administrator' WHERE campaign_id = ? AND principal_id = 'observer'",
+    ).run(campaignId);
     db.close();
     expect(repository.listCampaignEvents("observer", campaignId, "timeline-old")).toEqual([]);
     expect(repository.getCommandReceipt("observer", campaignId, "command-b")).toBeNull();
@@ -263,7 +320,8 @@ describe("role-sensitive command event and receipt queries", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
-    if(mutation.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-audit");db.prepare(mutation).run();
+    if (mutation.startsWith("DELETE FROM campaigns")) deleteCampaignForCorruptionTest(db, "campaign-audit");
+    db.prepare(mutation).run();
     db.close();
     expect(repository.listCampaignEvents("observer", campaignId, "timeline-old")).toEqual([]);
     expect(repository.getCommandReceipt("observer", campaignId, "command-b")).toBeNull();
@@ -282,10 +340,12 @@ describe("role-sensitive command event and receipt queries", () => {
         db.prepare("DELETE FROM campaign_actors WHERE campaign_id = ? AND id = 'actor-audit'").run(campaignId);
       }
       db.close();
-      expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-new"))
-        .toThrow("audit record is incomplete");
-      expect(() => repository.getCommandReceipt("observer", campaignId, "command-new"))
-        .toThrow("audit record is incomplete");
+      expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-new")).toThrow(
+        "audit record is incomplete",
+      );
+      expect(() => repository.getCommandReceipt("observer", campaignId, "command-new")).toThrow(
+        "audit record is incomplete",
+      );
       expect(repository.listCampaignEvents("nonmember", campaignId, "timeline-new")).toEqual([]);
       expect(repository.getCommandReceipt("nonmember", campaignId, "command-new")).toBeNull();
       repository.close();
@@ -338,16 +398,21 @@ describe("role-sensitive command event and receipt queries", () => {
     db.pragma("ignore_check_constraints = ON");
     db.prepare(`UPDATE command_receipts SET ${assignment} WHERE command_id = 'command-new'`).run();
     db.close();
-    expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-new"))
-      .toThrow("audit record is incomplete");
-    expect(() => repository.getCommandReceipt("player", campaignId, "command-new"))
-      .toThrow("audit record is incomplete");
+    expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-new")).toThrow(
+      "audit record is incomplete",
+    );
+    expect(() => repository.getCommandReceipt("player", campaignId, "command-new")).toThrow(
+      "audit record is incomplete",
+    );
     expect(repository.getCommandReceipt("nonmember", campaignId, "command-new")).toBeNull();
     repository.close();
   });
 
   it.each([
-    ["private command idempotency", "UPDATE campaign_commands SET idempotency_key = 'bad key' WHERE command_id = 'command-new'"],
+    [
+      "private command idempotency",
+      "UPDATE campaign_commands SET idempotency_key = 'bad key' WHERE command_id = 'command-new'",
+    ],
     ["event revision ahead of its timeline", "UPDATE campaign_timelines SET revision = 0 WHERE id = 'timeline-new'"],
   ])("treats malformed %s as incomplete without outsider disclosure", (_label, mutation) => {
     const repository = seed();
@@ -357,10 +422,12 @@ describe("role-sensitive command event and receipt queries", () => {
     db.prepare(mutation).run();
     db.close();
 
-    expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-new"))
-      .toThrow("audit record is incomplete");
-    expect(() => repository.getCommandReceipt("player", campaignId, "command-new"))
-      .toThrow("audit record is incomplete");
+    expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-new")).toThrow(
+      "audit record is incomplete",
+    );
+    expect(() => repository.getCommandReceipt("player", campaignId, "command-new")).toThrow(
+      "audit record is incomplete",
+    );
     expect(repository.listCampaignEvents("nonmember", campaignId, "timeline-new")).toEqual([]);
     expect(repository.getCommandReceipt("nonmember", campaignId, "command-new")).toBeNull();
     repository.close();
@@ -390,13 +457,12 @@ describe("role-sensitive command event and receipt queries", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
     db.exec("DROP TRIGGER campaign_timelines_advance_revision");
-    db.prepare("UPDATE campaign_timelines SET revision = ? WHERE id = 'timeline-old'")
-      .run(Number.MAX_SAFE_INTEGER);
+    db.prepare("UPDATE campaign_timelines SET revision = ? WHERE id = 'timeline-old'").run(Number.MAX_SAFE_INTEGER);
     db.close();
-    expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-old"))
-      .toThrow("audit record is incomplete");
-    expect(() => repository.getCommandReceipt("player", campaignId, "command-b"))
-      .toThrow("audit record is incomplete");
+    expect(() => repository.listCampaignEvents("observer", campaignId, "timeline-old")).toThrow(
+      "audit record is incomplete",
+    );
+    expect(() => repository.getCommandReceipt("player", campaignId, "command-b")).toThrow("audit record is incomplete");
     expect(repository.listCampaignEvents("nonmember", campaignId, "timeline-old")).toEqual([]);
     expect(repository.getCommandReceipt("nonmember", campaignId, "command-b")).toBeNull();
     repository.close();
@@ -406,29 +472,39 @@ describe("role-sensitive command event and receipt queries", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
-    db.prepare(`INSERT INTO campaign_actors VALUES
-      ('actor-other', 'campaign-other', 'cc-missing', 'sheet-missing', 'player-character', 'principal', ?, ?)`).run(BEFORE, BEFORE);
-    db.prepare("UPDATE campaign_timelines SET revision = 1 WHERE campaign_id = 'campaign-other' AND id = 'timeline-other'").run();
-    db.prepare(`INSERT INTO campaign_commands
+    db.prepare(
+      `INSERT INTO campaign_actors VALUES
+      ('actor-other', 'campaign-other', 'cc-missing', 'sheet-missing', 'player-character', 'principal', ?, ?)`,
+    ).run(BEFORE, BEFORE);
+    db.prepare(
+      "UPDATE campaign_timelines SET revision = 1 WHERE campaign_id = 'campaign-other' AND id = 'timeline-other'",
+    ).run();
+    db.prepare(
+      `INSERT INTO campaign_commands
       (campaign_id, command_id, idempotency_key, timeline_id, actor_id, expected_revision,
        source_turn_id, type, attribute_id, value) VALUES
       ('campaign-other', 'command-b', 'other-key', 'timeline-other', 'actor-other', 0,
-       NULL, 'set_actor_attribute', 'strength', 99)`).run();
-    db.prepare(`INSERT INTO campaign_events
+       NULL, 'set_actor_attribute', 'strength', 99)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO campaign_events
       (event_id, campaign_id, command_id, timeline_id, actor_id, source_turn_id, type,
        revision, occurred_at, attribute_id, value_before, value_after) VALUES
       ('event-other', 'campaign-other', 'command-b', 'timeline-other', 'actor-other', NULL,
-       'actor_attribute_set', 1, ?, 'strength', 10, 99)`).run(AT);
+       'actor_attribute_set', 1, ?, 'strength', 10, 99)`,
+    ).run(AT);
     db.prepare("INSERT INTO command_receipts VALUES ('campaign-other', 'command-b', 0, 1, 'event-other')").run();
     db.close();
 
     expect(repository.getCommandReceipt("local-owner", campaignId, "command-b")?.events[0]?.eventId).toBe("event-b");
-    expect(repository.getCommandReceipt("local-owner", "campaign-other", "command-b")?.events[0]?.eventId)
-      .toBe("event-other");
+    expect(repository.getCommandReceipt("local-owner", "campaign-other", "command-b")?.events[0]?.eventId).toBe(
+      "event-other",
+    );
     expect(repository.listCampaignEvents("local-owner", campaignId, "timeline-other")).toEqual([]);
     expect(repository.listCampaignEvents("local-owner", "campaign-other", "timeline-old")).toEqual([]);
-    expect(repository.listCampaignEvents("local-owner", "campaign-other", "timeline-other").map((event) => event.eventId))
-      .toEqual(["event-other"]);
+    expect(
+      repository.listCampaignEvents("local-owner", "campaign-other", "timeline-other").map((event) => event.eventId),
+    ).toEqual(["event-other"]);
     repository.close();
   });
 

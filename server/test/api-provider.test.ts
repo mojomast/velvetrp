@@ -4,12 +4,21 @@ import { useTmpDataDir } from "./helpers.js";
 
 process.env.NODE_ENV = "test";
 // The suite must never use a real provider key or a developer's provider endpoint.
-for (const name of ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENROUTER_BASE_URL", "OPENAI_BASE_URL", "OPENROUTER_MODEL", "OPENAI_MODEL"]) {
+for (const name of [
+  "OPENROUTER_API_KEY",
+  "OPENAI_API_KEY",
+  "OPENROUTER_BASE_URL",
+  "OPENAI_BASE_URL",
+  "OPENROUTER_MODEL",
+  "OPENAI_MODEL",
+]) {
   delete process.env[name];
 }
 useTmpDataDir();
 const ORIGINAL_PROVIDER_KEY_STORAGE = process.env.VELVET_PROVIDER_KEY_STORAGE;
-beforeAll(() => { process.env.VELVET_PROVIDER_KEY_STORAGE = "database"; });
+beforeAll(() => {
+  process.env.VELVET_PROVIDER_KEY_STORAGE = "database";
+});
 afterAll(() => {
   if (ORIGINAL_PROVIDER_KEY_STORAGE === undefined) delete process.env.VELVET_PROVIDER_KEY_STORAGE;
   else process.env.VELVET_PROVIDER_KEY_STORAGE = ORIGINAL_PROVIDER_KEY_STORAGE;
@@ -25,13 +34,31 @@ describe("provider api compatibility", () => {
     const app = buildApp();
     const get = await app.inject({ method: "GET", url: "/api/provider/preflight" });
     expect(get.statusCode).toBe(404);
-    const response = await app.inject({ method: "POST", url: "/api/provider/preflight", headers: { "content-type": "application/json" }, payload: {} });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/provider/preflight",
+      headers: { "content-type": "application/json" },
+      payload: {},
+    });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
-    expect(response.json()).toMatchObject({ ok: false, dmPlayCompatible: false, campaignGenerationCompatible: false, capabilities: [
-      { capability: "function-tools", status: "unavailable", failure: { permanence: "permanent", code: "configuration" } },
-      { capability: "strict-json-schema", status: "unavailable", failure: { permanence: "permanent", code: "configuration" } },
-    ] });
+    expect(response.json()).toMatchObject({
+      ok: false,
+      dmPlayCompatible: false,
+      campaignGenerationCompatible: false,
+      capabilities: [
+        {
+          capability: "function-tools",
+          status: "unavailable",
+          failure: { permanence: "permanent", code: "configuration" },
+        },
+        {
+          capability: "strict-json-schema",
+          status: "unavailable",
+          failure: { permanence: "permanent", code: "configuration" },
+        },
+      ],
+    });
     expect(JSON.stringify(response.json())).not.toMatch(/apiKey|authorization|bearer/i);
     await app.close();
   });
@@ -59,17 +86,43 @@ describe("provider api compatibility", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["x-request-id"]).toBe("provider-characterization");
     expect(Object.keys(body)).toEqual([
-      "id", "providerType", "baseUrl", "model", "hasApiKey", "apiKeySource", "apiKeyWarning", "streaming", "httpReferer", "appTitle",
-      "requireParameters", "allowFallbacks", "routingSort", "dataCollection", "zdr", "requestTimeoutSeconds",
-      "pricing", "adventureTurnBudget", "samplers", "updatedAt",
+      "id",
+      "providerType",
+      "baseUrl",
+      "model",
+      "hasApiKey",
+      "apiKeySource",
+      "apiKeyWarning",
+      "streaming",
+      "httpReferer",
+      "appTitle",
+      "requireParameters",
+      "allowFallbacks",
+      "routingSort",
+      "dataCollection",
+      "zdr",
+      "requestTimeoutSeconds",
+      "pricing",
+      "adventureTurnBudget",
+      "samplers",
+      "updatedAt",
     ]);
     expect(body.id).toBe("provider");
     expect(body).not.toHaveProperty("apiKey");
     expect(Object.keys(body.pricing)).toEqual(["promptPerMillion", "completionPerMillion"]);
     expect(body.adventureTurnBudget).toEqual({ maxTotalTokens: 65536, maxEstimatedCostUsd: null });
     expect(Object.keys(body.samplers)).toEqual([
-      "maxTokens", "topP", "topK", "minP", "repetitionPenalty", "frequencyPenalty", "presencePenalty", "seed",
-      "reasoningEffort", "stopStrings", "startReplyWith",
+      "maxTokens",
+      "topP",
+      "topK",
+      "minP",
+      "repetitionPenalty",
+      "frequencyPenalty",
+      "presencePenalty",
+      "seed",
+      "reasoningEffort",
+      "stopStrings",
+      "startReplyWith",
     ]);
     expect(typeof body.updatedAt).toBe("string");
     expect(new Date(body.updatedAt).toISOString()).toBe(body.updatedAt);

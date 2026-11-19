@@ -29,8 +29,7 @@ function toSummary(row: SummaryRow): EpisodeSummary {
 
 export async function getSummary(sessionId: string): Promise<EpisodeSummary | null> {
   const row = getRepositoryDatabase().prepare("SELECT * FROM summaries WHERE session_id = ?").get(sessionId) as
-    | SummaryRow
-    | undefined;
+    SummaryRow | undefined;
   return row ? toSummary(row) : null;
 }
 

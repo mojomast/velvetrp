@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { enemyTemplateCatalogReferenceSchema, itemCatalogReferenceSchema, currencyCatalogReferenceSchema } from "./content-catalog.js";
+import {
+  enemyTemplateCatalogReferenceSchema,
+  itemCatalogReferenceSchema,
+  currencyCatalogReferenceSchema,
+} from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema, campaignIdSchema } from "./rpg-characters.js";
@@ -13,28 +17,45 @@ export const combatLogEntryIdSchema = resourceIdSchema;
 export const rewardBundleIdSchema = resourceIdSchema;
 export const rewardClaimIdSchema = resourceIdSchema;
 export const combatActionIdSchema = resourceIdSchema;
-export const opportunityAttackReactionSchema = z.object({
-  reactionId: resourceIdSchema,
-  reactorCombatantId: combatantIdSchema,
-  targetCombatantId: combatantIdSchema,
-  round: z.number().int().min(1).max(1_000_000),
-  trigger: z.literal("left-reach"),
-}).strict();
+export const opportunityAttackReactionSchema = z
+  .object({
+    reactionId: resourceIdSchema,
+    reactorCombatantId: combatantIdSchema,
+    targetCombatantId: combatantIdSchema,
+    round: z.number().int().min(1).max(1_000_000),
+    trigger: z.literal("left-reach"),
+  })
+  .strict();
 
 export const combatTeamSchema = z.enum(["allies", "enemies"]);
 /** Both variants are explicit so the server can preserve their distinct provenance. */
 export const encounterKindSchema = z.enum(["prepared", "improvised"]);
 export const encounterStatusSchema = z.enum(["preparing", "active", "completed", "escaped", "cancelled"]);
-export const combatActionKindSchema = z.enum(["attack", "grapple", "escape-grapple", "dash", "disengage", "help", "hide", "power", "item", "defend", "flee", "end-turn"]);
+export const combatActionKindSchema = z.enum([
+  "attack",
+  "grapple",
+  "escape-grapple",
+  "dash",
+  "disengage",
+  "help",
+  "hide",
+  "power",
+  "item",
+  "defend",
+  "flee",
+  "end-turn",
+]);
 
 /**
  * Tactics are a server-owned, closed fallback selector, not a script, formula,
  * condition tree, or client supplied AI override.
  */
-export const deterministicFallbackTacticSchema = z.object({
-  kind: z.literal("deterministic_fallback"),
-  tacticId: resourceIdSchema,
-}).strict();
+export const deterministicFallbackTacticSchema = z
+  .object({
+    kind: z.literal("deterministic_fallback"),
+    tacticId: resourceIdSchema,
+  })
+  .strict();
 export const enemyTacticSchema = deterministicFallbackTacticSchema;
 
 /**
@@ -42,21 +63,25 @@ export const enemyTacticSchema = deterministicFallbackTacticSchema;
  * initiative, combatant membership, and every resolution value are server
  * state, so this intentionally contains no runtime mechanics.
  */
-export const enemySpawnIntentSchema = z.object({
-  enemyInstanceId: enemyInstanceIdSchema,
-  template: enemyTemplateCatalogReferenceSchema,
-  tactic: deterministicFallbackTacticSchema,
-}).strict();
+export const enemySpawnIntentSchema = z
+  .object({
+    enemyInstanceId: enemyInstanceIdSchema,
+    template: enemyTemplateCatalogReferenceSchema,
+    tactic: deterministicFallbackTacticSchema,
+  })
+  .strict();
 
 /** Spawn identity and pinned template for an enemy in one encounter. Runtime HP is server state. */
-export const enemyInstanceSchema = z.object({
-  campaignId: campaignIdSchema,
-  encounterId: encounterIdSchema,
-  enemyInstanceId: enemyInstanceIdSchema,
-  template: enemyTemplateCatalogReferenceSchema,
-  tactic: deterministicFallbackTacticSchema,
-  spawnedAt: utcIsoTimestampSchema,
-}).strict();
+export const enemyInstanceSchema = z
+  .object({
+    campaignId: campaignIdSchema,
+    encounterId: encounterIdSchema,
+    enemyInstanceId: enemyInstanceIdSchema,
+    template: enemyTemplateCatalogReferenceSchema,
+    tactic: deterministicFallbackTacticSchema,
+    spawnedAt: utcIsoTimestampSchema,
+  })
+  .strict();
 
 export const combatantReferenceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("actor"), actorId: actorIdSchema }).strict(),
@@ -76,56 +101,73 @@ const encounterMutationBase = {
  * and rewards from the pinned catalog inputs. Rewards therefore need no
  * caller-authored amount, item, currency, or rules payload.
  */
-export const createEncounterCommandSchema = z.object({
-  ...encounterMutationBase,
-  type: z.literal("create_encounter"),
-  sessionId: resourceIdSchema,
-  kind: encounterKindSchema,
-  enemySpawns: z.array(enemySpawnIntentSchema).max(128),
-  createdAt: utcIsoTimestampSchema,
-}).strict().superRefine((command, context) => {
-  const spawnedIds = new Set<string>();
-  command.enemySpawns.forEach((spawn, index) => {
-    if (spawnedIds.has(spawn.enemyInstanceId)) {
-      context.addIssue({ code: "custom", path: ["enemySpawns", index, "enemyInstanceId"], message: "enemy spawn IDs must be unique" });
-    }
-    spawnedIds.add(spawn.enemyInstanceId);
+export const createEncounterCommandSchema = z
+  .object({
+    ...encounterMutationBase,
+    type: z.literal("create_encounter"),
+    sessionId: resourceIdSchema,
+    kind: encounterKindSchema,
+    enemySpawns: z.array(enemySpawnIntentSchema).max(128),
+    createdAt: utcIsoTimestampSchema,
+  })
+  .strict()
+  .superRefine((command, context) => {
+    const spawnedIds = new Set<string>();
+    command.enemySpawns.forEach((spawn, index) => {
+      if (spawnedIds.has(spawn.enemyInstanceId)) {
+        context.addIssue({
+          code: "custom",
+          path: ["enemySpawns", index, "enemyInstanceId"],
+          message: "enemy spawn IDs must be unique",
+        });
+      }
+      spawnedIds.add(spawn.enemyInstanceId);
+    });
   });
-});
 
-export const joinCombatantCommandSchema = z.object({
-  ...encounterMutationBase,
-  type: z.literal("join_combatant"),
-  combatantId: combatantIdSchema,
-  combatant: combatantReferenceSchema,
-  team: combatTeamSchema,
-  joinedAt: utcIsoTimestampSchema,
-}).strict();
+export const joinCombatantCommandSchema = z
+  .object({
+    ...encounterMutationBase,
+    type: z.literal("join_combatant"),
+    combatantId: combatantIdSchema,
+    combatant: combatantReferenceSchema,
+    team: combatTeamSchema,
+    joinedAt: utcIsoTimestampSchema,
+  })
+  .strict();
 
 /** Asking to resolve initiative intentionally has no client-provided initiative value. */
-export const resolveInitiativeCommandSchema = z.object({
-  ...encounterMutationBase,
-  type: z.literal("resolve_initiative"),
-  resolvedAt: utcIsoTimestampSchema,
-}).strict();
+export const resolveInitiativeCommandSchema = z
+  .object({
+    ...encounterMutationBase,
+    type: z.literal("resolve_initiative"),
+    resolvedAt: utcIsoTimestampSchema,
+  })
+  .strict();
 
 /** Server projection of a resolved initiative entry; it is never command input. */
-export const initiativeSchema = z.object({
-  combatantId: combatantIdSchema,
-  initiative: z.number().int().min(-10_000).max(10_000),
-  resolvedAt: utcIsoTimestampSchema,
-}).strict();
+export const initiativeSchema = z
+  .object({
+    combatantId: combatantIdSchema,
+    initiative: z.number().int().min(-10_000).max(10_000),
+    resolvedAt: utcIsoTimestampSchema,
+  })
+  .strict();
 
-export const advanceTurnCommandSchema = z.object({
-  ...encounterMutationBase,
-  type: z.literal("advance_turn"),
-  advancedAt: utcIsoTimestampSchema,
-}).strict();
-export const advanceRoundCommandSchema = z.object({
-  ...encounterMutationBase,
-  type: z.literal("advance_round"),
-  advancedAt: utcIsoTimestampSchema,
-}).strict();
+export const advanceTurnCommandSchema = z
+  .object({
+    ...encounterMutationBase,
+    type: z.literal("advance_turn"),
+    advancedAt: utcIsoTimestampSchema,
+  })
+  .strict();
+export const advanceRoundCommandSchema = z
+  .object({
+    ...encounterMutationBase,
+    type: z.literal("advance_round"),
+    advancedAt: utcIsoTimestampSchema,
+  })
+  .strict();
 
 const actionCommandBase = {
   ...encounterMutationBase,
@@ -134,74 +176,147 @@ const actionCommandBase = {
   submittedAt: utcIsoTimestampSchema,
 };
 
-export const attackCombatActionCommandSchema = z.object({
-  ...actionCommandBase,
-  type: z.literal("attack"),
-  attackId: resourceIdSchema,
-  targetCombatantId: combatantIdSchema,
-}).strict();
-export const powerCombatActionCommandSchema = z.object({
-  ...actionCommandBase,
-  type: z.literal("power"),
-  powerId: resourceIdSchema,
-  targetCombatantId: combatantIdSchema.nullable(),
-}).strict();
-export const itemCombatActionCommandSchema = z.object({
-  ...actionCommandBase,
-  type: z.literal("item"),
-  inventoryEntryId: resourceIdSchema,
-  targetCombatantId: combatantIdSchema.nullable(),
-}).strict();
+export const attackCombatActionCommandSchema = z
+  .object({
+    ...actionCommandBase,
+    type: z.literal("attack"),
+    attackId: resourceIdSchema,
+    targetCombatantId: combatantIdSchema,
+  })
+  .strict();
+export const powerCombatActionCommandSchema = z
+  .object({
+    ...actionCommandBase,
+    type: z.literal("power"),
+    powerId: resourceIdSchema,
+    targetCombatantId: combatantIdSchema.nullable(),
+  })
+  .strict();
+export const itemCombatActionCommandSchema = z
+  .object({
+    ...actionCommandBase,
+    type: z.literal("item"),
+    inventoryEntryId: resourceIdSchema,
+    targetCombatantId: combatantIdSchema.nullable(),
+  })
+  .strict();
 export const defendCombatActionCommandSchema = z.object({ ...actionCommandBase, type: z.literal("defend") }).strict();
 export const fleeCombatActionCommandSchema = z.object({ ...actionCommandBase, type: z.literal("flee") }).strict();
-export const endTurnCombatActionCommandSchema = z.object({ ...actionCommandBase, type: z.literal("end-turn") }).strict();
+export const endTurnCombatActionCommandSchema = z
+  .object({ ...actionCommandBase, type: z.literal("end-turn") })
+  .strict();
 export const dashCombatActionCommandSchema = z.object({ ...actionCommandBase, type: z.literal("dash") }).strict();
-export const disengageCombatActionCommandSchema = z.object({ ...actionCommandBase, type: z.literal("disengage") }).strict();
-export const helpCombatActionCommandSchema = z.object({ ...actionCommandBase, type: z.literal("help"), targetCombatantId: combatantIdSchema }).strict();
+export const disengageCombatActionCommandSchema = z
+  .object({ ...actionCommandBase, type: z.literal("disengage") })
+  .strict();
+export const helpCombatActionCommandSchema = z
+  .object({ ...actionCommandBase, type: z.literal("help"), targetCombatantId: combatantIdSchema })
+  .strict();
 export const hideCombatActionCommandSchema = z.object({ ...actionCommandBase, type: z.literal("hide") }).strict();
 export const combatActionCommandSchema = z.discriminatedUnion("type", [
-  attackCombatActionCommandSchema, powerCombatActionCommandSchema, itemCombatActionCommandSchema,
-  defendCombatActionCommandSchema, fleeCombatActionCommandSchema, endTurnCombatActionCommandSchema,
-  dashCombatActionCommandSchema, disengageCombatActionCommandSchema, helpCombatActionCommandSchema, hideCombatActionCommandSchema,
+  attackCombatActionCommandSchema,
+  powerCombatActionCommandSchema,
+  itemCombatActionCommandSchema,
+  defendCombatActionCommandSchema,
+  fleeCombatActionCommandSchema,
+  endTurnCombatActionCommandSchema,
+  dashCombatActionCommandSchema,
+  disengageCombatActionCommandSchema,
+  helpCombatActionCommandSchema,
+  hideCombatActionCommandSchema,
 ]);
 
 /** Server-issued choices for the current turn. This is an allowlist, never an action override. */
 export const legalCombatActionSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("attack"), attackId: resourceIdSchema, attackType: z.enum(["melee", "ranged", "thrown"]).optional(),
-    targetCombatantIds: z.array(combatantIdSchema).min(1).max(128), targetEvidence: z.array(z.object({ targetCombatantId: combatantIdSchema,
-      lineOfEffect: z.enum(["clear", "blocked"]), cover: z.enum(["none", "half", "three-quarters", "full"]), blockedBy: z.array(mapPointSchema).max(10_000),
-      reason: z.enum(["full-cover", "unsupported-geometry"]).optional() }).strict()).max(128).optional() }).strict(),
+  z
+    .object({
+      kind: z.literal("attack"),
+      attackId: resourceIdSchema,
+      attackType: z.enum(["melee", "ranged", "thrown"]).optional(),
+      targetCombatantIds: z.array(combatantIdSchema).min(1).max(128),
+      targetEvidence: z
+        .array(
+          z
+            .object({
+              targetCombatantId: combatantIdSchema,
+              lineOfEffect: z.enum(["clear", "blocked"]),
+              cover: z.enum(["none", "half", "three-quarters", "full"]),
+              blockedBy: z.array(mapPointSchema).max(10_000),
+              reason: z.enum(["full-cover", "unsupported-geometry"]).optional(),
+            })
+            .strict(),
+        )
+        .max(128)
+        .optional(),
+    })
+    .strict(),
   z.object({ kind: z.literal("grapple"), targetCombatantIds: z.array(combatantIdSchema).min(1).max(128) }).strict(),
   z.object({ kind: z.literal("escape-grapple") }).strict(),
   z.object({ kind: z.literal("dash") }).strict(),
   z.object({ kind: z.literal("disengage") }).strict(),
   z.object({ kind: z.literal("help"), targetCombatantIds: z.array(combatantIdSchema).length(1) }).strict(),
   z.object({ kind: z.literal("hide") }).strict(),
-  z.object({ kind: z.literal("power"), powerId: resourceIdSchema, targetCombatantIds: z.array(combatantIdSchema).max(128), allowsNoTarget: z.boolean() }).strict(),
-  z.object({ kind: z.literal("item"), inventoryEntryId: resourceIdSchema, targetCombatantIds: z.array(combatantIdSchema).max(128), allowsNoTarget: z.boolean() }).strict(),
+  z
+    .object({
+      kind: z.literal("power"),
+      powerId: resourceIdSchema,
+      targetCombatantIds: z.array(combatantIdSchema).max(128),
+      allowsNoTarget: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("item"),
+      inventoryEntryId: resourceIdSchema,
+      targetCombatantIds: z.array(combatantIdSchema).max(128),
+      allowsNoTarget: z.boolean(),
+    })
+    .strict(),
   z.object({ kind: z.literal("defend") }).strict(),
   z.object({ kind: z.literal("flee") }).strict(),
   z.object({ kind: z.literal("end-turn") }).strict(),
 ]);
-export const legalCombatActionAllowlistSchema = z.object({
-  campaignId: campaignIdSchema,
-  encounterId: encounterIdSchema,
-  combatantId: combatantIdSchema,
-  revision: revisionSchema,
-  issuedAt: utcIsoTimestampSchema,
-  actions: z.array(legalCombatActionSchema).min(1).max(128),
-  coverEvidence: z.array(z.object({ targetCombatantId: combatantIdSchema,
-    lineOfEffect: z.enum(["clear", "blocked"]), cover: z.enum(["none", "half", "three-quarters", "full"]), blockedBy: z.array(mapPointSchema).max(10_000),
-    reason: z.enum(["full-cover", "unsupported-geometry"]).optional() }).strict()).max(128).optional(),
-}).strict().superRefine((allowlist, context) => {
-  const keys = new Set<string>();
-  allowlist.actions.forEach((action, index) => {
-    const id = action.kind === "attack" ? action.attackId : action.kind === "power" ? action.powerId : action.kind === "item" ? action.inventoryEntryId : "";
-    const key = `${action.kind}:${id}`;
-    if (keys.has(key)) context.addIssue({ code: "custom", message: "legal actions must be unique", path: ["actions", index] });
-    keys.add(key);
+export const legalCombatActionAllowlistSchema = z
+  .object({
+    campaignId: campaignIdSchema,
+    encounterId: encounterIdSchema,
+    combatantId: combatantIdSchema,
+    revision: revisionSchema,
+    issuedAt: utcIsoTimestampSchema,
+    actions: z.array(legalCombatActionSchema).min(1).max(128),
+    coverEvidence: z
+      .array(
+        z
+          .object({
+            targetCombatantId: combatantIdSchema,
+            lineOfEffect: z.enum(["clear", "blocked"]),
+            cover: z.enum(["none", "half", "three-quarters", "full"]),
+            blockedBy: z.array(mapPointSchema).max(10_000),
+            reason: z.enum(["full-cover", "unsupported-geometry"]).optional(),
+          })
+          .strict(),
+      )
+      .max(128)
+      .optional(),
+  })
+  .strict()
+  .superRefine((allowlist, context) => {
+    const keys = new Set<string>();
+    allowlist.actions.forEach((action, index) => {
+      const id =
+        action.kind === "attack"
+          ? action.attackId
+          : action.kind === "power"
+            ? action.powerId
+            : action.kind === "item"
+              ? action.inventoryEntryId
+              : "";
+      const key = `${action.kind}:${id}`;
+      if (keys.has(key))
+        context.addIssue({ code: "custom", message: "legal actions must be unique", path: ["actions", index] });
+      keys.add(key);
+    });
   });
-});
 
 export const combatLogEventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("encounter_created") }).strict(),
@@ -211,51 +326,77 @@ export const combatLogEventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("turn_advanced"), combatantId: combatantIdSchema }).strict(),
   z.object({ kind: z.literal("combat_terminal") }).strict(),
   z.object({ kind: z.literal("encounter_completed") }).strict(),
-  z.object({ kind: z.literal("action_resolved"), actionId: combatActionIdSchema, action: combatActionKindSchema }).strict(),
-  z.object({
-    kind: z.literal("combatant_state_changed"),
-    combatantId: combatantIdSchema,
-    hitPoints: z.number().int().min(-1_000_000).max(1_000_000),
-    status: z.enum(["active", "defeated", "fled", "removed"]),
-  }).strict(),
+  z
+    .object({ kind: z.literal("action_resolved"), actionId: combatActionIdSchema, action: combatActionKindSchema })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("combatant_state_changed"),
+      combatantId: combatantIdSchema,
+      hitPoints: z.number().int().min(-1_000_000).max(1_000_000),
+      status: z.enum(["active", "defeated", "fled", "removed"]),
+    })
+    .strict(),
   z.object({ kind: z.literal("rewards_granted"), rewardBundleIds: z.array(rewardBundleIdSchema).max(128) }).strict(),
   z.object({ kind: z.literal("reward_claimed"), rewardClaimId: rewardClaimIdSchema }).strict(),
 ]);
-export const combatLogEntrySchema = z.object({
-  logEntryId: combatLogEntryIdSchema,
-  campaignId: campaignIdSchema,
-  encounterId: encounterIdSchema,
-  sequence: z.number().int().min(1).max(1_000_000),
-  occurredAt: utcIsoTimestampSchema,
-  event: combatLogEventSchema,
-}).strict();
+export const combatLogEntrySchema = z
+  .object({
+    logEntryId: combatLogEntryIdSchema,
+    campaignId: campaignIdSchema,
+    encounterId: encounterIdSchema,
+    sequence: z.number().int().min(1).max(1_000_000),
+    occurredAt: utcIsoTimestampSchema,
+    event: combatLogEventSchema,
+  })
+  .strict();
 export const combatLogSchema = z.array(combatLogEntrySchema).max(10_000);
 
 export const encounterRewardSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("currency"), currency: currencyCatalogReferenceSchema, amount: z.number().int().min(1).max(1_000_000) }).strict(),
-  z.object({ kind: z.literal("item"), item: itemCatalogReferenceSchema, quantity: z.number().int().min(1).max(1_000_000) }).strict(),
+  z
+    .object({
+      kind: z.literal("currency"),
+      currency: currencyCatalogReferenceSchema,
+      amount: z.number().int().min(1).max(1_000_000),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("item"),
+      item: itemCatalogReferenceSchema,
+      quantity: z.number().int().min(1).max(1_000_000),
+    })
+    .strict(),
   z.object({ kind: z.literal("experience"), amount: z.number().int().min(1).max(1_000_000) }).strict(),
 ]);
-export const rewardBundleSchema = z.object({
-  rewardBundleId: rewardBundleIdSchema,
-  campaignId: campaignIdSchema,
-  encounterId: encounterIdSchema,
-  createdAt: utcIsoTimestampSchema,
-  rewards: z.array(encounterRewardSchema).min(1).max(128),
-}).strict();
-export const claimRewardBundleCommandSchema = z.object({
-  ...encounterMutationBase,
-  type: z.literal("claim_reward_bundle"),
-  rewardClaimId: rewardClaimIdSchema,
-  rewardBundleId: rewardBundleIdSchema,
-  recipientActorId: actorIdSchema,
-  claimedAt: utcIsoTimestampSchema,
-}).strict();
+export const rewardBundleSchema = z
+  .object({
+    rewardBundleId: rewardBundleIdSchema,
+    campaignId: campaignIdSchema,
+    encounterId: encounterIdSchema,
+    createdAt: utcIsoTimestampSchema,
+    rewards: z.array(encounterRewardSchema).min(1).max(128),
+  })
+  .strict();
+export const claimRewardBundleCommandSchema = z
+  .object({
+    ...encounterMutationBase,
+    type: z.literal("claim_reward_bundle"),
+    rewardClaimId: rewardClaimIdSchema,
+    rewardBundleId: rewardBundleIdSchema,
+    recipientActorId: actorIdSchema,
+    claimedAt: utcIsoTimestampSchema,
+  })
+  .strict();
 
 /** Closed mutation boundary for encounter lifecycle, commands, and reward claims. */
 export const encounterCommandSchema = z.discriminatedUnion("type", [
-  createEncounterCommandSchema, joinCombatantCommandSchema, resolveInitiativeCommandSchema,
-  advanceTurnCommandSchema, advanceRoundCommandSchema, ...combatActionCommandSchema.options,
+  createEncounterCommandSchema,
+  joinCombatantCommandSchema,
+  resolveInitiativeCommandSchema,
+  advanceTurnCommandSchema,
+  advanceRoundCommandSchema,
+  ...combatActionCommandSchema.options,
   claimRewardBundleCommandSchema,
 ]);
 

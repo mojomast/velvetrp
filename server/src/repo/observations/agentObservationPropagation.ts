@@ -1,10 +1,7 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import type { Clock, IdGenerator } from "../../runtime.js";
-import {
-  createAgentObservationRepository,
-  type AgentObservation,
-} from "./agentObservationRepo.js";
+import { createAgentObservationRepository, type AgentObservation } from "./agentObservationRepo.js";
 
 export const MAX_WITNESS_FANOUT = 12;
 export const MAX_FACTION_WITNESS_FANOUT = 12;
@@ -53,11 +50,26 @@ export interface GossipSampleInput {
   sessionId: string;
 }
 
-interface NpcIdRow { npc_id: string }
-interface FactionIdRow { faction_id: string }
-interface CountRow { count: number }
-interface GossipRow { source_command_id: string; text: string; observed_revision: number }
-interface KnowerObservationRow { source_command_id: string; hop_count: number; text: string; observed_revision: number }
+interface NpcIdRow {
+  npc_id: string;
+}
+interface FactionIdRow {
+  faction_id: string;
+}
+interface CountRow {
+  count: number;
+}
+interface GossipRow {
+  source_command_id: string;
+  text: string;
+  observed_revision: number;
+}
+interface KnowerObservationRow {
+  source_command_id: string;
+  hop_count: number;
+  text: string;
+  observed_revision: number;
+}
 
 const KNOWS_ROW = "observation_id";
 
@@ -84,7 +96,8 @@ export function propagateWitnessObservations(
   input: WitnessObservationInput,
 ): AgentObservation[] {
   const repository = createAgentObservationRepository(db, dependencies);
-  const present = db.prepare(WITNESS_NPCS)
+  const present = db
+    .prepare(WITNESS_NPCS)
     .all(input.campaignId, input.sessionId, input.sourceActorId ?? null, MAX_WITNESS_FANOUT) as NpcIdRow[];
   const countObservations = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
     WHERE campaign_id=? AND agent_kind='npc' AND agent_id=?`);
@@ -94,19 +107,22 @@ export function propagateWitnessObservations(
   const recorded: AgentObservation[] = [];
   for (const { npc_id: npcId } of present) {
     const replayed = selectWitnessed.get(input.campaignId, npcId, input.sourceCommandId) !== undefined;
-    if (!replayed && (countObservations.get(input.campaignId, npcId) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT) continue;
-    recorded.push(repository.record({
-      campaignId: input.campaignId,
-      timelineId: input.timelineId,
-      agentKind: "npc",
-      agentId: npcId,
-      sourceCommandId: input.sourceCommandId,
-      observedRevision: input.observedRevision,
-      channel: "witnessed",
-      hopCount: 0,
-      text: input.summary,
-      authority: input.authority ?? "verified",
-    }));
+    if (!replayed && (countObservations.get(input.campaignId, npcId) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT)
+      continue;
+    recorded.push(
+      repository.record({
+        campaignId: input.campaignId,
+        timelineId: input.timelineId,
+        agentKind: "npc",
+        agentId: npcId,
+        sourceCommandId: input.sourceCommandId,
+        observedRevision: input.observedRevision,
+        channel: "witnessed",
+        hopCount: 0,
+        text: input.summary,
+        authority: input.authority ?? "verified",
+      }),
+    );
   }
   return recorded;
 }
@@ -124,13 +140,22 @@ export function propagateFactionWitnessObservations(
   input: WitnessObservationInput,
 ): AgentObservation[] {
   const repository = createAgentObservationRepository(db, dependencies);
-  const factions = db.prepare(`SELECT DISTINCT membership.faction_id AS faction_id
+  const factions = db
+    .prepare(
+      `SELECT DISTINCT membership.faction_id AS faction_id
     FROM campaign_npc_faction_memberships_v28 membership
     WHERE membership.campaign_id=? AND membership.npc_id IN (${WITNESS_NPCS})
       AND membership.membership_role IN ${FACTION_SHARING_ROLES}
-    ORDER BY faction_id LIMIT ?`)
-    .all(input.campaignId, input.campaignId, input.sessionId, input.sourceActorId ?? null,
-      MAX_WITNESS_FANOUT, MAX_FACTION_WITNESS_FANOUT) as FactionIdRow[];
+    ORDER BY faction_id LIMIT ?`,
+    )
+    .all(
+      input.campaignId,
+      input.campaignId,
+      input.sessionId,
+      input.sourceActorId ?? null,
+      MAX_WITNESS_FANOUT,
+      MAX_FACTION_WITNESS_FANOUT,
+    ) as FactionIdRow[];
   const countObservations = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
     WHERE campaign_id=? AND agent_kind='faction' AND agent_id=?`);
   const selectWitnessed = db.prepare(`SELECT ${KNOWS_ROW} FROM agent_observations
@@ -139,19 +164,25 @@ export function propagateFactionWitnessObservations(
   const recorded: AgentObservation[] = [];
   for (const { faction_id: factionId } of factions) {
     const replayed = selectWitnessed.get(input.campaignId, factionId, input.sourceCommandId) !== undefined;
-    if (!replayed && (countObservations.get(input.campaignId, factionId) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT) continue;
-    recorded.push(repository.record({
-      campaignId: input.campaignId,
-      timelineId: input.timelineId,
-      agentKind: "faction",
-      agentId: factionId,
-      sourceCommandId: input.sourceCommandId,
-      observedRevision: input.observedRevision,
-      channel: "witnessed",
-      hopCount: 0,
-      text: input.summary,
-      authority: input.authority ?? "verified",
-    }));
+    if (
+      !replayed &&
+      (countObservations.get(input.campaignId, factionId) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT
+    )
+      continue;
+    recorded.push(
+      repository.record({
+        campaignId: input.campaignId,
+        timelineId: input.timelineId,
+        agentKind: "faction",
+        agentId: factionId,
+        sourceCommandId: input.sourceCommandId,
+        observedRevision: input.observedRevision,
+        channel: "witnessed",
+        hopCount: 0,
+        text: input.summary,
+        authority: input.authority ?? "verified",
+      }),
+    );
   }
   return recorded;
 }
@@ -184,19 +215,22 @@ export function propagateTownGossipObservations(
     WHERE campaign_id=? AND agent_kind='town' AND agent_id=? AND source_command_id=? AND hop_count=0
       AND relayer_agent_id IS NULL`);
   if (selectExisting.get(input.campaignId, TOWN_GOSSIP_AGENT_ID, input.sourceCommandId) !== undefined) return [];
-  if ((countObservations.get(input.campaignId, TOWN_GOSSIP_AGENT_ID) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT) return [];
-  return [repository.record({
-    campaignId: input.campaignId,
-    timelineId: input.timelineId,
-    agentKind: "town",
-    agentId: TOWN_GOSSIP_AGENT_ID,
-    sourceCommandId: input.sourceCommandId,
-    observedRevision: input.observedRevision,
-    channel: "witnessed",
-    hopCount: 0,
-    text: input.summary,
-    authority: "rumor",
-  })];
+  if ((countObservations.get(input.campaignId, TOWN_GOSSIP_AGENT_ID) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT)
+    return [];
+  return [
+    repository.record({
+      campaignId: input.campaignId,
+      timelineId: input.timelineId,
+      agentKind: "town",
+      agentId: TOWN_GOSSIP_AGENT_ID,
+      sourceCommandId: input.sourceCommandId,
+      observedRevision: input.observedRevision,
+      channel: "witnessed",
+      hopCount: 0,
+      text: input.summary,
+      authority: "rumor",
+    }),
+  ];
 }
 
 /**
@@ -211,12 +245,18 @@ export function propagateGossipToPresentNpcs(
   input: GossipSampleInput,
 ): AgentObservation[] {
   const repository = createAgentObservationRepository(db, dependencies);
-  const present = db.prepare(`SELECT npc_id FROM campaign_npc_presence_v43
-    WHERE campaign_id=? AND session_id=? AND state='present' ORDER BY npc_id LIMIT ?`)
+  const present = db
+    .prepare(
+      `SELECT npc_id FROM campaign_npc_presence_v43
+    WHERE campaign_id=? AND session_id=? AND state='present' ORDER BY npc_id LIMIT ?`,
+    )
     .all(input.campaignId, input.sessionId, MAX_GOSSIP_FANOUT) as NpcIdRow[];
-  const gossip = db.prepare(`SELECT source_command_id,text,observed_revision FROM agent_observations
+  const gossip = db
+    .prepare(
+      `SELECT source_command_id,text,observed_revision FROM agent_observations
     WHERE campaign_id=? AND timeline_id=? AND agent_kind='town' AND agent_id=?
-    ORDER BY created_at DESC, observation_id DESC LIMIT ?`)
+    ORDER BY created_at DESC, observation_id DESC LIMIT ?`,
+    )
     .all(input.campaignId, input.timelineId, TOWN_GOSSIP_AGENT_ID, MAX_GOSSIP_SOURCE_ITEMS) as GossipRow[];
   const selectWitnessed = db.prepare(`SELECT ${KNOWS_ROW} FROM agent_observations
     WHERE campaign_id=? AND agent_kind='npc' AND agent_id=? AND source_command_id=? AND hop_count=0`);
@@ -236,19 +276,21 @@ export function propagateGossipToPresentNpcs(
       if (selectWitnessed.get(input.campaignId, npcId, item.source_command_id) !== undefined) continue;
       if (selectTold.get(input.campaignId, npcId, item.source_command_id, TOWN_GOSSIP_AGENT_ID) !== undefined) continue;
       if ((countObservations.get(input.campaignId, npcId) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT) break;
-      recorded.push(repository.record({
-        campaignId: input.campaignId,
-        timelineId: input.timelineId,
-        agentKind: "npc",
-        agentId: npcId,
-        sourceCommandId: item.source_command_id,
-        observedRevision: item.observed_revision,
-        channel: "told",
-        relayerAgentId: TOWN_GOSSIP_AGENT_ID,
-        hopCount: 1,
-        text: item.text,
-        authority: "rumor",
-      }));
+      recorded.push(
+        repository.record({
+          campaignId: input.campaignId,
+          timelineId: input.timelineId,
+          agentKind: "npc",
+          agentId: npcId,
+          sourceCommandId: item.source_command_id,
+          observedRevision: item.observed_revision,
+          channel: "told",
+          relayerAgentId: TOWN_GOSSIP_AGENT_ID,
+          hopCount: 1,
+          text: item.text,
+          authority: "rumor",
+        }),
+      );
       sampled += 1;
     }
   }
@@ -267,10 +309,14 @@ export function propagateToldOnArrival(
   input: ToldOnArrivalInput,
 ): AgentObservation[] {
   const repository = createAgentObservationRepository(db, dependencies);
-  const knowers = db.prepare(`SELECT npc_id FROM campaign_npc_presence_v43
-    WHERE campaign_id=? AND session_id=? AND state='present' AND npc_id<>? ORDER BY npc_id LIMIT ?`)
+  const knowers = db
+    .prepare(
+      `SELECT npc_id FROM campaign_npc_presence_v43
+    WHERE campaign_id=? AND session_id=? AND state='present' AND npc_id<>? ORDER BY npc_id LIMIT ?`,
+    )
     .all(input.campaignId, input.sessionId, input.arrivingNpcId, MAX_TELL_FANOUT) as NpcIdRow[];
-  const knowerObservations = db.prepare(`SELECT source_command_id,hop_count,text,observed_revision FROM agent_observations
+  const knowerObservations =
+    db.prepare(`SELECT source_command_id,hop_count,text,observed_revision FROM agent_observations
     WHERE campaign_id=? AND agent_kind='npc' AND agent_id=?
     ORDER BY created_at DESC, observation_id DESC LIMIT ?`);
   const countObservations = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
@@ -281,27 +327,33 @@ export function propagateToldOnArrival(
   let arrivingCount = (countObservations.get(input.campaignId, input.arrivingNpcId) as CountRow).count;
   const recorded: AgentObservation[] = [];
   for (const { npc_id: knowerId } of knowers) {
-    const observations = knowerObservations.all(input.campaignId, knowerId, MAX_KNOWER_OBSERVATIONS) as KnowerObservationRow[];
+    const observations = knowerObservations.all(
+      input.campaignId,
+      knowerId,
+      MAX_KNOWER_OBSERVATIONS,
+    ) as KnowerObservationRow[];
     for (const observation of observations) {
       const hopCount = observation.hop_count + 1;
       if (hopCount > MAX_HOP_COUNT) continue;
-      const replayed = selectTold.get(
-        input.campaignId, input.arrivingNpcId, observation.source_command_id, hopCount, knowerId,
-      ) !== undefined;
+      const replayed =
+        selectTold.get(input.campaignId, input.arrivingNpcId, observation.source_command_id, hopCount, knowerId) !==
+        undefined;
       if (!replayed && arrivingCount >= MAX_OBSERVATIONS_PER_AGENT) continue;
-      recorded.push(repository.record({
-        campaignId: input.campaignId,
-        timelineId: input.timelineId,
-        agentKind: "npc",
-        agentId: input.arrivingNpcId,
-        sourceCommandId: observation.source_command_id,
-        observedRevision: observation.observed_revision,
-        channel: "told",
-        relayerAgentId: knowerId,
-        hopCount,
-        text: observation.text,
-        authority: "rumor",
-      }));
+      recorded.push(
+        repository.record({
+          campaignId: input.campaignId,
+          timelineId: input.timelineId,
+          agentKind: "npc",
+          agentId: input.arrivingNpcId,
+          sourceCommandId: observation.source_command_id,
+          observedRevision: observation.observed_revision,
+          channel: "told",
+          relayerAgentId: knowerId,
+          hopCount,
+          text: observation.text,
+          authority: "rumor",
+        }),
+      );
       if (!replayed) arrivingCount += 1;
       if (recorded.length >= MAX_TELL_PER_ARRIVAL) return recorded;
     }

@@ -60,7 +60,9 @@ export function createCampaignRoomSessionLifecycleRepository(
   db: DatabaseDriver.Database,
 ): CampaignRoomSessionLifecycleRepository {
   const getIntegrityRow = (sessionId: string): CampaignRoomSessionIntegrityRow | undefined =>
-    db.prepare(`SELECT target_session.id AS session_id, target_session.character_id,
+    db
+      .prepare(
+        `SELECT target_session.id AS session_id, target_session.character_id,
       primary_character.id AS primary_character_presence, target_session.title,
       target_session.state, target_session.created_at, target_session.stopped_at,
       CASE WHEN target_session.stop_reason IS NULL THEN 0
@@ -95,19 +97,24 @@ export function createCampaignRoomSessionLifecycleRepository(
         WHERE participant.session_id = target_session.id) AS maximum_position
     FROM sessions target_session
     LEFT JOIN characters primary_character ON primary_character.id = target_session.character_id
-    WHERE target_session.id = ?`).get(sessionId) as CampaignRoomSessionIntegrityRow | undefined;
+    WHERE target_session.id = ?`,
+      )
+      .get(sessionId) as CampaignRoomSessionIntegrityRow | undefined;
 
   const validateIntegrity = (row: CampaignRoomSessionIntegrityRow): "running" | "stopped" => {
-    if (row.primary_character_presence !== row.character_id
-      || !Number.isInteger(row.participant_count) || (row.participant_count as number) < 1
-      || (row.participant_count as number) > 12
-      || row.joined_character_count !== row.participant_count
-      || row.primary_participant_count !== 1
-      || row.distinct_character_count !== row.participant_count
-      || row.distinct_position_count !== row.participant_count
-      || row.malformed_position_count !== 0
-      || row.minimum_position !== 0
-      || row.maximum_position !== (row.participant_count as number) - 1) {
+    if (
+      row.primary_character_presence !== row.character_id ||
+      !Number.isInteger(row.participant_count) ||
+      (row.participant_count as number) < 1 ||
+      (row.participant_count as number) > 12 ||
+      row.joined_character_count !== row.participant_count ||
+      row.primary_participant_count !== 1 ||
+      row.distinct_character_count !== row.participant_count ||
+      row.distinct_position_count !== row.participant_count ||
+      row.malformed_position_count !== 0 ||
+      row.minimum_position !== 0 ||
+      row.maximum_position !== (row.participant_count as number) - 1
+    ) {
       throw new Error("campaign room session graph is malformed");
     }
     let names: unknown;
@@ -123,8 +130,10 @@ export function createCampaignRoomSessionLifecycleRepository(
       projectLegacyRoomText(row.title, true);
       for (const name of names) projectLegacyRoomText(name, false);
       const createdAt = utcIsoTimestampSchema.parse(row.created_at);
-      const running = (RUNNING_CAMPAIGN_ROOM_STATES as readonly string[]).includes(row.state)
-        && row.stopped_at === null && row.stop_reason_kind === 0;
+      const running =
+        (RUNNING_CAMPAIGN_ROOM_STATES as readonly string[]).includes(row.state) &&
+        row.stopped_at === null &&
+        row.stop_reason_kind === 0;
       if (running) return "running";
       if (row.state === "closed" && row.stopped_at !== null && row.stop_reason_kind === 1) {
         const stoppedAt = utcIsoTimestampSchema.parse(row.stopped_at);

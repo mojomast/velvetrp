@@ -24,8 +24,7 @@ const MIN_LIMIT = 1;
 const MAX_LIMIT = 200;
 const SQLITE_FILENAME = "velvet.sqlite";
 
-const USAGE =
-  "usage: report-system-one-disagreements.ts [--limit 1..200] [--all] [--out <path>]\n";
+const USAGE = "usage: report-system-one-disagreements.ts [--limit 1..200] [--all] [--out <path>]\n";
 
 export interface DisagreementCliOptions {
   limit: number;
@@ -42,14 +41,14 @@ export function parseDisagreementArgs(argv: readonly string[]): DisagreementCliO
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]!;
     if (arg === "--limit" || arg.startsWith("--limit=")) {
-      const raw = arg === "--limit" ? argv[index += 1] : arg.slice("--limit=".length);
+      const raw = arg === "--limit" ? argv[(index += 1)] : arg.slice("--limit=".length);
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) throw new Error(`--limit requires a number, received ${raw ?? "nothing"}`);
       limit = Math.max(MIN_LIMIT, Math.min(MAX_LIMIT, Math.trunc(parsed)));
     } else if (arg === "--all") {
       includeAgreements = true;
     } else if (arg === "--out" || arg.startsWith("--out=")) {
-      const value = arg === "--out" ? argv[index += 1] : arg.slice("--out=".length);
+      const value = arg === "--out" ? argv[(index += 1)] : arg.slice("--out=".length);
       if (!value || value.trim() === "") throw new Error("--out requires a path");
       out = path.resolve(value);
     } else if (arg === "--help" || arg === "-h") {
@@ -70,7 +69,9 @@ async function main(): Promise<void> {
   const dataDir = resolveDataDir();
   const databasePath = path.join(dataDir, SQLITE_FILENAME);
   if (!existsSync(databasePath)) {
-    throw new Error(`no Velvet database found at ${databasePath}; set VELVET_DATA_DIR or run the server once to create it`);
+    throw new Error(
+      `no Velvet database found at ${databasePath}; set VELVET_DATA_DIR or run the server once to create it`,
+    );
   }
   try {
     const rows = listDirectorDecisionsWithAuthority(options.limit);

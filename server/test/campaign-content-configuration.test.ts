@@ -36,15 +36,24 @@ function seed(dir = dataDir()): void {
   }
   db.prepare("UPDATE application_owner SET principal_id = 'app-owner' WHERE singleton = 1").run();
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
-      VALUES (?, 'Campaign', 'timeline-one', ?, '2030-01-01T00:00:00.000Z', '2030-01-02T00:00:00.000Z')`)
-      .run(campaignId, ownerId);
-    db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at)
-      VALUES ('timeline-one', ?, '2030-01-01T00:00:00.000Z')`).run(campaignId);
-    for (const [principalId, role] of [[ownerId, "owner"], ["campaign-gm", "gm"], ["campaign-player", "player"]]) {
-      db.prepare(`INSERT INTO campaign_memberships
-        VALUES (?, ?, ?, '2030-01-01T00:00:00.000Z')`).run(campaignId, principalId, role);
+      VALUES (?, 'Campaign', 'timeline-one', ?, '2030-01-01T00:00:00.000Z', '2030-01-02T00:00:00.000Z')`,
+    ).run(campaignId, ownerId);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id, campaign_id, created_at)
+      VALUES ('timeline-one', ?, '2030-01-01T00:00:00.000Z')`,
+    ).run(campaignId);
+    for (const [principalId, role] of [
+      [ownerId, "owner"],
+      ["campaign-gm", "gm"],
+      ["campaign-player", "player"],
+    ]) {
+      db.prepare(
+        `INSERT INTO campaign_memberships
+        VALUES (?, ?, ?, '2030-01-01T00:00:00.000Z')`,
+      ).run(campaignId, principalId, role);
     }
     for (const profile of ["profile-main", "profile-other"]) {
       db.prepare("INSERT INTO rpg_rules_profiles VALUES (?, ?, 'Description', '[]')").run(profile, profile);
@@ -56,9 +65,11 @@ function seed(dir = dataDir()): void {
       ["other-pack", "1.0.0", "profile-other", 1],
       ["unsealed-pack", "1.0.0", "profile-main", 0],
     ] as const) {
-      db.prepare(`INSERT INTO rpg_content_packs
+      db.prepare(
+        `INSERT INTO rpg_content_packs
         (pack_id, pack_version, rules_profile_id, name, description, tags, sealed)
-        VALUES (?, ?, ?, ?, 'Description', '[]', ?)`).run(packId, version, profile, packId, sealed);
+        VALUES (?, ?, ?, ?, 'Description', '[]', ?)`,
+      ).run(packId, version, profile, packId, sealed);
     }
   }).immediate();
   db.close();
@@ -98,12 +109,14 @@ describe("factory campaign content configuration", () => {
     const after = snapshot();
     expect(after.campaign).toEqual(before);
     expect(after.profiles).toEqual([{ campaign_id: campaignId, rules_profile_id: "profile-main" }]);
-    expect(after.pins).toEqual(input.contentPacks.map((pack) => ({
-      campaign_id: campaignId,
-      pack_id: pack.packId,
-      pack_version: pack.packVersion,
-      rules_profile_id: "profile-main",
-    })));
+    expect(after.pins).toEqual(
+      input.contentPacks.map((pack) => ({
+        campaign_id: campaignId,
+        pack_id: pack.packId,
+        pack_version: pack.packVersion,
+        rules_profile_id: "profile-main",
+      })),
+    );
   });
 
   it("allows zero packs as a final configuration", () => {
@@ -126,11 +139,13 @@ describe("factory campaign content configuration", () => {
     corrupt.prepare("INSERT INTO campaign_content_packs VALUES (?, 'orphan', '1', 'missing')").run(campaignId);
     corrupt.close();
 
-    expect(() => repository.configureCampaignContent("nonmember", "missing-campaign", input))
-      .toThrow("campaign not found");
+    expect(() => repository.configureCampaignContent("nonmember", "missing-campaign", input)).toThrow(
+      "campaign not found",
+    );
     for (const denied of ["campaign-gm", "campaign-player", "app-owner", "nonmember"]) {
-      expect(() => repository.configureCampaignContent(denied, campaignId, input))
-        .toThrow("requires the campaign owner");
+      expect(() => repository.configureCampaignContent(denied, campaignId, input)).toThrow(
+        "requires the campaign owner",
+      );
     }
     expect(() => repository.configureCampaignContent(ownerId, campaignId, input)).toThrow("malformed");
     repository.close();
@@ -164,9 +179,11 @@ describe("factory campaign content configuration", () => {
     seed();
     const db = new DatabaseDriver(dbPath());
     for (const packId of ["alpha", "Alpha", "_alpha"]) {
-      db.prepare(`INSERT INTO rpg_content_packs
+      db.prepare(
+        `INSERT INTO rpg_content_packs
         (pack_id, pack_version, rules_profile_id, name, description, tags, sealed)
-        VALUES (?, '1', 'profile-main', ?, 'Description', '[]', 1)`).run(packId, packId);
+        VALUES (?, '1', 'profile-main', ?, 'Description', '[]', 1)`,
+      ).run(packId, packId);
     }
     db.close();
     const repository = createRepository({ dataDir: dataDir() });
@@ -174,24 +191,34 @@ describe("factory campaign content configuration", () => {
       rulesProfileId: "profile-main",
       contentPacks: ["alpha", "_alpha", "Alpha"].map((packId) => ({ packId, packVersion: "1" })),
     };
-    expect(repository.configureCampaignContent(ownerId, campaignId, mixed).contentPacks.map((pack) => pack.packId))
-      .toEqual(["Alpha", "_alpha", "alpha"]);
+    expect(
+      repository.configureCampaignContent(ownerId, campaignId, mixed).contentPacks.map((pack) => pack.packId),
+    ).toEqual(["Alpha", "_alpha", "alpha"]);
     repository.close();
   });
 
   it.each([
     ["missing profile", { rulesProfileId: "missing", contentPacks: [] }],
     ["missing pack", { rulesProfileId: "profile-main", contentPacks: [{ packId: "missing", packVersion: "1" }] }],
-    ["wrong profile", { rulesProfileId: "profile-main", contentPacks: [{ packId: "other-pack", packVersion: "1.0.0" }] }],
-    ["unsealed pack", { rulesProfileId: "profile-main", contentPacks: [{ packId: "unsealed-pack", packVersion: "1.0.0" }] }],
-  ] satisfies Array<[string, ConfigureCampaignContentInput]>)("rejects an unavailable %s without writes", (_label, unavailable) => {
-    seed();
-    const repository = createRepository({ dataDir: dataDir() });
-    expect(() => repository.configureCampaignContent(ownerId, campaignId, unavailable)).toThrow("unavailable");
-    repository.close();
-    expect(snapshot().profiles).toEqual([]);
-    expect(snapshot().pins).toEqual([]);
-  });
+    [
+      "wrong profile",
+      { rulesProfileId: "profile-main", contentPacks: [{ packId: "other-pack", packVersion: "1.0.0" }] },
+    ],
+    [
+      "unsealed pack",
+      { rulesProfileId: "profile-main", contentPacks: [{ packId: "unsealed-pack", packVersion: "1.0.0" }] },
+    ],
+  ] satisfies Array<[string, ConfigureCampaignContentInput]>)(
+    "rejects an unavailable %s without writes",
+    (_label, unavailable) => {
+      seed();
+      const repository = createRepository({ dataDir: dataDir() });
+      expect(() => repository.configureCampaignContent(ownerId, campaignId, unavailable)).toThrow("unavailable");
+      repository.close();
+      expect(snapshot().profiles).toEqual([]);
+      expect(snapshot().pins).toEqual([]);
+    },
+  );
 
   it.each(["pins-without-profile", "missing-profile", "mismatched-pin", "orphan-pin", "unsealed-pin", "invalid-id"])(
     "fails loudly and never repairs malformed existing state: %s",
@@ -201,19 +228,25 @@ describe("factory campaign content configuration", () => {
       const db = new DatabaseDriver(dbPath());
       db.pragma("foreign_keys = OFF");
       if (malformation === "pins-without-profile") {
-        db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'pack-core', '1.0.0', 'profile-main')").run(campaignId);
+        db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'pack-core', '1.0.0', 'profile-main')").run(
+          campaignId,
+        );
       } else if (malformation === "missing-profile") {
         db.prepare("INSERT INTO campaign_rules_profiles VALUES (?, 'missing-profile')").run(campaignId);
       } else if (malformation === "mismatched-pin") {
         db.prepare("INSERT INTO campaign_rules_profiles VALUES (?, 'profile-main')").run(campaignId);
-        db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'other-pack', '1.0.0', 'profile-other')").run(campaignId);
+        db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'other-pack', '1.0.0', 'profile-other')").run(
+          campaignId,
+        );
       } else {
         db.exec("DROP TRIGGER campaign_content_packs_require_sealed_insert");
         db.prepare("INSERT INTO campaign_rules_profiles VALUES (?, 'profile-main')").run(campaignId);
         if (malformation === "orphan-pin") {
           db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'orphan', '1', 'profile-main')").run(campaignId);
         } else if (malformation === "unsealed-pin") {
-          db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'unsealed-pack', '1.0.0', 'profile-main')").run(campaignId);
+          db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'unsealed-pack', '1.0.0', 'profile-main')").run(
+            campaignId,
+          );
         } else {
           db.pragma("ignore_check_constraints = ON");
           db.prepare("INSERT INTO campaign_content_packs VALUES (?, 'bad/id', '1', 'profile-main')").run(campaignId);
@@ -247,7 +280,9 @@ describe("factory campaign content configuration", () => {
     } else {
       db.exec("DROP TRIGGER rpg_content_packs_prevent_update");
       db.exec("DROP TRIGGER rpg_content_packs_tags_update");
-      db.prepare("UPDATE rpg_content_packs SET tags = 'not-json' WHERE pack_id = 'pack-core' AND pack_version = '1.0.0'").run();
+      db.prepare(
+        "UPDATE rpg_content_packs SET tags = 'not-json' WHERE pack_id = 'pack-core' AND pack_version = '1.0.0'",
+      ).run();
     }
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
@@ -264,15 +299,23 @@ describe("factory campaign content configuration", () => {
     db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = ? AND principal_id = ?").run(campaignId, ownerId);
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
-    expect(() => repository.configureCampaignContent(ownerId, campaignId, input)).toThrow("malformed campaign ownership");
+    expect(() => repository.configureCampaignContent(ownerId, campaignId, input)).toThrow(
+      "malformed campaign ownership",
+    );
     repository.close();
   });
 
   it.each([
-    ["profile", `CREATE TRIGGER fail_configuration BEFORE INSERT ON campaign_rules_profiles
-      BEGIN SELECT RAISE(ABORT, 'profile insertion failed'); END`],
-    ["mid-pin", `CREATE TRIGGER fail_configuration BEFORE INSERT ON campaign_content_packs
-      WHEN NEW.pack_id = 'pack-extra' BEGIN SELECT RAISE(ABORT, 'mid-pin insertion failed'); END`],
+    [
+      "profile",
+      `CREATE TRIGGER fail_configuration BEFORE INSERT ON campaign_rules_profiles
+      BEGIN SELECT RAISE(ABORT, 'profile insertion failed'); END`,
+    ],
+    [
+      "mid-pin",
+      `CREATE TRIGGER fail_configuration BEFORE INSERT ON campaign_content_packs
+      WHEN NEW.pack_id = 'pack-extra' BEGIN SELECT RAISE(ABORT, 'mid-pin insertion failed'); END`,
+    ],
   ] as const)("rolls back all writes on %s failure", (stage, trigger) => {
     seed();
     const db = new DatabaseDriver(dbPath());
@@ -297,8 +340,9 @@ describe("factory campaign content configuration", () => {
     ]);
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
     const started = Date.now();
-    expect(repository.configureCampaignContent(ownerId, campaignId, input).contentPacks.map((pack) => pack.packId))
-      .toEqual(["pack-core", "pack-extra"]);
+    expect(
+      repository.configureCampaignContent(ownerId, campaignId, input).contentPacks.map((pack) => pack.packId),
+    ).toEqual(["pack-core", "pack-extra"]);
     expect(Date.now() - started).toBeGreaterThanOrEqual(75);
     expect(transaction).toHaveBeenCalledOnce();
     transaction.mockRestore();
@@ -311,7 +355,10 @@ describe("factory campaign content configuration", () => {
     const repository = createRepository({ dataDir: dataDir() });
     const writer = await startLockedWrite(dbPath(), [
       { sql: "INSERT INTO campaign_rules_profiles VALUES (?, ?)", params: [campaignId, input.rulesProfileId] },
-      { sql: "INSERT INTO campaign_content_packs VALUES (?, ?, ?, ?)", params: [campaignId, "pack-core", "2.0.0", input.rulesProfileId] },
+      {
+        sql: "INSERT INTO campaign_content_packs VALUES (?, ?, ?, ?)",
+        params: [campaignId, "pack-core", "2.0.0", input.rulesProfileId],
+      },
     ]);
     expect(() => repository.configureCampaignContent(ownerId, campaignId, input)).toThrow("conflicts");
     await writer.done;
@@ -323,12 +370,19 @@ describe("factory campaign content configuration", () => {
     const now = vi.fn(() => new Date());
     const nextId = vi.fn(() => "unused");
     const repository = createRepository({ dataDir: dataDir(), clock: { now }, ids: { nextId } });
-    const poison = { get rulesProfileId(): string { throw new Error("input read"); } } as ConfigureCampaignContentInput;
+    const poison = {
+      get rulesProfileId(): string {
+        throw new Error("input read");
+      },
+    } as ConfigureCampaignContentInput;
     expect(() => repository.configureCampaignContent("bad actor", campaignId, poison)).not.toThrow("input read");
     expect(() => repository.configureCampaignContent(ownerId, "bad campaign", poison)).not.toThrow("input read");
-    expect(() => repository.configureCampaignContent(ownerId, campaignId, { ...input, replacement: true } as never)).toThrow();
-    expect(() => repository.transaction(() => repository.configureCampaignContent("bad actor", "bad campaign", poison)))
-      .toThrow("cannot run inside a repository transaction");
+    expect(() =>
+      repository.configureCampaignContent(ownerId, campaignId, { ...input, replacement: true } as never),
+    ).toThrow();
+    expect(() =>
+      repository.transaction(() => repository.configureCampaignContent("bad actor", "bad campaign", poison)),
+    ).toThrow("cannot run inside a repository transaction");
     repository.transaction((unitOfWork) => {
       expect("configureCampaignContent" in unitOfWork).toBe(false);
       // @ts-expect-error Configuration intentionally is not a unit-of-work operation.
@@ -337,7 +391,8 @@ describe("factory campaign content configuration", () => {
     expect(now).not.toHaveBeenCalled();
     expect(nextId).not.toHaveBeenCalled();
     repository.close();
-    expect(() => repository.configureCampaignContent("bad actor", "bad campaign", poison))
-      .toThrow("repository is closed");
+    expect(() => repository.configureCampaignContent("bad actor", "bad campaign", poison)).toThrow(
+      "repository is closed",
+    );
   });
 });

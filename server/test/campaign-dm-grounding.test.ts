@@ -14,20 +14,38 @@ useTmpDataDir();
 const database = () => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
 
 function readResult(name: string, args: object, id: string): ProviderCompletionResult {
-  return { message: { role: "assistant", content: null, toolCalls: [{ id, name, arguments: JSON.stringify(args) }] },
-    usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 }, model: { requestedModel: "fake-dm", responseModel: "fake-dm" } };
+  return {
+    message: { role: "assistant", content: null, toolCalls: [{ id, name, arguments: JSON.stringify(args) }] },
+    usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+    model: { requestedModel: "fake-dm", responseModel: "fake-dm" },
+  };
 }
 
 describe("dm read tool registry", () => {
   it("advertises exactly four closed tools with strict schemas", () => {
     const schemas = dmReadToolSchemas();
-    expect(schemas.map(({ name }) => name)).toEqual(["read_campaign_recall", "read_quest_summary", "read_public_world", "read_present_npcs"]);
+    expect(schemas.map(({ name }) => name)).toEqual([
+      "read_campaign_recall",
+      "read_quest_summary",
+      "read_public_world",
+      "read_present_npcs",
+    ]);
     const recall = schemas[0]!;
-    const parameters = recall.parameters as { additionalProperties: boolean; required: string[]; properties: { topic: { enum: string[] } } };
+    const parameters = recall.parameters as {
+      additionalProperties: boolean;
+      required: string[];
+      properties: { topic: { enum: string[] } };
+    };
     expect(parameters.additionalProperties).toBe(false);
     expect(parameters.required).toEqual(["topic"]);
-    expect(parameters.properties.topic.enum).toEqual(["current-scene", "recent-outcomes", "public-locations", "present-cast"]);
-    for (const tool of schemas.slice(1)) expect((tool.parameters as { additionalProperties: boolean }).additionalProperties).toBe(false);
+    expect(parameters.properties.topic.enum).toEqual([
+      "current-scene",
+      "recent-outcomes",
+      "public-locations",
+      "present-cast",
+    ]);
+    for (const tool of schemas.slice(1))
+      expect((tool.parameters as { additionalProperties: boolean }).additionalProperties).toBe(false);
   });
 
   it("rejects unknown tools, extra fields, bad topics and free text", () => {
@@ -38,24 +56,37 @@ describe("dm read tool registry", () => {
     expect(() => parseDmReadCall("read_campaign_recall", {})).toThrow();
     expect(() => parseDmReadCall("read_quest_summary", { query: "free text" })).toThrow();
     expect(() => parseDmReadCall("read_public_world", { topic: "current-scene" })).toThrow();
-    expect(parseDmReadCall("read_campaign_recall", { topic: "present-cast" })).toEqual({ tool: "read_campaign_recall", topic: "present-cast" });
+    expect(parseDmReadCall("read_campaign_recall", { topic: "present-cast" })).toEqual({
+      tool: "read_campaign_recall",
+      topic: "present-cast",
+    });
     expect(parseDmReadCall("read_present_npcs", {})).toEqual({ tool: "read_present_npcs" });
   });
 });
 
 describe("bounded planning grounding", () => {
   it("returns bounded read-only results for all four tools and rejects unauthorized callers", async () => {
-    const f = await dmFixture(); f.graph();
-    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, { intent: "open", expectedModeRevision: 0, idempotencyKey: "grounding" });
+    const f = await dmFixture();
+    f.graph();
+    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+      intent: "open",
+      expectedModeRevision: 0,
+      idempotencyKey: "grounding",
+    });
     const db = database();
-    db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,?)")
-      .run("loc-a", f.campaign.id, "Harbor", "A foggy harbor", "public", "2036-01-01T00:00:00.000Z");
-    db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,?)")
-      .run("loc-b", f.campaign.id, "Market", "A busy market", "public", "2036-01-01T00:00:00.000Z");
-    db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,?)")
-      .run("loc-secret", f.campaign.id, "SECRET_VAULT", "GM only", "gm", "2036-01-01T00:00:00.000Z");
-    db.prepare(`INSERT INTO campaign_location_connections_v28(connection_id,campaign_id,from_location_id,to_location_id,visibility,route_state,requirement_kind,required_faction_id,minimum_reputation,created_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?)`).run("conn-a", f.campaign.id, "loc-a", "loc-b", "public", "open", "none", null, null, "2036-01-01T00:00:00.000Z");
+    db.prepare(
+      "INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,?)",
+    ).run("loc-a", f.campaign.id, "Harbor", "A foggy harbor", "public", "2036-01-01T00:00:00.000Z");
+    db.prepare(
+      "INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,?)",
+    ).run("loc-b", f.campaign.id, "Market", "A busy market", "public", "2036-01-01T00:00:00.000Z");
+    db.prepare(
+      "INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,?)",
+    ).run("loc-secret", f.campaign.id, "SECRET_VAULT", "GM only", "gm", "2036-01-01T00:00:00.000Z");
+    db.prepare(
+      `INSERT INTO campaign_location_connections_v28(connection_id,campaign_id,from_location_id,to_location_id,visibility,route_state,requirement_kind,required_faction_id,minimum_reputation,created_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`,
+    ).run("conn-a", f.campaign.id, "loc-a", "loc-b", "public", "open", "none", null, null, "2036-01-01T00:00:00.000Z");
 
     const before = {
       run: db.prepare("SELECT revision FROM dm_runs WHERE run_id=?").get(run.runId),
@@ -66,7 +97,10 @@ describe("bounded planning grounding", () => {
       locations: db.prepare("SELECT count(*) n FROM campaign_locations_v28").get(),
     };
 
-    const recall = f.repo.readDmPlanningGrounding("local-owner", run.runId, { tool: "read_campaign_recall", topic: "current-scene" });
+    const recall = f.repo.readDmPlanningGrounding("local-owner", run.runId, {
+      tool: "read_campaign_recall",
+      topic: "current-scene",
+    });
     expect(recall).toMatchObject({ tool: "read_campaign_recall" });
     expect(Buffer.byteLength(JSON.stringify(recall.data), "utf8")).toBeLessThanOrEqual(CAMPAIGN_RECALL_MAX_BYTES);
     expect(Buffer.byteLength(recall.summary, "utf8")).toBeLessThanOrEqual(6000);
@@ -81,7 +115,9 @@ describe("bounded planning grounding", () => {
     expect(Array.isArray(npcs.data)).toBe(true);
 
     db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('stranger','Stranger',0)").run();
-    expect(() => f.repo.readDmPlanningGrounding("stranger", run.runId, { tool: "read_public_world" })).toThrow(CampaignDmUnavailableError);
+    expect(() => f.repo.readDmPlanningGrounding("stranger", run.runId, { tool: "read_public_world" })).toThrow(
+      CampaignDmUnavailableError,
+    );
 
     expect({
       run: db.prepare("SELECT revision FROM dm_runs WHERE run_id=?").get(run.runId),
@@ -91,15 +127,21 @@ describe("bounded planning grounding", () => {
       requests: db.prepare("SELECT count(*) n FROM dm_provider_requests").get(),
       locations: db.prepare("SELECT count(*) n FROM campaign_locations_v28").get(),
     }).toEqual(before);
-    db.close(); f.repo.close();
+    db.close();
+    f.repo.close();
   });
 });
 
 describe("grounded director planning loop", () => {
   it("executes a read round in parallel, settles the beat on the next round and records the round", async () => {
-    const f = await dmFixture(); f.graph();
+    const f = await dmFixture();
+    f.graph();
     f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "ai" });
-    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, { intent: "open", expectedModeRevision: 1, idempotencyKey: "grounded" });
+    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+      intent: "open",
+      expectedModeRevision: 1,
+      idempotencyKey: "grounded",
+    });
     const planning: ProviderCompletionInput[] = [];
     const complete = vi.fn(async (input: ProviderCompletionInput): Promise<ProviderCompletionResult> => {
       if (input.promptVersion === "campaign-dm-narration-v1") return dmCompletion(input);
@@ -118,17 +160,25 @@ describe("grounded director planning loop", () => {
     expect(complete.mock.calls.filter(([input]) => input.promptVersion === "campaign-dm-narration-v1")).toHaveLength(1);
     expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, run.runId).state).toBe("completed");
     const db = database();
-    const rounds = db.prepare("SELECT round,status,response_json FROM dm_planning_rounds WHERE run_id=? ORDER BY round").all(run.runId) as { round: number; status: string; response_json: string }[];
+    const rounds = db
+      .prepare("SELECT round,status,response_json FROM dm_planning_rounds WHERE run_id=? ORDER BY round")
+      .all(run.runId) as { round: number; status: string; response_json: string }[];
     expect(rounds.map(({ round }) => round)).toEqual([1]);
     expect(rounds[0]!.status).toBe("settled");
     expect(rounds[0]!.response_json).toContain("selection");
-    db.close(); f.repo.close();
+    db.close();
+    f.repo.close();
   });
 
   it("forces select_dm_beat on the third planning call and never makes a fourth", async () => {
-    const f = await dmFixture(); f.graph();
+    const f = await dmFixture();
+    f.graph();
     f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "ai" });
-    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, { intent: "open", expectedModeRevision: 1, idempotencyKey: "forced" });
+    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+      intent: "open",
+      expectedModeRevision: 1,
+      idempotencyKey: "forced",
+    });
     const planning: ProviderCompletionInput[] = [];
     const complete = vi.fn(async (input: ProviderCompletionInput): Promise<ProviderCompletionResult> => {
       if (input.promptVersion === "campaign-dm-narration-v1") return dmCompletion(input);
@@ -144,15 +194,30 @@ describe("grounded director planning loop", () => {
     expect(complete.mock.calls.filter(([input]) => input.promptVersion === "campaign-dm-narration-v1")).toHaveLength(1);
     expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, run.runId).state).toBe("completed");
     const db = database();
-    const rounds = db.prepare("SELECT round,status FROM dm_planning_rounds WHERE run_id=? ORDER BY round").all(run.runId) as { round: number; status: string }[];
-    expect(rounds).toEqual([{ round: 1, status: "settled" }, { round: 2, status: "settled" }]);
-    db.close(); f.repo.close();
+    const rounds = db
+      .prepare("SELECT round,status FROM dm_planning_rounds WHERE run_id=? ORDER BY round")
+      .all(run.runId) as { round: number; status: string }[];
+    expect(rounds).toEqual([
+      { round: 1, status: "settled" },
+      { round: 2, status: "settled" },
+    ]);
+    db.close();
+    f.repo.close();
   });
 
   it("folds grounding observations into a user turn instead of replaying tool results on the known thinking endpoint", async () => {
-    const f = await dmFixture(); f.graph();
-    f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "thinking-ai" });
-    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, { intent: "open", expectedModeRevision: 1, idempotencyKey: "thinking-fold" });
+    const f = await dmFixture();
+    f.graph();
+    f.repo.setDmControl("local-owner", f.campaign.id, {
+      mode: "ai",
+      expectedRevision: 0,
+      idempotencyKey: "thinking-ai",
+    });
+    const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+      intent: "open",
+      expectedModeRevision: 1,
+      idempotencyKey: "thinking-fold",
+    });
     const planning: ProviderCompletionInput[] = [];
     const complete = vi.fn(async (input: ProviderCompletionInput): Promise<ProviderCompletionResult> => {
       if (input.promptVersion === "campaign-dm-narration-v1") return dmCompletion(input);
@@ -161,20 +226,37 @@ describe("grounded director planning loop", () => {
       // The thinking upstream never receives a tool-result transcript, so it can never demand a
       // private thinking block that an OpenAI-compatible transcript cannot replay.
       expect(input.messages.some((message) => message.role === "tool")).toBe(false);
-      expect(input.messages.some((message) => message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0)).toBe(false);
-      const folded = input.messages.filter((message) => message.role === "user").map((message) => message.content).join("\n");
+      expect(
+        input.messages.some((message) => message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0),
+      ).toBe(false);
+      const folded = input.messages
+        .filter((message) => message.role === "user")
+        .map((message) => message.content)
+        .join("\n");
       expect(folded).toContain("Read-only grounding tool results already collected");
       expect(folded).toContain("read_public_world");
       return dmCompletion(input, "reveal-node");
     });
-    const provider = { ...defaultProviderSettings(), baseUrl: "http://100.72.41.9:8787/v1", model: "deepseek-v4-flash" };
-    const deps = { complete, getProvider: async () => provider, getHarness: async () => defaultHarnessSettings(), now: () => new Date() };
+    const provider = {
+      ...defaultProviderSettings(),
+      baseUrl: "http://100.72.41.9:8787/v1",
+      model: "deepseek-v4-flash",
+    };
+    const deps = {
+      complete,
+      getProvider: async () => provider,
+      getHarness: async () => defaultHarnessSettings(),
+      now: () => new Date(),
+    };
     await orchestrateCampaignDmBeat(f.repo, "local-owner", run.runId, deps);
     expect(planning).toHaveLength(2);
     expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, run.runId).state).toBe("completed");
     const db = database();
-    const rounds = db.prepare("SELECT round,status FROM dm_planning_rounds WHERE run_id=? ORDER BY round").all(run.runId) as { round: number; status: string }[];
+    const rounds = db
+      .prepare("SELECT round,status FROM dm_planning_rounds WHERE run_id=? ORDER BY round")
+      .all(run.runId) as { round: number; status: string }[];
     expect(rounds).toEqual([{ round: 1, status: "settled" }]);
-    db.close(); f.repo.close();
+    db.close();
+    f.repo.close();
   });
 });

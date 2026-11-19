@@ -17,10 +17,12 @@ const workspaceResponse = () => ({
     classes: [{ name: "Warden", description: "A steadfast protector.", level: 3 }],
     attributes: [{ label: "Attribute 1", value: 12 }],
     proficiencies: [{ category: "skill", label: "Skill proficiency 1" }],
-    choices: [{
-      label: "Choice 1",
-      selection: { kind: "ability", name: "Steady Hand", description: "Remain composed under pressure." },
-    }],
+    choices: [
+      {
+        label: "Choice 1",
+        selection: { kind: "ability", name: "Steady Hand", description: "Remain composed under pressure." },
+      },
+    ],
     resources: [{ label: "Resource 1", current: 7, max: 10 }],
   },
 });
@@ -89,18 +91,42 @@ describe("Slice 90 campaign-character workspace contracts", () => {
 
   it("enforces established string bounds, nonblank text, and valid definition kinds", () => {
     const textCases: Array<(value: ReturnType<typeof workspaceResponse>, text: string) => void> = [
-      (value, text) => { value.character.name = text; },
-      (value, text) => { value.character.race.name = text; },
-      (value, text) => { value.character.race.description = text; },
-      (value, text) => { value.character.background.name = text; },
-      (value, text) => { value.character.classes[0]!.name = text; },
-      (value, text) => { value.character.classes[0]!.description = text; },
-      (value, text) => { value.character.attributes[0]!.label = text; },
-      (value, text) => { value.character.proficiencies[0]!.label = text; },
-      (value, text) => { value.character.choices[0]!.label = text; },
-      (value, text) => { value.character.choices[0]!.selection.name = text; },
-      (value, text) => { value.character.choices[0]!.selection.description = text; },
-      (value, text) => { value.character.resources[0]!.label = text; },
+      (value, text) => {
+        value.character.name = text;
+      },
+      (value, text) => {
+        value.character.race.name = text;
+      },
+      (value, text) => {
+        value.character.race.description = text;
+      },
+      (value, text) => {
+        value.character.background.name = text;
+      },
+      (value, text) => {
+        value.character.classes[0]!.name = text;
+      },
+      (value, text) => {
+        value.character.classes[0]!.description = text;
+      },
+      (value, text) => {
+        value.character.attributes[0]!.label = text;
+      },
+      (value, text) => {
+        value.character.proficiencies[0]!.label = text;
+      },
+      (value, text) => {
+        value.character.choices[0]!.label = text;
+      },
+      (value, text) => {
+        value.character.choices[0]!.selection.name = text;
+      },
+      (value, text) => {
+        value.character.choices[0]!.selection.description = text;
+      },
+      (value, text) => {
+        value.character.resources[0]!.label = text;
+      },
     ];
     for (const setText of textCases) {
       for (const invalid of ["", " \n\t "]) {
@@ -116,7 +142,9 @@ describe("Slice 90 campaign-character workspace contracts", () => {
     const longDescription = workspaceResponse();
     longDescription.character.race.description = "d".repeat(4_001);
     expect(campaignCharacterWorkspaceResponseSchema.safeParse(longDescription).success).toBe(false);
-    const badKind = workspaceResponse() as unknown as { character: { choices: Array<{ selection: { kind: string } }> } };
+    const badKind = workspaceResponse() as unknown as {
+      character: { choices: Array<{ selection: { kind: string } }> };
+    };
     badKind.character.choices[0]!.selection.kind = "controller";
     expect(campaignCharacterWorkspaceResponseSchema.safeParse(badKind).success).toBe(false);
   });
@@ -125,19 +153,45 @@ describe("Slice 90 campaign-character workspace contracts", () => {
     "rejects malformed UTF-16 in every display-text position %#",
     (malformed) => {
       const setters: Array<(value: ReturnType<typeof workspaceResponse>) => void> = [
-        (value) => { value.character.name = malformed; },
-        (value) => { value.character.race.name = malformed; },
-        (value) => { value.character.race.description = malformed; },
-        (value) => { value.character.background.name = malformed; },
-        (value) => { value.character.background.description = malformed; },
-        (value) => { value.character.classes[0]!.name = malformed; },
-        (value) => { value.character.classes[0]!.description = malformed; },
-        (value) => { value.character.attributes[0]!.label = malformed; },
-        (value) => { value.character.proficiencies[0]!.label = malformed; },
-        (value) => { value.character.choices[0]!.label = malformed; },
-        (value) => { value.character.choices[0]!.selection.name = malformed; },
-        (value) => { value.character.choices[0]!.selection.description = malformed; },
-        (value) => { value.character.resources[0]!.label = malformed; },
+        (value) => {
+          value.character.name = malformed;
+        },
+        (value) => {
+          value.character.race.name = malformed;
+        },
+        (value) => {
+          value.character.race.description = malformed;
+        },
+        (value) => {
+          value.character.background.name = malformed;
+        },
+        (value) => {
+          value.character.background.description = malformed;
+        },
+        (value) => {
+          value.character.classes[0]!.name = malformed;
+        },
+        (value) => {
+          value.character.classes[0]!.description = malformed;
+        },
+        (value) => {
+          value.character.attributes[0]!.label = malformed;
+        },
+        (value) => {
+          value.character.proficiencies[0]!.label = malformed;
+        },
+        (value) => {
+          value.character.choices[0]!.label = malformed;
+        },
+        (value) => {
+          value.character.choices[0]!.selection.name = malformed;
+        },
+        (value) => {
+          value.character.choices[0]!.selection.description = malformed;
+        },
+        (value) => {
+          value.character.resources[0]!.label = malformed;
+        },
       ];
       for (const setMalformed of setters) {
         const value = workspaceResponse();
@@ -160,14 +214,28 @@ describe("Slice 90 campaign-character workspace contracts", () => {
 
   it("enforces array maxima while accepting every exact maximum", () => {
     const exact = workspaceResponse();
-    exact.character.classes = many(MAX_CHARACTER_CLASSES, (index) => ({ name: `Class ${index}`, description: "Class.", level: 1 }));
-    exact.character.attributes = many(MAX_CHARACTER_ATTRIBUTES, (index) => ({ label: `Attribute ${index + 1}`, value: 0 }));
-    exact.character.proficiencies = many(MAX_CHARACTER_PROFICIENCIES, (index) => ({ category: "skill" as const, label: `Skill proficiency ${index + 1}` }));
+    exact.character.classes = many(MAX_CHARACTER_CLASSES, (index) => ({
+      name: `Class ${index}`,
+      description: "Class.",
+      level: 1,
+    }));
+    exact.character.attributes = many(MAX_CHARACTER_ATTRIBUTES, (index) => ({
+      label: `Attribute ${index + 1}`,
+      value: 0,
+    }));
+    exact.character.proficiencies = many(MAX_CHARACTER_PROFICIENCIES, (index) => ({
+      category: "skill" as const,
+      label: `Skill proficiency ${index + 1}`,
+    }));
     exact.character.choices = many(MAX_CHARACTER_CHOICES, (index) => ({
       label: `Choice ${index + 1}`,
       selection: { kind: "ability" as const, name: `Ability ${index}`, description: "Ability." },
     }));
-    exact.character.resources = many(MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES, (index) => ({ label: `Resource ${index + 1}`, current: 0, max: 0 }));
+    exact.character.resources = many(MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES, (index) => ({
+      label: `Resource ${index + 1}`,
+      current: 0,
+      max: 0,
+    }));
     expect(campaignCharacterWorkspaceResponseSchema.safeParse(exact).success).toBe(true);
 
     for (const field of ["classes", "attributes", "proficiencies", "choices", "resources"] as const) {
@@ -179,20 +247,48 @@ describe("Slice 90 campaign-character workspace contracts", () => {
 
   it("enforces integer, level, attribute, category, and resource invariants and types", () => {
     const mutations: Array<(value: ReturnType<typeof workspaceResponse>) => void> = [
-      (value) => { value.character.classes[0]!.level = 0; },
-      (value) => { value.character.classes[0]!.level = MAX_CHARACTER_LEVEL + 1; },
-      (value) => { value.character.classes[0]!.level = 1.5; },
-      (value) => { value.character.attributes[0]!.value = -1_001; },
-      (value) => { value.character.attributes[0]!.value = 1_001; },
-      (value) => { value.character.attributes[0]!.value = 1.5; },
-      (value) => { (value.character.proficiencies[0] as { category: string }).category = "unknown"; },
-      (value) => { value.character.resources[0]!.current = -1; },
-      (value) => { value.character.resources[0]!.max = 1_000_001; },
-      (value) => { value.character.resources[0]!.current = 1.5; },
-      (value) => { value.character.resources[0]!.current = 11; },
-      (value) => { value.character.resources[0]!.max = Number.POSITIVE_INFINITY; },
-      (value) => { value.character.attributes[0]!.value = Number.NaN; },
-      (value) => { (value.character.resources[0] as unknown as { current: string }).current = "7"; },
+      (value) => {
+        value.character.classes[0]!.level = 0;
+      },
+      (value) => {
+        value.character.classes[0]!.level = MAX_CHARACTER_LEVEL + 1;
+      },
+      (value) => {
+        value.character.classes[0]!.level = 1.5;
+      },
+      (value) => {
+        value.character.attributes[0]!.value = -1_001;
+      },
+      (value) => {
+        value.character.attributes[0]!.value = 1_001;
+      },
+      (value) => {
+        value.character.attributes[0]!.value = 1.5;
+      },
+      (value) => {
+        (value.character.proficiencies[0] as { category: string }).category = "unknown";
+      },
+      (value) => {
+        value.character.resources[0]!.current = -1;
+      },
+      (value) => {
+        value.character.resources[0]!.max = 1_000_001;
+      },
+      (value) => {
+        value.character.resources[0]!.current = 1.5;
+      },
+      (value) => {
+        value.character.resources[0]!.current = 11;
+      },
+      (value) => {
+        value.character.resources[0]!.max = Number.POSITIVE_INFINITY;
+      },
+      (value) => {
+        value.character.attributes[0]!.value = Number.NaN;
+      },
+      (value) => {
+        (value.character.resources[0] as unknown as { current: string }).current = "7";
+      },
     ];
     mutations.forEach((mutate, index) => {
       const value = workspaceResponse();
@@ -206,17 +302,36 @@ describe("Slice 90 campaign-character workspace contracts", () => {
 
   it("rejects wrong primitive and container types without coercion", () => {
     const mutations: Array<(value: unknown) => void> = [
-      (value) => { (value as { character: unknown }).character = []; },
-      (value) => { (value as { character: { name: unknown } }).character.name = 1; },
-      (value) => { (value as { character: { race: unknown } }).character.race = "Riverfolk"; },
-      (value) => { (value as { character: { background: unknown } }).character.background = null; },
-      (value) => { (value as { character: { classes: unknown } }).character.classes = {}; },
-      (value) => { (value as { character: { attributes: unknown } }).character.attributes = "Resolve"; },
-      (value) => { (value as { character: { proficiencies: unknown } }).character.proficiencies = false; },
-      (value) => { (value as { character: { choices: unknown } }).character.choices = null; },
-      (value) => { (value as { character: { resources: unknown } }).character.resources = 0; },
       (value) => {
-        (value as { character: { choices: Array<{ selection: unknown }> } }).character.choices[0]!.selection = "ability";
+        (value as { character: unknown }).character = [];
+      },
+      (value) => {
+        (value as { character: { name: unknown } }).character.name = 1;
+      },
+      (value) => {
+        (value as { character: { race: unknown } }).character.race = "Riverfolk";
+      },
+      (value) => {
+        (value as { character: { background: unknown } }).character.background = null;
+      },
+      (value) => {
+        (value as { character: { classes: unknown } }).character.classes = {};
+      },
+      (value) => {
+        (value as { character: { attributes: unknown } }).character.attributes = "Resolve";
+      },
+      (value) => {
+        (value as { character: { proficiencies: unknown } }).character.proficiencies = false;
+      },
+      (value) => {
+        (value as { character: { choices: unknown } }).character.choices = null;
+      },
+      (value) => {
+        (value as { character: { resources: unknown } }).character.resources = 0;
+      },
+      (value) => {
+        (value as { character: { choices: Array<{ selection: unknown }> } }).character.choices[0]!.selection =
+          "ability";
       },
     ];
     mutations.forEach((mutate, index) => {
@@ -228,12 +343,24 @@ describe("Slice 90 campaign-character workspace contracts", () => {
 
   it("rejects exact normalized duplicate display identities but preserves meaningful distinctions", () => {
     const duplicateMutations: Array<(value: ReturnType<typeof workspaceResponse>) => void> = [
-      (value) => { value.character.classes.push({ ...value.character.classes[0]! }); },
-      (value) => { value.character.attributes.push({ ...value.character.attributes[0]! }); },
-      (value) => { value.character.proficiencies.push({ ...value.character.proficiencies[0]! }); },
-      (value) => { value.character.choices.push(structuredClone(value.character.choices[0]!)); },
-      (value) => { value.character.resources.push({ ...value.character.resources[0]! }); },
-      (value) => { value.character.resources.push({ ...value.character.resources[0]! }); },
+      (value) => {
+        value.character.classes.push({ ...value.character.classes[0]! });
+      },
+      (value) => {
+        value.character.attributes.push({ ...value.character.attributes[0]! });
+      },
+      (value) => {
+        value.character.proficiencies.push({ ...value.character.proficiencies[0]! });
+      },
+      (value) => {
+        value.character.choices.push(structuredClone(value.character.choices[0]!));
+      },
+      (value) => {
+        value.character.resources.push({ ...value.character.resources[0]! });
+      },
+      (value) => {
+        value.character.resources.push({ ...value.character.resources[0]! });
+      },
     ];
     duplicateMutations.forEach((mutate) => {
       const value = workspaceResponse();
@@ -248,10 +375,18 @@ describe("Slice 90 campaign-character workspace contracts", () => {
 
   it("rejects colon, UUID, and resource-looking IDs in every label field", () => {
     const setters: Array<(value: ReturnType<typeof workspaceResponse>, label: string) => void> = [
-      (value, label) => { value.character.attributes[0]!.label = label; },
-      (value, label) => { value.character.proficiencies[0]!.label = label; },
-      (value, label) => { value.character.choices[0]!.label = label; },
-      (value, label) => { value.character.resources[0]!.label = label; },
+      (value, label) => {
+        value.character.attributes[0]!.label = label;
+      },
+      (value, label) => {
+        value.character.proficiencies[0]!.label = label;
+      },
+      (value, label) => {
+        value.character.choices[0]!.label = label;
+      },
+      (value, label) => {
+        value.character.resources[0]!.label = label;
+      },
     ];
     for (const setLabel of setters) {
       for (const id of ["attribute:resolve", "550e8400-e29b-41d4-a716-446655440000", "resource_unknown-1.test"]) {
@@ -264,15 +399,20 @@ describe("Slice 90 campaign-character workspace contracts", () => {
 
   it("accepts exact category-specific positional fallbacks for generic unknown IDs", () => {
     const value = workspaceResponse();
-    value.character.attributes = many(MAX_CHARACTER_ATTRIBUTES, (index) => ({ label: `Attribute ${index + 1}`, value: 0 }));
-    value.character.proficiencies = ([
-      ["skill", "Skill"],
-      ["saving-throw", "Saving throw"],
-      ["tool", "Tool"],
-      ["weapon", "Weapon"],
-      ["armor", "Armor"],
-      ["language", "Language"],
-    ] as const).map(([category, prefix], index) => ({ category, label: `${prefix} proficiency ${index + 1}` }));
+    value.character.attributes = many(MAX_CHARACTER_ATTRIBUTES, (index) => ({
+      label: `Attribute ${index + 1}`,
+      value: 0,
+    }));
+    value.character.proficiencies = (
+      [
+        ["skill", "Skill"],
+        ["saving-throw", "Saving throw"],
+        ["tool", "Tool"],
+        ["weapon", "Weapon"],
+        ["armor", "Armor"],
+        ["language", "Language"],
+      ] as const
+    ).map(([category, prefix], index) => ({ category, label: `${prefix} proficiency ${index + 1}` }));
     value.character.choices = many(MAX_CHARACTER_CHOICES, (index) => ({
       label: `Choice ${index + 1}`,
       selection: { kind: "ability" as const, name: `Unknown selection ${index + 1}`, description: "Content metadata." },
@@ -287,18 +427,42 @@ describe("Slice 90 campaign-character workspace contracts", () => {
 
   it("rejects wrong prefixes, categories, positions, zero, and out-of-range indices", () => {
     const mutations: Array<(value: ReturnType<typeof workspaceResponse>) => void> = [
-      (value) => { value.character.attributes[0]!.label = "Choice 1"; },
-      (value) => { value.character.attributes[0]!.label = "Attribute 0"; },
-      (value) => { value.character.attributes[0]!.label = `Attribute ${MAX_CHARACTER_ATTRIBUTES + 1}`; },
-      (value) => { value.character.attributes[0]!.label = "Attribute 2"; },
-      (value) => { value.character.proficiencies[0]!.label = "Language proficiency 1"; },
-      (value) => { value.character.proficiencies[0]!.label = "Skill proficiency 0"; },
-      (value) => { value.character.proficiencies[0]!.label = `Skill proficiency ${MAX_CHARACTER_PROFICIENCIES + 1}`; },
-      (value) => { value.character.proficiencies[0]!.label = "Skill proficiency 2"; },
-      (value) => { value.character.choices[0]!.label = "Choice 0"; },
-      (value) => { value.character.choices[0]!.label = `Choice ${MAX_CHARACTER_CHOICES + 1}`; },
-      (value) => { value.character.resources[0]!.label = "Resource 0"; },
-      (value) => { value.character.resources[0]!.label = `Resource ${MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES + 1}`; },
+      (value) => {
+        value.character.attributes[0]!.label = "Choice 1";
+      },
+      (value) => {
+        value.character.attributes[0]!.label = "Attribute 0";
+      },
+      (value) => {
+        value.character.attributes[0]!.label = `Attribute ${MAX_CHARACTER_ATTRIBUTES + 1}`;
+      },
+      (value) => {
+        value.character.attributes[0]!.label = "Attribute 2";
+      },
+      (value) => {
+        value.character.proficiencies[0]!.label = "Language proficiency 1";
+      },
+      (value) => {
+        value.character.proficiencies[0]!.label = "Skill proficiency 0";
+      },
+      (value) => {
+        value.character.proficiencies[0]!.label = `Skill proficiency ${MAX_CHARACTER_PROFICIENCIES + 1}`;
+      },
+      (value) => {
+        value.character.proficiencies[0]!.label = "Skill proficiency 2";
+      },
+      (value) => {
+        value.character.choices[0]!.label = "Choice 0";
+      },
+      (value) => {
+        value.character.choices[0]!.label = `Choice ${MAX_CHARACTER_CHOICES + 1}`;
+      },
+      (value) => {
+        value.character.resources[0]!.label = "Resource 0";
+      },
+      (value) => {
+        value.character.resources[0]!.label = `Resource ${MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES + 1}`;
+      },
     ];
     mutations.forEach((mutate, index) => {
       const value = workspaceResponse();

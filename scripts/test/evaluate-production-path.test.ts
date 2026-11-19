@@ -71,31 +71,41 @@ const DEFAULT_CANDIDATES: readonly CandidateSpec[] = [
 
 function makeDecision(spec: DecisionSpec = {}): ProductionDecision {
   const method = spec.method ?? "defer";
-  const selectionJson = spec.selectionJson ?? JSON.stringify({
-    method,
-    selection: method === "choice" && spec.pick !== null && spec.pick !== undefined
-      ? { candidateId: spec.pick, digest: "digest" }
-      : null,
-    topSignal: spec.topSignal ?? null,
-  });
+  const selectionJson =
+    spec.selectionJson ??
+    JSON.stringify({
+      method,
+      selection:
+        method === "choice" && spec.pick !== null && spec.pick !== undefined
+          ? { candidateId: spec.pick, digest: "digest" }
+          : null,
+      topSignal: spec.topSignal ?? null,
+    });
   const candidates = spec.candidates ?? DEFAULT_CANDIDATES;
-  const stateJson = spec.stateJson ?? JSON.stringify({
-    declaration: spec.declaration ?? "I make my move.",
-    candidates: candidates.map((candidate) => ({ ...candidate, label: candidate.candidateId })),
-  });
-  const turn = spec.turn === undefined
-    ? { declaration: spec.declaration ?? "I make my move.", state: "completed", mode: "exploration" }
-    : spec.turn;
-  return toProductionDecision("synthetic-world", {
-    decisionId: spec.decisionId ?? "decision-1",
-    turnId: spec.turnId ?? "turn-1",
-    band: spec.band ?? "act",
-    selectionJson,
-    stateJson,
-    shadow: spec.shadow ?? true,
-    fallbackUsed: false,
-    createdAt: spec.createdAt ?? "2026-01-01T00:00:00.000Z",
-  }, turn);
+  const stateJson =
+    spec.stateJson ??
+    JSON.stringify({
+      declaration: spec.declaration ?? "I make my move.",
+      candidates: candidates.map((candidate) => ({ ...candidate, label: candidate.candidateId })),
+    });
+  const turn =
+    spec.turn === undefined
+      ? { declaration: spec.declaration ?? "I make my move.", state: "completed", mode: "exploration" }
+      : spec.turn;
+  return toProductionDecision(
+    "synthetic-world",
+    {
+      decisionId: spec.decisionId ?? "decision-1",
+      turnId: spec.turnId ?? "turn-1",
+      band: spec.band ?? "act",
+      selectionJson,
+      stateJson,
+      shadow: spec.shadow ?? true,
+      fallbackUsed: false,
+      createdAt: spec.createdAt ?? "2026-01-01T00:00:00.000Z",
+    },
+    turn,
+  );
 }
 
 interface ProposalSpec {
@@ -215,28 +225,35 @@ test("parseDecisionState tolerates malformed JSON, missing kinds, and skipped en
   assert.equal(empty.malformed, false);
   assert.deepEqual(empty.candidates, []);
 
-  const parsed = parseDecisionState(JSON.stringify({
-    declaration: "I travel.",
-    candidates: [
-      { candidateId: "c1", kind: "exact_actor_travel.select", label: "Travel" },
-      { candidateId: "c2", kind: null },
-      { kind: "exact_rest.select" },
-      "not-an-object",
-    ],
-  }));
+  const parsed = parseDecisionState(
+    JSON.stringify({
+      declaration: "I travel.",
+      candidates: [
+        { candidateId: "c1", kind: "exact_actor_travel.select", label: "Travel" },
+        { candidateId: "c2", kind: null },
+        { kind: "exact_rest.select" },
+        "not-an-object",
+      ],
+    }),
+  );
   assert.equal(parsed.declaration, "I travel.");
-  assert.deepEqual(parsed.candidates.map((candidate) => candidate.candidateId), ["c1", "c2"]);
+  assert.deepEqual(
+    parsed.candidates.map((candidate) => candidate.candidateId),
+    ["c1", "c2"],
+  );
   assert.equal(parsed.candidates[0]!.kind, "exact_actor_travel.select");
   assert.equal(parsed.skippedCandidates, 2);
   assert.equal(parsed.malformed, false);
 });
 
 test("parseProductionSelection reads method, pick, and topSignal and tolerates malformed JSON", () => {
-  const choice = parseProductionSelection(JSON.stringify({
-    method: "choice",
-    selection: { candidateId: "c1", digest: "d" },
-    topSignal: 0.87,
-  }));
+  const choice = parseProductionSelection(
+    JSON.stringify({
+      method: "choice",
+      selection: { candidateId: "c1", digest: "d" },
+      topSignal: 0.87,
+    }),
+  );
   assert.deepEqual(choice, { method: "choice", candidateId: "c1", topSignal: 0.87, malformed: false });
 
   const defer = parseProductionSelection(JSON.stringify({ method: "defer", selection: null, topSignal: null }));
@@ -414,7 +431,11 @@ test("classifyPickCommit separates committed, advisory act, awaiting confirm, an
     pick: "rest-candidate:1",
     candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }],
   });
-  const committedExecution = makeExecution({ decisionId: "d-committed", actionKind: "rest", candidateId: "rest-candidate:1" });
+  const committedExecution = makeExecution({
+    decisionId: "d-committed",
+    actionKind: "rest",
+    candidateId: "rest-candidate:1",
+  });
   assert.equal(classifyPickCommit(committedDecision, [committedExecution]), "committed");
 
   // A candidate-id match commits even when the execution's action kind resolves to unknown.
@@ -453,13 +474,32 @@ test("classifyPickCommit separates committed, advisory act, awaiting confirm, an
 
 test("summarizeFamilyMetrics counts committed and advisory picks per family", () => {
   const decisions = [
-    makeDecision({ decisionId: "d1", method: "choice", pick: "rest-candidate:1", candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }] }),
-    makeDecision({ decisionId: "d2", method: "choice", pick: "rest-candidate:2", candidates: [{ candidateId: "rest-candidate:2", kind: "exact_rest.select" }] }),
-    makeDecision({ decisionId: "d3", method: "choice", pick: "travel-candidate:3", candidates: [{ candidateId: "travel-candidate:3", kind: "exact_actor_travel.select" }] }),
+    makeDecision({
+      decisionId: "d1",
+      method: "choice",
+      pick: "rest-candidate:1",
+      candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }],
+    }),
+    makeDecision({
+      decisionId: "d2",
+      method: "choice",
+      pick: "rest-candidate:2",
+      candidates: [{ candidateId: "rest-candidate:2", kind: "exact_rest.select" }],
+    }),
+    makeDecision({
+      decisionId: "d3",
+      method: "choice",
+      pick: "travel-candidate:3",
+      candidates: [{ candidateId: "travel-candidate:3", kind: "exact_actor_travel.select" }],
+    }),
   ];
   const executions = [makeExecution({ decisionId: "d1", actionKind: "rest", candidateId: "rest-candidate:1" })];
-  const rest = summarizeFamilyMetrics({ decisions, laneExecutions: executions, laneProposals: [], alignmentPairs: [] })
-    .find((row) => row.family === "rest")!;
+  const rest = summarizeFamilyMetrics({
+    decisions,
+    laneExecutions: executions,
+    laneProposals: [],
+    alignmentPairs: [],
+  }).find((row) => row.family === "rest")!;
   assert.equal(rest.picks, 2);
   assert.equal(rest.committed, 1);
   assert.equal(rest.advisoryAct, 1);
@@ -473,11 +513,43 @@ test("summarizeFamilyMetrics counts committed and advisory picks per family", ()
 
 test("buildProviderPicks keeps the first call in source precedence and counts extras", () => {
   const calls: ProviderCandidateCall[] = [
-    { turnId: "t1", candidateId: "check-candidate:1", toolName: "exact_srd_check.select", source: "provider-response", order: 0 },
-    { turnId: "t1", candidateId: "travel-candidate:1", toolName: "exact_actor_travel.select", source: "provider-response", order: 1 },
-    { turnId: "t1", candidateId: "power-candidate:1", toolName: "exact_power_use.select", source: "tool-call", order: 9 },
-    { turnId: "t2", candidateId: "rest-candidate:1", toolName: null, source: "provider-binding", order: 0, actionKind: "rest" },
-    { turnId: "t2", candidateId: "rest-candidate:0", toolName: null, source: "provider-binding", order: 0, actionKind: "mystery" },
+    {
+      turnId: "t1",
+      candidateId: "check-candidate:1",
+      toolName: "exact_srd_check.select",
+      source: "provider-response",
+      order: 0,
+    },
+    {
+      turnId: "t1",
+      candidateId: "travel-candidate:1",
+      toolName: "exact_actor_travel.select",
+      source: "provider-response",
+      order: 1,
+    },
+    {
+      turnId: "t1",
+      candidateId: "power-candidate:1",
+      toolName: "exact_power_use.select",
+      source: "tool-call",
+      order: 9,
+    },
+    {
+      turnId: "t2",
+      candidateId: "rest-candidate:1",
+      toolName: null,
+      source: "provider-binding",
+      order: 0,
+      actionKind: "rest",
+    },
+    {
+      turnId: "t2",
+      candidateId: "rest-candidate:0",
+      toolName: null,
+      source: "provider-binding",
+      order: 0,
+      actionKind: "mystery",
+    },
   ];
   const picks = buildProviderPicks("synthetic-world", calls);
   assert.equal(picks.length, 2);
@@ -493,17 +565,45 @@ test("buildProviderPicks keeps the first call in source precedence and counts ex
 
 test("computeAlignmentPairs classifies same id, same family, divergence, and unknowns", () => {
   const decisions = [
-    makeDecision({ decisionId: "d-same-id", turnId: "t1", method: "choice", pick: "rest-candidate:1", candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }] }),
-    makeDecision({ decisionId: "d-same-family", turnId: "t2", method: "choice", pick: "rest-candidate:2", candidates: [{ candidateId: "rest-candidate:2", kind: "exact_rest.select" }] }),
+    makeDecision({
+      decisionId: "d-same-id",
+      turnId: "t1",
+      method: "choice",
+      pick: "rest-candidate:1",
+      candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }],
+    }),
+    makeDecision({
+      decisionId: "d-same-family",
+      turnId: "t2",
+      method: "choice",
+      pick: "rest-candidate:2",
+      candidates: [{ candidateId: "rest-candidate:2", kind: "exact_rest.select" }],
+    }),
     makeDecision({ decisionId: "d-divergent", turnId: "t3", method: "choice", pick: "travel-candidate:1" }),
-    makeDecision({ decisionId: "d-unknown-lane", turnId: "t4", method: "choice", pick: "odd-candidate:1", candidates: [{ candidateId: "odd-candidate:1", kind: "mystery.kind" }] }),
+    makeDecision({
+      decisionId: "d-unknown-lane",
+      turnId: "t4",
+      method: "choice",
+      pick: "odd-candidate:1",
+      candidates: [{ candidateId: "odd-candidate:1", kind: "mystery.kind" }],
+    }),
     makeDecision({ decisionId: "d-no-provider", turnId: "t5", method: "choice", pick: "travel-candidate:2" }),
-    makeDecision({ decisionId: "d-defer", turnId: "t6", method: "defer", candidates: [{ candidateId: "travel-candidate:3", kind: "exact_actor_travel.select" }] }),
+    makeDecision({
+      decisionId: "d-defer",
+      turnId: "t6",
+      method: "defer",
+      candidates: [{ candidateId: "travel-candidate:3", kind: "exact_actor_travel.select" }],
+    }),
   ];
   const picks = [
     makeProviderPick({ turnId: "t1", candidateId: "rest-candidate:1", family: "rest" }),
     makeProviderPick({ turnId: "t2", candidateId: "rest-candidate:other", family: "rest" }),
-    makeProviderPick({ turnId: "t3", candidateId: "check-candidate:1", toolName: "exact_srd_check.select", family: "srd-check" }),
+    makeProviderPick({
+      turnId: "t3",
+      candidateId: "check-candidate:1",
+      toolName: "exact_srd_check.select",
+      family: "srd-check",
+    }),
     makeProviderPick({ turnId: "t4", candidateId: "travel-candidate:9", family: "travel" }),
     makeProviderPick({ turnId: "t6", candidateId: "travel-candidate:3", family: "travel" }),
   ];
@@ -563,13 +663,29 @@ test("countConfirmations counts approved, rejected, pending, not-required, unkno
 
 test("summarizeFamilyMetrics attributes proposals and confirmations to the action-kind family", () => {
   const decisions = [
-    makeDecision({ decisionId: "d1", method: "choice", pick: "rest-candidate:1", candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }] }),
-    makeDecision({ decisionId: "d2", method: "choice", pick: "quest-candidate:1", candidates: [{ candidateId: "quest-candidate:1", kind: "exact_quest_lifecycle.select" }] }),
+    makeDecision({
+      decisionId: "d1",
+      method: "choice",
+      pick: "rest-candidate:1",
+      candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }],
+    }),
+    makeDecision({
+      decisionId: "d2",
+      method: "choice",
+      pick: "quest-candidate:1",
+      candidates: [{ candidateId: "quest-candidate:1", kind: "exact_quest_lifecycle.select" }],
+    }),
   ];
   const proposals = [
     makeProposal({ proposalId: "p1", decisionId: "d1", actionKind: "rest", confirmation: "approved", executed: true }),
     makeProposal({ proposalId: "p2", decisionId: "d1", actionKind: "rest", confirmation: null }),
-    makeProposal({ proposalId: "p3", decisionId: "d2", actionKind: "quest-accept", candidateId: "quest-candidate:1", confirmation: "rejected" }),
+    makeProposal({
+      proposalId: "p3",
+      decisionId: "d2",
+      actionKind: "quest-accept",
+      candidateId: "quest-candidate:1",
+      confirmation: "rejected",
+    }),
   ];
   const rows = summarizeFamilyMetrics({ decisions, laneExecutions: [], laneProposals: proposals, alignmentPairs: [] });
   const rest = rows.find((row) => row.family === "rest")!;
@@ -590,7 +706,14 @@ test("summarizeProductionPath rolls up totals and recomputes rates over the scop
   const decisions = [
     makeDecision({ decisionId: "d1", turnId: "t1", method: "choice", pick: "travel-candidate:1", shadow: true }),
     makeDecision({ decisionId: "d2", turnId: "t1", method: "defer", candidates: [] }),
-    makeDecision({ decisionId: "d3", turnId: "t2", method: "choice", pick: "ghost-candidate:1", candidates: [], turn: null }),
+    makeDecision({
+      decisionId: "d3",
+      turnId: "t2",
+      method: "choice",
+      pick: "ghost-candidate:1",
+      candidates: [],
+      turn: null,
+    }),
   ];
   const summary = summarizeProductionPath({
     world: "synthetic-world",
@@ -628,7 +751,9 @@ test("productionAnomalies reports unjoined turns, malformed rows, out-of-shortli
     decisions,
     laneExecutions: [],
     laneProposals: [],
-    providerPicks: [makeProviderPick({ turnId: "t9", candidateId: "odd:1", toolName: null, family: PRODUCTION_FAMILY_UNKNOWN })],
+    providerPicks: [
+      makeProviderPick({ turnId: "t9", candidateId: "odd:1", toolName: null, family: PRODUCTION_FAMILY_UNKNOWN }),
+    ],
   });
   const joined = anomalies.join("\n");
   assert.match(joined, /no joined adventure_turns row/);
@@ -651,7 +776,13 @@ test("buildProductionPathReport aggregates across worlds and keeps world section
   const worldB = makeDataset("world-b", {
     decisions: [
       makeDecision({ decisionId: "b1", turnId: "b-t1", method: "defer", candidates: [] }),
-      makeDecision({ decisionId: "b2", turnId: "b-t2", method: "choice", pick: "rest-candidate:1", candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }] }),
+      makeDecision({
+        decisionId: "b2",
+        turnId: "b-t2",
+        method: "choice",
+        pick: "rest-candidate:1",
+        candidates: [{ candidateId: "rest-candidate:1", kind: "exact_rest.select" }],
+      }),
     ],
   });
   const report = buildProductionPathReport({ worlds: [worldA, worldB], generatedAt: "2026-01-02T03:04:05.000Z" });
@@ -660,7 +791,10 @@ test("buildProductionPathReport aggregates across worlds and keeps world section
   assert.equal(report.aggregate.totals.decisions, 3);
   assert.equal(report.aggregate.totals.picks, 2);
   assert.equal(report.aggregate.totals.alignment.compared, 1);
-  assert.deepEqual(report.worlds.map((world) => world.summary.world), ["world-a", "world-b"]);
+  assert.deepEqual(
+    report.worlds.map((world) => world.summary.world),
+    ["world-a", "world-b"],
+  );
   assert.equal(report.worlds[0]!.notices.length, 1);
   assert.equal(report.worlds[0]!.alignmentPairs.length, 1);
   assert.equal(report.worlds[1]!.summary.totals.decisions, 2);
@@ -689,7 +823,8 @@ test("renderProductionPathMarkdown is deterministic and carries the definitions,
   assert.match(first, /\| Family \| Advertised \|/);
   for (const family of PRODUCTION_FAMILY_ORDER) assert.ok(first.includes(`| ${family} |`), `missing row ${family}`);
   for (const note of PRODUCTION_PATH_HONESTY_NOTES) assert.ok(first.includes(note), `missing honesty note: ${note}`);
-  for (const definition of PRODUCTION_PATH_DEFINITIONS) assert.ok(first.includes(definition), `missing definition: ${definition}`);
+  for (const definition of PRODUCTION_PATH_DEFINITIONS)
+    assert.ok(first.includes(definition), `missing definition: ${definition}`);
   assert.ok(first.includes(PRODUCTION_FAMILY_SOURCE));
   assert.match(first, /Provider alignment: compared 0/);
 });
@@ -715,7 +850,10 @@ test("parseProductionPathArgs accepts repeated worlds, equals forms, and default
     json: "docs/system-one-production-path-evaluation.json",
     help: false,
   });
-  assert.deepEqual(parseProductionPathArgs(["--world", ".velvet/a", "--out", "docs/x.md", "--json", "docs/y.json"]).json, "docs/y.json");
+  assert.deepEqual(
+    parseProductionPathArgs(["--world", ".velvet/a", "--out", "docs/x.md", "--json", "docs/y.json"]).json,
+    "docs/y.json",
+  );
   assert.equal(defaultProductionJsonPath("docs/x.md"), "docs/x.json");
   assert.equal(defaultProductionJsonPath("docs/x.txt"), "docs/x.txt.json");
   assert.throws(() => parseProductionPathArgs([]), /--world is required/);

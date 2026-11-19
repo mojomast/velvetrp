@@ -1,4 +1,9 @@
-import type { SystemOneAnswer, SystemOneCaller, SystemOneCompletionInput, SystemOneCompletionResult } from "./systemOneCompletion.js";
+import type {
+  SystemOneAnswer,
+  SystemOneCaller,
+  SystemOneCompletionInput,
+  SystemOneCompletionResult,
+} from "./systemOneCompletion.js";
 
 /** Options for the deterministic in-process System One double. */
 export interface FakeSystemOneOptions {
@@ -60,7 +65,11 @@ export function createFakeSystemOneCaller(
     return {
       model: { requestedModel: input.settings.model, responseModel: options.responseModel ?? input.settings.model },
       answers,
-      usage: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens, totalTokens: usage.input_tokens + usage.output_tokens },
+      usage: {
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        totalTokens: usage.input_tokens + usage.output_tokens,
+      },
       provenance: { requestId: options.requestId ?? "req_fake", latencyMs: 1, attempts: 1 },
     };
   }) as SystemOneCaller & { calls: SystemOneCompletionInput[] };

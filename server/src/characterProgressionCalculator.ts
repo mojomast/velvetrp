@@ -19,7 +19,9 @@ import type { AbilityId } from "./rulesets/types.js";
 const refKey = (value: { packId: string; packVersion: string; kind: string; definitionId: string }) =>
   `${value.packId}\0${value.packVersion}\0${value.kind}\0${value.definitionId}`;
 
-type ProgressionAbilityScoreIncrease = NonNullable<ProgressionPreview["levels"][number]["abilityScoreIncreases"]>[number];
+type ProgressionAbilityScoreIncrease = NonNullable<
+  ProgressionPreview["levels"][number]["abilityScoreIncreases"]
+>[number];
 
 /** Applies one bounded ASI distribution, or returns null when it does not exactly
  * spend the offered points on unique offered abilities. Pure; no mutation of input. */
@@ -55,16 +57,22 @@ export function calculateCharacterProgression(
   if ((value.classProgressions?.length ?? 0) > 1 || (value.classLevelsByClass?.length ?? 0) > 1) {
     return calculateMulticlassProgression(value, rulesetIdentity);
   }
-  const thresholdLevel = value.profile.mode === "xp"
-    ? value.profile.thresholds.filter((threshold) => threshold.xp <= value.totalXp).at(-1)!.level
-    : Math.min(value.profile.maxLevel, 1 + value.milestoneCount);
+  const thresholdLevel =
+    value.profile.mode === "xp"
+      ? value.profile.thresholds.filter((threshold) => threshold.xp <= value.totalXp).at(-1)!.level
+      : Math.min(value.profile.maxLevel, 1 + value.milestoneCount);
   // Compensation never silently removes an already applied level.
   const maximumClassLevel = Math.max(...value.classLevels.map((step) => step.mechanics.level));
   const eligibleLevel = Math.max(value.currentLevel, Math.min(thresholdLevel, maximumClassLevel));
-  const classKey=refKey(value.selectedClassRef),seenLevels=new Set<number>();
+  const classKey = refKey(value.selectedClassRef),
+    seenLevels = new Set<number>();
   if (value.raceRef.kind !== "race") throw new Error("progression ancestry reference is not a race");
-  for(const step of value.classLevels){if(refKey(step.mechanics.classRef)!==classKey)throw new Error("progression class level has a mismatched selected class");
-    if(seenLevels.has(step.mechanics.level))throw new Error("progression catalog contains a duplicate class level");seenLevels.add(step.mechanics.level);}
+  for (const step of value.classLevels) {
+    if (refKey(step.mechanics.classRef) !== classKey)
+      throw new Error("progression class level has a mismatched selected class");
+    if (seenLevels.has(step.mechanics.level)) throw new Error("progression catalog contains a duplicate class level");
+    seenLevels.add(step.mechanics.level);
+  }
   const byLevel = new Map(value.classLevels.map((step) => [step.mechanics.level, step]));
   const selections = new Map(value.selections.map((selection) => [selection.choiceId, selection]));
   const knownAbilities = new Set(value.knownAbilities.map(refKey));
@@ -95,18 +103,50 @@ export function calculateCharacterProgression(
     for (const choice of step.mechanics.progressionChoices ?? []) {
       const selected = selections.get(choice.choiceId);
       if (choice.kind === "ability") {
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "ability", required: true, options: choice.options });
-        if (selected?.kind === "ability" && selected.ability.kind === "ability" && choice.options.some((option) => refKey(option) === refKey(selected.ability)) && !knownAbilities.has(refKey(selected.ability))) {
-          selectedAbilities.push(selected.ability); knownAbilities.add(refKey(selected.ability));
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "ability",
+          required: true,
+          options: choice.options,
+        });
+        if (
+          selected?.kind === "ability" &&
+          selected.ability.kind === "ability" &&
+          choice.options.some((option) => refKey(option) === refKey(selected.ability)) &&
+          !knownAbilities.has(refKey(selected.ability))
+        ) {
+          selectedAbilities.push(selected.ability);
+          knownAbilities.add(refKey(selected.ability));
         }
       } else if (choice.kind === "feat") {
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "feat", required: true, options: choice.options });
-        if (selected?.kind === "feat" && selected.ability.kind === "feat" && choice.options.some((option) => refKey(option) === refKey(selected.ability))) {
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "feat",
+          required: true,
+          options: choice.options,
+        });
+        if (
+          selected?.kind === "feat" &&
+          selected.ability.kind === "feat" &&
+          choice.options.some((option) => refKey(option) === refKey(selected.ability))
+        ) {
           selectedFeats.push(selected.ability);
         }
       } else if (choice.kind === "subclass") {
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "subclass", required: true, options: choice.options });
-        if (selected?.kind === "subclass" && selected.ability.kind === "subclass" && choice.options.some((option) => refKey(option) === refKey(selected.ability))) {
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "subclass",
+          required: true,
+          options: choice.options,
+        });
+        if (
+          selected?.kind === "subclass" &&
+          selected.ability.kind === "subclass" &&
+          choice.options.some((option) => refKey(option) === refKey(selected.ability))
+        ) {
           selectedSubclasses.push(selected.ability);
         }
       } else if (choice.kind === "class") {
@@ -116,12 +156,26 @@ export function calculateCharacterProgression(
       } else {
         // Ability-score targets are reference-only, so the pending choice offers exact
         // ability-score references synthesized from the catalog's bounded attribute ids.
-        const options = choice.scores.map((attribute) => ({ packId: step.reference.packId,
-          packVersion: step.reference.packVersion, kind: "ability-score" as const, definitionId: attribute }));
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "ability-score-increase", required: true, points: choice.points, options });
+        const options = choice.scores.map((attribute) => ({
+          packId: step.reference.packId,
+          packVersion: step.reference.packVersion,
+          kind: "ability-score" as const,
+          definitionId: attribute,
+        }));
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "ability-score-increase",
+          required: true,
+          points: choice.points,
+          options,
+        });
         if (selected?.kind === "ability-score-increase") {
           const applied = applyAbilityScoreIncreases(choice, selected, scores);
-          if (applied) { scores = applied.scores; abilityScoreIncreases.push(...applied.increases); }
+          if (applied) {
+            scores = applied.scores;
+            abilityScoreIncreases.push(...applied.increases);
+          }
         }
       }
     }
@@ -129,33 +183,77 @@ export function calculateCharacterProgression(
     // The repository persists race-adjusted scores; do not apply ancestry bonuses again.
     const durabilityScore = scoresBefore[durabilityAttribute(scoresBefore)];
     if (durabilityScore === undefined) throw new Error("progression requires a durability ability score");
-    const after = calculateCharacterDerivedStats({ ...(rulesetIdentity ?? {}), scores: scores as typeof value.derivedBase.scores, racialBonuses: {},
+    const after = calculateCharacterDerivedStats({
+      ...(rulesetIdentity ?? {}),
+      scores: scores as typeof value.derivedBase.scores,
+      racialBonuses: {},
       classHp: before.maxHp + step.mechanics.hpGain - abilityModifier(durabilityScore),
-      raceSpeed: value.derivedBase.raceSpeed, proficiencyBonus: step.mechanics.proficiencyBonus,
-      spellcastingAttribute: value.derivedBase.spellcastingAttribute });
+      raceSpeed: value.derivedBase.raceSpeed,
+      proficiencyBonus: step.mechanics.proficiencyBonus,
+      spellcastingAttribute: value.derivedBase.spellcastingAttribute,
+    });
     const hpBefore = hp;
     const damage = before.maxHp - hpBefore;
     hp = Math.max(0, after.maxHp - damage);
     const resourceChanges = (step.mechanics.resourceGrants ?? []).map((grant) => {
       const current = resources.get(grant.resourceId) ?? { resourceId: grant.resourceId, current: 0, max: 0 };
-      const change = { resourceId: grant.resourceId, currentBefore: current.current, currentAfter: current.current + grant.currentIncrease,
-        maxBefore: current.max, maxAfter: current.max + grant.maxIncrease };
-      resources.set(grant.resourceId, { resourceId: grant.resourceId, current: change.currentAfter, max: change.maxAfter });
+      const change = {
+        resourceId: grant.resourceId,
+        currentBefore: current.current,
+        currentAfter: current.current + grant.currentIncrease,
+        maxBefore: current.max,
+        maxAfter: current.max + grant.maxIncrease,
+      };
+      resources.set(grant.resourceId, {
+        resourceId: grant.resourceId,
+        current: change.currentAfter,
+        max: change.maxAfter,
+      });
       return change;
     });
     const fixedAbilities = step.mechanics.abilityRefs.filter((reference) => !knownAbilities.has(refKey(reference)));
     fixedAbilities.forEach((reference) => knownAbilities.add(refKey(reference)));
     const spells = step.mechanics.spellRefs.filter((reference) => !knownSpells.has(refKey(reference)));
     spells.forEach((reference) => knownSpells.add(refKey(reference)));
-    levels.push({ level, hp: { maxBefore: before.maxHp, maxAfter: after.maxHp, currentBefore: hpBefore,
-      currentAfter: hp, gain: step.mechanics.hpGain }, proficiency: { before: Number(before.explanations.find((entry) => entry.statistic === "spell-attack")?.inputs.proficiencyBonus ?? step.mechanics.proficiencyBonus), after: step.mechanics.proficiencyBonus },
-      resources: resourceChanges, fixedAbilities, selectedAbilities, selectedFeats, selectedSubclasses, abilityScoreIncreases, spells,
-      derivedBefore: before, derivedAfter: after });
+    levels.push({
+      level,
+      hp: {
+        maxBefore: before.maxHp,
+        maxAfter: after.maxHp,
+        currentBefore: hpBefore,
+        currentAfter: hp,
+        gain: step.mechanics.hpGain,
+      },
+      proficiency: {
+        before: Number(
+          before.explanations.find((entry) => entry.statistic === "spell-attack")?.inputs.proficiencyBonus ??
+            step.mechanics.proficiencyBonus,
+        ),
+        after: step.mechanics.proficiencyBonus,
+      },
+      resources: resourceChanges,
+      fixedAbilities,
+      selectedAbilities,
+      selectedFeats,
+      selectedSubclasses,
+      abilityScoreIncreases,
+      spells,
+      derivedBefore: before,
+      derivedAfter: after,
+    });
     derived = after;
   }
-  const tokenPayload = { campaignCharacterId: value.campaignCharacterId, revision: value.revision, mode: value.profile.mode,
-    currentLevel: value.currentLevel, eligibleLevel, totalXp: value.totalXp, milestoneCount: value.milestoneCount,
-    pendingChoices, levels };
+  const tokenPayload = {
+    campaignCharacterId: value.campaignCharacterId,
+    revision: value.revision,
+    mode: value.profile.mode,
+    currentLevel: value.currentLevel,
+    eligibleLevel,
+    totalXp: value.totalXp,
+    milestoneCount: value.milestoneCount,
+    pendingChoices,
+    levels,
+  };
   const token = createHash("sha256").update(JSON.stringify(tokenPayload)).digest("hex");
   return progressionPreviewSchema.parse({ ...tokenPayload, token });
 }
@@ -175,13 +273,15 @@ function calculateMulticlassProgression(
   value: ProgressionCalculatorInput,
   rulesetIdentity?: { rulesetId: string; rulesetVersion: string },
 ): ProgressionPreview {
-  const thresholdLevel = value.profile.mode === "xp"
-    ? value.profile.thresholds.filter((threshold) => threshold.xp <= value.totalXp).at(-1)!.level
-    : Math.min(value.profile.maxLevel, 1 + value.milestoneCount);
+  const thresholdLevel =
+    value.profile.mode === "xp"
+      ? value.profile.thresholds.filter((threshold) => threshold.xp <= value.totalXp).at(-1)!.level
+      : Math.min(value.profile.maxLevel, 1 + value.milestoneCount);
   if (value.raceRef.kind !== "race") throw new Error("progression ancestry reference is not a race");
-  const progressionInputs = value.classProgressions && value.classProgressions.length > 0
-    ? value.classProgressions
-    : [{ classRef: value.selectedClassRef, classLevels: value.classLevels }];
+  const progressionInputs =
+    value.classProgressions && value.classProgressions.length > 0
+      ? value.classProgressions
+      : [{ classRef: value.selectedClassRef, classLevels: value.classLevels }];
   const primaryKey = refKey(value.selectedClassRef);
   const progressions = new Map<string, ResolvedMulticlassProgression>();
   let maximumTotal = 0;
@@ -240,8 +340,7 @@ function calculateMulticlassProgression(
     let advanced = primary.steps.get(level)
       ? { level, step: primary.steps.get(level)!, classRef: primary.classRef }
       : nextClassStep(primaryKey);
-    const classChoice = (advanced.step.mechanics.progressionChoices ?? [])
-      .find((choice) => choice.kind === "class");
+    const classChoice = (advanced.step.mechanics.progressionChoices ?? []).find((choice) => choice.kind === "class");
     const classSelection = classChoice ? selections.get(classChoice.choiceId) : undefined;
     let granted: MulticlassProficiency[] = [];
     if (classChoice && classSelection?.kind === "class") {
@@ -271,60 +370,150 @@ function calculateMulticlassProgression(
     for (const choice of advanced.step.mechanics.progressionChoices ?? []) {
       const selected = selections.get(choice.choiceId);
       if (choice.kind === "ability") {
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "ability", required: true, options: choice.options });
-        if (selected?.kind === "ability" && selected.ability.kind === "ability" && choice.options.some((option) => refKey(option) === refKey(selected.ability)) && !knownAbilities.has(refKey(selected.ability))) {
-          selectedAbilities.push(selected.ability); knownAbilities.add(refKey(selected.ability));
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "ability",
+          required: true,
+          options: choice.options,
+        });
+        if (
+          selected?.kind === "ability" &&
+          selected.ability.kind === "ability" &&
+          choice.options.some((option) => refKey(option) === refKey(selected.ability)) &&
+          !knownAbilities.has(refKey(selected.ability))
+        ) {
+          selectedAbilities.push(selected.ability);
+          knownAbilities.add(refKey(selected.ability));
         }
       } else if (choice.kind === "feat") {
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "feat", required: true, options: choice.options });
-        if (selected?.kind === "feat" && selected.ability.kind === "feat" && choice.options.some((option) => refKey(option) === refKey(selected.ability))) {
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "feat",
+          required: true,
+          options: choice.options,
+        });
+        if (
+          selected?.kind === "feat" &&
+          selected.ability.kind === "feat" &&
+          choice.options.some((option) => refKey(option) === refKey(selected.ability))
+        ) {
           selectedFeats.push(selected.ability);
         }
       } else if (choice.kind === "subclass") {
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "subclass", required: true, options: choice.options });
-        if (selected?.kind === "subclass" && selected.ability.kind === "subclass" && choice.options.some((option) => refKey(option) === refKey(selected.ability))) {
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "subclass",
+          required: true,
+          options: choice.options,
+        });
+        if (
+          selected?.kind === "subclass" &&
+          selected.ability.kind === "subclass" &&
+          choice.options.some((option) => refKey(option) === refKey(selected.ability))
+        ) {
           selectedSubclasses.push(selected.ability);
         }
       } else if (choice.kind === "class") {
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "class", required: true, options: choice.options });
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "class",
+          required: true,
+          options: choice.options,
+        });
       } else {
-        const options = choice.scores.map((attribute) => ({ packId: advanced.step.reference.packId,
-          packVersion: advanced.step.reference.packVersion, kind: "ability-score" as const, definitionId: attribute }));
-        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "ability-score-increase", required: true, points: choice.points, options });
+        const options = choice.scores.map((attribute) => ({
+          packId: advanced.step.reference.packId,
+          packVersion: advanced.step.reference.packVersion,
+          kind: "ability-score" as const,
+          definitionId: attribute,
+        }));
+        pendingChoices.push({
+          level,
+          choiceId: choice.choiceId,
+          kind: "ability-score-increase",
+          required: true,
+          points: choice.points,
+          options,
+        });
         if (selected?.kind === "ability-score-increase") {
           const applied = applyAbilityScoreIncreases(choice, selected, scores);
-          if (applied) { scores = applied.scores; abilityScoreIncreases.push(...applied.increases); }
+          if (applied) {
+            scores = applied.scores;
+            abilityScoreIncreases.push(...applied.increases);
+          }
         }
       }
     }
     const before = derived;
     const durabilityScore = scoresBefore[durabilityAttribute(scoresBefore)];
     if (durabilityScore === undefined) throw new Error("progression requires a durability ability score");
-    const after = calculateCharacterDerivedStats({ ...(rulesetIdentity ?? {}), scores: scores as typeof value.derivedBase.scores, racialBonuses: {},
+    const after = calculateCharacterDerivedStats({
+      ...(rulesetIdentity ?? {}),
+      scores: scores as typeof value.derivedBase.scores,
+      racialBonuses: {},
       classHp: before.maxHp + advanced.step.mechanics.hpGain - abilityModifier(durabilityScore),
-      raceSpeed: value.derivedBase.raceSpeed, proficiencyBonus: advanced.step.mechanics.proficiencyBonus,
-      spellcastingAttribute: value.derivedBase.spellcastingAttribute });
+      raceSpeed: value.derivedBase.raceSpeed,
+      proficiencyBonus: advanced.step.mechanics.proficiencyBonus,
+      spellcastingAttribute: value.derivedBase.spellcastingAttribute,
+    });
     const hpBefore = hp;
     const damage = before.maxHp - hpBefore;
     hp = Math.max(0, after.maxHp - damage);
     const resourceChanges = (advanced.step.mechanics.resourceGrants ?? []).map((grant) => {
       const current = resources.get(grant.resourceId) ?? { resourceId: grant.resourceId, current: 0, max: 0 };
-      const change = { resourceId: grant.resourceId, currentBefore: current.current, currentAfter: current.current + grant.currentIncrease,
-        maxBefore: current.max, maxAfter: current.max + grant.maxIncrease };
-      resources.set(grant.resourceId, { resourceId: grant.resourceId, current: change.currentAfter, max: change.maxAfter });
+      const change = {
+        resourceId: grant.resourceId,
+        currentBefore: current.current,
+        currentAfter: current.current + grant.currentIncrease,
+        maxBefore: current.max,
+        maxAfter: current.max + grant.maxIncrease,
+      };
+      resources.set(grant.resourceId, {
+        resourceId: grant.resourceId,
+        current: change.currentAfter,
+        max: change.maxAfter,
+      });
       return change;
     });
-    const fixedAbilities = advanced.step.mechanics.abilityRefs.filter((reference) => !knownAbilities.has(refKey(reference)));
+    const fixedAbilities = advanced.step.mechanics.abilityRefs.filter(
+      (reference) => !knownAbilities.has(refKey(reference)),
+    );
     fixedAbilities.forEach((reference) => knownAbilities.add(refKey(reference)));
     const spells = advanced.step.mechanics.spellRefs.filter((reference) => !knownSpells.has(refKey(reference)));
     spells.forEach((reference) => knownSpells.add(refKey(reference)));
-    levels.push({ level, hp: { maxBefore: before.maxHp, maxAfter: after.maxHp, currentBefore: hpBefore,
-      currentAfter: hp, gain: advanced.step.mechanics.hpGain },
-      proficiency: { before: Number(before.explanations.find((entry) => entry.statistic === "spell-attack")?.inputs.proficiencyBonus ?? advanced.step.mechanics.proficiencyBonus), after: advanced.step.mechanics.proficiencyBonus },
-      resources: resourceChanges, fixedAbilities, selectedAbilities, selectedFeats, selectedSubclasses, abilityScoreIncreases, spells,
-      classRef: advanced.classRef, classLevel: advanced.step.mechanics.level,
+    levels.push({
+      level,
+      hp: {
+        maxBefore: before.maxHp,
+        maxAfter: after.maxHp,
+        currentBefore: hpBefore,
+        currentAfter: hp,
+        gain: advanced.step.mechanics.hpGain,
+      },
+      proficiency: {
+        before: Number(
+          before.explanations.find((entry) => entry.statistic === "spell-attack")?.inputs.proficiencyBonus ??
+            advanced.step.mechanics.proficiencyBonus,
+        ),
+        after: advanced.step.mechanics.proficiencyBonus,
+      },
+      resources: resourceChanges,
+      fixedAbilities,
+      selectedAbilities,
+      selectedFeats,
+      selectedSubclasses,
+      abilityScoreIncreases,
+      spells,
+      classRef: advanced.classRef,
+      classLevel: advanced.step.mechanics.level,
       ...(granted.length ? { grantedProficiencies: granted } : {}),
-      derivedBefore: before, derivedAfter: after });
+      derivedBefore: before,
+      derivedAfter: after,
+    });
     derived = after;
   }
   const classLevelsByClass = [...currentClassLevels.values()]
@@ -336,9 +525,19 @@ function calculateMulticlassProgression(
     if (classId) casterLevels.push({ classId, level: entry.level });
   }
   const spellSlots = classLevelsByClass.length > 1 ? multiclassSpellSlotsFor(casterLevels) : undefined;
-  const tokenPayload = { campaignCharacterId: value.campaignCharacterId, revision: value.revision, mode: value.profile.mode,
-    currentLevel: value.currentLevel, eligibleLevel, totalXp: value.totalXp, milestoneCount: value.milestoneCount,
-    pendingChoices, levels, classLevelsByClass, ...(spellSlots ? { spellSlots } : {}) };
+  const tokenPayload = {
+    campaignCharacterId: value.campaignCharacterId,
+    revision: value.revision,
+    mode: value.profile.mode,
+    currentLevel: value.currentLevel,
+    eligibleLevel,
+    totalXp: value.totalXp,
+    milestoneCount: value.milestoneCount,
+    pendingChoices,
+    levels,
+    classLevelsByClass,
+    ...(spellSlots ? { spellSlots } : {}),
+  };
   const token = createHash("sha256").update(JSON.stringify(tokenPayload)).digest("hex");
   return progressionPreviewSchema.parse({ ...tokenPayload, token });
 }

@@ -1,6 +1,20 @@
 export type CombatActionPlan = {
   legalActionId: string;
-  kind: "attack" | "grapple" | "escape-grapple" | "shove" | "stand-up" | "dash" | "disengage" | "help" | "hide" | "ready" | "flee" | "end-turn" | "stabilize" | "death-save";
+  kind:
+    | "attack"
+    | "grapple"
+    | "escape-grapple"
+    | "shove"
+    | "stand-up"
+    | "dash"
+    | "disengage"
+    | "help"
+    | "hide"
+    | "ready"
+    | "flee"
+    | "end-turn"
+    | "stabilize"
+    | "death-save";
   actingCombatantId: string;
   targetIds: string[];
   cost: "action" | null;
@@ -50,7 +64,11 @@ export type CombatSpellRangedCandidate = Readonly<{
   targetIds: string[];
 }>;
 export interface CombatSpellCandidateProvider {
-  getCombatRangedCandidates(campaignId: string, encounterId: string, combatantId: string): readonly CombatSpellRangedCandidate[];
+  getCombatRangedCandidates(
+    campaignId: string,
+    encounterId: string,
+    combatantId: string,
+  ): readonly CombatSpellRangedCandidate[];
 }
 
 export type PersistedCombatTurnEconomy = {

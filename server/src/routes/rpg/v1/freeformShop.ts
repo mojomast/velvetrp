@@ -53,64 +53,80 @@ const noneReasonSchema = z.enum([
 
 const boundingText = (max: number) => z.string().min(1).max(max);
 
-const itemReferenceSchema = z.object({
-  kind: z.literal("item"),
-  packId: boundingText(128),
-  packVersion: boundingText(MAX_PACK_VERSION_LENGTH),
-  definitionId: boundingText(MAX_DEFINITION_ID_LENGTH),
-}).strict();
+const itemReferenceSchema = z
+  .object({
+    kind: z.literal("item"),
+    packId: boundingText(128),
+    packVersion: boundingText(MAX_PACK_VERSION_LENGTH),
+    definitionId: boundingText(MAX_DEFINITION_ID_LENGTH),
+  })
+  .strict();
 
-const stockLineSchema = z.object({
-  stockId: boundingText(128),
-  item: itemReferenceSchema,
-  quantity: z.number().int().min(MIN_FREEFORM_SHOP_QUANTITY).max(MAX_FREEFORM_SHOP_QUANTITY),
-  unitPriceMinor: z.number().int().min(0),
-  currencyCode: boundingText(MAX_CURRENCY_CODE_LENGTH),
-}).strict();
+const stockLineSchema = z
+  .object({
+    stockId: boundingText(128),
+    item: itemReferenceSchema,
+    quantity: z.number().int().min(MIN_FREEFORM_SHOP_QUANTITY).max(MAX_FREEFORM_SHOP_QUANTITY),
+    unitPriceMinor: z.number().int().min(0),
+    currencyCode: boundingText(MAX_CURRENCY_CODE_LENGTH),
+  })
+  .strict();
 
-const candidateSchema = z.object({
-  candidateId: boundingText(128),
-  shopId: boundingText(128),
-  shopName: boundingText(MAX_SHOP_NAME_LENGTH),
-  npcId: boundingText(128),
-  items: z.array(stockLineSchema).min(1).max(MAX_FREEFORM_SHOP_ITEMS),
-}).strict();
+const candidateSchema = z
+  .object({
+    candidateId: boundingText(128),
+    shopId: boundingText(128),
+    shopName: boundingText(MAX_SHOP_NAME_LENGTH),
+    npcId: boundingText(128),
+    items: z.array(stockLineSchema).min(1).max(MAX_FREEFORM_SHOP_ITEMS),
+  })
+  .strict();
 
 const classificationSchema = z.discriminatedUnion("intent", [
-  z.object({
-    intent: z.literal("none"),
-    reason: noneReasonSchema,
-  }).strict(),
-  z.object({
-    intent: z.literal("materialize-shop"),
-    merchantName: boundingText(MAX_NAME_LENGTH),
-    candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
-  }).strict(),
+  z
+    .object({
+      intent: z.literal("none"),
+      reason: noneReasonSchema,
+    })
+    .strict(),
+  z
+    .object({
+      intent: z.literal("materialize-shop"),
+      merchantName: boundingText(MAX_NAME_LENGTH),
+      candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
+    })
+    .strict(),
 ]);
 
 const materializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: noneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: candidateSchema,
-    shopId: boundingText(128),
-    npcId: boundingText(128),
-    draftId: boundingText(128),
-    contentReceiptId: boundingText(128).nullable(),
-    bindingCreated: z.boolean(),
-    stock: z.array(stockLineSchema).min(1).max(MAX_FREEFORM_SHOP_ITEMS),
-  }).strict(),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: candidateSchema,
+      shopId: boundingText(128),
+      npcId: boundingText(128),
+      draftId: boundingText(128),
+      contentReceiptId: boundingText(128).nullable(),
+      bindingCreated: z.boolean(),
+      stock: z.array(stockLineSchema).min(1).max(MAX_FREEFORM_SHOP_ITEMS),
+    })
+    .strict(),
 ]);
 
-const requestSchema = z.object({
-  merchantNpcId: boundingText(128),
-  candidateId: boundingText(128).optional(),
-}).strict();
+const requestSchema = z
+  .object({
+    merchantNpcId: boundingText(128),
+    candidateId: boundingText(128).optional(),
+  })
+  .strict();
 
-const responseSchema = z.object({
-  classification: classificationSchema,
-  materialization: materializationSchema.optional(),
-}).strict();
+const responseSchema = z
+  .object({
+    classification: classificationSchema,
+    materialization: materializationSchema.optional(),
+  })
+  .strict();
 
 export interface FreeformShopHttpOptions {
   repositoryAccessor: () => FreeformShopRepository;
@@ -133,13 +149,25 @@ function failure(error: unknown, request: FastifyRequest, reply: FastifyReply): 
     return unavailable(request, reply);
   }
   if (error instanceof FreeformShopConflictError) {
-    return sendApiProblem(request, reply, 409, "RPG_FREEFORM_SHOP_CONFLICT",
-      "Freeform shop conflicts with current state; refresh before retrying");
+    return sendApiProblem(
+      request,
+      reply,
+      409,
+      "RPG_FREEFORM_SHOP_CONFLICT",
+      "Freeform shop conflicts with current state; refresh before retrying",
+    );
   }
-  request.log.error({ operation: "freeform-shop", method: request.method, route: request.routeOptions.url },
-    "freeform shop command failed");
-  return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR",
-    "Freeform shop outcome may be unknown; reconcile before retrying");
+  request.log.error(
+    { operation: "freeform-shop", method: request.method, route: request.routeOptions.url },
+    "freeform shop command failed",
+  );
+  return sendApiProblem(
+    request,
+    reply,
+    500,
+    "RPG_INTERNAL_ERROR",
+    "Freeform shop outcome may be unknown; reconcile before retrying",
+  );
 }
 
 export const freeformShopHttpRoutes: FastifyPluginAsync<FreeformShopHttpOptions> = async (app, options) => {
@@ -153,8 +181,17 @@ export const freeformShopHttpRoutes: FastifyPluginAsync<FreeformShopHttpOptions>
           await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
           return;
         }
-        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0) {
-          await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Freeform shop does not accept query parameters");
+        if (
+          (request.raw.url ?? request.url).includes("?") ||
+          Object.keys(request.query as Record<string, unknown>).length > 0
+        ) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Freeform shop does not accept query parameters",
+          );
           return;
         }
         if (Object.values(request.params).some((value) => !resourceIdSchema.safeParse(value).success)) {
@@ -163,7 +200,13 @@ export const freeformShopHttpRoutes: FastifyPluginAsync<FreeformShopHttpOptions>
         }
         const contentType = request.headers["content-type"];
         if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Freeform shop requires application/json");
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Freeform shop requires application/json",
+          );
         }
       },
       errorHandler: (_error, request, reply) =>
@@ -177,12 +220,24 @@ export const freeformShopHttpRoutes: FastifyPluginAsync<FreeformShopHttpOptions>
       try {
         const repository = options.repositoryAccessor();
         const { campaignId, sessionId, actorId } = request.params;
-        const classification = repository.classifyFreeformShopIntent(PRINCIPAL, campaignId, sessionId, actorId, body.data.merchantNpcId);
+        const classification = repository.classifyFreeformShopIntent(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.merchantNpcId,
+        );
         if (classification.intent === "none") {
           return reply.code(200).send(responseSchema.parse({ classification }));
         }
-        const materialization = repository.materializeFreeformShop(PRINCIPAL, campaignId, sessionId, actorId, body.data.merchantNpcId,
-          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {});
+        const materialization = repository.materializeFreeformShop(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.merchantNpcId,
+          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {},
+        );
         return reply.code(200).send(responseSchema.parse({ classification, materialization }));
       } catch (error) {
         return failure(error, request, reply);

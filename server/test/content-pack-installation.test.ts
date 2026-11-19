@@ -69,9 +69,7 @@ function contentSnapshot(dir = process.env.VELVET_DATA_DIR as string): Record<st
   return result;
 }
 
-function changedDefinition(
-  patch: Partial<InstallContentPackInput["classes"][number]>,
-): InstallContentPackInput {
+function changedDefinition(patch: Partial<InstallContentPackInput["classes"][number]>): InstallContentPackInput {
   return { ...input, classes: [{ ...input.classes[0]!, ...patch }, input.classes[1]!] };
 }
 
@@ -83,27 +81,46 @@ function installationStatements(
   if (options.includeProfile) {
     statements.push({
       sql: `INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags) VALUES (?, ?, ?, ?)`,
-      params: [pack.rulesProfileId, pack.rulesProfile.name, pack.rulesProfile.description, JSON.stringify(pack.rulesProfile.tags)],
+      params: [
+        pack.rulesProfileId,
+        pack.rulesProfile.name,
+        pack.rulesProfile.description,
+        JSON.stringify(pack.rulesProfile.tags),
+      ],
     });
   }
   statements.push({
     sql: `INSERT INTO rpg_content_packs
       (pack_id, pack_version, rules_profile_id, name, description, tags, sealed) VALUES (?, ?, ?, ?, ?, ?, 0)`,
     params: [
-      pack.packId, pack.packVersion, pack.rulesProfileId, options.persistedName ?? pack.name,
-      pack.description, JSON.stringify(pack.tags),
+      pack.packId,
+      pack.packVersion,
+      pack.rulesProfileId,
+      options.persistedName ?? pack.name,
+      pack.description,
+      JSON.stringify(pack.tags),
     ],
   });
   for (const definition of [
-    ...pack.classes, ...pack.races, ...pack.backgrounds, ...pack.items,
-    ...pack.spells, ...pack.abilities, ...pack.enemies,
+    ...pack.classes,
+    ...pack.races,
+    ...pack.backgrounds,
+    ...pack.items,
+    ...pack.spells,
+    ...pack.abilities,
+    ...pack.enemies,
   ]) {
     statements.push({
       sql: `INSERT INTO rpg_definitions
         (pack_id, pack_version, kind, definition_id, name, description, tags) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       params: [
-        pack.packId, pack.packVersion, definition.kind, definition.definitionId,
-        definition.name, definition.description, JSON.stringify(definition.tags),
+        pack.packId,
+        pack.packVersion,
+        definition.kind,
+        definition.definitionId,
+        definition.name,
+        definition.description,
+        JSON.stringify(definition.tags),
       ],
     });
   }
@@ -138,17 +155,27 @@ describe("content-pack installation", () => {
     repository.close();
 
     const snapshot = contentSnapshot();
-    expect(snapshot.profiles).toEqual([{
-      rules_profile_id: input.rulesProfileId,
-      name: input.rulesProfile.name,
-      description: input.rulesProfile.description,
-      tags: JSON.stringify(input.rulesProfile.tags),
-    }]);
-    expect((snapshot.definitions as Array<{ kind: string; definition_id: string }>).map(
-      ({ kind, definition_id }) => `${kind}:${definition_id}`,
-    )).toEqual([
-      "class:fighter", "class:wizard", "race:human", "background:sage", "item:rope",
-      "spell:bolt", "ability:action", "enemy:dragon",
+    expect(snapshot.profiles).toEqual([
+      {
+        rules_profile_id: input.rulesProfileId,
+        name: input.rulesProfile.name,
+        description: input.rulesProfile.description,
+        tags: JSON.stringify(input.rulesProfile.tags),
+      },
+    ]);
+    expect(
+      (snapshot.definitions as Array<{ kind: string; definition_id: string }>).map(
+        ({ kind, definition_id }) => `${kind}:${definition_id}`,
+      ),
+    ).toEqual([
+      "class:fighter",
+      "class:wizard",
+      "race:human",
+      "background:sage",
+      "item:rope",
+      "spell:bolt",
+      "ability:action",
+      "enemy:dragon",
     ]);
     expect(snapshot.selections).toEqual([]);
     expect(snapshot.pins).toEqual([]);
@@ -164,18 +191,28 @@ describe("content-pack installation", () => {
     const repository = createRepository({ dataDir: dataDir() });
     repository.installContentPack(ownerId, input);
 
-    for (const denied of ["local-owner", "campaign-owner", "campaign-gm", "campaign-player", "campaign-observer", "missing-principal"]) {
-      expect(() => repository.installContentPack(denied, input))
-        .toThrow("content pack installation requires the application owner");
-      expect(() => repository.installContentPack(denied, { ...input, packId: "not-installed" }))
-        .toThrow("content pack installation requires the application owner");
+    for (const denied of [
+      "local-owner",
+      "campaign-owner",
+      "campaign-gm",
+      "campaign-player",
+      "campaign-observer",
+      "missing-principal",
+    ]) {
+      expect(() => repository.installContentPack(denied, input)).toThrow(
+        "content pack installation requires the application owner",
+      );
+      expect(() => repository.installContentPack(denied, { ...input, packId: "not-installed" })).toThrow(
+        "content pack installation requires the application owner",
+      );
     }
 
     const transfer = new DatabaseDriver(dbPath());
     transfer.prepare("UPDATE application_owner SET principal_id = 'next-owner' WHERE singleton = 1").run();
     transfer.close();
-    expect(() => repository.installContentPack(ownerId, input))
-      .toThrow("content pack installation requires the application owner");
+    expect(() => repository.installContentPack(ownerId, input)).toThrow(
+      "content pack installation requires the application owner",
+    );
     expect(repository.installContentPack("next-owner", input).packId).toBe(input.packId);
     repository.close();
   });
@@ -190,7 +227,7 @@ describe("content-pack installation", () => {
       races: [...input.races].reverse(),
     };
     expect(repository.installContentPack(ownerId, reordered)).toEqual(installed);
-    expect((contentSnapshot().definitions as unknown[])).toHaveLength(8);
+    expect(contentSnapshot().definitions as unknown[]).toHaveLength(8);
 
     const mutations: InstallContentPackInput[] = [
       { ...input, rulesProfile: { ...input.rulesProfile, name: "Changed profile" } },
@@ -240,13 +277,15 @@ describe("content-pack installation", () => {
   it("requires exact existing profile metadata and leaves an unreferenced matching profile reusable", () => {
     initializeOwner();
     const db = new DatabaseDriver(dbPath());
-    db.prepare(`INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
-      VALUES (?, ?, ?, ?)`).run(
-        input.rulesProfileId,
-        input.rulesProfile.name,
-        input.rulesProfile.description,
-        JSON.stringify(input.rulesProfile.tags),
-      );
+    db.prepare(
+      `INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
+      VALUES (?, ?, ?, ?)`,
+    ).run(
+      input.rulesProfileId,
+      input.rulesProfile.name,
+      input.rulesProfile.description,
+      JSON.stringify(input.rulesProfile.tags),
+    );
     db.close();
     const repository = createRepository({ dataDir: dataDir() });
     expect(repository.installContentPack(ownerId, input).rulesProfileId).toBe(input.rulesProfileId);
@@ -255,24 +294,35 @@ describe("content-pack installation", () => {
     const otherDir = makeTmpDataDir();
     initializeOwner(otherDir);
     const conflictDb = new DatabaseDriver(dbPath(otherDir));
-    conflictDb.prepare(`INSERT INTO rpg_rules_profiles VALUES (?, 'Different', 'Core profile metadata.', ?)`)
+    conflictDb
+      .prepare(`INSERT INTO rpg_rules_profiles VALUES (?, 'Different', 'Core profile metadata.', ?)`)
       .run(input.rulesProfileId, JSON.stringify(input.rulesProfile.tags));
     conflictDb.close();
     const conflict = createRepository({ dataDir: otherDir });
-    expect(() => conflict.installContentPack(ownerId, input))
-      .toThrow("rules profile metadata conflicts with the installed profile");
+    expect(() => conflict.installContentPack(ownerId, input)).toThrow(
+      "rules profile metadata conflicts with the installed profile",
+    );
     expect(contentSnapshot(otherDir).packs).toEqual([]);
     conflict.close();
   });
 
   it("rolls back profile, pack, and every definition on profile, pack, or mid-definition SQL failure", () => {
     for (const [stage, trigger] of [
-      ["profile", `CREATE TRIGGER fail_install BEFORE INSERT ON rpg_rules_profiles
-        BEGIN SELECT RAISE(ABORT, 'injected profile failure'); END`],
-      ["pack", `CREATE TRIGGER fail_install BEFORE INSERT ON rpg_content_packs
-        BEGIN SELECT RAISE(ABORT, 'injected pack failure'); END`],
-      ["definition", `CREATE TRIGGER fail_install BEFORE INSERT ON rpg_definitions WHEN NEW.kind = 'ability'
-        BEGIN SELECT RAISE(ABORT, 'injected definition failure'); END`],
+      [
+        "profile",
+        `CREATE TRIGGER fail_install BEFORE INSERT ON rpg_rules_profiles
+        BEGIN SELECT RAISE(ABORT, 'injected profile failure'); END`,
+      ],
+      [
+        "pack",
+        `CREATE TRIGGER fail_install BEFORE INSERT ON rpg_content_packs
+        BEGIN SELECT RAISE(ABORT, 'injected pack failure'); END`,
+      ],
+      [
+        "definition",
+        `CREATE TRIGGER fail_install BEFORE INSERT ON rpg_definitions WHEN NEW.kind = 'ability'
+        BEGIN SELECT RAISE(ABORT, 'injected definition failure'); END`,
+      ],
     ] as const) {
       const dir = makeTmpDataDir();
       initializeOwner(dir);
@@ -303,8 +353,9 @@ describe("content-pack installation", () => {
     );
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
     const conflictStarted = Date.now();
-    expect(() => repository.installContentPack(ownerId, other))
-      .toThrow("content pack metadata conflicts with the installed pack");
+    expect(() => repository.installContentPack(ownerId, other)).toThrow(
+      "content pack metadata conflicts with the installed pack",
+    );
     expect(Date.now() - conflictStarted).toBeGreaterThanOrEqual(75);
     expect(transaction).toHaveBeenCalledOnce();
     await conflictWriter.done;
@@ -321,11 +372,16 @@ describe("content-pack installation", () => {
       clock: { now },
       ids: { nextId },
     });
-    const poisonInput = { get packId(): string { throw new Error("input was read"); } } as InstallContentPackInput;
+    const poisonInput = {
+      get packId(): string {
+        throw new Error("input was read");
+      },
+    } as InstallContentPackInput;
     expect(() => repository.installContentPack("bad actor", poisonInput)).not.toThrow("input was read");
     expect(() => repository.installContentPack(ownerId, { ...input, path: "pack.json" } as never)).toThrow();
-    expect(() => repository.transaction(() => repository.installContentPack(ownerId, input)))
-      .toThrow("content pack installation cannot run inside a repository transaction");
+    expect(() => repository.transaction(() => repository.installContentPack(ownerId, input))).toThrow(
+      "content pack installation cannot run inside a repository transaction",
+    );
     repository.transaction((unitOfWork) => {
       expect("installContentPack" in unitOfWork).toBe(false);
       // @ts-expect-error Installation intentionally is not a unit-of-work operation.
@@ -344,10 +400,15 @@ describe("content-pack installation", () => {
     expect("appendContentPackDefinition" in repository).toBe(false);
 
     const db = new DatabaseDriver(dbPath());
-    expect(() => db.prepare(`INSERT INTO rpg_definitions
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO rpg_definitions
       (pack_id, pack_version, kind, definition_id, name, description, tags)
-      VALUES (?, ?, 'class', 'sql-appended', 'SQL append', 'Unsupported direct SQL', '[]')`)
-      .run(input.packId, input.packVersion)).toThrow("sealed RPG content packs cannot accept definitions");
+      VALUES (?, ?, 'class', 'sql-appended', 'SQL append', 'Unsupported direct SQL', '[]')`,
+        )
+        .run(input.packId, input.packVersion),
+    ).toThrow("sealed RPG content packs cannot accept definitions");
     db.close();
     expect(repository.installContentPack(ownerId, input).packId).toBe(input.packId);
     expect(contentSnapshot().definitions).toHaveLength(8);

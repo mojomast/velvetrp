@@ -52,7 +52,13 @@ const harvestProposal = (overrides: Record<string, unknown> = {}): Record<string
   state: {
     private_context: { summary: "a quiet road" },
     candidates: [
-      { candidateId: "beat:a", digest: "a".repeat(64), action: "ambient-beat", label: "An ambient moment", pacing: true },
+      {
+        candidateId: "beat:a",
+        digest: "a".repeat(64),
+        action: "ambient-beat",
+        label: "An ambient moment",
+        pacing: true,
+      },
       { candidateId: "beat:b", digest: "b".repeat(64), action: "reveal-node", label: "Reveal the gate", pacing: false },
       { candidateId: "beat:c", digest: "c".repeat(64), action: "advance-time", label: "Time passes", pacing: false },
     ],
@@ -139,11 +145,19 @@ test("skips unusable harvested states, expectations, and duplicate ids", () => {
     }),
     harvestProposal({
       proposalId: "c".repeat(64),
-      state: { candidates: [{ candidateId: "beat:a", digest: "a".repeat(64), action: "ambient-beat", label: "Beat", extra: true }] },
+      state: {
+        candidates: [
+          { candidateId: "beat:a", digest: "a".repeat(64), action: "ambient-beat", label: "Beat", extra: true },
+        ],
+      },
     }),
     harvestProposal({
       proposalId: "d".repeat(64),
-      state: { candidates: [{ candidateId: "beat:a", digest: "a".repeat(64), action: "ambient-beat", label: "Beat", pacing: "yes" }] },
+      state: {
+        candidates: [
+          { candidateId: "beat:a", digest: "a".repeat(64), action: "ambient-beat", label: "Beat", pacing: "yes" },
+        ],
+      },
     }),
   ]);
 
@@ -156,10 +170,7 @@ test("skips unusable harvested states, expectations, and duplicate ids", () => {
 test("grades harvested scenarios by exact candidate id and holds by the composed hold", () => {
   const scenario: Scenario = {
     id: `${HARVEST_ID_PREFIX}${"a".repeat(12)}`,
-    projection: [
-      projectionCandidate("beat:a", "ambient-beat", true),
-      projectionCandidate("beat:b", "reveal-node"),
-    ],
+    projection: [projectionCandidate("beat:a", "ambient-beat", true), projectionCandidate("beat:b", "reveal-node")],
     preferred: "beat:b",
     acceptable: ["beat:a"],
     holdout: false,
@@ -179,23 +190,31 @@ test("grades harvested scenarios by exact candidate id and holds by the composed
   assert.equal(preferred.correct, true);
   assert.equal(preferred.exact, true, "the preferred candidate id is an exact pick");
 
-  const alternative = readout(scenario, {
-    ...answers,
-    [`${DIRECTOR_PROGRESS_PREFIX}beat:a`]: { type: "noul", noul: 0.9 },
-    [`${DIRECTOR_PROGRESS_PREFIX}beat:b`]: { type: "noul", noul: 0.2 },
-    [`${DIRECTOR_PRIORITY_PREFIX}beat:a`]: score(1),
-  }, thresholds);
+  const alternative = readout(
+    scenario,
+    {
+      ...answers,
+      [`${DIRECTOR_PROGRESS_PREFIX}beat:a`]: { type: "noul", noul: 0.9 },
+      [`${DIRECTOR_PROGRESS_PREFIX}beat:b`]: { type: "noul", noul: 0.2 },
+      [`${DIRECTOR_PRIORITY_PREFIX}beat:a`]: score(1),
+    },
+    thresholds,
+  );
   assert.equal(alternative.selectedAction, "ambient-beat");
   assert.equal(alternative.correct, true, "an acceptable harvested candidate is not a regression");
   assert.equal(alternative.exact, false, "an acceptable harvested candidate is not the preferred pick");
 
   const holdScenario: Scenario = { ...scenario, preferred: "hold", acceptable: [] };
-  const held = readout(holdScenario, {
-    ...answers,
-    [`${DIRECTOR_PROGRESS_PREFIX}beat:a`]: { type: "noul", noul: 0.1 },
-    [`${DIRECTOR_PROGRESS_PREFIX}beat:b`]: { type: "noul", noul: 0.1 },
-    [DIRECTOR_HOLD_KEY]: { type: "noul", noul: 0.9 },
-  }, thresholds);
+  const held = readout(
+    holdScenario,
+    {
+      ...answers,
+      [`${DIRECTOR_PROGRESS_PREFIX}beat:a`]: { type: "noul", noul: 0.1 },
+      [`${DIRECTOR_PROGRESS_PREFIX}beat:b`]: { type: "noul", noul: 0.1 },
+      [DIRECTOR_HOLD_KEY]: { type: "noul", noul: 0.9 },
+    },
+    thresholds,
+  );
   assert.equal(held.method, "hold");
   assert.equal(held.selectedAction, null);
   assert.equal(held.correct, true);
@@ -203,7 +222,9 @@ test("grades harvested scenarios by exact candidate id and holds by the composed
 });
 
 test("treats an absent or malformed harvest fixture as zero scenarios without failing", async () => {
-  const missing = await loadHarvestedDirectorScenarios(path.join(tmpdir(), `velvet-director-harvest-missing-${process.pid}.json`));
+  const missing = await loadHarvestedDirectorScenarios(
+    path.join(tmpdir(), `velvet-director-harvest-missing-${process.pid}.json`),
+  );
   assert.deepEqual(
     { scenarios: missing.scenarios.length, present: missing.present, warning: missing.warning },
     { scenarios: 0, present: false, warning: null },
@@ -214,19 +235,30 @@ test("treats an absent or malformed harvest fixture as zero scenarios without fa
   assert.equal(notJson.present, true);
   assert.ok(notJson.warning?.includes("not valid JSON"));
 
-  const noProposals = parseHarvestedDirectorScenarios(JSON.stringify({ version: 1, lane: "director-selection", generatedAt: "2026-09-17T00:00:00.000Z" }));
+  const noProposals = parseHarvestedDirectorScenarios(
+    JSON.stringify({ version: 1, lane: "director-selection", generatedAt: "2026-09-17T00:00:00.000Z" }),
+  );
   assert.equal(noProposals.scenarios.length, 0);
   assert.ok(noProposals.warning?.includes("proposals"));
 
-  const wrongVersion = parseHarvestedDirectorScenarios(JSON.stringify({ version: 2, lane: "director-selection", generatedAt: "x", proposals: [] }));
+  const wrongVersion = parseHarvestedDirectorScenarios(
+    JSON.stringify({ version: 2, lane: "director-selection", generatedAt: "x", proposals: [] }),
+  );
   assert.equal(wrongVersion.scenarios.length, 0);
   assert.ok(wrongVersion.warning?.includes("version"));
 
-  const wrongLane = parseHarvestedDirectorScenarios(JSON.stringify({ version: 1, lane: "adventure-selection", generatedAt: "x", proposals: [harvestProposal()] }));
+  const wrongLane = parseHarvestedDirectorScenarios(
+    JSON.stringify({ version: 1, lane: "adventure-selection", generatedAt: "x", proposals: [harvestProposal()] }),
+  );
   assert.equal(wrongLane.scenarios.length, 0);
   assert.ok(wrongLane.warning?.includes("adventure-selection"));
 
-  const fixture = { version: 1, lane: "director-selection", generatedAt: "2026-09-17T00:00:00.000Z", proposals: [harvestProposal()] };
+  const fixture = {
+    version: 1,
+    lane: "director-selection",
+    generatedAt: "2026-09-17T00:00:00.000Z",
+    proposals: [harvestProposal()],
+  };
   const parsed = parseHarvestedDirectorScenarios(JSON.stringify(fixture));
   assert.equal(parsed.warning, null);
   assert.equal(parsed.scenarios.length, 1);
@@ -266,7 +298,11 @@ test("joins the composed ordered selection into a stable decision string", () =>
     "a reordered selection is a different decision",
   );
   assert.equal(directorSelectionDecision({ hold: true, selections: [] }), "hold");
-  assert.equal(directorSelectionDecision({ hold: false, selections: [] }), "defer", "a composition that commits nothing defers");
+  assert.equal(
+    directorSelectionDecision({ hold: false, selections: [] }),
+    "defer",
+    "a composition that commits nothing defers",
+  );
 });
 
 test("rolls up decision stability with one consistent case and one conflict", () => {
@@ -322,12 +358,24 @@ test("renders the stability roll-up, harvest provenance, and the absent-fixture 
     scenarios: [scenario],
     repeats: 1,
     model: "jev-test",
-    defaultOutcomes: [{ method: "defer", selectedAction: null, topSignal: 0, acted: false, correct: false, exact: false }],
+    defaultOutcomes: [
+      { method: "defer", selectedAction: null, topSignal: 0, acted: false, correct: false, exact: false },
+    ],
     allPoints: [],
     devPoints: [],
     holdoutPoints: [],
-    selected: selectActionThreshold([], { thresholds: THRESHOLD_GRID, minAccuracy: 0.9, minActed: 4, targetCoverage: 0.4 }),
-    gate: evaluatePromotionGate("director-selection", { samples: 0, accuracy: 0, brier: 1, expectedCalibrationError: 1 }),
+    selected: selectActionThreshold([], {
+      thresholds: THRESHOLD_GRID,
+      minAccuracy: 0.9,
+      minActed: 4,
+      targetCoverage: 0.4,
+    }),
+    gate: evaluatePromotionGate("director-selection", {
+      samples: 0,
+      accuracy: 0,
+      brier: 1,
+      expectedCalibrationError: 1,
+    }),
     samples: 1,
     exactAccuracy: 0,
     gateStats: [{ id: "frozen", acted: 0, total: 1, accuracy: 0, meanPredicted: 0 }],
@@ -335,7 +383,10 @@ test("renders the stability roll-up, harvest provenance, and the absent-fixture 
       fitted: { a: 1, b: 0 },
       devSamples: 0,
       holdoutSamples: 0,
-      holdout: { raw: { brier: 0, expectedCalibrationError: 0 }, calibrated: { brier: 0, expectedCalibrationError: 0 } },
+      holdout: {
+        raw: { brier: 0, expectedCalibrationError: 0 },
+        calibrated: { brier: 0, expectedCalibrationError: 0 },
+      },
       all: { raw: { brier: 0, expectedCalibrationError: 0 }, calibrated: { brier: 0, expectedCalibrationError: 0 } },
     },
     negatives: { acted: 0, incorrect: 0, inexact: 0, lowestIncorrectSignal: null },
@@ -359,7 +410,14 @@ test("renders the stability roll-up, harvest provenance, and the absent-fixture 
 
   const warningReport = renderDirectorCalibration({
     ...base,
-    harvest: { fixture: HARVEST_FIXTURE, present: true, confirmed: 0, skipped: 0, cases: 0, warning: "harvested fixture is not valid JSON: boom" },
+    harvest: {
+      fixture: HARVEST_FIXTURE,
+      present: true,
+      confirmed: 0,
+      skipped: 0,
+      cases: 0,
+      warning: "harvested fixture is not valid JSON: boom",
+    },
   });
   assert.ok(warningReport.includes("> **Harvest warning:** harvested fixture is not valid JSON: boom"));
   assert.ok(warningReport.includes("Those proposals are skipped; the run continues."));

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { stabilityUid, summarizeStability, type StabilitySample } from "../src/agent/systemOneStability.js";
 
-const sample = (caseId: string, decision: string, signal: number | null): StabilitySample => ({ caseId, decision, signal });
+const sample = (caseId: string, decision: string, signal: number | null): StabilitySample => ({
+  caseId,
+  decision,
+  signal,
+});
 
 describe("summarizeStability", () => {
   it("reports agreement, conflicts, and signal variance per case", () => {
@@ -40,7 +44,13 @@ describe("summarizeStability", () => {
     expect(summary.cases[0]!.signalStdDev).toBeNull();
     expect(summary.meanSignalStdDev).toBeNull();
     expect(summarizeStability([])).toEqual({
-      cases: [], repeats: 0, meanAgreement: 0, conflictCases: 0, conflictRate: 0, meanSignalStdDev: null, maxSignalStdDev: null,
+      cases: [],
+      repeats: 0,
+      meanAgreement: 0,
+      conflictCases: 0,
+      conflictRate: 0,
+      meanSignalStdDev: null,
+      maxSignalStdDev: null,
     });
   });
 

@@ -44,11 +44,19 @@ const characterInput = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 };
 const emptyProfile = {
-  goal: "", ideal: "", bond: "", flaw: "", history: "", personality: "",
-  fears: "", relationships: "", appearance: "", voice: "",
+  goal: "",
+  ideal: "",
+  bond: "",
+  flaw: "",
+  history: "",
+  personality: "",
+  fears: "",
+  relationships: "",
+  appearance: "",
+  voice: "",
 };
 
 describe("schema", () => {
@@ -58,33 +66,51 @@ describe("schema", () => {
     expect(db.pragma("journal_mode", { simple: true })).toBe("wal");
     expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
     expect(db.pragma("busy_timeout", { simple: true })).toBe(5_000);
-    expect(db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name IN (
+    expect(
+      db
+        .prepare(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name IN (
       'campaign_opening_narratives_v41', 'generated_campaign_quests_v41',
       'campaign_content_commands_v42', 'campaign_npc_presence_v43',
       'campaign_companions_v45', 'exact_candidates_v46', 'exact_candidate_executions_v47',
       'exact_candidate_provider_bindings_v48', 'character_draft_rerolls_v49',
       'campaign_generation_calls_v50', 'character_starter_materializations_v51',
       'campaign_generation_jobs_v52', 'campaign_material_deliveries_v53'
-    ) ORDER BY name`).all()).toEqual(expect.arrayContaining([
-      { name: "campaign_companions_v45" },
-      { name: "exact_candidate_executions_v47" },
-      { name: "exact_candidate_provider_bindings_v48" },
-      { name: "exact_candidates_v46" },
-      { name: "campaign_content_commands_v42" },
-      { name: "campaign_npc_presence_v43" },
-      { name: "campaign_opening_narratives_v41" },
-      { name: "campaign_generation_calls_v50" },
-      { name: "campaign_generation_jobs_v52" },
-      { name: "campaign_material_deliveries_v53" },
-      { name: "character_draft_rerolls_v49" },
-      { name: "character_starter_materializations_v51" },
-      { name: "generated_campaign_quests_v41" },
-    ]));
-    expect(db.prepare("SELECT 1 FROM sqlite_master WHERE name IN ('meta','story_layout_attestation_v34')").all()).toEqual([]);
-    expect(db.prepare("SELECT singleton,principal_id FROM application_owner").all()).toEqual([{ singleton: 1, principal_id: "local-owner" }]);
-    expect(db.prepare("SELECT modifier_kind FROM rpg_effect_modifier_vocabulary_v26 ORDER BY modifier_kind").all()).toEqual([
-      { modifier_kind: "advantage" }, { modifier_kind: "flat" }, { modifier_kind: "immunity" },
-      { modifier_kind: "proficiency" }, { modifier_kind: "resistance" }, { modifier_kind: "vulnerability" },
+    ) ORDER BY name`,
+        )
+        .all(),
+    ).toEqual(
+      expect.arrayContaining([
+        { name: "campaign_companions_v45" },
+        { name: "exact_candidate_executions_v47" },
+        { name: "exact_candidate_provider_bindings_v48" },
+        { name: "exact_candidates_v46" },
+        { name: "campaign_content_commands_v42" },
+        { name: "campaign_npc_presence_v43" },
+        { name: "campaign_opening_narratives_v41" },
+        { name: "campaign_generation_calls_v50" },
+        { name: "campaign_generation_jobs_v52" },
+        { name: "campaign_material_deliveries_v53" },
+        { name: "character_draft_rerolls_v49" },
+        { name: "character_starter_materializations_v51" },
+        { name: "generated_campaign_quests_v41" },
+      ]),
+    );
+    expect(
+      db.prepare("SELECT 1 FROM sqlite_master WHERE name IN ('meta','story_layout_attestation_v34')").all(),
+    ).toEqual([]);
+    expect(db.prepare("SELECT singleton,principal_id FROM application_owner").all()).toEqual([
+      { singleton: 1, principal_id: "local-owner" },
+    ]);
+    expect(
+      db.prepare("SELECT modifier_kind FROM rpg_effect_modifier_vocabulary_v26 ORDER BY modifier_kind").all(),
+    ).toEqual([
+      { modifier_kind: "advantage" },
+      { modifier_kind: "flat" },
+      { modifier_kind: "immunity" },
+      { modifier_kind: "proficiency" },
+      { modifier_kind: "resistance" },
+      { modifier_kind: "vulnerability" },
     ]);
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     db.close();
@@ -112,17 +138,25 @@ describe("schema", () => {
     let raw = new DatabaseDriver(databasePath);
     raw.exec("DROP TRIGGER campaigns_prevent_physical_delete_v22");
     raw.close();
-    expect(() => createRepository({ dataDir: dir })).toThrow(/missing trigger campaigns_prevent_physical_delete_v22.*Velvet did not modify it.*db:export/s);
+    expect(() => createRepository({ dataDir: dir })).toThrow(
+      /missing trigger campaigns_prevent_physical_delete_v22.*Velvet did not modify it.*db:export/s,
+    );
 
     const cleanDir = makeTmpDataDir();
     const cleanPath = path.join(cleanDir, "velvet.sqlite");
     createRepository({ dataDir: cleanDir }).close();
     raw = new DatabaseDriver(cleanPath);
     raw.pragma("foreign_keys = OFF");
-    raw.prepare(`INSERT INTO sessions
-      (id,character_id,title,state,preset_id,created_at) VALUES('orphan','missing','', 'setup','default','2030-01-01T00:00:00.000Z')`).run();
+    raw
+      .prepare(
+        `INSERT INTO sessions
+      (id,character_id,title,state,preset_id,created_at) VALUES('orphan','missing','', 'setup','default','2030-01-01T00:00:00.000Z')`,
+      )
+      .run();
     raw.close();
-    expect(() => createRepository({ dataDir: cleanDir })).toThrow(/foreign-key violation in sessions.*Velvet did not modify it.*db:export/s);
+    expect(() => createRepository({ dataDir: cleanDir })).toThrow(
+      /foreign-key violation in sessions.*Velvet did not modify it.*db:export/s,
+    );
   });
 
   it("keeps drift rejection strict while the corruption fixture seam permits domain assertions", () => {
@@ -196,7 +230,9 @@ describe("factory session context source", () => {
     repository.close();
 
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
-    expect(raw.prepare("SELECT source_of_truth, updated_at FROM session_context WHERE session_id = ?").get(session.id)).toEqual({
+    expect(
+      raw.prepare("SELECT source_of_truth, updated_at FROM session_context WHERE session_id = ?").get(session.id),
+    ).toEqual({
       source_of_truth: "The observatory is locked.",
       updated_at: "2030-04-05T06:07:08.009Z",
     });
@@ -209,7 +245,8 @@ describe("factory session context source", () => {
     const synthesized = await updateSessionSynthesizedSource(session.id, "A brass key is present.");
     const dir = process.env.VELVET_DATA_DIR as string;
     closeRepo();
-    const clockNow = vi.fn()
+    const clockNow = vi
+      .fn()
       .mockReturnValueOnce(new Date("2030-01-01T00:00:00.000Z"))
       .mockReturnValueOnce(new Date("2031-01-01T00:00:00.000Z"));
     const repository = createRepository({ dataDir: dir, clock: { now: clockNow } });
@@ -222,7 +259,13 @@ describe("factory session context source", () => {
     repository.close();
 
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
-    expect(raw.prepare("SELECT source_of_truth, updated_at, synthesized_source, synthesized_updated_at FROM session_context WHERE session_id = ?").get(session.id)).toEqual({
+    expect(
+      raw
+        .prepare(
+          "SELECT source_of_truth, updated_at, synthesized_source, synthesized_updated_at FROM session_context WHERE session_id = ?",
+        )
+        .get(session.id),
+    ).toEqual({
       source_of_truth: "Replacement manual source.",
       updated_at: "2031-01-01T00:00:00.000Z",
       synthesized_source: "A brass key is present.",
@@ -238,7 +281,9 @@ describe("factory session context source", () => {
     const prior = await updateSessionContextSource(session.id, "Prior source.");
     const dir = process.env.VELVET_DATA_DIR as string;
     closeRepo();
-    const clockNow = vi.fn(() => { throw new Error("clock unavailable"); });
+    const clockNow = vi.fn(() => {
+      throw new Error("clock unavailable");
+    });
     const repository = createRepository({ dataDir: dir, clock: { now: clockNow } });
 
     expect(() => repository.updateSessionContextSource(session.id, "Must not persist.")).toThrow("clock unavailable");
@@ -246,7 +291,9 @@ describe("factory session context source", () => {
     repository.close();
 
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
-    expect(raw.prepare("SELECT source_of_truth, updated_at FROM session_context WHERE session_id = ?").get(session.id)).toEqual({
+    expect(
+      raw.prepare("SELECT source_of_truth, updated_at FROM session_context WHERE session_id = ?").get(session.id),
+    ).toEqual({
       source_of_truth: "Prior source.",
       updated_at: prior.updatedAt,
     });
@@ -313,8 +360,18 @@ describe("repository transactions", () => {
     const calls: string[] = [];
     const repository = createRepository({
       dataDir: dir,
-      ids: { nextId: () => { calls.push("id"); return "character-fixed"; } },
-      clock: { now: () => { calls.push("clock"); return new Date("2030-04-05T06:07:08.009Z"); } },
+      ids: {
+        nextId: () => {
+          calls.push("id");
+          return "character-fixed";
+        },
+      },
+      clock: {
+        now: () => {
+          calls.push("clock");
+          return new Date("2030-04-05T06:07:08.009Z");
+        },
+      },
     });
 
     const character = repository.createCharacter(characterInput);
@@ -340,8 +397,10 @@ describe("repository transactions", () => {
       is_real_person: 0,
       created_at: "2030-04-05T06:07:08.009Z",
     });
-    expect(raw.prepare("SELECT * FROM character_profiles WHERE character_id = ?").get("character-fixed"))
-      .toEqual({ character_id: "character-fixed", ...emptyProfile });
+    expect(raw.prepare("SELECT * FROM character_profiles WHERE character_id = ?").get("character-fixed")).toEqual({
+      character_id: "character-fixed",
+      ...emptyProfile,
+    });
     raw.close();
   });
 
@@ -350,7 +409,11 @@ describe("repository transactions", () => {
     const clockNow = vi.fn(() => new Date());
     const repository = createRepository({
       dataDir: dir,
-      ids: { nextId: vi.fn(() => { throw new Error("ID generator unavailable"); }) },
+      ids: {
+        nextId: vi.fn(() => {
+          throw new Error("ID generator unavailable");
+        }),
+      },
       clock: { now: clockNow },
     });
 
@@ -369,7 +432,11 @@ describe("repository transactions", () => {
     const repository = createRepository({
       dataDir: dir,
       ids: { nextId },
-      clock: { now: vi.fn(() => { throw new Error("clock unavailable"); }) },
+      clock: {
+        now: vi.fn(() => {
+          throw new Error("clock unavailable");
+        }),
+      },
     });
 
     expect(() => repository.createCharacter(characterInput)).toThrow("clock unavailable");
@@ -384,7 +451,8 @@ describe("repository transactions", () => {
   it("preserves the first row and consumes dependencies on duplicate character IDs", () => {
     const dir = makeTmpDataDir();
     const nextId = vi.fn(() => "duplicate-character");
-    const clockNow = vi.fn()
+    const clockNow = vi
+      .fn()
       .mockReturnValueOnce(new Date("2030-01-01T00:00:00.000Z"))
       .mockReturnValueOnce(new Date("2031-01-01T00:00:00.000Z"));
     const repository = createRepository({ dataDir: dir, ids: { nextId }, clock: { now: clockNow } });
@@ -449,11 +517,13 @@ describe("repository transactions", () => {
     const repository = createRepository({ dataDir: makeTmpDataDir() });
     expect(typeof repository.getNpcCast).toBe("function");
     expect(typeof repository.mutateNpcPresence).toBe("function");
-    expect(() => repository.transaction(() => repository.getNpcCast("invalid actor", "invalid campaign", "invalid session")))
-      .toThrow("world operation cannot run inside a repository transaction");
+    expect(() =>
+      repository.transaction(() => repository.getNpcCast("invalid actor", "invalid campaign", "invalid session")),
+    ).toThrow("world operation cannot run inside a repository transaction");
     repository.close();
-    expect(() => repository.getNpcCast("invalid actor", "invalid campaign", "invalid session"))
-      .toThrow("repository is closed");
+    expect(() => repository.getNpcCast("invalid actor", "invalid campaign", "invalid session")).toThrow(
+      "repository is closed",
+    );
   });
 
   it("commits all writes in a synchronous unit of work", async () => {
@@ -480,11 +550,13 @@ describe("repository transactions", () => {
     closeRepo();
     const repository = createRepository({ dataDir: dir });
 
-    expect(() => repository.transaction((unitOfWork) => {
-      unitOfWork.addConsentEvent(session.id, "user-stop", false, "rolled back");
-      unitOfWork.transitionSession(session.id, "closed", "user-stop");
-      throw new Error("forced failure");
-    })).toThrow("forced failure");
+    expect(() =>
+      repository.transaction((unitOfWork) => {
+        unitOfWork.addConsentEvent(session.id, "user-stop", false, "rolled back");
+        unitOfWork.transitionSession(session.id, "closed", "user-stop");
+        throw new Error("forced failure");
+      }),
+    ).toThrow("forced failure");
 
     const unchanged = repository.getSession(session.id);
     expect(unchanged?.state).toBe("setup");
@@ -508,12 +580,14 @@ describe("repository transactions", () => {
     const unsafeTransaction = repository.transaction as unknown as (
       callback: (unitOfWork: RepositoryUnitOfWork) => unknown,
     ) => unknown;
-    expect(() => unsafeTransaction(async (unitOfWork) => {
-      unitOfWork.addConsentEvent(session.id, "async-stop", false, "must roll back");
-      unitOfWork.transitionSession(session.id, "closed", "async-stop");
-      await Promise.resolve();
-      unitOfWork.addConsentEvent(session.id, "late-write", false, "must be inactive");
-    })).toThrow("repository transaction callbacks must be synchronous");
+    expect(() =>
+      unsafeTransaction(async (unitOfWork) => {
+        unitOfWork.addConsentEvent(session.id, "async-stop", false, "must roll back");
+        unitOfWork.transitionSession(session.id, "closed", "async-stop");
+        await Promise.resolve();
+        unitOfWork.addConsentEvent(session.id, "late-write", false, "must be inactive");
+      }),
+    ).toThrow("repository transaction callbacks must be synchronous");
 
     const unchanged = repository.getSession(session.id);
     expect(unchanged?.state).toBe("setup");
@@ -539,17 +613,21 @@ describe("repository transactions", () => {
     expect(unsafeTransaction(() => inheritedNonCallable)).toBe(inheritedNonCallable);
 
     const inheritedCallable = Object.create({ then: (resolve: (value: string) => void) => resolve("late") });
-    expect(() => unsafeTransaction((unitOfWork) => {
-      unitOfWork.addConsentEvent(session.id, "thenable", false, "must roll back");
-      return inheritedCallable;
-    })).toThrow("repository transaction callbacks must be synchronous");
+    expect(() =>
+      unsafeTransaction((unitOfWork) => {
+        unitOfWork.addConsentEvent(session.id, "thenable", false, "must roll back");
+        return inheritedCallable;
+      }),
+    ).toThrow("repository transaction callbacks must be synchronous");
     expect(repository.getSession(session.id)?.consentLog.map((event) => event.scope)).toEqual(["scene-created"]);
 
     let captured: RepositoryUnitOfWork | undefined;
-    expect(() => repository.transaction((unitOfWork) => {
-      captured = unitOfWork;
-      throw new Error("callback failed");
-    })).toThrow("callback failed");
+    expect(() =>
+      repository.transaction((unitOfWork) => {
+        captured = unitOfWork;
+        throw new Error("callback failed");
+      }),
+    ).toThrow("callback failed");
     expect(() => captured!.getSession(session.id)).toThrow("transaction unit of work is no longer active");
     repository.close();
   });
@@ -631,11 +709,21 @@ describe("named character creation", () => {
   it("hydrates an empty profile for a character created by a legacy positional insert", async () => {
     await listCharacters();
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
-    db.prepare("INSERT INTO characters VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .run("legacy-character", "Legacy", 40, "wanderer", "fictional only", 1, 0, "2020-01-01T00:00:00.000Z");
+    db.prepare("INSERT INTO characters VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
+      "legacy-character",
+      "Legacy",
+      40,
+      "wanderer",
+      "fictional only",
+      1,
+      0,
+      "2020-01-01T00:00:00.000Z",
+    );
     db.close();
 
-    expect(await listCharacters()).toContainEqual(expect.objectContaining({ id: "legacy-character", profile: emptyProfile }));
+    expect(await listCharacters()).toContainEqual(
+      expect.objectContaining({ id: "legacy-character", profile: emptyProfile }),
+    );
   });
 });
 
@@ -649,8 +737,18 @@ describe("factory lore creation", () => {
     const calls: string[] = [];
     const repository = createRepository({
       dataDir: dir,
-      ids: { nextId: () => { calls.push("id"); return "lore-fixed"; } },
-      clock: { now: () => { calls.push("clock"); return new Date("2030-04-05T06:07:08.009Z"); } },
+      ids: {
+        nextId: () => {
+          calls.push("id");
+          return "lore-fixed";
+        },
+      },
+      clock: {
+        now: () => {
+          calls.push("clock");
+          return new Date("2030-04-05T06:07:08.009Z");
+        },
+      },
     });
 
     const entry = repository.createLoreEntry({
@@ -685,10 +783,9 @@ describe("factory lore creation", () => {
       insertion_order: 100,
       created_at: "2030-04-05T06:07:08.009Z",
     });
-    expect(raw.prepare("SELECT character_id FROM lore_characters WHERE lore_id = ? ORDER BY rowid").all("lore-fixed")).toEqual([
-      { character_id: second.id },
-      { character_id: first.id },
-    ]);
+    expect(
+      raw.prepare("SELECT character_id FROM lore_characters WHERE lore_id = ? ORDER BY rowid").all("lore-fixed"),
+    ).toEqual([{ character_id: second.id }, { character_id: first.id }]);
     raw.close();
   });
 
@@ -716,18 +813,27 @@ describe("factory lore creation", () => {
 
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
     expect(raw.prepare("SELECT character_id FROM lore WHERE id = ?").get(entry.id)).toEqual({ character_id: null });
-    expect((raw.prepare("SELECT COUNT(*) AS count FROM lore_characters WHERE lore_id = ?").get(entry.id) as { count: number }).count).toBe(0);
+    expect(
+      (
+        raw.prepare("SELECT COUNT(*) AS count FROM lore_characters WHERE lore_id = ?").get(entry.id) as {
+          count: number;
+        }
+      ).count,
+    ).toBe(0);
     raw.close();
   });
 
   it("does not consume the clock or insert rows when ID generation fails", () => {
     const dir = process.env.VELVET_DATA_DIR as string;
     const clockNow = vi.fn(() => new Date());
-    const nextId = vi.fn(() => { throw new Error("ID generator unavailable"); });
+    const nextId = vi.fn(() => {
+      throw new Error("ID generator unavailable");
+    });
     const repository = createRepository({ dataDir: dir, ids: { nextId }, clock: { now: clockNow } });
 
-    expect(() => repository.createLoreEntry({ characterIds: [], keys: [], content: "none", enabled: true, insertionOrder: 0 }))
-      .toThrow("ID generator unavailable");
+    expect(() =>
+      repository.createLoreEntry({ characterIds: [], keys: [], content: "none", enabled: true, insertionOrder: 0 }),
+    ).toThrow("ID generator unavailable");
     expect(nextId).toHaveBeenCalledOnce();
     expect(clockNow).not.toHaveBeenCalled();
     repository.close();
@@ -741,11 +847,14 @@ describe("factory lore creation", () => {
   it("consumes the ID but inserts no rows when the clock fails", () => {
     const dir = process.env.VELVET_DATA_DIR as string;
     const nextId = vi.fn(() => "lore-fixed");
-    const clockNow = vi.fn(() => { throw new Error("clock unavailable"); });
+    const clockNow = vi.fn(() => {
+      throw new Error("clock unavailable");
+    });
     const repository = createRepository({ dataDir: dir, ids: { nextId }, clock: { now: clockNow } });
 
-    expect(() => repository.createLoreEntry({ characterIds: [], keys: [], content: "none", enabled: true, insertionOrder: 0 }))
-      .toThrow("clock unavailable");
+    expect(() =>
+      repository.createLoreEntry({ characterIds: [], keys: [], content: "none", enabled: true, insertionOrder: 0 }),
+    ).toThrow("clock unavailable");
     expect(nextId).toHaveBeenCalledOnce();
     expect(clockNow).toHaveBeenCalledOnce();
     repository.close();
@@ -767,13 +876,15 @@ describe("factory lore creation", () => {
     const clockNow = vi.fn(() => new Date("2030-01-01T00:00:00.000Z"));
     const repository = createRepository({ dataDir: dir, ids: { nextId }, clock: { now: clockNow } });
 
-    expect(() => repository.createLoreEntry({
-      characterIds: scope(character.id),
-      keys: ["rollback"],
-      content: "Must roll back",
-      enabled: true,
-      insertionOrder: 1,
-    })).toThrow();
+    expect(() =>
+      repository.createLoreEntry({
+        characterIds: scope(character.id),
+        keys: ["rollback"],
+        content: "Must roll back",
+        enabled: true,
+        insertionOrder: 1,
+      }),
+    ).toThrow();
     expect(nextId).toHaveBeenCalledOnce();
     expect(clockNow).toHaveBeenCalledOnce();
     repository.close();
@@ -791,8 +902,9 @@ describe("factory lore creation", () => {
     const repository = createRepository({ dataDir: dir, ids: { nextId }, clock: { now: clockNow } });
     repository.close();
 
-    expect(() => repository.createLoreEntry({ characterIds: [], keys: [], content: "none", enabled: true, insertionOrder: 0 }))
-      .toThrow("repository is closed");
+    expect(() =>
+      repository.createLoreEntry({ characterIds: [], keys: [], content: "none", enabled: true, insertionOrder: 0 }),
+    ).toThrow("repository is closed");
     expect(nextId).not.toHaveBeenCalled();
     expect(clockNow).not.toHaveBeenCalled();
   });
@@ -805,16 +917,40 @@ describe("factory lore creation", () => {
       ids: { nextId: () => ids.shift() ?? "unused" },
       clock: { now: () => new Date("2030-01-01T00:00:00.000Z") },
     });
-    repository.createLoreEntry({ characterIds: [], keys: ["first"], content: "first", enabled: true, insertionOrder: 5 });
-    repository.createLoreEntry({ characterIds: [], keys: ["lower"], content: "lower", enabled: true, insertionOrder: 1 });
-    repository.createLoreEntry({ characterIds: [], keys: ["second"], content: "second", enabled: true, insertionOrder: 5 });
+    repository.createLoreEntry({
+      characterIds: [],
+      keys: ["first"],
+      content: "first",
+      enabled: true,
+      insertionOrder: 5,
+    });
+    repository.createLoreEntry({
+      characterIds: [],
+      keys: ["lower"],
+      content: "lower",
+      enabled: true,
+      insertionOrder: 1,
+    });
+    repository.createLoreEntry({
+      characterIds: [],
+      keys: ["second"],
+      content: "second",
+      enabled: true,
+      insertionOrder: 5,
+    });
     repository.close();
 
     expect((await listLoreEntries()).map((entry) => entry.id)).toEqual(["lower", "same-first", "same-second"]);
   });
 
   it("keeps the named wrapper promise-based", () => {
-    const pending = createLoreEntry({ characterIds: [], keys: ["named"], content: "Named", enabled: true, insertionOrder: 1 });
+    const pending = createLoreEntry({
+      characterIds: [],
+      keys: ["named"],
+      content: "Named",
+      enabled: true,
+      insertionOrder: 1,
+    });
     expect(pending).toBeInstanceOf(Promise);
     return expect(pending).resolves.toMatchObject({ characterIds: [], characterId: null, keys: ["named"] });
   });
@@ -831,7 +967,13 @@ describe("messages", () => {
     const messages = await listMessages(session.id);
     expect(messages.map((m) => m.role)).toEqual(["user", "character"]);
     expect(messages[0]?.usage).toBeNull();
-    expect(messages[1]?.usage).toEqual({ promptTokens: 100, completionTokens: 20, totalTokens: 120, source: "provider", model: "test-model" });
+    expect(messages[1]?.usage).toEqual({
+      promptTokens: 100,
+      completionTokens: 20,
+      totalTokens: 120,
+      source: "provider",
+      model: "test-model",
+    });
   });
 });
 
@@ -876,7 +1018,9 @@ describe("memories", () => {
     const character = await createCharacter(characterInput);
     const fact = { kind: "fact" as const, content: "Keeps a silver key", sourceTurnId: "t1", userApproved: true };
     expect(await addMemoryFacts(character.id, [fact, { ...fact, sourceTurnId: "t2" }])).toHaveLength(1);
-    expect(await addMemoryFacts(character.id, [{ ...fact, content: " keeps A SILVER key ", sourceTurnId: "t3" }])).toHaveLength(0);
+    expect(
+      await addMemoryFacts(character.id, [{ ...fact, content: " keeps A SILVER key ", sourceTurnId: "t3" }]),
+    ).toHaveLength(0);
     expect(await listAllMemories(character.id)).toHaveLength(1);
   });
 });
@@ -887,7 +1031,11 @@ describe("summaries", () => {
     const session = await createSession({ characterId: character.id });
     expect(await getSummary(session.id)).toBeNull();
     await upsertSummary(session.id, { summary: "first", keyEvents: ["a"], emotionalBeat: "steady" });
-    const updated = await upsertSummary(session.id, { summary: "second", keyEvents: ["a", "b"], emotionalBeat: "warm" });
+    const updated = await upsertSummary(session.id, {
+      summary: "second",
+      keyEvents: ["a", "b"],
+      emotionalBeat: "warm",
+    });
     expect(updated.summary).toBe("second");
     const stored = await getSummary(session.id);
     expect(stored?.summary).toBe("second");
@@ -908,9 +1056,21 @@ describe("lore", () => {
     expect(global.keys).toEqual(["nebula"]);
     expect(global.content).toBe("The nebula glows.");
 
-    await createLoreEntry({ characterId: character.id, keys: ["compass"], content: "A silver compass.", enabled: true, insertionOrder: 2 });
+    await createLoreEntry({
+      characterId: character.id,
+      keys: ["compass"],
+      content: "A silver compass.",
+      enabled: true,
+      insertionOrder: 2,
+    });
     const other = await createCharacter({ ...characterInput, name: "Other" });
-    await createLoreEntry({ characterId: other.id, keys: ["other"], content: "Not yours.", enabled: true, insertionOrder: 3 });
+    await createLoreEntry({
+      characterId: other.id,
+      keys: ["other"],
+      content: "Not yours.",
+      enabled: true,
+      insertionOrder: 3,
+    });
 
     const scoped = await listLoreEntries(character.id);
     expect(scoped.map((e) => e.keys[0])).toEqual(["nebula", "compass"]);
@@ -1003,7 +1163,8 @@ describe("factory harness settings updates", () => {
   });
 
   it("uses successive clock values while preserving omitted fields", () => {
-    const clockNow = vi.fn()
+    const clockNow = vi
+      .fn()
       .mockReturnValueOnce(new Date("2030-01-01T00:00:00.000Z"))
       .mockReturnValueOnce(new Date("2031-01-01T00:00:00.000Z"));
     const repository = createRepository({ dataDir: makeTmpDataDir(), clock: { now: clockNow } });
@@ -1027,7 +1188,8 @@ describe("factory harness settings updates", () => {
     ["array", []],
     ["unknown-only", { unknown: "value" }],
   ])("accepts a %s no-op write and gives it a fresh timestamp", (_label, patch) => {
-    const clockNow = vi.fn()
+    const clockNow = vi
+      .fn()
       .mockReturnValueOnce(new Date("2030-01-01T00:00:00.000Z"))
       .mockReturnValueOnce(new Date("2030-01-02T00:00:00.000Z"));
     const repository = createRepository({ dataDir: makeTmpDataDir(), clock: { now: clockNow } });
@@ -1046,14 +1208,20 @@ describe("factory harness settings updates", () => {
     closeRepo();
     const repository = createRepository({
       dataDir: dir,
-      clock: { now: vi.fn(() => { throw new Error("clock unavailable"); }) },
+      clock: {
+        now: vi.fn(() => {
+          throw new Error("clock unavailable");
+        }),
+      },
     });
 
     expect(() => repository.updateHarnessSettings({ styleGuide: "must not persist" })).toThrow("clock unavailable");
     repository.close();
 
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
-    expect(raw.prepare("SELECT payload FROM settings WHERE id = 'harness'").get()).toEqual({ payload: JSON.stringify(prior) });
+    expect(raw.prepare("SELECT payload FROM settings WHERE id = 'harness'").get()).toEqual({
+      payload: JSON.stringify(prior),
+    });
     raw.close();
   });
 

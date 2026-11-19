@@ -11,11 +11,18 @@ const character: Character = {
   archetype: "confident space captain",
   boundaries: "keep it fictional",
   profile: {
-    goal: "Find the lost beacon.", ideal: "Leave no one behind.", bond: "Her crew", flaw: "Reckless",
-    history: "Former survey pilot.", personality: "Decisive", fears: "Deep water", relationships: "Trusts Ivo",
-    appearance: "Weathered flight jacket", voice: "Short, confident sentences",
+    goal: "Find the lost beacon.",
+    ideal: "Leave no one behind.",
+    bond: "Her crew",
+    flaw: "Reckless",
+    history: "Former survey pilot.",
+    personality: "Decisive",
+    fears: "Deep water",
+    relationships: "Trusts Ivo",
+    appearance: "Weathered flight jacket",
+    voice: "Short, confident sentences",
   },
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
   isRealPerson: false,
   createdAt: new Date().toISOString(),
 };
@@ -187,7 +194,12 @@ describe("buildOrchestratedMessages", () => {
   });
 
   it("includes participant cards, attributed history, and a target-speaker instruction", () => {
-    const second = { ...character, id: "c2", name: "Bex", profile: { ...character.profile!, goal: "Protect Bex's goal marker." } };
+    const second = {
+      ...character,
+      id: "c2",
+      name: "Bex",
+      profile: { ...character.profile!, goal: "Protect Bex's goal marker." },
+    };
     const groupSession = { ...session, participants: [character, second] };
     const history = msg("character", "Bex speaks");
     history.speakerCharacterId = second.id;
@@ -196,8 +208,13 @@ describe("buildOrchestratedMessages", () => {
       targetCharacter: second,
       participants: [character, second],
       session: groupSession,
-      history: [history], memories: [memory], summary: null, preset,
-      lore: [], harness: defaultHarnessSettings(), userContent: "continue",
+      history: [history],
+      memories: [memory],
+      summary: null,
+      preset,
+      lore: [],
+      harness: defaultHarnessSettings(),
+      userContent: "continue",
     });
     const joined = messages.map((message) => message.content).join("\n");
     expect(joined).toContain("PARTICIPANT CARDS");
@@ -207,16 +224,33 @@ describe("buildOrchestratedMessages", () => {
     expect(joined).toContain("Name: Bex (TARGET SPEAKER)");
     expect(joined).toContain("exactly one reply as Bex");
     expect(messages.some((message) => message.content === "[Bex] Bex speaks")).toBe(true);
-    const profileMessage = messages.find((message) => message.content.includes("UNTRUSTED TARGET CHARACTER PROFILE DATA"));
+    const profileMessage = messages.find((message) =>
+      message.content.includes("UNTRUSTED TARGET CHARACTER PROFILE DATA"),
+    );
     expect(profileMessage?.role).toBe("user");
     expect(profileMessage?.content).toContain("Protect Bex's goal marker.");
     expect(profileMessage?.content).not.toContain("Find the lost beacon.");
-    expect(messages.filter((message) => message.role === "system").map((message) => message.content).join("\n"))
-      .not.toContain("Protect Bex's goal marker.");
+    expect(
+      messages
+        .filter((message) => message.role === "system")
+        .map((message) => message.content)
+        .join("\n"),
+    ).not.toContain("Protect Bex's goal marker.");
   });
 
   it("injects shared context and natural action/emote guidance", () => {
-    const messages = buildOrchestratedMessages({ character, session, history: [], memories: [], summary: null, preset, lore: [], harness: defaultHarnessSettings(), userContent: "continue", sharedContext: "Aria stands beside Bex at the harbor." });
+    const messages = buildOrchestratedMessages({
+      character,
+      session,
+      history: [],
+      memories: [],
+      summary: null,
+      preset,
+      lore: [],
+      harness: defaultHarnessSettings(),
+      userContent: "continue",
+      sharedContext: "Aria stands beside Bex at the harbor.",
+    });
     const joined = messages.map((message) => message.content).join("\n");
     expect(joined).toContain("SHARED CONTEXT BASKET");
     expect(joined).toContain("Aria stands beside Bex");
@@ -227,8 +261,15 @@ describe("buildOrchestratedMessages", () => {
   it("does not feed repeated model-generated speaker labels back into history", () => {
     const repeated = msg("character", "[Aria] [Aria] Aria: A clean line.");
     const messages = buildOrchestratedMessages({
-      character, session, history: [repeated], memories: [], summary: null, preset,
-      lore: [], harness: defaultHarnessSettings(), userContent: "next",
+      character,
+      session,
+      history: [repeated],
+      memories: [],
+      summary: null,
+      preset,
+      lore: [],
+      harness: defaultHarnessSettings(),
+      userContent: "next",
     });
     expect(messages.some((message) => message.content === "[Aria] A clean line.")).toBe(true);
   });

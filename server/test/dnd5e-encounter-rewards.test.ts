@@ -69,12 +69,8 @@ describe("planDnd5eEncounterRewards", () => {
   });
 
   it("throws on invalid numeric input and marks an unknown level illegal", () => {
-    expect(() =>
-      planDnd5eEncounterRewards({ defeated: [], currentXp: -1, currentLevel: 1 }),
-    ).toThrow(RangeError);
-    expect(() =>
-      planDnd5eEncounterRewards({ defeated: [], currentXp: 0, currentLevel: 1.5 }),
-    ).toThrow(RangeError);
+    expect(() => planDnd5eEncounterRewards({ defeated: [], currentXp: -1, currentLevel: 1 })).toThrow(RangeError);
+    expect(() => planDnd5eEncounterRewards({ defeated: [], currentXp: 0, currentLevel: 1.5 })).toThrow(RangeError);
     const plan = planDnd5eEncounterRewards({ defeated: [], currentXp: 0, currentLevel: 21 });
     expect(plan.legal).toBe(false);
     expect(plan.reasons.length).toBeGreaterThan(0);

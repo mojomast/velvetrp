@@ -6,19 +6,28 @@ import { createQuickAdventure, getCampaignAdministration, listCampaigns } from "
 import { CampaignLibraryPage } from "./CampaignLibraryPage";
 
 vi.mock("../api", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../api")>(),
+  ...(await importOriginal<typeof import("../api")>()),
   listCampaigns: vi.fn(),
   createCampaign: vi.fn(),
   getCampaignAdministration: vi.fn(),
   createQuickAdventure: vi.fn(),
 }));
 
-const built = { campaignId: "quick-campaign", campaignName: "The Sintermark", sessionId: "quick-room", actorId: "quick-actor", replayed: false };
+const built = {
+  campaignId: "quick-campaign",
+  campaignName: "The Sintermark",
+  sessionId: "quick-room",
+  actorId: "quick-actor",
+  replayed: false,
+};
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((onResolve, onReject) => { resolve = onResolve; reject = onReject; });
+  const promise = new Promise<T>((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
   return { promise, resolve, reject };
 }
 
@@ -30,7 +39,11 @@ function setup() {
   return { onOpen, button: () => screen.getByRole("button", { name: /quick adventure/i }) };
 }
 
-afterEach(() => { cleanup(); vi.resetAllMocks(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.resetAllMocks();
+  vi.restoreAllMocks();
+});
 
 describe("CampaignLibraryPage quick adventure", () => {
   it("builds once per click, shows progress, and opens the new campaign in play", async () => {

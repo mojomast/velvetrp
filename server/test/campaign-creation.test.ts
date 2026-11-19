@@ -23,7 +23,8 @@ function databasePath(): string {
 
 function campaignCounts(): { campaigns: number; timelines: number; memberships: number } {
   const db = new DatabaseDriver(databasePath(), { readonly: true });
-  const count = (table: string) => (db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
+  const count = (table: string) =>
+    (db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
   const counts = {
     campaigns: count("campaigns"),
     timelines: count("campaign_timelines"),
@@ -39,8 +40,18 @@ describe("factory campaign creation", () => {
     const ids = ["campaign-fixed", "timeline-fixed"];
     const repository = createRepository({
       dataDir: dataDir(),
-      ids: { nextId: () => { calls.push("id"); return ids.shift()!; } },
-      clock: { now: () => { calls.push("clock"); return new Date(fixedAt); } },
+      ids: {
+        nextId: () => {
+          calls.push("id");
+          return ids.shift()!;
+        },
+      },
+      clock: {
+        now: () => {
+          calls.push("clock");
+          return new Date(fixedAt);
+        },
+      },
     });
 
     const campaign = repository.createCampaign("local-owner", { name: "  The Long Road  " });
@@ -54,34 +65,58 @@ describe("factory campaign creation", () => {
       updatedAt: fixedAt,
     });
     expect(Object.keys(campaign)).toEqual([
-      "id", "name", "activeTimelineId", "ownerPrincipalId", "createdAt", "updatedAt",
+      "id",
+      "name",
+      "activeTimelineId",
+      "ownerPrincipalId",
+      "createdAt",
+      "updatedAt",
     ]);
     expect(calls).toEqual(["id", "id", "clock"]);
     repository.close();
 
     const db = new DatabaseDriver(databasePath(), { readonly: true });
-    expect(db.prepare("SELECT * FROM campaigns").all()).toEqual([{
-      id: "campaign-fixed",
-      name: "The Long Road",
-      active_timeline_id: "timeline-fixed",
-      owner_principal_id: "local-owner",
-      owner_role: "owner",
-      created_at: fixedAt,
-      updated_at: fixedAt,
-      lifecycle_status: "draft",
-      settings: '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
-      administration_revision: 0,
-    }]);
-    expect(db.prepare("SELECT * FROM campaign_timelines").all()).toEqual([{
-      id: "timeline-fixed", campaign_id: "campaign-fixed", created_at: fixedAt, revision: 0,
-    }]);
-    expect(db.prepare("SELECT * FROM campaign_timeline_history").all()).toEqual([{
-      campaign_id: "campaign-fixed", timeline_id: "timeline-fixed", parent_timeline_id: null,
-      source_timeline_id: null, created_by_command_id: null, forked_from_revision: null,
-    }]);
-    expect(db.prepare("SELECT * FROM campaign_memberships").all()).toEqual([{
-      campaign_id: "campaign-fixed", principal_id: "local-owner", role: "owner", created_at: fixedAt,
-    }]);
+    expect(db.prepare("SELECT * FROM campaigns").all()).toEqual([
+      {
+        id: "campaign-fixed",
+        name: "The Long Road",
+        active_timeline_id: "timeline-fixed",
+        owner_principal_id: "local-owner",
+        owner_role: "owner",
+        created_at: fixedAt,
+        updated_at: fixedAt,
+        lifecycle_status: "draft",
+        settings:
+          '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
+        administration_revision: 0,
+      },
+    ]);
+    expect(db.prepare("SELECT * FROM campaign_timelines").all()).toEqual([
+      {
+        id: "timeline-fixed",
+        campaign_id: "campaign-fixed",
+        created_at: fixedAt,
+        revision: 0,
+      },
+    ]);
+    expect(db.prepare("SELECT * FROM campaign_timeline_history").all()).toEqual([
+      {
+        campaign_id: "campaign-fixed",
+        timeline_id: "timeline-fixed",
+        parent_timeline_id: null,
+        source_timeline_id: null,
+        created_by_command_id: null,
+        forked_from_revision: null,
+      },
+    ]);
+    expect(db.prepare("SELECT * FROM campaign_memberships").all()).toEqual([
+      {
+        campaign_id: "campaign-fixed",
+        principal_id: "local-owner",
+        role: "owner",
+        created_at: fixedAt,
+      },
+    ]);
     expect(db.pragma("foreign_key_check")).toEqual([]);
     db.close();
   });
@@ -115,9 +150,7 @@ describe("factory campaign creation", () => {
     db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES ('remote-owner', 'Remote owner', 0)").run();
     db.prepare("UPDATE application_owner SET principal_id = 'remote-owner' WHERE singleton = 1").run();
     db.close();
-    const nextId = vi.fn()
-      .mockReturnValueOnce("campaign-remote")
-      .mockReturnValueOnce("timeline-remote");
+    const nextId = vi.fn().mockReturnValueOnce("campaign-remote").mockReturnValueOnce("timeline-remote");
     const clockNow = vi.fn(() => new Date(fixedAt));
     const repository = createRepository({
       dataDir: dataDir(),
@@ -125,8 +158,9 @@ describe("factory campaign creation", () => {
       clock: { now: clockNow },
     });
 
-    expect(() => repository.createCampaign("local-owner", { name: "Denied" }))
-      .toThrow(CampaignCreationAuthorizationError);
+    expect(() => repository.createCampaign("local-owner", { name: "Denied" })).toThrow(
+      CampaignCreationAuthorizationError,
+    );
     expect(nextId).not.toHaveBeenCalled();
     expect(clockNow).not.toHaveBeenCalled();
     expect(repository.createCampaign("remote-owner", { name: "Authorized" }).ownerPrincipalId).toBe("remote-owner");
@@ -172,7 +206,9 @@ describe("factory campaign creation", () => {
   );
 
   it("stops at the first ID failure", () => {
-    const nextId = vi.fn(() => { throw new Error("first ID unavailable"); });
+    const nextId = vi.fn(() => {
+      throw new Error("first ID unavailable");
+    });
     const clockNow = vi.fn(() => new Date());
     const repository = createRepository({
       dataDir: dataDir(),
@@ -188,9 +224,12 @@ describe("factory campaign creation", () => {
   });
 
   it("consumes only the campaign ID when the timeline ID fails", () => {
-    const nextId = vi.fn()
+    const nextId = vi
+      .fn()
       .mockReturnValueOnce("campaign-consumed")
-      .mockImplementationOnce(() => { throw new Error("second ID unavailable"); });
+      .mockImplementationOnce(() => {
+        throw new Error("second ID unavailable");
+      });
     const clockNow = vi.fn(() => new Date());
     const repository = createRepository({
       dataDir: dataDir(),
@@ -208,8 +247,22 @@ describe("factory campaign creation", () => {
   it.each([
     ["invalid campaign ID", ["invalid id", "timeline-unused"], vi.fn(() => new Date(fixedAt)), 1, 0],
     ["invalid timeline ID", ["campaign-used", "invalid id"], vi.fn(() => new Date(fixedAt)), 2, 0],
-    ["clock failure", ["campaign-used", "timeline-used"], vi.fn(() => { throw new Error("clock unavailable"); }), 2, 1],
-    ["invalid clock", ["campaign-used", "timeline-used"], vi.fn(() => ({ toISOString: () => "not-a-time" }) as Date), 2, 1],
+    [
+      "clock failure",
+      ["campaign-used", "timeline-used"],
+      vi.fn(() => {
+        throw new Error("clock unavailable");
+      }),
+      2,
+      1,
+    ],
+    [
+      "invalid clock",
+      ["campaign-used", "timeline-used"],
+      vi.fn(() => ({ toISOString: () => "not-a-time" }) as Date),
+      2,
+      1,
+    ],
   ])("rolls back after %s with exact dependency consumption", (_label, values, clockNow, idCalls, clockCalls) => {
     const ids = [...values];
     const nextId = vi.fn(() => ids.shift()!);
@@ -242,8 +295,9 @@ describe("factory campaign creation", () => {
       ids: { nextId: () => campaignCollisionIds.shift()! },
       clock: { now: () => new Date(fixedAt) },
     });
-    expect(() => campaignCollision.createCampaign("local-owner", { name: "Campaign collision" }))
-      .toThrow(CampaignCreationIdCollisionError);
+    expect(() => campaignCollision.createCampaign("local-owner", { name: "Campaign collision" })).toThrow(
+      CampaignCreationIdCollisionError,
+    );
     campaignCollision.close();
 
     const timelineCollisionIds = ["campaign-two", "timeline-one"];
@@ -252,8 +306,9 @@ describe("factory campaign creation", () => {
       ids: { nextId: () => timelineCollisionIds.shift()! },
       clock: { now: () => new Date(fixedAt) },
     });
-    expect(() => timelineCollision.createCampaign("local-owner", { name: "Timeline collision" }))
-      .toThrow(CampaignCreationIdCollisionError);
+    expect(() => timelineCollision.createCampaign("local-owner", { name: "Timeline collision" })).toThrow(
+      CampaignCreationIdCollisionError,
+    );
     timelineCollision.close();
 
     expect(campaignCounts()).toEqual({ campaigns: 1, timelines: 1, memberships: 1 });
@@ -302,8 +357,9 @@ describe("factory campaign creation", () => {
       clock: { now: clockNow },
     });
 
-    expect(() => repository.transaction(() => repository.createCampaign("local-owner", { name: "Nested" })))
-      .toThrow("campaign creation cannot run inside a repository transaction");
+    expect(() => repository.transaction(() => repository.createCampaign("local-owner", { name: "Nested" }))).toThrow(
+      "campaign creation cannot run inside a repository transaction",
+    );
     expect(nextId).not.toHaveBeenCalled();
     expect(clockNow).not.toHaveBeenCalled();
     repository.close();

@@ -71,20 +71,39 @@ function finiteNonNegative(value: number): boolean {
 }
 
 function validatePolicy(policy: TurnBudgetPolicy): void {
-  if (![policy.maxPromptTokens, policy.maxCompletionTokens, policy.maxTotalTokens,
-    policy.maxConcurrentRequests, policy.maxRequestsPerWindow, policy.rateWindowMs].every(finiteNonNegative)
-      || !Number.isSafeInteger(policy.maxPromptTokens) || !Number.isSafeInteger(policy.maxCompletionTokens)
-      || !Number.isSafeInteger(policy.maxTotalTokens) || !Number.isSafeInteger(policy.maxConcurrentRequests)
-      || !Number.isSafeInteger(policy.maxRequestsPerWindow) || policy.maxConcurrentRequests < 1
-      || policy.maxRequestsPerWindow < 1 || policy.rateWindowMs <= 0) {
+  if (
+    ![
+      policy.maxPromptTokens,
+      policy.maxCompletionTokens,
+      policy.maxTotalTokens,
+      policy.maxConcurrentRequests,
+      policy.maxRequestsPerWindow,
+      policy.rateWindowMs,
+    ].every(finiteNonNegative) ||
+    !Number.isSafeInteger(policy.maxPromptTokens) ||
+    !Number.isSafeInteger(policy.maxCompletionTokens) ||
+    !Number.isSafeInteger(policy.maxTotalTokens) ||
+    !Number.isSafeInteger(policy.maxConcurrentRequests) ||
+    !Number.isSafeInteger(policy.maxRequestsPerWindow) ||
+    policy.maxConcurrentRequests < 1 ||
+    policy.maxRequestsPerWindow < 1 ||
+    policy.rateWindowMs <= 0
+  ) {
     throw new RangeError("turn budget limits must be positive finite values and token limits must be safe integers");
   }
   const bytesPerToken = policy.bytesPerEstimatedToken ?? 3;
-  if (!Number.isFinite(bytesPerToken) || bytesPerToken <= 0) throw new RangeError("bytesPerEstimatedToken must be positive");
-  if (policy.maxEstimatedCostUsd !== null && (!finiteNonNegative(policy.maxEstimatedCostUsd) || policy.pricing === null)) {
+  if (!Number.isFinite(bytesPerToken) || bytesPerToken <= 0)
+    throw new RangeError("bytesPerEstimatedToken must be positive");
+  if (
+    policy.maxEstimatedCostUsd !== null &&
+    (!finiteNonNegative(policy.maxEstimatedCostUsd) || policy.pricing === null)
+  ) {
     throw new RangeError("a dollar budget requires non-negative pricing");
   }
-  if (policy.pricing && (![policy.pricing.promptPerMillionUsd, policy.pricing.completionPerMillionUsd].every(finiteNonNegative))) {
+  if (
+    policy.pricing &&
+    ![policy.pricing.promptPerMillionUsd, policy.pricing.completionPerMillionUsd].every(finiteNonNegative)
+  ) {
     throw new RangeError("token pricing must be non-negative");
   }
 }
@@ -96,39 +115,63 @@ export function estimateTurnTokens(text: string, bytesPerEstimatedToken = 3): nu
   return Math.ceil(Buffer.byteLength(text, "utf8") / bytesPerEstimatedToken);
 }
 
-export function estimateTurnCostUsd(usage: Pick<TurnTokenUsage, "promptTokens" | "completionTokens">, pricing: TurnTokenPricing | null): number {
+export function estimateTurnCostUsd(
+  usage: Pick<TurnTokenUsage, "promptTokens" | "completionTokens">,
+  pricing: TurnTokenPricing | null,
+): number {
   if (!pricing) return 0;
-  return (usage.promptTokens * pricing.promptPerMillionUsd + usage.completionTokens * pricing.completionPerMillionUsd) / 1_000_000;
+  return (
+    (usage.promptTokens * pricing.promptPerMillionUsd + usage.completionTokens * pricing.completionPerMillionUsd) /
+    1_000_000
+  );
 }
 
 export function createTurnBudget(policy: TurnBudgetPolicy): TurnBudgetState {
   validatePolicy(policy);
   return {
     policy: { ...policy, ...(policy.pricing ? { pricing: { ...policy.pricing } } : {}) },
-    accounting: { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedCostUsd: 0, providerMeasuredTokens: 0, locallyEstimatedTokens: 0 },
+    accounting: {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      estimatedCostUsd: 0,
+      providerMeasuredTokens: 0,
+      locallyEstimatedTokens: 0,
+    },
     reservations: {},
     requestStartsMs: [],
   };
 }
 
 function activeTotals(state: TurnBudgetState): TurnBudgetAccounting {
-  return Object.values(state.reservations).reduce<TurnBudgetAccounting>((total, reservation) => ({
-    promptTokens: total.promptTokens + reservation.promptTokens,
-    completionTokens: total.completionTokens + reservation.completionTokens,
-    totalTokens: total.totalTokens + reservation.promptTokens + reservation.completionTokens,
-    estimatedCostUsd: total.estimatedCostUsd + reservation.estimatedCostUsd,
-    providerMeasuredTokens: total.providerMeasuredTokens,
-    locallyEstimatedTokens: total.locallyEstimatedTokens,
-  }), { ...state.accounting });
+  return Object.values(state.reservations).reduce<TurnBudgetAccounting>(
+    (total, reservation) => ({
+      promptTokens: total.promptTokens + reservation.promptTokens,
+      completionTokens: total.completionTokens + reservation.completionTokens,
+      totalTokens: total.totalTokens + reservation.promptTokens + reservation.completionTokens,
+      estimatedCostUsd: total.estimatedCostUsd + reservation.estimatedCostUsd,
+      providerMeasuredTokens: total.providerMeasuredTokens,
+      locallyEstimatedTokens: total.locallyEstimatedTokens,
+    }),
+    { ...state.accounting },
+  );
 }
 
 /** Evaluates token, dollar, concurrency, and rolling-window limits without mutating state. */
-export function decideTurnBudget(state: TurnBudgetState, request: TurnBudgetRequest, nowMs: number): TurnBudgetDecision {
+export function decideTurnBudget(
+  state: TurnBudgetState,
+  request: TurnBudgetRequest,
+  nowMs: number,
+): TurnBudgetDecision {
   validatePolicy(state.policy);
   if (!request.id.trim() || state.reservations[request.id]) {
     return { allowed: false, reason: "duplicate-reservation", retryAtMs: null };
   }
-  if (!Number.isFinite(nowMs) || !Number.isSafeInteger(request.maxCompletionTokens) || request.maxCompletionTokens < 0) {
+  if (
+    !Number.isFinite(nowMs) ||
+    !Number.isSafeInteger(request.maxCompletionTokens) ||
+    request.maxCompletionTokens < 0
+  ) {
     throw new RangeError("budget request values are invalid");
   }
   if (Object.keys(state.reservations).length >= state.policy.maxConcurrentRequests) {
@@ -139,14 +182,19 @@ export function decideTurnBudget(state: TurnBudgetState, request: TurnBudgetRequ
   if (recentStarts.length >= state.policy.maxRequestsPerWindow) {
     return { allowed: false, reason: "rate-limit", retryAtMs: recentStarts[0]! + state.policy.rateWindowMs };
   }
-  const promptTokens = request.estimatedPromptTokens
-    ?? estimateTurnTokens(request.promptText ?? "", state.policy.bytesPerEstimatedToken ?? 3);
-  if (!Number.isSafeInteger(promptTokens) || promptTokens < 0) throw new RangeError("estimatedPromptTokens must be a non-negative safe integer");
+  const promptTokens =
+    request.estimatedPromptTokens ??
+    estimateTurnTokens(request.promptText ?? "", state.policy.bytesPerEstimatedToken ?? 3);
+  if (!Number.isSafeInteger(promptTokens) || promptTokens < 0)
+    throw new RangeError("estimatedPromptTokens must be a non-negative safe integer");
   const reservation: TurnBudgetReservation = {
     id: request.id,
     promptTokens,
     completionTokens: request.maxCompletionTokens,
-    estimatedCostUsd: estimateTurnCostUsd({ promptTokens, completionTokens: request.maxCompletionTokens }, state.policy.pricing),
+    estimatedCostUsd: estimateTurnCostUsd(
+      { promptTokens, completionTokens: request.maxCompletionTokens },
+      state.policy.pricing,
+    ),
     startedAtMs: nowMs,
   };
   const projected = activeTotals(state);
@@ -159,8 +207,10 @@ export function decideTurnBudget(state: TurnBudgetState, request: TurnBudgetRequ
   if (projected.totalTokens + promptTokens + request.maxCompletionTokens > state.policy.maxTotalTokens) {
     return { allowed: false, reason: "total-token-budget", retryAtMs: null };
   }
-  if (state.policy.maxEstimatedCostUsd !== null
-      && projected.estimatedCostUsd + reservation.estimatedCostUsd > state.policy.maxEstimatedCostUsd) {
+  if (
+    state.policy.maxEstimatedCostUsd !== null &&
+    projected.estimatedCostUsd + reservation.estimatedCostUsd > state.policy.maxEstimatedCostUsd
+  ) {
     return { allowed: false, reason: "estimated-dollar-budget", retryAtMs: null };
   }
   return { allowed: true, reservation };
@@ -171,7 +221,11 @@ export type TurnBudgetReserveResult =
   | { allowed: false; state: TurnBudgetState; reason: TurnBudgetDenialReason; retryAtMs: number | null };
 
 /** Atomically decides and reserves worst-case capacity for a provider dispatch. */
-export function reserveTurnBudget(state: TurnBudgetState, request: TurnBudgetRequest, nowMs: number): TurnBudgetReserveResult {
+export function reserveTurnBudget(
+  state: TurnBudgetState,
+  request: TurnBudgetRequest,
+  nowMs: number,
+): TurnBudgetReserveResult {
   const decision = decideTurnBudget(state, request, nowMs);
   if (!decision.allowed) return { ...decision, state };
   const windowStart = nowMs - state.policy.rateWindowMs;
@@ -195,25 +249,39 @@ export interface TurnBudgetSettlement {
 }
 
 function validUsage(usage: TurnTokenUsage): boolean {
-  return [usage.promptTokens, usage.completionTokens, usage.totalTokens].every((value) => Number.isSafeInteger(value) && value >= 0)
-    && usage.totalTokens >= usage.promptTokens + usage.completionTokens;
+  return (
+    [usage.promptTokens, usage.completionTokens, usage.totalTokens].every(
+      (value) => Number.isSafeInteger(value) && value >= 0,
+    ) && usage.totalTokens >= usage.promptTokens + usage.completionTokens
+  );
 }
 
 /** Settles one reservation, preferring provider usage and conservatively estimating missing usage. */
-export function settleTurnBudget(state: TurnBudgetState, reservationId: string, settlement: TurnBudgetSettlement): TurnBudgetState {
+export function settleTurnBudget(
+  state: TurnBudgetState,
+  reservationId: string,
+  settlement: TurnBudgetSettlement,
+): TurnBudgetState {
   const reservation = state.reservations[reservationId];
   if (!reservation) throw new Error(`unknown turn budget reservation: ${reservationId}`);
   const measured = settlement.usage ?? null;
   if (measured && !validUsage(measured)) throw new RangeError("provider token usage is invalid");
-  const usage: TurnTokenUsage = measured ?? (() => {
-    const promptTokens = settlement.promptText === undefined
-      ? reservation.promptTokens
-      : Math.max(reservation.promptTokens, estimateTurnTokens(settlement.promptText, state.policy.bytesPerEstimatedToken ?? 3));
-    const completionTokens = settlement.completionText === undefined
-      ? reservation.completionTokens
-      : estimateTurnTokens(settlement.completionText, state.policy.bytesPerEstimatedToken ?? 3);
-    return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
-  })();
+  const usage: TurnTokenUsage =
+    measured ??
+    (() => {
+      const promptTokens =
+        settlement.promptText === undefined
+          ? reservation.promptTokens
+          : Math.max(
+              reservation.promptTokens,
+              estimateTurnTokens(settlement.promptText, state.policy.bytesPerEstimatedToken ?? 3),
+            );
+      const completionTokens =
+        settlement.completionText === undefined
+          ? reservation.completionTokens
+          : estimateTurnTokens(settlement.completionText, state.policy.bytesPerEstimatedToken ?? 3);
+      return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
+    })();
   const { [reservationId]: _, ...reservations } = state.reservations;
   return {
     ...state,
@@ -244,19 +312,27 @@ export interface SettledTurnBudgetUsage extends TurnTokenUsage {
 export class AdventureTurnBudgetManager {
   private readonly states = new Map<string, TurnBudgetState>();
 
-  initialize(turnId: string, policy: TurnBudgetPolicy, settlements: readonly (TurnTokenUsage & {
-    source: "provider" | "estimated"; startedAtMs: number;
-  })[]): void {
+  initialize(
+    turnId: string,
+    policy: TurnBudgetPolicy,
+    settlements: readonly (TurnTokenUsage & {
+      source: "provider" | "estimated";
+      startedAtMs: number;
+    })[],
+  ): void {
     if (this.states.has(turnId)) return;
     const state = createTurnBudget(policy);
-    state.accounting = settlements.reduce<TurnBudgetAccounting>((total, usage) => ({
-      promptTokens: total.promptTokens + usage.promptTokens,
-      completionTokens: total.completionTokens + usage.completionTokens,
-      totalTokens: total.totalTokens + usage.totalTokens,
-      estimatedCostUsd: total.estimatedCostUsd + estimateTurnCostUsd(usage, policy.pricing),
-      providerMeasuredTokens: total.providerMeasuredTokens + (usage.source === "provider" ? usage.totalTokens : 0),
-      locallyEstimatedTokens: total.locallyEstimatedTokens + (usage.source === "estimated" ? usage.totalTokens : 0),
-    }), state.accounting);
+    state.accounting = settlements.reduce<TurnBudgetAccounting>(
+      (total, usage) => ({
+        promptTokens: total.promptTokens + usage.promptTokens,
+        completionTokens: total.completionTokens + usage.completionTokens,
+        totalTokens: total.totalTokens + usage.totalTokens,
+        estimatedCostUsd: total.estimatedCostUsd + estimateTurnCostUsd(usage, policy.pricing),
+        providerMeasuredTokens: total.providerMeasuredTokens + (usage.source === "provider" ? usage.totalTokens : 0),
+        locallyEstimatedTokens: total.locallyEstimatedTokens + (usage.source === "estimated" ? usage.totalTokens : 0),
+      }),
+      state.accounting,
+    );
     state.requestStartsMs = settlements.map((settlement) => settlement.startedAtMs).filter(Number.isFinite);
     this.states.set(turnId, state);
   }
@@ -265,7 +341,8 @@ export class AdventureTurnBudgetManager {
     const current = this.states.get(turnId) ?? createTurnBudget(policy);
     const reserved = reserveTurnBudget(current, request, nowMs);
     if (reserved.allowed) this.states.set(turnId, reserved.state);
-    return reserved.allowed ? { allowed: true, reservation: reserved.reservation }
+    return reserved.allowed
+      ? { allowed: true, reservation: reserved.reservation }
       : { allowed: false, reason: reserved.reason, retryAtMs: reserved.retryAtMs };
   }
 
@@ -288,7 +365,9 @@ export class AdventureTurnBudgetManager {
     if (current) this.states.set(turnId, releaseTurnBudgetReservation(current, reservationId));
   }
 
-  clear(turnId: string): void { this.states.delete(turnId); }
+  clear(turnId: string): void {
+    this.states.delete(turnId);
+  }
 }
 
 export const adventureTurnBudgets = new AdventureTurnBudgetManager();

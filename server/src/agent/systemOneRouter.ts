@@ -142,16 +142,17 @@ export function composeRouterDecision(
   // The relevant confidence is the probability mass assigned to the *chosen*
   // handler. Using the distribution maximum would let a confident
   // `none_of_these` act on a weakly chosen handler.
-  const signal = choice && chosen ? choice.probabilities[chosen] ?? choice.confidence : null;
+  const signal = choice && chosen ? (choice.probabilities[chosen] ?? choice.confidence) : null;
 
   const deterministicAnswer = answers[ROUTER_DETERMINISTIC_KEY];
-  const deterministicNoul = deterministicAnswer && deterministicAnswer.type === "noul" ? deterministicAnswer.noul : null;
-  const deterministicSufficient = deterministicNoul === null
-    ? null
-    : bandForConfidence(deterministicNoul, thresholds) === "act";
+  const deterministicNoul =
+    deterministicAnswer && deterministicAnswer.type === "noul" ? deterministicAnswer.noul : null;
+  const deterministicSufficient =
+    deterministicNoul === null ? null : bandForConfidence(deterministicNoul, thresholds) === "act";
 
   const complexityAnswer = answers[ROUTER_COMPLEXITY_KEY];
-  const complexity = complexityAnswer && complexityAnswer.type === "score" ? complexityLevel(complexityAnswer.score) : null;
+  const complexity =
+    complexityAnswer && complexityAnswer.type === "score" ? complexityLevel(complexityAnswer.score) : null;
 
   // 1. Safety gate. This is checked before every other rule and can never be
   //    overridden: a human decision or safety-sensitive request goes to human review.
@@ -171,7 +172,11 @@ export function composeRouterDecision(
 
   // 2. Deterministic-first: a confidently sufficient deterministic path is the
   //    cheapest outcome and is preferred whenever it is an allowed move.
-  if (request.hasDeterministicPath && deterministicSufficient === true && mayAdoptHandler(currentHandler, "deterministic")) {
+  if (
+    request.hasDeterministicPath &&
+    deterministicSufficient === true &&
+    mayAdoptHandler(currentHandler, "deterministic")
+  ) {
     return {
       band: "act",
       handler: "deterministic",

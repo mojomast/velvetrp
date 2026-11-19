@@ -13,8 +13,16 @@ import type { ActorResourceReadRepository } from "./actorResourceReadRepo.js";
 import { actorHasActiveEncounter } from "../encounter/activeEncounterPolicy.js";
 
 /** Matches the canonical JSON representation used by M1.5 receipts. */
-const canonical = (value: unknown): string => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
-  ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, item) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.keys(item)
+            .sort()
+            .map((key) => [key, item[key]]),
+        )
+      : item,
+  );
 
 /** State-changing actor-resource commands backed by the shared M1.5 stream. */
 export interface ActorResourceWriteRepository {
@@ -26,10 +34,7 @@ export interface ActorResourceWriteRepository {
     input: ActorScopedResourceChange,
   ): M15Result<{ resources: M15ActorResource[] }>;
   /** Validates and applies an authoritative M1.5 actor-resource command. */
-  mutateActorResource(
-    principal: string,
-    command: ActorResourceCommand,
-  ): M15Result<{ resources: M15ActorResource[] }>;
+  mutateActorResource(principal: string, command: ActorResourceCommand): M15Result<{ resources: M15ActorResource[] }>;
 }
 
 /**
@@ -62,7 +67,8 @@ export function createActorResourceWriteRepository(
         if (command.resourceId === "health" && actorHasActiveEncounter(db, command.campaignId, command.actorId)) {
           throw new ActorResourceConflictError("active encounter health is authoritative");
         }
-        const row = db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?")
+        const row = db
+          .prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?")
           .get(command.campaignId, command.actorId, command.resourceId) as any;
         if (!row) throw new ActorResourceConflictError("actor resource is unavailable");
         let amount = row.current;
@@ -72,29 +78,44 @@ export function createActorResourceWriteRepository(
         else if (command.type === "set_actor_resource_capacity") max = command.capacity;
         if (amount < 0) throw new ActorResourceNegativeError("actor resource cannot become negative");
         if (amount > max) throw new ActorResourceConflictError("actor resource cannot exceed capacity");
-        if (command.type === "change_actor_resource" || command.type === "set_actor_resource" || command.type === "set_actor_resource_capacity") {
-          db.prepare("UPDATE rpg_actor_resources SET current=?,max=? WHERE campaign_id=? AND actor_id=? AND name=?")
-            .run(amount, max, command.campaignId, command.actorId, command.resourceId);
+        if (
+          command.type === "change_actor_resource" ||
+          command.type === "set_actor_resource" ||
+          command.type === "set_actor_resource_capacity"
+        ) {
+          db.prepare(
+            "UPDATE rpg_actor_resources SET current=?,max=? WHERE campaign_id=? AND actor_id=? AND name=?",
+          ).run(amount, max, command.campaignId, command.actorId, command.resourceId);
         }
         // Capacity sidecars model an additional bounded pool and must never exceed its new limit.
         if (command.type === "set_actor_resource_capacity") {
-          db.prepare("UPDATE rpg_actor_resource_capacities_v25 SET maximum_capacity=?,used_capacity=MIN(used_capacity,?) WHERE campaign_id=? AND actor_id=? AND resource_name=?")
-            .run(max, max, command.campaignId, command.actorId, command.resourceId);
+          db.prepare(
+            "UPDATE rpg_actor_resource_capacities_v25 SET maximum_capacity=?,used_capacity=MIN(used_capacity,?) WHERE campaign_id=? AND actor_id=? AND resource_name=?",
+          ).run(max, max, command.campaignId, command.actorId, command.resourceId);
         }
         if (command.type === "set_actor_resource_charges") {
-          db.prepare(`INSERT INTO rpg_actor_resource_charges_v25(campaign_id,actor_id,resource_name,current_charges,maximum_charges)
-            VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name) DO UPDATE SET current_charges=excluded.current_charges,maximum_charges=excluded.maximum_charges`)
-            .run(command.campaignId, command.actorId, command.resourceId, command.current, command.capacity);
+          db.prepare(
+            `INSERT INTO rpg_actor_resource_charges_v25(campaign_id,actor_id,resource_name,current_charges,maximum_charges)
+            VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name) DO UPDATE SET current_charges=excluded.current_charges,maximum_charges=excluded.maximum_charges`,
+          ).run(command.campaignId, command.actorId, command.resourceId, command.current, command.capacity);
         }
         if (command.type === "set_actor_resource_ammunition") {
-          db.prepare(`INSERT INTO rpg_actor_resource_ammunition_v25(campaign_id,actor_id,resource_name,current_ammunition,maximum_ammunition)
-            VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name) DO UPDATE SET current_ammunition=excluded.current_ammunition,maximum_ammunition=excluded.maximum_ammunition`)
-            .run(command.campaignId, command.actorId, command.resourceId, command.current, command.capacity);
+          db.prepare(
+            `INSERT INTO rpg_actor_resource_ammunition_v25(campaign_id,actor_id,resource_name,current_ammunition,maximum_ammunition)
+            VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name) DO UPDATE SET current_ammunition=excluded.current_ammunition,maximum_ammunition=excluded.maximum_ammunition`,
+          ).run(command.campaignId, command.actorId, command.resourceId, command.current, command.capacity);
         }
         if (command.type === "set_actor_resource_binding") {
-          db.prepare(`INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json)
-            VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name) DO UPDATE SET binding_key=excluded.binding_key,binding_json=excluded.binding_json`)
-            .run(command.campaignId, command.actorId, command.resourceId, command.binding.kind, canonical(command.binding));
+          db.prepare(
+            `INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json)
+            VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name) DO UPDATE SET binding_key=excluded.binding_key,binding_json=excluded.binding_json`,
+          ).run(
+            command.campaignId,
+            command.actorId,
+            command.resourceId,
+            command.binding.kind,
+            canonical(command.binding),
+          );
         }
         return { resources: reader.getM15ActorResources(principal, command.campaignId, command.actorId) };
       },

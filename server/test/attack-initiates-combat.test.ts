@@ -23,7 +23,13 @@ async function fixture() {
   const base = await dmFixture(true);
   let npcRevision = 0;
   const createNpc = (name: string, description: string, key: string) => {
-    const persona = base.repo.createCharacter({ name, age: 40, archetype: "Commoner", boundaries: "", fictionalConfirmed: true });
+    const persona = base.repo.createCharacter({
+      name,
+      age: 40,
+      archetype: "Commoner",
+      boundaries: "",
+      fictionalConfirmed: true,
+    });
     return base.repo.createCampaignNpc(OWNER, base.campaign.id, {
       personaId: persona.id,
       publicState: { name, description },
@@ -34,18 +40,26 @@ async function fixture() {
   };
   const hob = createNpc("Old Hob", "The village ferryman who tends the crossing.", "attack-npc-hob");
   const watch = createNpc("Gate Watch", "A loyal guard at the east gate.", "attack-npc-watch");
-  const turnAs = (principalId: string, declaration: string, key: string) => base.repo.createAdventureTurn(principalId, {
-    campaignId: base.campaign.id, timelineId: base.campaign.activeTimelineId, sessionId: base.session.id,
-    actorId: base.actorId, declaration,
-    expectedCampaignRevision: base.repo.getCampaignAdministration(OWNER, base.campaign.id)!.revision,
-    idempotencyKey: key,
-  });
+  const turnAs = (principalId: string, declaration: string, key: string) =>
+    base.repo.createAdventureTurn(principalId, {
+      campaignId: base.campaign.id,
+      timelineId: base.campaign.activeTimelineId,
+      sessionId: base.session.id,
+      actorId: base.actorId,
+      declaration,
+      expectedCampaignRevision: base.repo.getCampaignAdministration(OWNER, base.campaign.id)!.revision,
+      idempotencyKey: key,
+    });
   return { ...base, hob, watch, turn: (declaration: string, key: string) => turnAs(OWNER, declaration, key), turnAs };
 }
 
 function deps(f: Fixture, complete: AdventureAgentDependencies["complete"]): AdventureAgentDependencies {
-  return { complete, getProvider: async () => ({ ...defaultProviderSettings(), model: "attack-fixture" }),
-    getHarness: async () => defaultHarnessSettings(), now: f.options.clock.now };
+  return {
+    complete,
+    getProvider: async () => ({ ...defaultProviderSettings(), model: "attack-fixture" }),
+    getHarness: async () => defaultHarnessSettings(),
+    now: f.options.clock.now,
+  };
 }
 
 /** Records every planning dispatch and answers with a plain completed decision (no tool calls). */
@@ -53,8 +67,11 @@ function recorder() {
   const calls: ProviderCompletionInput[] = [];
   const complete: AdventureAgentDependencies["complete"] = async (input) => {
     calls.push(input);
-    return { message: { role: "assistant", content: "Private planning prose is discarded.", toolCalls: [] },
-      usage: null, model: { requestedModel: "attack-fixture", responseModel: "attack-fixture" } };
+    return {
+      message: { role: "assistant", content: "Private planning prose is discarded.", toolCalls: [] },
+      usage: null,
+      model: { requestedModel: "attack-fixture", responseModel: "attack-fixture" },
+    };
   };
   return { calls, complete };
 }
@@ -68,8 +85,20 @@ describe("detectAttackTarget", () => {
 
   it("keeps the violent verb vocabulary in one exported constant", () => {
     expect(ATTACK_VERBS).toEqual([
-      "attack", "hit", "strike", "stab", "swing at", "slash", "shoot", "kill", "fight",
-      "draw on", "charge", "punch", "kick", "throw at",
+      "attack",
+      "hit",
+      "strike",
+      "stab",
+      "swing at",
+      "slash",
+      "shoot",
+      "kill",
+      "fight",
+      "draw on",
+      "charge",
+      "punch",
+      "kick",
+      "throw at",
     ]);
     expect(Object.isFrozen(ATTACK_VERBS)).toBe(true);
   });
@@ -146,30 +175,42 @@ describe("player attack declarations initiate real combat", () => {
 
       const db = database();
       try {
-        const encounters = db.prepare("SELECT encounter_id,status FROM encounter WHERE campaign_id=?").all(f.campaign.id) as
-          Array<{ encounter_id: string; status: string }>;
+        const encounters = db
+          .prepare("SELECT encounter_id,status FROM encounter WHERE campaign_id=?")
+          .all(f.campaign.id) as Array<{ encounter_id: string; status: string }>;
         expect(encounters).toHaveLength(1);
         expect(encounters[0]!.status).toBe("active");
-        expect(db.prepare("SELECT pack_id,pack_version,definition_id FROM encounter_enemy_provenance_v31 WHERE encounter_id=?")
-          .get(encounters[0]!.encounter_id)).toEqual({
-            pack_id: SRD_5_1_STARTER_CATALOG.manifest.packId,
-            pack_version: SRD_5_1_STARTER_CATALOG.manifest.packVersion,
-            definition_id: CULTIST,
-          });
-        const map = db.prepare("SELECT map_id,mode,active FROM tactical_maps_v58 WHERE encounter_id=?")
+        expect(
+          db
+            .prepare(
+              "SELECT pack_id,pack_version,definition_id FROM encounter_enemy_provenance_v31 WHERE encounter_id=?",
+            )
+            .get(encounters[0]!.encounter_id),
+        ).toEqual({
+          pack_id: SRD_5_1_STARTER_CATALOG.manifest.packId,
+          pack_version: SRD_5_1_STARTER_CATALOG.manifest.packVersion,
+          definition_id: CULTIST,
+        });
+        const map = db
+          .prepare("SELECT map_id,mode,active FROM tactical_maps_v58 WHERE encounter_id=?")
           .get(encounters[0]!.encounter_id) as { map_id: string; mode: string; active: number } | undefined;
         expect(map).toMatchObject({ mode: "combat", active: 1 });
-        const tokens = db.prepare("SELECT disposition,label FROM tactical_map_tokens_v58 WHERE map_id=? ORDER BY token_id")
+        const tokens = db
+          .prepare("SELECT disposition,label FROM tactical_map_tokens_v58 WHERE map_id=? ORDER BY token_id")
           .all(map!.map_id) as Array<{ disposition: string; label: string }>;
         expect(tokens).toHaveLength(2);
         expect(tokens.some((token) => token.disposition === "friendly")).toBe(true);
         expect(tokens.some((token) => token.disposition === "hostile")).toBe(true);
-      } finally { db.close(); }
+      } finally {
+        db.close();
+      }
 
       const candidates = f.repo.listCombatInitiationCandidates(OWNER, f.campaign.id, f.session.id, f.actorId);
       expect(candidates).toContainEqual({ kind: "npc", id: f.hob.npcId, name: "Old Hob" });
       expect(candidates.some((candidate) => candidate.kind === "actor" && candidate.id === f.actorId)).toBe(false);
-    } finally { f.repo.close(); }
+    } finally {
+      f.repo.close();
+    }
   });
 
   it.each([
@@ -186,16 +227,25 @@ describe("player attack declarations initiate real combat", () => {
       expect(dispatch.calls).toHaveLength(1);
       const db = database();
       try {
-        expect(db.prepare("SELECT count(*) count FROM encounter WHERE campaign_id=?").get(f.campaign.id)).toEqual({ count: 0 });
-      } finally { db.close(); }
-    } finally { f.repo.close(); }
+        expect(db.prepare("SELECT count(*) count FROM encounter WHERE campaign_id=?").get(f.campaign.id)).toEqual({
+          count: 0,
+        });
+      } finally {
+        db.close();
+      }
+    } finally {
+      f.repo.close();
+    }
   });
 
   it("never materializes a second encounter while one is already active", async () => {
     const f = await fixture();
     try {
       const prepared = f.prepare();
-      f.repo.startEncounter(OWNER, prepared.encounterId, { expectedRevision: prepared.revision, idempotencyKey: "attack-active-start" });
+      f.repo.startEncounter(OWNER, prepared.encounterId, {
+        expectedRevision: prepared.revision,
+        idempotencyKey: "attack-active-start",
+      });
       const created = f.turn("I attack Gate Watch.", "attack-active");
       const dispatch = recorder();
       const result = await orchestrateAdventureTurn(f.repo, created.turnId, deps(f, dispatch.complete));
@@ -203,11 +253,23 @@ describe("player attack declarations initiate real combat", () => {
       expect(result.outcome).toBe("completed");
       const db = database();
       try {
-        expect(db.prepare("SELECT count(*) count FROM encounter WHERE campaign_id=?").get(f.campaign.id)).toEqual({ count: 1 });
-        expect(db.prepare(`SELECT provenance.definition_id definition_id FROM encounter_enemy_provenance_v31 provenance
-          WHERE provenance.campaign_id=?`).get(f.campaign.id)).toEqual({ definition_id: f.enemy.definitionId });
-      } finally { db.close(); }
-    } finally { f.repo.close(); }
+        expect(db.prepare("SELECT count(*) count FROM encounter WHERE campaign_id=?").get(f.campaign.id)).toEqual({
+          count: 1,
+        });
+        expect(
+          db
+            .prepare(
+              `SELECT provenance.definition_id definition_id FROM encounter_enemy_provenance_v31 provenance
+          WHERE provenance.campaign_id=?`,
+            )
+            .get(f.campaign.id),
+        ).toEqual({ definition_id: f.enemy.definitionId });
+      } finally {
+        db.close();
+      }
+    } finally {
+      f.repo.close();
+    }
   });
 
   it("does not initiate combat from an observer turn", async () => {
@@ -217,10 +279,15 @@ describe("player attack declarations initiate real combat", () => {
       const db = database();
       db.pragma("foreign_keys=ON");
       db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(player, player);
-      db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)")
-        .run(f.campaign.id, player, "player", AT);
-      db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE campaign_id=? AND actor_id=?")
-        .run(player, f.campaign.id, f.actorId);
+      db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)").run(
+        f.campaign.id,
+        player,
+        "player",
+        AT,
+      );
+      db.prepare(
+        "UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE campaign_id=? AND actor_id=?",
+      ).run(player, f.campaign.id, f.actorId);
       db.close();
 
       const created = f.turnAs(player, "I attack Old Hob with my sword.", "attack-observer-turn");
@@ -228,9 +295,11 @@ describe("player attack declarations initiate real combat", () => {
       // changed directly so the campaign administration revision (and the turn's context
       // ancestry) stays intact while the service's own authorization still rejects initiation.
       const demote = database();
-      demote.prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id=?")
+      demote
+        .prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id=?")
         .run(f.campaign.id, player);
-      demote.prepare("UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE campaign_id=? AND actor_id=?")
+      demote
+        .prepare("UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE campaign_id=? AND actor_id=?")
         .run(OWNER, f.campaign.id, f.actorId);
       demote.close();
 
@@ -241,8 +310,14 @@ describe("player attack declarations initiate real combat", () => {
       expect(dispatch.calls).toHaveLength(1);
       const after = database();
       try {
-        expect(after.prepare("SELECT count(*) count FROM encounter WHERE campaign_id=?").get(f.campaign.id)).toEqual({ count: 0 });
-      } finally { after.close(); }
-    } finally { f.repo.close(); }
+        expect(after.prepare("SELECT count(*) count FROM encounter WHERE campaign_id=?").get(f.campaign.id)).toEqual({
+          count: 0,
+        });
+      } finally {
+        after.close();
+      }
+    } finally {
+      f.repo.close();
+    }
   });
 });

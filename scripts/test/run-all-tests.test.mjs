@@ -69,7 +69,10 @@ describe("RunAllTests", () => {
   it("test_default_steps_cover_every_workspace_in_order", () => {
     const result = spawnSync(process.execPath, [RUNNER, "--list"], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     assert.equal(result.status, 0, result.stderr);
-    const names = result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const names = result.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
     assert.deepEqual(names, ["contracts", "server", "client"]);
   });
 
@@ -84,11 +87,13 @@ describe("RunAllTests", () => {
 function ciSteps() {
   const text = readFileSync(path.join(ROOT, ".github", "workflows", "ci.yml"), "utf8");
   const blocks = text.split(/\n(?=\s*- (?:name|run|uses):)/);
-  return blocks.map((block) => {
-    const run = block.match(/^\s*(?:- )?run:\s*(.+)$/m)?.[1]?.trim();
-    const cond = block.match(/^\s*(?:- )?if:\s*(.+)$/m)?.[1]?.trim();
-    return { run, cond };
-  }).filter((s) => s.run);
+  return blocks
+    .map((block) => {
+      const run = block.match(/^\s*(?:- )?run:\s*(.+)$/m)?.[1]?.trim();
+      const cond = block.match(/^\s*(?:- )?if:\s*(.+)$/m)?.[1]?.trim();
+      return { run, cond };
+    })
+    .filter((s) => s.run);
 }
 
 describe("CiWorkflow", () => {
@@ -110,7 +115,10 @@ describe("CiWorkflow", () => {
 
   it("test_ci_no_longer_runs_the_chained_root_test", () => {
     const steps = ciSteps();
-    assert.equal(steps.find((s) => s.run === "npm run test"), undefined);
+    assert.equal(
+      steps.find((s) => s.run === "npm run test"),
+      undefined,
+    );
     assert.ok(steps.find((s) => s.run === "npm ci"));
     assert.ok(steps.find((s) => s.run === "npm run typecheck"));
   });

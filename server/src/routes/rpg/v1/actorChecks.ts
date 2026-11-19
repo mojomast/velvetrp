@@ -24,8 +24,9 @@ export interface ActorChecksHttpOptions {
 }
 
 function invalidQuery(request: FastifyRequest): boolean {
-  return (request.raw.url ?? request.url).includes("?")
-    || Object.keys(request.query as Record<string, unknown>).length > 0;
+  return (
+    (request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0
+  );
 }
 
 function notFound(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1]) {
@@ -33,18 +34,39 @@ function notFound(request: FastifyRequest, reply: Parameters<typeof sendApiProbl
 }
 
 function conflict(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1]) {
-  return sendApiProblem(request, reply, 409, "RPG_ACTOR_CHECK_CONFLICT", "Actor check command conflicts with current state");
+  return sendApiProblem(
+    request,
+    reply,
+    409,
+    "RPG_ACTOR_CHECK_CONFLICT",
+    "Actor check command conflicts with current state",
+  );
 }
 
 function mapFailure(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1], error: unknown) {
-  if (error instanceof ActorCheckNotFoundError || error instanceof M16AuthorizationError) return notFound(request, reply);
+  if (error instanceof ActorCheckNotFoundError || error instanceof M16AuthorizationError)
+    return notFound(request, reply);
   if (error instanceof M16StaleError) {
-    return sendApiProblem(request, reply, 409, "RPG_ACTOR_CHECK_STALE", "Actor check state is stale; refresh before trying again");
+    return sendApiProblem(
+      request,
+      reply,
+      409,
+      "RPG_ACTOR_CHECK_STALE",
+      "Actor check state is stale; refresh before trying again",
+    );
   }
   if (error instanceof CheckUnavailableError || error instanceof M16ConflictError) return conflict(request, reply);
-  request.log.error({ operation: "actor-check", method: request.method, route: request.routeOptions.url }, "RPG actor check operation failed");
-  return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR",
-    "Actor check outcome could not be confirmed; reconcile actor state before retrying and do not automatically retry");
+  request.log.error(
+    { operation: "actor-check", method: request.method, route: request.routeOptions.url },
+    "RPG actor check operation failed",
+  );
+  return sendApiProblem(
+    request,
+    reply,
+    500,
+    "RPG_INTERNAL_ERROR",
+    "Actor check outcome could not be confirmed; reconcile actor state before retrying and do not automatically retry",
+  );
 }
 
 export const actorChecksHttpRoutes: FastifyPluginAsync<ActorChecksHttpOptions> = async (app, options) => {
@@ -60,17 +82,28 @@ export const actorChecksHttpRoutes: FastifyPluginAsync<ActorChecksHttpOptions> =
           return;
         }
         if (invalidQuery(request)) {
-          await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Actor checks do not accept query parameters");
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Actor checks do not accept query parameters",
+          );
           return;
         }
         const contentType = request.headers["content-type"];
         if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Actor check command requires application/json");
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Actor check command requires application/json",
+          );
         }
       },
-      errorHandler: (_error, request, reply) => sendApiProblem(
-        request, reply, 400, "RPG_INVALID_REQUEST", "Actor check command request is invalid",
-      ),
+      errorHandler: (_error, request, reply) =>
+        sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Actor check command request is invalid"),
     },
     async (request, reply) => {
       const actorId = resourceIdSchema.safeParse(request.params.actorId);
@@ -80,7 +113,8 @@ export const actorChecksHttpRoutes: FastifyPluginAsync<ActorChecksHttpOptions> =
       // caller-selected numeric difficulty classes or malformed JSON.
       if (request.body && typeof request.body === "object" && "difficultyRef" in request.body) {
         const difficulty = (request.body as { difficultyRef?: unknown }).difficultyRef;
-        if (typeof difficulty === "string" && !checkDifficultyRefSchema.safeParse(difficulty).success) return conflict(request, reply);
+        if (typeof difficulty === "string" && !checkDifficultyRefSchema.safeParse(difficulty).success)
+          return conflict(request, reply);
       }
       const body = actorCheckCommandRequestSchema.safeParse(request.body);
       if (!body.success) {
@@ -89,17 +123,20 @@ export const actorChecksHttpRoutes: FastifyPluginAsync<ActorChecksHttpOptions> =
       try {
         const result = options.checkRepositoryAccessor().resolveActorCheck(LOCAL_OWNER, actorId.data, body.data);
         const modifier = result.resolution.terms.reduce(
-          (sum, term) => sum + (term.kind === "roll" ? 0 : term.value), 0,
+          (sum, term) => sum + (term.kind === "roll" ? 0 : term.value),
+          0,
         );
-        return reply.code(200).send(actorCheckCommandResponseSchema.parse({
-          check: { ...result.resolution, modifier },
-          receipt: {
-            idempotencyKey: result.receipt.idempotencyKey,
-            revisionBefore: result.receipt.revisionBefore,
-            revisionAfter: result.receipt.revisionAfter,
-            occurredAt: result.receipt.occurredAt,
-          },
-        }));
+        return reply.code(200).send(
+          actorCheckCommandResponseSchema.parse({
+            check: { ...result.resolution, modifier },
+            receipt: {
+              idempotencyKey: result.receipt.idempotencyKey,
+              revisionBefore: result.receipt.revisionBefore,
+              revisionAfter: result.receipt.revisionAfter,
+              occurredAt: result.receipt.occurredAt,
+            },
+          }),
+        );
       } catch (error) {
         return mapFailure(request, reply, error);
       }

@@ -9,7 +9,13 @@ import {
 
 const thresholds = { actionThreshold: 0.75, reviewThreshold: 0.5 };
 const noul = (value: number): SystemOneAnswer => ({ type: "noul", noul: value });
-const severity = (level: number): SystemOneAnswer => ({ type: "score", score: level, confidence: 0.9, legend: {}, probabilities: {} });
+const severity = (level: number): SystemOneAnswer => ({
+  type: "score",
+  score: level,
+  confidence: 0.9,
+  legend: {},
+  probabilities: {},
+});
 
 const benign = (overrides: Partial<Record<string, SystemOneAnswer>> = {}): Record<string, SystemOneAnswer> => ({
   override_attempt: noul(0.02),
@@ -70,7 +76,10 @@ describe("composeGuardrailDecision", () => {
   });
 
   it("routes a self-harm signal to support and outranks a simultaneous block", () => {
-    const composition = composeGuardrailDecision(benign({ self_harm_signal: noul(0.9), boundary_crossing: noul(0.95) }), thresholds);
+    const composition = composeGuardrailDecision(
+      benign({ self_harm_signal: noul(0.9), boundary_crossing: noul(0.95) }),
+      thresholds,
+    );
     expect(composition.disposition).toBe("support");
     expect(composition.band).toBe("act");
     expect(composition.topSignal).toBe(0.9);
@@ -94,8 +103,18 @@ describe("composeGuardrailDecision", () => {
   it("never throws on missing or malformed answers", () => {
     expect(() => composeGuardrailDecision({}, thresholds)).not.toThrow();
     const empty = composeGuardrailDecision({}, thresholds);
-    expect(empty).toEqual({ band: "fallback", disposition: "pass", hazards: [], signals: {}, topSignal: null, severity: null });
-    const composition = composeGuardrailDecision({ boundary_crossing: { type: "choice", choice: "x", confidence: 0.9, probabilities: {} } }, thresholds);
+    expect(empty).toEqual({
+      band: "fallback",
+      disposition: "pass",
+      hazards: [],
+      signals: {},
+      topSignal: null,
+      severity: null,
+    });
+    const composition = composeGuardrailDecision(
+      { boundary_crossing: { type: "choice", choice: "x", confidence: 0.9, probabilities: {} } },
+      thresholds,
+    );
     expect(composition.disposition).toBe("pass");
     expect(composition.band).toBe("fallback");
     expect(composition.topSignal).toBeNull();

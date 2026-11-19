@@ -45,7 +45,9 @@ export function createCampaignCharacterRosterOperations(
     ): CampaignCharacterRosterSnapshot | null => {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
       const id = resourceIdSchema.parse(campaignId);
-      const rows = db.prepare(`WITH authorized AS (
+      const rows = db
+        .prepare(
+          `WITH authorized AS (
       SELECT membership.campaign_id, membership.principal_id, membership.role, membership.created_at,
         campaign.owner_principal_id, campaign.owner_role
       FROM campaign_memberships membership
@@ -199,7 +201,9 @@ export function createCampaignCharacterRosterOperations(
     LEFT JOIN campaign_actor_private_state ps
       ON ps.actor_id = a.id AND ps.campaign_id = a.campaign_id AND ps.campaign_id = cc.campaign_id
     ORDER BY cc.created_at ASC, cc.id COLLATE BINARY ASC
-    LIMIT ${MAX_CAMPAIGN_CHARACTER_ROSTER + 1}`).all({ actorId, campaignId: id }) as CampaignCharacterRosterRow[];
+    LIMIT ${MAX_CAMPAIGN_CHARACTER_ROSTER + 1}`,
+        )
+        .all({ actorId, campaignId: id }) as CampaignCharacterRosterRow[];
       if (rows.length === 0) return null;
 
       try {
@@ -216,19 +220,32 @@ export function createCampaignCharacterRosterOperations(
           role: first.owner_membership_role,
           createdAt: first.owner_membership_created_at,
         });
-        if (authorization.campaignId !== id || authorization.principalId !== actorId
-          || !["owner", "gm", "player", "observer"].includes(authorization.role)
-          || first.campaign_owner_role !== "owner" || first.owner_role_count !== 1
-          || first.exact_owner_count !== 1 || first.owner_parent_id !== owner.principalId
-          || owner.campaignId !== id || owner.principalId !== first.campaign_owner_principal_id
-          || owner.role !== "owner"
-          || !Number.isSafeInteger(first.roster_count) || first.roster_count < 0
-          || first.roster_count > MAX_CAMPAIGN_CHARACTER_ROSTER) malformedCampaignCharacterRoster();
+        if (
+          authorization.campaignId !== id ||
+          authorization.principalId !== actorId ||
+          !["owner", "gm", "player", "observer"].includes(authorization.role) ||
+          first.campaign_owner_role !== "owner" ||
+          first.owner_role_count !== 1 ||
+          first.exact_owner_count !== 1 ||
+          first.owner_parent_id !== owner.principalId ||
+          owner.campaignId !== id ||
+          owner.principalId !== first.campaign_owner_principal_id ||
+          owner.role !== "owner" ||
+          !Number.isSafeInteger(first.roster_count) ||
+          first.roster_count < 0 ||
+          first.roster_count > MAX_CAMPAIGN_CHARACTER_ROSTER
+        )
+          malformedCampaignCharacterRoster();
 
         if (first.roster_count === 0) {
-          if (rows.length !== 1 || first.campaign_character_id !== null
-            || first.character_id !== null || first.persona_name !== null
-            || first.integrity_error_count !== 0) malformedCampaignCharacterRoster();
+          if (
+            rows.length !== 1 ||
+            first.campaign_character_id !== null ||
+            first.character_id !== null ||
+            first.persona_name !== null ||
+            first.integrity_error_count !== 0
+          )
+            malformedCampaignCharacterRoster();
           return { campaignId: id, characters: [] };
         }
         if (rows.length !== first.roster_count) malformedCampaignCharacterRoster();
@@ -236,22 +253,28 @@ export function createCampaignCharacterRosterOperations(
         const ids = new Set<string>();
         const personaIds = new Set<string>();
         const characters = rows.map((row) => {
-          if (row.requesting_campaign_id !== first.requesting_campaign_id
-            || row.requesting_principal_id !== first.requesting_principal_id
-            || row.requesting_role !== first.requesting_role
-            || row.requesting_created_at !== first.requesting_created_at
-            || row.campaign_owner_principal_id !== first.campaign_owner_principal_id
-            || row.campaign_owner_role !== first.campaign_owner_role
-            || row.owner_role_count !== first.owner_role_count
-            || row.exact_owner_count !== first.exact_owner_count
-            || row.owner_membership_campaign_id !== first.owner_membership_campaign_id
-            || row.owner_membership_principal_id !== first.owner_membership_principal_id
-            || row.owner_membership_role !== first.owner_membership_role
-            || row.owner_membership_created_at !== first.owner_membership_created_at
-            || row.owner_parent_id !== first.owner_parent_id
-            || row.roster_count !== first.roster_count || row.integrity_error_count !== 0
-            || row.campaign_character_id === null || row.character_id === null || row.persona_name === null
-            || ids.has(row.campaign_character_id) || personaIds.has(row.character_id)) {
+          if (
+            row.requesting_campaign_id !== first.requesting_campaign_id ||
+            row.requesting_principal_id !== first.requesting_principal_id ||
+            row.requesting_role !== first.requesting_role ||
+            row.requesting_created_at !== first.requesting_created_at ||
+            row.campaign_owner_principal_id !== first.campaign_owner_principal_id ||
+            row.campaign_owner_role !== first.campaign_owner_role ||
+            row.owner_role_count !== first.owner_role_count ||
+            row.exact_owner_count !== first.exact_owner_count ||
+            row.owner_membership_campaign_id !== first.owner_membership_campaign_id ||
+            row.owner_membership_principal_id !== first.owner_membership_principal_id ||
+            row.owner_membership_role !== first.owner_membership_role ||
+            row.owner_membership_created_at !== first.owner_membership_created_at ||
+            row.owner_parent_id !== first.owner_parent_id ||
+            row.roster_count !== first.roster_count ||
+            row.integrity_error_count !== 0 ||
+            row.campaign_character_id === null ||
+            row.character_id === null ||
+            row.persona_name === null ||
+            ids.has(row.campaign_character_id) ||
+            personaIds.has(row.character_id)
+          ) {
             return malformedCampaignCharacterRoster();
           }
           ids.add(row.campaign_character_id);

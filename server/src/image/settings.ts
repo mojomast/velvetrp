@@ -321,7 +321,9 @@ export function validateSceneImageSettings(value: unknown): SceneImageSettingsVa
           continue;
         }
         if (override.length > SCENE_IMAGE_PROMPT_OVERRIDE_VALUE_MAX_CHARS) {
-          issues.push(`promptOverrides["${key}"] must be at most ${SCENE_IMAGE_PROMPT_OVERRIDE_VALUE_MAX_CHARS} characters`);
+          issues.push(
+            `promptOverrides["${key}"] must be at most ${SCENE_IMAGE_PROMPT_OVERRIDE_VALUE_MAX_CHARS} characters`,
+          );
           continue;
         }
         promptOverrides[key] = override;
@@ -332,14 +334,29 @@ export function validateSceneImageSettings(value: unknown): SceneImageSettingsVa
   const settings: SceneImageSettings = {
     enabled: bool("enabled", DEFAULT_SCENE_IMAGE_SETTINGS.enabled),
     mode: member("mode", SCENE_IMAGE_MODES, DEFAULT_SCENE_IMAGE_SETTINGS.mode),
-    stylePresetId: text("stylePresetId", DEFAULT_SCENE_IMAGE_SETTINGS.stylePresetId, SCENE_IMAGE_STYLE_PRESET_ID_MAX_CHARS, 1),
+    stylePresetId: text(
+      "stylePresetId",
+      DEFAULT_SCENE_IMAGE_SETTINGS.stylePresetId,
+      SCENE_IMAGE_STYLE_PRESET_ID_MAX_CHARS,
+      1,
+    ),
     stylePhrase: text("stylePhrase", DEFAULT_SCENE_IMAGE_SETTINGS.stylePhrase, SCENE_IMAGE_STYLE_PHRASE_MAX_CHARS),
     promptOverrides,
     steps: integer("steps", DEFAULT_SCENE_IMAGE_SETTINGS.steps, SCENE_IMAGE_STEPS_MIN, SCENE_IMAGE_STEPS_MAX),
-    guidance: boundedNumber("guidance", DEFAULT_SCENE_IMAGE_SETTINGS.guidance, SCENE_IMAGE_GUIDANCE_MIN, SCENE_IMAGE_GUIDANCE_MAX),
+    guidance: boundedNumber(
+      "guidance",
+      DEFAULT_SCENE_IMAGE_SETTINGS.guidance,
+      SCENE_IMAGE_GUIDANCE_MIN,
+      SCENE_IMAGE_GUIDANCE_MAX,
+    ),
     seedMode: member("seedMode", SCENE_IMAGE_SEED_MODES, DEFAULT_SCENE_IMAGE_SETTINGS.seedMode),
     fixedSeed: integer("fixedSeed", DEFAULT_SCENE_IMAGE_SETTINGS.fixedSeed, SCENE_IMAGE_MIN_SEED, SCENE_IMAGE_MAX_SEED),
-    variationCount: integer("variationCount", DEFAULT_SCENE_IMAGE_SETTINGS.variationCount, SCENE_IMAGE_VARIATION_MIN, SCENE_IMAGE_VARIATION_MAX),
+    variationCount: integer(
+      "variationCount",
+      DEFAULT_SCENE_IMAGE_SETTINGS.variationCount,
+      SCENE_IMAGE_VARIATION_MIN,
+      SCENE_IMAGE_VARIATION_MAX,
+    ),
     autoPerSessionLimit: integer(
       "autoPerSessionLimit",
       DEFAULT_SCENE_IMAGE_SETTINGS.autoPerSessionLimit,
@@ -378,9 +395,8 @@ export function cloneSceneImageSettings(settings: SceneImageSettings): SceneImag
  */
 export function mergeSceneImageSettings(base: SceneImageSettings, patch: SceneImageSettingsPatch): SceneImageSettings {
   const defined = Object.fromEntries(Object.entries(patch).filter(([, entry]) => entry !== undefined));
-  const promptOverrides = patch.promptOverrides === undefined
-    ? base.promptOverrides
-    : { ...base.promptOverrides, ...patch.promptOverrides };
+  const promptOverrides =
+    patch.promptOverrides === undefined ? base.promptOverrides : { ...base.promptOverrides, ...patch.promptOverrides };
   return parseSceneImageSettings({ ...base, ...defined, promptOverrides });
 }
 
@@ -391,7 +407,9 @@ export function mergeSceneImageSettings(base: SceneImageSettings, patch: SceneIm
  */
 export function applySceneImagePreset(settings: SceneImageSettings, presetId: string): SceneImageSettings {
   if (!isSceneImagePresetId(presetId)) {
-    throw new RangeError(`Unknown scene-image preset "${presetId}"; expected one of ${Object.keys(SCENE_IMAGE_PRESETS).join(", ")}`);
+    throw new RangeError(
+      `Unknown scene-image preset "${presetId}"; expected one of ${Object.keys(SCENE_IMAGE_PRESETS).join(", ")}`,
+    );
   }
   const preset = SCENE_IMAGE_PRESETS[presetId];
   return mergeSceneImageSettings(settings, { steps: preset.steps, guidance: preset.guidance });
@@ -421,13 +439,23 @@ export function sceneImageCacheKey(input: SceneImageCacheKeyInput): string {
   const prompt = typeof input.prompt === "string" ? input.prompt.trim() : "";
   if (prompt.length === 0) throw new RangeError("sceneImageCacheKey requires a non-empty prompt");
   if (!Number.isInteger(input.seed) || input.seed < SCENE_IMAGE_MIN_SEED || input.seed > SCENE_IMAGE_MAX_SEED) {
-    throw new RangeError(`sceneImageCacheKey seed must be an integer between ${SCENE_IMAGE_MIN_SEED} and ${SCENE_IMAGE_MAX_SEED}`);
+    throw new RangeError(
+      `sceneImageCacheKey seed must be an integer between ${SCENE_IMAGE_MIN_SEED} and ${SCENE_IMAGE_MAX_SEED}`,
+    );
   }
   if (!Number.isInteger(input.steps) || input.steps < SCENE_IMAGE_STEPS_MIN || input.steps > SCENE_IMAGE_STEPS_MAX) {
-    throw new RangeError(`sceneImageCacheKey steps must be an integer between ${SCENE_IMAGE_STEPS_MIN} and ${SCENE_IMAGE_STEPS_MAX}`);
+    throw new RangeError(
+      `sceneImageCacheKey steps must be an integer between ${SCENE_IMAGE_STEPS_MIN} and ${SCENE_IMAGE_STEPS_MAX}`,
+    );
   }
-  if (!Number.isFinite(input.guidance) || input.guidance < SCENE_IMAGE_GUIDANCE_MIN || input.guidance > SCENE_IMAGE_GUIDANCE_MAX) {
-    throw new RangeError(`sceneImageCacheKey guidance must be between ${SCENE_IMAGE_GUIDANCE_MIN} and ${SCENE_IMAGE_GUIDANCE_MAX}`);
+  if (
+    !Number.isFinite(input.guidance) ||
+    input.guidance < SCENE_IMAGE_GUIDANCE_MIN ||
+    input.guidance > SCENE_IMAGE_GUIDANCE_MAX
+  ) {
+    throw new RangeError(
+      `sceneImageCacheKey guidance must be between ${SCENE_IMAGE_GUIDANCE_MIN} and ${SCENE_IMAGE_GUIDANCE_MAX}`,
+    );
   }
   const material: Array<string | number> = [prompt, input.seed, input.steps, input.guidance];
   const modelVersion = typeof input.modelVersion === "string" ? input.modelVersion.trim() : "";
@@ -469,14 +497,21 @@ export function nextCooldownAt(lastGeneratedAt: string | null, cooldownSeconds: 
  * never runs through this helper: a manual click is bounded by the UI and the
  * confirmation rule, not by the automatic limits.
  */
-export function withinAutoLimits(state: SceneImageUsageState, settings: SceneImageSettings, now: Date): SceneImageAutoLimitDecision {
-  if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new TypeError("withinAutoLimits requires a valid Date");
+export function withinAutoLimits(
+  state: SceneImageUsageState,
+  settings: SceneImageSettings,
+  now: Date,
+): SceneImageAutoLimitDecision {
+  if (!(now instanceof Date) || Number.isNaN(now.getTime()))
+    throw new TypeError("withinAutoLimits requires a valid Date");
   const images = Number.isFinite(state.imagesThisSession) ? Math.max(0, Math.floor(state.imagesThisSession)) : 0;
   const remaining = Math.max(0, settings.autoPerSessionLimit - images);
   const cooldownEndsAt = nextCooldownAt(state.lastGeneratedAt, settings.cooldownSeconds);
-  if (!settings.enabled || settings.mode === "off") return { allowed: false, reason: "disabled", remaining: 0, cooldownEndsAt };
+  if (!settings.enabled || settings.mode === "off")
+    return { allowed: false, reason: "disabled", remaining: 0, cooldownEndsAt };
   if (settings.mode !== "automatic") return { allowed: false, reason: "manual", remaining: 0, cooldownEndsAt };
-  if (images >= settings.autoPerSessionLimit) return { allowed: false, reason: "session-limit", remaining: 0, cooldownEndsAt };
+  if (images >= settings.autoPerSessionLimit)
+    return { allowed: false, reason: "session-limit", remaining: 0, cooldownEndsAt };
   if (cooldownEndsAt !== null && now.getTime() < Date.parse(cooldownEndsAt)) {
     return { allowed: false, reason: "cooldown", remaining, cooldownEndsAt };
   }

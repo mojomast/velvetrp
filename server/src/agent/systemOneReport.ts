@@ -1,7 +1,4 @@
-import type {
-  SystemOneDecisionRecord,
-  SystemOneDecisionSummary,
-} from "../repo/systemOneDecisionRepo.js";
+import type { SystemOneDecisionRecord, SystemOneDecisionSummary } from "../repo/systemOneDecisionRepo.js";
 
 const EMPTY = "—";
 
@@ -40,13 +37,17 @@ export function buildSystemOneShadowReport(
   lines.push(`- Total decisions: ${summary.total}`);
   lines.push(`- Shadow decisions: ${summary.shadow} (${formatPercent(summary.shadow, summary.total)})`);
   lines.push(`- Lane commits: ${summary.laneCommits} (${formatPercent(summary.laneCommits, summary.total)})`);
-  lines.push(`- Shadow decisions with a lane commit: ${summary.shadowLaneCommits} (${formatPercent(summary.shadowLaneCommits, summary.total)})`);
+  lines.push(
+    `- Shadow decisions with a lane commit: ${summary.shadowLaneCommits} (${formatPercent(summary.shadowLaneCommits, summary.total)})`,
+  );
   lines.push(`- Fallback used: ${summary.fallbackUsed} (${formatPercent(summary.fallbackUsed, summary.total)})`);
   lines.push(`- Mean latency: ${formatLatency(summary.meanLatencyMs)} ms`);
   lines.push(`- Total input tokens: ${summary.totalInputTokens}`);
   lines.push(`- Total output tokens: ${summary.totalOutputTokens}`);
   lines.push("");
-  lines.push("Lane commit evidence is the authoritative `adventure_check_executions_v54` row with `origin='lane'` linked by `system_one_decision_id`; a decision row with `shadow: true` was only recorded as advisory.");
+  lines.push(
+    "Lane commit evidence is the authoritative `adventure_check_executions_v54` row with `origin='lane'` linked by `system_one_decision_id`; a decision row with `shadow: true` was only recorded as advisory.",
+  );
   lines.push("");
 
   lines.push("## Per-lane breakdown");
@@ -57,7 +58,9 @@ export function buildSystemOneShadowReport(
     lines.push("| Lane | Decisions | Share | Lane commits |");
     lines.push("| --- | ---: | ---: | ---: |");
     for (const entry of summary.byLane) {
-      lines.push(`| ${entry.lane} | ${entry.count} | ${formatPercent(entry.count, summary.total)} | ${entry.laneCommits} |`);
+      lines.push(
+        `| ${entry.lane} | ${entry.count} | ${formatPercent(entry.count, summary.total)} | ${entry.laneCommits} |`,
+      );
     }
   }
   lines.push("");
@@ -84,9 +87,9 @@ export function buildSystemOneShadowReport(
     lines.push("| --- | --- | --- | --- | --- | ---: | --- |");
     for (const record of recent) {
       lines.push(
-        `| ${record.lane} | ${record.confidenceBand} | ${formatBoolean(record.fallbackUsed)}`
-        + ` | ${formatBoolean(record.shadow)} | ${formatLaneCommit(record.committedByLane)}`
-        + ` | ${formatLatency(record.latencyMs)} | ${record.createdAt} |`,
+        `| ${record.lane} | ${record.confidenceBand} | ${formatBoolean(record.fallbackUsed)}` +
+          ` | ${formatBoolean(record.shadow)} | ${formatLaneCommit(record.committedByLane)}` +
+          ` | ${formatLatency(record.latencyMs)} | ${record.createdAt} |`,
       );
     }
   }

@@ -1,9 +1,5 @@
 // Part of db.ts refactor — see server/src/repo/db/schema.ts for migration order
-import {
-  contentPackSchema,
-  rpgDefinitionSchema,
-  rulesProfileSchema,
-} from "@velvet/contracts";
+import { contentPackSchema, rpgDefinitionSchema, rulesProfileSchema } from "@velvet/contracts";
 import type { ContentPack, RpgDefinition, RulesProfile } from "../../types.js";
 
 /** Database projection for a rules-profile metadata row. */
@@ -72,8 +68,10 @@ export function sameMetadata(
   left: { name: string; description: string; tags: readonly string[] },
   right: { name: string; description: string; tags: readonly string[] },
 ): boolean {
-  return left.name === right.name
-    && left.description === right.description
-    && left.tags.length === right.tags.length
-    && left.tags.every((tag, index) => tag === right.tags[index]);
+  return (
+    left.name === right.name &&
+    left.description === right.description &&
+    left.tags.length === right.tags.length &&
+    left.tags.every((tag, index) => tag === right.tags[index])
+  );
 }

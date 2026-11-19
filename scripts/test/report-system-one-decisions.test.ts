@@ -41,14 +41,24 @@ function seedDecision(decisionId: string, lane: string, shadow: boolean, created
 function seedLaneExecution(databasePath: string, decisionId: string, suffix: string): void {
   const db = new DatabaseDriver(databasePath);
   db.pragma("foreign_keys = OFF");
-  db.prepare(`INSERT INTO adventure_check_executions_v54
+  db.prepare(
+    `INSERT INTO adventure_check_executions_v54
     (command_id,candidate_id,campaign_id,turn_id,origin,provider_call_id,provider_tool_call_id,round_number,
       provider_request_digest,provider_response_digest,system_one_decision_id,selection_json,selection_digest,
       revision_before,revision_after,rolls_json,public_result_json,result_digest,occurred_at)
-    VALUES(?,?,?,?,'lane',NULL,NULL,NULL,NULL,NULL,?,?,?,0,1,?,?,?,?)`).run(
-    `check-command:${suffix}`, `check-candidate:${suffix}`, `campaign:${suffix}`, `turn:${suffix}`, decisionId,
-    JSON.stringify({ candidateId: `check-candidate:${suffix}` }), "a".repeat(64),
-    JSON.stringify([{ value: 12, kept: true }]), JSON.stringify({ outcome: "success" }), "b".repeat(64), AT,
+    VALUES(?,?,?,?,'lane',NULL,NULL,NULL,NULL,NULL,?,?,?,0,1,?,?,?,?)`,
+  ).run(
+    `check-command:${suffix}`,
+    `check-candidate:${suffix}`,
+    `campaign:${suffix}`,
+    `turn:${suffix}`,
+    decisionId,
+    JSON.stringify({ candidateId: `check-candidate:${suffix}` }),
+    "a".repeat(64),
+    JSON.stringify([{ value: 12, kept: true }]),
+    JSON.stringify({ outcome: "success" }),
+    "b".repeat(64),
+    AT,
   );
   db.close();
 }

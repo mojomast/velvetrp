@@ -48,19 +48,25 @@ export type Dnd5eEncounterPlan = Readonly<{
 const TARGET_DIFFICULTIES: readonly EncounterBuilderDifficulty[] = Object.freeze(["easy", "medium", "hard", "deadly"]);
 
 const DIFFICULTY_RANK: Readonly<Record<EncounterDifficulty, number>> = Object.freeze({
-  trivial: 0, easy: 1, medium: 2, hard: 3, deadly: 4,
+  trivial: 0,
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  deadly: 4,
 });
 
 export function planDnd5eEncounter(input: Dnd5eEncounterInput): Dnd5eEncounterPlan {
   const thresholds = partyXpThresholds(input.partyLevels);
-  if (!TARGET_DIFFICULTIES.includes(input.targetDifficulty)) throw new Error(`unsupported target difficulty: ${input.targetDifficulty}`);
+  if (!TARGET_DIFFICULTIES.includes(input.targetDifficulty))
+    throw new Error(`unsupported target difficulty: ${input.targetDifficulty}`);
   const requestedMax = input.maxMonsters ?? 20;
   requireInteger(requestedMax, "maxMonsters");
   if (requestedMax < 1) throw new RangeError("maxMonsters must be a positive integer");
   const maxMonsters = Math.min(requestedMax, 50);
   const seenIds = new Set<string>();
   input.candidates.forEach((candidate) => {
-    if (typeof candidate.id !== "string" || candidate.id.length === 0) throw new Error("candidate id must be a non-empty string");
+    if (typeof candidate.id !== "string" || candidate.id.length === 0)
+      throw new Error("candidate id must be a non-empty string");
     if (seenIds.has(candidate.id)) throw new Error(`duplicate candidate id: ${candidate.id}`);
     seenIds.add(candidate.id);
     try {
@@ -104,7 +110,9 @@ export function planDnd5eEncounter(input: Dnd5eEncounterInput): Dnd5eEncounterPl
 
   const roster = sorted
     .filter((candidate) => counts.has(candidate.id))
-    .map((candidate) => Object.freeze({ id: candidate.id, challengeRating: candidate.challengeRating, count: counts.get(candidate.id)! }));
+    .map((candidate) =>
+      Object.freeze({ id: candidate.id, challengeRating: candidate.challengeRating, count: counts.get(candidate.id)! }),
+    );
   const monsters = roster.map((entry) => ({ challengeRating: entry.challengeRating, count: entry.count }));
   const rawXp = rawEncounterXp(monsters);
   const adjustedXp = adjustedEncounterXp(monsters, input.partyLevels.length);
@@ -115,8 +123,10 @@ export function planDnd5eEncounter(input: Dnd5eEncounterInput): Dnd5eEncounterPl
   const legal = monsterCount > 0 && difficulty === input.targetDifficulty;
   if (!legal && input.candidates.length > 0) {
     if (monsterCount === 0) reasons.push(`no candidate monster fits the ${input.targetDifficulty} target band`);
-    else if (DIFFICULTY_RANK[difficulty] < DIFFICULTY_RANK[input.targetDifficulty]) reasons.push(`the roster is below the ${input.targetDifficulty} target`);
-    else if (DIFFICULTY_RANK[difficulty] > DIFFICULTY_RANK[input.targetDifficulty]) reasons.push(`the roster exceeds the ${input.targetDifficulty} target`);
+    else if (DIFFICULTY_RANK[difficulty] < DIFFICULTY_RANK[input.targetDifficulty])
+      reasons.push(`the roster is below the ${input.targetDifficulty} target`);
+    else if (DIFFICULTY_RANK[difficulty] > DIFFICULTY_RANK[input.targetDifficulty])
+      reasons.push(`the roster exceeds the ${input.targetDifficulty} target`);
     if (monsterCount === maxMonsters) reasons.push("the maximum monster count was reached");
   }
 

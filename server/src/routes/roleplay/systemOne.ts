@@ -27,11 +27,23 @@ const hasOnlyLimitQuery = (request: FastifyRequest): boolean =>
 
 /** Privacy projection: never expose raw state, questions, answers, request, selection, or usage. */
 function projectDecision(record: SystemOneDecisionRecord): {
-  decisionId: string; lane: string; campaignId: string | null; sessionId: string | null; turnId: string | null;
-  provider: string; model: string; confidencePolicyVersion: string;
-  requestDigest: string; questionsDigest: string; stateDigest: string;
+  decisionId: string;
+  lane: string;
+  campaignId: string | null;
+  sessionId: string | null;
+  turnId: string | null;
+  provider: string;
+  model: string;
+  confidencePolicyVersion: string;
+  requestDigest: string;
+  questionsDigest: string;
+  stateDigest: string;
   confidenceBand: SystemOneDecisionRecord["confidenceBand"];
-  fallbackUsed: boolean; shadow: boolean; committedByLane: boolean; latencyMs: number; createdAt: string;
+  fallbackUsed: boolean;
+  shadow: boolean;
+  committedByLane: boolean;
+  latencyMs: number;
+  createdAt: string;
 } {
   return {
     decisionId: record.decisionId,
@@ -58,8 +70,8 @@ const PROBE_QUESTIONS: Record<string, SystemOneQuestion> = {
   reachable: { type: "noul", instructions: "Is this a reachable capability probe?" },
 };
 
-const hasQuery = (request: FastifyRequest) => (request.raw.url ?? request.url).includes("?")
-  || Object.keys(request.query as Record<string, unknown>).length > 0;
+const hasQuery = (request: FastifyRequest) =>
+  (request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0;
 
 export const roleplaySystemOneRoutes: FastifyPluginAsync = async (app) => {
   app.get("/provider/system-one", async () => getPublicSystemOneSettings());
@@ -101,41 +113,55 @@ export const roleplaySystemOneRoutes: FastifyPluginAsync = async (app) => {
     return updateSystemOneSettings(body);
   });
 
-  app.post("/provider/system-one/preflight", {
-    onRequest: async (request, reply) => {
-      reply.header("cache-control", "no-store");
-      if (hasQuery(request)) { await reply.code(400).send({ error: "system-one preflight does not accept query parameters" }); return; }
-      if (typeof request.headers["content-type"] !== "string" || !JSON_TYPE.test(request.headers["content-type"])) {
-        await reply.code(415).send({ error: "system-one preflight requires application/json" });
-      }
+  app.post(
+    "/provider/system-one/preflight",
+    {
+      onRequest: async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        if (hasQuery(request)) {
+          await reply.code(400).send({ error: "system-one preflight does not accept query parameters" });
+          return;
+        }
+        if (typeof request.headers["content-type"] !== "string" || !JSON_TYPE.test(request.headers["content-type"])) {
+          await reply.code(415).send({ error: "system-one preflight requires application/json" });
+        }
+      },
     },
-  }, async (request, reply) => {
-    if (!request.body || typeof request.body !== "object" || Array.isArray(request.body) || Object.keys(request.body as object).length !== 0) {
-      return reply.code(400).send({ error: "system-one preflight body must be an empty object" });
-    }
-    const settings = await getSystemOneSettings();
-    let result: { ok: true; model: string; latencyMs: number; requestId: string | null } | { ok: false; failure: SystemOneFailure };
-    try {
-      const answered = await completeWithSystemOne({
-        settings,
-        state: "capability probe",
-        questions: PROBE_QUESTIONS,
-        maxAttempts: 2,
+    async (request, reply) => {
+      if (
+        !request.body ||
+        typeof request.body !== "object" ||
+        Array.isArray(request.body) ||
+        Object.keys(request.body as object).length !== 0
+      ) {
+        return reply.code(400).send({ error: "system-one preflight body must be an empty object" });
+      }
+      const settings = await getSystemOneSettings();
+      let result:
+        | { ok: true; model: string; latencyMs: number; requestId: string | null }
+        | { ok: false; failure: SystemOneFailure };
+      try {
+        const answered = await completeWithSystemOne({
+          settings,
+          state: "capability probe",
+          questions: PROBE_QUESTIONS,
+          maxAttempts: 2,
+        });
+        result = {
+          ok: true,
+          model: answered.model.responseModel ?? settings.model,
+          latencyMs: answered.provenance.latencyMs,
+          requestId: answered.provenance.requestId,
+        };
+      } catch (error) {
+        result = { ok: false, failure: classifySystemOneFailure(error) };
+      }
+      return reply.send({
+        enabled: settings.enabled,
+        configured: settings.apiKey.trim().length > 0,
+        model: settings.model.trim() || "unconfigured",
+        ...result,
       });
-      result = {
-        ok: true,
-        model: answered.model.responseModel ?? settings.model,
-        latencyMs: answered.provenance.latencyMs,
-        requestId: answered.provenance.requestId,
-      };
-    } catch (error) {
-      result = { ok: false, failure: classifySystemOneFailure(error) };
-    }
-    return reply.send({
-      enabled: settings.enabled,
-      configured: settings.apiKey.trim().length > 0,
-      model: settings.model.trim() || "unconfigured",
-      ...result,
-    });
-  });
+    },
+  );
 };

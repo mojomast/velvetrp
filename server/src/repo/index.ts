@@ -75,8 +75,11 @@ export {
   type CharacterBuilderRepository,
 } from "./characterBuilderRepo.js";
 export {
-  CharacterProgressionAuthorizationError, CharacterProgressionConflictError, CharacterProgressionStaleError,
-  CharacterProgressionUnavailableError, type CharacterProgressionRepository,
+  CharacterProgressionAuthorizationError,
+  CharacterProgressionConflictError,
+  CharacterProgressionStaleError,
+  CharacterProgressionUnavailableError,
+  type CharacterProgressionRepository,
 } from "./characterProgressionRepo.js";
 export { calculateCharacterDerivedStats } from "../characterBuilderCalculator.js";
 export {
@@ -94,29 +97,120 @@ export {
   createActorGameplaySheetReadRepository,
   type ActorGameplaySheetReadRepository,
 } from "./campaign/actorGameplaySheetReadRepo.js";
-export { ActorResourceAuthorizationError, ActorResourceConflictError, ActorResourceNegativeError, ActorResourceStaleError, type ActorResourceRepository } from "./actorResourceRepo.js";
-export { InventoryAuthorizationError, InventoryBindingError, InventoryCapacityError, InventorySlotConflictError, InventoryStaleError, type InventoryRepository } from "./inventoryRepo.js";
-export { EconomyAuthorizationError, EconomyConflictError, QuoteExpiredError, ShopStockExhaustedError, TradeStaleError, type EconomyRepository } from "./economyRepo.js";
+export {
+  ActorResourceAuthorizationError,
+  ActorResourceConflictError,
+  ActorResourceNegativeError,
+  ActorResourceStaleError,
+  type ActorResourceRepository,
+} from "./actorResourceRepo.js";
+export {
+  InventoryAuthorizationError,
+  InventoryBindingError,
+  InventoryCapacityError,
+  InventorySlotConflictError,
+  InventoryStaleError,
+  type InventoryRepository,
+} from "./inventoryRepo.js";
+export {
+  EconomyAuthorizationError,
+  EconomyConflictError,
+  QuoteExpiredError,
+  ShopStockExhaustedError,
+  TradeStaleError,
+  type EconomyRepository,
+} from "./economyRepo.js";
 export { RestAuthorizationError, RestIllegalStateError, RestStaleError, type RestRepository } from "./restRepo.js";
-export { createAttunementRepository, type AttunementRepository, type AttunementDependencies,
-  type ActorAttunementSnapshot, type AttunementEntryView, type AttunementOutcome } from "./attunementRepo.js";
+export {
+  createAttunementRepository,
+  type AttunementRepository,
+  type AttunementDependencies,
+  type ActorAttunementSnapshot,
+  type AttunementEntryView,
+  type AttunementOutcome,
+} from "./attunementRepo.js";
 export { ActorCheckNotFoundError, CheckUnavailableError, type CheckRepository } from "./checkRepo.js";
-export { createAdventureCheckRepository, type AdventureCheckRepository, type AdventureCheckPublicReceipt,
-  type ProviderSafeAdventureCheckCandidate } from "./adventureCheckRepo.js";
+export {
+  createAdventureCheckRepository,
+  type AdventureCheckRepository,
+  type AdventureCheckPublicReceipt,
+  type ProviderSafeAdventureCheckCandidate,
+} from "./adventureCheckRepo.js";
 export { createAdventureInventoryRepository, type AdventureInventoryRepository } from "./adventureInventoryRepo.js";
-export { createAdventureCommerceRepository, type AdventureCommerceRepository, type VendorShopAssociation } from "./adventureCommerceRepo.js";
-export { CampaignIntegrationConflictError, CampaignIntegrationForbiddenError, CampaignIntegrationStaleError,
-  CampaignIntegrationUnavailableError, type CampaignAdministrationIntegrationRepository } from "./campaignAdministrationIntegrationRepo.js";
+export {
+  createAdventureCommerceRepository,
+  type AdventureCommerceRepository,
+  type VendorShopAssociation,
+} from "./adventureCommerceRepo.js";
+export {
+  CampaignIntegrationConflictError,
+  CampaignIntegrationForbiddenError,
+  CampaignIntegrationStaleError,
+  CampaignIntegrationUnavailableError,
+  type CampaignAdministrationIntegrationRepository,
+} from "./campaignAdministrationIntegrationRepo.js";
 export { createAdventurePowerRestRepository, type AdventurePowerRestRepository } from "./adventurePowerRestRepo.js";
-export { createAdventureQuestProgressionRepository, type AdventureQuestProgressionRepository } from "./adventureQuestProgressionRepo.js";
-export { PowerUnavailableError, PowerInsufficientResourceError, ActorPowerNotFoundError, ActorPowerConflictError, ActorPowerInsufficientError, type ActorPowerSnapshot, type PowerRepository } from "./powerRepo.js";
-export { createSpellcastingRepository, SpellcastingUnavailableError, SpellcastingComponentError, SpellcastingRangeError, type SpellcastingRepository, type SpellcastingRepositoryOptions } from "./spellcastingRepo.js";
-export { M16AuthorizationError, M16StaleError, M16ConflictError, EffectUnavailableError, EffectImmuneError, type ActorEffectSnapshot, type EffectRepository } from "./effectRepo.js";
-export { EncounterAuthorizationError, EncounterStaleError, EncounterConflictError, EncounterUnavailableError, EncounterTurnError, type EncounterRepository } from "./encounterRepo.js";
-export { TacticalMapAuthorizationError, TacticalMapUnavailableError, TacticalMapStaleError, TacticalMapConflictError, type TacticalMapRepository } from "./tacticalMapRepo.js";
-export { ensureCombatTacticalMap, inferCombatMapKind, combatMapSeed, type EnsureCombatTacticalMapDependencies,
-  type EnsureCombatTacticalMapContext, type EnsureCombatTacticalMapInput, type EnsureCombatTacticalMapResult } from "./combatTacticalMap.js";
-export { WorldAuthorizationError, WorldStaleError, WorldConflictError, WorldUnavailableError, type WorldRepository } from "./worldRepo.js";
+export {
+  createAdventureQuestProgressionRepository,
+  type AdventureQuestProgressionRepository,
+} from "./adventureQuestProgressionRepo.js";
+export {
+  PowerUnavailableError,
+  PowerInsufficientResourceError,
+  ActorPowerNotFoundError,
+  ActorPowerConflictError,
+  ActorPowerInsufficientError,
+  type ActorPowerSnapshot,
+  type PowerRepository,
+} from "./powerRepo.js";
+export {
+  createSpellcastingRepository,
+  SpellcastingUnavailableError,
+  SpellcastingComponentError,
+  SpellcastingRangeError,
+  type SpellcastingRepository,
+  type SpellcastingRepositoryOptions,
+} from "./spellcastingRepo.js";
+export {
+  M16AuthorizationError,
+  M16StaleError,
+  M16ConflictError,
+  EffectUnavailableError,
+  EffectImmuneError,
+  type ActorEffectSnapshot,
+  type EffectRepository,
+} from "./effectRepo.js";
+export {
+  EncounterAuthorizationError,
+  EncounterStaleError,
+  EncounterConflictError,
+  EncounterUnavailableError,
+  EncounterTurnError,
+  type EncounterRepository,
+} from "./encounterRepo.js";
+export {
+  TacticalMapAuthorizationError,
+  TacticalMapUnavailableError,
+  TacticalMapStaleError,
+  TacticalMapConflictError,
+  type TacticalMapRepository,
+} from "./tacticalMapRepo.js";
+export {
+  ensureCombatTacticalMap,
+  inferCombatMapKind,
+  combatMapSeed,
+  type EnsureCombatTacticalMapDependencies,
+  type EnsureCombatTacticalMapContext,
+  type EnsureCombatTacticalMapInput,
+  type EnsureCombatTacticalMapResult,
+} from "./combatTacticalMap.js";
+export {
+  WorldAuthorizationError,
+  WorldStaleError,
+  WorldConflictError,
+  WorldUnavailableError,
+  type WorldRepository,
+} from "./worldRepo.js";
 export {
   MAX_FREEFORM_DESTINATION_LENGTH,
   FREEFORM_LOCATION_FEATURES,
@@ -302,9 +396,16 @@ export {
   variationIndex,
   type VariationPool,
 } from "./freeform/freeformVariation.js";
-export { createEncounterPlanningService, type EncounterPlanningService, type EncounterPlanningDependencies,
-  type EncounterCatalogDefinition, type EncounterCandidate, type EncounterPlanningDifficulty,
-  type CampaignEncounterRequest, type CampaignEncounterPlan } from "./dm/encounterPlanning.js";
+export {
+  createEncounterPlanningService,
+  type EncounterPlanningService,
+  type EncounterPlanningDependencies,
+  type EncounterCatalogDefinition,
+  type EncounterCandidate,
+  type EncounterPlanningDifficulty,
+  type CampaignEncounterRequest,
+  type CampaignEncounterPlan,
+} from "./dm/encounterPlanning.js";
 export {
   CampaignStartingLocationAuthorizationError,
   CampaignStartingLocationConflictError,
@@ -321,27 +422,43 @@ export {
   type CompanionRepository,
 } from "./companionRepo.js";
 export {
-  getQuest, getStoryline, listClues, listObjectiveCompletions, listQuests, listRewards, listStorylines,
-  type CreateQuestInput, type CreateRewardInput, type CreateStorylineInput,
-  type Quest, type QuestClue, type QuestObjectiveCompletion, type QuestReward, type Storyline,
-  QuestAuthorizationError, QuestConflictError, QuestDomainUnavailableError, QuestStaleError,
-  type AdventureQuestNarrationReceipt, type AdventureQuestObjectiveCandidate, type AdventureQuestPublicReceipt,
-  type CampaignQuestSnapshot, type QuestMutationResult,
+  getQuest,
+  getStoryline,
+  listClues,
+  listObjectiveCompletions,
+  listQuests,
+  listRewards,
+  listStorylines,
+  type CreateQuestInput,
+  type CreateRewardInput,
+  type CreateStorylineInput,
+  type Quest,
+  type QuestClue,
+  type QuestObjectiveCompletion,
+  type QuestReward,
+  type Storyline,
+  QuestAuthorizationError,
+  QuestConflictError,
+  QuestDomainUnavailableError,
+  QuestStaleError,
+  type AdventureQuestNarrationReceipt,
+  type AdventureQuestObjectiveCandidate,
+  type AdventureQuestPublicReceipt,
+  type CampaignQuestSnapshot,
+  type QuestMutationResult,
 } from "./questRepo.js";
 export {
-  StoryAuthorizationError, StoryConflictError, StoryStaleError, StoryUnavailableError,
-  type StoryMutationResult, type StoryRepository,
+  StoryAuthorizationError,
+  StoryConflictError,
+  StoryStaleError,
+  StoryUnavailableError,
+  type StoryMutationResult,
+  type StoryRepository,
 } from "./storyRepo.js";
 export * from "./adventureTurnRepo.js";
 export * from "./candidateRepo/index.js";
 export * from "./systemOneDecisionRepo.js";
-export {
-  createCharacter,
-  deleteCharacter,
-  getCharacter,
-  listCharacters,
-  updateCharacter,
-} from "./characterRepo.js";
+export { createCharacter, deleteCharacter, getCharacter, listCharacters, updateCharacter } from "./characterRepo.js";
 export {
   getHarnessSettings,
   getProviderSettings,
@@ -377,10 +494,7 @@ export {
   recordUsageEvent,
   setActiveBranch,
 } from "./messageRepo.js";
-export {
-  createRepository,
-  type CreateRepositoryOptions,
-} from "./campaignRepositoryOrchestration.js";
+export { createRepository, type CreateRepositoryOptions } from "./campaignRepositoryOrchestration.js";
 export type {
   CampaignCharacterRosterSnapshot,
   CampaignCharacterSheetSnapshot,
@@ -426,15 +540,5 @@ export {
   setMemoryApproval,
   updateMemory,
 } from "./memoryRepo.js";
-export {
-  createLoreEntry,
-  deleteLoreEntry,
-  getLoreEntry,
-  listLoreEntries,
-  updateLoreEntry,
-} from "./loreRepo.js";
-export {
-  deleteSummary,
-  getSummary,
-  upsertSummary,
-} from "./summaryRepo.js";
+export { createLoreEntry, deleteLoreEntry, getLoreEntry, listLoreEntries, updateLoreEntry } from "./loreRepo.js";
+export { deleteSummary, getSummary, upsertSummary } from "./summaryRepo.js";

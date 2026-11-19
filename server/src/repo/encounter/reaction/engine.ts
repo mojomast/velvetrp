@@ -2,13 +2,21 @@ import type DatabaseDriver from "better-sqlite3";
 import { resourceIdSchema } from "@velvet/contracts";
 import type { IdGenerator } from "../../../runtime.js";
 import type {
-  BoundedReactionTrigger, DeclaredReaction, ReactionEvent, ReactionEventKind, ReactionMatchContext, ReactionReceipt,
+  BoundedReactionTrigger,
+  DeclaredReaction,
+  ReactionEvent,
+  ReactionEventKind,
+  ReactionMatchContext,
+  ReactionReceipt,
   ReactionWindowEntry,
 } from "./types.js";
 
 const relationOf = (context: ReactionMatchContext, event: ReactionEvent): "self" | "ally" | "enemy" =>
-  context.reactorCombatantId === event.subjectCombatantId ? "self"
-    : context.reactorTeam === context.subjectTeam ? "ally" : "enemy";
+  context.reactorCombatantId === event.subjectCombatantId
+    ? "self"
+    : context.reactorTeam === context.subjectTeam
+      ? "ally"
+      : "enemy";
 
 /**
  * The single bounded-trigger predicate. A trigger matches only when the event
@@ -43,7 +51,10 @@ export type ReactionCandidate = Readonly<{
 }>;
 
 /** Opens a window: every candidate whose bounded trigger fires for the event, in stable order. */
-export function selectReactionWindow(event: ReactionEvent, candidates: readonly ReactionCandidate[]): ReactionWindowEntry[] {
+export function selectReactionWindow(
+  event: ReactionEvent,
+  candidates: readonly ReactionCandidate[],
+): ReactionWindowEntry[] {
   const entries: ReactionWindowEntry[] = [];
   for (const candidate of candidates) {
     const context: ReactionMatchContext = {
@@ -76,11 +87,17 @@ export type ReactionBudget = Readonly<{ used: boolean; available: boolean; usedA
 
 /** Reads the separate per-round reaction marker without consuming it. */
 export function readReactionBudget(
-  db: DatabaseDriver.Database, encounterId: string, combatantId: string, round: number,
+  db: DatabaseDriver.Database,
+  encounterId: string,
+  combatantId: string,
+  round: number,
 ): ReactionBudget {
-  const row = db.prepare(`SELECT used,used_at FROM combat_reaction_usage_v63
-    WHERE encounter_id=? AND combatant_id=? AND round_number=?`).get(encounterId, combatantId, round) as
-    { used: number; used_at: string | null } | undefined;
+  const row = db
+    .prepare(
+      `SELECT used,used_at FROM combat_reaction_usage_v63
+    WHERE encounter_id=? AND combatant_id=? AND round_number=?`,
+    )
+    .get(encounterId, combatantId, round) as { used: number; used_at: string | null } | undefined;
   const used = row?.used === 1;
   return { used, available: !used, usedAt: row?.used_at ?? null };
 }
@@ -91,25 +108,37 @@ export function readReactionBudget(
  * round across every trigger kind.
  */
 export function claimReactionBudget(
-  db: DatabaseDriver.Database, encounterId: string, combatantId: string, round: number, at: string,
+  db: DatabaseDriver.Database,
+  encounterId: string,
+  combatantId: string,
+  round: number,
+  at: string,
 ): boolean {
-  const result = db.prepare(`INSERT INTO combat_reaction_usage_v63(encounter_id,combatant_id,round_number,used,used_at) VALUES(?,?,?,1,?)
-    ON CONFLICT(encounter_id,combatant_id,round_number) DO UPDATE SET used=1,used_at=excluded.used_at WHERE combat_reaction_usage_v63.used=0`)
+  const result = db
+    .prepare(
+      `INSERT INTO combat_reaction_usage_v63(encounter_id,combatant_id,round_number,used,used_at) VALUES(?,?,?,1,?)
+    ON CONFLICT(encounter_id,combatant_id,round_number) DO UPDATE SET used=1,used_at=excluded.used_at WHERE combat_reaction_usage_v63.used=0`,
+    )
     .run(encounterId, combatantId, round, at);
   return result.changes === 1;
 }
 
 /** Releases a claimed reaction (used only for rollback inside a failed transaction). */
 export function releaseReactionBudget(
-  db: DatabaseDriver.Database, encounterId: string, combatantId: string, round: number,
+  db: DatabaseDriver.Database,
+  encounterId: string,
+  combatantId: string,
+  round: number,
 ): void {
-  db.prepare("UPDATE combat_reaction_usage_v63 SET used=0,used_at=NULL WHERE encounter_id=? AND combatant_id=? AND round_number=? AND used=1")
-    .run(encounterId, combatantId, round);
+  db.prepare(
+    "UPDATE combat_reaction_usage_v63 SET used=0,used_at=NULL WHERE encounter_id=? AND combatant_id=? AND round_number=? AND used=1",
+  ).run(encounterId, combatantId, round);
 }
 
 /** Builds the deterministic response receipt for one spent reaction. */
 export function buildReactionReceipt<TOutcome extends Record<string, unknown>>(
-  ids: IdGenerator, input: {
+  ids: IdGenerator,
+  input: {
     event: ReactionEventKind;
     reactorCombatantId: string;
     sourceCombatantId: string | null;

@@ -192,26 +192,147 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     },
   ],
   connections: [
-    { key: "conn-hollowford-market", fromLocationKey: "loc-hollowford", toLocationKey: "loc-market-cross", description: "A mud-and-gravel lane climbs gently from the village well to the crossing. It is a five-minute walk.", visibility: "public" },
-    { key: "conn-market-hollowford", fromLocationKey: "loc-market-cross", toLocationKey: "loc-hollowford", description: "The lane drops back toward the smoke of the village hearths. It is a five-minute walk.", visibility: "public" },
-    { key: "conn-market-stonebridge", fromLocationKey: "loc-market-cross", toLocationKey: "loc-stonebridge", description: "The river road runs east between hedgerows to the old span.", visibility: "public" },
-    { key: "conn-stonebridge-market", fromLocationKey: "loc-stonebridge", toLocationKey: "loc-market-cross", description: "The river road returns west toward the stalls and forges.", visibility: "public" },
-    { key: "conn-stonebridge-mill", fromLocationKey: "loc-stonebridge", toLocationKey: "loc-old-mill", description: "A towpath follows the millrace downstream to the rotting wheel.", visibility: "public" },
-    { key: "conn-mill-stonebridge", fromLocationKey: "loc-old-mill", toLocationKey: "loc-stonebridge", description: "The towpath climbs back along the race to the stone span.", visibility: "public" },
-    { key: "conn-mill-warden", fromLocationKey: "loc-old-mill", toLocationKey: "loc-warden-tower", description: "A switchback track climbs from the millpond to the ridge watchtower.", visibility: "public" },
-    { key: "conn-warden-mill", fromLocationKey: "loc-warden-tower", toLocationKey: "loc-old-mill", description: "The switchback descends from the ridge to the millpond.", visibility: "public" },
-    { key: "conn-warden-wood", fromLocationKey: "loc-warden-tower", toLocationKey: "loc-whispering-wood", description: "A cairn-marked trail enters the pines below the tower.", visibility: "public" },
-    { key: "conn-wood-warden", fromLocationKey: "loc-whispering-wood", toLocationKey: "loc-warden-tower", description: "The cairn trail climbs back out of the pines to the watchtower.", visibility: "public" },
-    { key: "conn-hollowford-marsh", fromLocationKey: "loc-hollowford", toLocationKey: "loc-salt-marsh", description: "A sunken boardwalk leads from the lower village green into the reeds.", visibility: "public" },
-    { key: "conn-marsh-hollowford", fromLocationKey: "loc-salt-marsh", toLocationKey: "loc-hollowford", description: "The boardwalk returns from the reeds to the village green.", visibility: "public" },
-    { key: "conn-marsh-chapel", fromLocationKey: "loc-salt-marsh", toLocationKey: "loc-ruined-chapel", description: "A dry levee path skirts the marsh pools toward the ruined chapel.", visibility: "public" },
-    { key: "conn-chapel-marsh", fromLocationKey: "loc-ruined-chapel", toLocationKey: "loc-salt-marsh", description: "The levee path leads back from the chapel to the marsh.", visibility: "public" },
-    { key: "conn-chapel-mine", fromLocationKey: "loc-ruined-chapel", toLocationKey: "loc-greyvein-mine", description: "An old pilgrim track climbs from the chapel to the mine's tailings.", visibility: "public" },
-    { key: "conn-mine-chapel", fromLocationKey: "loc-greyvein-mine", toLocationKey: "loc-ruined-chapel", description: "The pilgrim track descends from the mine to the chapel garden.", visibility: "public" },
-    { key: "conn-mine-stonebridge", fromLocationKey: "loc-greyvein-mine", toLocationKey: "loc-stonebridge", description: "A cart road follows the ore wagons down to the river crossing.", visibility: "public" },
-    { key: "conn-stonebridge-mine", fromLocationKey: "loc-stonebridge", toLocationKey: "loc-greyvein-mine", description: "The cart road climbs from the bridge toward the mine headframes.", visibility: "public" },
-    { key: "conn-wood-cinder", fromLocationKey: "loc-whispering-wood", toLocationKey: "loc-cinder-camp", description: "A smoke-blackened path pushes through the bracken to the burned steading.", visibility: "public" },
-    { key: "conn-cinder-wood", fromLocationKey: "loc-cinder-camp", toLocationKey: "loc-whispering-wood", description: "The bracken path leads back out of the clearing toward the pines.", visibility: "public" },
+    {
+      key: "conn-hollowford-market",
+      fromLocationKey: "loc-hollowford",
+      toLocationKey: "loc-market-cross",
+      description:
+        "A mud-and-gravel lane climbs gently from the village well to the crossing. It is a five-minute walk.",
+      visibility: "public",
+    },
+    {
+      key: "conn-market-hollowford",
+      fromLocationKey: "loc-market-cross",
+      toLocationKey: "loc-hollowford",
+      description: "The lane drops back toward the smoke of the village hearths. It is a five-minute walk.",
+      visibility: "public",
+    },
+    {
+      key: "conn-market-stonebridge",
+      fromLocationKey: "loc-market-cross",
+      toLocationKey: "loc-stonebridge",
+      description: "The river road runs east between hedgerows to the old span.",
+      visibility: "public",
+    },
+    {
+      key: "conn-stonebridge-market",
+      fromLocationKey: "loc-stonebridge",
+      toLocationKey: "loc-market-cross",
+      description: "The river road returns west toward the stalls and forges.",
+      visibility: "public",
+    },
+    {
+      key: "conn-stonebridge-mill",
+      fromLocationKey: "loc-stonebridge",
+      toLocationKey: "loc-old-mill",
+      description: "A towpath follows the millrace downstream to the rotting wheel.",
+      visibility: "public",
+    },
+    {
+      key: "conn-mill-stonebridge",
+      fromLocationKey: "loc-old-mill",
+      toLocationKey: "loc-stonebridge",
+      description: "The towpath climbs back along the race to the stone span.",
+      visibility: "public",
+    },
+    {
+      key: "conn-mill-warden",
+      fromLocationKey: "loc-old-mill",
+      toLocationKey: "loc-warden-tower",
+      description: "A switchback track climbs from the millpond to the ridge watchtower.",
+      visibility: "public",
+    },
+    {
+      key: "conn-warden-mill",
+      fromLocationKey: "loc-warden-tower",
+      toLocationKey: "loc-old-mill",
+      description: "The switchback descends from the ridge to the millpond.",
+      visibility: "public",
+    },
+    {
+      key: "conn-warden-wood",
+      fromLocationKey: "loc-warden-tower",
+      toLocationKey: "loc-whispering-wood",
+      description: "A cairn-marked trail enters the pines below the tower.",
+      visibility: "public",
+    },
+    {
+      key: "conn-wood-warden",
+      fromLocationKey: "loc-whispering-wood",
+      toLocationKey: "loc-warden-tower",
+      description: "The cairn trail climbs back out of the pines to the watchtower.",
+      visibility: "public",
+    },
+    {
+      key: "conn-hollowford-marsh",
+      fromLocationKey: "loc-hollowford",
+      toLocationKey: "loc-salt-marsh",
+      description: "A sunken boardwalk leads from the lower village green into the reeds.",
+      visibility: "public",
+    },
+    {
+      key: "conn-marsh-hollowford",
+      fromLocationKey: "loc-salt-marsh",
+      toLocationKey: "loc-hollowford",
+      description: "The boardwalk returns from the reeds to the village green.",
+      visibility: "public",
+    },
+    {
+      key: "conn-marsh-chapel",
+      fromLocationKey: "loc-salt-marsh",
+      toLocationKey: "loc-ruined-chapel",
+      description: "A dry levee path skirts the marsh pools toward the ruined chapel.",
+      visibility: "public",
+    },
+    {
+      key: "conn-chapel-marsh",
+      fromLocationKey: "loc-ruined-chapel",
+      toLocationKey: "loc-salt-marsh",
+      description: "The levee path leads back from the chapel to the marsh.",
+      visibility: "public",
+    },
+    {
+      key: "conn-chapel-mine",
+      fromLocationKey: "loc-ruined-chapel",
+      toLocationKey: "loc-greyvein-mine",
+      description: "An old pilgrim track climbs from the chapel to the mine's tailings.",
+      visibility: "public",
+    },
+    {
+      key: "conn-mine-chapel",
+      fromLocationKey: "loc-greyvein-mine",
+      toLocationKey: "loc-ruined-chapel",
+      description: "The pilgrim track descends from the mine to the chapel garden.",
+      visibility: "public",
+    },
+    {
+      key: "conn-mine-stonebridge",
+      fromLocationKey: "loc-greyvein-mine",
+      toLocationKey: "loc-stonebridge",
+      description: "A cart road follows the ore wagons down to the river crossing.",
+      visibility: "public",
+    },
+    {
+      key: "conn-stonebridge-mine",
+      fromLocationKey: "loc-stonebridge",
+      toLocationKey: "loc-greyvein-mine",
+      description: "The cart road climbs from the bridge toward the mine headframes.",
+      visibility: "public",
+    },
+    {
+      key: "conn-wood-cinder",
+      fromLocationKey: "loc-whispering-wood",
+      toLocationKey: "loc-cinder-camp",
+      description: "A smoke-blackened path pushes through the bracken to the burned steading.",
+      visibility: "public",
+    },
+    {
+      key: "conn-cinder-wood",
+      fromLocationKey: "loc-cinder-camp",
+      toLocationKey: "loc-whispering-wood",
+      description: "The bracken path leads back out of the clearing toward the pines.",
+      visibility: "public",
+    },
   ],
   factions: [
     {
@@ -220,7 +341,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       description:
         "The elected village council, responsible for the ward-stones, the grain store, and the palisade. Cautious, underfunded, and genuinely responsible for the people of the Reach.",
       visibility: "public",
-      gmNotes: "The council is split between paying off the goblins and asking the Wardens to burn the camp. Mayor Fenn fears either choice makes the Reach look weak.",
+      gmNotes:
+        "The council is split between paying off the goblins and asking the Wardens to burn the camp. Mayor Fenn fears either choice makes the Reach look weak.",
     },
     {
       key: "faction-river-traders",
@@ -228,7 +350,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       description:
         "Charcoal burners, ore carters, and barge families who keep the river road open. They profit from the mine and lose most when the road is closed.",
       visibility: "public",
-      gmNotes: "Mara Voss has quietly paid the cinder goblins a toll before and will do it again if the party proves unreliable.",
+      gmNotes:
+        "Mara Voss has quietly paid the cinder goblins a toll before and will do it again if the party proves unreliable.",
     },
     {
       key: "faction-hollow-wardens",
@@ -236,7 +359,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       description:
         "A small frontier militia and survey corps who maintain the warding stones and patrol the wood. They answer to the council but act on their own judgment in the field.",
       visibility: "public",
-      gmNotes: "Warden Thorn believes the ward-stones are failing because something beneath the Greyvein seam is waking, not because of the goblins.",
+      gmNotes:
+        "Warden Thorn believes the ward-stones are failing because something beneath the Greyvein seam is waking, not because of the goblins.",
     },
   ],
   npcs: [
@@ -244,21 +368,25 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       key: "npc-mayor-edda",
       name: "Mayor Edda Fenn",
       archetype: "Frontier mayor",
-      description: "A weathered, practical mayor who has held Hollowford together through three bad winters and is running out of patience with the goblins.",
+      description:
+        "A weathered, practical mayor who has held Hollowford together through three bad winters and is running out of patience with the goblins.",
       visibility: "public",
       locationKey: "loc-hollowford",
       factionKeys: ["faction-hollowford-council"],
-      privateGoals: "Keep the Reach independent and fed. She has already quietly emptied the grain store to buy one month of quiet from the camp.",
+      privateGoals:
+        "Keep the Reach independent and fed. She has already quietly emptied the grain store to buy one month of quiet from the camp.",
     },
     {
       key: PLAYTEST_WORLD_VENDOR_NPC_KEY,
       name: "Bran Ironhand",
       archetype: "Village smith and vendor",
-      description: "A broad, laconic smith who repairs tools, shoes horses, and sells simple field gear from a stall at the Market Cross.",
+      description:
+        "A broad, laconic smith who repairs tools, shoes horses, and sells simple field gear from a stall at the Market Cross.",
       visibility: "public",
       locationKey: "loc-market-cross",
       factionKeys: ["faction-river-traders"],
-      privateGoals: "Keep his forge lit; he owes the League a favour and dislikes being reminded of it. He will trade fairly with anyone who pays in coin.",
+      privateGoals:
+        "Keep his forge lit; he owes the League a favour and dislikes being reminded of it. He will trade fairly with anyone who pays in coin.",
     },
     {
       key: "npc-trader-mara",
@@ -274,7 +402,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       key: "npc-herbalist-nia",
       name: "Nia Willow",
       archetype: "Herbalist",
-      description: "A quiet herbalist who gathers from the marsh edge and treats miners and militia alike, often for no coin.",
+      description:
+        "A quiet herbalist who gathers from the marsh edge and treats miners and militia alike, often for no coin.",
       visibility: "public",
       locationKey: "loc-hollowford",
       factionKeys: [],
@@ -284,7 +413,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       key: "npc-innkeeper-tom",
       name: "Tom Barley",
       archetype: "Innkeeper",
-      description: "The cheerful, endlessly talking keeper of the Hollowford common hall, and its best source of rumor.",
+      description:
+        "The cheerful, endlessly talking keeper of the Hollowford common hall, and its best source of rumor.",
       visibility: "public",
       locationKey: "loc-hollowford",
       factionKeys: ["faction-hollowford-council"],
@@ -294,31 +424,37 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       key: "npc-warden-kael",
       name: "Kael Thorn",
       archetype: "Warden captain",
-      description: "A scarred, deliberate patrol captain who would rather walk a trail twice than fight once on bad ground.",
+      description:
+        "A scarred, deliberate patrol captain who would rather walk a trail twice than fight once on bad ground.",
       visibility: "public",
       locationKey: "loc-warden-tower",
       factionKeys: ["faction-hollow-wardens"],
-      privateGoals: "Find the lost patrol and prove the goblins are not the real threat. He suspects a deeper seam under Greyvein.",
+      privateGoals:
+        "Find the lost patrol and prove the goblins are not the real threat. He suspects a deeper seam under Greyvein.",
     },
     {
       key: "npc-scholar-orin",
       name: "Orin Vale",
       archetype: "Warden archivist",
-      description: "A fussy, bookish surveyor who can date a ward-stone by its carving and complains constantly about the damp.",
+      description:
+        "A fussy, bookish surveyor who can date a ward-stone by its carving and complains constantly about the damp.",
       visibility: "public",
       locationKey: "loc-warden-tower",
       factionKeys: ["faction-hollow-wardens"],
-      privateGoals: "Complete the Reach survey before his eyes give out. He has hidden the most valuable map from the council.",
+      privateGoals:
+        "Complete the Reach survey before his eyes give out. He has hidden the most valuable map from the council.",
     },
     {
       key: "npc-ferryman-pell",
       name: "Pell Marsh",
       archetype: "Marsh ferryman",
-      description: "A taciturn old boatman who poles the marsh channels and says little even when he has seen a great deal.",
+      description:
+        "A taciturn old boatman who poles the marsh channels and says little even when he has seen a great deal.",
       visibility: "public",
       locationKey: "loc-salt-marsh",
       factionKeys: ["faction-river-traders"],
-      privateGoals: "Avoid whatever is dredging the channel at night. He has seen a lantern-bearer who cast no reflection.",
+      privateGoals:
+        "Avoid whatever is dredging the channel at night. He has seen a lantern-bearer who cast no reflection.",
     },
     {
       key: "npc-sister-anabel",
@@ -328,13 +464,15 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       visibility: "public",
       locationKey: "loc-ruined-chapel",
       factionKeys: [],
-      privateGoals: "Re-consecrate the crypt before what is buried there wakes. She knows the warding knots are a set of nine.",
+      privateGoals:
+        "Re-consecrate the crypt before what is buried there wakes. She knows the warding knots are a set of nine.",
     },
     {
       key: "npc-miner-gregor",
       name: "Gregor Stone",
       archetype: "Mine foreman",
-      description: "A stubborn foreman who came up out of the Greyvein before the flood and has been organizing a rescue ever since.",
+      description:
+        "A stubborn foreman who came up out of the Greyvein before the flood and has been organizing a rescue ever since.",
       visibility: "public",
       locationKey: "loc-greyvein-mine",
       factionKeys: ["faction-river-traders"],
@@ -351,9 +489,27 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       locationKeys: ["loc-cinder-camp", "loc-warden-tower"],
       journalText: "Warden Thorn will accept a report on the camp's strength before the council votes.",
       objectives: [
-        { key: "obj-scout-camp", description: "Observe the camp and count its sentries", targetProgress: 1, dependencyObjectiveKeys: [], visibility: "public" },
-        { key: "obj-identify-supplier", description: "Identify who has been supplying Reach iron", targetProgress: 1, dependencyObjectiveKeys: ["obj-scout-camp"], visibility: "public" },
-        { key: "obj-resolve-camp", description: "Resolve the camp threat", targetProgress: 1, dependencyObjectiveKeys: ["obj-scout-camp"], visibility: "public" },
+        {
+          key: "obj-scout-camp",
+          description: "Observe the camp and count its sentries",
+          targetProgress: 1,
+          dependencyObjectiveKeys: [],
+          visibility: "public",
+        },
+        {
+          key: "obj-identify-supplier",
+          description: "Identify who has been supplying Reach iron",
+          targetProgress: 1,
+          dependencyObjectiveKeys: ["obj-scout-camp"],
+          visibility: "public",
+        },
+        {
+          key: "obj-resolve-camp",
+          description: "Resolve the camp threat",
+          targetProgress: 1,
+          dependencyObjectiveKeys: ["obj-scout-camp"],
+          visibility: "public",
+        },
       ],
       rewards: [
         { key: "rew-camp-xp", label: "Camp resolved", kind: "xp", amount: 300, visibility: "public" },
@@ -369,13 +525,37 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       locationKeys: ["loc-greyvein-mine", "loc-hollowford"],
       journalText: "Nia Willow's brother is among the missing. She will lend supplies to anyone who goes down.",
       objectives: [
-        { key: "obj-open-winch-house", description: "Gain entry to the barred winch house", targetProgress: 1, dependencyObjectiveKeys: [], visibility: "public" },
-        { key: "obj-search-galleries", description: "Search the upper galleries", targetProgress: 2, dependencyObjectiveKeys: ["obj-open-winch-house"], visibility: "public" },
-        { key: "obj-report-miners", description: "Report the miners' fate to the village", targetProgress: 1, dependencyObjectiveKeys: ["obj-search-galleries"], visibility: "public" },
+        {
+          key: "obj-open-winch-house",
+          description: "Gain entry to the barred winch house",
+          targetProgress: 1,
+          dependencyObjectiveKeys: [],
+          visibility: "public",
+        },
+        {
+          key: "obj-search-galleries",
+          description: "Search the upper galleries",
+          targetProgress: 2,
+          dependencyObjectiveKeys: ["obj-open-winch-house"],
+          visibility: "public",
+        },
+        {
+          key: "obj-report-miners",
+          description: "Report the miners' fate to the village",
+          targetProgress: 1,
+          dependencyObjectiveKeys: ["obj-search-galleries"],
+          visibility: "public",
+        },
       ],
       rewards: [
         { key: "rew-miners-xp", label: "Rescue completed", kind: "xp", amount: 250, visibility: "public" },
-        { key: "rew-miners-supplies", label: "Herbalist's supplies", kind: "custom", amount: null, visibility: "public" },
+        {
+          key: "rew-miners-supplies",
+          label: "Herbalist's supplies",
+          kind: "custom",
+          amount: null,
+          visibility: "public",
+        },
       ],
     },
     {
@@ -386,10 +566,24 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       visibility: "public",
       locationKeys: ["loc-old-mill"],
       objectives: [
-        { key: "obj-inspect-wheel", description: "Inspect the bound water wheel", targetProgress: 1, dependencyObjectiveKeys: [], visibility: "public" },
-        { key: "obj-clear-loft", description: "Clear whatever nests in the grain loft", targetProgress: 1, dependencyObjectiveKeys: ["obj-inspect-wheel"], visibility: "public" },
+        {
+          key: "obj-inspect-wheel",
+          description: "Inspect the bound water wheel",
+          targetProgress: 1,
+          dependencyObjectiveKeys: [],
+          visibility: "public",
+        },
+        {
+          key: "obj-clear-loft",
+          description: "Clear whatever nests in the grain loft",
+          targetProgress: 1,
+          dependencyObjectiveKeys: ["obj-inspect-wheel"],
+          visibility: "public",
+        },
       ],
-      rewards: [{ key: "rew-mill-coin", label: "Innkeeper's purse", kind: "currency", amount: 15, visibility: "public" }],
+      rewards: [
+        { key: "rew-mill-coin", label: "Innkeeper's purse", kind: "currency", amount: 15, visibility: "public" },
+      ],
     },
     {
       key: "quest-river-road-bandits",
@@ -399,8 +593,20 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       visibility: "public",
       locationKeys: ["loc-stonebridge", "loc-salt-marsh"],
       objectives: [
-        { key: "obj-find-bandits", description: "Find the bandit camp or its lookout", targetProgress: 1, dependencyObjectiveKeys: [], visibility: "public" },
-        { key: "obj-clear-road", description: "Clear the river road for the ore carts", targetProgress: 1, dependencyObjectiveKeys: ["obj-find-bandits"], visibility: "public" },
+        {
+          key: "obj-find-bandits",
+          description: "Find the bandit camp or its lookout",
+          targetProgress: 1,
+          dependencyObjectiveKeys: [],
+          visibility: "public",
+        },
+        {
+          key: "obj-clear-road",
+          description: "Clear the river road for the ore carts",
+          targetProgress: 1,
+          dependencyObjectiveKeys: ["obj-find-bandits"],
+          visibility: "public",
+        },
       ],
       rewards: [
         { key: "rew-road-coin", label: "League escort fee", kind: "currency", amount: 20, visibility: "public" },
@@ -415,9 +621,27 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       visibility: "public",
       locationKeys: ["loc-ruined-chapel"],
       objectives: [
-        { key: "obj-learn-knots", description: "Learn the order of the nine warding knots", targetProgress: 1, dependencyObjectiveKeys: [], visibility: "public" },
-        { key: "obj-enter-crypt", description: "Enter the chapel crypt", targetProgress: 1, dependencyObjectiveKeys: ["obj-learn-knots"], visibility: "public" },
-        { key: "obj-restore-relic", description: "Restore the warding relic", targetProgress: 1, dependencyObjectiveKeys: ["obj-enter-crypt"], visibility: "public" },
+        {
+          key: "obj-learn-knots",
+          description: "Learn the order of the nine warding knots",
+          targetProgress: 1,
+          dependencyObjectiveKeys: [],
+          visibility: "public",
+        },
+        {
+          key: "obj-enter-crypt",
+          description: "Enter the chapel crypt",
+          targetProgress: 1,
+          dependencyObjectiveKeys: ["obj-learn-knots"],
+          visibility: "public",
+        },
+        {
+          key: "obj-restore-relic",
+          description: "Restore the warding relic",
+          targetProgress: 1,
+          dependencyObjectiveKeys: ["obj-enter-crypt"],
+          visibility: "public",
+        },
       ],
       rewards: [
         { key: "rew-relic-xp", label: "Crypt sealed", kind: "xp", amount: 200, visibility: "public" },
@@ -437,7 +661,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
       objectives: ["Break the outer picket", "Prevent an alarm from reaching the main fire"],
       terrain: ["Snare-lines", "Burning timber", "Chokepoint gate"],
       escalation: ["More goblins from the main fire", "A hooded messenger slips away"],
-      resolution: "A quick, quiet win keeps the camp confused; a loud one turns it into a running fight through the bracken.",
+      resolution:
+        "A quick, quiet win keeps the camp confused; a loud one turns it into a running fight through the bracken.",
       enemyReferences: [srdEnemy("srd-5.1:enemy-template:goblin")],
       monsterConceptKeys: [],
     },
@@ -461,7 +686,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "clue-cracked-wardstone",
       title: "The Cracked Ward-Stone",
-      description: "The village well's ward-stone is split along a line that runs toward the wood, not with the grain of the rock.",
+      description:
+        "The village well's ward-stone is split along a line that runs toward the wood, not with the grain of the rock.",
       visibility: "public",
       locationKey: "loc-hollowford",
       revealsStoryNodeKey: "story-failing-wards",
@@ -469,7 +695,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "clue-reach-iron",
       title: "Reach-Made Iron",
-      description: "Goblin arrowheads and tool-heads are stamped with Greyvein assay marks; someone is trading the Reach's own iron to the camp.",
+      description:
+        "Goblin arrowheads and tool-heads are stamped with Greyvein assay marks; someone is trading the Reach's own iron to the camp.",
       visibility: "public",
       locationKey: PLAYTEST_WORLD_ENCOUNTER_ANCHOR_KEY,
       revealsStoryNodeKey: "story-supplier",
@@ -477,7 +704,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "clue-bound-wheel",
       title: "New Cord on an Old Wheel",
-      description: "The mill wheel is bound with fresh, tarred cord and turned by a hidden counterweight, not by the river.",
+      description:
+        "The mill wheel is bound with fresh, tarred cord and turned by a hidden counterweight, not by the river.",
       visibility: "public",
       locationKey: "loc-old-mill",
       revealsStoryNodeKey: "story-failing-wards",
@@ -485,7 +713,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "clue-older-seam",
       title: "A Seam Older Than the Mine",
-      description: "Below the Greyvein galleries is a worked seam cut with the same nine-knot pattern as the ward-stones.",
+      description:
+        "Below the Greyvein galleries is a worked seam cut with the same nine-knot pattern as the ward-stones.",
       visibility: "public",
       locationKey: "loc-greyvein-mine",
       revealsStoryNodeKey: "story-deep-seam",
@@ -493,7 +722,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "clue-dredged-channel",
       title: "A Dredged Channel",
-      description: "Someone has cleared a channel through the marsh reeds by night, wide enough for a flat boat and a heavy crate.",
+      description:
+        "Someone has cleared a channel through the marsh reeds by night, wide enough for a flat boat and a heavy crate.",
       visibility: "public",
       locationKey: "loc-salt-marsh",
       revealsStoryNodeKey: "story-supplier",
@@ -501,7 +731,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "clue-nine-knots",
       title: "The Order of the Nine Knots",
-      description: "Sister Anabel can read the chapel carvings: nine warding knots bound in a ring, and one of the nine has been cut.",
+      description:
+        "Sister Anabel can read the chapel carvings: nine warding knots bound in a ring, and one of the nine has been cut.",
       visibility: "public",
       locationKey: "loc-ruined-chapel",
       revealsStoryNodeKey: "story-deep-seam",
@@ -511,19 +742,22 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "story-failing-wards",
       title: "The Failing Wards",
-      description: "The Reach's warding stones are cracking and the old mill turns against the current: the frontier's protections are coming apart.",
+      description:
+        "The Reach's warding stones are cracking and the old mill turns against the current: the frontier's protections are coming apart.",
       visibility: "public",
     },
     {
       key: "story-supplier",
       title: "Someone Arming the Camp",
-      description: "Reach iron and a dredged channel point to a supplier who wants the goblins strong and the road closed.",
+      description:
+        "Reach iron and a dredged channel point to a supplier who wants the goblins strong and the road closed.",
       visibility: "public",
     },
     {
       key: "story-deep-seam",
       title: "The Deep Seam",
-      description: "The Greyvein galleries broke into an older worked seam marked with the same nine-knot wards as the chapel and the stones.",
+      description:
+        "The Greyvein galleries broke into an older worked seam marked with the same nine-knot wards as the chapel and the stones.",
       visibility: "public",
     },
     {
@@ -546,19 +780,53 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     },
   ],
   storyRelationships: [
-    { key: "edge-wards-deep", fromStoryNodeKey: "story-failing-wards", toStoryNodeKey: "story-deep-seam", description: "The cracked stones and the bound wheel both point down into the old seam.", visibility: "public" },
-    { key: "edge-supplier-camp", fromStoryNodeKey: "story-supplier", toStoryNodeKey: "story-cinder-camp", description: "The Reach iron ties the supplier to the camp's growing strength.", visibility: "public" },
-    { key: "edge-deep-patron", fromStoryNodeKey: "story-deep-seam", toStoryNodeKey: "story-hidden-patron", description: "The older seam is why someone is quietly arming the camp.", visibility: "gm" },
-    { key: "edge-patron-wakes", fromStoryNodeKey: "story-hidden-patron", toStoryNodeKey: "story-what-wakes", description: "The patron's real aim is to break the last knots.", visibility: "gm" },
-    { key: "edge-camp-deep", fromStoryNodeKey: "story-cinder-camp", toStoryNodeKey: "story-deep-seam", description: "The camp sits on the road to the old seam.", visibility: "public" },
+    {
+      key: "edge-wards-deep",
+      fromStoryNodeKey: "story-failing-wards",
+      toStoryNodeKey: "story-deep-seam",
+      description: "The cracked stones and the bound wheel both point down into the old seam.",
+      visibility: "public",
+    },
+    {
+      key: "edge-supplier-camp",
+      fromStoryNodeKey: "story-supplier",
+      toStoryNodeKey: "story-cinder-camp",
+      description: "The Reach iron ties the supplier to the camp's growing strength.",
+      visibility: "public",
+    },
+    {
+      key: "edge-deep-patron",
+      fromStoryNodeKey: "story-deep-seam",
+      toStoryNodeKey: "story-hidden-patron",
+      description: "The older seam is why someone is quietly arming the camp.",
+      visibility: "gm",
+    },
+    {
+      key: "edge-patron-wakes",
+      fromStoryNodeKey: "story-hidden-patron",
+      toStoryNodeKey: "story-what-wakes",
+      description: "The patron's real aim is to break the last knots.",
+      visibility: "gm",
+    },
+    {
+      key: "edge-camp-deep",
+      fromStoryNodeKey: "story-cinder-camp",
+      toStoryNodeKey: "story-deep-seam",
+      description: "The camp sits on the road to the old seam.",
+      visibility: "public",
+    },
   ],
   lore: [
     {
       key: "rumor-cinder-smoke",
       title: "Rumor: Smoke Over the Wood",
-      summary: "Around the Market Cross they say the cinder camp burns all night and that its goblins answer to a voice that is not goblin.",
+      summary:
+        "Around the Market Cross they say the cinder camp burns all night and that its goblins answer to a voice that is not goblin.",
       visibility: "public",
-      details: ["The camp was a shepherd's steading before it burned.", "Hunters have seen a hooded figure on the marsh path."],
+      details: [
+        "The camp was a shepherd's steading before it burned.",
+        "Hunters have seen a hooded figure on the marsh path.",
+      ],
       locationKeys: ["loc-market-cross"],
       factionKeys: ["faction-river-traders"],
       storyNodeKeys: ["story-cinder-camp"],
@@ -566,7 +834,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "rumor-mill-light",
       title: "Rumor: A Light in the Mill",
-      summary: "Tom Barley swears a lamp moves through the old mill at night, and that the wheel turns upstream when it does.",
+      summary:
+        "Tom Barley swears a lamp moves through the old mill at night, and that the wheel turns upstream when it does.",
       visibility: "public",
       details: ["The last miller drowned in the tailrace.", "The wheel's binding cord is new, not river-worn."],
       locationKeys: ["loc-old-mill", "loc-hollowford"],
@@ -576,7 +845,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "rumor-mine-bell",
       title: "Rumor: The Mine Bell Rings Alone",
-      summary: "The Greyvein rescue bell has rung twice with no one at the winch house, and the miners' families are losing hope.",
+      summary:
+        "The Greyvein rescue bell has rung twice with no one at the winch house, and the miners' families are losing hope.",
       visibility: "public",
       details: ["The winch house is barred from the inside.", "The foreman's log ends mid-sentence."],
       locationKeys: ["loc-greyvein-mine"],
@@ -586,7 +856,8 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "rumor-river-toll",
       title: "Rumor: A Toll on the River Road",
-      summary: "Carters whisper that the League has been paying the goblins to leave the ore carts alone, and that the payments are late.",
+      summary:
+        "Carters whisper that the League has been paying the goblins to leave the ore carts alone, and that the payments are late.",
       visibility: "public",
       details: ["Mara Voss's carts have been stopped twice.", "The council will not talk about the grain store."],
       locationKeys: ["loc-stonebridge", "loc-salt-marsh"],
@@ -596,9 +867,13 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "rumor-chapel-knots",
       title: "Rumor: The Ninth Knot Is Cut",
-      summary: "Sister Anabel will tell anyone who asks that the chapel carvings show nine warding knots, and that one has been deliberately cut.",
+      summary:
+        "Sister Anabel will tell anyone who asks that the chapel carvings show nine warding knots, and that one has been deliberately cut.",
       visibility: "public",
-      details: ["The crypt was bricked, then unbricked from within.", "The carving pattern matches the village ward-stone."],
+      details: [
+        "The crypt was bricked, then unbricked from within.",
+        "The carving pattern matches the village ward-stone.",
+      ],
       locationKeys: ["loc-ruined-chapel"],
       factionKeys: [],
       storyNodeKeys: ["story-failing-wards", "story-deep-seam"],
@@ -608,13 +883,15 @@ export const PLAYTEST_WORLD_CONTENT: GeneratedCampaignContentProvider = {
     {
       key: "handout-reach-map",
       title: "A Rough Map of the Reach",
-      content: "A charcoal sketch on oiled cloth marks the village, the crossing, the mill, the marsh, the chapel, the mine, and the cairn trail into the wood. Someone has ringed the goblin camp and drawn a question mark beside the mine.",
+      content:
+        "A charcoal sketch on oiled cloth marks the village, the crossing, the mill, the marsh, the chapel, the mine, and the cairn trail into the wood. Someone has ringed the goblin camp and drawn a question mark beside the mine.",
       visibility: "public",
     },
     {
       key: "handout-warden-muster",
       title: "Warden Muster Notice",
-      content: "A notice nailed to the tower door: able bodies are asked to report to Captain Thorn before the first frost, with or without their own steel.",
+      content:
+        "A notice nailed to the tower door: able bodies are asked to report to Captain Thorn before the first frost, with or without their own steel.",
       visibility: "public",
     },
   ],

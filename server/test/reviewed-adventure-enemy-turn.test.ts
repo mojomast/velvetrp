@@ -26,28 +26,51 @@ describe("reviewed adventure enemy-first combat", () => {
     const fixture = await createReviewedAdventure(makeTmpDataDir(), { prepareOptionalEncounter: false, rng });
     const repo = fixture.repo;
     try {
-      const enemy = SRD_5_1_STARTER_CATALOG.definitions.find((definition) =>
-        definition.reference.definitionId === "srd-5.1:enemy-template:goblin")!.reference as {
-          kind: "enemy-template"; packId: string; packVersion: string; definitionId: string;
-        };
+      const enemy = SRD_5_1_STARTER_CATALOG.definitions.find(
+        (definition) => definition.reference.definitionId === "srd-5.1:enemy-template:goblin",
+      )!.reference as {
+        kind: "enemy-template";
+        packId: string;
+        packVersion: string;
+        definitionId: string;
+      };
       draws.push(5, 0, 15, 0);
-      const created = repo.createEncounter(OWNER, fixture.campaignId, { sessionId: fixture.sessionId, name: "Goblin Ambush",
-        combatants: [{ kind: "actor", actorId: fixture.actorId, team: "allies" },
-          { kind: "enemy", template: enemy, team: "enemies" }], idempotencyKey: "goblin-ambush-create" });
+      const created = repo.createEncounter(OWNER, fixture.campaignId, {
+        sessionId: fixture.sessionId,
+        name: "Goblin Ambush",
+        combatants: [
+          { kind: "actor", actorId: fixture.actorId, team: "allies" },
+          { kind: "enemy", template: enemy, team: "enemies" },
+        ],
+        idempotencyKey: "goblin-ambush-create",
+      });
       const encounterId = created.encounter.encounterId;
-      repo.startEncounter(OWNER, encounterId, { expectedRevision: created.receipt.revisionAfter, idempotencyKey: "goblin-ambush-start" });
+      repo.startEncounter(OWNER, encounterId, {
+        expectedRevision: created.receipt.revisionAfter,
+        idempotencyKey: "goblin-ambush-start",
+      });
       const started = repo.getCombatState(OWNER, encounterId)!;
       const goblinId = started.currentCombatant!;
-      expect(started.combatants.find((combatant) => combatant.combatantId === goblinId)).toMatchObject({ kind: "enemy" });
+      expect(started.combatants.find((combatant) => combatant.combatantId === goblinId)).toMatchObject({
+        kind: "enemy",
+      });
       const actorCombatantId = started.combatants.find((combatant) => combatant.kind === "actor")!.combatantId;
 
       const campaign = repo.getCampaign(OWNER, fixture.campaignId)!;
       const administration = repo.getCampaignAdministration(OWNER, fixture.campaignId)!;
-      const turn = repo.createAdventureTurn(OWNER, { campaignId: fixture.campaignId, timelineId: campaign.activeTimelineId,
-        sessionId: fixture.sessionId, actorId: fixture.actorId, declaration: "I raise my longsword against the goblin.",
-        expectedCampaignRevision: administration.revision, idempotencyKey: "enemy-first-turn" });
-      const snapshot = repo.getCampaignAgentContextSnapshot(OWNER, fixture.campaignId, fixture.sessionId,
-        { kind: "enemy", combatantId: goblinId });
+      const turn = repo.createAdventureTurn(OWNER, {
+        campaignId: fixture.campaignId,
+        timelineId: campaign.activeTimelineId,
+        sessionId: fixture.sessionId,
+        actorId: fixture.actorId,
+        declaration: "I raise my longsword against the goblin.",
+        expectedCampaignRevision: administration.revision,
+        idempotencyKey: "enemy-first-turn",
+      });
+      const snapshot = repo.getCampaignAgentContextSnapshot(OWNER, fixture.campaignId, fixture.sessionId, {
+        kind: "enemy",
+        combatantId: goblinId,
+      });
       expect(snapshot?.ruleset?.id).toBe("dnd-5e");
       expect(snapshot?.encounter).toMatchObject({ currentCombatantId: goblinId, currentCombatantKind: "enemy" });
 

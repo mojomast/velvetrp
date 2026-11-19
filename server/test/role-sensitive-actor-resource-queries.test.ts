@@ -19,30 +19,42 @@ function seed() {
   createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }).close();
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys = ON");
-  db.prepare(`INSERT INTO principals VALUES
+  db.prepare(
+    `INSERT INTO principals VALUES
     ('gm', 'GM', 0), ('player', 'Player', 0), ('observer', 'Observer', 0),
-    ('nonmember', 'Nonmember', 0), ('application-only', 'Application only', 0)`).run();
+    ('nonmember', 'Nonmember', 0), ('application-only', 'Application only', 0)`,
+  ).run();
   db.prepare("UPDATE application_owner SET principal_id = 'application-only' WHERE singleton = 1").run();
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at) VALUES
       ('campaign-one', 'One', 'timeline-one', 'local-owner', ?, ?),
-      ('campaign-two', 'Two', 'timeline-two', 'local-owner', ?, ?)`).run(BEFORE, BEFORE, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES
-      ('timeline-one', 'campaign-one', ?), ('timeline-two', 'campaign-two', ?)`).run(BEFORE, BEFORE);
-    db.prepare(`INSERT INTO campaign_memberships VALUES
+      ('campaign-two', 'Two', 'timeline-two', 'local-owner', ?, ?)`,
+    ).run(BEFORE, BEFORE, BEFORE, BEFORE);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES
+      ('timeline-one', 'campaign-one', ?), ('timeline-two', 'campaign-two', ?)`,
+    ).run(BEFORE, BEFORE);
+    db.prepare(
+      `INSERT INTO campaign_memberships VALUES
       ('campaign-one', 'local-owner', 'owner', ?), ('campaign-one', 'gm', 'gm', ?),
       ('campaign-one', 'player', 'player', ?), ('campaign-one', 'observer', 'observer', ?),
-      ('campaign-two', 'local-owner', 'owner', ?)`).run(BEFORE, BEFORE, BEFORE, BEFORE, BEFORE);
+      ('campaign-two', 'local-owner', 'owner', ?)`,
+    ).run(BEFORE, BEFORE, BEFORE, BEFORE, BEFORE);
   })();
-  db.prepare(`INSERT INTO characters VALUES
+  db.prepare(
+    `INSERT INTO characters VALUES
     ('persona-one', 'One', 30, 'hero', '', 1, 0, ?),
     ('persona-empty', 'Empty', 30, 'hero', '', 1, 0, ?),
-    ('persona-two', 'Two', 30, 'hero', '', 1, 0, ?)`).run(BEFORE, BEFORE, BEFORE);
+    ('persona-two', 'Two', 30, 'hero', '', 1, 0, ?)`,
+  ).run(BEFORE, BEFORE, BEFORE);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Description', '[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core', '1', 'profile', 'Core', 'Description', '[]', 0)").run();
   db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', 'race', 'human', 'Human', 'Description', '[]')").run();
-  db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', 'background', 'sage', 'Sage', 'Description', '[]')").run();
+  db.prepare(
+    "INSERT INTO rpg_definitions VALUES ('core', '1', 'background', 'sage', 'Sage', 'Description', '[]')",
+  ).run();
   db.prepare("UPDATE rpg_content_packs SET sealed = 1").run();
   for (const campaign of ["campaign-one", "campaign-two"]) {
     db.prepare("INSERT INTO campaign_rules_profiles VALUES (?, 'profile')").run(campaign);
@@ -53,22 +65,33 @@ function seed() {
     ["empty", "campaign-one", "persona-empty"],
     ["two", "campaign-two", "persona-two"],
   ]) {
-    db.prepare("INSERT INTO campaign_characters VALUES (?, ?, ?, ?, ?)")
-      .run(`cc-${suffix}`, campaign, persona, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO rpg_campaign_sheets VALUES
-      (?, ?, ?, 'core', '1', 'race', 'human', 'core', '1', 'background', 'sage', ?, ?)`)
-      .run(`sheet-${suffix}`, campaign, `cc-${suffix}`, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO campaign_actors
-      VALUES (?, ?, ?, ?, 'player-character', 'principal', ?, ?)`)
-      .run(`actor-${suffix}`, campaign, `cc-${suffix}`, `sheet-${suffix}`, BEFORE, BEFORE);
-    db.prepare("INSERT INTO campaign_actor_private_state VALUES (?, ?, 'local-owner', 'secret')")
-      .run(`actor-${suffix}`, campaign);
+    db.prepare("INSERT INTO campaign_characters VALUES (?, ?, ?, ?, ?)").run(
+      `cc-${suffix}`,
+      campaign,
+      persona,
+      BEFORE,
+      BEFORE,
+    );
+    db.prepare(
+      `INSERT INTO rpg_campaign_sheets VALUES
+      (?, ?, ?, 'core', '1', 'race', 'human', 'core', '1', 'background', 'sage', ?, ?)`,
+    ).run(`sheet-${suffix}`, campaign, `cc-${suffix}`, BEFORE, BEFORE);
+    db.prepare(
+      `INSERT INTO campaign_actors
+      VALUES (?, ?, ?, ?, 'player-character', 'principal', ?, ?)`,
+    ).run(`actor-${suffix}`, campaign, `cc-${suffix}`, `sheet-${suffix}`, BEFORE, BEFORE);
+    db.prepare("INSERT INTO campaign_actor_private_state VALUES (?, ?, 'local-owner', 'secret')").run(
+      `actor-${suffix}`,
+      campaign,
+    );
   }
-  db.prepare(`INSERT INTO rpg_actor_resources VALUES
+  db.prepare(
+    `INSERT INTO rpg_actor_resources VALUES
     ('campaign-one', 'actor-one', 'hp', 7, 10),
     ('campaign-one', 'actor-one', 'HP', 0, 0),
     ('campaign-one', 'actor-one', 'mana.1', 1000000, 1000000),
-    ('campaign-two', 'actor-two', 'hp', 1, 2)`).run();
+    ('campaign-two', 'actor-two', 'hp', 1, 2)`,
+  ).run();
   db.close();
   return createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
 }
@@ -108,7 +131,10 @@ describe("role-sensitive actor resource queries", () => {
   });
 
   it.each([
-    ["membership role", "UPDATE campaign_memberships SET role = 'administrator' WHERE campaign_id = 'campaign-one' AND principal_id = 'observer'"],
+    [
+      "membership role",
+      "UPDATE campaign_memberships SET role = 'administrator' WHERE campaign_id = 'campaign-one' AND principal_id = 'observer'",
+    ],
     ["principal parent", "DELETE FROM principals WHERE id = 'observer'"],
     ["campaign parent", "DELETE FROM campaigns WHERE id = 'campaign-one'"],
   ])("requires an intact authorization %s", (_label, mutation) => {
@@ -116,7 +142,8 @@ describe("role-sensitive actor resource queries", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.pragma("ignore_check_constraints = ON");
-    if(mutation.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare(mutation).run();
+    if (mutation.startsWith("DELETE FROM campaigns")) deleteCampaignForCorruptionTest(db, "campaign-one");
+    db.prepare(mutation).run();
     db.close();
     expect(repository.listActorResources("observer", "campaign-one", "actor-one")).toEqual([]);
     expect(repository.getActorResource("observer", "campaign-one", "actor-one", "hp")).toBeNull();
@@ -130,10 +157,12 @@ describe("role-sensitive actor resource queries", () => {
     db.prepare("DELETE FROM campaign_actors WHERE id = 'actor-empty'").run();
     db.prepare("UPDATE campaign_actors SET sheet_id = 'sheet-empty' WHERE id = 'actor-one'").run();
     db.close();
-    expect(() => repository.listActorResources("observer", "campaign-one", "actor-one"))
-      .toThrow("actor resource root is incomplete");
-    expect(() => repository.getActorResource("observer", "campaign-one", "actor-one", "hp"))
-      .toThrow("actor resource root is incomplete");
+    expect(() => repository.listActorResources("observer", "campaign-one", "actor-one")).toThrow(
+      "actor resource root is incomplete",
+    );
+    expect(() => repository.getActorResource("observer", "campaign-one", "actor-one", "hp")).toThrow(
+      "actor resource root is incomplete",
+    );
     expect(repository.listActorResources("nonmember", "campaign-one", "actor-one")).toEqual([]);
     repository.close();
   });
@@ -142,12 +171,16 @@ describe("role-sensitive actor resource queries", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
-    db.prepare("UPDATE rpg_actor_resources SET campaign_id = 'campaign-two' WHERE actor_id = 'actor-one' AND name = 'hp'").run();
+    db.prepare(
+      "UPDATE rpg_actor_resources SET campaign_id = 'campaign-two' WHERE actor_id = 'actor-one' AND name = 'hp'",
+    ).run();
     db.close();
-    expect(() => repository.listActorResources("observer", "campaign-one", "actor-one"))
-      .toThrow("actor resource record is invalid");
-    expect(() => repository.getActorResource("observer", "campaign-one", "actor-one", "hp"))
-      .toThrow("actor resource record is invalid");
+    expect(() => repository.listActorResources("observer", "campaign-one", "actor-one")).toThrow(
+      "actor resource record is invalid",
+    );
+    expect(() => repository.getActorResource("observer", "campaign-one", "actor-one", "hp")).toThrow(
+      "actor resource record is invalid",
+    );
     expect(repository.listActorResources("nonmember", "campaign-one", "actor-one")).toEqual([]);
     expect(repository.getActorResource("nonmember", "campaign-one", "actor-one", "hp")).toBeNull();
     expect(repository.listActorResources("local-owner", "campaign-two", "actor-one")).toEqual([]);
@@ -178,10 +211,12 @@ describe("role-sensitive actor resource queries", () => {
     db.pragma("foreign_keys = OFF");
     db.prepare(mutation).run();
     db.close();
-    expect(() => repository.listActorResources("observer", "campaign-one", "actor-one"))
-      .toThrow("actor resource root is incomplete");
-    expect(() => repository.getActorResource("observer", "campaign-one", "actor-one", "hp"))
-      .toThrow("actor resource root is incomplete");
+    expect(() => repository.listActorResources("observer", "campaign-one", "actor-one")).toThrow(
+      "actor resource root is incomplete",
+    );
+    expect(() => repository.getActorResource("observer", "campaign-one", "actor-one", "hp")).toThrow(
+      "actor resource root is incomplete",
+    );
     expect(repository.listActorResources("nonmember", "campaign-one", "actor-one")).toEqual([]);
     expect(repository.getActorResource("nonmember", "campaign-one", "actor-one", "hp")).toBeNull();
     repository.close();
@@ -189,12 +224,21 @@ describe("role-sensitive actor resource queries", () => {
 
   it.each([
     ["invalid name", "UPDATE rpg_actor_resources SET name = '' WHERE actor_id = 'actor-one' AND name = 'hp'"],
-    ["embedded-NUL name", "UPDATE rpg_actor_resources SET name = char(104, 112, 0, 120) WHERE actor_id = 'actor-one' AND name = 'hp'"],
-    ["overlength name", `UPDATE rpg_actor_resources SET name = '${"x".repeat(129)}' WHERE actor_id = 'actor-one' AND name = 'hp'`],
+    [
+      "embedded-NUL name",
+      "UPDATE rpg_actor_resources SET name = char(104, 112, 0, 120) WHERE actor_id = 'actor-one' AND name = 'hp'",
+    ],
+    [
+      "overlength name",
+      `UPDATE rpg_actor_resources SET name = '${"x".repeat(129)}' WHERE actor_id = 'actor-one' AND name = 'hp'`,
+    ],
     ["text amount", "UPDATE rpg_actor_resources SET current = 'seven' WHERE actor_id = 'actor-one' AND name = 'hp'"],
     ["fractional amount", "UPDATE rpg_actor_resources SET current = 1.5 WHERE actor_id = 'actor-one' AND name = 'hp'"],
     ["negative current", "UPDATE rpg_actor_resources SET current = -1 WHERE actor_id = 'actor-one' AND name = 'hp'"],
-    ["overflow current", "UPDATE rpg_actor_resources SET current = 1000001 WHERE actor_id = 'actor-one' AND name = 'hp'"],
+    [
+      "overflow current",
+      "UPDATE rpg_actor_resources SET current = 1000001 WHERE actor_id = 'actor-one' AND name = 'hp'",
+    ],
     ["text max", "UPDATE rpg_actor_resources SET max = 'ten' WHERE actor_id = 'actor-one' AND name = 'hp'"],
     ["fractional max", "UPDATE rpg_actor_resources SET max = 10.5 WHERE actor_id = 'actor-one' AND name = 'hp'"],
     ["negative max", "UPDATE rpg_actor_resources SET max = -1 WHERE actor_id = 'actor-one' AND name = 'hp'"],
@@ -220,7 +264,9 @@ describe("role-sensitive actor resource queries", () => {
     const now = vi.fn(() => new Date(AT));
     const nextId = vi.fn(() => "unused");
     const repository = createRepository({
-      dataDir: process.env.VELVET_DATA_DIR as string, clock: { now }, ids: { nextId },
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      clock: { now },
+      ids: { nextId },
     });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
@@ -241,7 +287,9 @@ describe("role-sensitive actor resource queries", () => {
         expect(sql).toMatch(/JOIN campaigns/);
         expect(sql).toMatch(/LEFT JOIN campaign_characters/);
         expect(sql).toMatch(/LEFT JOIN rpg_campaign_sheets/);
-        expect(sql).not.toMatch(/private_notes|controller_principal_id|campaign_commands|campaign_events|command_receipts/i);
+        expect(sql).not.toMatch(
+          /private_notes|controller_principal_id|campaign_commands|campaign_events|command_receipts/i,
+        );
         expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE)\b/i);
         expect(transaction).not.toHaveBeenCalled();
         expect(now).not.toHaveBeenCalled();
@@ -259,21 +307,25 @@ describe("role-sensitive actor resource queries", () => {
     let expired: RepositoryUnitOfWork | undefined;
     repository.transaction((unit) => {
       expired = unit;
-      expect(unit.listActorResources("player", "campaign-one", "actor-one"))
-        .toEqual(repository.listActorResources("player", "campaign-one", "actor-one"));
+      expect(unit.listActorResources("player", "campaign-one", "actor-one")).toEqual(
+        repository.listActorResources("player", "campaign-one", "actor-one"),
+      );
       expect(unit.getActorResource("observer", "campaign-one", "actor-one", "hp")?.current).toBe(7);
     });
     expect(() => repository.listActorResources("bad actor", "campaign-one", "actor-one")).toThrow();
     expect(() => repository.getActorResource("observer", "campaign-one", "actor-one", "bad name")).toThrow();
-    expect(() => expired!.listActorResources("bad actor", "bad campaign", "bad actor"))
-      .toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getActorResource("bad actor", "bad campaign", "bad actor", "bad name"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.listActorResources("bad actor", "bad campaign", "bad actor")).toThrow(
+      "transaction unit of work is no longer active",
+    );
+    expect(() => expired!.getActorResource("bad actor", "bad campaign", "bad actor", "bad name")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     expect(repoModule).not.toHaveProperty("listActorResources");
     expect(repoModule).not.toHaveProperty("getActorResource");
     repository.close();
-    expect(() => repository.listActorResources("bad actor", "bad campaign", "bad actor"))
-      .toThrow("repository is closed");
+    expect(() => repository.listActorResources("bad actor", "bad campaign", "bad actor")).toThrow(
+      "repository is closed",
+    );
   });
 
   it("validates every argument before preparing SQL", () => {
@@ -305,29 +357,47 @@ describe("role-sensitive actor resource queries", () => {
     db.prepare("DELETE FROM rpg_actor_resources WHERE actor_id = 'actor-empty'").run();
     db.close();
     repository.executeInitializeActorResource("local-owner", {
-      commandId: "resource-command", idempotencyKey: "resource-key", campaignId: "campaign-one",
-      timelineId: "timeline-one", actorId: "actor-empty", expectedRevision: 0, sourceTurnId: null,
+      commandId: "resource-command",
+      idempotencyKey: "resource-key",
+      campaignId: "campaign-one",
+      timelineId: "timeline-one",
+      actorId: "actor-empty",
+      expectedRevision: 0,
+      sourceTurnId: null,
       command: { type: "initialize_actor_resource", payload: { name: "stamina", current: 3, max: 8 } },
     });
     expect(repository.getActorResource("observer", "campaign-one", "actor-empty", "stamina")?.current).toBe(3);
-    expect(repository.getCommandReceipt("observer", "campaign-one", "resource-command")?.events[0]?.data)
-      .toEqual({ name: "stamina", current: 3, max: 8 });
+    expect(repository.getCommandReceipt("observer", "campaign-one", "resource-command")?.events[0]?.data).toEqual({
+      name: "stamina",
+      current: 3,
+      max: 8,
+    });
     const mutate = new DatabaseDriver(dbPath());
-    mutate.prepare("UPDATE rpg_actor_resources SET current = 2 WHERE actor_id = 'actor-empty' AND name = 'stamina'").run();
+    mutate
+      .prepare("UPDATE rpg_actor_resources SET current = 2 WHERE actor_id = 'actor-empty' AND name = 'stamina'")
+      .run();
     mutate.close();
     expect(repository.getActorResource("observer", "campaign-one", "actor-empty", "stamina")?.current).toBe(2);
-    expect(repository.getCommandReceipt("observer", "campaign-one", "resource-command")?.events[0]?.data)
-      .toEqual({ name: "stamina", current: 3, max: 8 });
+    expect(repository.getCommandReceipt("observer", "campaign-one", "resource-command")?.events[0]?.data).toEqual({
+      name: "stamina",
+      current: 3,
+      max: 8,
+    });
 
     const removeState = new DatabaseDriver(dbPath());
     removeState.prepare("DELETE FROM rpg_actor_resources WHERE actor_id = 'actor-empty' AND name = 'stamina'").run();
     removeState.close();
     expect(repository.getActorResource("observer", "campaign-one", "actor-empty", "stamina")).toBeNull();
-    expect(repository.getCommandReceipt("observer", "campaign-one", "resource-command")?.events[0]?.data)
-      .toEqual({ name: "stamina", current: 3, max: 8 });
+    expect(repository.getCommandReceipt("observer", "campaign-one", "resource-command")?.events[0]?.data).toEqual({
+      name: "stamina",
+      current: 3,
+      max: 8,
+    });
 
     const removeAudit = new DatabaseDriver(dbPath());
-    removeAudit.prepare("INSERT INTO rpg_actor_resources VALUES ('campaign-one', 'actor-empty', 'stamina', 1, 8)").run();
+    removeAudit
+      .prepare("INSERT INTO rpg_actor_resources VALUES ('campaign-one', 'actor-empty', 'stamina', 1, 8)")
+      .run();
     removeAudit.exec(`
       DROP TRIGGER command_receipts_prevent_delete;
       DROP TRIGGER campaign_events_prevent_delete;
@@ -337,8 +407,13 @@ describe("role-sensitive actor resource queries", () => {
       DELETE FROM campaign_commands WHERE command_id = 'resource-command';
     `);
     removeAudit.close();
-    expect(repository.getActorResource("observer", "campaign-one", "actor-empty", "stamina"))
-      .toEqual({ campaignId: "campaign-one", actorId: "actor-empty", name: "stamina", current: 1, max: 8 });
+    expect(repository.getActorResource("observer", "campaign-one", "actor-empty", "stamina")).toEqual({
+      campaignId: "campaign-one",
+      actorId: "actor-empty",
+      name: "stamina",
+      current: 1,
+      max: 8,
+    });
     repository.close();
   });
 });

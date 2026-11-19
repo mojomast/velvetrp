@@ -79,7 +79,10 @@ export interface ScenePromptBuildOptions {
 }
 
 function isDmAudience(value: unknown): boolean {
-  return value === "dm" || (typeof value === "object" && value !== null && (value as { audience?: unknown }).audience === "dm");
+  return (
+    value === "dm" ||
+    (typeof value === "object" && value !== null && (value as { audience?: unknown }).audience === "dm")
+  );
 }
 
 function resolveAudience(options: ScenePromptBuildOptions | SceneAudience): SceneAudience {
@@ -136,7 +139,10 @@ function clipPrompt(prompt: string, maxChars: number): string {
  * Builds the image prompt in the fixed clause order. `audience` defaults to
  * `player` and may be passed directly or as `{ audience: "dm" }`.
  */
-export function buildScenePrompt(input: ScenePromptInput, options: ScenePromptBuildOptions | SceneAudience = {}): string {
+export function buildScenePrompt(
+  input: ScenePromptInput,
+  options: ScenePromptBuildOptions | SceneAudience = {},
+): string {
   const audience = resolveAudience(options);
   const location = cleanText(input.locationName);
   const focal = cleanText(input.focalFeature);
@@ -148,10 +154,14 @@ export function buildScenePrompt(input: ScenePromptInput, options: ScenePromptBu
     .filter((text) => text.length > 0);
 
   const clauses: string[] = [];
-  const subject = location.length > 0 && focal.length > 0 ? `${location} — ${focal}`
-    : location.length > 0 ? location
-      : focal.length > 0 ? `Focal feature: ${focal}`
-        : "";
+  const subject =
+    location.length > 0 && focal.length > 0
+      ? `${location} — ${focal}`
+      : location.length > 0
+        ? location
+        : focal.length > 0
+          ? `Focal feature: ${focal}`
+          : "";
   if (subject.length > 0) clauses.push(sentence(subject));
   if (composition.length > 0) clauses.push(sentence(composition));
   if (lighting.length > 0) clauses.push(sentence(lighting));
@@ -159,7 +169,9 @@ export function buildScenePrompt(input: ScenePromptInput, options: ScenePromptBu
   if (environment.length > 0) clauses.push(sentence(`Materials and environment: ${environment.join("; ")}`));
   clauses.push(sentence(`Campaign art style: ${cleanText(input.stylePhrase) || "consistent campaign art style"}`));
   clauses.push("One coherent scene with a strong silhouette and few recognizable features.");
-  clauses.push("At 256x256, favor clear composition over tiny objects, lettering, crowds, or complicated action; favor unoccupied scenery.");
+  clauses.push(
+    "At 256x256, favor clear composition over tiny objects, lettering, crowds, or complicated action; favor unoccupied scenery.",
+  );
 
   return clipPrompt(clauses.join(" "), SCENE_PROMPT_MAX_CHARS);
 }
@@ -202,9 +214,10 @@ export function scenePromptLengthReport(prompt: string): ScenePromptLengthReport
   const approximateTokens = estimateScenePromptTokens(clean);
   const tokenOverflow = approximateTokens > SCENE_PROMPT_MAX_ENCODER_TOKENS;
   const charOverflow = chars > SCENE_PROMPT_MAX_CHARS;
-  const warning = tokenOverflow || charOverflow
-    ? `Scene prompt is ${chars} characters and approximately ${approximateTokens} tokens (word heuristic, not tokenizer-accurate); the ${SCENE_PROMPT_MAX_ENCODER_TOKENS}-token image encoder may truncate it.`
-    : null;
+  const warning =
+    tokenOverflow || charOverflow
+      ? `Scene prompt is ${chars} characters and approximately ${approximateTokens} tokens (word heuristic, not tokenizer-accurate); the ${SCENE_PROMPT_MAX_ENCODER_TOKENS}-token image encoder may truncate it.`
+      : null;
   return {
     words,
     chars,
@@ -262,11 +275,15 @@ const VISIBLE_NAME_HINTS: ReadonlyArray<{ readonly pattern: RegExp; readonly des
 export function visibleNameFallback(name: string): string {
   const cleaned = cleanText(name);
   if (cleaned.length === 0) return VISIBLE_NAME_FALLBACK_DESCRIPTOR;
-  const words = cleaned.toLowerCase().split(/[\s'’-]+/).filter((word) => word.length > 0);
+  const words = cleaned
+    .toLowerCase()
+    .split(/[\s'’-]+/)
+    .filter((word) => word.length > 0);
   const descriptors: string[] = [];
   for (const hint of VISIBLE_NAME_HINTS) {
     if (descriptors.length >= 2) break;
-    if (wordMatchesAny(words, hint.pattern) && !descriptors.includes(hint.descriptor)) descriptors.push(hint.descriptor);
+    if (wordMatchesAny(words, hint.pattern) && !descriptors.includes(hint.descriptor))
+      descriptors.push(hint.descriptor);
   }
   return descriptors.length > 0 ? `a figure with ${descriptors.join(" and ")}` : VISIBLE_NAME_FALLBACK_DESCRIPTOR;
 }
@@ -325,7 +342,8 @@ function assertAxisValues(values: readonly number[], label: string, min: number,
     throw new RangeError(`${label} must contain at most ${SCENE_BATCH_MAX_AXIS_VALUES} values`);
   }
   for (const value of values) {
-    if (typeof value !== "number" || !Number.isFinite(value)) throw new RangeError(`${label} values must be finite numbers`);
+    if (typeof value !== "number" || !Number.isFinite(value))
+      throw new RangeError(`${label} values must be finite numbers`);
     if (value < min || value > max) throw new RangeError(`${label} values must be between ${min} and ${max}`);
   }
 }

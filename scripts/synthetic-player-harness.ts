@@ -69,7 +69,10 @@ export const FAMILY_TOOL_KINDS: Readonly<Record<MechanicFamily, string>> = {
 
 /** Reverse of `FAMILY_TOOL_KINDS`: tool kind -> family. Unknown kinds are simply absent. */
 export const KIND_TO_FAMILY: Readonly<Record<string, MechanicFamily>> = Object.freeze(
-  Object.fromEntries(MECHANIC_FAMILIES.map(family => [FAMILY_TOOL_KINDS[family], family])) as Record<string, MechanicFamily>,
+  Object.fromEntries(MECHANIC_FAMILIES.map((family) => [FAMILY_TOOL_KINDS[family], family])) as Record<
+    string,
+    MechanicFamily
+  >,
 );
 
 export const FAILURE_MODES = [
@@ -244,14 +247,18 @@ function personaDefinition(input: {
   confirmationPolicy: ConfirmationPolicy;
   notes: string;
 }): PersonaDefinition {
-  const policyTotal = input.confirmationPolicy.approve + input.confirmationPolicy.reject + input.confirmationPolicy.stall;
-  if (!Number.isFinite(policyTotal) || policyTotal <= 0) throw new Error(`persona ${input.archetype} has an empty confirmation policy`);
+  const policyTotal =
+    input.confirmationPolicy.approve + input.confirmationPolicy.reject + input.confirmationPolicy.stall;
+  if (!Number.isFinite(policyTotal) || policyTotal <= 0)
+    throw new Error(`persona ${input.archetype} has an empty confirmation policy`);
   for (const rate of [input.typoRate, input.abbreviationRate, input.oocRate]) {
-    if (!Number.isFinite(rate) || rate < 0 || rate > 1) throw new Error(`persona ${input.archetype} has an out-of-range rate`);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 1)
+      throw new Error(`persona ${input.archetype} has an out-of-range rate`);
   }
   for (const mode of FAILURE_MODES) {
     const weight = input.failureAffinity[mode];
-    if (!Number.isFinite(weight) || weight <= 0) throw new Error(`persona ${input.archetype} has an invalid failure affinity for ${mode}`);
+    if (!Number.isFinite(weight) || weight <= 0)
+      throw new Error(`persona ${input.archetype} has an invalid failure affinity for ${mode}`);
   }
   return Object.freeze({
     personaId: `${input.archetype}.v1`,
@@ -286,7 +293,15 @@ export const PERSONAS: Readonly<Record<PersonaArchetype, PersonaDefinition>> = O
     abbreviationRate: 0.05,
     patience: "high",
     oocRate: 0.05,
-    failureAffinity: { direct: 0.6, ambiguous: 0.9, "multi-family": 0.8, unsupported: 0.7, unadvertised: 0.7, "small-talk-ooc": 0.35, "literal-edge": 0.7 },
+    failureAffinity: {
+      direct: 0.6,
+      ambiguous: 0.9,
+      "multi-family": 0.8,
+      unsupported: 0.7,
+      unadvertised: 0.7,
+      "small-talk-ooc": 0.35,
+      "literal-edge": 0.7,
+    },
     confirmationPolicy: { approve: 0.92, reject: 0.05, stall: 0.03, alwaysApproveProgression: true },
     notes: "Always confirms progression; keeps declared goals in view.",
   }),
@@ -300,7 +315,15 @@ export const PERSONAS: Readonly<Record<PersonaArchetype, PersonaDefinition>> = O
     abbreviationRate: 0.06,
     patience: "medium",
     oocRate: 0.08,
-    failureAffinity: { direct: 0.6, ambiguous: 1.2, "multi-family": 0.8, unsupported: 0.9, unadvertised: 1.4, "small-talk-ooc": 0.4, "literal-edge": 0.8 },
+    failureAffinity: {
+      direct: 0.6,
+      ambiguous: 1.2,
+      "multi-family": 0.8,
+      unsupported: 0.9,
+      unadvertised: 1.4,
+      "small-talk-ooc": 0.4,
+      "literal-edge": 0.8,
+    },
     confirmationPolicy: { approve: 0.8, reject: 0.08, stall: 0.12, alwaysApproveProgression: false },
     notes: "References earlier places; prefers unadvertised destinations.",
   }),
@@ -314,7 +337,15 @@ export const PERSONAS: Readonly<Record<PersonaArchetype, PersonaDefinition>> = O
     abbreviationRate: 0.12,
     patience: "low",
     oocRate: 0.3,
-    failureAffinity: { direct: 0.35, ambiguous: 1, "multi-family": 0.9, unsupported: 0.7, unadvertised: 0.6, "small-talk-ooc": 1.6, "literal-edge": 0.6 },
+    failureAffinity: {
+      direct: 0.35,
+      ambiguous: 1,
+      "multi-family": 0.9,
+      unsupported: 0.7,
+      unadvertised: 0.6,
+      "small-talk-ooc": 1.6,
+      "literal-edge": 0.6,
+    },
     confirmationPolicy: { approve: 0.35, reject: 0.25, stall: 0.4, alwaysApproveProgression: false },
     notes: "Ignores advertised mechanics; asks meta questions.",
   }),
@@ -328,7 +359,15 @@ export const PERSONAS: Readonly<Record<PersonaArchetype, PersonaDefinition>> = O
     abbreviationRate: 0.05,
     patience: "high",
     oocRate: 0.12,
-    failureAffinity: { direct: 0.5, ambiguous: 1.1, "multi-family": 1.4, unsupported: 1.1, unadvertised: 1, "small-talk-ooc": 0.7, "literal-edge": 1.6 },
+    failureAffinity: {
+      direct: 0.5,
+      ambiguous: 1.1,
+      "multi-family": 1.4,
+      unsupported: 1.1,
+      unadvertised: 1,
+      "small-talk-ooc": 0.7,
+      "literal-edge": 1.6,
+    },
     confirmationPolicy: { approve: 0.85, reject: 0.1, stall: 0.05, alwaysApproveProgression: false },
     notes: "Literal readings and two-intent turns; reads rules text aloud.",
   }),
@@ -342,14 +381,24 @@ export const PERSONAS: Readonly<Record<PersonaArchetype, PersonaDefinition>> = O
     abbreviationRate: 0.18,
     patience: "low",
     oocRate: 0.15,
-    failureAffinity: { direct: 1.2, ambiguous: 0.7, "multi-family": 0.5, unsupported: 0.8, unadvertised: 0.6, "small-talk-ooc": 0.8, "literal-edge": 0.9 },
+    failureAffinity: {
+      direct: 1.2,
+      ambiguous: 0.7,
+      "multi-family": 0.5,
+      unsupported: 0.8,
+      unadvertised: 0.6,
+      "small-talk-ooc": 0.8,
+      "literal-edge": 0.9,
+    },
     confirmationPolicy: { approve: 0.55, reject: 0.35, stall: 0.1, alwaysApproveProgression: false },
     notes: "Short turns and self-corrections; hates negotiation.",
   }),
 });
 
 /** Canonical persona order used by the CLI and tests. */
-export const PERSONA_LIST: readonly PersonaDefinition[] = Object.freeze(PERSONA_ARCHETYPES.map(archetype => PERSONAS[archetype]));
+export const PERSONA_LIST: readonly PersonaDefinition[] = Object.freeze(
+  PERSONA_ARCHETYPES.map((archetype) => PERSONAS[archetype]),
+);
 
 export function isPersonaArchetype(value: unknown): value is PersonaArchetype {
   return typeof value === "string" && (PERSONA_ARCHETYPES as readonly string[]).includes(value);
@@ -436,7 +485,7 @@ export const noiseUppercaseFirst: SurfaceNoiseFn = (text) => {
 
 /** Replaces exactly one token that has a table entry with its abbreviation. */
 export const noiseAbbreviation: SurfaceNoiseFn = (text, seed) => {
-  const candidates = wordTokens(text).filter(token => ABBREVIATIONS[token.value.toLowerCase()] !== undefined);
+  const candidates = wordTokens(text).filter((token) => ABBREVIATIONS[token.value.toLowerCase()] !== undefined);
   if (candidates.length === 0) return { text };
   const rng = createRng(`${seed}:abbreviation`);
   const token = rng.pick(candidates);
@@ -451,7 +500,7 @@ export const noiseAbbreviation: SurfaceNoiseFn = (text, seed) => {
  */
 export const noiseTypo: SurfaceNoiseFn = (text, seed) => {
   const rng = createRng(`${seed}:typo`);
-  const tokens = wordTokens(text).filter(token => token.value.length >= 3);
+  const tokens = wordTokens(text).filter((token) => token.value.length >= 3);
   if (tokens.length === 0) return { text };
   const token = rng.pick(tokens);
   const chars = token.value;
@@ -696,11 +745,14 @@ export function validateTurnContract(value: unknown, context: TurnContractContex
       if (key !== "family" && key !== "failureMode") issues.push(`unknown field "intended.${key}"`);
     }
     if (!isMechanicFamily(intended["family"]) && resolveMechanicFamily(intended["family"]) === null) {
-      issues.push(`"intended.family" must be a family id (${MECHANIC_FAMILIES.join(", ")}) or a tool kind (${Object.values(FAMILY_TOOL_KINDS).join(", ")})`);
+      issues.push(
+        `"intended.family" must be a family id (${MECHANIC_FAMILIES.join(", ")}) or a tool kind (${Object.values(FAMILY_TOOL_KINDS).join(", ")})`,
+      );
     } else {
       family = resolveMechanicFamily(intended["family"]);
     }
-    if (!isFailureMode(intended["failureMode"])) issues.push(`"intended.failureMode" must be one of ${FAILURE_MODES.join(", ")}`);
+    if (!isFailureMode(intended["failureMode"]))
+      issues.push(`"intended.failureMode" must be one of ${FAILURE_MODES.join(", ")}`);
     else failureMode = intended["failureMode"];
   }
 
@@ -736,7 +788,8 @@ export function validateTurnContract(value: unknown, context: TurnContractContex
     issues.push(`"references" exceeds ${maxReferences} entries`);
   } else {
     for (const [index, entry] of rawReferences.entries()) {
-      if (typeof entry !== "string" || entry.trim().length === 0) issues.push(`"references[${index}]" must be a nonblank string`);
+      if (typeof entry !== "string" || entry.trim().length === 0)
+        issues.push(`"references[${index}]" must be a nonblank string`);
       else if (references.includes(entry.trim())) issues.push(`"references" repeats "${entry.trim()}"`);
       else references.push(entry.trim());
     }
@@ -746,7 +799,9 @@ export function validateTurnContract(value: unknown, context: TurnContractContex
     issues.push(`runId mismatch: expected "${context.runId}", got "${runId}"`);
   }
   if (context.sessionIds !== undefined && sessionId !== null && !context.sessionIds.includes(sessionId)) {
-    issues.push(`sessionId mismatch: expected one of ${context.sessionIds.map(id => `"${id}"`).join(", ")}, got "${sessionId}"`);
+    issues.push(
+      `sessionId mismatch: expected one of ${context.sessionIds.map((id) => `"${id}"`).join(", ")}, got "${sessionId}"`,
+    );
   }
   if (context.turnIndex !== undefined && turnIndex !== null && turnIndex !== context.turnIndex) {
     issues.push(`turnIndex mismatch: expected ${context.turnIndex}, got ${turnIndex}`);
@@ -762,7 +817,9 @@ export function validateTurnContract(value: unknown, context: TurnContractContex
   }
   if (context.target !== undefined && family !== null && failureMode !== null) {
     if (family !== context.target.family || failureMode !== context.target.failureMode) {
-      issues.push(`intended target mismatch: expected ${context.target.family}/${context.target.failureMode}, got ${family}/${failureMode}`);
+      issues.push(
+        `intended target mismatch: expected ${context.target.family}/${context.target.failureMode}, got ${family}/${failureMode}`,
+      );
     }
   }
   for (const required of context.requiredNoise ?? []) {
@@ -844,7 +901,10 @@ export function parseTurnContractJson(text: string, context: TurnContractContext
       lastError = error instanceof Error ? error.message : String(error);
     }
   }
-  throw new TurnContractError([`response is not valid JSON (${lastError ?? "empty response"})`], "generator returned an unparseable turn contract");
+  throw new TurnContractError(
+    [`response is not valid JSON (${lastError ?? "empty response"})`],
+    "generator returned an unparseable turn contract",
+  );
 }
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -865,7 +925,8 @@ export const COVERAGE_CELL_COUNT = MECHANIC_FAMILIES.length * FAILURE_MODES.leng
 export const COVERAGE_TOTAL_TARGET = COVERAGE_CELL_COUNT * COVERAGE_TARGET_PER_CELL;
 
 export function defaultCoverageTargets(perCell: number = COVERAGE_TARGET_PER_CELL): CoverageTargets {
-  if (!Number.isInteger(perCell) || perCell < 0) throw new Error("coverage target per cell must be a non-negative integer");
+  if (!Number.isInteger(perCell) || perCell < 0)
+    throw new Error("coverage target per cell must be a non-negative integer");
   const targets = {} as Record<MechanicFamily, Readonly<Record<FailureMode, number>>>;
   for (const family of MECHANIC_FAMILIES) {
     const row = {} as Record<FailureMode, number>;
@@ -904,7 +965,10 @@ export type CoverageReport = {
     totalCells: number;
   };
   exhausted: boolean;
-  byFamily: Record<MechanicFamily, { target: number; planned: number; achieved: number; advertised: number; acted: number }>;
+  byFamily: Record<
+    MechanicFamily,
+    { target: number; planned: number; achieved: number; advertised: number; acted: number }
+  >;
   byFailureMode: Record<FailureMode, { target: number; planned: number; achieved: number }>;
 };
 
@@ -954,7 +1018,8 @@ function validateCoverageTargets(targets: CoverageTargets): void {
     if (!row) throw new Error(`coverage targets are missing family "${family}"`);
     for (const mode of FAILURE_MODES) {
       const value = row[mode];
-      if (!Number.isInteger(value) || value < 0) throw new Error(`coverage target ${family}/${mode} must be a non-negative integer`);
+      if (!Number.isInteger(value) || value < 0)
+        throw new Error(`coverage target ${family}/${mode} must be a non-negative integer`);
       total += value;
     }
   }
@@ -986,7 +1051,8 @@ export class CoverageScheduler {
     this.#biasFamilyWeight = options.biasFamilyWeight ?? 3;
     this.#directWeight = options.directWeight ?? DEFAULT_DIRECT_WEIGHT;
     validateCoverageTargets(this.targets);
-    if (!(this.#baseFamilyWeight > 0) || !(this.#biasFamilyWeight > 0)) throw new Error("coverage family weights must be positive");
+    if (!(this.#baseFamilyWeight > 0) || !(this.#biasFamilyWeight > 0))
+      throw new Error("coverage family weights must be positive");
     if (!Number.isFinite(this.#directWeight) || this.#directWeight < MIN_DIRECT_WEIGHT) {
       throw new Error(`directWeight must be a finite number >= ${MIN_DIRECT_WEIGHT}`);
     }
@@ -1028,7 +1094,10 @@ export class CoverageScheduler {
   }
 
   remainingFor(cell: CoverageCell): number {
-    return Math.max(0, this.targets[cell.family][cell.failureMode] - (this.#planned.get(cellKey(cell.family, cell.failureMode)) ?? 0));
+    return Math.max(
+      0,
+      this.targets[cell.family][cell.failureMode] - (this.#planned.get(cellKey(cell.family, cell.failureMode)) ?? 0),
+    );
   }
 
   plannedFor(cell: CoverageCell): number {
@@ -1056,9 +1125,8 @@ export class CoverageScheduler {
    */
   next(rng: SeededRng, options: { advertisedFamilies?: readonly MechanicFamily[] } = {}): CoverageCell | null {
     const advertisedFamilies = options.advertisedFamilies;
-    const advertised = advertisedFamilies !== undefined && advertisedFamilies.length > 0
-      ? new Set(advertisedFamilies)
-      : null;
+    const advertised =
+      advertisedFamilies !== undefined && advertisedFamilies.length > 0 ? new Set(advertisedFamilies) : null;
     let candidates = this.#collectCandidates(advertised);
     if (candidates.length === 0) candidates = this.#collectCandidates(null);
     if (candidates.length === 0) return null;
@@ -1085,7 +1153,14 @@ export class CoverageScheduler {
       for (const mode of FAILURE_MODES) {
         const cell: CoverageCell = { family, failureMode: mode };
         if (this.remainingFor(cell) <= 0) continue;
-        candidates.push({ cell, weight: coverageWeight(this.#persona, cell, { baseFamilyWeight: this.#baseFamilyWeight, biasFamilyWeight: this.#biasFamilyWeight, directWeight: this.#directWeight }) });
+        candidates.push({
+          cell,
+          weight: coverageWeight(this.#persona, cell, {
+            baseFamilyWeight: this.#baseFamilyWeight,
+            biasFamilyWeight: this.#biasFamilyWeight,
+            directWeight: this.#directWeight,
+          }),
+        });
       }
     }
     return candidates;
@@ -1169,7 +1244,13 @@ export class CoverageScheduler {
         remainingTotal += cellRemaining;
         if (cellPlanned >= target) satisfiedCells += 1;
       }
-      byFamily[family] = { target: targetTotal, planned: familyPlanned, achieved: familyAchieved, advertised: familyAdvertised, acted: familyActed };
+      byFamily[family] = {
+        target: targetTotal,
+        planned: familyPlanned,
+        achieved: familyAchieved,
+        advertised: familyAdvertised,
+        acted: familyActed,
+      };
     }
     for (const mode of FAILURE_MODES) {
       let targetTotal = 0;
@@ -1254,7 +1335,8 @@ export function parseAdventureDecisionRow(row: {
     if (!isPlainObject(raw)) continue;
     const kind = raw["kind"];
     if (typeof kind !== "string" || kind.length === 0) continue;
-    const candidateId = typeof raw["candidateId"] === "string" && raw["candidateId"].length > 0 ? raw["candidateId"] : null;
+    const candidateId =
+      typeof raw["candidateId"] === "string" && raw["candidateId"].length > 0 ? raw["candidateId"] : null;
     const label = typeof raw["label"] === "string" && raw["label"].length > 0 ? raw["label"] : null;
     candidates.push({ candidateId, kind });
     if (!kinds.includes(kind)) kinds.push(kind);
@@ -1279,7 +1361,7 @@ export function parseAdventureDecisionRow(row: {
       if (isPlainObject(pick)) {
         const candidateId = pick["candidateId"];
         if (typeof candidateId === "string") {
-          const match = candidates.find(candidate => candidate.candidateId === candidateId);
+          const match = candidates.find((candidate) => candidate.candidateId === candidateId);
           if (match !== undefined) selectedKind = match.kind;
         }
       }
@@ -1300,7 +1382,9 @@ export function readTurnAdvertisements(dataDir: string, turnId: string): TurnAdv
   try {
     database = new DatabaseSync(path.join(dataDir, "velvet.sqlite"), { readOnly: true });
     const row = database
-      .prepare("SELECT request_json, selection_json, confidence_band FROM system_one_decisions_v1 WHERE lane = 'adventure-selection' AND turn_id = ? ORDER BY created_at DESC LIMIT 1")
+      .prepare(
+        "SELECT request_json, selection_json, confidence_band FROM system_one_decisions_v1 WHERE lane = 'adventure-selection' AND turn_id = ? ORDER BY created_at DESC LIMIT 1",
+      )
       .get(turnId);
     if (row === undefined) return null;
     return parseAdventureDecisionRow({
@@ -1391,7 +1475,7 @@ export function requiredNoiseFor(persona: PersonaDefinition, turnSeed: string): 
   const count = rng.chance(0.25) ? 2 : 1;
   const chosen: SurfaceNoiseName[] = [];
   for (let index = 0; index < count; index += 1) {
-    const candidates = SURFACE_NOISES.filter(name => !chosen.includes(name));
+    const candidates = SURFACE_NOISES.filter((name) => !chosen.includes(name));
     let total = 0;
     for (const name of candidates) total += weights[name];
     let roll = rng.next() * total;
@@ -1411,11 +1495,13 @@ export function requiredNoiseFor(persona: PersonaDefinition, turnSeed: string): 
 /** Plans one session: weighted targets, turn seeds, effort, and required noise. */
 export function planRun(input: PlanRunInput): RunPlan {
   if (!Number.isInteger(input.turns) || input.turns < 0) throw new Error("turns must be a non-negative integer");
-  const scheduler = input.scheduler ?? new CoverageScheduler({
-    ...(input.targets ? { targets: input.targets } : {}),
-    persona: input.persona,
-    ...(input.directWeight !== undefined ? { directWeight: input.directWeight } : {}),
-  });
+  const scheduler =
+    input.scheduler ??
+    new CoverageScheduler({
+      ...(input.targets ? { targets: input.targets } : {}),
+      persona: input.persona,
+      ...(input.directWeight !== undefined ? { directWeight: input.directWeight } : {}),
+    });
   const rng = createRng(`${input.runSeed}:schedule`);
   const turns: PlannedTurn[] = [];
   for (let turnIndex = 0; turnIndex < input.turns; turnIndex += 1) {
@@ -1488,21 +1574,25 @@ export function buildGeneratorMessages(input: GeneratorPromptInput): { system: s
     `Keep the declaration to roughly ${WORD_BUDGET_BY_VERBOSITY[persona.verbosity]} words for this persona; stay in the lower half unless the failure mode or effort calls for a longer turn.`,
     "Output exactly one strict JSON turn contract and nothing else.",
   ].join("\n");
-  const transcriptLines = input.transcript.length > 0
-    ? input.transcript.map((turn, index) => {
-      const narration = turn.narration ? ` => ${truncateText(turn.narration, 400)}` : "";
-      return `${index + 1}. [${turn.turnId}] ${truncateText(turn.declaration, 400)}${narration}`;
-    }).join("\n")
-    : "(no completed turns yet)";
+  const transcriptLines =
+    input.transcript.length > 0
+      ? input.transcript
+          .map((turn, index) => {
+            const narration = turn.narration ? ` => ${truncateText(turn.narration, 400)}` : "";
+            return `${index + 1}. [${turn.turnId}] ${truncateText(turn.declaration, 400)}${narration}`;
+          })
+          .join("\n")
+      : "(no completed turns yet)";
   // Advertised options are player-facing labels only. Off-menu cells must avoid invoking them;
   // every other cell must clearly invoke one. The lines never carry ids, digests, revisions,
   // provider details, or harness vocabulary.
   const advertisedOptions = input.advertisedOptions ?? [];
-  const advertisedLine = advertisedOptions.length === 0
-    ? null
-    : isOffMenuFailureMode(input.target.failureMode)
-      ? `The game currently offers these options: ${advertisedOptions.join(", ")}. This turn is deliberately off-menu: do not clearly invoke any of the listed options.`
-      : `The game currently offers these options: ${advertisedOptions.join(", ")}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`;
+  const advertisedLine =
+    advertisedOptions.length === 0
+      ? null
+      : isOffMenuFailureMode(input.target.failureMode)
+        ? `The game currently offers these options: ${advertisedOptions.join(", ")}. This turn is deliberately off-menu: do not clearly invoke any of the listed options.`
+        : `The game currently offers these options: ${advertisedOptions.join(", ")}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`;
   const user = [
     "Transcript (completed declarations and latest narrations, oldest first):",
     transcriptLines,
@@ -1515,7 +1605,7 @@ export function buildGeneratorMessages(input: GeneratorPromptInput): { system: s
     `Allowed surface noise: ${input.allowedNoise.join(", ")}.`,
     input.requiredNoise.length > 0
       ? `Required noise declarations this turn (they must appear in "noise"): ${input.requiredNoise.join(", ")}.`
-      : 'Required noise declarations this turn: none.',
+      : "Required noise declarations this turn: none.",
     'Respond with one strict JSON object and no markdown fences: {"runId":string,"sessionId":string,"turnIndex":number,"personaId":string,"seed":string,"effort":"low"|"high","declaration":string,"ooc"?:string,"intended":{"family":string,"failureMode":string},"noise":string[],"references":string[]}.',
     `Echo these exact values: runId=${input.runId}, sessionId=${input.sessionId}, turnIndex=${input.turnIndex}, personaId=${persona.personaId}, seed=${input.seed}, effort=${input.effort}, intended.family=${input.target.family}, intended.failureMode=${input.target.failureMode}.`,
   ].join("\n");
@@ -1553,7 +1643,15 @@ export function readGeneratorEnvConfig(env: NodeJS.ProcessEnv = process.env): Ge
   const baseUrl = (env.OPENROUTER_BASE_URL ?? "http://100.72.41.9:8787/v1").trim().replace(/\/+$/, "");
   const model = (env.OPENROUTER_MODEL ?? "deepseek-v4-flash").trim();
   if (baseUrl.length === 0 || model.length === 0) return null;
-  return { provider: "openai-compatible", baseUrl, apiKey, model, temperature: 0.9, maxTokens: 2048, timeoutMs: 60_000 };
+  return {
+    provider: "openai-compatible",
+    baseUrl,
+    apiKey,
+    model,
+    temperature: 0.9,
+    maxTokens: 2048,
+    timeoutMs: 60_000,
+  };
 }
 
 /**
@@ -1591,12 +1689,9 @@ export function createLiveGenerator(config: GeneratorEnvConfig, fetchImpl: typeo
     } catch {
       throw new Error(`generator response was not JSON: ${text.slice(0, 400)}`);
     }
-    const content = isPlainObject(body) && Array.isArray(body["choices"])
-      ? choicesContent(body["choices"])
-      : null;
-    const finishReason = isPlainObject(body) && Array.isArray(body["choices"])
-      ? choicesFinishReason(body["choices"])
-      : null;
+    const content = isPlainObject(body) && Array.isArray(body["choices"]) ? choicesContent(body["choices"]) : null;
+    const finishReason =
+      isPlainObject(body) && Array.isArray(body["choices"]) ? choicesFinishReason(body["choices"]) : null;
     return { content, finishReason };
   };
   return async (request) => {
@@ -1646,13 +1741,13 @@ function choicesFinishReason(choices: readonly unknown[]): string | null {
 }
 
 const FAKE_DECLARATION_TEMPLATES: Readonly<Record<FailureMode, (family: string) => string>> = {
-  direct: family => `I move on the ${family} directly and keep it simple.`,
-  ambiguous: family => `Maybe something with the ${family}, if you think that works.`,
-  "multi-family": family => `I work the ${family} and also ask around about the mill.`,
-  unsupported: family => `I try to force the ${family} to go my way.`,
-  unadvertised: family => `I look for a ${family} angle nobody mentioned.`,
-  "small-talk-ooc": family => `I chat about the ${family} with whoever is nearby.`,
-  "literal-edge": family => `I take the ${family} literally and see what happens.`,
+  direct: (family) => `I move on the ${family} directly and keep it simple.`,
+  ambiguous: (family) => `Maybe something with the ${family}, if you think that works.`,
+  "multi-family": (family) => `I work the ${family} and also ask around about the mill.`,
+  unsupported: (family) => `I try to force the ${family} to go my way.`,
+  unadvertised: (family) => `I look for a ${family} angle nobody mentioned.`,
+  "small-talk-ooc": (family) => `I chat about the ${family} with whoever is nearby.`,
+  "literal-edge": (family) => `I take the ${family} literally and see what happens.`,
 };
 
 /**
@@ -1831,11 +1926,63 @@ export function tokenTrigramSet(text: string): Set<string> {
  * enough to keep a shingle ("smoke on the water").
  */
 export const PHRASE_STOPWORDS: ReadonlySet<string> = new Set([
-  "a", "an", "and", "are", "as", "at", "be", "been", "but", "by", "did", "do", "does",
-  "for", "from", "had", "has", "have", "he", "her", "him", "his", "i", "if", "in", "is",
-  "it", "its", "me", "my", "no", "not", "of", "on", "or", "our", "she", "so", "that",
-  "the", "their", "them", "then", "there", "they", "this", "to", "up", "us", "was", "we",
-  "were", "what", "when", "with", "you", "your",
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "been",
+  "but",
+  "by",
+  "did",
+  "do",
+  "does",
+  "for",
+  "from",
+  "had",
+  "has",
+  "have",
+  "he",
+  "her",
+  "him",
+  "his",
+  "i",
+  "if",
+  "in",
+  "is",
+  "it",
+  "its",
+  "me",
+  "my",
+  "no",
+  "not",
+  "of",
+  "on",
+  "or",
+  "our",
+  "she",
+  "so",
+  "that",
+  "the",
+  "their",
+  "them",
+  "then",
+  "there",
+  "they",
+  "this",
+  "to",
+  "up",
+  "us",
+  "was",
+  "we",
+  "were",
+  "what",
+  "when",
+  "with",
+  "you",
+  "your",
 ]);
 
 /**
@@ -1848,7 +1995,7 @@ export function tokenQuadgramSet(text: string): Set<string> {
   const shingles = new Set<string>();
   for (let index = 0; index + 3 < tokens.length; index += 1) {
     const window = tokens.slice(index, index + 4);
-    if (window.every(token => PHRASE_STOPWORDS.has(token))) continue;
+    if (window.every((token) => PHRASE_STOPWORDS.has(token))) continue;
     shingles.add(window.join(" "));
   }
   return shingles;
@@ -1890,7 +2037,7 @@ const MIXED_INTENT_MARKERS = [" and ", " then ", "; ", " but "] as const;
  */
 export function computeHumanLikeness(turns: readonly HarnessTurnRecord[]): HumanLikenessReport {
   const count = turns.length;
-  const wordCounts = turns.map(turn => declarationWordCount(turn.declaration));
+  const wordCounts = turns.map((turn) => declarationWordCount(turn.declaration));
   const sortedCounts = [...wordCounts].sort((a, b) => a - b);
   const mean = count === 0 ? 0 : wordCounts.reduce((sum, value) => sum + value, 0) / count;
   let variance = 0;
@@ -1932,7 +2079,7 @@ export function computeHumanLikeness(turns: readonly HarnessTurnRecord[]): Human
     if (turn.declaration.includes("?")) questions += 1;
     if (turn.ooc !== null && turn.ooc.trim().length > 0) ooc += 1;
     if (turn.noiseApplied.length > 0) noise += 1;
-    if (MIXED_INTENT_MARKERS.some(marker => lower.includes(marker))) mixedIntent += 1;
+    if (MIXED_INTENT_MARKERS.some((marker) => lower.includes(marker))) mixedIntent += 1;
     if (isOffMenuFailureMode(turn.target.failureMode)) offMenu += 1;
 
     const trimmed = trimmedDeclarations[index] as string;
@@ -1971,13 +2118,13 @@ export function computeHumanLikeness(turns: readonly HarnessTurnRecord[]): Human
     for (const index of phraseTurns.get(entry.phrase) as number[]) repeatedPhraseTurnIndexes.add(index);
   }
 
-  const share = (numerator: number): number => count === 0 ? 0 : round3(numerator / count);
+  const share = (numerator: number): number => (count === 0 ? 0 : round3(numerator / count));
   return {
     turns: count,
     medianWords: round3(percentile(sortedCounts, 0.5)),
     p90Words: round3(percentile(sortedCounts, 0.9)),
-    lowEffortShare: share(wordCounts.filter(value => value <= 5).length),
-    longShare: share(wordCounts.filter(value => value >= 30).length),
+    lowEffortShare: share(wordCounts.filter((value) => value <= 5).length),
+    longShare: share(wordCounts.filter((value) => value >= 30).length),
     burstiness: round3(burstiness),
     distinct1: round3(distinct1),
     distinct2: round3(distinct2),
@@ -2006,7 +2153,13 @@ export type HarnessManifest = {
   mode: "dry-run" | "live";
   generator: GeneratorIdentity;
   gameProvider: { model: string };
-  world: { campaignId: string | null; sessionId: string | null; actorId: string | null; dataDir: string | null; contentProfile: string | null };
+  world: {
+    campaignId: string | null;
+    sessionId: string | null;
+    actorId: string | null;
+    dataDir: string | null;
+    contentProfile: string | null;
+  };
   sessions: SyntheticSessionRecord[];
   turns: HarnessTurnRecord[];
   /** Re-targeting records, in turn order; empty when every planned cell stayed on plan. */
@@ -2068,20 +2221,24 @@ export function sessionIndexLabel(index: number): string {
 
 /** `synthetic-player.<persona>.<seed>.<n>` from the design doc. */
 export function sessionTagFor(archetype: PersonaArchetype, seed: string, sessionIndex: number): string {
-  if (!TAG_SEGMENT_PATTERN.test(seed)) throw new Error("seed must be a tag-safe token (letters, digits, dash, underscore)");
+  if (!TAG_SEGMENT_PATTERN.test(seed))
+    throw new Error("seed must be a tag-safe token (letters, digits, dash, underscore)");
   if (!TAG_SEGMENT_PATTERN.test(archetype)) throw new Error("persona archetype must be a tag-safe token");
   return `${SYNTHETIC_TAG_PREFIX}.${archetype}.${seed}.${sessionIndexLabel(sessionIndex)}`;
 }
 
 export function isSyntheticTag(tag: string): boolean {
   const parts = tag.split(".");
-  return parts.length === 4
-    && parts[0] === SYNTHETIC_TAG_PREFIX
-    && parts.slice(1).every(part => TAG_SEGMENT_PATTERN.test(part));
+  return (
+    parts.length === 4 &&
+    parts[0] === SYNTHETIC_TAG_PREFIX &&
+    parts.slice(1).every((part) => TAG_SEGMENT_PATTERN.test(part))
+  );
 }
 
 export function assertSyntheticTag(tag: string): string {
-  if (!isSyntheticTag(tag)) throw new Error(`synthetic tag must look like ${SYNTHETIC_TAG_PREFIX}.<persona>.<seed>.<n>: ${tag}`);
+  if (!isSyntheticTag(tag))
+    throw new Error(`synthetic tag must look like ${SYNTHETIC_TAG_PREFIX}.<persona>.<seed>.<n>: ${tag}`);
   return tag;
 }
 
@@ -2167,7 +2324,11 @@ export function buildStreamRequest(baseUrl: string, body: StreamInitialBody | St
 }
 
 export function buildTurnRequest(baseUrl: string, turnId: string): HttpRequestSpec {
-  return { method: "GET", url: `${apiRoot(baseUrl)}/adventure-turns/${encodeURIComponent(turnId)}`, headers: { accept: "application/json" } };
+  return {
+    method: "GET",
+    url: `${apiRoot(baseUrl)}/adventure-turns/${encodeURIComponent(turnId)}`,
+    headers: { accept: "application/json" },
+  };
 }
 
 export function buildConfirmRequest(baseUrl: string, turnId: string, body: ConfirmBody): HttpRequestSpec {
@@ -2181,7 +2342,11 @@ export function buildConfirmRequest(baseUrl: string, turnId: string, body: Confi
 
 export function buildTranscriptRequest(baseUrl: string, campaignId: string, sessionId: string): HttpRequestSpec {
   const query = `campaignId=${encodeURIComponent(campaignId)}&sessionId=${encodeURIComponent(sessionId)}`;
-  return { method: "GET", url: `${apiRoot(baseUrl)}/adventure-turns/transcript?${query}`, headers: { accept: "application/json" } };
+  return {
+    method: "GET",
+    url: `${apiRoot(baseUrl)}/adventure-turns/transcript?${query}`,
+    headers: { accept: "application/json" },
+  };
 }
 
 export function buildReconcileInitialRequest(baseUrl: string, query: ReconcileInitialQuery): HttpRequestSpec {
@@ -2191,7 +2356,11 @@ export function buildReconcileInitialRequest(baseUrl: string, query: ReconcileIn
     `actorId=${encodeURIComponent(query.actorId)}`,
     `idempotencyKey=${encodeURIComponent(query.idempotencyKey)}`,
   ].join("&");
-  return { method: "GET", url: `${apiRoot(baseUrl)}/adventure-turns/reconcile-initial?${params}`, headers: { accept: "application/json" } };
+  return {
+    method: "GET",
+    url: `${apiRoot(baseUrl)}/adventure-turns/reconcile-initial?${params}`,
+    headers: { accept: "application/json" },
+  };
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -2208,8 +2377,8 @@ export type SseEvent = {
 export function parseSseBlock(block: string): SseEvent | null {
   const data = block
     .split(/\r?\n/)
-    .filter(line => line.startsWith("data:"))
-    .map(line => line.slice(5).trim())
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trim())
     .join("");
   if (data.length === 0) return null;
   let parsed: unknown;
@@ -2255,11 +2424,18 @@ export class SessionTurnError extends Error {
 export type ConfirmationPolicyInput = { proposalToolNames?: readonly string[] };
 
 /** Seeded confirmation decision, faithful to the persona policy. */
-export function decideConfirmation(persona: PersonaDefinition, seed: string, input: ConfirmationPolicyInput = {}): ConfirmationDecision {
+export function decideConfirmation(
+  persona: PersonaDefinition,
+  seed: string,
+  input: ConfirmationPolicyInput = {},
+): ConfirmationDecision {
   const policy = persona.confirmationPolicy;
-  if (input.proposalToolNames && input.proposalToolNames.length > 0
-    && policy.alwaysApproveProgression
-    && input.proposalToolNames.every(tool => tool === FAMILY_TOOL_KINDS.progression)) {
+  if (
+    input.proposalToolNames &&
+    input.proposalToolNames.length > 0 &&
+    policy.alwaysApproveProgression &&
+    input.proposalToolNames.every((tool) => tool === FAMILY_TOOL_KINDS.progression)
+  ) {
     return "approve";
   }
   const total = policy.approve + policy.reject + policy.stall;
@@ -2356,13 +2532,22 @@ export class SessionDriver {
     return { status: response.status, ok: response.ok, body };
   }
 
-  async readBootstrap(): Promise<{ expectedRevision: number; sessionId: string | null; playableActors: { actorId: string; name: string }[] }> {
-    const response = await this.#json(buildPlayBootstrapRequest(this.#options.baseUrl, this.#options.campaignId, this.#options.sessionId));
-    if (!response.ok) throw new SessionTurnError(`play bootstrap failed with HTTP ${response.status}`, { uncertain: false });
+  async readBootstrap(): Promise<{
+    expectedRevision: number;
+    sessionId: string | null;
+    playableActors: { actorId: string; name: string }[];
+  }> {
+    const response = await this.#json(
+      buildPlayBootstrapRequest(this.#options.baseUrl, this.#options.campaignId, this.#options.sessionId),
+    );
+    if (!response.ok)
+      throw new SessionTurnError(`play bootstrap failed with HTTP ${response.status}`, { uncertain: false });
     const body = response.body;
     const expectedRevision = isPlainObject(body) ? body["expectedRevision"] : undefined;
     if (typeof expectedRevision !== "number" || !Number.isInteger(expectedRevision)) {
-      throw new SessionTurnError("play bootstrap response is missing an integer expectedRevision", { uncertain: false });
+      throw new SessionTurnError("play bootstrap response is missing an integer expectedRevision", {
+        uncertain: false,
+      });
     }
     const actors: { actorId: string; name: string }[] = [];
     if (isPlainObject(body) && Array.isArray(body["playableActors"])) {
@@ -2380,8 +2565,11 @@ export class SessionDriver {
   }
 
   async readTranscript(): Promise<TranscriptTurn[]> {
-    const response = await this.#json(buildTranscriptRequest(this.#options.baseUrl, this.#options.campaignId, this.#options.sessionId));
-    if (!response.ok) throw new SessionTurnError(`transcript read failed with HTTP ${response.status}`, { uncertain: false });
+    const response = await this.#json(
+      buildTranscriptRequest(this.#options.baseUrl, this.#options.campaignId, this.#options.sessionId),
+    );
+    if (!response.ok)
+      throw new SessionTurnError(`transcript read failed with HTTP ${response.status}`, { uncertain: false });
     const turns: TranscriptTurn[] = [];
     if (isPlainObject(response.body) && Array.isArray(response.body["turns"])) {
       for (const entry of response.body["turns"]) {
@@ -2403,17 +2591,22 @@ export class SessionDriver {
 
   /** Read-only idempotency locator; a null result is ambiguous and never authorizes a retry. */
   async reconcileInitial(idempotencyKey: string): Promise<unknown> {
-    const response = await this.#json(buildReconcileInitialRequest(this.#options.baseUrl, {
-      campaignId: this.#options.campaignId,
-      sessionId: this.#options.sessionId,
-      actorId: this.#options.actorId,
-      idempotencyKey,
-    }));
-    if (!response.ok) throw new SessionTurnError(`reconcile-initial failed with HTTP ${response.status}`, { uncertain: true });
-    return isPlainObject(response.body) ? response.body["result"] ?? null : null;
+    const response = await this.#json(
+      buildReconcileInitialRequest(this.#options.baseUrl, {
+        campaignId: this.#options.campaignId,
+        sessionId: this.#options.sessionId,
+        actorId: this.#options.actorId,
+        idempotencyKey,
+      }),
+    );
+    if (!response.ok)
+      throw new SessionTurnError(`reconcile-initial failed with HTTP ${response.status}`, { uncertain: true });
+    return isPlainObject(response.body) ? (response.body["result"] ?? null) : null;
   }
 
-  async #openStream(body: StreamInitialBody | StreamResumeBody): Promise<{ turnId: string | null; events: SseEvent[] }> {
+  async #openStream(
+    body: StreamInitialBody | StreamResumeBody,
+  ): Promise<{ turnId: string | null; events: SseEvent[] }> {
     const spec = buildStreamRequest(this.#options.baseUrl, body);
     let response: Response;
     try {
@@ -2445,7 +2638,8 @@ export class SessionDriver {
     narration: NarrationStatus | null;
   }> {
     const response = await this.#json(buildTurnRequest(this.#options.baseUrl, turnId));
-    if (!response.ok) throw new SessionTurnError(`turn read failed with HTTP ${response.status}`, { uncertain: true, turnId });
+    if (!response.ok)
+      throw new SessionTurnError(`turn read failed with HTTP ${response.status}`, { uncertain: true, turnId });
     const body = isPlainObject(response.body) ? response.body : {};
     const turn = isPlainObject(body["turn"]) ? body["turn"] : {};
     const receipts: { commandId: string; proposalId: string }[] = [];
@@ -2458,11 +2652,14 @@ export class SessionDriver {
       }
     }
     const narrationRaw = isPlainObject(body["narrationStatus"]) ? body["narrationStatus"] : null;
-    const narration = narrationRaw === null ? null : {
-      status: typeof narrationRaw["status"] === "string" ? narrationRaw["status"] : "none",
-      text: typeof narrationRaw["text"] === "string" ? narrationRaw["text"] : null,
-      source: typeof narrationRaw["source"] === "string" ? narrationRaw["source"] : null,
-    };
+    const narration =
+      narrationRaw === null
+        ? null
+        : {
+            status: typeof narrationRaw["status"] === "string" ? narrationRaw["status"] : "none",
+            text: typeof narrationRaw["text"] === "string" ? narrationRaw["text"] : null,
+            source: typeof narrationRaw["source"] === "string" ? narrationRaw["source"] : null,
+          };
     return {
       state: typeof turn["state"] === "string" ? turn["state"] : null,
       revision: typeof turn["revision"] === "number" && Number.isInteger(turn["revision"]) ? turn["revision"] : null,
@@ -2494,40 +2691,53 @@ export class SessionDriver {
     let stalled = false;
 
     for (let round = 0; round < this.#maxConfirmationRounds; round += 1) {
-      const batch = confirmationBatches(events).find(ids => !handled.has(ids.join(",")));
+      const batch = confirmationBatches(events).find((ids) => !handled.has(ids.join(",")));
       if (!batch) break;
       handled.add(batch.join(","));
       batches.push(batch);
-      const decision = input.confirmationDecision ?? decideConfirmation(this.#options.persona, `${input.turnSeed}:confirmation:${round}`, {
-        proposalToolNames: proposalToolNames(events, batch),
-      });
+      const decision =
+        input.confirmationDecision ??
+        decideConfirmation(this.#options.persona, `${input.turnSeed}:confirmation:${round}`, {
+          proposalToolNames: proposalToolNames(events, batch),
+        });
       decisions.push(decision);
       if (decision === "stall") {
         stalled = true;
         break;
       }
-      if (turnId === null) throw new SessionTurnError("confirmation_required arrived without a durable turn id", { uncertain: true });
+      if (turnId === null)
+        throw new SessionTurnError("confirmation_required arrived without a durable turn id", { uncertain: true });
       const detail = await this.#getTurnDetail(turnId);
-      if (detail.revision === null) throw new SessionTurnError("turn detail is missing revision", { uncertain: true, turnId });
-      const confirmed = await this.#json(buildConfirmRequest(this.#options.baseUrl, turnId, {
-        proposalIds: batch,
-        decision,
-        expectedRevision: detail.revision,
-        idempotencyKey: deriveConfirmationIdempotencyKey(this.#options.runId, input.turnIndex, round),
-      }));
+      if (detail.revision === null)
+        throw new SessionTurnError("turn detail is missing revision", { uncertain: true, turnId });
+      const confirmed = await this.#json(
+        buildConfirmRequest(this.#options.baseUrl, turnId, {
+          proposalIds: batch,
+          decision,
+          expectedRevision: detail.revision,
+          idempotencyKey: deriveConfirmationIdempotencyKey(this.#options.runId, input.turnIndex, round),
+        }),
+      );
       if (!confirmed.ok) {
-        throw new SessionTurnError(`confirmation POST failed with HTTP ${confirmed.status}`, { uncertain: confirmed.status >= 500 || confirmed.status === 429, turnId });
+        throw new SessionTurnError(`confirmation POST failed with HTTP ${confirmed.status}`, {
+          uncertain: confirmed.status >= 500 || confirmed.status === 429,
+          turnId,
+        });
       }
-      const resumeToken = isPlainObject(confirmed.body) && typeof confirmed.body["resumeToken"] === "string" && confirmed.body["resumeToken"].length > 0
-        ? confirmed.body["resumeToken"]
-        : null;
+      const resumeToken =
+        isPlainObject(confirmed.body) &&
+        typeof confirmed.body["resumeToken"] === "string" &&
+        confirmed.body["resumeToken"].length > 0
+          ? confirmed.body["resumeToken"]
+          : null;
       if (resumeToken === null) break;
       stream = await this.#openStream({ resumeToken });
       if (stream.turnId !== null) turnId = stream.turnId;
       events.push(...stream.events);
     }
 
-    if (turnId === null) throw new SessionTurnError("adventure turn stream did not expose a durable turn id", { uncertain: true });
+    if (turnId === null)
+      throw new SessionTurnError("adventure turn stream did not expose a durable turn id", { uncertain: true });
     const detail = await this.#getTurnDetail(turnId);
     const terminal = lastTerminalOutcome(events);
     let transcript: TranscriptTurn[] | null = null;
@@ -2536,8 +2746,8 @@ export class SessionDriver {
     } catch {
       transcript = null;
     }
-    const terminalOutcome: TerminalOutcome = terminal
-      ?? (stalled ? "aborted" : detail.state === "completed" ? "done" : "unknown");
+    const terminalOutcome: TerminalOutcome =
+      terminal ?? (stalled ? "aborted" : detail.state === "completed" ? "done" : "unknown");
     const eventCodes = turnEventCodes(events);
     return {
       turnId,
@@ -2550,9 +2760,10 @@ export class SessionDriver {
       transcript,
       uncertain: false,
       events: eventCodes,
-      error: terminalOutcome === "done"
-        ? null
-        : describeTurnFailure({ terminalOutcome, terminalObserved: terminal !== null, codes: eventCodes }),
+      error:
+        terminalOutcome === "done"
+          ? null
+          : describeTurnFailure({ terminalOutcome, terminalObserved: terminal !== null, codes: eventCodes }),
     };
   }
 }
@@ -2597,7 +2808,11 @@ function confirmationBatches(events: readonly SseEvent[]): string[][] {
   for (const event of events) {
     if (event.type !== "confirmation_required" || !isPlainObject(event.payload)) continue;
     const proposalIds = event.payload["proposalIds"];
-    if (Array.isArray(proposalIds) && proposalIds.length > 0 && proposalIds.every(id => typeof id === "string" && id.length > 0)) {
+    if (
+      Array.isArray(proposalIds) &&
+      proposalIds.length > 0 &&
+      proposalIds.every((id) => typeof id === "string" && id.length > 0)
+    ) {
       batches.push(proposalIds as string[]);
     }
   }
@@ -2614,7 +2829,7 @@ function proposalToolNames(events: readonly SseEvent[], proposalIds: readonly st
     const toolName = proposal["toolName"];
     if (typeof proposalId === "string" && typeof toolName === "string") names.set(proposalId, toolName);
   }
-  return proposalIds.map(id => names.get(id)).filter((name): name is string => name !== undefined);
+  return proposalIds.map((id) => names.get(id)).filter((name): name is string => name !== undefined);
 }
 
 function lastTerminalOutcome(events: readonly SseEvent[]): TerminalOutcome | null {
@@ -2672,9 +2887,7 @@ export function describeTurnFailure(input: {
 }): string {
   const terminal = input.terminalObserved ? input.terminalOutcome : "fallback";
   const last = input.codes[input.codes.length - 1];
-  return last
-    ? `turn failed: ${last.code}; terminal=${terminal}`
-    : `turn did not complete (terminal=${terminal})`;
+  return last ? `turn failed: ${last.code}; terminal=${terminal}` : `turn did not complete (terminal=${terminal})`;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -2728,7 +2941,12 @@ export function materializeTurn(raw: unknown, context: TurnMaterializationContex
 // Run orchestration
 // -------------------------------------------------------------------------------------------------
 
-export type SubmitTurnFn = (input: { turnIndex: number; declaration: string; turnSeed: string; idempotencyKey: string }) => Promise<TurnOutcome>;
+export type SubmitTurnFn = (input: {
+  turnIndex: number;
+  declaration: string;
+  turnSeed: string;
+  idempotencyKey: string;
+}) => Promise<TurnOutcome>;
 
 /** Default number of recent advertisement snapshots unioned for re-targeting. */
 export const DEFAULT_MENU_WINDOW = 3;
@@ -2841,15 +3059,19 @@ export function validateFocusCell(value: unknown): CoverageCell | null {
  * mode no HTTP is issued and every turn stays `planned`.
  */
 export async function runHarnessSession(input: HarnessSessionInput): Promise<HarnessManifest> {
-  if (input.mode === "live" && input.submitTurn === null) throw new Error("live mode requires a submitTurn implementation");
+  if (input.mode === "live" && input.submitTurn === null)
+    throw new Error("live mode requires a submitTurn implementation");
   if (input.mode === "live" && input.sessionId === null) throw new Error("live mode requires a bound API session id");
   const focus = validateFocusCell(input.focus);
   const notes: string[] = [...input.notes];
   if (input.mode === "dry-run") notes.push("dry-run: no HTTP requests were issued; every turn remains planned");
-  const sessionTag = input.syntheticTag === null
-    ? sessionTagFor(input.persona.archetype, input.runSeed, input.sessionIndex)
-    : assertSyntheticTag(input.syntheticTag);
-  notes.push(`session tag ${sessionTag} maps to API session ${input.sessionId ?? "(unbound dry-run)"}; harvest CLIs can filter on the ${SYNTHETIC_TAG_PREFIX} prefix.`);
+  const sessionTag =
+    input.syntheticTag === null
+      ? sessionTagFor(input.persona.archetype, input.runSeed, input.sessionIndex)
+      : assertSyntheticTag(input.syntheticTag);
+  notes.push(
+    `session tag ${sessionTag} maps to API session ${input.sessionId ?? "(unbound dry-run)"}; harvest CLIs can filter on the ${SYNTHETIC_TAG_PREFIX} prefix.`,
+  );
 
   const plan = planRun({
     runSeed: input.runSeed,
@@ -2858,7 +3080,8 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     ...(input.targets ? { targets: input.targets } : {}),
     ...(input.directWeight !== undefined ? { directWeight: input.directWeight } : {}),
   });
-  if (plan.truncated) notes.push(`coverage targets exhausted after ${plan.turns.length} of ${input.turns} requested turns`);
+  if (plan.truncated)
+    notes.push(`coverage targets exhausted after ${plan.turns.length} of ${input.turns} requested turns`);
   const menuWindow = normalizeMenuWindow(input.menuWindow);
 
   const turns: HarnessTurnRecord[] = [];
@@ -2868,8 +3091,8 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
   const contractHash = createHash("sha256");
   const contentProfile = input.contentProfile?.trim() || null;
   const dataDir = input.dataDir;
-  const readAdvertisements = input.readAdvertisements
-    ?? (dataDir !== null ? (turnId: string) => readTurnAdvertisements(dataDir, turnId) : null);
+  const readAdvertisements =
+    input.readAdvertisements ?? (dataDir !== null ? (turnId: string) => readTurnAdvertisements(dataDir, turnId) : null);
   const targetSwaps: HarnessTargetSwap[] = [];
   let previousAdvertisements: TurnAdvertisementSnapshot | null = null;
   let pendingPlannedTarget: CoverageCell | undefined;
@@ -2893,7 +3116,9 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
       pendingPlannedTarget = original;
       targetSwaps.push({ turnIndex: first.turnIndex, from: original, to: { ...focus } });
       if (alreadyFullyPlanned) {
-        notes.push(`focus ${focus.family}/${focus.failureMode}: coverage target was already fully planned; turn ${first.turnIndex} forced it anyway`);
+        notes.push(
+          `focus ${focus.family}/${focus.failureMode}: coverage target was already fully planned; turn ${first.turnIndex} forced it anyway`,
+        );
       }
     }
   }
@@ -2930,7 +3155,7 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     menuHistory.push([...snapshot.families]);
     if (menuHistory.length > menuWindow) menuHistory.splice(0, menuHistory.length - menuWindow);
     if (snapshot.families.includes(executed.family)) plan.scheduler.recordAdvertised(executed);
-    const selectedFamily = snapshot.selectedKind === null ? null : KIND_TO_FAMILY[snapshot.selectedKind] ?? null;
+    const selectedFamily = snapshot.selectedKind === null ? null : (KIND_TO_FAMILY[snapshot.selectedKind] ?? null);
     if (selectedFamily !== null && selectedFamily === executed.family) plan.scheduler.recordActed(executed);
   };
 
@@ -2949,8 +3174,9 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     const upcoming = plan.turns[nextIndex];
     if (upcoming === undefined) return;
     if (union.includes(upcoming.target.family)) return;
-    const reachable = union.some(family =>
-      FAILURE_MODES.some(mode => plan.scheduler.remainingFor({ family, failureMode: mode }) > 0));
+    const reachable = union.some((family) =>
+      FAILURE_MODES.some((mode) => plan.scheduler.remainingFor({ family, failureMode: mode }) > 0),
+    );
     if (!reachable) return;
     const original: CoverageCell = { ...upcoming.target };
     plan.scheduler.release(original);
@@ -2985,9 +3211,7 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
       allowedNoise: planned.allowedNoise,
       requiredNoise: planned.requiredNoise,
       referenceBudget: input.referenceBudget,
-      ...(latest !== null && latest.labels.length > 0
-        ? { advertisedOptions: [...latest.labels] }
-        : {}),
+      ...(latest !== null && latest.labels.length > 0 ? { advertisedOptions: [...latest.labels] } : {}),
     };
     const request = buildGenerationRequest(base);
     promptHash.update(stableStringify(request.messages, 0));
@@ -3027,14 +3251,19 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     record.noiseDropped = [...materialized.contract.noiseDropped];
     record.noiseApplied = [...materialized.applied];
     record.references = [...materialized.contract.references];
-    contractHash.update(stableStringify({
-      declaration: materialized.declaration,
-      ooc: materialized.ooc,
-      noise: materialized.applied,
-      intended: materialized.contract.intended,
-      effort: materialized.contract.effort,
-      references: materialized.contract.references,
-    }, 0));
+    contractHash.update(
+      stableStringify(
+        {
+          declaration: materialized.declaration,
+          ooc: materialized.ooc,
+          noise: materialized.applied,
+          intended: materialized.contract.intended,
+          effort: materialized.contract.effort,
+          references: materialized.contract.references,
+        },
+        0,
+      ),
+    );
 
     if (input.mode === "dry-run") {
       record.outcome = "planned";
@@ -3053,7 +3282,9 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
       });
       record.outcome = outcome.uncertain
         ? "uncertain"
-        : outcome.terminalOutcome === "done" || outcome.terminalOutcome === "aborted" || outcome.terminalOutcome === "error"
+        : outcome.terminalOutcome === "done" ||
+            outcome.terminalOutcome === "aborted" ||
+            outcome.terminalOutcome === "error"
           ? outcome.terminalOutcome
           : "error";
       record.turnId = outcome.turnId;
@@ -3072,18 +3303,21 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
       }
       if (outcome.terminalOutcome !== "done") {
         record.error = outcome.error ?? `turn did not complete (terminal=${outcome.terminalOutcome})`;
-        if (outcome.events.length > 0) record.events = outcome.events.map(entry => ({ ...entry }));
+        if (outcome.events.length > 0) record.events = outcome.events.map((entry) => ({ ...entry }));
       }
       if (outcome.transcript !== null) {
         transcript = [...outcome.transcript];
       } else {
-        transcript = [...transcript, {
-          turnId: outcome.turnId,
-          actorId: input.actorId ?? "",
-          declaration: materialized.declaration,
-          narration: outcome.narration?.text ?? null,
-          completedAt: "",
-        }];
+        transcript = [
+          ...transcript,
+          {
+            turnId: outcome.turnId,
+            actorId: input.actorId ?? "",
+            declaration: materialized.declaration,
+            narration: outcome.narration?.text ?? null,
+            completedAt: "",
+          },
+        ];
       }
       turns.push(record);
       processAdvertisements(record, planned.target);
@@ -3110,7 +3344,9 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     }
   }
 
-  const executedTurns = turns.filter(turn => turn.outcome === "done" || turn.outcome === "aborted" || turn.outcome === "uncertain").length;
+  const executedTurns = turns.filter(
+    (turn) => turn.outcome === "done" || turn.outcome === "aborted" || turn.outcome === "uncertain",
+  ).length;
   return {
     harnessVersion: HARNESS_VERSION,
     personaVersion: PERSONA_VERSION,
@@ -3129,16 +3365,18 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
       dataDir: input.dataDir,
       contentProfile,
     },
-    sessions: [{
-      sessionTag,
-      sessionId: input.sessionId,
-      personaId: input.persona.personaId,
-      personaVersion: input.persona.personaVersion,
-      runSeed: input.runSeed,
-      turns: input.mode === "dry-run" ? turns.length : executedTurns,
-      promptDigest: promptHash.digest("hex"),
-      contractDigest: contractHash.digest("hex"),
-    }],
+    sessions: [
+      {
+        sessionTag,
+        sessionId: input.sessionId,
+        personaId: input.persona.personaId,
+        personaVersion: input.persona.personaVersion,
+        runSeed: input.runSeed,
+        turns: input.mode === "dry-run" ? turns.length : executedTurns,
+        promptDigest: promptHash.digest("hex"),
+        contractDigest: contractHash.digest("hex"),
+      },
+    ],
     turns,
     targetSwaps,
     coverage: plan.scheduler.report(),
@@ -3217,7 +3455,12 @@ export function harnessUsage(): string {
   ].join("\n");
 }
 
-function takeValue(argv: readonly string[], index: number, inline: string | null, flag: string): { value: string; nextIndex: number } {
+function takeValue(
+  argv: readonly string[],
+  index: number,
+  inline: string | null,
+  flag: string,
+): { value: string; nextIndex: number } {
   if (inline !== null) {
     if (inline.length === 0) throw new Error(`${flag} requires a value`);
     return { value: inline, nextIndex: index };
@@ -3280,9 +3523,12 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
       }
       case "--personas": {
         const taken = takeValue(argv, index, inline, flag);
-        const parsed = taken.value.split(",").map(entry => entry.trim()).filter(entry => entry.length > 0);
+        const parsed = taken.value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0);
         if (parsed.length === 0) throw new Error("--personas requires at least one archetype");
-        personas = parsed.map(entry => {
+        personas = parsed.map((entry) => {
           const archetype = entry.endsWith(".v1") ? entry.slice(0, -3) : entry;
           if (!isPersonaArchetype(archetype)) throw new Error(`unknown persona: ${entry}`);
           return archetype;
@@ -3298,7 +3544,8 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
       }
       case "--seed": {
         const taken = takeValue(argv, index, inline, flag);
-        if (!/^[A-Za-z0-9_-]+$/.test(taken.value)) throw new Error("--seed must be a tag-safe token (letters, digits, dash, underscore)");
+        if (!/^[A-Za-z0-9_-]+$/.test(taken.value))
+          throw new Error("--seed must be a tag-safe token (letters, digits, dash, underscore)");
         seed = taken.value;
         index = taken.nextIndex;
         break;
@@ -3311,7 +3558,10 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
       }
       case "--session-id": {
         const taken = takeValue(argv, index, inline, flag);
-        sessionIds = taken.value.split(",").map(entry => entry.trim()).filter(entry => entry.length > 0);
+        sessionIds = taken.value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0);
         if (sessionIds.length === 0) throw new Error("--session-id requires at least one id");
         index = taken.nextIndex;
         break;
@@ -3384,7 +3634,8 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
       }
       case "--focus-family": {
         const taken = takeValue(argv, index, inline, flag);
-        if (!isMechanicFamily(taken.value)) throw new Error(`--focus-family must be one of ${MECHANIC_FAMILIES.join(", ")}`);
+        if (!isMechanicFamily(taken.value))
+          throw new Error(`--focus-family must be one of ${MECHANIC_FAMILIES.join(", ")}`);
         focusFamily = taken.value;
         index = taken.nextIndex;
         break;
@@ -3415,18 +3666,39 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   if ((focusFamily === null) !== (focusMode === null)) {
     throw new Error("--focus-family and --focus-mode must be used together");
   }
-  const focus: CoverageCell | null = focusFamily !== null && focusMode !== null
-    ? { family: focusFamily, failureMode: focusMode }
-    : null;
+  const focus: CoverageCell | null =
+    focusFamily !== null && focusMode !== null ? { family: focusFamily, failureMode: focusMode } : null;
   let parsedBase: URL;
   try {
     parsedBase = new URL(baseUrl);
   } catch {
     throw new Error("--api-base-url must be a valid URL");
   }
-  if (!(["http:", "https:"] as string[]).includes(parsedBase.protocol)) throw new Error("--api-base-url must be an HTTP(S) URL");
+  if (!(["http:", "https:"] as string[]).includes(parsedBase.protocol))
+    throw new Error("--api-base-url must be an HTTP(S) URL");
   baseUrl = parsedBase.toString().replace(/\/+$/, "");
-  return { turns, personas, seed, runs, campaignId, sessionIds, actorId, out, dryRun, syntheticTag, runId, sheetSummary, baseUrl, maxConfirmationRounds, dataDir, contentProfile, menuWindow, directWeight, focus, help };
+  return {
+    turns,
+    personas,
+    seed,
+    runs,
+    campaignId,
+    sessionIds,
+    actorId,
+    out,
+    dryRun,
+    syntheticTag,
+    runId,
+    sheetSummary,
+    baseUrl,
+    maxConfirmationRounds,
+    dataDir,
+    contentProfile,
+    menuWindow,
+    directWeight,
+    focus,
+    help,
+  };
 }
 
 export type HarnessCliIo = {
@@ -3436,14 +3708,20 @@ export type HarnessCliIo = {
 };
 
 const defaultIo: HarnessCliIo = {
-  out: text => process.stdout.write(`${text}\n`),
-  err: text => process.stderr.write(`${text}\n`),
+  out: (text) => process.stdout.write(`${text}\n`),
+  err: (text) => process.stderr.write(`${text}\n`),
   fetchImpl: fetch,
 };
 
 function readGitCommit(cwd: string): string | null {
   try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null;
+    return (
+      execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim() || null
+    );
   } catch {
     return null;
   }
@@ -3452,19 +3730,29 @@ function readGitCommit(cwd: string): string | null {
 /** Prints a compact, deterministic run summary (never contains credentials or resume tokens). */
 export function renderManifestSummary(manifest: HarnessManifest): string[] {
   const lines: string[] = [];
-  lines.push(`synthetic-player-harness ${manifest.harnessVersion} — ${manifest.mode} — run ${manifest.runId} — state ${manifest.state}`);
-  lines.push(`seed=${manifest.seed} runSeed=${manifest.runSeed} generator=${manifest.generator.provider}:${manifest.generator.model}`);
+  lines.push(
+    `synthetic-player-harness ${manifest.harnessVersion} — ${manifest.mode} — run ${manifest.runId} — state ${manifest.state}`,
+  );
+  lines.push(
+    `seed=${manifest.seed} runSeed=${manifest.runSeed} generator=${manifest.generator.provider}:${manifest.generator.model}`,
+  );
   for (const session of manifest.sessions) {
-    lines.push(`  sessionTag ${session.sessionTag} -> sessionId ${session.sessionId ?? "(unbound; pass --session-id before live play)"}`);
+    lines.push(
+      `  sessionTag ${session.sessionTag} -> sessionId ${session.sessionId ?? "(unbound; pass --session-id before live play)"}`,
+    );
   }
   for (const turn of manifest.turns) {
-    lines.push(`  turn ${turn.turnIndex} target=${turn.target.family}/${turn.target.failureMode} effort=${turn.effort} seed=${turn.turnSeed} noise=[${turn.noiseApplied.join(",")}] outcome=${turn.outcome}${turn.turnId ? ` turnId=${turn.turnId}` : ""}`);
+    lines.push(
+      `  turn ${turn.turnIndex} target=${turn.target.family}/${turn.target.failureMode} effort=${turn.effort} seed=${turn.turnSeed} noise=[${turn.noiseApplied.join(",")}] outcome=${turn.outcome}${turn.turnId ? ` turnId=${turn.turnId}` : ""}`,
+    );
     lines.push(`    declaration: ${JSON.stringify(turn.declaration)}`);
   }
   const totals = manifest.coverage.totals;
-  lines.push(`coverage: planned ${totals.planned}/${totals.target}, achieved ${totals.achieved}/${totals.target}, remaining ${totals.remaining}, satisfied cells ${totals.satisfiedCells}/${totals.totalCells}`);
+  lines.push(
+    `coverage: planned ${totals.planned}/${totals.target}, achieved ${totals.achieved}/${totals.target}, remaining ${totals.remaining}, satisfied cells ${totals.satisfiedCells}/${totals.totalCells}`,
+  );
   const turnCount = manifest.turns.length;
-  const share = (count: number): string => turnCount === 0 ? "n/a" : `${Math.round((count / turnCount) * 100)}%`;
+  const share = (count: number): string => (turnCount === 0 ? "n/a" : `${Math.round((count / turnCount) * 100)}%`);
   lines.push(`advertised: ${totals.advertisedTotal}/${turnCount} (${share(totals.advertisedTotal)})`);
   lines.push(`acted: ${totals.actedTotal}/${turnCount} (${share(totals.actedTotal)})`);
   if (manifest.menuWindow > 1) {
@@ -3473,10 +3761,14 @@ export function renderManifestSummary(manifest: HarnessManifest): string[] {
   }
   const human = manifest.humanLikeness;
   const humanPct = (value: number): string => `${(value * 100).toFixed(1)}%`;
-  lines.push(`human-likeness: ${human.turns} turns, median ${human.medianWords} words, p90 ${human.p90Words}, low-effort ${humanPct(human.lowEffortShare)}, long ${humanPct(human.longShare)}, burstiness ${human.burstiness}, distinct-1 ${human.distinct1}, distinct-2 ${human.distinct2}`);
-  lines.push(`  near-duplicate share ${human.nearDuplicateShare} (max trigram Jaccard >= ${NEAR_DUPLICATE_JACCARD}), verbatim reuses ${human.verbatimReuses}, OOC ${humanPct(human.oocShare)}, questions ${humanPct(human.questionShare)}, noise ${humanPct(human.noiseShare)}, mixed intent ${humanPct(human.mixedIntentShare)}, off-menu ${humanPct(human.offMenuShare)}`);
+  lines.push(
+    `human-likeness: ${human.turns} turns, median ${human.medianWords} words, p90 ${human.p90Words}, low-effort ${humanPct(human.lowEffortShare)}, long ${humanPct(human.longShare)}, burstiness ${human.burstiness}, distinct-1 ${human.distinct1}, distinct-2 ${human.distinct2}`,
+  );
+  lines.push(
+    `  near-duplicate share ${human.nearDuplicateShare} (max trigram Jaccard >= ${NEAR_DUPLICATE_JACCARD}), verbatim reuses ${human.verbatimReuses}, OOC ${humanPct(human.oocShare)}, questions ${humanPct(human.questionShare)}, noise ${humanPct(human.noiseShare)}, mixed intent ${humanPct(human.mixedIntentShare)}, off-menu ${humanPct(human.offMenuShare)}`,
+  );
   if (human.topRepeatedPhrases.length > 0) {
-    const motifs = human.topRepeatedPhrases.map(entry => `"${entry.phrase}" x${entry.count}`).join(", ");
+    const motifs = human.topRepeatedPhrases.map((entry) => `"${entry.phrase}" x${entry.count}`).join(", ");
     lines.push(`  repeated motifs: ${motifs}`);
   }
   return lines;
@@ -3516,16 +3808,21 @@ export async function runHarnessCli(
     if (missing.length > 0) throw new Error(`live mode requires ${missing.join(", ")} (or pass --dry-run)`);
   }
 
-  const personas = options.personas.map(archetype => PERSONAS[archetype]);
+  const personas = options.personas.map((archetype) => PERSONAS[archetype]);
   const generatorIdentity: GeneratorIdentity = dryRun
     ? { provider: "fake", model: "deterministic-fake-generator", baseUrlDigest: null, temperature: null }
     : {
-      provider: "openai-compatible",
-      model: (generatorConfig as GeneratorEnvConfig).model,
-      baseUrlDigest: createHash("sha256").update((generatorConfig as GeneratorEnvConfig).baseUrl).digest("hex").slice(0, 16),
-      temperature: (generatorConfig as GeneratorEnvConfig).temperature,
-    };
-  const generateTurn = dryRun ? createFakeGenerator() : createLiveGenerator(generatorConfig as GeneratorEnvConfig, io.fetchImpl);
+        provider: "openai-compatible",
+        model: (generatorConfig as GeneratorEnvConfig).model,
+        baseUrlDigest: createHash("sha256")
+          .update((generatorConfig as GeneratorEnvConfig).baseUrl)
+          .digest("hex")
+          .slice(0, 16),
+        temperature: (generatorConfig as GeneratorEnvConfig).temperature,
+      };
+  const generateTurn = dryRun
+    ? createFakeGenerator()
+    : createLiveGenerator(generatorConfig as GeneratorEnvConfig, io.fetchImpl);
   const dataDir = options.dataDir;
   const startedAt = new Date().toISOString();
   const gitCommit = readGitCommit(process.cwd());
@@ -3534,12 +3831,14 @@ export async function runHarnessCli(
     const label = sessionIndexLabel(runIndex);
     const persona = personas[runIndex % personas.length] as PersonaDefinition;
     const runSeed = options.runs === 1 ? options.seed : `${options.seed}-${label}`;
-    const runId = options.runId !== null
-      ? (options.runs === 1 ? options.runId : `${options.runId}-${label}`)
-      : `synth-${options.seed}${options.runs === 1 ? "" : `-${label}`}`;
-    const sessionId = options.sessionIds.length > 0
-      ? options.sessionIds[runIndex % options.sessionIds.length] as string
-      : null;
+    const runId =
+      options.runId !== null
+        ? options.runs === 1
+          ? options.runId
+          : `${options.runId}-${label}`
+        : `synth-${options.seed}${options.runs === 1 ? "" : `-${label}`}`;
+    const sessionId =
+      options.sessionIds.length > 0 ? (options.sessionIds[runIndex % options.sessionIds.length] as string) : null;
     // The tag keeps the user seed and the session index; the per-run seed adds the index label.
     const sessionTag = options.syntheticTag ?? sessionTagFor(persona.archetype, options.seed, runIndex);
     const notes: string[] = dryRun
@@ -3548,19 +3847,19 @@ export async function runHarnessCli(
     const submitTurn: SubmitTurnFn | null = dryRun
       ? null
       : (() => {
-        const driver = new SessionDriver({
-          baseUrl: options.baseUrl,
-          campaignId: options.campaignId as string,
-          sessionId: sessionId as string,
-          actorId: options.actorId as string,
-          runId,
-          persona,
-          sessionTag,
-          fetchImpl: io.fetchImpl,
-          maxConfirmationRounds: options.maxConfirmationRounds,
-        });
-        return request => driver.submitTurn(request);
-      })();
+          const driver = new SessionDriver({
+            baseUrl: options.baseUrl,
+            campaignId: options.campaignId as string,
+            sessionId: sessionId as string,
+            actorId: options.actorId as string,
+            runId,
+            persona,
+            sessionTag,
+            fetchImpl: io.fetchImpl,
+            maxConfirmationRounds: options.maxConfirmationRounds,
+          });
+          return (request) => driver.submitTurn(request);
+        })();
 
     const manifest = await runHarnessSession({
       runId,

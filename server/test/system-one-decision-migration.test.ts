@@ -4,10 +4,22 @@ import { describe, expect, it } from "vitest";
 import { ensureCurrentSchema } from "../src/repo/db/schema.js";
 
 const asset = (name: string) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8");
-const predecessorSql = () => asset("currentSchema.sql") + "\n" + asset("campaignDmSchema.sql") + "\n"
-  + asset("recallSchema.sql") + "\n" + asset("contextInspectionProvenanceSchema.sql") + "\n"
-  + asset("npcKnowledgeSchema.sql") + "\n" + asset("combatMarkerSchema.sql") + "\n"
-  + asset("attunementSchema.sql") + "\n" + asset("combatReadyActionSchema.sql");
+const predecessorSql = () =>
+  asset("currentSchema.sql") +
+  "\n" +
+  asset("campaignDmSchema.sql") +
+  "\n" +
+  asset("recallSchema.sql") +
+  "\n" +
+  asset("contextInspectionProvenanceSchema.sql") +
+  "\n" +
+  asset("npcKnowledgeSchema.sql") +
+  "\n" +
+  asset("combatMarkerSchema.sql") +
+  "\n" +
+  asset("attunementSchema.sql") +
+  "\n" +
+  asset("combatReadyActionSchema.sql");
 
 describe("system one decision schema migration", () => {
   it("adds only the decision sidecar to the exact predecessor without backfill", () => {

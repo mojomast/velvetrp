@@ -60,10 +60,7 @@ export function applyCalibration(probability: number, calibration: PlattCalibrat
  * Applies a calibration to an optional emitted signal; `null` passes through unchanged.
  * The identity map short-circuits so the default path returns the exact raw value.
  */
-export function calibrateTopSignal(
-  topSignal: number | null,
-  calibration: PlattCalibration,
-): number | null {
+export function calibrateTopSignal(topSignal: number | null, calibration: PlattCalibration): number | null {
   if (topSignal === null) return null;
   if (calibration.a === 1 && calibration.b === 0) return topSignal;
   return applyCalibration(topSignal, calibration);
@@ -81,7 +78,8 @@ export interface PlattFitOptions {
 function validateOptions(iterations: number, learningRate: number, regularization: number): void {
   if (!Number.isInteger(iterations) || iterations < 1) throw new RangeError("iterations must be a positive integer");
   if (!Number.isFinite(learningRate) || learningRate <= 0) throw new RangeError("learningRate must be positive");
-  if (!Number.isFinite(regularization) || regularization < 0) throw new RangeError("regularization must be non-negative");
+  if (!Number.isFinite(regularization) || regularization < 0)
+    throw new RangeError("regularization must be non-negative");
 }
 
 /**

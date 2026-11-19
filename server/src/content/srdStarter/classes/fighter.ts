@@ -33,11 +33,17 @@ const FIGHTER_FEATURE_NOTES: Record<number, string> = {
 };
 
 /** Bounded numeric feature capacity layered on top of each level's hit die grant. */
-const FIGHTER_FEATURE_GRANTS: Record<number, readonly { resourceId: string; maxIncrease: number; currentIncrease: number; recovery?: "short-rest" | "long-rest" }[]> = {
+const FIGHTER_FEATURE_GRANTS: Record<
+  number,
+  readonly { resourceId: string; maxIncrease: number; currentIncrease: number; recovery?: "short-rest" | "long-rest" }[]
+> = {
   2: [{ resourceId: "action-surge", maxIncrease: 1, currentIncrease: 1, recovery: "short-rest" }],
   9: [{ resourceId: "indomitable", maxIncrease: 1, currentIncrease: 1, recovery: "long-rest" }],
   13: [{ resourceId: "indomitable", maxIncrease: 1, currentIncrease: 1, recovery: "long-rest" }],
-  17: [{ resourceId: "action-surge", maxIncrease: 1, currentIncrease: 1, recovery: "short-rest" }, { resourceId: "indomitable", maxIncrease: 1, currentIncrease: 1, recovery: "long-rest" }],
+  17: [
+    { resourceId: "action-surge", maxIncrease: 1, currentIncrease: 1, recovery: "short-rest" },
+    { resourceId: "indomitable", maxIncrease: 1, currentIncrease: 1, recovery: "long-rest" },
+  ],
 };
 
 function levelReference(refs: StarterReferences, level: number) {
@@ -68,9 +74,15 @@ export function fighterDefinition(refs: StarterReferences) {
   return {
     reference: refs.klass,
     name: "Fighter",
-    description: "Bounded SRD 5.1 Fighter progression covers levels 1-20 as metadata, including the Champion Martial Archetype. Fighting Style, Action Surge, Extra Attack, and Indomitable remain unsupported at runtime.",
+    description:
+      "Bounded SRD 5.1 Fighter progression covers levels 1-20 as metadata, including the Champion Martial Archetype. Fighting Style, Action Surge, Extra Attack, and Indomitable remain unsupported at runtime.",
     tags: ["srd-5.1", "fighter", UNSUPPORTED_TAG],
-    mechanics: { hitDie: FIGHTER_HIT_DIE, primaryAttribute: "strength", savingAttributes: ["strength", "constitution"], levelRefs: FIGHTER_LEVEL_NUMBERS.map((level) => levelReference(refs, level)) },
+    mechanics: {
+      hitDie: FIGHTER_HIT_DIE,
+      primaryAttribute: "strength",
+      savingAttributes: ["strength", "constitution"],
+      levelRefs: FIGHTER_LEVEL_NUMBERS.map((level) => levelReference(refs, level)),
+    },
   };
 }
 
@@ -83,7 +95,28 @@ export function fighterLevels(refs: StarterReferences) {
     name: `Fighter Level ${number}`,
     description: featureDescription(number),
     tags: ["srd-5.1", UNSUPPORTED_TAG, `${FIGHTER_SLUG}-${number}`],
-    mechanics: { classRef: classReference, level: number, proficiencyBonus: proficiencyBonusFor(number), hpGain: number === 1 ? FIGHTER_HIT_DIE : FIGHTER_HP_GAIN, abilityRefs, spellRefs: [] as string[], resourceGrants: resourceGrants(number), ...(number === 3 ? { progressionChoices: [{ choiceId: "fighter-subclass", required: true as const, count: 1 as const, kind: "subclass" as const, options: [subclass] }] } : {}) },
+    mechanics: {
+      classRef: classReference,
+      level: number,
+      proficiencyBonus: proficiencyBonusFor(number),
+      hpGain: number === 1 ? FIGHTER_HIT_DIE : FIGHTER_HP_GAIN,
+      abilityRefs,
+      spellRefs: [] as string[],
+      resourceGrants: resourceGrants(number),
+      ...(number === 3
+        ? {
+            progressionChoices: [
+              {
+                choiceId: "fighter-subclass",
+                required: true as const,
+                count: 1 as const,
+                kind: "subclass" as const,
+                options: [subclass],
+              },
+            ],
+          }
+        : {}),
+    },
   });
   return [
     level(1, [attack, secondWind]),
@@ -94,11 +127,14 @@ export function fighterLevels(refs: StarterReferences) {
 }
 
 export function fighterSubclasses(refs: StarterReferences) {
-  return [{
-    reference: championReference(refs),
-    name: "Champion",
-    description: "Bounded SRD 5.1 Champion Martial Archetype metadata for the Fighter class; Improved Critical, Remarkable Athlete, Additional Fighting Style, Superior Critical, and Survivor remain unsupported at runtime.",
-    tags: ["srd-5.1", "subclass", "fighter"],
-    mechanics: { classRef: refs.klass, level: 3, abilityRefs: [] as string[] },
-  }];
+  return [
+    {
+      reference: championReference(refs),
+      name: "Champion",
+      description:
+        "Bounded SRD 5.1 Champion Martial Archetype metadata for the Fighter class; Improved Critical, Remarkable Athlete, Additional Fighting Style, Superior Critical, and Survivor remain unsupported at runtime.",
+      tags: ["srd-5.1", "subclass", "fighter"],
+      mechanics: { classRef: refs.klass, level: 3, abilityRefs: [] as string[] },
+    },
+  ];
 }

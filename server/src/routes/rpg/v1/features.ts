@@ -20,7 +20,9 @@ import {
   campaignRoomLinkingResponseSchema,
   campaignStarterSetupRequestSchema,
   campaignStarterSetupResponseSchema,
-  resourceIdSchema, SRD_5_1_STARTER_ID, SRD_5_1_STARTER_IDENTITY,
+  resourceIdSchema,
+  SRD_5_1_STARTER_ID,
+  SRD_5_1_STARTER_IDENTITY,
 } from "@velvet/contracts";
 import type {
   Campaign,
@@ -163,8 +165,8 @@ import { combatConsumablesHttpRoutes } from "./combatConsumables.js";
 import { combatPowersHttpRoutes } from "./combatPowers.js";
 import { worldHttpRoutes } from "./worldRoutes.js";
 import type { WorldRepository } from "../../../repo/worldRepo.js";
-import {npcHttpRoutes} from "./npcRoutes.js";
-import {factionHttpRoutes} from "./factionRoutes.js";
+import { npcHttpRoutes } from "./npcRoutes.js";
+import { factionHttpRoutes } from "./factionRoutes.js";
 import { npcPresenceHttpRoutes } from "./npcPresenceRoutes.js";
 import { companionAdministrationHttpRoutes } from "./companionAdministration.js";
 import type { CompanionRepository } from "../../../repo/companionRepo.js";
@@ -178,44 +180,111 @@ import type { CampaignContextInspectionReadRepository } from "../../../repo/camp
 import { readSupra2ImageConfig } from "../../../provider/supra2ImageService.js";
 
 /** Shared lazy repository shape from which each RPG HTTP lane selects a narrow capability set. */
-export interface CampaignListRepository extends
-  Partial<OriginalStarterSetupRepository>,
-  Partial<CampaignDiceRepository>,
-  Partial<Pick<CharacterBuilderRepository, "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">>,
-  Partial<Pick<CharacterProgressionRepository, "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">>,
-  Partial<Pick<CampaignAdministrationRepository,
-    "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation"
-    | "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
-    | "detachAuditedCampaignRoom" | "listCampaignTimelineHistory" | "createCampaignCheckpoint"
-    | "listCampaignCheckpoints" | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
-    | "getCampaignAdministrationReceipt" | "dryRunCampaignImport" | "applyCampaignImportById" | "readCampaignExport">>,
-  Partial<QuestRepository>,
-  Partial<StoryRepository>,
-  Partial<Pick<ActorResourceRepository, "getActorResourceSnapshot" | "changeActorResourceForActor">>,
-  Partial<Pick<InventoryRepository, "getActorInventorySnapshot" | "mutateInventoryForActor">>,
-  Partial<Pick<RestRepository, "takeRest">>,
-  Partial<Pick<AttunementRepository, "listActorAttunements" | "attuneActorItem" | "dropActorAttunement">>,
-  Partial<Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">>,
-  Partial<Pick<AdventureCommerceRepository, "requestVendorSaleQuote" | "getNpcShop">>,
-  Partial<Pick<CheckRepository, "resolveActorCheck">>,
-  Partial<Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">>,
-  Partial<Pick<SpellcastingRepository, "castSpell">>,
-  Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
-  Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter" | "cancelPreparingEncounter">>,
-  Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">>,
-  Partial<Pick<EncounterRepository, "resolveCombatAction" | "executeCombatEnemyTurn" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "getCombatRewardClaimResult">>,
-  Partial<Pick<EncounterRepository, "getUseConsumableLegalActions" | "useConsumable" | "getUseConsumableCommandResultByKey">>,
-  Partial<Pick<EncounterRepository, "getCombatPowerLegalActions" | "useCombatPower" | "getCombatPowerResultByKey">>,
-  Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor" | "placeActor">>,
-  Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
-  Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation"|"resolveFactionReaction"|"setFactionRelation"|"changeActorFactionMembership"|"changeNpcFactionMembership">>,
-  Partial<Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">>,
-  Partial<Pick<CompanionRepository,
-    "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">>,
-  Partial<TacticalMapRepository>,
-  Partial<CampaignStartingLocationRepository>,
-  Partial<CampaignAdministrationIntegrationRepository>,
-  Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
+export interface CampaignListRepository
+  extends
+    Partial<OriginalStarterSetupRepository>,
+    Partial<CampaignDiceRepository>,
+    Partial<
+      Pick<
+        CharacterBuilderRepository,
+        "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft"
+      >
+    >,
+    Partial<
+      Pick<
+        CharacterProgressionRepository,
+        "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression"
+      >
+    >,
+    Partial<
+      Pick<
+        CampaignAdministrationRepository,
+        | "getCampaignAdministration"
+        | "updateCampaignAdministration"
+        | "archiveCampaignWithConfirmation"
+        | "addAuditedCampaignMembership"
+        | "changeAuditedCampaignMembershipRole"
+        | "removeAuditedCampaignMembership"
+        | "detachAuditedCampaignRoom"
+        | "listCampaignTimelineHistory"
+        | "createCampaignCheckpoint"
+        | "listCampaignCheckpoints"
+        | "forkCampaignTimeline"
+        | "createCampaignRecap"
+        | "listCampaignRecaps"
+        | "getCampaignAdministrationReceipt"
+        | "dryRunCampaignImport"
+        | "applyCampaignImportById"
+        | "readCampaignExport"
+      >
+    >,
+    Partial<QuestRepository>,
+    Partial<StoryRepository>,
+    Partial<Pick<ActorResourceRepository, "getActorResourceSnapshot" | "changeActorResourceForActor">>,
+    Partial<Pick<InventoryRepository, "getActorInventorySnapshot" | "mutateInventoryForActor">>,
+    Partial<Pick<RestRepository, "takeRest">>,
+    Partial<Pick<AttunementRepository, "listActorAttunements" | "attuneActorItem" | "dropActorAttunement">>,
+    Partial<Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">>,
+    Partial<Pick<AdventureCommerceRepository, "requestVendorSaleQuote" | "getNpcShop">>,
+    Partial<Pick<CheckRepository, "resolveActorCheck">>,
+    Partial<Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">>,
+    Partial<Pick<SpellcastingRepository, "castSpell">>,
+    Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
+    Partial<
+      Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter" | "cancelPreparingEncounter">
+    >,
+    Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">>,
+    Partial<
+      Pick<
+        EncounterRepository,
+        | "resolveCombatAction"
+        | "executeCombatEnemyTurn"
+        | "endCombat"
+        | "getCombatCommandResult"
+        | "claimCombatReward"
+        | "getCombatRewardClaimResult"
+      >
+    >,
+    Partial<
+      Pick<EncounterRepository, "getUseConsumableLegalActions" | "useConsumable" | "getUseConsumableCommandResultByKey">
+    >,
+    Partial<Pick<EncounterRepository, "getCombatPowerLegalActions" | "useCombatPower" | "getCombatPowerResultByKey">>,
+    Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor" | "placeActor">>,
+    Partial<Pick<WorldRepository, "listCampaignNpcs" | "createCampaignNpc" | "changeNpcRelationship">>,
+    Partial<
+      Pick<
+        WorldRepository,
+        | "listCampaignFactions"
+        | "createCampaignFaction"
+        | "changeFactionReputation"
+        | "resolveFactionReaction"
+        | "setFactionRelation"
+        | "changeActorFactionMembership"
+        | "changeNpcFactionMembership"
+      >
+    >,
+    Partial<Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">>,
+    Partial<
+      Pick<
+        CompanionRepository,
+        "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant"
+      >
+    >,
+    Partial<TacticalMapRepository>,
+    Partial<CampaignStartingLocationRepository>,
+    Partial<CampaignAdministrationIntegrationRepository>,
+    Partial<
+      Pick<
+        ContentCatalogRepository,
+        | "validateContentCatalog"
+        | "publishContentCatalog"
+        | "listContentCatalogPublicationPage"
+        | "getContentCatalogForOwner"
+        | "getCampaignContentCatalog"
+        | "configureCampaignCatalog"
+        | "resolveCampaignCatalog"
+      >
+    > {
   getAdventureTurn?: AdventureTurnRepository["getAdventureTurn"];
   getAdventureTurnByInitialIdempotencyKey?: AdventureTurnRepository["getAdventureTurnByInitialIdempotencyKey"];
   getCampaignPlayBootstrap?: Repository["getCampaignPlayBootstrap"];
@@ -238,28 +307,31 @@ export interface CampaignListRepository extends
   getCampaign?(actorPrincipalId: string, campaignId: string): CampaignAccess | null;
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
-  listPublicCampaignEvents?(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
+  listPublicCampaignEvents?(
+    actorPrincipalId: string,
+    campaignId: string,
+    timelineId: string,
+    afterRevision: number,
+    limit: number,
+  ): CampaignEventPage;
   getCommandReceipt?: Repository["getCommandReceipt"];
-  getAgentCombatReceipt?:Repository["getAgentCombatReceipt"];
-  getExactCandidateTravelPublicReceipt?:Repository["getExactCandidateTravelPublicReceipt"];
-  getAdventureCheckPublicReceipt?:Repository["getAdventureCheckPublicReceipt"];
-  getAdventureInventoryPublicReceipt?:Repository["getAdventureInventoryPublicReceipt"];
-  getAdventureCommercePublicReceipt?:Repository["getAdventureCommercePublicReceipt"];
-  getAdventurePowerPublicReceipt?:Repository["getAdventurePowerPublicReceipt"];
-  getAdventureRestPublicReceipt?:Repository["getAdventureRestPublicReceipt"];
-  getAdventureQuestLifecyclePublicReceipt?:Repository["getAdventureQuestLifecyclePublicReceipt"];
-  getAdventureProgressionPublicReceipt?:Repository["getAdventureProgressionPublicReceipt"];
-  getAdventureCombatConsumablePublicReceipt?:Repository["getAdventureCombatConsumablePublicReceipt"];
+  getAgentCombatReceipt?: Repository["getAgentCombatReceipt"];
+  getExactCandidateTravelPublicReceipt?: Repository["getExactCandidateTravelPublicReceipt"];
+  getAdventureCheckPublicReceipt?: Repository["getAdventureCheckPublicReceipt"];
+  getAdventureInventoryPublicReceipt?: Repository["getAdventureInventoryPublicReceipt"];
+  getAdventureCommercePublicReceipt?: Repository["getAdventureCommercePublicReceipt"];
+  getAdventurePowerPublicReceipt?: Repository["getAdventurePowerPublicReceipt"];
+  getAdventureRestPublicReceipt?: Repository["getAdventureRestPublicReceipt"];
+  getAdventureQuestLifecyclePublicReceipt?: Repository["getAdventureQuestLifecyclePublicReceipt"];
+  getAdventureProgressionPublicReceipt?: Repository["getAdventureProgressionPublicReceipt"];
+  getAdventureCombatConsumablePublicReceipt?: Repository["getAdventureCombatConsumablePublicReceipt"];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
   getCampaignCharacterCreationOptions(
     actorPrincipalId: string,
     campaignId: string,
   ): CampaignCharacterCreationOptionsResponse | null;
-  getCampaignCharacterRoster(
-    actorPrincipalId: string,
-    campaignId: string,
-  ): CampaignCharacterRosterSnapshot | null;
+  getCampaignCharacterRoster(actorPrincipalId: string, campaignId: string): CampaignCharacterRosterSnapshot | null;
   getCampaignCharacterWorkspace(
     actorPrincipalId: string,
     campaignId: string,
@@ -271,7 +343,11 @@ export interface CampaignListRepository extends
     campaignCharacterId: string,
   ): import("../../../repo/index.js").CampaignCharacterSheetSnapshot | null;
   getActorGameplaySheet?: ActorGameplaySheetReadRepository["getActorGameplaySheet"];
-  getCampaignCharacter?(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterRead | null;
+  getCampaignCharacter?(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterRead | null;
   listActorResources?(actorPrincipalId: string, campaignId: string, actorId: string): ActorResource[];
   createOriginalStarterCampaignCharacter: OriginalStarterCharacterCreationRepository["createOriginalStarterCampaignCharacter"];
   resolveCampaignCatalog?: MechanicsStarterSetupSnapshotRepository["resolveCampaignCatalog"];
@@ -279,15 +355,8 @@ export interface CampaignListRepository extends
   configureMechanicsStarterCatalog?: MechanicsStarterSetupRepository["configureMechanicsStarterCatalog"];
   installSrdStarterCatalog?: Repository["installSrdStarterCatalog"];
   configureSrdStarterCatalog?: Repository["configureSrdStarterCatalog"];
-  renameCampaignIfUnchanged(
-    actorPrincipalId: string,
-    campaignId: string,
-    input: CampaignRenameRequest,
-  ): Campaign;
-  getCampaignRoomLinkingSnapshot?(
-    actorPrincipalId: string,
-    campaignId: string,
-  ): CampaignRoomLinkingSnapshot | null;
+  renameCampaignIfUnchanged(actorPrincipalId: string, campaignId: string, input: CampaignRenameRequest): Campaign;
+  getCampaignRoomLinkingSnapshot?(actorPrincipalId: string, campaignId: string): CampaignRoomLinkingSnapshot | null;
   attachCampaignSession?(
     actorPrincipalId: string,
     input: { campaignId: string; sessionId: string },
@@ -329,80 +398,181 @@ function logCampaignOperationFailure(
   operation: string,
   level: "error" | "info" = "error",
 ): void {
-  request.log[level]({ operation, method: request.method, route: request.routeOptions.url }, "RPG campaign operation failed");
+  request.log[level](
+    { operation, method: request.method, route: request.routeOptions.url },
+    "RPG campaign operation failed",
+  );
 }
 
-type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
-  "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "rerollCharacterDraft" | "finalizeCharacterDraft">
-  & Required<Pick<CampaignListRepository, "getCampaignCharacter" | "listActorResources">>;
-type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
-  "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">;
+type CharacterBuilderLaneRepository = Pick<
+  CharacterBuilderRepository,
+  | "createCharacterDraft"
+  | "getCharacterDraft"
+  | "updateCharacterDraft"
+  | "rerollCharacterDraft"
+  | "finalizeCharacterDraft"
+> &
+  Required<Pick<CampaignListRepository, "getCampaignCharacter" | "listActorResources">>;
+type CharacterProgressionLaneRepository = Pick<
+  CharacterProgressionRepository,
+  "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression"
+>;
 type CharacterSheetLaneRepository = Required<Pick<CampaignListRepository, "getCampaignCharacterSheetSnapshot">>;
 type ActorGameplaySheetLaneRepository = Required<Pick<CampaignListRepository, "getActorGameplaySheet">>;
-type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
-  "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
-type CampaignTransferLaneRepository = Pick<CampaignAdministrationRepository,
-  "dryRunCampaignImport" | "applyCampaignImportById" | "readCampaignExport">;
-type CampaignMembershipLaneRepository = Pick<CampaignAdministrationRepository,
-  "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
-  | "detachAuditedCampaignRoom"> & {
+type CampaignAdministrationLaneRepository = Pick<
+  CampaignAdministrationRepository,
+  "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation"
+>;
+type CampaignTransferLaneRepository = Pick<
+  CampaignAdministrationRepository,
+  "dryRunCampaignImport" | "applyCampaignImportById" | "readCampaignExport"
+>;
+type CampaignMembershipLaneRepository = Pick<
+  CampaignAdministrationRepository,
+  | "addAuditedCampaignMembership"
+  | "changeAuditedCampaignMembershipRole"
+  | "removeAuditedCampaignMembership"
+  | "detachAuditedCampaignRoom"
+> & {
   listCampaignMemberships(actorPrincipalId: string, campaignId: string): unknown[];
 };
-type CampaignHistoryLaneRepository = Pick<CampaignAdministrationRepository,
-  "listCampaignTimelineHistory" | "createCampaignCheckpoint" | "listCampaignCheckpoints"
-  | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps" | "getCampaignAdministrationReceipt"> & {
-  listPublicCampaignEvents(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
+type CampaignHistoryLaneRepository = Pick<
+  CampaignAdministrationRepository,
+  | "listCampaignTimelineHistory"
+  | "createCampaignCheckpoint"
+  | "listCampaignCheckpoints"
+  | "forkCampaignTimeline"
+  | "createCampaignRecap"
+  | "listCampaignRecaps"
+  | "getCampaignAdministrationReceipt"
+> & {
+  listPublicCampaignEvents(
+    actorPrincipalId: string,
+    campaignId: string,
+    timelineId: string,
+    afterRevision: number,
+    limit: number,
+  ): CampaignEventPage;
   getCommandReceipt: Repository["getCommandReceipt"];
-  getAgentCombatReceipt:Repository["getAgentCombatReceipt"];
-  getExactCandidateTravelPublicReceipt:Repository["getExactCandidateTravelPublicReceipt"];
-  getAdventureCheckPublicReceipt:Repository["getAdventureCheckPublicReceipt"];
-  getAdventureInventoryPublicReceipt:Repository["getAdventureInventoryPublicReceipt"];
-  getAdventureCommercePublicReceipt:Repository["getAdventureCommercePublicReceipt"];
-  getAdventurePowerPublicReceipt:Repository["getAdventurePowerPublicReceipt"];
-  getAdventureRestPublicReceipt:Repository["getAdventureRestPublicReceipt"];
+  getAgentCombatReceipt: Repository["getAgentCombatReceipt"];
+  getExactCandidateTravelPublicReceipt: Repository["getExactCandidateTravelPublicReceipt"];
+  getAdventureCheckPublicReceipt: Repository["getAdventureCheckPublicReceipt"];
+  getAdventureInventoryPublicReceipt: Repository["getAdventureInventoryPublicReceipt"];
+  getAdventureCommercePublicReceipt: Repository["getAdventureCommercePublicReceipt"];
+  getAdventurePowerPublicReceipt: Repository["getAdventurePowerPublicReceipt"];
+  getAdventureRestPublicReceipt: Repository["getAdventureRestPublicReceipt"];
 };
-type QuestLaneRepository = Pick<QuestRepository,
-  "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand">;
-type StoryLaneRepository = Pick<StoryRepository, "getCampaignStory" | "createCampaignStorylineGraph" | "executeStorylineCommand">;
-type ContentCatalogLaneRepository = Pick<ContentCatalogRepository,
-  "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage"
-  | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog"
-  | "resolveCampaignCatalog">;
-type ActorResourceLaneRepository = Pick<ActorResourceRepository,
-  "getActorResourceSnapshot" | "changeActorResourceForActor">;
-type InventoryLaneRepository = Pick<InventoryRepository,
-  "getActorInventorySnapshot" | "mutateInventoryForActor">;
+type QuestLaneRepository = Pick<QuestRepository, "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand">;
+type StoryLaneRepository = Pick<
+  StoryRepository,
+  "getCampaignStory" | "createCampaignStorylineGraph" | "executeStorylineCommand"
+>;
+type ContentCatalogLaneRepository = Pick<
+  ContentCatalogRepository,
+  | "validateContentCatalog"
+  | "publishContentCatalog"
+  | "listContentCatalogPublicationPage"
+  | "getContentCatalogForOwner"
+  | "getCampaignContentCatalog"
+  | "configureCampaignCatalog"
+  | "resolveCampaignCatalog"
+>;
+type ActorResourceLaneRepository = Pick<
+  ActorResourceRepository,
+  "getActorResourceSnapshot" | "changeActorResourceForActor"
+>;
+type InventoryLaneRepository = Pick<InventoryRepository, "getActorInventorySnapshot" | "mutateInventoryForActor">;
 type RestLaneRepository = Pick<RestRepository, "takeRest">;
-type AttunementLaneRepository = Pick<AttunementRepository, "listActorAttunements" | "attuneActorItem" | "dropActorAttunement">;
-type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">
-  & Pick<AdventureCommerceRepository, "requestVendorSaleQuote" | "getNpcShop">;
+type AttunementLaneRepository = Pick<
+  AttunementRepository,
+  "listActorAttunements" | "attuneActorItem" | "dropActorAttunement"
+>;
+type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor"> &
+  Pick<AdventureCommerceRepository, "requestVendorSaleQuote" | "getNpcShop">;
 type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
 type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">;
 type SpellcastingLaneRepository = Pick<SpellcastingRepository, "castSpell">;
 type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">;
-type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "getEncounterSetupCandidates" | "createEncounter" | "startEncounter" | "cancelPreparingEncounter">;
+type EncounterLifecycleLaneRepository = Pick<
+  EncounterRepository,
+  "listEncounters" | "getEncounterSetupCandidates" | "createEncounter" | "startEncounter" | "cancelPreparingEncounter"
+>;
 type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">;
-type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "executeCombatEnemyTurn" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "listCombatRewards" | "getCombatRewardClaimResult">;
-type CombatPowerLaneRepository=Pick<EncounterRepository,"getCombatPowerLegalActions"|"useCombatPower"|"getCombatPowerResultByKey">;
-type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"establishCamp"|"placeActor">;
-type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
-type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation"|"resolveFactionReaction"|"setFactionRelation"|"changeActorFactionMembership"|"changeNpcFactionMembership">;type NpcPresenceHttpLaneRepository = Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">;
-type CompanionAdministrationHttpLaneRepository = Pick<CompanionRepository,
-  "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">;
+type CombatCommandLaneRepository = Pick<
+  EncounterRepository,
+  | "resolveCombatAction"
+  | "executeCombatEnemyTurn"
+  | "endCombat"
+  | "getCombatCommandResult"
+  | "claimCombatReward"
+  | "listCombatRewards"
+  | "getCombatRewardClaimResult"
+>;
+type CombatPowerLaneRepository = Pick<
+  EncounterRepository,
+  "getCombatPowerLegalActions" | "useCombatPower" | "getCombatPowerResultByKey"
+>;
+type WorldHttpLaneRepository = Pick<
+  WorldRepository,
+  "getCampaignWorld" | "travelActor" | "establishCamp" | "placeActor"
+>;
+type NpcHttpLaneRepository = Pick<WorldRepository, "listCampaignNpcs" | "createCampaignNpc" | "changeNpcRelationship">;
+type FactionHttpLaneRepository = Pick<
+  WorldRepository,
+  | "listCampaignFactions"
+  | "createCampaignFaction"
+  | "changeFactionReputation"
+  | "resolveFactionReaction"
+  | "setFactionRelation"
+  | "changeActorFactionMembership"
+  | "changeNpcFactionMembership"
+>;
+type NpcPresenceHttpLaneRepository = Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">;
+type CompanionAdministrationHttpLaneRepository = Pick<
+  CompanionRepository,
+  "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant"
+>;
 type TacticalMapLaneRepository = TacticalMapRepository;
-type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnByInitialIdempotencyKey" | "getAdventureTurnNarration" | "createAdventureTurn"
-  | "waitForToolConfirmation" | "decideToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration">
-  & Required<Pick<CampaignListRepository, "getCampaign">>;
+type AdventureTurnLaneRepository = Pick<
+  AdventureTurnRepository,
+  | "getAdventureTurn"
+  | "getAdventureTurnByInitialIdempotencyKey"
+  | "getAdventureTurnNarration"
+  | "createAdventureTurn"
+  | "waitForToolConfirmation"
+  | "decideToolProposals"
+  | "reconcileAdventureTurnMechanics"
+  | "updateAdventureTurnNarration"
+> &
+  Required<Pick<CampaignListRepository, "getCampaign">>;
 type CampaignPlayLaneRepository = Required<Pick<CampaignListRepository, "getCampaignPlayBootstrap">>;
 type CampaignStartingLocationLaneRepository = CampaignStartingLocationRepository;
-type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
-  | "createGenerationDraft" | "applyEncounterGenerationDraftAtomically" | "applyCampaignContentGenerationDraftAtomically">
-  & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>
-  & Pick<Repository, "stageCampaignGenerationAtomically" | "beginCampaignGenerationCall" | "getCampaignGenerationCall" | "finishCampaignGenerationCall"
-    | "getCampaignGenerationContext" | "recordCampaignGenerationCandidate" | "getCampaignGeneratedFoundation"
-    | "getCampaignGeneratedPlanning" | "getCampaignPublishedMaterials" | "publishCampaignMaterial" | "getSessionZeroSafetyPolicy">;
-type RegionPackLaneRepository = GenerationDraftLaneRepository
-  & { getCampaignStartingLocation: CampaignStartingLocationLaneRepository["getCampaignStartingLocation"] };
+type GenerationDraftLaneRepository = Pick<
+  AdventureTurnRepository,
+  | "getGenerationDraft"
+  | "getGenerationDraftByIdempotencyKey"
+  | "createGenerationDraft"
+  | "applyEncounterGenerationDraftAtomically"
+  | "applyCampaignContentGenerationDraftAtomically"
+> &
+  Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">> &
+  Pick<
+    Repository,
+    | "stageCampaignGenerationAtomically"
+    | "beginCampaignGenerationCall"
+    | "getCampaignGenerationCall"
+    | "finishCampaignGenerationCall"
+    | "getCampaignGenerationContext"
+    | "recordCampaignGenerationCandidate"
+    | "getCampaignGeneratedFoundation"
+    | "getCampaignGeneratedPlanning"
+    | "getCampaignPublishedMaterials"
+    | "publishCampaignMaterial"
+    | "getSessionZeroSafetyPolicy"
+  >;
+type RegionPackLaneRepository = GenerationDraftLaneRepository & {
+  getCampaignStartingLocation: CampaignStartingLocationLaneRepository["getCampaignStartingLocation"];
+};
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -414,12 +584,14 @@ class UnsupportedCampaignRepositoryError extends Error {
 function assertCharacterBuilderRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CharacterBuilderLaneRepository {
-  if (typeof repository.createCharacterDraft !== "function"
-    || typeof repository.getCharacterDraft !== "function"
-    || typeof repository.updateCharacterDraft !== "function"
-    || typeof repository.finalizeCharacterDraft !== "function"
-    || typeof repository.getCampaignCharacter !== "function"
-    || typeof repository.listActorResources !== "function") {
+  if (
+    typeof repository.createCharacterDraft !== "function" ||
+    typeof repository.getCharacterDraft !== "function" ||
+    typeof repository.updateCharacterDraft !== "function" ||
+    typeof repository.finalizeCharacterDraft !== "function" ||
+    typeof repository.getCampaignCharacter !== "function" ||
+    typeof repository.listActorResources !== "function"
+  ) {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
@@ -427,10 +599,12 @@ function assertCharacterBuilderRepository(
 function assertCharacterProgressionRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CharacterProgressionLaneRepository {
-  if (typeof repository.getCharacterProgression !== "function"
-    || typeof repository.previewCharacterProgression !== "function"
-    || typeof repository.grantCharacterXp !== "function"
-    || typeof repository.applyCharacterProgression !== "function") {
+  if (
+    typeof repository.getCharacterProgression !== "function" ||
+    typeof repository.previewCharacterProgression !== "function" ||
+    typeof repository.grantCharacterXp !== "function" ||
+    typeof repository.applyCharacterProgression !== "function"
+  ) {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
@@ -452,9 +626,11 @@ function assertActorGameplaySheetRepository(
 function assertCampaignAdministrationRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CampaignAdministrationLaneRepository {
-  if (typeof repository.getCampaignAdministration !== "function"
-    || typeof repository.updateCampaignAdministration !== "function"
-    || typeof repository.archiveCampaignWithConfirmation !== "function") {
+  if (
+    typeof repository.getCampaignAdministration !== "function" ||
+    typeof repository.updateCampaignAdministration !== "function" ||
+    typeof repository.archiveCampaignWithConfirmation !== "function"
+  ) {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
@@ -462,121 +638,253 @@ function assertCampaignAdministrationRepository(
 function assertCampaignTransferRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CampaignTransferLaneRepository {
-  if (typeof repository.dryRunCampaignImport !== "function"
-    || typeof repository.applyCampaignImportById !== "function"
-    || typeof repository.readCampaignExport !== "function") throw new UnsupportedCampaignRepositoryError();
+  if (
+    typeof repository.dryRunCampaignImport !== "function" ||
+    typeof repository.applyCampaignImportById !== "function" ||
+    typeof repository.readCampaignExport !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertCampaignMembershipRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CampaignMembershipLaneRepository {
-  if (typeof repository.addAuditedCampaignMembership !== "function"
-    || typeof repository.changeAuditedCampaignMembershipRole !== "function"
-    || typeof repository.removeAuditedCampaignMembership !== "function"
-    || typeof repository.detachAuditedCampaignRoom !== "function"
-    || typeof repository.listCampaignMemberships !== "function") throw new UnsupportedCampaignRepositoryError();
+  if (
+    typeof repository.addAuditedCampaignMembership !== "function" ||
+    typeof repository.changeAuditedCampaignMembershipRole !== "function" ||
+    typeof repository.removeAuditedCampaignMembership !== "function" ||
+    typeof repository.detachAuditedCampaignRoom !== "function" ||
+    typeof repository.listCampaignMemberships !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertCampaignHistoryRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CampaignHistoryLaneRepository {
-  if (typeof repository.listCampaignTimelineHistory !== "function"
-    || typeof repository.createCampaignCheckpoint !== "function"
-    || typeof repository.listCampaignCheckpoints !== "function"
-    || typeof repository.forkCampaignTimeline !== "function"
-    || typeof repository.createCampaignRecap !== "function"
-    || typeof repository.listCampaignRecaps !== "function"
-    || typeof repository.getCampaignAdministrationReceipt !== "function"
-    || typeof repository.listPublicCampaignEvents !== "function"
-    || typeof repository.getCommandReceipt !== "function"
-    || typeof repository.getAgentCombatReceipt!=="function"
-    || typeof repository.getExactCandidateTravelPublicReceipt!=="function"
-    || typeof repository.getAdventureCheckPublicReceipt!=="function"
-     || typeof repository.getAdventureInventoryPublicReceipt!=="function"
-     || typeof repository.getAdventureCommercePublicReceipt!=="function"
-     || typeof repository.getAdventurePowerPublicReceipt!=="function"
-     || typeof repository.getAdventureRestPublicReceipt!=="function") throw new UnsupportedCampaignRepositoryError();
+  if (
+    typeof repository.listCampaignTimelineHistory !== "function" ||
+    typeof repository.createCampaignCheckpoint !== "function" ||
+    typeof repository.listCampaignCheckpoints !== "function" ||
+    typeof repository.forkCampaignTimeline !== "function" ||
+    typeof repository.createCampaignRecap !== "function" ||
+    typeof repository.listCampaignRecaps !== "function" ||
+    typeof repository.getCampaignAdministrationReceipt !== "function" ||
+    typeof repository.listPublicCampaignEvents !== "function" ||
+    typeof repository.getCommandReceipt !== "function" ||
+    typeof repository.getAgentCombatReceipt !== "function" ||
+    typeof repository.getExactCandidateTravelPublicReceipt !== "function" ||
+    typeof repository.getAdventureCheckPublicReceipt !== "function" ||
+    typeof repository.getAdventureInventoryPublicReceipt !== "function" ||
+    typeof repository.getAdventureCommercePublicReceipt !== "function" ||
+    typeof repository.getAdventurePowerPublicReceipt !== "function" ||
+    typeof repository.getAdventureRestPublicReceipt !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
 
-function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {
+function assertQuestRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & QuestLaneRepository {
   const methods: Array<keyof QuestLaneRepository> = [
-    "listCampaignQuests", "createCampaignQuest", "executeQuestCommand",
+    "listCampaignQuests",
+    "createCampaignQuest",
+    "executeQuestCommand",
   ];
-  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+  if (methods.some((method) => typeof repository[method] !== "function"))
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertStoryRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & StoryLaneRepository {
-  const methods: Array<keyof StoryLaneRepository> = ["getCampaignStory", "createCampaignStorylineGraph", "executeStorylineCommand"];
-  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+function assertStoryRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & StoryLaneRepository {
+  const methods: Array<keyof StoryLaneRepository> = [
+    "getCampaignStory",
+    "createCampaignStorylineGraph",
+    "executeStorylineCommand",
+  ];
+  if (methods.some((method) => typeof repository[method] !== "function"))
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertContentCatalogRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & ContentCatalogLaneRepository {
-  const methods: Array<keyof ContentCatalogLaneRepository> = ["validateContentCatalog", "publishContentCatalog", "listContentCatalogPublicationPage", "getContentCatalogForOwner", "getCampaignContentCatalog", "configureCampaignCatalog", "resolveCampaignCatalog"];
-  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+function assertContentCatalogRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & ContentCatalogLaneRepository {
+  const methods: Array<keyof ContentCatalogLaneRepository> = [
+    "validateContentCatalog",
+    "publishContentCatalog",
+    "listContentCatalogPublicationPage",
+    "getContentCatalogForOwner",
+    "getCampaignContentCatalog",
+    "configureCampaignCatalog",
+    "resolveCampaignCatalog",
+  ];
+  if (methods.some((method) => typeof repository[method] !== "function"))
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertActorResourceRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & ActorResourceLaneRepository {
-  if (typeof repository.getActorResourceSnapshot !== "function" || typeof repository.changeActorResourceForActor !== "function") {
+function assertActorResourceRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & ActorResourceLaneRepository {
+  if (
+    typeof repository.getActorResourceSnapshot !== "function" ||
+    typeof repository.changeActorResourceForActor !== "function"
+  ) {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
-function assertInventoryRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & InventoryLaneRepository {
-  if (typeof repository.getActorInventorySnapshot !== "function" || typeof repository.mutateInventoryForActor !== "function") {
+function assertInventoryRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & InventoryLaneRepository {
+  if (
+    typeof repository.getActorInventorySnapshot !== "function" ||
+    typeof repository.mutateInventoryForActor !== "function"
+  ) {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
-function assertRestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & RestLaneRepository {
+function assertRestRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & RestLaneRepository {
   if (typeof repository.takeRest !== "function") throw new UnsupportedCampaignRepositoryError();
 }
-function assertAttunementRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & AttunementLaneRepository {
-  if (typeof repository.listActorAttunements !== "function" || typeof repository.attuneActorItem !== "function"
-    || typeof repository.dropActorAttunement !== "function") throw new UnsupportedCampaignRepositoryError();
+function assertAttunementRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & AttunementLaneRepository {
+  if (
+    typeof repository.listActorAttunements !== "function" ||
+    typeof repository.attuneActorItem !== "function" ||
+    typeof repository.dropActorAttunement !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertEconomyRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & EconomyLaneRepository {
-  if (typeof repository.getActorEconomySnapshot !== "function" || typeof repository.getShop !== "function"
-    || typeof repository.mutateEconomyForActor !== "function" || typeof repository.requestVendorSaleQuote !== "function"
-    || typeof repository.getNpcShop !== "function") throw new UnsupportedCampaignRepositoryError();
+function assertEconomyRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & EconomyLaneRepository {
+  if (
+    typeof repository.getActorEconomySnapshot !== "function" ||
+    typeof repository.getShop !== "function" ||
+    typeof repository.mutateEconomyForActor !== "function" ||
+    typeof repository.requestVendorSaleQuote !== "function" ||
+    typeof repository.getNpcShop !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertCheckRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CheckLaneRepository {
+function assertCheckRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CheckLaneRepository {
   if (typeof repository.resolveActorCheck !== "function") throw new UnsupportedCampaignRepositoryError();
 }
-function assertPowerRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & PowerLaneRepository {
-  if (typeof repository.getActorPowerSnapshot !== "function"
-    || typeof repository.useActorPower !== "function") throw new UnsupportedCampaignRepositoryError();
+function assertPowerRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & PowerLaneRepository {
+  if (typeof repository.getActorPowerSnapshot !== "function" || typeof repository.useActorPower !== "function")
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertSpellcastingRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & SpellcastingLaneRepository {
+function assertSpellcastingRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & SpellcastingLaneRepository {
   if (typeof repository.castSpell !== "function") throw new UnsupportedCampaignRepositoryError();
 }
-function assertEffectRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & EffectLaneRepository {
-  if (typeof repository.getActorEffectSnapshot !== "function"
-    || typeof repository.mutateActorEffect !== "function") throw new UnsupportedCampaignRepositoryError();
+function assertEffectRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & EffectLaneRepository {
+  if (typeof repository.getActorEffectSnapshot !== "function" || typeof repository.mutateActorEffect !== "function")
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertEncounterLifecycleRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & EncounterLifecycleLaneRepository {
-  if (typeof repository.listEncounters !== "function" || typeof repository.createEncounter !== "function"
-      || typeof repository.startEncounter !== "function" || typeof repository.cancelPreparingEncounter !== "function") throw new UnsupportedCampaignRepositoryError();
+function assertEncounterLifecycleRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & EncounterLifecycleLaneRepository {
+  if (
+    typeof repository.listEncounters !== "function" ||
+    typeof repository.createEncounter !== "function" ||
+    typeof repository.startEncounter !== "function" ||
+    typeof repository.cancelPreparingEncounter !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertCombatReadRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CombatReadLaneRepository {
-  if (typeof repository.getCombatState !== "function" || typeof repository.listCombatLogPage !== "function" || typeof repository.listCombatRewards !== "function") {
+function assertCombatReadRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CombatReadLaneRepository {
+  if (
+    typeof repository.getCombatState !== "function" ||
+    typeof repository.listCombatLogPage !== "function" ||
+    typeof repository.listCombatRewards !== "function"
+  ) {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
-function assertCombatCommandRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CombatCommandLaneRepository {
-  if(typeof repository.resolveCombatAction!=="function"||typeof repository.executeCombatEnemyTurn!=="function"||typeof repository.endCombat!=="function"||typeof repository.getCombatCommandResult!=="function"||typeof repository.claimCombatReward!=="function"||typeof repository.listCombatRewards!=="function"||typeof repository.getCombatRewardClaimResult!=="function")
+function assertCombatCommandRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CombatCommandLaneRepository {
+  if (
+    typeof repository.resolveCombatAction !== "function" ||
+    typeof repository.executeCombatEnemyTurn !== "function" ||
+    typeof repository.endCombat !== "function" ||
+    typeof repository.getCombatCommandResult !== "function" ||
+    typeof repository.claimCombatReward !== "function" ||
+    typeof repository.listCombatRewards !== "function" ||
+    typeof repository.getCombatRewardClaimResult !== "function"
+  )
     throw new UnsupportedCampaignRepositoryError();
 }
-function assertCombatPowerRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&CombatPowerLaneRepository{if(typeof repository.getCombatPowerLegalActions!=="function"||typeof repository.useCombatPower!=="function"||typeof repository.getCombatPowerResultByKey!=="function")throw new UnsupportedCampaignRepositoryError();}
-type CombatConsumableLaneRepository=Pick<EncounterRepository,"getUseConsumableLegalActions"|"useConsumable"|"getUseConsumableCommandResultByKey">;
-function assertCombatConsumableRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&CombatConsumableLaneRepository{
-  if(typeof repository.getUseConsumableLegalActions!=="function"||typeof repository.useConsumable!=="function"
-    ||typeof repository.getUseConsumableCommandResultByKey!=="function")throw new UnsupportedCampaignRepositoryError();
+function assertCombatPowerRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CombatPowerLaneRepository {
+  if (
+    typeof repository.getCombatPowerLegalActions !== "function" ||
+    typeof repository.useCombatPower !== "function" ||
+    typeof repository.getCombatPowerResultByKey !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertWorldHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&WorldHttpLaneRepository{
-  const candidate=repository as unknown as Record<string,unknown>;
-  if(typeof repository.getCampaignWorld!=="function"||typeof repository.travelActor!=="function"||typeof candidate.establishCamp!=="function"||typeof repository.placeActor!=="function")throw new UnsupportedCampaignRepositoryError();
+type CombatConsumableLaneRepository = Pick<
+  EncounterRepository,
+  "getUseConsumableLegalActions" | "useConsumable" | "getUseConsumableCommandResultByKey"
+>;
+function assertCombatConsumableRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CombatConsumableLaneRepository {
+  if (
+    typeof repository.getUseConsumableLegalActions !== "function" ||
+    typeof repository.useConsumable !== "function" ||
+    typeof repository.getUseConsumableCommandResultByKey !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertNpcHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&NpcHttpLaneRepository{
-  if(typeof repository.listCampaignNpcs!=="function"||typeof repository.createCampaignNpc!=="function"||typeof repository.changeNpcRelationship!=="function")throw new UnsupportedCampaignRepositoryError();
+function assertWorldHttpRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & WorldHttpLaneRepository {
+  const candidate = repository as unknown as Record<string, unknown>;
+  if (
+    typeof repository.getCampaignWorld !== "function" ||
+    typeof repository.travelActor !== "function" ||
+    typeof candidate.establishCamp !== "function" ||
+    typeof repository.placeActor !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertFactionHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&FactionHttpLaneRepository{
-  const methods:Array<keyof FactionHttpLaneRepository>=["listCampaignFactions","createCampaignFaction","changeFactionReputation","resolveFactionReaction","setFactionRelation","changeActorFactionMembership","changeNpcFactionMembership"];
-  if(methods.some((method)=>typeof repository[method]!=="function"))throw new UnsupportedCampaignRepositoryError();
+function assertNpcHttpRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & NpcHttpLaneRepository {
+  if (
+    typeof repository.listCampaignNpcs !== "function" ||
+    typeof repository.createCampaignNpc !== "function" ||
+    typeof repository.changeNpcRelationship !== "function"
+  )
+    throw new UnsupportedCampaignRepositoryError();
+}
+function assertFactionHttpRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & FactionHttpLaneRepository {
+  const methods: Array<keyof FactionHttpLaneRepository> = [
+    "listCampaignFactions",
+    "createCampaignFaction",
+    "changeFactionReputation",
+    "resolveFactionReaction",
+    "setFactionRelation",
+    "changeActorFactionMembership",
+    "changeNpcFactionMembership",
+  ];
+  if (methods.some((method) => typeof repository[method] !== "function"))
+    throw new UnsupportedCampaignRepositoryError();
 }
 function assertNpcPresenceHttpRepository(
   repository: CampaignListRepository,
@@ -589,36 +897,87 @@ function assertCompanionAdministrationHttpRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CompanionAdministrationHttpLaneRepository {
   const methods: Array<keyof CompanionAdministrationHttpLaneRepository> = [
-    "getCompanionManagement", "createCompanion", "createCompanionGrant", "revokeCompanionGrant",
+    "getCompanionManagement",
+    "createCompanion",
+    "createCompanionGrant",
+    "revokeCompanionGrant",
   ];
-  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+  if (methods.some((method) => typeof repository[method] !== "function"))
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertTacticalMapRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & TacticalMapLaneRepository {
-  const methods: Array<keyof TacticalMapLaneRepository> = ["generateTacticalMapForSession", "getTacticalMap", "previewTacticalMapMove", "moveTacticalMapToken"];
-  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+function assertTacticalMapRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & TacticalMapLaneRepository {
+  const methods: Array<keyof TacticalMapLaneRepository> = [
+    "generateTacticalMapForSession",
+    "getTacticalMap",
+    "previewTacticalMapMove",
+    "moveTacticalMapToken",
+  ];
+  if (methods.some((method) => typeof repository[method] !== "function"))
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertAdventureTurnRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & AdventureTurnLaneRepository {
-  const methods: Array<keyof AdventureTurnLaneRepository> = ["getAdventureTurn", "getAdventureTurnByInitialIdempotencyKey", "getAdventureTurnNarration", "createAdventureTurn",
-    "waitForToolConfirmation", "decideToolProposals", "reconcileAdventureTurnMechanics", "updateAdventureTurnNarration", "getCampaign"];
-  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+function assertAdventureTurnRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & AdventureTurnLaneRepository {
+  const methods: Array<keyof AdventureTurnLaneRepository> = [
+    "getAdventureTurn",
+    "getAdventureTurnByInitialIdempotencyKey",
+    "getAdventureTurnNarration",
+    "createAdventureTurn",
+    "waitForToolConfirmation",
+    "decideToolProposals",
+    "reconcileAdventureTurnMechanics",
+    "updateAdventureTurnNarration",
+    "getCampaign",
+  ];
+  if (methods.some((method) => typeof repository[method] !== "function"))
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertCampaignPlayRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CampaignPlayLaneRepository {
+function assertCampaignPlayRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CampaignPlayLaneRepository {
   if (typeof repository.getCampaignPlayBootstrap !== "function") throw new UnsupportedCampaignRepositoryError();
 }
-function assertCampaignStartingLocationRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CampaignStartingLocationLaneRepository {
-  if (typeof repository.getCampaignStartingLocation !== "function" || typeof repository.designateCampaignStartingLocation !== "function") {
+function assertCampaignStartingLocationRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CampaignStartingLocationLaneRepository {
+  if (
+    typeof repository.getCampaignStartingLocation !== "function" ||
+    typeof repository.designateCampaignStartingLocation !== "function"
+  ) {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
-function assertGenerationDraftRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
-  const methods: Array<keyof GenerationDraftLaneRepository> = ["getGenerationDraft", "getGenerationDraftByIdempotencyKey", "createGenerationDraft",
-    "applyEncounterGenerationDraftAtomically", "applyCampaignContentGenerationDraftAtomically", "getCampaign", "getCampaignAdministration",
-    "stageCampaignGenerationAtomically", "beginCampaignGenerationCall", "getCampaignGenerationCall", "finishCampaignGenerationCall",
-    "getCampaignGenerationContext", "recordCampaignGenerationCandidate", "getCampaignGeneratedFoundation",
-    "getCampaignGeneratedPlanning", "getCampaignPublishedMaterials", "publishCampaignMaterial", "getSessionZeroSafetyPolicy"];
-  if (methods.some((method) => typeof (repository as Partial<GenerationDraftLaneRepository>)[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+function assertGenerationDraftRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
+  const methods: Array<keyof GenerationDraftLaneRepository> = [
+    "getGenerationDraft",
+    "getGenerationDraftByIdempotencyKey",
+    "createGenerationDraft",
+    "applyEncounterGenerationDraftAtomically",
+    "applyCampaignContentGenerationDraftAtomically",
+    "getCampaign",
+    "getCampaignAdministration",
+    "stageCampaignGenerationAtomically",
+    "beginCampaignGenerationCall",
+    "getCampaignGenerationCall",
+    "finishCampaignGenerationCall",
+    "getCampaignGenerationContext",
+    "recordCampaignGenerationCandidate",
+    "getCampaignGeneratedFoundation",
+    "getCampaignGeneratedPlanning",
+    "getCampaignPublishedMaterials",
+    "publishCampaignMaterial",
+    "getSessionZeroSafetyPolicy",
+  ];
+  if (methods.some((method) => typeof (repository as Partial<GenerationDraftLaneRepository>)[method] !== "function"))
+    throw new UnsupportedCampaignRepositoryError();
 }
-function assertRegionPackRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & RegionPackLaneRepository {
+function assertRegionPackRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & RegionPackLaneRepository {
   assertGenerationDraftRepository(repository);
   if (typeof repository.getCampaignStartingLocation !== "function") throw new UnsupportedCampaignRepositoryError();
 }
@@ -627,9 +986,7 @@ function assertRegionPackRepository(repository: CampaignListRepository): asserts
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
   let repositoryState:
-    | { status: "ready"; repository: CampaignListRepository }
-    | { status: "failed"; error: unknown }
-    | null = null;
+    { status: "ready"; repository: CampaignListRepository } | { status: "failed"; error: unknown } | null = null;
   let repositoryClosed = false;
   app.addHook("onClose", async () => {
     if (!repositoryClosed) {
@@ -671,8 +1028,10 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   const sceneImageInstallationEnabled = (): boolean => {
     try {
       if (!options.sceneImages) return false;
-      return options.sceneImages.installationEnabled?.()
-        ?? (options.sceneImages.injectedService ? true : readSupra2ImageConfig(process.env).enabled);
+      return (
+        options.sceneImages.installationEnabled?.() ??
+        (options.sceneImages.injectedService ? true : readSupra2ImageConfig(process.env).enabled)
+      );
     } catch {
       return false;
     }
@@ -683,25 +1042,36 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
    * route degrades to scene revision zero and a scene-key prompt instead of
    * blocking generation.
    */
-  const resolveSceneContext: SceneImageSceneResolver = options.sceneImages?.resolveScene ?? ((campaignId, sessionId, actorId) => {
-    try {
-      const repository = getCampaignRepository();
-      if (typeof repository.getCampaignWorld !== "function") return null;
-      const world = repository.getCampaignWorld(LOCAL_CAMPAIGN_PRINCIPAL, campaignId, sessionId);
-      if (!world || world.sessionId !== sessionId) return null;
-      if (actorId !== undefined) {
-        const actorLocation = world.currentLocations.find((entry) => entry.actorId === actorId);
-        if (actorLocation) {
-          const location = world.visibleLocations.find((entry) => entry.locationId === actorLocation.locationId);
-          return { sceneKey: `location:${actorLocation.locationId}`, sceneRevision: actorLocation.revision,
-            locationLabel: location?.name ?? null, locationDescription: location?.description ?? null };
+  const resolveSceneContext: SceneImageSceneResolver =
+    options.sceneImages?.resolveScene ??
+    ((campaignId, sessionId, actorId) => {
+      try {
+        const repository = getCampaignRepository();
+        if (typeof repository.getCampaignWorld !== "function") return null;
+        const world = repository.getCampaignWorld(LOCAL_CAMPAIGN_PRINCIPAL, campaignId, sessionId);
+        if (!world || world.sessionId !== sessionId) return null;
+        if (actorId !== undefined) {
+          const actorLocation = world.currentLocations.find((entry) => entry.actorId === actorId);
+          if (actorLocation) {
+            const location = world.visibleLocations.find((entry) => entry.locationId === actorLocation.locationId);
+            return {
+              sceneKey: `location:${actorLocation.locationId}`,
+              sceneRevision: actorLocation.revision,
+              locationLabel: location?.name ?? null,
+              locationDescription: location?.description ?? null,
+            };
+          }
         }
+        return {
+          sceneKey: `session:${sessionId}`,
+          sceneRevision: world.revision,
+          locationLabel: null,
+          locationDescription: null,
+        };
+      } catch {
+        return null;
       }
-      return { sceneKey: `session:${sessionId}`, sceneRevision: world.revision, locationLabel: null, locationDescription: null };
-    } catch {
-      return null;
-    }
-  });
+    });
   const onNarrationSettled = createSceneImageNarrationHook({
     serviceAccessor: getSceneImageService,
     installationEnabled: sceneImageInstallationEnabled,
@@ -769,7 +1139,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertQuestRepository(repository);
     return repository;
   };
-  const storyRepositoryAccessor = (): StoryLaneRepository => { const repository = getCampaignRepository(); assertStoryRepository(repository); return repository; };
+  const storyRepositoryAccessor = (): StoryLaneRepository => {
+    const repository = getCampaignRepository();
+    assertStoryRepository(repository);
+    return repository;
+  };
   const contentCatalogRepositoryAccessor = (): ContentCatalogLaneRepository => {
     const repository = getCampaignRepository();
     assertContentCatalogRepository(repository);
@@ -780,7 +1154,9 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     return createEncounterPlanningService({
       resolveCampaignCatalog: (actor, campaignId) => repository.resolveCampaignCatalog(actor, campaignId),
       getCampaignContentCatalog: (actor, campaignId, packId, packVersion) =>
-        repository.getCampaignContentCatalog(actor, campaignId, packId, packVersion) as { definitions: readonly EncounterCatalogDefinition[] } | null,
+        repository.getCampaignContentCatalog(actor, campaignId, packId, packVersion) as {
+          definitions: readonly EncounterCatalogDefinition[];
+        } | null,
     });
   };
   const actorResourceRepositoryAccessor = (): ActorResourceLaneRepository => {
@@ -818,7 +1194,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertPowerRepository(repository);
     return repository;
   };
-  const spellcastingRepositoryAccessor = (): SpellcastingLaneRepository => { const repository = getCampaignRepository(); assertSpellcastingRepository(repository); return repository; };
+  const spellcastingRepositoryAccessor = (): SpellcastingLaneRepository => {
+    const repository = getCampaignRepository();
+    assertSpellcastingRepository(repository);
+    return repository;
+  };
   const effectRepositoryAccessor = (): EffectLaneRepository => {
     const repository = getCampaignRepository();
     assertEffectRepository(repository);
@@ -835,15 +1215,35 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     return repository;
   };
   const combatCommandRepositoryAccessor = (): CombatCommandLaneRepository => {
-    const repository=getCampaignRepository();assertCombatCommandRepository(repository);return repository;
+    const repository = getCampaignRepository();
+    assertCombatCommandRepository(repository);
+    return repository;
   };
-  const combatPowerRepositoryAccessor=():CombatPowerLaneRepository=>{const repository=getCampaignRepository();assertCombatPowerRepository(repository);return repository;};
-  const consumableRepositoryAccessor=():CombatConsumableLaneRepository=>{
-    const repository=getCampaignRepository();assertCombatConsumableRepository(repository);return repository;
+  const combatPowerRepositoryAccessor = (): CombatPowerLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCombatPowerRepository(repository);
+    return repository;
   };
-  const worldRepositoryAccessor=():WorldHttpLaneRepository=>{const repository=getCampaignRepository();assertWorldHttpRepository(repository);return repository;};
-  const npcRepositoryAccessor=():NpcHttpLaneRepository=>{const repository=getCampaignRepository();assertNpcHttpRepository(repository);return repository;};
-  const factionRepositoryAccessor=():FactionHttpLaneRepository=>{const repository=getCampaignRepository();assertFactionHttpRepository(repository);return repository;};
+  const consumableRepositoryAccessor = (): CombatConsumableLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCombatConsumableRepository(repository);
+    return repository;
+  };
+  const worldRepositoryAccessor = (): WorldHttpLaneRepository => {
+    const repository = getCampaignRepository();
+    assertWorldHttpRepository(repository);
+    return repository;
+  };
+  const npcRepositoryAccessor = (): NpcHttpLaneRepository => {
+    const repository = getCampaignRepository();
+    assertNpcHttpRepository(repository);
+    return repository;
+  };
+  const factionRepositoryAccessor = (): FactionHttpLaneRepository => {
+    const repository = getCampaignRepository();
+    assertFactionHttpRepository(repository);
+    return repository;
+  };
   const npcPresenceRepositoryAccessor = (): NpcPresenceHttpLaneRepository => {
     const repository = getCampaignRepository();
     assertNpcPresenceHttpRepository(repository);
@@ -854,19 +1254,47 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCompanionAdministrationHttpRepository(repository);
     return repository;
   };
-  const tacticalMapRepositoryAccessor = (): TacticalMapLaneRepository => { const repository = getCampaignRepository(); assertTacticalMapRepository(repository); return repository; };
-  const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository & Repository => { const repository = getCampaignRepository(); assertAdventureTurnRepository(repository); return repository as unknown as AdventureTurnLaneRepository & Repository; };
-  const campaignPlayRepositoryAccessor = (): CampaignPlayLaneRepository => { const repository = getCampaignRepository(); assertCampaignPlayRepository(repository); return repository; };
-  const startingLocationRepositoryAccessor = (): CampaignStartingLocationLaneRepository => {
-    const repository = getCampaignRepository(); assertCampaignStartingLocationRepository(repository); return repository;
+  const tacticalMapRepositoryAccessor = (): TacticalMapLaneRepository => {
+    const repository = getCampaignRepository();
+    assertTacticalMapRepository(repository);
+    return repository;
   };
-  const generationDraftRepositoryAccessor = (): GenerationDraftLaneRepository => { const repository = getCampaignRepository(); assertGenerationDraftRepository(repository); return repository; };
-  const regionPackRepositoryAccessor = (): RegionPackLaneRepository => { const repository = getCampaignRepository(); assertRegionPackRepository(repository); return repository; };
+  const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository & Repository => {
+    const repository = getCampaignRepository();
+    assertAdventureTurnRepository(repository);
+    return repository as unknown as AdventureTurnLaneRepository & Repository;
+  };
+  const campaignPlayRepositoryAccessor = (): CampaignPlayLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCampaignPlayRepository(repository);
+    return repository;
+  };
+  const startingLocationRepositoryAccessor = (): CampaignStartingLocationLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCampaignStartingLocationRepository(repository);
+    return repository;
+  };
+  const generationDraftRepositoryAccessor = (): GenerationDraftLaneRepository => {
+    const repository = getCampaignRepository();
+    assertGenerationDraftRepository(repository);
+    return repository;
+  };
+  const regionPackRepositoryAccessor = (): RegionPackLaneRepository => {
+    const repository = getCampaignRepository();
+    assertRegionPackRepository(repository);
+    return repository;
+  };
   const administrationIntegrationsRepositoryAccessor = (): CampaignAdministrationIntegrationRepository => {
     const repository = getCampaignRepository();
-    if (typeof repository.getCampaignAdministrationIntegrations !== "function" || typeof repository.associateCampaignVendor !== "function"
-      || typeof repository.configureCampaignBuyPolicy !== "function" || typeof repository.selectCampaignRuleset !== "function"
-      || typeof repository.updateSessionZeroSafetyPolicy !== "function" || typeof repository.requestCampaignSafetyAction !== "function") throw new UnsupportedCampaignRepositoryError();
+    if (
+      typeof repository.getCampaignAdministrationIntegrations !== "function" ||
+      typeof repository.associateCampaignVendor !== "function" ||
+      typeof repository.configureCampaignBuyPolicy !== "function" ||
+      typeof repository.selectCampaignRuleset !== "function" ||
+      typeof repository.updateSessionZeroSafetyPolicy !== "function" ||
+      typeof repository.requestCampaignSafetyAction !== "function"
+    )
+      throw new UnsupportedCampaignRepositoryError();
     return repository as CampaignListRepository & CampaignAdministrationIntegrationRepository;
   };
   await app.register(characterBuilderHttpRoutes, {
@@ -884,7 +1312,9 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignAdministrationHttpRoutes, {
     campaignAdministrationRepositoryAccessor,
   });
-  await app.register(campaignAdministrationIntegrationsHttpRoutes, { repositoryAccessor: administrationIntegrationsRepositoryAccessor });
+  await app.register(campaignAdministrationIntegrationsHttpRoutes, {
+    repositoryAccessor: administrationIntegrationsRepositoryAccessor,
+  });
   await app.register(campaignTransferHttpRoutes, { campaignTransferRepositoryAccessor });
   await app.register(campaignMembershipHttpRoutes, { campaignMembershipRepositoryAccessor });
   await app.register(campaignHistoryHttpRoutes, { campaignHistoryRepositoryAccessor });
@@ -905,18 +1335,23 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(combatReadsHttpRoutes, { combatRepositoryAccessor });
   await app.register(combatCommandsHttpRoutes, { combatCommandRepositoryAccessor });
   await app.register(combatConsumablesHttpRoutes, { consumableRepositoryAccessor });
-  await app.register(combatPowersHttpRoutes,{combatPowerRepositoryAccessor});
-  await app.register(worldHttpRoutes,{worldRepositoryAccessor});
-  await app.register(npcHttpRoutes,{npcRepositoryAccessor});
-  await app.register(factionHttpRoutes,{factionRepositoryAccessor});
+  await app.register(combatPowersHttpRoutes, { combatPowerRepositoryAccessor });
+  await app.register(worldHttpRoutes, { worldRepositoryAccessor });
+  await app.register(npcHttpRoutes, { npcRepositoryAccessor });
+  await app.register(factionHttpRoutes, { factionRepositoryAccessor });
   await app.register(npcPresenceHttpRoutes, { npcPresenceRepositoryAccessor });
   await app.register(companionAdministrationHttpRoutes, { companionRepositoryAccessor });
   await app.register(tacticalMapHttpRoutes, { tacticalMapRepositoryAccessor });
-  await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor, onNarrationSettled,
-    ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
+  await app.register(adventureTurnsHttpRoutes, {
+    adventureTurnRepositoryAccessor,
+    onNarrationSettled,
+    ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}),
+  });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
-  await app.register(campaignDmHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository,
-    ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
+  await app.register(campaignDmHttpRoutes, {
+    repositoryAccessor: () => getCampaignRepository() as Repository,
+    ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}),
+  });
   // One bounded free-form travel command: the same lazy repository already
   // implements `classifyFreeformTravelIntent`/`materializeFreeformTravel`.
   await app.register(freeformTravelHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
@@ -950,30 +1385,48 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}),
   });
   await app.register(quickAdventureHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository });
-  await app.register(campaignContextInspectionHttpRoutes, { repositoryAccessor: () => {
-    const repository = getCampaignRepository();
-    if (typeof repository.inspectCampaignContext !== "function"
-      || typeof repository.resolveCampaignContextInspectionDispatchReferences !== "function") throw new UnsupportedCampaignRepositoryError();
-    return repository as CampaignListRepository & CampaignContextInspectionReadRepository;
-  } });
+  await app.register(campaignContextInspectionHttpRoutes, {
+    repositoryAccessor: () => {
+      const repository = getCampaignRepository();
+      if (
+        typeof repository.inspectCampaignContext !== "function" ||
+        typeof repository.resolveCampaignContextInspectionDispatchReferences !== "function"
+      )
+        throw new UnsupportedCampaignRepositoryError();
+      return repository as CampaignListRepository & CampaignContextInspectionReadRepository;
+    },
+  });
   await app.register(campaignStartingLocationHttpRoutes, { startingLocationRepositoryAccessor });
-  await app.register(campaignRoomActivationHttpRoutes, { activationRepositoryAccessor: () => {
-    const repository = getCampaignRepository();
-    if (!repository.activateCampaignRoom || !repository.getCampaignRoomActivationReadiness) throw new Error("room activation repository is unavailable");
-    return { activateCampaignRoom: repository.activateCampaignRoom.bind(repository),
-      getCampaignRoomActivationReadiness: repository.getCampaignRoomActivationReadiness.bind(repository) };
-  } });
-  await app.register(campaignRoomParticipantHttpRoutes, { participantRepositoryAccessor: () => {
-    const repository = getCampaignRepository();
-    if (!repository.addCampaignRoomParticipant) throw new Error("room participant repository is unavailable");
-    return { addCampaignRoomParticipant: repository.addCampaignRoomParticipant.bind(repository) };
-  } });
-  await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor,
-    ...(options.encounterGeneration ? { generateEncounter: options.encounterGeneration } : {}) });
-  await app.register(campaignContentGenerationHttpRoutes, { generationDraftRepositoryAccessor,
-    ...(options.campaignContentGeneration ? { generateCampaignContent: options.campaignContentGeneration } : {}) });
-  await app.register(campaignRegionPackHttpRoutes, { generationDraftRepositoryAccessor: regionPackRepositoryAccessor,
-    ...(options.campaignContentGeneration ? { generateCampaignContent: options.campaignContentGeneration } : {}) });
+  await app.register(campaignRoomActivationHttpRoutes, {
+    activationRepositoryAccessor: () => {
+      const repository = getCampaignRepository();
+      if (!repository.activateCampaignRoom || !repository.getCampaignRoomActivationReadiness)
+        throw new Error("room activation repository is unavailable");
+      return {
+        activateCampaignRoom: repository.activateCampaignRoom.bind(repository),
+        getCampaignRoomActivationReadiness: repository.getCampaignRoomActivationReadiness.bind(repository),
+      };
+    },
+  });
+  await app.register(campaignRoomParticipantHttpRoutes, {
+    participantRepositoryAccessor: () => {
+      const repository = getCampaignRepository();
+      if (!repository.addCampaignRoomParticipant) throw new Error("room participant repository is unavailable");
+      return { addCampaignRoomParticipant: repository.addCampaignRoomParticipant.bind(repository) };
+    },
+  });
+  await app.register(generationDraftsHttpRoutes, {
+    generationDraftRepositoryAccessor,
+    ...(options.encounterGeneration ? { generateEncounter: options.encounterGeneration } : {}),
+  });
+  await app.register(campaignContentGenerationHttpRoutes, {
+    generationDraftRepositoryAccessor,
+    ...(options.campaignContentGeneration ? { generateCampaignContent: options.campaignContentGeneration } : {}),
+  });
+  await app.register(campaignRegionPackHttpRoutes, {
+    generationDraftRepositoryAccessor: regionPackRepositoryAccessor,
+    ...(options.campaignContentGeneration ? { generateCampaignContent: options.campaignContentGeneration } : {}),
+  });
   await app.register(sceneImagesHttpRoutes, {
     serviceAccessor: getSceneImageService,
     installationEnabled: sceneImageInstallationEnabled,
@@ -989,7 +1442,13 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
     }
     if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign rooms do not accept query parameters");
+      return sendApiProblem(
+        request,
+        reply,
+        400,
+        "RPG_INVALID_REQUEST",
+        "Campaign rooms do not accept query parameters",
+      );
     }
     const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
     if (!campaignId.success) {
@@ -1016,70 +1475,110 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     Params: { campaignId: string };
     Querystring: Record<string, unknown>;
     Body: unknown;
-  }>("/campaigns/:campaignId/rooms", {
-    onRequest: async (request, reply) => {
-      reply.header("cache-control", "no-store");
-      if (!readRpgFeatureFlags().campaign) {
-        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-        return;
-      }
-      if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
-        await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign room attachment does not accept query parameters");
-        return;
-      }
-      if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
-        await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-        return;
-      }
-      const contentType = request.headers["content-type"];
-      if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-        await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Campaign room attachment requires application/json");
-      }
+  }>(
+    "/campaigns/:campaignId/rooms",
+    {
+      onRequest: async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        if (!readRpgFeatureFlags().campaign) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
+        }
+        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Campaign room attachment does not accept query parameters",
+          );
+          return;
+        }
+        if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
+          await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Campaign room attachment requires application/json",
+          );
+        }
+      },
+      errorHandler: (_error, request, reply) => {
+        logCampaignOperationFailure(request, "campaign-room-attach-body", "info");
+        return sendApiProblem(
+          request,
+          reply,
+          400,
+          "RPG_INVALID_REQUEST",
+          "Campaign room attachment request is invalid",
+        );
+      },
     },
-    errorHandler: (_error, request, reply) => {
-      logCampaignOperationFailure(request, "campaign-room-attach-body", "info");
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign room attachment request is invalid");
-    },
-  }, async (request, reply) => {
-    const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
-    const body = campaignRoomAttachRequestSchema.safeParse(request.body);
-    if (!campaignId.success) {
-      return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-    }
-    if (!body.success) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign room attachment request is invalid");
-    }
-    try {
-      const repository = getCampaignRepository();
-      if (typeof repository.attachCampaignSession !== "function") {
-        throw new Error("campaign repository does not support room attachment");
-      }
-      const attachment = repository.attachCampaignSession(LOCAL_CAMPAIGN_PRINCIPAL, {
-        campaignId: campaignId.data, sessionId: body.data.sessionId,
-      });
-      if (attachment.campaignId !== campaignId.data || attachment.sessionId !== body.data.sessionId) {
-        throw new Error("campaign room attachment does not match the request");
-      }
-      return reply.code(200).send(campaignRoomAttachResponseSchema.parse({
-        attachment: { sessionId: attachment.sessionId, attachedAt: attachment.attachedAt },
-      }));
-    } catch (error) {
-      if (error instanceof CampaignSessionAttachmentUnavailableError) {
+    async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      const body = campaignRoomAttachRequestSchema.safeParse(request.body);
+      if (!campaignId.success) {
         return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
       }
-      if (error instanceof CampaignSessionAttachmentSessionMissingError) {
-        return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_ROOM_NOT_FOUND", "Room not found");
+      if (!body.success) {
+        return sendApiProblem(
+          request,
+          reply,
+          400,
+          "RPG_INVALID_REQUEST",
+          "Campaign room attachment request is invalid",
+        );
       }
-      if (error instanceof CampaignSessionAttachmentConflictError) {
-        return sendApiProblem(request, reply, 409, "RPG_CAMPAIGN_ROOM_CONFLICT", "Room cannot be attached to this campaign");
+      try {
+        const repository = getCampaignRepository();
+        if (typeof repository.attachCampaignSession !== "function") {
+          throw new Error("campaign repository does not support room attachment");
+        }
+        const attachment = repository.attachCampaignSession(LOCAL_CAMPAIGN_PRINCIPAL, {
+          campaignId: campaignId.data,
+          sessionId: body.data.sessionId,
+        });
+        if (attachment.campaignId !== campaignId.data || attachment.sessionId !== body.data.sessionId) {
+          throw new Error("campaign room attachment does not match the request");
+        }
+        return reply.code(200).send(
+          campaignRoomAttachResponseSchema.parse({
+            attachment: { sessionId: attachment.sessionId, attachedAt: attachment.attachedAt },
+          }),
+        );
+      } catch (error) {
+        if (error instanceof CampaignSessionAttachmentUnavailableError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+        }
+        if (error instanceof CampaignSessionAttachmentSessionMissingError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_ROOM_NOT_FOUND", "Room not found");
+        }
+        if (error instanceof CampaignSessionAttachmentConflictError) {
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_CAMPAIGN_ROOM_CONFLICT",
+            "Room cannot be attached to this campaign",
+          );
+        }
+        logCampaignOperationFailure(request, "campaign-room-attach");
+        return sendApiProblem(
+          request,
+          reply,
+          500,
+          "RPG_INTERNAL_ERROR",
+          "Campaign room attachment status is unknown; refresh campaign rooms before trying again; never retry automatically",
+        );
       }
-      logCampaignOperationFailure(request, "campaign-room-attach");
-      return sendApiProblem(
-        request, reply, 500, "RPG_INTERNAL_ERROR",
-        "Campaign room attachment status is unknown; refresh campaign rooms before trying again; never retry automatically",
-      );
-    }
-  });
+    },
+  );
 
   app.get<{
     Params: { campaignId: string };
@@ -1092,7 +1591,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     }
     if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
       return sendApiProblem(
-        request, reply, 400, "RPG_INVALID_REQUEST", "Campaign dice history does not accept query parameters",
+        request,
+        reply,
+        400,
+        "RPG_INVALID_REQUEST",
+        "Campaign dice history does not accept query parameters",
       );
     }
     const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
@@ -1104,15 +1607,23 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
       if (typeof repository.transaction !== "function") {
         throw new Error("campaign repository does not support dice operations");
       }
-      const response = createCampaignDiceService(repository as CampaignDiceRepository, options.diceCommandIds)
-        .read(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data);
+      const response = createCampaignDiceService(repository as CampaignDiceRepository, options.diceCommandIds).read(
+        LOCAL_CAMPAIGN_PRINCIPAL,
+        campaignId.data,
+      );
       return campaignDiceHistoryResponseSchema.parse(response);
     } catch (error) {
       if (error instanceof CampaignDiceUnavailableError) {
         return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
       }
       logCampaignOperationFailure(request, "campaign-dice-history");
-      return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign dice history could not be loaded; refresh is required");
+      return sendApiProblem(
+        request,
+        reply,
+        500,
+        "RPG_INTERNAL_ERROR",
+        "Campaign dice history could not be loaded; refresh is required",
+      );
     }
   });
 
@@ -1120,136 +1631,183 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     Params: { campaignId: string };
     Querystring: Record<string, unknown>;
     Body: unknown;
-  }>("/campaigns/:campaignId/dice-rolls", {
-    onRequest: async (request, reply) => {
-      const flags = readRpgFeatureFlags();
-      reply.header("cache-control", "no-store");
-      if (!flags.campaign || !flags.mechanics) {
-        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-        return;
-      }
-      if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
-        await sendApiProblem(
-          request, reply, 400, "RPG_INVALID_REQUEST", "Campaign dice roll does not accept query parameters",
-        );
-        return;
-      }
-      if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
-        await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-        return;
-      }
-      const contentType = request.headers["content-type"];
-      if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-        await sendApiProblem(
-          request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Campaign dice roll requires application/json",
-        );
-      }
+  }>(
+    "/campaigns/:campaignId/dice-rolls",
+    {
+      onRequest: async (request, reply) => {
+        const flags = readRpgFeatureFlags();
+        reply.header("cache-control", "no-store");
+        if (!flags.campaign || !flags.mechanics) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
+        }
+        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Campaign dice roll does not accept query parameters",
+          );
+          return;
+        }
+        if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
+          await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Campaign dice roll requires application/json",
+          );
+        }
+      },
+      errorHandler: (_error, request, reply) => {
+        logCampaignOperationFailure(request, "campaign-dice-roll-body", "info");
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign dice roll request is invalid");
+      },
     },
-    errorHandler: (_error, request, reply) => {
-      logCampaignOperationFailure(request, "campaign-dice-roll-body", "info");
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign dice roll request is invalid");
-    },
-  }, async (request, reply) => {
-    const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
-    const body = campaignDiceRollRequestSchema.safeParse(request.body);
-    if (!campaignId.success) {
-      return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-    }
-    if (!body.success) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign dice roll request is invalid");
-    }
-    try {
-      const repository = getCampaignRepository();
-      if (typeof repository.transaction !== "function"
-          || typeof repository.executeRollActorDiceForVisibleCharacter !== "function") {
-        throw new Error("campaign repository does not support dice operations");
-      }
-      const response = createCampaignDiceService(repository as CampaignDiceRepository, options.diceCommandIds)
-        .roll(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data, body.data);
-      return reply.code(201).send(campaignDiceRollResponseSchema.parse(response));
-    } catch (error) {
-      if (error instanceof CampaignDiceUnavailableError) {
+    async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      const body = campaignDiceRollRequestSchema.safeParse(request.body);
+      if (!campaignId.success) {
         return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
       }
-      if (error instanceof CampaignDiceVisibleBindingConflictError) {
+      if (!body.success) {
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign dice roll request is invalid");
+      }
+      try {
+        const repository = getCampaignRepository();
+        if (
+          typeof repository.transaction !== "function" ||
+          typeof repository.executeRollActorDiceForVisibleCharacter !== "function"
+        ) {
+          throw new Error("campaign repository does not support dice operations");
+        }
+        const response = createCampaignDiceService(repository as CampaignDiceRepository, options.diceCommandIds).roll(
+          LOCAL_CAMPAIGN_PRINCIPAL,
+          campaignId.data,
+          body.data,
+        );
+        return reply.code(201).send(campaignDiceRollResponseSchema.parse(response));
+      } catch (error) {
+        if (error instanceof CampaignDiceUnavailableError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+        }
+        if (error instanceof CampaignDiceVisibleBindingConflictError) {
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_CAMPAIGN_DICE_BINDING_CONFLICT",
+            "Campaign character selection changed; refresh dice history before rolling",
+          );
+        }
+        logCampaignOperationFailure(request, "campaign-dice-roll");
         return sendApiProblem(
-          request, reply, 409, "RPG_CAMPAIGN_DICE_BINDING_CONFLICT",
-          "Campaign character selection changed; refresh dice history before rolling",
+          request,
+          reply,
+          500,
+          "RPG_INTERNAL_ERROR",
+          "Dice roll status is unknown; refresh dice history before trying again; never retry automatically",
         );
       }
-      logCampaignOperationFailure(request, "campaign-dice-roll");
-      return sendApiProblem(
-        request, reply, 500, "RPG_INTERNAL_ERROR",
-        "Dice roll status is unknown; refresh dice history before trying again; never retry automatically",
-      );
-    }
-  });
+    },
+  );
 
-  app.get<{ Querystring: Record<string, unknown> }>("/campaigns", { exposeHeadRoute: false }, async (request, reply) => {
-    if (!readRpgFeatureFlags().campaign) {
-      return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-    }
-    if (Object.keys(request.query).length > 0) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign list does not accept query parameters");
-    }
+  app.get<{ Querystring: Record<string, unknown> }>(
+    "/campaigns",
+    { exposeHeadRoute: false },
+    async (request, reply) => {
+      if (!readRpgFeatureFlags().campaign) {
+        return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+      }
+      if (Object.keys(request.query).length > 0) {
+        return sendApiProblem(
+          request,
+          reply,
+          400,
+          "RPG_INVALID_REQUEST",
+          "Campaign list does not accept query parameters",
+        );
+      }
 
-    try {
-      // This literal is trusted local context, not caller-controlled identity or authentication.
-      const campaignRepository = getCampaignRepository();
-      return campaignListResponseSchema.parse({
-        campaigns: campaignRepository.listCampaigns(LOCAL_CAMPAIGN_PRINCIPAL),
-      });
-    } catch {
-      logCampaignOperationFailure(request, "campaign-list");
-      return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaigns could not be loaded");
-    }
-  });
+      try {
+        // This literal is trusted local context, not caller-controlled identity or authentication.
+        const campaignRepository = getCampaignRepository();
+        return campaignListResponseSchema.parse({
+          campaigns: campaignRepository.listCampaigns(LOCAL_CAMPAIGN_PRINCIPAL),
+        });
+      } catch {
+        logCampaignOperationFailure(request, "campaign-list");
+        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaigns could not be loaded");
+      }
+    },
+  );
 
   app.get<{
     Params: { campaignId: string; campaignCharacterId: string };
     Querystring: Record<string, unknown>;
-  }>("/campaigns/:campaignId/characters/:campaignCharacterId/workspace", { exposeHeadRoute: false }, async (request, reply) => {
-    // Workspaces can contain mutable character state. Apply this before every
-    // validation branch so successes and scoped problems are never cached.
-    reply.header("cache-control", "no-store");
-    if (!readRpgFeatureFlags().campaign) {
-      return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-    }
-    if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
-      return sendApiProblem(
-        request, reply, 400, "RPG_INVALID_REQUEST",
-        "Campaign character workspace does not accept query parameters",
-      );
-    }
-    const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
-    const campaignCharacterId = resourceIdSchema.safeParse(request.params.campaignCharacterId);
-    if (!campaignId.success || !campaignCharacterId.success) {
-      return sendApiProblem(
-        request, reply, 404, "RPG_CAMPAIGN_CHARACTER_NOT_FOUND", "Campaign character not found",
-      );
-    }
-
-    try {
-      const result = getCampaignRepository().getCampaignCharacterWorkspace(
-        LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data, campaignCharacterId.data,
-      );
-      if (result === null) {
+  }>(
+    "/campaigns/:campaignId/characters/:campaignCharacterId/workspace",
+    { exposeHeadRoute: false },
+    async (request, reply) => {
+      // Workspaces can contain mutable character state. Apply this before every
+      // validation branch so successes and scoped problems are never cached.
+      reply.header("cache-control", "no-store");
+      if (!readRpgFeatureFlags().campaign) {
+        return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+      }
+      if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
         return sendApiProblem(
-          request, reply, 404, "RPG_CAMPAIGN_CHARACTER_NOT_FOUND", "Campaign character not found",
+          request,
+          reply,
+          400,
+          "RPG_INVALID_REQUEST",
+          "Campaign character workspace does not accept query parameters",
         );
       }
-      if (result.campaignId !== campaignId.data
-        || result.campaignCharacterId !== campaignCharacterId.data) {
-        throw new Error("campaign character workspace output does not match the request");
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      const campaignCharacterId = resourceIdSchema.safeParse(request.params.campaignCharacterId);
+      if (!campaignId.success || !campaignCharacterId.success) {
+        return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_CHARACTER_NOT_FOUND", "Campaign character not found");
       }
-      return campaignCharacterWorkspaceResponseSchema.parse({ character: result.character });
-    } catch {
-      logCampaignOperationFailure(request, "campaign-character-workspace");
-      return sendApiProblem(
-        request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign character workspace could not be loaded",
-      );
-    }
-  });
+
+      try {
+        const result = getCampaignRepository().getCampaignCharacterWorkspace(
+          LOCAL_CAMPAIGN_PRINCIPAL,
+          campaignId.data,
+          campaignCharacterId.data,
+        );
+        if (result === null) {
+          return sendApiProblem(
+            request,
+            reply,
+            404,
+            "RPG_CAMPAIGN_CHARACTER_NOT_FOUND",
+            "Campaign character not found",
+          );
+        }
+        if (result.campaignId !== campaignId.data || result.campaignCharacterId !== campaignCharacterId.data) {
+          throw new Error("campaign character workspace output does not match the request");
+        }
+        return campaignCharacterWorkspaceResponseSchema.parse({ character: result.character });
+      } catch {
+        logCampaignOperationFailure(request, "campaign-character-workspace");
+        return sendApiProblem(
+          request,
+          reply,
+          500,
+          "RPG_INTERNAL_ERROR",
+          "Campaign character workspace could not be loaded",
+        );
+      }
+    },
+  );
 
   app.get<{
     Params: { campaignId: string };
@@ -1305,92 +1863,111 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     Params: { campaignId: string };
     Querystring: Record<string, unknown>;
     Body: unknown;
-  }>("/campaigns/:campaignId/characters", {
-    onRequest: async (request, reply) => {
-      if (!readRpgFeatureFlags().campaign) {
-        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-        return;
-      }
-      // Inspect the raw target so even a bare trailing `?` is rejected.
-      if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
-        await sendApiProblem(
-          request, reply, 400, "RPG_INVALID_REQUEST",
-          "Campaign character creation does not accept query parameters",
+  }>(
+    "/campaigns/:campaignId/characters",
+    {
+      onRequest: async (request, reply) => {
+        if (!readRpgFeatureFlags().campaign) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
+        }
+        // Inspect the raw target so even a bare trailing `?` is rejected.
+        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Campaign character creation does not accept query parameters",
+          );
+          return;
+        }
+        // Path validity deliberately precedes media/body parsing and repository opening.
+        if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
+          await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Campaign character creation requires application/json",
+          );
+        }
+      },
+      errorHandler: (_error, request, reply) => {
+        logCampaignOperationFailure(request, "campaign-character-create-body", "info");
+        return sendApiProblem(
+          request,
+          reply,
+          400,
+          "RPG_INVALID_REQUEST",
+          "Campaign character creation request is invalid",
         );
-        return;
-      }
-      // Path validity deliberately precedes media/body parsing and repository opening.
-      if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
-        await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-        return;
-      }
-      const contentType = request.headers["content-type"];
-      if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-        await sendApiProblem(
-          request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE",
-          "Campaign character creation requires application/json",
-        );
-      }
+      },
     },
-    errorHandler: (_error, request, reply) => {
-      logCampaignOperationFailure(request, "campaign-character-create-body", "info");
-      return sendApiProblem(
-        request, reply, 400, "RPG_INVALID_REQUEST", "Campaign character creation request is invalid",
-      );
-    },
-  }, async (request, reply) => {
-    const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
-    const body = campaignCharacterCreateRequestSchema.safeParse(request.body);
-    // The path was checked in onRequest; retain a defensive check without opening the repository.
-    if (!campaignId.success) {
-      return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-    }
-    if (!body.success) {
-      return sendApiProblem(
-        request, reply, 400, "RPG_INVALID_REQUEST", "Campaign character creation request is invalid",
-      );
-    }
-
-    try {
-      const repository = getCampaignRepository();
-      if (typeof repository.createOriginalStarterCampaignCharacter !== "function") {
-        throw new Error("campaign repository does not support original starter character creation");
-      }
-      // Campaign, controller, content and aggregate fields stay server-owned in
-      // the fixed trusted-local service. The caller selects only one persona.
-      const rawResponse = createOriginalStarterCharacterCreationService(
-        repository as OriginalStarterCharacterCreationRepository,
-      ).create(campaignId.data, body.data);
-      const response = campaignCharacterCreateResponseSchema.parse(rawResponse);
-      if (response.character.characterId !== body.data.characterId) {
-        throw new Error("campaign character creation output does not match the request");
-      }
-      return reply.code(201).send(response);
-    } catch (error) {
-      if (error instanceof OriginalStarterCharacterCreationUnavailableError) {
+    async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      const body = campaignCharacterCreateRequestSchema.safeParse(request.body);
+      // The path was checked in onRequest; retain a defensive check without opening the repository.
+      if (!campaignId.success) {
         return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
       }
-      if (error instanceof OriginalStarterCharacterPersonaUnavailableError) {
+      if (!body.success) {
         return sendApiProblem(
-          request, reply, 404, "RPG_CAMPAIGN_CHARACTER_PERSONA_NOT_FOUND", "Persona not found",
+          request,
+          reply,
+          400,
+          "RPG_INVALID_REQUEST",
+          "Campaign character creation request is invalid",
         );
       }
-      if (error instanceof OriginalStarterCharacterCreationConflictError) {
+
+      try {
+        const repository = getCampaignRepository();
+        if (typeof repository.createOriginalStarterCampaignCharacter !== "function") {
+          throw new Error("campaign repository does not support original starter character creation");
+        }
+        // Campaign, controller, content and aggregate fields stay server-owned in
+        // the fixed trusted-local service. The caller selects only one persona.
+        const rawResponse = createOriginalStarterCharacterCreationService(
+          repository as OriginalStarterCharacterCreationRepository,
+        ).create(campaignId.data, body.data);
+        const response = campaignCharacterCreateResponseSchema.parse(rawResponse);
+        if (response.character.characterId !== body.data.characterId) {
+          throw new Error("campaign character creation output does not match the request");
+        }
+        return reply.code(201).send(response);
+      } catch (error) {
+        if (error instanceof OriginalStarterCharacterCreationUnavailableError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+        }
+        if (error instanceof OriginalStarterCharacterPersonaUnavailableError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_CHARACTER_PERSONA_NOT_FOUND", "Persona not found");
+        }
+        if (error instanceof OriginalStarterCharacterCreationConflictError) {
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_CAMPAIGN_CHARACTER_CREATE_CONFLICT",
+            "Campaign character could not be created because of a conflict",
+          );
+        }
+        logCampaignOperationFailure(request, "campaign-character-create");
         return sendApiProblem(
-          request, reply, 409, "RPG_CAMPAIGN_CHARACTER_CREATE_CONFLICT",
-          "Campaign character could not be created because of a conflict",
+          request,
+          reply,
+          500,
+          "RPG_INTERNAL_ERROR",
+          "Campaign character creation status is unknown; reconciliation with authoritative character list and creation options GETs is required; never retry automatically",
         );
       }
-      logCampaignOperationFailure(request, "campaign-character-create");
-      return sendApiProblem(
-        request,
-        reply,
-        500,
-        "RPG_INTERNAL_ERROR",
-        "Campaign character creation status is unknown; reconciliation with authoritative character list and creation options GETs is required; never retry automatically",
-      );
-    }
-  });
+    },
+  );
 
   app.get<{
     Params: { campaignId: string };
@@ -1401,7 +1978,10 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     }
     if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
       return sendApiProblem(
-        request, reply, 400, "RPG_INVALID_REQUEST",
+        request,
+        reply,
+        400,
+        "RPG_INVALID_REQUEST",
         "Campaign character roster does not accept query parameters",
       );
     }
@@ -1411,10 +1991,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     }
 
     try {
-      const result = getCampaignRepository().getCampaignCharacterRoster(
-        LOCAL_CAMPAIGN_PRINCIPAL,
-        campaignId.data,
-      );
+      const result = getCampaignRepository().getCampaignCharacterRoster(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data);
       if (result === null) {
         return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
       }
@@ -1424,9 +2001,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
       return campaignCharacterListResponseSchema.parse({ characters: result.characters });
     } catch {
       logCampaignOperationFailure(request, "campaign-character-roster");
-      return sendApiProblem(
-        request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign characters could not be loaded",
-      );
+      return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign characters could not be loaded");
     }
   });
 
@@ -1439,7 +2014,13 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
     }
     if (Object.keys(request.query).length > 0) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign detail does not accept query parameters");
+      return sendApiProblem(
+        request,
+        reply,
+        400,
+        "RPG_INVALID_REQUEST",
+        "Campaign detail does not accept query parameters",
+      );
     }
     const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
     if (!campaignId.success) {
@@ -1468,311 +2049,440 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     Params: { campaignId: string };
     Querystring: Record<string, unknown>;
     Body: unknown;
-  }>("/campaigns/:campaignId", {
-    onRequest: async (request, reply) => {
-      if (!readRpgFeatureFlags().campaign) {
-        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-        return;
-      }
-      if (Object.keys(request.query).length > 0) {
-        await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign rename does not accept query parameters");
-        return;
-      }
-      const contentType = request.headers["content-type"];
-      if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-        await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Campaign rename requires application/json");
-      }
-    },
-    errorHandler: (_error, request, reply) => {
-      logCampaignOperationFailure(request, "campaign-rename-body", "info");
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign rename request is invalid");
-    },
-  }, async (request, reply) => {
-    const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
-    if (!campaignId.success) {
-      return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-    }
-    const parsed = campaignRenameRequestSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign rename request is invalid", {
-        issues: parsed.error.issues.map((issue) => ({
-          path: issue.path.join("."),
-          code: issue.code,
-          message: issue.message,
-        })),
-      });
-    }
-
-    try {
-      const campaignRepository = getCampaignRepository();
-      const campaign = campaignRepository.renameCampaignIfUnchanged(
-        LOCAL_CAMPAIGN_PRINCIPAL,
-        campaignId.data,
-        parsed.data,
-      );
-      const response = campaignRenameResponseSchema.parse({
-        campaign: { id: campaign.id, name: campaign.name, updatedAt: campaign.updatedAt },
-      });
-      // Schema validity alone is insufficient: every successful write must
-      // advance the stale token strictly beyond the observed precondition.
-      if (response.campaign.id !== campaignId.data
-        || response.campaign.name !== parsed.data.name
-        || response.campaign.updatedAt <= parsed.data.expectedUpdatedAt) {
-        throw new Error("campaign rename output does not match the request");
-      }
-      return response;
-    } catch (error) {
-      if (error instanceof CampaignRenameUnavailableError) {
-        return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-      }
-      if (error instanceof CampaignRenameStaleError) {
-        return sendApiProblem(request, reply, 409, "RPG_CAMPAIGN_RENAME_STALE", "Campaign rename precondition is stale");
-      }
-      logCampaignOperationFailure(request, "campaign-rename");
-      return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign could not be renamed");
-    }
-  });
-
-  app.post<{ Querystring: Record<string, unknown>; Body: unknown }>("/campaigns", {
-    onRequest: async (request, reply) => {
-      if (!readRpgFeatureFlags().campaign) {
-        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-        return;
-      }
-      if (Object.keys(request.query).length > 0) {
-        await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign creation does not accept query parameters");
-        return;
-      }
-      const contentType = request.headers["content-type"];
-      if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-        await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Campaign creation requires application/json");
-      }
-    },
-    errorHandler: (_error, request, reply) => {
-      // Fastify parses JSON before the handler. Collapse malformed and empty
-      // JSON into the same public contract as a schema-invalid body.
-      logCampaignOperationFailure(request, "campaign-create-body", "info");
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign creation request is invalid");
-    },
-  }, async (request, reply) => {
-    const parsed = campaignCreateRequestSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign creation request is invalid", {
-        issues: parsed.error.issues.map((issue) => ({
-          path: issue.path.join("."),
-          code: issue.code,
-          message: issue.message,
-        })),
-      });
-    }
-
-    try {
-      const campaignRepository = getCampaignRepository();
-      const response = campaignCreateResponseSchema.parse({
-        // This literal is trusted local context, never caller identity.
-        campaign: campaignRepository.createCampaign(LOCAL_CAMPAIGN_PRINCIPAL, parsed.data),
-      });
-      return reply.code(201).send(response);
-    } catch (error) {
-      if (error instanceof CampaignCreationAuthorizationError) {
-        return sendApiProblem(request, reply, 403, "RPG_CAMPAIGN_CREATE_FORBIDDEN", "Campaign creation is not permitted");
-      }
-      if (error instanceof CampaignCreationIdCollisionError) {
-        return sendApiProblem(request, reply, 409, "RPG_CAMPAIGN_CREATE_CONFLICT", "Campaign could not be created because of a conflict");
-      }
-      logCampaignOperationFailure(request, "campaign-create");
-      return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign could not be created");
-    }
-  });
-
-  app.put<{
-    Params: { campaignId: string };
-    Querystring: Record<string, unknown>;
-    Body: unknown;
-  }>("/campaigns/:campaignId/starter-setup", {
-    exposeHeadRoute: false,
-    onRequest: async (request, reply) => {
-      if (!readRpgFeatureFlags().campaign) {
-        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-        return;
-      }
-      if (Object.keys(request.query).length > 0) {
-        await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Starter setup does not accept query parameters");
-        return;
-      }
-      const contentType = request.headers["content-type"];
-      if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-        await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Starter setup requires application/json");
-      }
-    },
-    errorHandler: (_error, request, reply) => {
-      logCampaignOperationFailure(request, "campaign-starter-setup-body", "info");
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Starter setup request is invalid");
-    },
-  }, async (request, reply) => {
-    const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
-    if (!campaignId.success) {
-      return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-    }
-    const body = campaignStarterSetupRequestSchema.safeParse(request.body);
-    if (!body.success) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Starter setup request is invalid", {
-        issues: body.error.issues.map((issue) => ({
-          path: issue.path.join("."), code: issue.code, message: issue.message,
-        })),
-      });
-    }
-
-    try {
-      const repository = getCampaignRepository();
-      if (typeof repository.inspectOriginalStarterSetup !== "function"
-        || typeof repository.installOriginalStarterContent !== "function"
-        || typeof repository.configureOriginalStarterContent !== "function") {
-        throw new Error("campaign repository does not support starter setup");
-      }
-      const campaign = createOriginalStarterSetupService(repository as OriginalStarterSetupRepository)
-        .setup(campaignId.data);
-      const response = campaignStarterSetupResponseSchema.parse({ campaign });
-      const content = response.campaign.content;
-      if (response.campaign.id !== campaignId.data || response.campaign.actorRole !== "owner"
-        || content.status !== "configured"
-        || content.rulesProfileId !== ORIGINAL_STARTER_RULES_PROFILE_ID
-        || content.contentPacks.length !== 1
-        || content.contentPacks[0]?.packId !== ORIGINAL_STARTER_PACK_ID
-        || content.contentPacks[0]?.packVersion !== ORIGINAL_STARTER_PACK_VERSION) {
-        throw new Error("starter setup output does not prove the exact setup");
-      }
-      return response;
-    } catch (error) {
-      if (error instanceof OriginalStarterSetupUnavailableError) {
-        return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-      }
-      if (error instanceof OriginalStarterSetupConflictError) {
-        return sendApiProblem(request, reply, 409, "RPG_CAMPAIGN_STARTER_SETUP_CONFLICT", "Starter setup conflicts with current campaign state");
-      }
-      logCampaignOperationFailure(request, "campaign-starter-setup");
-      return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign starter setup could not be completed");
-    }
-  });
-
-  app.put<{
-    Params: { campaignId: string };
-    Querystring: Record<string, unknown>;
-    Body: unknown;
-  }>("/campaigns/:campaignId/mechanics-starter-setup", {
-    exposeHeadRoute: false,
-    onRequest: async (request, reply) => {
-      reply.header("cache-control", "no-store");
-      // Both flags precede every caller-controlled query/path/media/body check
-      // and repository lifecycle touch.
-      const flags = readRpgFeatureFlags();
-      if (!flags.campaign || !flags.mechanics) {
-        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-        return;
-      }
-      if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
-        await sendApiProblem(
-          request, reply, 400, "RPG_INVALID_REQUEST",
-          "Mechanics starter setup does not accept query parameters",
-        );
-        return;
-      }
-      if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
-        await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-        return;
-      }
-      const contentType = request.headers["content-type"];
-      if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-        await sendApiProblem(
-          request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE",
-          "Mechanics starter setup requires application/json",
-        );
-      }
-    },
-    errorHandler: (_error, request, reply) => {
-      logCampaignOperationFailure(request, "campaign-mechanics-starter-setup-body", "info");
-      return sendApiProblem(
-        request, reply, 400, "RPG_INVALID_REQUEST", "Mechanics starter setup request is invalid",
-      );
-    },
-  }, async (request, reply) => {
-    const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
-    if (!campaignId.success) {
-      return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
-    }
-    const body = campaignMechanicsStarterSetupRequestSchema.safeParse(request.body);
-    if (!body.success) {
-      return sendApiProblem(
-        request, reply, 400, "RPG_INVALID_REQUEST", "Mechanics starter setup request is invalid",
-        { issues: body.error.issues.map((issue) => ({
-          path: issue.path.join("."), code: issue.code, message: issue.message,
-        })) },
-      );
-    }
-
-    try {
-      const repository = getCampaignRepository();
-      if (body.data.starterId === SRD_5_1_STARTER_ID) {
-        if (typeof repository.installSrdStarterCatalog !== "function"
-          || typeof repository.configureSrdStarterCatalog !== "function"
-          || typeof repository.getCampaignAdministration !== "function") throw new Error("campaign repository does not support SRD starter setup");
-        const before = repository.getCampaignAdministration(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data);
-        if (!before) throw new MechanicsStarterSetupUnavailableError();
-        repository.installSrdStarterCatalog(LOCAL_CAMPAIGN_PRINCIPAL);
-        repository.configureSrdStarterCatalog(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data, { expectedRevision: before.revision,
-          idempotencyKey: "srd-5.1-starter-setup-v1" });
-        const campaign = repository.getCampaignDetail(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data);
-        if (!campaign || campaign.content.status !== "configured"
-          || campaign.content.rulesProfileId !== SRD_5_1_STARTER_IDENTITY.rulesProfileId
-          || campaign.content.contentPacks.length !== 1
-          || campaign.content.contentPacks[0]?.packId !== SRD_5_1_STARTER_IDENTITY.packId
-          || campaign.content.contentPacks[0]?.packVersion !== SRD_5_1_STARTER_IDENTITY.packVersion) {
-          throw new MechanicsStarterSetupConflictError();
+  }>(
+    "/campaigns/:campaignId",
+    {
+      onRequest: async (request, reply) => {
+        if (!readRpgFeatureFlags().campaign) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
         }
-        return reply.code(200).send(campaignMechanicsStarterSetupResponseSchema.parse({ campaign }));
-      }
-      if (typeof repository.transaction !== "function"
-        || typeof repository.installMechanicsStarterCatalog !== "function"
-        || typeof repository.configureMechanicsStarterCatalog !== "function") {
-        throw new Error("campaign repository does not support mechanics starter setup");
-      }
-      const campaign = createMechanicsStarterSetupService(repository as unknown as MechanicsStarterSetupRepository)
-        .setup(campaignId.data);
-      const response = campaignMechanicsStarterSetupResponseSchema.parse({ campaign });
-      const content = response.campaign.content;
-      if (response.campaign.id !== campaignId.data || response.campaign.actorRole !== "owner"
-        || content.status !== "configured"
-        || content.rulesProfileId !== MECHANICS_STARTER_IDENTITY.rulesProfileId
-        || content.contentPacks.length !== 1
-        || content.contentPacks[0]?.packId !== MECHANICS_STARTER_IDENTITY.packId
-        || content.contentPacks[0]?.packVersion !== MECHANICS_STARTER_IDENTITY.packVersion) {
-        throw new Error("mechanics starter setup output does not prove the exact setup");
-      }
-      return reply.code(200).send(response);
-    } catch (error) {
-      if (error instanceof MechanicsStarterSetupUnavailableError) {
+        if (Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Campaign rename does not accept query parameters",
+          );
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Campaign rename requires application/json",
+          );
+        }
+      },
+      errorHandler: (_error, request, reply) => {
+        logCampaignOperationFailure(request, "campaign-rename-body", "info");
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign rename request is invalid");
+      },
+    },
+    async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      if (!campaignId.success) {
         return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
       }
-      if (error instanceof MechanicsStarterSetupConflictError || error instanceof ContentCatalogConflictError
-        || error instanceof ContentCatalogStaleError) {
+      const parsed = campaignRenameRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign rename request is invalid", {
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            code: issue.code,
+            message: issue.message,
+          })),
+        });
+      }
+
+      try {
+        const campaignRepository = getCampaignRepository();
+        const campaign = campaignRepository.renameCampaignIfUnchanged(
+          LOCAL_CAMPAIGN_PRINCIPAL,
+          campaignId.data,
+          parsed.data,
+        );
+        const response = campaignRenameResponseSchema.parse({
+          campaign: { id: campaign.id, name: campaign.name, updatedAt: campaign.updatedAt },
+        });
+        // Schema validity alone is insufficient: every successful write must
+        // advance the stale token strictly beyond the observed precondition.
+        if (
+          response.campaign.id !== campaignId.data ||
+          response.campaign.name !== parsed.data.name ||
+          response.campaign.updatedAt <= parsed.data.expectedUpdatedAt
+        ) {
+          throw new Error("campaign rename output does not match the request");
+        }
+        return response;
+      } catch (error) {
+        if (error instanceof CampaignRenameUnavailableError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+        }
+        if (error instanceof CampaignRenameStaleError) {
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_CAMPAIGN_RENAME_STALE",
+            "Campaign rename precondition is stale",
+          );
+        }
+        logCampaignOperationFailure(request, "campaign-rename");
+        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign could not be renamed");
+      }
+    },
+  );
+
+  app.post<{ Querystring: Record<string, unknown>; Body: unknown }>(
+    "/campaigns",
+    {
+      onRequest: async (request, reply) => {
+        if (!readRpgFeatureFlags().campaign) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
+        }
+        if (Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Campaign creation does not accept query parameters",
+          );
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Campaign creation requires application/json",
+          );
+        }
+      },
+      errorHandler: (_error, request, reply) => {
+        // Fastify parses JSON before the handler. Collapse malformed and empty
+        // JSON into the same public contract as a schema-invalid body.
+        logCampaignOperationFailure(request, "campaign-create-body", "info");
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign creation request is invalid");
+      },
+    },
+    async (request, reply) => {
+      const parsed = campaignCreateRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign creation request is invalid", {
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            code: issue.code,
+            message: issue.message,
+          })),
+        });
+      }
+
+      try {
+        const campaignRepository = getCampaignRepository();
+        const response = campaignCreateResponseSchema.parse({
+          // This literal is trusted local context, never caller identity.
+          campaign: campaignRepository.createCampaign(LOCAL_CAMPAIGN_PRINCIPAL, parsed.data),
+        });
+        return reply.code(201).send(response);
+      } catch (error) {
+        if (error instanceof CampaignCreationAuthorizationError) {
+          return sendApiProblem(
+            request,
+            reply,
+            403,
+            "RPG_CAMPAIGN_CREATE_FORBIDDEN",
+            "Campaign creation is not permitted",
+          );
+        }
+        if (error instanceof CampaignCreationIdCollisionError) {
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_CAMPAIGN_CREATE_CONFLICT",
+            "Campaign could not be created because of a conflict",
+          );
+        }
+        logCampaignOperationFailure(request, "campaign-create");
+        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign could not be created");
+      }
+    },
+  );
+
+  app.put<{
+    Params: { campaignId: string };
+    Querystring: Record<string, unknown>;
+    Body: unknown;
+  }>(
+    "/campaigns/:campaignId/starter-setup",
+    {
+      exposeHeadRoute: false,
+      onRequest: async (request, reply) => {
+        if (!readRpgFeatureFlags().campaign) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
+        }
+        if (Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Starter setup does not accept query parameters",
+          );
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Starter setup requires application/json",
+          );
+        }
+      },
+      errorHandler: (_error, request, reply) => {
+        logCampaignOperationFailure(request, "campaign-starter-setup-body", "info");
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Starter setup request is invalid");
+      },
+    },
+    async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      if (!campaignId.success) {
+        return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+      }
+      const body = campaignStarterSetupRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Starter setup request is invalid", {
+          issues: body.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            code: issue.code,
+            message: issue.message,
+          })),
+        });
+      }
+
+      try {
+        const repository = getCampaignRepository();
+        if (
+          typeof repository.inspectOriginalStarterSetup !== "function" ||
+          typeof repository.installOriginalStarterContent !== "function" ||
+          typeof repository.configureOriginalStarterContent !== "function"
+        ) {
+          throw new Error("campaign repository does not support starter setup");
+        }
+        const campaign = createOriginalStarterSetupService(repository as OriginalStarterSetupRepository).setup(
+          campaignId.data,
+        );
+        const response = campaignStarterSetupResponseSchema.parse({ campaign });
+        const content = response.campaign.content;
+        if (
+          response.campaign.id !== campaignId.data ||
+          response.campaign.actorRole !== "owner" ||
+          content.status !== "configured" ||
+          content.rulesProfileId !== ORIGINAL_STARTER_RULES_PROFILE_ID ||
+          content.contentPacks.length !== 1 ||
+          content.contentPacks[0]?.packId !== ORIGINAL_STARTER_PACK_ID ||
+          content.contentPacks[0]?.packVersion !== ORIGINAL_STARTER_PACK_VERSION
+        ) {
+          throw new Error("starter setup output does not prove the exact setup");
+        }
+        return response;
+      } catch (error) {
+        if (error instanceof OriginalStarterSetupUnavailableError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+        }
+        if (error instanceof OriginalStarterSetupConflictError) {
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_CAMPAIGN_STARTER_SETUP_CONFLICT",
+            "Starter setup conflicts with current campaign state",
+          );
+        }
+        logCampaignOperationFailure(request, "campaign-starter-setup");
         return sendApiProblem(
-          request, reply, 409, "RPG_CAMPAIGN_MECHANICS_STARTER_SETUP_CONFLICT",
-          "Mechanics starter setup conflicts with current campaign state",
+          request,
+          reply,
+          500,
+          "RPG_INTERNAL_ERROR",
+          "Campaign starter setup could not be completed",
         );
       }
-      logCampaignOperationFailure(request, "campaign-mechanics-starter-setup");
-      return sendApiProblem(
-        request, reply, 500, "RPG_INTERNAL_ERROR",
-        "Campaign mechanics starter setup status is unknown; reconcile with campaign detail before trying again; never retry automatically",
-      );
-    }
-  });
+    },
+  );
+
+  app.put<{
+    Params: { campaignId: string };
+    Querystring: Record<string, unknown>;
+    Body: unknown;
+  }>(
+    "/campaigns/:campaignId/mechanics-starter-setup",
+    {
+      exposeHeadRoute: false,
+      onRequest: async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        // Both flags precede every caller-controlled query/path/media/body check
+        // and repository lifecycle touch.
+        const flags = readRpgFeatureFlags();
+        if (!flags.campaign || !flags.mechanics) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
+        }
+        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Mechanics starter setup does not accept query parameters",
+          );
+          return;
+        }
+        if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
+          await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Mechanics starter setup requires application/json",
+          );
+        }
+      },
+      errorHandler: (_error, request, reply) => {
+        logCampaignOperationFailure(request, "campaign-mechanics-starter-setup-body", "info");
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Mechanics starter setup request is invalid");
+      },
+    },
+    async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      if (!campaignId.success) {
+        return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+      }
+      const body = campaignMechanicsStarterSetupRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        return sendApiProblem(
+          request,
+          reply,
+          400,
+          "RPG_INVALID_REQUEST",
+          "Mechanics starter setup request is invalid",
+          {
+            issues: body.error.issues.map((issue) => ({
+              path: issue.path.join("."),
+              code: issue.code,
+              message: issue.message,
+            })),
+          },
+        );
+      }
+
+      try {
+        const repository = getCampaignRepository();
+        if (body.data.starterId === SRD_5_1_STARTER_ID) {
+          if (
+            typeof repository.installSrdStarterCatalog !== "function" ||
+            typeof repository.configureSrdStarterCatalog !== "function" ||
+            typeof repository.getCampaignAdministration !== "function"
+          )
+            throw new Error("campaign repository does not support SRD starter setup");
+          const before = repository.getCampaignAdministration(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data);
+          if (!before) throw new MechanicsStarterSetupUnavailableError();
+          repository.installSrdStarterCatalog(LOCAL_CAMPAIGN_PRINCIPAL);
+          repository.configureSrdStarterCatalog(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data, {
+            expectedRevision: before.revision,
+            idempotencyKey: "srd-5.1-starter-setup-v1",
+          });
+          const campaign = repository.getCampaignDetail(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data);
+          if (
+            !campaign ||
+            campaign.content.status !== "configured" ||
+            campaign.content.rulesProfileId !== SRD_5_1_STARTER_IDENTITY.rulesProfileId ||
+            campaign.content.contentPacks.length !== 1 ||
+            campaign.content.contentPacks[0]?.packId !== SRD_5_1_STARTER_IDENTITY.packId ||
+            campaign.content.contentPacks[0]?.packVersion !== SRD_5_1_STARTER_IDENTITY.packVersion
+          ) {
+            throw new MechanicsStarterSetupConflictError();
+          }
+          return reply.code(200).send(campaignMechanicsStarterSetupResponseSchema.parse({ campaign }));
+        }
+        if (
+          typeof repository.transaction !== "function" ||
+          typeof repository.installMechanicsStarterCatalog !== "function" ||
+          typeof repository.configureMechanicsStarterCatalog !== "function"
+        ) {
+          throw new Error("campaign repository does not support mechanics starter setup");
+        }
+        const campaign = createMechanicsStarterSetupService(
+          repository as unknown as MechanicsStarterSetupRepository,
+        ).setup(campaignId.data);
+        const response = campaignMechanicsStarterSetupResponseSchema.parse({ campaign });
+        const content = response.campaign.content;
+        if (
+          response.campaign.id !== campaignId.data ||
+          response.campaign.actorRole !== "owner" ||
+          content.status !== "configured" ||
+          content.rulesProfileId !== MECHANICS_STARTER_IDENTITY.rulesProfileId ||
+          content.contentPacks.length !== 1 ||
+          content.contentPacks[0]?.packId !== MECHANICS_STARTER_IDENTITY.packId ||
+          content.contentPacks[0]?.packVersion !== MECHANICS_STARTER_IDENTITY.packVersion
+        ) {
+          throw new Error("mechanics starter setup output does not prove the exact setup");
+        }
+        return reply.code(200).send(response);
+      } catch (error) {
+        if (error instanceof MechanicsStarterSetupUnavailableError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+        }
+        if (
+          error instanceof MechanicsStarterSetupConflictError ||
+          error instanceof ContentCatalogConflictError ||
+          error instanceof ContentCatalogStaleError
+        ) {
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_CAMPAIGN_MECHANICS_STARTER_SETUP_CONFLICT",
+            "Mechanics starter setup conflicts with current campaign state",
+          );
+        }
+        logCampaignOperationFailure(request, "campaign-mechanics-starter-setup");
+        return sendApiProblem(
+          request,
+          reply,
+          500,
+          "RPG_INTERNAL_ERROR",
+          "Campaign mechanics starter setup status is unknown; reconcile with campaign detail before trying again; never retry automatically",
+        );
+      }
+    },
+  );
 
   app.setNotFoundHandler((request, reply) => {
     // Scoped misses include unsupported methods (including Fastify's implicit
     // HEAD/OPTIONS paths); none may be cached differently from RPG resources.
-    reply.header("cache-control", (request.raw.url ?? request.url).includes("/context-inspection/")
-      ? "private, no-store" : "no-store");
+    reply.header(
+      "cache-control",
+      (request.raw.url ?? request.url).includes("/context-inspection/") ? "private, no-store" : "no-store",
+    );
     return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
   });
 };

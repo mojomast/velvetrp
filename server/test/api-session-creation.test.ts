@@ -14,7 +14,7 @@ const characterInput = (name: string) => ({
   age: 30,
   archetype: `${name} archetype`,
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 });
 
 async function createCharacter(app: ReturnType<typeof buildApp>, name: string): Promise<Character> {
@@ -62,12 +62,16 @@ describe("session creation api characterization", () => {
     expectError(missing, 400, "session input is required");
     expectError(await postSession(app, null), 400, "session input is required");
     for (const payload of ["character", 12, false]) {
-      expectError(await app.inject({
-        method: "POST",
-        url: "/api/sessions",
-        headers: { "content-type": "application/json" },
-        payload: JSON.stringify(payload),
-      }), 400, "session input is required");
+      expectError(
+        await app.inject({
+          method: "POST",
+          url: "/api/sessions",
+          headers: { "content-type": "application/json" },
+          payload: JSON.stringify(payload),
+        }),
+        400,
+        "session input is required",
+      );
     }
     await app.close();
   });
@@ -76,11 +80,7 @@ describe("session creation api characterization", () => {
     const app = buildApp();
     expectError(await postSession(app, { characterId: 1, characterIds: "bad" }), 400, "characterId must be a string");
     for (const characterIds of ["bad", ["valid", 2], null]) {
-      expectError(
-        await postSession(app, { characterIds }),
-        400,
-        "characterIds must be an array of strings",
-      );
+      expectError(await postSession(app, { characterIds }), 400, "characterIds must be an array of strings");
     }
     await app.close();
   });
@@ -88,7 +88,12 @@ describe("session creation api characterization", () => {
   it("requires an ID and gives an explicit empty plural list precedence over a valid singular ID", async () => {
     const app = buildApp();
     const character = await createCharacter(app, "Present");
-    for (const payload of [{}, { characterIds: [] }, { characterId: "" }, { characterId: character.id, characterIds: [] }]) {
+    for (const payload of [
+      {},
+      { characterIds: [] },
+      { characterId: "" },
+      { characterId: character.id, characterIds: [] },
+    ]) {
       expectError(await postSession(app, payload), 400, "characterId or characterIds is required");
     }
     await app.close();
@@ -124,7 +129,10 @@ describe("session creation api characterization", () => {
     const singularFallback = await postSession(app, { characterId: two.id, characterIds: [one.id, two.id] });
     expect(singularFallback.statusCode).toBe(201);
     expect(singularFallback.json()).toMatchObject({ characterId: two.id, primaryCharacterId: two.id });
-    expect((singularFallback.json() as Session).participants.map((participant) => participant.id)).toEqual([one.id, two.id]);
+    expect((singularFallback.json() as Session).participants.map((participant) => participant.id)).toEqual([
+      one.id,
+      two.id,
+    ]);
 
     expectError(
       await postSession(app, { characterId: three.id, characterIds: [one.id, two.id] }),
@@ -198,13 +206,15 @@ describe("session creation api characterization", () => {
       title: "",
       state: "setup",
       presetId: "default",
-      consentLog: [{
-        id: expect.any(String),
-        at: expect.any(String),
-        scope: "scene-created",
-        granted: true,
-        note: "Fictional adult character confirmed at creation.",
-      }],
+      consentLog: [
+        {
+          id: expect.any(String),
+          at: expect.any(String),
+          scope: "scene-created",
+          granted: true,
+          note: "Fictional adult character confirmed at creation.",
+        },
+      ],
       activeLeafId: null,
       createdAt: expect.any(String),
       stoppedAt: null,
@@ -217,7 +227,11 @@ describe("session creation api characterization", () => {
   it("preserves explicit untrimmed and empty title and preset values", async () => {
     const app = buildApp();
     const character = await createCharacter(app, "Explicit");
-    const padded = await postSession(app, { characterId: character.id, title: "  Untouched  ", presetId: "  custom  " });
+    const padded = await postSession(app, {
+      characterId: character.id,
+      title: "  Untouched  ",
+      presetId: "  custom  ",
+    });
     expect(padded.statusCode).toBe(201);
     expect(padded.json()).toMatchObject({ title: "  Untouched  ", presetId: "  custom  " });
     const empty = await postSession(app, { characterId: character.id, title: "", presetId: "" });
@@ -230,11 +244,20 @@ describe("session creation api characterization", () => {
 describe("solo session creation api characterization", () => {
   it("rejects missing, null, non-string, empty, and whitespace IDs with the same exact 400", async () => {
     const app = buildApp();
-    const payloads = [undefined, null, {}, { characterId: null }, { characterId: 3 }, { characterId: "" }, { characterId: "   " }];
+    const payloads = [
+      undefined,
+      null,
+      {},
+      { characterId: null },
+      { characterId: 3 },
+      { characterId: "" },
+      { characterId: "   " },
+    ];
     for (const payload of payloads) {
-      const response = payload === undefined
-        ? await app.inject({ method: "POST", url: "/api/sessions/solo" })
-        : await app.inject({ method: "POST", url: "/api/sessions/solo", payload: payload as object });
+      const response =
+        payload === undefined
+          ? await app.inject({ method: "POST", url: "/api/sessions/solo" })
+          : await app.inject({ method: "POST", url: "/api/sessions/solo", payload: payload as object });
       expectError(response, 400, "characterId is required");
     }
     await app.close();
@@ -256,7 +279,11 @@ describe("solo session creation api characterization", () => {
   it("creates a new default solo with the exact 200 envelope", async () => {
     const app = buildApp();
     const character = await createCharacter(app, "New Solo");
-    const response = await app.inject({ method: "POST", url: "/api/sessions/solo", payload: { characterId: character.id } });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/solo",
+      payload: { characterId: character.id },
+    });
 
     expect(response.statusCode).toBe(200);
     const body = response.json() as { session: Session; messages: Message[]; created: boolean };
@@ -269,13 +296,15 @@ describe("solo session creation api characterization", () => {
         title: "",
         state: "setup",
         presetId: "default",
-        consentLog: [{
-          id: expect.any(String),
-          at: expect.any(String),
-          scope: "scene-created",
-          granted: true,
-          note: "Fictional adult character confirmed at creation.",
-        }],
+        consentLog: [
+          {
+            id: expect.any(String),
+            at: expect.any(String),
+            scope: "scene-created",
+            granted: true,
+            note: "Fictional adult character confirmed at creation.",
+          },
+        ],
         activeLeafId: null,
         createdAt: expect.any(String),
         stoppedAt: null,
@@ -290,7 +319,11 @@ describe("solo session creation api characterization", () => {
   it("reopens the exact open solo and returns its current active messages", async () => {
     const app = buildApp();
     const character = await createCharacter(app, "Reopen");
-    const first = await app.inject({ method: "POST", url: "/api/sessions/solo", payload: { characterId: character.id } });
+    const first = await app.inject({
+      method: "POST",
+      url: "/api/sessions/solo",
+      payload: { characterId: character.id },
+    });
     const original = (first.json() as { session: Session }).session;
     const userMessage = await addMessage(original.id, "user", "Existing turn");
     const characterMessage = await addMessage(original.id, "character", "Existing reply", {
@@ -298,7 +331,11 @@ describe("solo session creation api characterization", () => {
       speakerCharacterId: character.id,
     });
 
-    const reopened = await app.inject({ method: "POST", url: "/api/sessions/solo", payload: { characterId: character.id } });
+    const reopened = await app.inject({
+      method: "POST",
+      url: "/api/sessions/solo",
+      payload: { characterId: character.id },
+    });
     expect(reopened.statusCode).toBe(200);
     expect(reopened.json()).toEqual({
       session: { ...original, activeLeafId: characterMessage.id },
@@ -317,7 +354,11 @@ describe("solo session creation api characterization", () => {
 
     const response = await app.inject({ method: "POST", url: "/api/sessions/solo", payload: { characterId: one.id } });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ created: true, session: { characterId: one.id, participants: [{ id: one.id }] }, messages: [] });
+    expect(response.json()).toMatchObject({
+      created: true,
+      session: { characterId: one.id, participants: [{ id: one.id }] },
+      messages: [],
+    });
     expect(response.json().session.id).not.toBe(group.id);
     expect(response.json().session.id).not.toBe(otherSolo.id);
     await app.close();
@@ -329,11 +370,24 @@ describe("solo session creation api characterization", () => {
     const original = (await postSession(app, { characterId: character.id })).json() as Session;
     const stoppedResponse = await app.inject({ method: "POST", url: `/api/sessions/${original.id}/stop` });
     expect(stoppedResponse.statusCode).toBe(200);
-    expect(stoppedResponse.json()).toMatchObject({ id: original.id, state: "closed", stoppedAt: expect.any(String), stopReason: "user-stop" });
+    expect(stoppedResponse.json()).toMatchObject({
+      id: original.id,
+      state: "closed",
+      stoppedAt: expect.any(String),
+      stopReason: "user-stop",
+    });
 
-    const response = await app.inject({ method: "POST", url: "/api/sessions/solo", payload: { characterId: character.id } });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/solo",
+      payload: { characterId: character.id },
+    });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ created: true, session: { state: "setup", stoppedAt: null, stopReason: null }, messages: [] });
+    expect(response.json()).toMatchObject({
+      created: true,
+      session: { state: "setup", stoppedAt: null, stopReason: null },
+      messages: [],
+    });
     expect(response.json().session.id).not.toBe(original.id);
     await app.close();
   });
@@ -351,7 +405,11 @@ describe("solo session creation api characterization", () => {
     raw.close();
     const marker = await addMessage(newer.id, "user", "Newest history");
 
-    const response = await app.inject({ method: "POST", url: "/api/sessions/solo", payload: { characterId: character.id } });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/solo",
+      payload: { characterId: character.id },
+    });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       session: { ...newer, createdAt: newerCreatedAt, activeLeafId: marker.id },

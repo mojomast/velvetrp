@@ -2,10 +2,21 @@ import { describe, expect, it } from "vitest";
 import { boundDirectorPreparation, DM_PREPARATION_CONTEXT_MAX_CHARS } from "../src/repo/campaignDmRepo.js";
 
 const oversized = () => ({
-  campaignId: "campaign", deliveryRevision: 3,
-  encounters: Array.from({ length: 40 }, (_, index) => ({ artifactKey: `enc-${index}`, title: `Encounter ${index}`, body: "e".repeat(300) })),
-  lore: Array.from({ length: 40 }, (_, index) => ({ artifactKey: `lore-${index}`, title: `Lore ${index}`, body: "l".repeat(300) })),
-  questItems: [], monsterConcepts: [], deliverables: [],
+  campaignId: "campaign",
+  deliveryRevision: 3,
+  encounters: Array.from({ length: 40 }, (_, index) => ({
+    artifactKey: `enc-${index}`,
+    title: `Encounter ${index}`,
+    body: "e".repeat(300),
+  })),
+  lore: Array.from({ length: 40 }, (_, index) => ({
+    artifactKey: `lore-${index}`,
+    title: `Lore ${index}`,
+    body: "l".repeat(300),
+  })),
+  questItems: [],
+  monsterConcepts: [],
+  deliverables: [],
 });
 
 describe("director preparation bound", () => {

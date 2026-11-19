@@ -35,7 +35,7 @@ const characterInput = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 };
 
 async function createCharacter(app: ReturnType<typeof buildApp>, name = "Aria") {
@@ -106,7 +106,8 @@ class SseReader {
             if (line.startsWith("event:")) event = line.slice(6).trim();
             if (line.startsWith("data:")) data.push(line.slice(5).trim());
           }
-          if (data.length > 0) this.events.push({ event, data: JSON.parse(data.join("\n")) as Record<string, unknown> });
+          if (data.length > 0)
+            this.events.push({ event, data: JSON.parse(data.join("\n")) as Record<string, unknown> });
           boundary = buffer.indexOf("\n\n");
         }
         this.resolveWaiters();
@@ -151,8 +152,11 @@ describe("session lifecycle api", () => {
     const stoppedSession = await createSessionRecord({ characterId: character.id });
     const observed: Array<{ id: string; state: string }> = [];
     const abortActiveGeneration = vi.fn((sessionId: string) => {
-      const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"), { readonly: true });
-      const row = db.prepare("SELECT id, state FROM sessions WHERE id = ?").get(sessionId) as { id: string; state: string } | undefined;
+      const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"), {
+        readonly: true,
+      });
+      const row = db.prepare("SELECT id, state FROM sessions WHERE id = ?").get(sessionId) as
+        { id: string; state: string } | undefined;
       db.close();
       if (row) observed.push(row);
     });
@@ -210,7 +214,11 @@ describe("session lifecycle api", () => {
       usage: { promptTokens: 12, completionTokens: 3, totalTokens: 15, source: "provider", model: "fixture-model" },
     });
     await updateSessionContextSource(session.id, "The observatory is locked.");
-    await upsertSummary(session.id, { summary: "At the observatory.", keyEvents: ["Arrived"], emotionalBeat: "steady" });
+    await upsertSummary(session.id, {
+      summary: "At the observatory.",
+      keyEvents: ["Arrived"],
+      emotionalBeat: "steady",
+    });
     await addConsentEvent(session.id, "check-in", true, "Still comfortable.");
 
     const deleted = await app.inject({ method: "DELETE", url: `/api/sessions/${session.id}` });
@@ -241,12 +249,17 @@ describe("session lifecycle api", () => {
     };
     expect(usage.calls).toBe(1);
     expect(usage.totalTokens).toBe(15);
-    expect(usage.bySession).toEqual([expect.objectContaining({ sessionId: session.id, title: "Deleted session", totalTokens: 15 })]);
+    expect(usage.bySession).toEqual([
+      expect.objectContaining({ sessionId: session.id, title: "Deleted session", totalTokens: 15 }),
+    ]);
 
     closeRepo();
-    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"), { readonly: true });
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"), {
+      readonly: true,
+    });
     const count = (table: string) =>
-      (db.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE session_id = ?`).get(session.id) as { count: number }).count;
+      (db.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE session_id = ?`).get(session.id) as { count: number })
+        .count;
     expect(count("session_characters")).toBe(0);
     expect(count("messages")).toBe(0);
     expect(count("session_context")).toBe(0);
@@ -292,7 +305,11 @@ describe("session lifecycle api", () => {
       payload: { content: "Continue the scene." },
     });
     expect(laterWrite.statusCode).toBe(409);
-    expect(laterWrite.json()).toMatchObject({ error: "session is stopped", stoppedAt: stopped.stoppedAt, stopReason: "user-stop" });
+    expect(laterWrite.json()).toMatchObject({
+      error: "session is stopped",
+      stoppedAt: stopped.stoppedAt,
+      stopReason: "user-stop",
+    });
 
     const repeatedResponse = await app.inject({ method: "POST", url: `/api/sessions/${created.id}/stop` });
     expect(repeatedResponse.statusCode).toBe(200);

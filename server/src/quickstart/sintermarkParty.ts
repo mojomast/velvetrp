@@ -45,10 +45,7 @@ import {
   type ProgressionSelection,
   type UpdateCharacterDraftInput,
 } from "@velvet/contracts";
-import {
-  SRD_5_1_STARTER_CATALOG,
-  type Repository,
-} from "../repo/index.js";
+import { SRD_5_1_STARTER_CATALOG, type Repository } from "../repo/index.js";
 import { getRepositoryDatabase } from "../repo/repoContext.js";
 
 const TARGET_LEVEL = 3;
@@ -60,24 +57,34 @@ export const SINTERMARK_HERO_PROFILES = {
     ideal: "A commons must be able to inspect the figures used to govern it.",
     bond: "Orra brought Tessel out of a settling gallery when the Register called the evacuation premature.",
     flaw: "Treats grief and disagreement like measurement errors; sounds cold when frightened.",
-    history: "Raised on the Warm Verge, trained at the Kiln College, then employed as a Register draught adjuster. Tessel helped prepare reassuring charts before discovering their readings did not match the ground. Left with copies and now wants independent measurements, not revenge. Knows how a vent lease can condemn a home as readily as a fire can.",
-    personality: "Meticulous, dryly funny, generous with practical teaching. Keeps chalk, a folding level and a sampling prism beside the spellbook. Will admit uncertainty, but hates being asked to round away inconvenient evidence.",
+    history:
+      "Raised on the Warm Verge, trained at the Kiln College, then employed as a Register draught adjuster. Tessel helped prepare reassuring charts before discovering their readings did not match the ground. Left with copies and now wants independent measurements, not revenge. Knows how a vent lease can condemn a home as readily as a fire can.",
+    personality:
+      "Meticulous, dryly funny, generous with practical teaching. Keeps chalk, a folding level and a sampling prism beside the spellbook. Will admit uncertainty, but hates being asked to round away inconvenient evidence.",
     fears: "Being right too late; a clever intervention that rescues a furnace but wrecks someone's well.",
-    relationships: "Neris Rusk taught Tessel to keep raw notes. Pell Marrow regards Tessel as a disloyal employee. Yara knows the family on the Verge. Orra insists that measurements are useful only if someone gets home.",
-    appearance: "A soot-grey survey coat with repaired cuffs, cropped silver hair, ink-stained fingertips and brass-framed protective lenses.",
-    voice: "Short, exact sentences and understated jokes. Says 'I haven't measured that' instead of guessing. Becomes more formal when angry.",
+    relationships:
+      "Neris Rusk taught Tessel to keep raw notes. Pell Marrow regards Tessel as a disloyal employee. Yara knows the family on the Verge. Orra insists that measurements are useful only if someone gets home.",
+    appearance:
+      "A soot-grey survey coat with repaired cuffs, cropped silver hair, ink-stained fingertips and brass-framed protective lenses.",
+    voice:
+      "Short, exact sentences and understated jokes. Says 'I haven't measured that' instead of guessing. Becomes more formal when angry.",
   }),
   orra: personaProfileSchema.parse({
     goal: "Bring every crew home and secure enforceable heat-share and rescue guarantees.",
     ideal: "Maintenance and mutual aid are sacred duties; nobody is expendable.",
     bond: "The Steps' jack crews trained Orra, and their families trust her with the last descent.",
     flaw: "Cannot abandon a rescue even when the cost to everyone else becomes severe; confuses stubbornness with duty.",
-    history: "A hill-dwarf jack-crew captain who became a Life cleric through a local faith of repair and shared fire. Has raised whole terraces a finger's breadth at a time and carried colleagues out of failed galleries. A rescue once saved Tessel, making the pair unlikely partners. She wants written guarantees, usable equipment and paid crews rather than another commemorative plaque.",
-    personality: "Plain-spoken, attentive, unhurried beneath a settling ceiling. Remembers names, checks knots herself, and makes room for frightened people without promising that everything is safe.",
+    history:
+      "A hill-dwarf jack-crew captain who became a Life cleric through a local faith of repair and shared fire. Has raised whole terraces a finger's breadth at a time and carried colleagues out of failed galleries. A rescue once saved Tessel, making the pair unlikely partners. She wants written guarantees, usable equipment and paid crews rather than another commemorative plaque.",
+    personality:
+      "Plain-spoken, attentive, unhurried beneath a settling ceiling. Remembers names, checks knots herself, and makes room for frightened people without promising that everything is safe.",
     fears: "Leaving someone below; being made the respectable face of a settlement the crews cannot live with.",
-    relationships: "Dolph Marrow trusts her underground but argues with her over strike tactics. Cael treats the workers she brings up. Orl Tace's bargaining makes her uneasy. Tessel can tell her where the ground is moving, but she makes Tessel explain who will bear the cost.",
-    appearance: "Broad-shouldered, dark braided hair, a plate harness patched with numbered rescue tags, and a warhammer fashioned like a building-jack handle.",
-    voice: "Warm low voice, practical verbs, names before titles. Asks 'Who is still below?' before discussing liability.",
+    relationships:
+      "Dolph Marrow trusts her underground but argues with her over strike tactics. Cael treats the workers she brings up. Orl Tace's bargaining makes her uneasy. Tessel can tell her where the ground is moving, but she makes Tessel explain who will bear the cost.",
+    appearance:
+      "Broad-shouldered, dark braided hair, a plate harness patched with numbered rescue tags, and a warhammer fashioned like a building-jack handle.",
+    voice:
+      "Warm low voice, practical verbs, names before titles. Asks 'Who is still below?' before discussing liability.",
   }),
 };
 
@@ -129,11 +136,7 @@ const HEROES: readonly HeroSpec[] = [
     classDefinitionId: "srd-5.1:class:wizard",
     primaryAttribute: "intelligence",
     // Exact level-one prepared spells offered by the Wizard class definition.
-    preparedSpells: [
-      "srd-5.1:spell:magic-missile",
-      "srd-5.1:spell:false-life",
-      "srd-5.1:spell:shield",
-    ],
+    preparedSpells: ["srd-5.1:spell:magic-missile", "srd-5.1:spell:false-life", "srd-5.1:spell:shield"],
     targetScores: { intelligence: 20, dexterity: 20, constitution: 20, wisdom: 18, strength: 16, charisma: 18 },
     battlePowers: [
       "srd-5.1:spell:fire-bolt",
@@ -189,17 +192,9 @@ const HEROES: readonly HeroSpec[] = [
     classDefinitionId: "srd-5.1:class:cleric",
     primaryAttribute: "wisdom",
     // Exact level-one prepared spells offered by the Cleric class definition.
-    preparedSpells: [
-      "srd-5.1:spell:bless",
-      "srd-5.1:spell:cure-wounds",
-      "srd-5.1:spell:healing-word",
-    ],
+    preparedSpells: ["srd-5.1:spell:bless", "srd-5.1:spell:cure-wounds", "srd-5.1:spell:healing-word"],
     targetScores: { strength: 20, wisdom: 20, constitution: 20, dexterity: 18, intelligence: 18, charisma: 18 },
-    battlePowers: [
-      "srd-5.1:spell:bless",
-      "srd-5.1:spell:cure-wounds",
-      "srd-5.1:spell:healing-word",
-    ],
+    battlePowers: ["srd-5.1:spell:bless", "srd-5.1:spell:cure-wounds", "srd-5.1:spell:healing-word"],
     componentNotes:
       "bless V,S,M (sprinkling of holy water) and is area-targeted; cure-wounds V,S (touch); healing-word V (60 ft bonus action).",
     reactionConstraints:
@@ -305,7 +300,11 @@ function selectionForChoice(choice: ProgressionPendingChoice): ProgressionSelect
     case "class":
       return { choiceId: choice.choiceId, kind: "class", ability: option };
     case "ability-score-increase":
-      return { choiceId: choice.choiceId, kind: "ability-score-increase", increases: [{ ability: option, amount: Math.min(2, choice.points) }] };
+      return {
+        choiceId: choice.choiceId,
+        kind: "ability-score-increase",
+        increases: [{ ability: option, amount: Math.min(2, choice.points) }],
+      };
   }
 }
 
@@ -338,8 +337,17 @@ function createPersona(repository: Repository, ownerId: string, hero: HeroSpec):
 }
 
 /** Advances the character to the SRD starter cap (level 3) through real progression commands. */
-function advanceToTargetLevel(repository: Repository, ownerId: string, campaignCharacterId: string, keyPrefix: string, key: string): void {
-  let state = requireValue(repository.getCharacterProgression(ownerId, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
+function advanceToTargetLevel(
+  repository: Repository,
+  ownerId: string,
+  campaignCharacterId: string,
+  keyPrefix: string,
+  key: string,
+): void {
+  let state = requireValue(
+    repository.getCharacterProgression(ownerId, campaignCharacterId),
+    `Sintermark: ${key} progression is unavailable`,
+  );
   if (state.totalXp < TARGET_XP) {
     repository.grantCharacterXp(ownerId, campaignCharacterId, {
       amount: TARGET_XP - state.totalXp,
@@ -349,9 +357,15 @@ function advanceToTargetLevel(repository: Repository, ownerId: string, campaignC
     });
   }
   for (let guard = 0; guard < 8; guard += 1) {
-    state = requireValue(repository.getCharacterProgression(ownerId, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
+    state = requireValue(
+      repository.getCharacterProgression(ownerId, campaignCharacterId),
+      `Sintermark: ${key} progression is unavailable`,
+    );
     if (state.level >= TARGET_LEVEL) return;
-    const preview = requireValue(repository.previewCharacterProgression(ownerId, campaignCharacterId), `Sintermark: ${key} progression preview is unavailable`);
+    const preview = requireValue(
+      repository.previewCharacterProgression(ownerId, campaignCharacterId),
+      `Sintermark: ${key} progression preview is unavailable`,
+    );
     repository.applyCharacterProgression(ownerId, campaignCharacterId, {
       previewRevision: preview.revision,
       previewToken: preview.token,
@@ -359,13 +373,24 @@ function advanceToTargetLevel(repository: Repository, ownerId: string, campaignC
       idempotencyKey: `${keyPrefix}.${key}.apply.${guard}`,
     });
   }
-  const finalState = requireValue(repository.getCharacterProgression(ownerId, campaignCharacterId), `Sintermark: ${key} progression is unavailable`);
-  if (finalState.level !== TARGET_LEVEL) throw new Error(`Sintermark: ${key} reached level ${finalState.level}, expected ${TARGET_LEVEL}`);
+  const finalState = requireValue(
+    repository.getCharacterProgression(ownerId, campaignCharacterId),
+    `Sintermark: ${key} progression is unavailable`,
+  );
+  if (finalState.level !== TARGET_LEVEL)
+    throw new Error(`Sintermark: ${key} reached level ${finalState.level}, expected ${TARGET_LEVEL}`);
 }
 
 /** Reads the active campaign timeline revision for the GM command envelope seam. */
-function activeTimeline(repository: Repository, ownerId: string, campaignId: string): { timelineId: string; revision: number } {
-  const administration = requireValue(repository.getCampaignAdministration(ownerId, campaignId), "Sintermark: campaign administration is unavailable");
+function activeTimeline(
+  repository: Repository,
+  ownerId: string,
+  campaignId: string,
+): { timelineId: string; revision: number } {
+  const administration = requireValue(
+    repository.getCampaignAdministration(ownerId, campaignId),
+    "Sintermark: campaign administration is unavailable",
+  );
   const timeline = requireValue(
     repository.getCampaignTimeline(ownerId, campaignId, administration.activeTimelineId),
     "Sintermark: active campaign timeline is unavailable",
@@ -374,7 +399,16 @@ function activeTimeline(repository: Repository, ownerId: string, campaignId: str
 }
 
 /** GM override: set one ability score absolutely, after leveling. */
-function setActorAttribute(repository: Repository, ownerId: string, campaignId: string, actorId: string, keyPrefix: string, key: string, attributeId: SrdAttributeId, value: number): void {
+function setActorAttribute(
+  repository: Repository,
+  ownerId: string,
+  campaignId: string,
+  actorId: string,
+  keyPrefix: string,
+  key: string,
+  attributeId: SrdAttributeId,
+  value: number,
+): void {
   const timeline = activeTimeline(repository, ownerId, campaignId);
   const commandId = `${keyPrefix}.attr.${key}.${attributeId}`;
   const envelope: CommandEnvelope = {
@@ -391,7 +425,16 @@ function setActorAttribute(repository: Repository, ownerId: string, campaignId: 
 }
 
 /** Creates an actor resource row that does not yet exist (GM initialize seam). */
-function initializeResource(repository: Repository, ownerId: string, campaignId: string, actorId: string, keyPrefix: string, key: string, name: string, amount: number): void {
+function initializeResource(
+  repository: Repository,
+  ownerId: string,
+  campaignId: string,
+  actorId: string,
+  keyPrefix: string,
+  key: string,
+  name: string,
+  amount: number,
+): void {
   const timeline = activeTimeline(repository, ownerId, campaignId);
   const commandId = `${keyPrefix}.res.${key}.${name}`;
   const envelope: CommandEnvelope = {
@@ -411,13 +454,25 @@ function initializeResource(repository: Repository, ownerId: string, campaignId:
  * Raises an existing resource through the public actor-resource mutator
  * (set capacity, then set current), or initializes it when absent.
  */
-function ensureResourceAt(repository: Repository, ownerId: string, campaignId: string, actorId: string, keyPrefix: string, key: string, name: string, amount: number): void {
+function ensureResourceAt(
+  repository: Repository,
+  ownerId: string,
+  campaignId: string,
+  actorId: string,
+  keyPrefix: string,
+  key: string,
+  name: string,
+  amount: number,
+): void {
   const resources = repository.getM15ActorResources(ownerId, campaignId, actorId);
   if (!resources.some((resource) => resource.resourceId === name)) {
     initializeResource(repository, ownerId, campaignId, actorId, keyPrefix, key, name, amount);
     return;
   }
-  const before = requireValue(repository.getActorResourceSnapshot(ownerId, campaignId, actorId), "Sintermark: actor resource snapshot is unavailable");
+  const before = requireValue(
+    repository.getActorResourceSnapshot(ownerId, campaignId, actorId),
+    "Sintermark: actor resource snapshot is unavailable",
+  );
   const capacityCommand: ActorResourceCommand = {
     type: "set_actor_resource_capacity",
     campaignId,
@@ -428,7 +483,10 @@ function ensureResourceAt(repository: Repository, ownerId: string, campaignId: s
     idempotencyKey: `${keyPrefix}.res.${key}.${name}.cap`,
   };
   repository.mutateActorResource(ownerId, capacityCommand);
-  const afterCapacity = requireValue(repository.getActorResourceSnapshot(ownerId, campaignId, actorId), "Sintermark: actor resource snapshot is unavailable");
+  const afterCapacity = requireValue(
+    repository.getActorResourceSnapshot(ownerId, campaignId, actorId),
+    "Sintermark: actor resource snapshot is unavailable",
+  );
   const currentCommand: ActorResourceCommand = {
     type: "set_actor_resource",
     campaignId,
@@ -463,32 +521,39 @@ function requireOwnedActor(
   actorId: string,
   message: string,
 ): void {
-  const owned = db.prepare(`SELECT 1 FROM campaigns campaign
+  const owned = db
+    .prepare(
+      `SELECT 1 FROM campaigns campaign
     JOIN campaign_memberships membership ON membership.campaign_id=campaign.id
       AND membership.principal_id=? AND membership.role='owner'
     JOIN campaign_actors actor ON actor.campaign_id=campaign.id AND actor.id=?
-    WHERE campaign.id=? AND campaign.owner_principal_id=?`)
+    WHERE campaign.id=? AND campaign.owner_principal_id=?`,
+    )
     .get(ownerId, actorId, campaignId, ownerId);
   if (!owned) throw new Error(message);
 }
 
 /** Pins an exact public item for execution using the campaign's existing pin. */
-function pinItemExecution(
-  db: ReturnType<typeof getRepositoryDatabase>,
-  campaignId: string,
-  item: ItemRef,
-): void {
-  const publicPin = db.prepare(`SELECT 1 FROM campaign_catalog_current_pins pin
+function pinItemExecution(db: ReturnType<typeof getRepositoryDatabase>, campaignId: string, item: ItemRef): void {
+  const publicPin = db
+    .prepare(
+      `SELECT 1 FROM campaign_catalog_current_pins pin
     JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
-    WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='item' AND definition.definition_id=?`)
+    WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='item' AND definition.definition_id=?`,
+    )
     .get(campaignId, item.packId, item.packVersion, item.definitionId);
   if (!publicPin) throw new Error(`Sintermark: item ${item.definitionId} is not publicly pinned`);
-  const existing = db.prepare(`SELECT 1 FROM rpg_campaign_catalog_definitions_v25
-    WHERE campaign_id=? AND pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`)
+  const existing = db
+    .prepare(
+      `SELECT 1 FROM rpg_campaign_catalog_definitions_v25
+    WHERE campaign_id=? AND pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`,
+    )
     .get(campaignId, item.packId, item.packVersion, item.definitionId);
-  if (!existing) db.prepare(`INSERT INTO rpg_campaign_catalog_definitions_v25
-    (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?, 'item',?)`)
-    .run(campaignId, item.packId, item.packVersion, item.definitionId);
+  if (!existing)
+    db.prepare(
+      `INSERT INTO rpg_campaign_catalog_definitions_v25
+    (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?, 'item',?)`,
+    ).run(campaignId, item.packId, item.packVersion, item.definitionId);
 }
 
 function materializeInstancedEntry(input: {
@@ -499,15 +564,30 @@ function materializeInstancedEntry(input: {
   item: ItemRef;
 }): void {
   withRepositoryDatabase((db) => {
-    requireOwnedActor(db, input.ownerId, input.campaignId, input.actorId, "Sintermark: instanced authoring target is not an owned campaign actor");
+    requireOwnedActor(
+      db,
+      input.ownerId,
+      input.campaignId,
+      input.actorId,
+      "Sintermark: instanced authoring target is not an owned campaign actor",
+    );
     pinItemExecution(db, input.campaignId, input.item);
     const existing = db.prepare("SELECT entry_id FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(input.entryId);
     if (existing) return;
-    db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,
+    db.prepare(
+      `INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,
       item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
-      VALUES(?,?,?,?,?,'item',?,'instanced',1,?,NULL,0,?)`)
-      .run(input.entryId, input.campaignId, input.actorId, input.item.packId, input.item.packVersion,
-        input.item.definitionId, input.entryId, new Date().toISOString());
+      VALUES(?,?,?,?,?,'item',?,'instanced',1,?,NULL,0,?)`,
+    ).run(
+      input.entryId,
+      input.campaignId,
+      input.actorId,
+      input.item.packId,
+      input.item.packVersion,
+      input.item.definitionId,
+      input.entryId,
+      new Date().toISOString(),
+    );
   });
 }
 
@@ -520,13 +600,23 @@ function materializeStackableEntry(input: {
   quantity: number;
 }): void {
   withRepositoryDatabase((db) => {
-    requireOwnedActor(db, input.ownerId, input.campaignId, input.actorId, "Sintermark: stackable authoring target is not an owned campaign actor");
+    requireOwnedActor(
+      db,
+      input.ownerId,
+      input.campaignId,
+      input.actorId,
+      "Sintermark: stackable authoring target is not an owned campaign actor",
+    );
     pinItemExecution(db, input.campaignId, input.item);
 
-    const row = db.prepare(`SELECT definition.definition_json json FROM campaign_catalog_current_pins pin
+    const row = db
+      .prepare(
+        `SELECT definition.definition_json json FROM campaign_catalog_current_pins pin
       JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
-      WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='item' AND definition.definition_id=?`)
-      .get(input.campaignId, input.item.packId, input.item.packVersion, input.item.definitionId) as { json: string } | undefined;
+      WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='item' AND definition.definition_id=?`,
+      )
+      .get(input.campaignId, input.item.packId, input.item.packVersion, input.item.definitionId) as
+      { json: string } | undefined;
     if (!row) throw new Error(`Sintermark: item ${input.item.definitionId} is not publicly pinned`);
     const definition = itemCatalogDefinitionSchema.parse(JSON.parse(row.json));
     if (definition.mechanics.stackable !== true) {
@@ -536,11 +626,20 @@ function materializeStackableEntry(input: {
     const existing = db.prepare("SELECT entry_id FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(input.entryId);
     if (existing) return;
 
-    db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,
+    db.prepare(
+      `INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,
       item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
-      VALUES(?,?,?,?,?,'item',?,'stackable',?,NULL,NULL,0,?)`)
-      .run(input.entryId, input.campaignId, input.actorId, input.item.packId, input.item.packVersion,
-        input.item.definitionId, input.quantity, new Date().toISOString());
+      VALUES(?,?,?,?,?,'item',?,'stackable',?,NULL,NULL,0,?)`,
+    ).run(
+      input.entryId,
+      input.campaignId,
+      input.actorId,
+      input.item.packId,
+      input.item.packVersion,
+      input.item.definitionId,
+      input.quantity,
+      new Date().toISOString(),
+    );
   });
 }
 
@@ -555,9 +654,14 @@ function equipItem(
   entryId: string,
   equip: NonNullable<InstancedItemPlan["equip"]>,
 ): void {
-  const snapshot = requireValue(repository.getActorInventorySnapshot(ownerId, campaignId, actorId), "Sintermark: inventory snapshot is unavailable");
-  const conflict = snapshot.equipment.find((entry) =>
-    entry.slot === equip.slot && (equip.slot !== "hand" || entry.hand === equip.hand) && entry.entryId !== entryId);
+  const snapshot = requireValue(
+    repository.getActorInventorySnapshot(ownerId, campaignId, actorId),
+    "Sintermark: inventory snapshot is unavailable",
+  );
+  const conflict = snapshot.equipment.find(
+    (entry) =>
+      entry.slot === equip.slot && (equip.slot !== "hand" || entry.hand === equip.hand) && entry.entryId !== entryId,
+  );
   if (conflict) {
     repository.mutateInventoryForActor(ownerId, campaignId, actorId, {
       kind: "unequip",
@@ -566,7 +670,10 @@ function equipItem(
       idempotencyKey: scopedKey(keyPrefix, key, "unequip", conflict.entryId),
     });
   }
-  const current = requireValue(repository.getActorInventorySnapshot(ownerId, campaignId, actorId), "Sintermark: inventory snapshot is unavailable");
+  const current = requireValue(
+    repository.getActorInventorySnapshot(ownerId, campaignId, actorId),
+    "Sintermark: inventory snapshot is unavailable",
+  );
   repository.mutateInventoryForActor(ownerId, campaignId, actorId, {
     kind: "equip",
     entryId,
@@ -605,8 +712,7 @@ export const SINTERMARK_PARTY_GUIDE = Object.freeze({
     concept: hero.archetype,
     ancestry: hero.ancestryDefinitionId,
     class: hero.classDefinitionId,
-    subclass:
-      hero.key === "tessel" ? "srd-5.1:subclass:school-of-evocation" : "srd-5.1:subclass:life-domain",
+    subclass: hero.key === "tessel" ? "srd-5.1:subclass:school-of-evocation" : "srd-5.1:subclass:life-domain",
     preparedSpells: [...hero.preparedSpells],
     knownCantrips: hero.key === "tessel" ? ["srd-5.1:spell:fire-bolt", "srd-5.1:spell:ray-of-frost"] : [],
     supportedBattlePowers: [...hero.battlePowers],
@@ -615,7 +721,9 @@ export const SINTERMARK_PARTY_GUIDE = Object.freeze({
     targetScores: { ...hero.targetScores },
     resourceBoosts: { health: "1000/1000", focus: "100/100", slot1: "100/100", slot2: "100/100" },
     equippedItems: hero.instancedItems.filter((item) => item.equip).map((item) => item.definitionId),
-     referenceOnlyItems: hero.instancedItems.filter((item) => itemDefinitionOf(item.definitionId).mechanics.magic).map((item) => item.definitionId),
+    referenceOnlyItems: hero.instancedItems
+      .filter((item) => itemDefinitionOf(item.definitionId).mechanics.magic)
+      .map((item) => item.definitionId),
     stackableItems: hero.stackableItems.map((item) => ({ definitionId: item.definitionId, quantity: item.quantity })),
     attunementReference: [...hero.attunementItems],
   })),
@@ -678,7 +786,16 @@ export async function createSintermarkParty(
   for (const hero of HEROES) {
     const entry = party.find((candidate) => candidate.name === hero.name)!;
     for (const attributeId of SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS) {
-      setActorAttribute(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, attributeId, hero.targetScores[attributeId]);
+      setActorAttribute(
+        repository,
+        ownerId,
+        campaignId,
+        entry.actorId,
+        keyPrefix,
+        hero.key,
+        attributeId,
+        hero.targetScores[attributeId],
+      );
     }
     ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "health", 1000);
     ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "focus", 100);
@@ -705,7 +822,14 @@ export async function createSintermarkParty(
     for (const item of hero.stackableItems) {
       const reference = itemRefFor(item.definitionId);
       const entryId = `${keyPrefix}.${hero.key}.stack.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
-      materializeStackableEntry({ ownerId, campaignId, actorId: entry.actorId, entryId, item: reference, quantity: item.quantity });
+      materializeStackableEntry({
+        ownerId,
+        campaignId,
+        actorId: entry.actorId,
+        entryId,
+        item: reference,
+        quantity: item.quantity,
+      });
     }
   }
 

@@ -60,9 +60,7 @@
           "id": "reach-locations",
           "sections": ["locations"],
           "brief": "Add four public locations beyond Cinderhold that exercise SRD 5.1 exploration: the Deep Vault, a lightless underdark descent where obscurement and darkvision matter; the Dragonspine Roost, a volcanic aerie of a hostile dragon and its servants; the Verdant Wilds, a beast- and plant-haunted forest; and the Storm Reef, a submerged wreck field where combat happens fully immersed. Create locations only in this job; do not create connections.",
-          "expandFrom": [
-            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 4 }
-          ],
+          "expandFrom": [{ "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 4 }],
           "desiredCounts": { "locations": 4 }
         }
       ]
@@ -189,9 +187,7 @@
           "id": "mid-cr-bestiary",
           "sections": ["monster-concepts"],
           "brief": "Create three public monster concepts for mid-level play at the crater, the reef, and the deep roads. Bind each concept to an exact SRD 5.1 enemy-template reference supplied in pinnedCatalog where one fits (for example an ogre, owlbear, mummy, gargoyle, water elemental, or young dragon); otherwise mark its mechanics inert. Each needs a role that is not merely a damage sponge, a tactics list, and ties to an accepted location.",
-          "expandFrom": [
-            { "jobId": "reach-locations", "fields": ["locations"], "limit": 4 }
-          ],
+          "expandFrom": [{ "jobId": "reach-locations", "fields": ["locations"], "limit": 4 }],
           "desiredCounts": { "monsterConcepts": 3 }
         },
         {

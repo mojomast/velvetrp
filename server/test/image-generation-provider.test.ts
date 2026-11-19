@@ -66,8 +66,14 @@ describe("image generation configuration", () => {
   it("stays disabled unless the flag is exact-true and the base URL is valid", () => {
     expect(readImageGenerationConfig({}).enabled).toBe(false);
     expect(readImageGenerationConfig({ VELVET_IMAGES_BASE_URL: "https://images.example.com" }).enabled).toBe(false);
-    expect(readImageGenerationConfig({ VELVET_IMAGES_ENABLED: "TRUE", VELVET_IMAGES_BASE_URL: "https://images.example.com" }).enabled).toBe(false);
-    expect(readImageGenerationConfig({ VELVET_IMAGES_ENABLED: "true", VELVET_IMAGES_BASE_URL: "http://images.example.com" }).enabled).toBe(false);
+    expect(
+      readImageGenerationConfig({ VELVET_IMAGES_ENABLED: "TRUE", VELVET_IMAGES_BASE_URL: "https://images.example.com" })
+        .enabled,
+    ).toBe(false);
+    expect(
+      readImageGenerationConfig({ VELVET_IMAGES_ENABLED: "true", VELVET_IMAGES_BASE_URL: "http://images.example.com" })
+        .enabled,
+    ).toBe(false);
     expect(readImageGenerationConfig({ VELVET_IMAGES_ENABLED: "true" }).enabled).toBe(false);
     const config = readImageGenerationConfig({
       VELVET_IMAGES_ENABLED: "true",
@@ -92,15 +98,17 @@ describe("image generation configuration", () => {
     for (const value of ["0", "1023", "67108865", "abc", "1.5"]) {
       expect(() => readImageGenerationConfig({ VELVET_IMAGES_MAX_BYTES: value }), value).toThrow();
     }
-    expect(readImageGenerationConfig({ VELVET_IMAGES_TIMEOUT_MS: "1000", VELVET_IMAGES_MAX_BYTES: "1024" }))
-      .toMatchObject({ enabled: false, timeoutMs: 1_000, maxBytes: 1_024 });
+    expect(
+      readImageGenerationConfig({ VELVET_IMAGES_TIMEOUT_MS: "1000", VELVET_IMAGES_MAX_BYTES: "1024" }),
+    ).toMatchObject({ enabled: false, timeoutMs: 1_000, maxBytes: 1_024 });
   });
 });
 
 describe("image generation client", () => {
   it("posts the parsed request with a bearer token and returns the parsed result", async () => {
     const { calls, fetchImpl } = recordingFetch(async () =>
-      Response.json({ images: [{ format: "png", base64: "aGVsbG8=" }], seed: 7, seconds: 0.25 }));
+      Response.json({ images: [{ format: "png", base64: "aGVsbG8=" }], seed: 7, seconds: 0.25 }),
+    );
     const client = createImageGenerationClient({ config: baseConfig, fetch: fetchImpl });
     const result = await client.generate({ prompt: "  a moonlit castle  ", seed: 7 });
     expect(result).toEqual({ images: [{ format: "png", base64: "aGVsbG8=" }], seed: 7, seconds: 0.25 });
@@ -111,23 +119,34 @@ describe("image generation client", () => {
     expect(headers.get("authorization")).toBe("Bearer test-token");
     expect(headers.get("content-type")).toBe("application/json");
     expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
-      prompt: "a moonlit castle", seed: 7, steps: 50, guidanceScale: 3, count: 1,
+      prompt: "a moonlit castle",
+      seed: 7,
+      steps: 50,
+      guidanceScale: 3,
+      count: 1,
     });
   });
 
   it("probes health through the same policy and omits an absent credential", async () => {
     const { calls, fetchImpl } = recordingFetch(async () =>
-      Response.json({ status: "ok", model: "supra2-img", commit: null, device: "cuda:0" }));
+      Response.json({ status: "ok", model: "supra2-img", commit: null, device: "cuda:0" }),
+    );
     const client = createImageGenerationClient({ config: { ...baseConfig, token: "" }, fetch: fetchImpl });
-    await expect(client.health()).resolves.toEqual({ status: "ok", model: "supra2-img", commit: null, device: "cuda:0" });
+    await expect(client.health()).resolves.toEqual({
+      status: "ok",
+      model: "supra2-img",
+      commit: null,
+      device: "cuda:0",
+    });
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe("http://127.0.0.1:8788/health");
     expect(new Headers(calls[0]!.init.headers).get("authorization")).toBeNull();
   });
 
   it("classifies non-200 responses once, without retrying, and redacts the token", async () => {
-    const { calls, fetchImpl } = recordingFetch(async () =>
-      new Response(JSON.stringify({ error: "model not loaded for test-token" }), { status: 503 }));
+    const { calls, fetchImpl } = recordingFetch(
+      async () => new Response(JSON.stringify({ error: "model not loaded for test-token" }), { status: 503 }),
+    );
     const client = createImageGenerationClient({ config: baseConfig, fetch: fetchImpl });
     await expect(client.generate({ prompt: "a lighthouse" })).rejects.toMatchObject({
       name: "ImageGenerationHttpError",
@@ -140,7 +159,9 @@ describe("image generation client", () => {
   it("rejects malformed and non-JSON bodies as protocol failures", async () => {
     const malformed = createImageGenerationClient({
       config: baseConfig,
-      fetch: recordingFetch(async () => Response.json({ images: [{ format: "gif", base64: "x" }], seed: 1, seconds: 0 })).fetchImpl,
+      fetch: recordingFetch(async () =>
+        Response.json({ images: [{ format: "gif", base64: "x" }], seed: 1, seconds: 0 }),
+      ).fetchImpl,
     });
     await expect(malformed.generate({ prompt: "a lighthouse" })).rejects.toBeInstanceOf(ImageGenerationProtocolError);
     const nonJson = createImageGenerationClient({
@@ -152,10 +173,11 @@ describe("image generation client", () => {
 
   it("aborts at the configured deadline and reports a typed timeout", async () => {
     let observedSignal: AbortSignal | undefined;
-    const hanging: typeof fetch = (_input, init) => new Promise((_resolve, reject) => {
-      observedSignal = init?.signal ?? undefined;
-      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
-    });
+    const hanging: typeof fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        observedSignal = init?.signal ?? undefined;
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
     const client = createImageGenerationClient({ config: { ...baseConfig, timeoutMs: 25 }, fetch: hanging });
     await expect(client.generate({ prompt: "a lighthouse" })).rejects.toBeInstanceOf(ImageGenerationTimeoutError);
     expect(observedSignal?.aborted).toBe(true);
@@ -166,26 +188,43 @@ describe("image generation client", () => {
     expect(base64DecodedByteEstimate(oversized)).toBeGreaterThan(1_024);
     const client = createImageGenerationClient({
       config: { ...baseConfig, maxBytes: 1_024 },
-      fetch: recordingFetch(async () => Response.json({ images: [{ format: "png", base64: oversized }], seed: 1, seconds: 0 })).fetchImpl,
+      fetch: recordingFetch(async () =>
+        Response.json({ images: [{ format: "png", base64: oversized }], seed: 1, seconds: 0 }),
+      ).fetchImpl,
     });
-    await expect(client.generate({ prompt: "a lighthouse" })).rejects.toBeInstanceOf(ImageGenerationPayloadTooLargeError);
+    await expect(client.generate({ prompt: "a lighthouse" })).rejects.toBeInstanceOf(
+      ImageGenerationPayloadTooLargeError,
+    );
     const declared = createImageGenerationClient({
       config: { ...baseConfig, maxBytes: 1_024 },
-      fetch: recordingFetch(async () =>
-        new Response("{}", { headers: { "content-length": String(8 * 1024 * 1024) } })).fetchImpl,
+      fetch: recordingFetch(async () => new Response("{}", { headers: { "content-length": String(8 * 1024 * 1024) } }))
+        .fetchImpl,
     });
-    await expect(declared.generate({ prompt: "a lighthouse" })).rejects.toBeInstanceOf(ImageGenerationPayloadTooLargeError);
+    await expect(declared.generate({ prompt: "a lighthouse" })).rejects.toBeInstanceOf(
+      ImageGenerationPayloadTooLargeError,
+    );
   });
 
   it("refuses to call out while disabled or with an invalid request", async () => {
     let called = false;
     const disabled = createImageGenerationClient({
       config: { ...baseConfig, enabled: false },
-      fetch: async () => { called = true; return Response.json({}); },
+      fetch: async () => {
+        called = true;
+        return Response.json({});
+      },
     });
     await expect(disabled.health()).rejects.toBeInstanceOf(ImageGenerationConfigurationError);
-    await expect(disabled.generate({ prompt: "a lighthouse" })).rejects.toBeInstanceOf(ImageGenerationConfigurationError);
-    const client = createImageGenerationClient({ config: baseConfig, fetch: async () => { called = true; return Response.json({}); } });
+    await expect(disabled.generate({ prompt: "a lighthouse" })).rejects.toBeInstanceOf(
+      ImageGenerationConfigurationError,
+    );
+    const client = createImageGenerationClient({
+      config: baseConfig,
+      fetch: async () => {
+        called = true;
+        return Response.json({});
+      },
+    });
     await expect(client.generate({ prompt: "   " })).rejects.toBeInstanceOf(ImageGenerationConfigurationError);
     expect(called).toBe(false);
   });
@@ -208,7 +247,10 @@ describe("fake image generation client", () => {
     await expect(fake.health()).resolves.toMatchObject({ status: "ok", commit: null, device: "cpu" });
     expect(fake.healthCalls).toBe(1);
 
-    const failing = createFakeImageGenerationClient({ failWith: new Error("offline"), healthFailWith: new Error("down") });
+    const failing = createFakeImageGenerationClient({
+      failWith: new Error("offline"),
+      healthFailWith: new Error("down"),
+    });
     await expect(failing.generate({ prompt: "portrait" })).rejects.toThrow("offline");
     expect(failing.calls).toHaveLength(1);
     await expect(failing.health()).rejects.toThrow("down");

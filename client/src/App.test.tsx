@@ -1,61 +1,240 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { CharacterBuilderPage, resetCharacterBuilderPageModuleStateForTests } from "./components/rpg/character/CharacterBuilderPage";
+import {
+  CharacterBuilderPage,
+  resetCharacterBuilderPageModuleStateForTests,
+} from "./components/rpg/character/CharacterBuilderPage";
 import { LevelUpWizard, resetLevelUpWizardModuleStateForTests } from "./components/rpg/character/LevelUpWizard";
 import { AttributeAllocator } from "./components/rpg/character/AttributeAllocator";
 import { ApiError } from "./api";
-import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_PACK, ORIGINAL_STARTER_RACE, ORIGINAL_STARTER_RULES_PROFILE } from "@velvet/contracts";
+import {
+  ORIGINAL_STARTER_BACKGROUND,
+  ORIGINAL_STARTER_CLASS,
+  ORIGINAL_STARTER_PACK,
+  ORIGINAL_STARTER_RACE,
+  ORIGINAL_STARTER_RULES_PROFILE,
+} from "@velvet/contracts";
 
 const combatPage = vi.hoisted(() => ({ props: null as null | Record<string, unknown> }));
 vi.mock("./components/rpg/combat/CombatTrackerPage", () => ({
   CombatTrackerPage: (props: Record<string, unknown>) => {
     combatPage.props = props;
-    return <main><h1>Combat tracker</h1><button onClick={() => (props.onReturnToRoom as (() => void) | undefined)?.()}>Return to room</button><button onClick={() => (props.onBack as () => void)()}>Back</button></main>;
+    return (
+      <main>
+        <h1>Combat tracker</h1>
+        <button onClick={() => (props.onReturnToRoom as (() => void) | undefined)?.()}>Return to room</button>
+        <button onClick={() => (props.onBack as () => void)()}>Back</button>
+      </main>
+    );
   },
 }));
 
-const aria = { id: "char-1", name: "Aria", age: 29, archetype: "Confidant", boundaries: "fictional adults only", fictionalConfirmed: true, isRealPerson: false, createdAt: "2026-01-01T00:00:00.000Z" };
+const aria = {
+  id: "char-1",
+  name: "Aria",
+  age: 29,
+  archetype: "Confidant",
+  boundaries: "fictional adults only",
+  fictionalConfirmed: true,
+  isRealPerson: false,
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
 const rowan = { ...aria, id: "char-2", name: "Rowan", archetype: "Mysterious stranger" };
-const baseSession = { id: "sess-1", characterId: aria.id, primaryCharacterId: aria.id, participants: [aria, rowan], title: "Night watch", state: "active" as "setup" | "active" | "paused" | "cooldown" | "closed", presetId: "default", consentLog: [], activeLeafId: null, createdAt: "2026-01-01T00:00:00.000Z", stoppedAt: null as string | null, stopReason: null as string | null };
-const harness = { id: "harness", systemPrompt: "", personaPreamble: "", styleGuide: "", postHistoryInstructions: "", recentTurns: 12, memoryChars: 1200, summaryChars: 800, loreChars: 800, temperature: null, promptOverrides: {}, updatedAt: "" };
-const provider = { id: "provider", providerType: "openai-compatible", baseUrl: "", model: "test-model", hasApiKey: false, streaming: false, httpReferer: "", appTitle: "Velvet", requireParameters: false, allowFallbacks: true, routingSort: "default", dataCollection: "default", zdr: false, requestTimeoutSeconds: 90, pricing: { promptPerMillion: null, completionPerMillion: null }, adventureTurnBudget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null }, samplers: { maxTokens: null, topP: null, topK: null, minP: null, repetitionPenalty: null, frequencyPenalty: null, presencePenalty: null, seed: null, reasoningEffort: null, stopStrings: [], startReplyWith: "" }, updatedAt: "" };
-const campaignAccess = { id: "campaign-one", name: "The Long Road", activeTimelineId: "timeline-secret", ownerPrincipalId: "principal-secret", actorRole: "owner", createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-02T00:00:00.000Z" };
-const campaignDetail = { campaign: { id: campaignAccess.id, name: campaignAccess.name, actorRole: "owner", createdAt: campaignAccess.createdAt, updatedAt: campaignAccess.updatedAt, content: { status: "unconfigured" } } };
-const configuredCampaignDetail = { campaign: { ...campaignDetail.campaign, content: { status: "configured", rulesProfileId: ORIGINAL_STARTER_RULES_PROFILE.rulesProfileId, contentPacks: [{ packId: ORIGINAL_STARTER_PACK.packId, packVersion: ORIGINAL_STARTER_PACK.packVersion }] } } };
-const appCreationOptions = { campaignId: campaignAccess.id, personas: [{ characterId: "app-persona-secret", name: "App Persona", alreadyUsed: false }], starter: { rulesProfile: ORIGINAL_STARTER_RULES_PROFILE, pack: ORIGINAL_STARTER_PACK, race: ORIGINAL_STARTER_RACE, background: ORIGINAL_STARTER_BACKGROUND, class: { ...ORIGINAL_STARTER_CLASS, level: 1 } } };
+const baseSession = {
+  id: "sess-1",
+  characterId: aria.id,
+  primaryCharacterId: aria.id,
+  participants: [aria, rowan],
+  title: "Night watch",
+  state: "active" as "setup" | "active" | "paused" | "cooldown" | "closed",
+  presetId: "default",
+  consentLog: [],
+  activeLeafId: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  stoppedAt: null as string | null,
+  stopReason: null as string | null,
+};
+const harness = {
+  id: "harness",
+  systemPrompt: "",
+  personaPreamble: "",
+  styleGuide: "",
+  postHistoryInstructions: "",
+  recentTurns: 12,
+  memoryChars: 1200,
+  summaryChars: 800,
+  loreChars: 800,
+  temperature: null,
+  promptOverrides: {},
+  updatedAt: "",
+};
+const provider = {
+  id: "provider",
+  providerType: "openai-compatible",
+  baseUrl: "",
+  model: "test-model",
+  hasApiKey: false,
+  streaming: false,
+  httpReferer: "",
+  appTitle: "Velvet",
+  requireParameters: false,
+  allowFallbacks: true,
+  routingSort: "default",
+  dataCollection: "default",
+  zdr: false,
+  requestTimeoutSeconds: 90,
+  pricing: { promptPerMillion: null, completionPerMillion: null },
+  adventureTurnBudget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null },
+  samplers: {
+    maxTokens: null,
+    topP: null,
+    topK: null,
+    minP: null,
+    repetitionPenalty: null,
+    frequencyPenalty: null,
+    presencePenalty: null,
+    seed: null,
+    reasoningEffort: null,
+    stopStrings: [],
+    startReplyWith: "",
+  },
+  updatedAt: "",
+};
+const campaignAccess = {
+  id: "campaign-one",
+  name: "The Long Road",
+  activeTimelineId: "timeline-secret",
+  ownerPrincipalId: "principal-secret",
+  actorRole: "owner",
+  createdAt: "2030-01-01T00:00:00.000Z",
+  updatedAt: "2030-01-02T00:00:00.000Z",
+};
+const campaignDetail = {
+  campaign: {
+    id: campaignAccess.id,
+    name: campaignAccess.name,
+    actorRole: "owner",
+    createdAt: campaignAccess.createdAt,
+    updatedAt: campaignAccess.updatedAt,
+    content: { status: "unconfigured" },
+  },
+};
+const configuredCampaignDetail = {
+  campaign: {
+    ...campaignDetail.campaign,
+    content: {
+      status: "configured",
+      rulesProfileId: ORIGINAL_STARTER_RULES_PROFILE.rulesProfileId,
+      contentPacks: [{ packId: ORIGINAL_STARTER_PACK.packId, packVersion: ORIGINAL_STARTER_PACK.packVersion }],
+    },
+  },
+};
+const appCreationOptions = {
+  campaignId: campaignAccess.id,
+  personas: [{ characterId: "app-persona-secret", name: "App Persona", alreadyUsed: false }],
+  starter: {
+    rulesProfile: ORIGINAL_STARTER_RULES_PROFILE,
+    pack: ORIGINAL_STARTER_PACK,
+    race: ORIGINAL_STARTER_RACE,
+    background: ORIGINAL_STARTER_BACKGROUND,
+    class: { ...ORIGINAL_STARTER_CLASS, level: 1 },
+  },
+};
 
-function message(id: string, role: "user" | "character", content: string, speakerCharacterId: string | null = null) { return { id, sessionId: baseSession.id, role, speakerCharacterId, content, parentId: null, swipeGroupId: null, swipeIndex: 0, seq: 0, status: "final", createdAt: "2026-01-01T00:00:00.000Z" }; }
-function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } }); }
-function sse(events: Array<{ event: string; data: unknown }>) { return new Response(events.map(({ event, data }) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } }); }
-function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason?: unknown) => void; const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; }); return { promise, resolve, reject }; }
-interface Route { method: string; match: RegExp; handler: (body: unknown) => Response | Promise<Response>; }
+function message(id: string, role: "user" | "character", content: string, speakerCharacterId: string | null = null) {
+  return {
+    id,
+    sessionId: baseSession.id,
+    role,
+    speakerCharacterId,
+    content,
+    parentId: null,
+    swipeGroupId: null,
+    swipeIndex: 0,
+    seq: 0,
+    status: "final",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
+}
+function sse(events: Array<{ event: string; data: unknown }>) {
+  return new Response(events.map(({ event, data }) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join(""), {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+interface Route {
+  method: string;
+  match: RegExp;
+  handler: (body: unknown) => Response | Promise<Response>;
+}
 let routes: Route[] = [];
-function installFetch(characters = [aria, rowan], sessions = [baseSession], campaign = false, mechanics = false, studio = false) {
+function installFetch(
+  characters = [aria, rowan],
+  sessions = [baseSession],
+  campaign = false,
+  mechanics = false,
+  studio = false,
+) {
   routes = [
     { method: "GET", match: /\/api\/characters$/, handler: () => json({ characters }) },
     { method: "GET", match: /\/api\/sessions$/, handler: () => json({ sessions }) },
     { method: "GET", match: /\/api\/features$/, handler: () => json({ voice: false, images: false }) },
-    { method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign, mechanics, combat: false, studio, remoteAuthentication: false, systemOne: false }) },
+    {
+      method: "GET",
+      match: /\/api\/rpg\/v1\/features$/,
+      handler: () =>
+        json({ campaign, mechanics, combat: false, studio, remoteAuthentication: false, systemOne: false }),
+    },
     { method: "GET", match: /\/api\/provider$/, handler: () => json(provider) },
     { method: "GET", match: /\/api\/harness$/, handler: () => json(harness) },
   ];
-  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const method = (init?.method ?? "GET").toUpperCase(); const url = String(input); const body = typeof init?.body === "string" ? JSON.parse(init.body) as unknown : undefined;
-    const route = routes.find((entry) => entry.method === method && entry.match.test(url));
-    if (!route) throw new Error(`no mock for ${method} ${url}`);
-    return route.handler(body);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const method = (init?.method ?? "GET").toUpperCase();
+      const url = String(input);
+      const body = typeof init?.body === "string" ? (JSON.parse(init.body) as unknown) : undefined;
+      const route = routes.find((entry) => entry.method === method && entry.match.test(url));
+      if (!route) throw new Error(`no mock for ${method} ${url}`);
+      return route.handler(body);
+    }),
+  );
 }
-async function openLibrary() { if (localStorage.getItem("velvet.navigation.v1") === null) localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "home" })); render(<App />); await screen.findByRole("heading", { name: "Characters" }); }
+async function openLibrary() {
+  if (localStorage.getItem("velvet.navigation.v1") === null)
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "home" }));
+  render(<App />);
+  await screen.findByRole("heading", { name: "Characters" });
+}
 async function openAdvancedCampaign() {
   // These tests exercise legacy operations and their exact read counts. Give
   // the new entry its own fixture before entering the advanced destination.
   const legacyRoutes = routes;
   routes = [
     { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-    { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-    { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+    {
+      method: "GET",
+      match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+      handler: () => json({ characters: [] }),
+    },
+    {
+      method: "GET",
+      match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+      handler: () => json({ attached: [], eligible: [] }),
+    },
     ...legacyRoutes,
   ];
   fireEvent.click(await screen.findByRole("button", { name: `Open campaign ${campaignAccess.name}` }));
@@ -65,8 +244,26 @@ async function openAdvancedCampaign() {
 }
 
 describe("persistence and multi-character frontend", () => {
-  beforeEach(() => { localStorage.clear(); combatPage.props = null; Element.prototype.scrollTo = vi.fn(); HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; }); HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.open = false; }); vi.stubGlobal("confirm", vi.fn(() => true)); });
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, "", "/"); });
+  beforeEach(() => {
+    localStorage.clear();
+    combatPage.props = null;
+    Element.prototype.scrollTo = vi.fn();
+    HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+      this.open = true;
+    });
+    HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+      this.open = false;
+    });
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
+  });
 
   it("deep-links a campaign destination from the URL hash over stale local state", async () => {
     installFetch([], [], true);
@@ -74,57 +271,114 @@ describe("persistence and multi-character frontend", () => {
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [], eligible: [] }),
+      },
     );
     window.history.replaceState({}, "", "#/campaign/campaign-one/overview");
     render(<App />);
     await screen.findByTestId("campaign-overview");
     expect(screen.getByRole("heading", { name: "Campaign overview" })).toBeTruthy();
     expect(window.location.hash).toBe("#/campaign/campaign-one/overview");
-    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-overview", campaignId: "campaign-one" });
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+      view: "campaign-overview",
+      campaignId: "campaign-one",
+    });
   });
 
   it("opens an explicit deep link over a different stored campaign workspace", async () => {
     installFetch([], [], true);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-play", campaignId: "campaign-two", sessionId: "session-two" }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-play", campaignId: "campaign-two", sessionId: "session-two" }),
+    );
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [], eligible: [] }),
+      },
     );
     window.history.replaceState({}, "", "/?deepLink=1#/campaign/campaign-one/overview");
     render(<App />);
     await screen.findByTestId("campaign-overview");
     expect(window.location.hash).toBe("#/campaign/campaign-one/overview");
-    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-overview", campaignId: "campaign-one" });
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+      view: "campaign-overview",
+      campaignId: "campaign-one",
+    });
   });
 
   it("follows a same-origin hash change while a workspace is open", async () => {
     installFetch([aria], [], true, true);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }),
+    );
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [], eligible: [] }),
+      },
     );
     render(<App />);
     await screen.findByRole("heading", { name: campaignAccess.name });
     window.history.replaceState({}, "", "#/campaign/campaign-one/party");
-    act(() => { window.dispatchEvent(new Event("hashchange")); });
+    act(() => {
+      window.dispatchEvent(new Event("hashchange"));
+    });
     await screen.findByTestId("campaign-party");
     expect(window.location.hash).toBe("#/campaign/campaign-one/party");
   });
 
   it("restores the previous campaign destination when the browser goes back", async () => {
     installFetch([aria], [], true, true);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }),
+    );
     routes.push(
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [], eligible: [] }),
+      },
     );
     render(<App />);
     await screen.findByRole("heading", { name: campaignAccess.name });
@@ -132,9 +386,14 @@ describe("persistence and multi-character frontend", () => {
     await screen.findByTestId("campaign-party");
     expect(window.location.hash).toBe("#/campaign/campaign-one/party");
     window.history.replaceState({}, "", "#/campaign/campaign-one");
-    act(() => { window.dispatchEvent(new PopStateEvent("popstate")); });
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
     await screen.findByRole("heading", { name: campaignAccess.name });
-    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id });
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+      view: "campaign-detail",
+      campaignId: campaignAccess.id,
+    });
   });
 
   it("opens the new overview from the campaign library and keeps setup secondary", async () => {
@@ -142,8 +401,16 @@ describe("persistence and multi-character frontend", () => {
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [], eligible: [] }),
+      },
     );
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: `Open campaign ${campaignAccess.name}` }));
@@ -157,38 +424,82 @@ describe("persistence and multi-character frontend", () => {
 
   it("ignores new-room hydration after navigating to the party workspace", async () => {
     installFetch([aria], [], true);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-rooms", campaignId: campaignAccess.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-rooms", campaignId: campaignAccess.id }),
+    );
     const hydration = deferred<Response>();
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [{ sessionId: baseSession.id, title: "Crossing", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: campaignAccess.createdAt, stopped: false }], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () =>
+          json({
+            attached: [
+              {
+                sessionId: baseSession.id,
+                title: "Crossing",
+                participantNames: [aria.name],
+                createdAt: baseSession.createdAt,
+                attachedAt: campaignAccess.createdAt,
+                stopped: false,
+              },
+            ],
+            eligible: [],
+          }),
+      },
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => hydration.promise },
     );
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Open room" }));
-    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/sessions/sess-1"))).toBe(true));
+    await waitFor(() =>
+      expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/sessions/sess-1"))).toBe(true),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Characters workspace" }));
     await screen.findByTestId("campaign-party");
-    await act(async () => { hydration.resolve(json({ session: baseSession, messages: [] })); });
+    await act(async () => {
+      hydration.resolve(json({ session: baseSession, messages: [] }));
+    });
     expect(screen.getByTestId("campaign-party")).toBeTruthy();
     expect(screen.queryByPlaceholderText("Write a message…")).toBeNull();
   });
 
   it("lists durable characters and creates a group session with a primary", async () => {
-    installFetch(); let payload: Record<string, unknown> | null = null;
+    installFetch();
+    let payload: Record<string, unknown> | null = null;
     routes.push(
-      { method: "POST", match: /\/api\/sessions$/, handler: (body) => { payload = body as Record<string, unknown>; return json(baseSession, 201); } },
+      {
+        method: "POST",
+        match: /\/api\/sessions$/,
+        handler: (body) => {
+          payload = body as Record<string, unknown>;
+          return json(baseSession, 201);
+        },
+      },
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
     );
     await openLibrary();
-    expect(screen.getByText("Aria")).toBeTruthy(); expect(screen.getByText("Rowan")).toBeTruthy();
-    const checks = screen.getAllByRole("checkbox"); fireEvent.click(checks[0]!); fireEvent.click(checks[1]!);
-    const radios = screen.getAllByRole("radio"); fireEvent.click(radios[1]!);
+    expect(screen.getByText("Aria")).toBeTruthy();
+    expect(screen.getByText("Rowan")).toBeTruthy();
+    const checks = screen.getAllByRole("checkbox");
+    fireEvent.click(checks[0]!);
+    fireEvent.click(checks[1]!);
+    const radios = screen.getAllByRole("radio");
+    fireEvent.click(radios[1]!);
     fireEvent.change(screen.getByLabelText("Session title"), { target: { value: "Shared mystery" } });
     fireEvent.click(screen.getByRole("button", { name: "Start new session" }));
     await screen.findByPlaceholderText("Write a message…");
-    expect(payload).toMatchObject({ characterIds: [aria.id, rowan.id], primaryCharacterId: rowan.id, title: "Shared mystery" });
+    expect(payload).toMatchObject({
+      characterIds: [aria.id, rowan.id],
+      primaryCharacterId: rowan.id,
+      title: "Shared mystery",
+    });
     expect(screen.getByRole("button", { name: "Continue as Aria" })).toBeTruthy();
   });
 
@@ -206,113 +517,443 @@ describe("persistence and multi-character frontend", () => {
     expect((screen.getByLabelText("Character name") as HTMLInputElement).value).toBe("");
   });
 
-  it("restores a campaign world entry and returns focus to its campaign trigger",async()=>{
-    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-world",campaignId:campaignAccess.id}));
-    routes.push(
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"0"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,handler:()=>json({characters:[]})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/,handler:()=>json(appCreationOptions)},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,handler:()=>json({characters:[],rolls:[]})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,handler:()=>json({rooms:[],eligible:[]})},
+  it("restores a campaign world entry and returns focus to its campaign trigger", async () => {
+    installFetch([aria], [], true, true, true);
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-world", campaignId: campaignAccess.id }),
     );
-    render(<App/>);await screen.findByRole("heading",{name:"World explorer"});expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}")).toMatchObject({view:"campaign-world",campaignId:campaignAccess.id});fireEvent.click(screen.getByRole("button",{name:"← Campaign"}));await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole("button",{name:"World"})));
+    routes.push(
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,
+        handler: () =>
+          new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json", "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/,
+        handler: () => json(appCreationOptions),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,
+        handler: () => json({ characters: [], rolls: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ rooms: [], eligible: [] }),
+      },
+    );
+    render(<App />);
+    await screen.findByRole("heading", { name: "World explorer" });
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+      view: "campaign-world",
+      campaignId: campaignAccess.id,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "← Campaign" }));
+    await screen.findByRole("heading", { name: campaignAccess.name });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "World" })));
   });
 
   it("restores campaign transfer and scopes Back focus to the destination campaign heading", async () => {
-    installFetch([aria], [], true, true, true); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-transfer", campaignId: campaignAccess.id }));
-    routes.push(
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/, handler: () => json(appCreationOptions) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ rooms: [], eligible: [] }) },
+    installFetch([aria], [], true, true, true);
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-transfer", campaignId: campaignAccess.id }),
     );
-    render(<App />); await screen.findByRole("heading", { name: "Import and export" }); fireEvent.click(screen.getByRole("button", { name: "← Campaign" }));
-    const destination = await screen.findByRole("heading", { name: campaignAccess.name }); await waitFor(() => expect(document.activeElement).toBe(destination));
-    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id });
-  });
-
-  it("falls restored narrative studios back to campaign detail when the studio rollout is off",async()=>{
-    installFetch([aria],[],true,true,false);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-story",campaignId:campaignAccess.id}));routes.push({method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)});render(<App/>);await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}").view).toBe("campaign-detail"));expect(screen.queryByRole("button",{name:"Story studio"})).toBeNull();
-  });
-
-  it("opens every campaign studio entry and restores focus to its exact trigger",async()=>{
-    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-detail",campaignId:campaignAccess.id}));routes.push(
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"x-world-revision":"0"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify({npcs:[],relationships:[]}),{status:200,headers:{"x-world-revision":"0"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[],memberships:[],relations:[]}),{status:200,headers:{"x-world-revision":"0"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/,handler:()=>new Response(JSON.stringify({quests:[],objectives:[],journal:[]}),{status:200,headers:{"x-quest-revision":"0"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/story$/,handler:()=>new Response(JSON.stringify({storylines:[],nodes:[],edges:[],plotPoints:[],clues:[]}),{status:200,headers:{"x-story-revision":"0"}})},
-    );render(<App/>);await screen.findByRole("heading",{name:campaignAccess.name});
-    for(const [button,heading] of [["World","World explorer"],["Cast & factions","Cast & factions"],["Quest journal","Quest journal"],["Story studio","Story studio"]] as const){fireEvent.click(screen.getByRole("button",{name:button}));await screen.findByRole("heading",{name:heading});fireEvent.click(screen.getByRole("button",{name:"← Campaign"}));await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole("button",{name:button})));}
-  });
-
-  it.each(["player","observer"] as const)("clears GM cast records before rendering a downgraded %s projection",async(nextRole)=>{
-    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-cast",campaignId:campaignAccess.id}));localStorage.setItem("velvet.narrative-mutation.v3:campaign-one:npc",JSON.stringify({campaignId:"campaign-one",lane:"npc",operation:"Create NPC",idempotencyKey:"safe-key",expectedRevision:0,phase:"confirmed",startedAt:campaignAccess.createdAt,refresh:"partial",result:{gmNotes:"REGISTRY SECRET"}}));let detailReads=0;
     routes.push(
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json({campaign:{...configuredCampaignDetail.campaign,actorRole:++detailReads===1?"gm":nextRole}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify(detailReads===1?{npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"SECRET GOAL",gmNotes:"SECRET NOTE",merchantState:null},createdAt:campaignAccess.createdAt}],relationships:[]}:{npcs:[],relationships:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[],memberships:[],relations:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
-    );
-    render(<App/>);await screen.findByText("SECRET GOAL");if(nextRole==="observer")fireEvent.focus(window);else fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await screen.findByText("No visible NPCs.");expect(document.body.textContent).not.toContain("SECRET");expect(localStorage.getItem("velvet.narrative-mutation.v3:campaign-one:npc")).not.toContain("REGISTRY SECRET");expect(screen.queryByRole("heading",{name:"Create NPC definition"})).toBeNull();
-  });
-
-  it("clears a GM studio and leaves campaign navigation when reauthorization becomes unavailable",async()=>{
-    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-cast",campaignId:campaignAccess.id}));let detailReads=0;
-    routes.push(
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>++detailReads===1?json(configuredCampaignDetail):json({type:"x",title:"Missing",status:404,detail:"missing",code:"RPG_CAMPAIGN_NOT_FOUND",requestId:"r",error:"missing"},404)},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify({npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"SECRET",gmNotes:"SECRET",merchantState:null},createdAt:campaignAccess.createdAt}],relationships:[]}),{status:200,headers:{"x-world-revision":"1"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[],memberships:[],relations:[]}),{status:200,headers:{"x-world-revision":"1"}})},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns$/,handler:()=>json({campaigns:[]})},
-    );
-    render(<App/>);await screen.findAllByText("SECRET");fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await waitFor(()=>expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}").view).toBe("campaigns"));expect(document.body.textContent).not.toContain("SECRET");
-  });
-
-  it.each(["acknowledged-error", "lost-ack-eof"])("reconciles an interrupted saved user without restoring a duplicate draft (%s)", async (failure) => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
-    routes.unshift({ method: "GET", match: /\/api\/provider$/, handler: () => json({ ...provider, streaming: true }) });
-    const user = message("saved-user", "user", "I inspect the door.");
-    let reads = 0; let posts = 0;
-    routes.push(
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: ++reads === 1 ? [] : [user] }) },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/stream$/, handler: () => {
-        posts++;
-        return sse(failure === "acknowledged-error" ? [{ event: "user_message", data: { message: user, generationId: "generation" } }, { event: "error", data: { error: "Interrupted provider" } }] : []);
-      } },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/,
+        handler: () => json(appCreationOptions),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,
+        handler: () => json({ characters: [], rolls: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ rooms: [], eligible: [] }),
+      },
     );
     render(<App />);
-    const composer = await screen.findByPlaceholderText("Write a message…") as HTMLInputElement;
-    fireEvent.change(composer, { target: { value: user.content } });
-    fireEvent.click(screen.getByRole("button", { name: "Send to Aria" }));
-    await waitFor(() => { expect(reads).toBe(2); expect(composer.disabled).toBe(false); });
-    expect(screen.getAllByText(user.content)).toHaveLength(1);
-    expect(composer.value).toBe("");
-    expect(posts).toBe(1);
+    await screen.findByRole("heading", { name: "Import and export" });
+    fireEvent.click(screen.getByRole("button", { name: "← Campaign" }));
+    const destination = await screen.findByRole("heading", { name: campaignAccess.name });
+    await waitFor(() => expect(document.activeElement).toBe(destination));
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+      view: "campaign-detail",
+      campaignId: campaignAccess.id,
+    });
   });
 
+  it("falls restored narrative studios back to campaign detail when the studio rollout is off", async () => {
+    installFetch([aria], [], true, true, false);
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-story", campaignId: campaignAccess.id }),
+    );
+    routes.push({
+      method: "GET",
+      match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+      handler: () => json(configuredCampaignDetail),
+    });
+    render(<App />);
+    await screen.findByRole("heading", { name: campaignAccess.name });
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("campaign-detail"),
+    );
+    expect(screen.queryByRole("button", { name: "Story studio" })).toBeNull();
+  });
+
+  it("opens every campaign studio entry and restores focus to its exact trigger", async () => {
+    installFetch([aria], [], true, true, true);
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }),
+    );
+    routes.push(
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,
+        handler: () =>
+          new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,
+        handler: () =>
+          new Response(JSON.stringify({ npcs: [], relationships: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,
+        handler: () =>
+          new Response(JSON.stringify({ factions: [], standings: [], memberships: [], relations: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/,
+        handler: () =>
+          new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), {
+            status: 200,
+            headers: { "x-quest-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/story$/,
+        handler: () =>
+          new Response(JSON.stringify({ storylines: [], nodes: [], edges: [], plotPoints: [], clues: [] }), {
+            status: 200,
+            headers: { "x-story-revision": "0" },
+          }),
+      },
+    );
+    render(<App />);
+    await screen.findByRole("heading", { name: campaignAccess.name });
+    for (const [button, heading] of [
+      ["World", "World explorer"],
+      ["Cast & factions", "Cast & factions"],
+      ["Quest journal", "Quest journal"],
+      ["Story studio", "Story studio"],
+    ] as const) {
+      fireEvent.click(screen.getByRole("button", { name: button }));
+      await screen.findByRole("heading", { name: heading });
+      fireEvent.click(screen.getByRole("button", { name: "← Campaign" }));
+      await screen.findByRole("heading", { name: campaignAccess.name });
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: button })));
+    }
+  });
+
+  it.each(["player", "observer"] as const)(
+    "clears GM cast records before rendering a downgraded %s projection",
+    async (nextRole) => {
+      installFetch([aria], [], true, true, true);
+      localStorage.setItem(
+        "velvet.navigation.v1",
+        JSON.stringify({ view: "campaign-cast", campaignId: campaignAccess.id }),
+      );
+      localStorage.setItem(
+        "velvet.narrative-mutation.v3:campaign-one:npc",
+        JSON.stringify({
+          campaignId: "campaign-one",
+          lane: "npc",
+          operation: "Create NPC",
+          idempotencyKey: "safe-key",
+          expectedRevision: 0,
+          phase: "confirmed",
+          startedAt: campaignAccess.createdAt,
+          refresh: "partial",
+          result: { gmNotes: "REGISTRY SECRET" },
+        }),
+      );
+      let detailReads = 0;
+      routes.push(
+        {
+          method: "GET",
+          match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+          handler: () =>
+            json({
+              campaign: { ...configuredCampaignDetail.campaign, actorRole: ++detailReads === 1 ? "gm" : nextRole },
+            }),
+        },
+        {
+          method: "GET",
+          match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,
+          handler: () =>
+            new Response(
+              JSON.stringify(
+                detailReads === 1
+                  ? {
+                      npcs: [
+                        {
+                          npcId: "npc",
+                          personaId: "persona",
+                          publicState: { name: "Mira" },
+                          privateState: { goals: "SECRET GOAL", gmNotes: "SECRET NOTE", merchantState: null },
+                          createdAt: campaignAccess.createdAt,
+                        },
+                      ],
+                      relationships: [],
+                    }
+                  : { npcs: [], relationships: [] },
+              ),
+              { status: 200, headers: { "Content-Type": "application/json", "x-world-revision": "1" } },
+            ),
+        },
+        {
+          method: "GET",
+          match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,
+          handler: () =>
+            new Response(JSON.stringify({ factions: [], standings: [], memberships: [], relations: [] }), {
+              status: 200,
+              headers: { "Content-Type": "application/json", "x-world-revision": "1" },
+            }),
+        },
+      );
+      render(<App />);
+      await screen.findByText("SECRET GOAL");
+      if (nextRole === "observer") fireEvent.focus(window);
+      else fireEvent.click(screen.getByRole("button", { name: "Reauthorize & refresh" }));
+      await screen.findByText("No visible NPCs.");
+      expect(document.body.textContent).not.toContain("SECRET");
+      expect(localStorage.getItem("velvet.narrative-mutation.v3:campaign-one:npc")).not.toContain("REGISTRY SECRET");
+      expect(screen.queryByRole("heading", { name: "Create NPC definition" })).toBeNull();
+    },
+  );
+
+  it("clears a GM studio and leaves campaign navigation when reauthorization becomes unavailable", async () => {
+    installFetch([aria], [], true, true, true);
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-cast", campaignId: campaignAccess.id }),
+    );
+    let detailReads = 0;
+    routes.push(
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () =>
+          ++detailReads === 1
+            ? json(configuredCampaignDetail)
+            : json(
+                {
+                  type: "x",
+                  title: "Missing",
+                  status: 404,
+                  detail: "missing",
+                  code: "RPG_CAMPAIGN_NOT_FOUND",
+                  requestId: "r",
+                  error: "missing",
+                },
+                404,
+              ),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,
+        handler: () =>
+          new Response(
+            JSON.stringify({
+              npcs: [
+                {
+                  npcId: "npc",
+                  personaId: "persona",
+                  publicState: { name: "Mira" },
+                  privateState: { goals: "SECRET", gmNotes: "SECRET", merchantState: null },
+                  createdAt: campaignAccess.createdAt,
+                },
+              ],
+              relationships: [],
+            }),
+            { status: 200, headers: { "x-world-revision": "1" } },
+          ),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,
+        handler: () =>
+          new Response(JSON.stringify({ factions: [], standings: [], memberships: [], relations: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "1" },
+          }),
+      },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) },
+    );
+    render(<App />);
+    await screen.findAllByText("SECRET");
+    fireEvent.click(screen.getByRole("button", { name: "Reauthorize & refresh" }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("campaigns"),
+    );
+    expect(document.body.textContent).not.toContain("SECRET");
+  });
+
+  it.each(["acknowledged-error", "lost-ack-eof"])(
+    "reconciles an interrupted saved user without restoring a duplicate draft (%s)",
+    async (failure) => {
+      installFetch();
+      localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+      routes.unshift({
+        method: "GET",
+        match: /\/api\/provider$/,
+        handler: () => json({ ...provider, streaming: true }),
+      });
+      const user = message("saved-user", "user", "I inspect the door.");
+      let reads = 0;
+      let posts = 0;
+      routes.push(
+        {
+          method: "GET",
+          match: /\/api\/sessions\/sess-1$/,
+          handler: () => json({ session: baseSession, messages: ++reads === 1 ? [] : [user] }),
+        },
+        {
+          method: "POST",
+          match: /\/api\/sessions\/sess-1\/stream$/,
+          handler: () => {
+            posts++;
+            return sse(
+              failure === "acknowledged-error"
+                ? [
+                    { event: "user_message", data: { message: user, generationId: "generation" } },
+                    { event: "error", data: { error: "Interrupted provider" } },
+                  ]
+                : [],
+            );
+          },
+        },
+      );
+      render(<App />);
+      const composer = (await screen.findByPlaceholderText("Write a message…")) as HTMLInputElement;
+      fireEvent.change(composer, { target: { value: user.content } });
+      fireEvent.click(screen.getByRole("button", { name: "Send to Aria" }));
+      await waitFor(() => {
+        expect(reads).toBe(2);
+        expect(composer.disabled).toBe(false);
+      });
+      expect(screen.getAllByText(user.content)).toHaveLength(1);
+      expect(composer.value).toBe("");
+      expect(posts).toBe(1);
+    },
+  );
+
   it.each(["message", "swipe"])("waits for cancellation and recovers a committed %s reply", async (kind) => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     routes.unshift({ method: "GET", match: /\/api\/provider$/, handler: () => json({ ...provider, streaming: true }) });
     const user = message("saved-user", "user", "I inspect the door.");
     const reply = { ...message("saved-reply", "character", "The key fits the lock.", aria.id), parentId: user.id };
     const previousReply = { ...message("old-reply", "character", "The door is shut.", aria.id), parentId: user.id };
-    const canceled = deferred<Response>(); let reads = 0; let posts = 0; let cancels = 0;
+    const canceled = deferred<Response>();
+    let reads = 0;
+    let posts = 0;
+    let cancels = 0;
     let delivery!: ReadableStreamDefaultController<Uint8Array>;
     routes.push(
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: ++reads === 1 ? (kind === "swipe" ? [user, previousReply] : []) : [user, reply] }) },
-      { method: "POST", match: /\/api\/sessions\/sess-1(?:\/messages\/old-reply\/swipe)?\/stream$/, handler: () => {
-        posts++;
-        return new Response(new ReadableStream<Uint8Array>({ start(controller) {
-          delivery = controller;
-          controller.enqueue(new TextEncoder().encode((kind === "message" ? `event: user_message\ndata: ${JSON.stringify({ message: user })}\n\n` : "") + 'event: delta\ndata: {"seq":0,"text":"The key"}\n\n'));
-        } }));
-      } },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/generation\/cancel$/, handler: () => { cancels++; delivery.close(); return canceled.promise; } },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () =>
+          json({
+            session: baseSession,
+            messages: ++reads === 1 ? (kind === "swipe" ? [user, previousReply] : []) : [user, reply],
+          }),
+      },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1(?:\/messages\/old-reply\/swipe)?\/stream$/,
+        handler: () => {
+          posts++;
+          return new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                delivery = controller;
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    (kind === "message" ? `event: user_message\ndata: ${JSON.stringify({ message: user })}\n\n` : "") +
+                      'event: delta\ndata: {"seq":0,"text":"The key"}\n\n',
+                  ),
+                );
+              },
+            }),
+          );
+        },
+      },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1\/generation\/cancel$/,
+        handler: () => {
+          cancels++;
+          delivery.close();
+          return canceled.promise;
+        },
+      },
     );
     render(<App />);
-    const composer = await screen.findByPlaceholderText("Write a message…") as HTMLInputElement;
+    const composer = (await screen.findByPlaceholderText("Write a message…")) as HTMLInputElement;
     if (kind === "swipe") fireEvent.click(screen.getByRole("button", { name: "Regenerate reply" }));
     else {
       fireEvent.change(composer, { target: { value: user.content } });
@@ -321,22 +962,34 @@ describe("persistence and multi-character frontend", () => {
     await screen.findByText("The key");
     fireEvent.click(screen.getByRole("button", { name: "Stop generating" }));
     await waitFor(() => expect(cancels).toBe(1));
-    expect(composer.disabled).toBe(true); expect(reads).toBe(1);
+    expect(composer.disabled).toBe(true);
+    expect(reads).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Stop generating" }));
-    await act(async () => { canceled.resolve(json({ ok: true, aborted: "generation" })); });
+    await act(async () => {
+      canceled.resolve(json({ ok: true, aborted: "generation" }));
+    });
     await screen.findByText(reply.content);
     await waitFor(() => expect(composer.disabled).toBe(false));
-    expect(composer.value).toBe(""); expect(screen.getAllByText(user.content)).toHaveLength(1);
+    expect(composer.value).toBe("");
+    expect(screen.getAllByText(user.content)).toHaveLength(1);
     expect(screen.queryByText(previousReply.content)).toBeNull();
-    expect(posts).toBe(1); expect(cancels).toBe(1); expect(reads).toBe(2);
+    expect(posts).toBe(1);
+    expect(cancels).toBe(1);
+    expect(reads).toBe(2);
   });
 
   it("ignores an interrupted stream reconciliation that arrives after navigation", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     routes.unshift({ method: "GET", match: /\/api\/provider$/, handler: () => json({ ...provider, streaming: true }) });
-    const recovery = deferred<Response>(); let reads = 0;
+    const recovery = deferred<Response>();
+    let reads = 0;
     routes.push(
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => ++reads === 1 ? json({ session: baseSession, messages: [] }) : recovery.promise },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () => (++reads === 1 ? json({ session: baseSession, messages: [] }) : recovery.promise),
+      },
       { method: "POST", match: /\/api\/sessions\/sess-1\/stream$/, handler: () => sse([]) },
     );
     render(<App />);
@@ -345,7 +998,14 @@ describe("persistence and multi-character frontend", () => {
     await waitFor(() => expect(reads).toBe(2));
     fireEvent.click(screen.getByRole("button", { name: "← Library" }));
     await screen.findByRole("heading", { name: "Characters" });
-    await act(async () => { recovery.resolve(json({ session: { ...baseSession, title: "STALE RECOVERY", state: "closed" }, messages: [message("late", "character", "Late saved reply", aria.id)] })); });
+    await act(async () => {
+      recovery.resolve(
+        json({
+          session: { ...baseSession, title: "STALE RECOVERY", state: "closed" },
+          messages: [message("late", "character", "Late saved reply", aria.id)],
+        }),
+      );
+    });
     expect(screen.getByRole("heading", { name: "Characters" })).toBeTruthy();
     expect(screen.queryByText("Late saved reply")).toBeNull();
     expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("home");
@@ -353,16 +1013,106 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("restores a saved session and renders each message's actual speaker", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     let savedSource = "They are waiting in the observatory.";
     routes.push(
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [message("m1", "character", "Aria speaks", aria.id), message("m2", "character", "Rowan answers", rowan.id)] }) },
-      { method: "GET", match: /\/api\/sessions\/sess-1\/context$/, handler: () => json({ context: { sessionId: baseSession.id, state: "active", sourceOfTruth: `MANUAL CANON (highest priority):\n${savedSource}\n\nSYNTHESIZED CURRENT SCENE FACTS:\nLocation & time:\n- Observatory at night`, editableSource: savedSource, sourceUpdatedAt: "2026-01-01T00:00:00.000Z", synthesizedSource: "Location & time:\n- Observatory at night", synthesizedUpdatedAt: "2026-01-01T00:01:00.000Z", participants: [{ id: aria.id, name: aria.name, archetype: aria.archetype }, { id: rowan.id, name: rowan.name, archetype: rowan.archetype }], recentEvents: ["Aria: Aria speaks", "Rowan: Rowan answers"], rememberedFacts: ["Aria: likes stars"], activeLore: ["The harbor closes at midnight"], openThreads: [] } }) },
-      { method: "GET", match: /\/api\/usage$/, handler: () => json({ usage: { calls: 4, promptTokens: 1200, completionTokens: 300, totalTokens: 1500, providerMeasuredTokens: 1200, estimatedTokens: 300, estimatedCostUsd: 0.00054, pricing: { promptPerMillion: .2, completionPerMillion: 1 }, byKind: [{ kind: "character_reply", calls: 4, promptTokens: 1200, completionTokens: 300, totalTokens: 1500, estimatedCostUsd: .00054 }], byModel: [{ model: "test-model", calls: 4, promptTokens: 1200, completionTokens: 300, totalTokens: 1500, estimatedCostUsd: .00054 }], bySession: [{ sessionId: baseSession.id, title: baseSession.title, calls: 4, promptTokens: 1200, completionTokens: 300, totalTokens: 1500, estimatedCostUsd: .00054 }] } }) },
-      { method: "PUT", match: /\/api\/sessions\/sess-1\/context$/, handler: (body) => { savedSource = (body as { sourceOfTruth: string }).sourceOfTruth; return json({ source: { sourceOfTruth: savedSource, updatedAt: "2026-01-02T00:00:00.000Z" } }); } },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () =>
+          json({
+            session: baseSession,
+            messages: [
+              message("m1", "character", "Aria speaks", aria.id),
+              message("m2", "character", "Rowan answers", rowan.id),
+            ],
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1\/context$/,
+        handler: () =>
+          json({
+            context: {
+              sessionId: baseSession.id,
+              state: "active",
+              sourceOfTruth: `MANUAL CANON (highest priority):\n${savedSource}\n\nSYNTHESIZED CURRENT SCENE FACTS:\nLocation & time:\n- Observatory at night`,
+              editableSource: savedSource,
+              sourceUpdatedAt: "2026-01-01T00:00:00.000Z",
+              synthesizedSource: "Location & time:\n- Observatory at night",
+              synthesizedUpdatedAt: "2026-01-01T00:01:00.000Z",
+              participants: [
+                { id: aria.id, name: aria.name, archetype: aria.archetype },
+                { id: rowan.id, name: rowan.name, archetype: rowan.archetype },
+              ],
+              recentEvents: ["Aria: Aria speaks", "Rowan: Rowan answers"],
+              rememberedFacts: ["Aria: likes stars"],
+              activeLore: ["The harbor closes at midnight"],
+              openThreads: [],
+            },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/usage$/,
+        handler: () =>
+          json({
+            usage: {
+              calls: 4,
+              promptTokens: 1200,
+              completionTokens: 300,
+              totalTokens: 1500,
+              providerMeasuredTokens: 1200,
+              estimatedTokens: 300,
+              estimatedCostUsd: 0.00054,
+              pricing: { promptPerMillion: 0.2, completionPerMillion: 1 },
+              byKind: [
+                {
+                  kind: "character_reply",
+                  calls: 4,
+                  promptTokens: 1200,
+                  completionTokens: 300,
+                  totalTokens: 1500,
+                  estimatedCostUsd: 0.00054,
+                },
+              ],
+              byModel: [
+                {
+                  model: "test-model",
+                  calls: 4,
+                  promptTokens: 1200,
+                  completionTokens: 300,
+                  totalTokens: 1500,
+                  estimatedCostUsd: 0.00054,
+                },
+              ],
+              bySession: [
+                {
+                  sessionId: baseSession.id,
+                  title: baseSession.title,
+                  calls: 4,
+                  promptTokens: 1200,
+                  completionTokens: 300,
+                  totalTokens: 1500,
+                  estimatedCostUsd: 0.00054,
+                },
+              ],
+            },
+          }),
+      },
+      {
+        method: "PUT",
+        match: /\/api\/sessions\/sess-1\/context$/,
+        handler: (body) => {
+          savedSource = (body as { sourceOfTruth: string }).sourceOfTruth;
+          return json({ source: { sourceOfTruth: savedSource, updatedAt: "2026-01-02T00:00:00.000Z" } });
+        },
+      },
     );
     render(<App />);
-    await screen.findByText("Aria speaks"); await screen.findByText("Rowan answers");
+    await screen.findByText("Aria speaks");
+    await screen.findByText("Rowan answers");
     await screen.findByText("Shared context basket");
     await screen.findByText("Overall usage & estimated cost");
     expect(screen.getByText("1,200")).toBeTruthy();
@@ -374,27 +1124,37 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save manual canon" }));
     await screen.findByText("They have moved to the moonlit roof.");
     const labels = screen.getAllByText(/^(Aria|Rowan)$/).map((node) => node.textContent);
-    expect(labels).toContain("Aria"); expect(labels).toContain("Rowan");
+    expect(labels).toContain("Aria");
+    expect(labels).toContain("Rowan");
   });
 
   it("clears stale restored IDs and returns to the library", async () => {
-    installFetch([aria], []); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: "gone", selectedIds: ["gone"] }));
+    installFetch([aria], []);
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "chat", sessionId: "gone", selectedIds: ["gone"] }),
+    );
     await openLibrary();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("home"));
   });
 
   it("handles malformed persisted navigation at runtime", async () => {
     installFetch([aria], []);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "invalid", selectedIds: { bad: true }, primaryId: 12 }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "invalid", selectedIds: { bad: true }, primaryId: 12 }),
+    );
     await openLibrary();
     expect(screen.getByRole("heading", { name: "Characters" })).toBeTruthy();
   });
 
   it("opens the legacy library while optional RPG feature discovery remains pending", async () => {
     installFetch([aria], []);
-    routes = routes.map((route) => route.match.test("/api/rpg/v1/features")
-      ? { ...route, handler: () => new Promise<Response>(() => undefined) }
-      : route);
+    routes = routes.map((route) =>
+      route.match.test("/api/rpg/v1/features")
+        ? { ...route, handler: () => new Promise<Response>(() => undefined) }
+        : route,
+    );
     render(<App />);
     await screen.findByRole("heading", { name: "Characters" });
     expect(screen.getByText("Aria")).toBeTruthy();
@@ -404,10 +1164,17 @@ describe("persistence and multi-character frontend", () => {
   it("restores legacy chat while optional RPG feature discovery remains pending", async () => {
     installFetch([aria], [baseSession]);
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
-    routes = routes.map((route) => route.match.test("/api/rpg/v1/features")
-      ? { ...route, handler: () => new Promise<Response>(() => undefined) }
-      : route);
-    routes.push({ method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [message("m-pending", "character", "Legacy chat ready", aria.id)] }) });
+    routes = routes.map((route) =>
+      route.match.test("/api/rpg/v1/features")
+        ? { ...route, handler: () => new Promise<Response>(() => undefined) }
+        : route,
+    );
+    routes.push({
+      method: "GET",
+      match: /\/api\/sessions\/sess-1$/,
+      handler: () =>
+        json({ session: baseSession, messages: [message("m-pending", "character", "Legacy chat ready", aria.id)] }),
+    });
     render(<App />);
     await screen.findByText("Legacy chat ready");
   });
@@ -415,14 +1182,31 @@ describe("persistence and multi-character frontend", () => {
   it("does not let delayed unavailable campaign discovery evict a newer ordinary chat", async () => {
     const discovery = deferred<Response>();
     installFetch([aria, rowan], [baseSession], true);
-    routes = routes.map((route) => route.match.test("/api/rpg/v1/features")
-      ? { ...route, handler: () => discovery.promise }
-      : route);
-    routes.push({ method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [message("ordinary-newer", "character", "Newer ordinary chat", aria.id)] }) });
+    routes = routes.map((route) =>
+      route.match.test("/api/rpg/v1/features") ? { ...route, handler: () => discovery.promise } : route,
+    );
+    routes.push({
+      method: "GET",
+      match: /\/api\/sessions\/sess-1$/,
+      handler: () =>
+        json({
+          session: baseSession,
+          messages: [message("ordinary-newer", "character", "Newer ordinary chat", aria.id)],
+        }),
+    });
     await openLibrary();
     fireEvent.click(screen.getByText(baseSession.title).closest("button")!);
     await screen.findByText("Newer ordinary chat");
-    discovery.resolve(json({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false }));
+    discovery.resolve(
+      json({
+        campaign: false,
+        mechanics: false,
+        combat: false,
+        studio: false,
+        remoteAuthentication: false,
+        systemOne: false,
+      }),
+    );
     await discovery.promise;
     await Promise.resolve();
     expect(screen.getByText("Newer ordinary chat")).toBeTruthy();
@@ -433,17 +1217,40 @@ describe("persistence and multi-character frontend", () => {
     const privateSession = { ...baseSession, id: "private-newer", participants: [aria], title: "" };
     installFetch([aria, rowan], [baseSession], true);
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
-    routes = routes.map((route) => route.match.test("/api/rpg/v1/features")
-      ? { ...route, handler: () => discovery.promise }
-      : route);
+    routes = routes.map((route) =>
+      route.match.test("/api/rpg/v1/features") ? { ...route, handler: () => discovery.promise } : route,
+    );
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "POST", match: /\/api\/sessions\/solo$/, handler: () => json({ session: privateSession, messages: [{ ...message("private-newer-message", "character", "Newer private chat", aria.id), sessionId: privateSession.id }], created: false }) },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/solo$/,
+        handler: () =>
+          json({
+            session: privateSession,
+            messages: [
+              {
+                ...message("private-newer-message", "character", "Newer private chat", aria.id),
+                sessionId: privateSession.id,
+              },
+            ],
+            created: false,
+          }),
+      },
     );
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Private chat with Aria" }));
     await screen.findByText("Newer private chat");
-    discovery.resolve(json({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false }));
+    discovery.resolve(
+      json({
+        campaign: false,
+        mechanics: false,
+        combat: false,
+        studio: false,
+        remoteAuthentication: false,
+        systemOne: false,
+      }),
+    );
     await discovery.promise;
     await Promise.resolve();
     expect(screen.getByText("Newer private chat")).toBeTruthy();
@@ -453,7 +1260,9 @@ describe("persistence and multi-character frontend", () => {
     installFetch([aria], [], true);
     routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) });
     await openLibrary();
-    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).endsWith("/api/rpg/v1/features"))).toHaveLength(1);
+    expect(
+      vi.mocked(fetch).mock.calls.filter(([input]) => String(input).endsWith("/api/rpg/v1/features")),
+    ).toHaveLength(1);
     fireEvent.click(await screen.findByRole("button", { name: "Campaigns" }));
     await screen.findByRole("heading", { name: "Campaigns & worlds" });
     expect(screen.getByText("No campaigns yet.")).toBeTruthy();
@@ -466,7 +1275,11 @@ describe("persistence and multi-character frontend", () => {
     installFetch([aria], [], true, true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/content-packs\?limit=100$/, handler: () => json({ publications: [], nextCursor: null }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/content-packs\?limit=100$/,
+        handler: () => json({ publications: [], nextCursor: null }),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -474,7 +1287,9 @@ describe("persistence and multi-character frontend", () => {
     const heading = await screen.findByRole("heading", { name: "Content pack studio" });
     await waitFor(() => expect(document.activeElement).toBe(heading));
     expect(screen.getByText(/No sealed content packs yet/)).toBeTruthy();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("content-packs"));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("content-packs"),
+    );
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
     const contentPacks = await screen.findByRole("button", { name: "Content packs" });
     await waitFor(() => expect(document.activeElement).toBe(contentPacks));
@@ -493,7 +1308,11 @@ describe("persistence and multi-character frontend", () => {
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,
+        handler: () => json({ characters: [], rolls: [] }),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -512,21 +1331,75 @@ describe("persistence and multi-character frontend", () => {
 
   it("restores persisted campaign administration and authoritatively loads its campaign name", async () => {
     installFetch([aria], [], true);
-    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: true, remoteAuthentication: false, systemOne: false }) });
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-administration", campaignId: campaignAccess.id }));
+    routes.unshift({
+      method: "GET",
+      match: /\/api\/rpg\/v1\/features$/,
+      handler: () =>
+        json({
+          campaign: true,
+          mechanics: true,
+          combat: true,
+          studio: true,
+          remoteAuthentication: false,
+          systemOne: false,
+        }),
+    });
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-administration", campaignId: campaignAccess.id }),
+    );
     const at = "2030-01-02T00:00:00.000Z";
     routes.push(
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/administration$/, handler: () => json({ campaign: {
-        id: campaignAccess.id, actorRole: "owner", status: "published", activeTimelineId: "timeline-one", revision: 4, updatedAt: at,
-        settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "" },
-      } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/timelines$/, handler: () => json({ activeTimelineId: "timeline-one", timelines: [
-        { id: "timeline-one", parentTimelineId: null, forkedFromRevision: null, revision: 7, createdAt: at, active: true },
-      ] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/checkpoints$/, handler: () => json({ checkpoints: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/memberships$/, handler: () => json({ memberships: [
-        { principalId: "local-owner", role: "owner", createdAt: at },
-      ] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/administration$/,
+        handler: () =>
+          json({
+            campaign: {
+              id: campaignAccess.id,
+              actorRole: "owner",
+              status: "published",
+              activeTimelineId: "timeline-one",
+              revision: 4,
+              updatedAt: at,
+              settings: {
+                maxPlayers: 6,
+                allowPlayerDice: true,
+                safetyMode: "strict",
+                recapVisibility: "gm-only",
+                gmNotes: "",
+              },
+            },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/timelines$/,
+        handler: () =>
+          json({
+            activeTimelineId: "timeline-one",
+            timelines: [
+              {
+                id: "timeline-one",
+                parentTimelineId: null,
+                forkedFromRevision: null,
+                revision: 7,
+                createdAt: at,
+                active: true,
+              },
+            ],
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/checkpoints$/,
+        handler: () => json({ checkpoints: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/memberships$/,
+        handler: () => json({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: at }] }),
+      },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
     );
 
@@ -534,9 +1407,12 @@ describe("persistence and multi-character frontend", () => {
     expect(await screen.findByRole("heading", { name: "Campaign administration" })).toBeTruthy();
     expect(screen.getAllByText(campaignAccess.name).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Archive campaign" })).toBeTruthy();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
-      view: "campaign-administration", campaignId: campaignAccess.id,
-    }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-administration",
+        campaignId: campaignAccess.id,
+      }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Create workspace" }));
     await screen.findByRole("heading", { name: "Create your campaign" });
     expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("campaign-create");
@@ -553,12 +1429,19 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
     await openAdvancedCampaign();
     await screen.findByRole("heading", { name: campaignAccess.name });
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-detail",
+        campaignId: campaignAccess.id,
+      }),
+    );
     expect(document.body.textContent).not.toContain(campaignAccess.ownerPrincipalId);
     expect(document.body.textContent).not.toContain(campaignAccess.activeTimelineId);
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
     await screen.findByRole("heading", { name: "Campaigns & worlds" });
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").campaignId).toBeUndefined());
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").campaignId).toBeUndefined(),
+    );
   });
 
   it("integrates the names-only campaign roster without exposing either opaque identity", async () => {
@@ -570,7 +1453,11 @@ describe("persistence and multi-character frontend", () => {
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: roster }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: roster }),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -587,14 +1474,36 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("keeps a mechanics-enabled unconfigured attached room in legacy chat across reload and Back", async () => {
-    const attached = { sessionId: baseSession.id, title: "Night watch", participantNames: [aria.name, rowan.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Night watch",
+      participantNames: [aria.name, rowan.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     let roomReads = 0;
     installFetch([aria, rowan], [baseSession], true, true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => { roomReads += 1; return json({ attached: [attached], eligible: [] }); } },
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [message("campaign-message", "character", "Campaign room history", aria.id)] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => {
+          roomReads += 1;
+          return json({ attached: [attached], eligible: [] });
+        },
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () =>
+          json({
+            session: baseSession,
+            messages: [message("campaign-message", "character", "Campaign room history", aria.id)],
+          }),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -602,7 +1511,13 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
     await screen.findByText("Campaign room history");
     expect(screen.getByRole("button", { name: "← Back to campaign" })).toBeTruthy();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "chat", sessionId: baseSession.id, chatReturnCampaignId: campaignAccess.id }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "chat",
+        sessionId: baseSession.id,
+        chatReturnCampaignId: campaignAccess.id,
+      }),
+    );
     expect(screen.queryByRole("heading", { name: "Adventure room" })).toBeNull();
     cleanup();
     render(<App />);
@@ -614,34 +1529,129 @@ describe("persistence and multi-character frontend", () => {
     await waitFor(() => expect(roomReads).toBe(2));
     await waitFor(() => expect(document.activeElement).toBe(roomsHeading));
     expect(document.body.outerHTML).not.toContain(baseSession.id);
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").chatReturnCampaignId).toBeUndefined());
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").chatReturnCampaignId).toBeUndefined(),
+    );
   });
 
   it("opens a mechanics-enabled campaign room in authoritative play with read-only legacy history", async () => {
-    const attached = { sessionId: baseSession.id, title: "Night watch", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
-    const playBootstrap = { dm: { mode: "human", revision: 0 }, campaignId: campaignAccess.id, sessionId: baseSession.id, expectedRevision: 7, session: { attached: true, attachedAt: attached.attachedAt, active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, capabilities: { campaignDice: { canView: true, canRoll: true } }, playableActors: [{ actorId: "actor", name: "Aria" }] };
-    const world = { currentLocations: [{ actorId: "actor", locationId: "harbor", revision: 0, updatedAt: attached.attachedAt }], visibleLocations: [{ locationId: "harbor", parentLocationId: null, name: "Harbor", description: "Salt air" }, { locationId: "road", parentLocationId: null, name: "Road", description: "Inland" }], visibleConnections: [{ connectionId: "route", fromLocationId: "harbor", toLocationId: "road" }] };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Night watch",
+      participantNames: [aria.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
+    const playBootstrap = {
+      dm: { mode: "human", revision: 0 },
+      campaignId: campaignAccess.id,
+      sessionId: baseSession.id,
+      expectedRevision: 7,
+      session: { attached: true, attachedAt: attached.attachedAt, active: true, adventureEligible: true },
+      principal: { role: "owner", control: "all" },
+      capabilities: { campaignDice: { canView: true, canRoll: true } },
+      playableActors: [{ actorId: "actor", name: "Aria" }],
+    };
+    const world = {
+      currentLocations: [{ actorId: "actor", locationId: "harbor", revision: 0, updatedAt: attached.attachedAt }],
+      visibleLocations: [
+        { locationId: "harbor", parentLocationId: null, name: "Harbor", description: "Salt air" },
+        { locationId: "road", parentLocationId: null, name: "Road", description: "Inland" },
+      ],
+      visibleConnections: [{ connectionId: "route", fromLocationId: "harbor", toLocationId: "road" }],
+    };
     installFetch([aria], [baseSession], true, true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [attached], eligible: [] }) },
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [message("campaign-message", "character", "Campaign room history", aria.id)] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/, handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/transcript\?campaignId=campaign-one&sessionId=sess-1$/, handler: () => json({ campaignId: campaignAccess.id, sessionId: baseSession.id, turns: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/, handler: () => new Response(JSON.stringify(world), { status: 200, headers: { "x-world-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/, handler: () => json({ encounters: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [attached], eligible: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () =>
+          json({
+            session: baseSession,
+            messages: [message("campaign-message", "character", "Campaign room history", aria.id)],
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/,
+        handler: () => json(playBootstrap),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/,
+        handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/adventure-turns\/transcript\?campaignId=campaign-one&sessionId=sess-1$/,
+        handler: () => json({ campaignId: campaignAccess.id, sessionId: baseSession.id, turns: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,
+        handler: () => new Response(JSON.stringify(world), { status: 200, headers: { "x-world-revision": "0" } }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,
+        handler: () =>
+          new Response(JSON.stringify({ npcs: [], relationships: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/,
+        handler: () =>
+          new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), {
+            status: 200,
+            headers: { "x-quest-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/,
+        handler: () => json({ resources: [], revision: 0 }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/,
+        handler: () => json({ encounters: [] }),
+      },
     );
-    await openLibrary(); fireEvent.click(screen.getByRole("button", { name: "Campaigns" })); await openAdvancedCampaign();
+    await openLibrary();
+    fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
+    await openAdvancedCampaign();
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
-    await screen.findByRole("heading", { name: campaignAccess.name }); expect(screen.getByRole("heading", { name: "Read-only pre-campaign history" })).toBeTruthy(); expect(screen.getByText("Campaign room history")).toBeTruthy();
-    expect(screen.queryByLabelText(/Message for/)).toBeNull(); expect(screen.getByLabelText("What do you do?")).toBeTruthy();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-play", campaignId: campaignAccess.id, sessionId: baseSession.id, playSelectedActorId: "actor" }));
-    const storedPlay = JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}"); expect(storedPlay.selectedIds).toBeUndefined(); expect(storedPlay.primaryId).toBeUndefined();
+    await screen.findByRole("heading", { name: campaignAccess.name });
+    expect(screen.getByRole("heading", { name: "Read-only pre-campaign history" })).toBeTruthy();
+    expect(screen.getByText("Campaign room history")).toBeTruthy();
+    expect(screen.queryByLabelText(/Message for/)).toBeNull();
+    expect(screen.getByLabelText("What do you do?")).toBeTruthy();
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-play",
+        campaignId: campaignAccess.id,
+        sessionId: baseSession.id,
+        playSelectedActorId: "actor",
+      }),
+    );
+    const storedPlay = JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}");
+    expect(storedPlay.selectedIds).toBeUndefined();
+    expect(storedPlay.primaryId).toBeUndefined();
     fireEvent.click(screen.getByRole("button", { name: "Table tools" }));
     fireEvent.click(screen.getByRole("button", { name: "Travel" }));
     await screen.findByRole("heading", { name: "World explorer" });
@@ -649,66 +1659,273 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("restores a persisted adventure turn through the play page and preserves its locator", async () => {
-    const playBootstrap = { dm: { mode: "human", revision: 0 }, campaignId: campaignAccess.id, sessionId: baseSession.id, expectedRevision: 7, session: { attached: true, attachedAt: "2030-01-03T00:00:00.000Z", active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, capabilities: { campaignDice: { canView: true, canRoll: true } }, playableActors: [{ actorId: "actor", name: "Aria" }] };
-    const turn = { turnId: "restored-turn", campaignId: campaignAccess.id, sessionId: baseSession.id, actorId: "actor", mode: "original", priorTurnId: null,
-      declaration: "Listen", state: "completed", revision: 2, createdAt: campaignAccess.createdAt, updatedAt: campaignAccess.updatedAt };
-    installFetch([aria], [baseSession], true, true); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-play", campaignId: campaignAccess.id,
-      sessionId: baseSession.id, adventureTurnId: "restored-turn", playSelectedActorId: "actor" }));
+    const playBootstrap = {
+      dm: { mode: "human", revision: 0 },
+      campaignId: campaignAccess.id,
+      sessionId: baseSession.id,
+      expectedRevision: 7,
+      session: { attached: true, attachedAt: "2030-01-03T00:00:00.000Z", active: true, adventureEligible: true },
+      principal: { role: "owner", control: "all" },
+      capabilities: { campaignDice: { canView: true, canRoll: true } },
+      playableActors: [{ actorId: "actor", name: "Aria" }],
+    };
+    const turn = {
+      turnId: "restored-turn",
+      campaignId: campaignAccess.id,
+      sessionId: baseSession.id,
+      actorId: "actor",
+      mode: "original",
+      priorTurnId: null,
+      declaration: "Listen",
+      state: "completed",
+      revision: 2,
+      createdAt: campaignAccess.createdAt,
+      updatedAt: campaignAccess.updatedAt,
+    };
+    installFetch([aria], [baseSession], true, true);
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-play",
+        campaignId: campaignAccess.id,
+        sessionId: baseSession.id,
+        adventureTurnId: "restored-turn",
+        playSelectedActorId: "actor",
+      }),
+    );
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/, handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/restored-turn$/, handler: () => json({ turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Restored adventure narration", source: "provider-assisted" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/, handler: () => json({ encounters: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/,
+        handler: () => json(playBootstrap),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/,
+        handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/adventure-turns\/restored-turn$/,
+        handler: () =>
+          json({
+            turn,
+            proposals: [],
+            confirmation: { state: "none" },
+            receipts: [],
+            narrationStatus: { status: "completed", text: "Restored adventure narration", source: "provider-assisted" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,
+        handler: () =>
+          new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,
+        handler: () =>
+          new Response(JSON.stringify({ npcs: [], relationships: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/,
+        handler: () =>
+          new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), {
+            status: 200,
+            headers: { "x-quest-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/,
+        handler: () => json({ resources: [], revision: 0 }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/,
+        handler: () => json({ encounters: [] }),
+      },
     );
-    render(<App />); await screen.findByText("Restored adventure narration");
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: campaignAccess.name })));
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-play", adventureTurnId: "restored-turn" }));
+    render(<App />);
+    await screen.findByText("Restored adventure narration");
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: campaignAccess.name })),
+    );
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-play",
+        adventureTurnId: "restored-turn",
+      }),
+    );
   });
 
   it("clears play locators and restores campaign focus when mechanics disappear", async () => {
-    installFetch([aria], [baseSession], true, false); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-play", campaignId: campaignAccess.id,
-      sessionId: baseSession.id, adventureTurnId: "old-turn", playSelectedActorId: "actor" }));
-    localStorage.setItem(`velvet.campaign-play.v1:${campaignAccess.id}:${baseSession.id}`, JSON.stringify({ turnId: "old-turn", selectedActorId: "actor", streamPhase: "terminal" }));
+    installFetch([aria], [baseSession], true, false);
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-play",
+        campaignId: campaignAccess.id,
+        sessionId: baseSession.id,
+        adventureTurnId: "old-turn",
+        playSelectedActorId: "actor",
+      }),
+    );
+    localStorage.setItem(
+      `velvet.campaign-play.v1:${campaignAccess.id}:${baseSession.id}`,
+      JSON.stringify({ turnId: "old-turn", selectedActorId: "actor", streamPhase: "terminal" }),
+    );
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/, handler: () => json(appCreationOptions) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/,
+        handler: () => json(appCreationOptions),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,
+        handler: () => json({ characters: [], rolls: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [], eligible: [] }),
+      },
     );
-    render(<App />); const heading = await screen.findByRole("heading", { name: campaignAccess.name });
+    render(<App />);
+    const heading = await screen.findByRole("heading", { name: campaignAccess.name });
     await waitFor(() => expect(document.activeElement).toBe(heading));
     expect(localStorage.getItem(`velvet.campaign-play.v1:${campaignAccess.id}:${baseSession.id}`)).toBeNull();
     expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").adventureTurnId).toBeUndefined();
   });
 
   it("embeds combat without leaving play and still restores previously saved combat routes", async () => {
-    const playBootstrap = { dm: { mode: "human", revision: 0 }, campaignId: campaignAccess.id, sessionId: baseSession.id, expectedRevision: 7, session: { attached: true, attachedAt: "2030-01-03T00:00:00.000Z", active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, capabilities: { campaignDice: { canView: true, canRoll: true } }, playableActors: [{ actorId: "actor", name: "Aria" }] };
+    const playBootstrap = {
+      dm: { mode: "human", revision: 0 },
+      campaignId: campaignAccess.id,
+      sessionId: baseSession.id,
+      expectedRevision: 7,
+      session: { attached: true, attachedAt: "2030-01-03T00:00:00.000Z", active: true, adventureEligible: true },
+      principal: { role: "owner", control: "all" },
+      capabilities: { campaignDice: { canView: true, canRoll: true } },
+      playableActors: [{ actorId: "actor", name: "Aria" }],
+    };
     installFetch([aria], [baseSession], true, true);
-    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: false, remoteAuthentication: false, systemOne: false }) });
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-play", campaignId: campaignAccess.id, sessionId: baseSession.id, playSelectedActorId: "actor" }));
+    routes.unshift({
+      method: "GET",
+      match: /\/api\/rpg\/v1\/features$/,
+      handler: () =>
+        json({
+          campaign: true,
+          mechanics: true,
+          combat: true,
+          studio: false,
+          remoteAuthentication: false,
+          systemOne: false,
+        }),
+    });
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-play",
+        campaignId: campaignAccess.id,
+        sessionId: baseSession.id,
+        playSelectedActorId: "actor",
+      }),
+    );
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/, handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/transcript\?campaignId=campaign-one&sessionId=sess-1$/, handler: () => json({ campaignId: campaignAccess.id, sessionId: baseSession.id, turns: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/, handler: () => json({ encounters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/,
+        handler: () => json(playBootstrap),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/,
+        handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/adventure-turns\/transcript\?campaignId=campaign-one&sessionId=sess-1$/,
+        handler: () => json({ campaignId: campaignAccess.id, sessionId: baseSession.id, turns: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,
+        handler: () =>
+          new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,
+        handler: () =>
+          new Response(JSON.stringify({ npcs: [], relationships: [] }), {
+            status: 200,
+            headers: { "x-world-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/,
+        handler: () =>
+          new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), {
+            status: 200,
+            headers: { "x-quest-revision": "0" },
+          }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/,
+        handler: () => json({ resources: [], revision: 0 }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/,
+        handler: () => json({ encounters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,
+        handler: () => json({ characters: [], rolls: [] }),
+      },
     );
 
-    render(<App />); await screen.findByRole("heading", { name: campaignAccess.name });
+    render(<App />);
+    await screen.findByRole("heading", { name: campaignAccess.name });
     fireEvent.click(screen.getByRole("tab", { name: "Map" }));
     const map = screen.getByRole("region", { name: "Living map" });
     const composer = screen.getByLabelText("What do you do?");
@@ -718,17 +1935,49 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(screen.getByRole("button", { name: "Table tools" }));
     fireEvent.click(screen.getByRole("button", { name: "Combat & rewards" }));
     await screen.findByRole("heading", { name: "Combat tracker" });
-    expect(combatPage.props).toMatchObject({ embedded: true, campaignId: campaignAccess.id, sessionId: baseSession.id, actorRole: "owner", audience: "gm", controlledActorId: "actor" });
+    expect(combatPage.props).toMatchObject({
+      embedded: true,
+      campaignId: campaignAccess.id,
+      sessionId: baseSession.id,
+      actorRole: "owner",
+      audience: "gm",
+      controlledActorId: "actor",
+    });
     expect(screen.getByRole("region", { name: "Living map" })).toBe(map);
     expect((screen.getByLabelText("What do you do?") as HTMLTextAreaElement).value).toBe("Keep my draft at the table");
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
-      view: "campaign-play", campaignId: campaignAccess.id, sessionId: baseSession.id, playSelectedActorId: "actor",
-    }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-play",
+        campaignId: campaignAccess.id,
+        sessionId: baseSession.id,
+        playSelectedActorId: "actor",
+      }),
+    );
 
     const durable = JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}");
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ ...durable, view: "campaign-combat", combatReturnView: "campaign-play", combatActorRole: "owner", combatControlledActorId: "actor", combatReturnPane: "context", combatReturnFocus: "navigation", combatId: "combat-one" }));
-    cleanup(); combatPage.props = null; render(<App />); await screen.findByRole("heading", { name: "Combat tracker" });
-    expect(combatPage.props).toMatchObject({ sessionId: baseSession.id, actorRole: "owner", controlledActorId: "actor", initialCombatId: "combat-one" });
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        ...durable,
+        view: "campaign-combat",
+        combatReturnView: "campaign-play",
+        combatActorRole: "owner",
+        combatControlledActorId: "actor",
+        combatReturnPane: "context",
+        combatReturnFocus: "navigation",
+        combatId: "combat-one",
+      }),
+    );
+    cleanup();
+    combatPage.props = null;
+    render(<App />);
+    await screen.findByRole("heading", { name: "Combat tracker" });
+    expect(combatPage.props).toMatchObject({
+      sessionId: baseSession.id,
+      actorRole: "owner",
+      controlledActorId: "actor",
+      initialCombatId: "combat-one",
+    });
     fireEvent.click(screen.getByRole("button", { name: "Return to room" }));
     await screen.findByRole("heading", { name: campaignAccess.name });
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Table tools" })));
@@ -736,13 +1985,35 @@ describe("persistence and multi-character frontend", () => {
 
   it("keeps the legacy campaign-detail combat entry free of room authority", async () => {
     installFetch([aria], [], true, true);
-    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: false, remoteAuthentication: false, systemOne: false }) });
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
-    routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) });
-    render(<App />); await screen.findByRole("heading", { name: campaignAccess.name });
+    routes.unshift({
+      method: "GET",
+      match: /\/api\/rpg\/v1\/features$/,
+      handler: () =>
+        json({
+          campaign: true,
+          mechanics: true,
+          combat: true,
+          studio: false,
+          remoteAuthentication: false,
+          systemOne: false,
+        }),
+    });
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }),
+    );
+    routes.push({
+      method: "GET",
+      match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+      handler: () => json(configuredCampaignDetail),
+    });
+    render(<App />);
+    await screen.findByRole("heading", { name: campaignAccess.name });
     fireEvent.click(screen.getByRole("button", { name: "Open combat tracker" }));
     await screen.findByRole("heading", { name: "Combat tracker" });
-    expect(combatPage.props?.sessionId).toBeUndefined(); expect(combatPage.props?.actorRole).toBeUndefined(); expect(combatPage.props?.onReturnToRoom).toBeUndefined();
+    expect(combatPage.props?.sessionId).toBeUndefined();
+    expect(combatPage.props?.actorRole).toBeUndefined();
+    expect(combatPage.props?.onReturnToRoom).toBeUndefined();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await screen.findByRole("heading", { name: campaignAccess.name });
   });
@@ -751,16 +2022,51 @@ describe("persistence and multi-character frontend", () => {
     const opaqueId = " room/%?#雪 ";
     const encodedId = encodeURIComponent(opaqueId);
     const opaqueSession = { ...baseSession, id: opaqueId, title: "Opaque room" };
-    const attached = { sessionId: opaqueId, title: opaqueSession.title, participantNames: [aria.name, rowan.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
-    const context = { sessionId: opaqueId, state: "active", sourceOfTruth: "Exact room context", editableSource: "Exact room context", sourceUpdatedAt: null, synthesizedSource: "", synthesizedUpdatedAt: null, participants: [], recentEvents: [], rememberedFacts: [], activeLore: [], openThreads: [] };
+    const attached = {
+      sessionId: opaqueId,
+      title: opaqueSession.title,
+      participantNames: [aria.name, rowan.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
+    const context = {
+      sessionId: opaqueId,
+      state: "active",
+      sourceOfTruth: "Exact room context",
+      editableSource: "Exact room context",
+      sourceUpdatedAt: null,
+      synthesizedSource: "",
+      synthesizedUpdatedAt: null,
+      participants: [],
+      recentEvents: [],
+      rememberedFacts: [],
+      activeLore: [],
+      openThreads: [],
+    };
     installFetch([aria, rowan], [opaqueSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [attached], eligible: [] }) },
-      { method: "GET", match: new RegExp(`/api/sessions/${encodedId}$`), handler: () => json({ session: opaqueSession, messages: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [attached], eligible: [] }),
+      },
+      {
+        method: "GET",
+        match: new RegExp(`/api/sessions/${encodedId}$`),
+        handler: () => json({ session: opaqueSession, messages: [] }),
+      },
       { method: "GET", match: new RegExp(`/api/sessions/${encodedId}/context$`), handler: () => json({ context }) },
-      { method: "POST", match: new RegExp(`/api/sessions/${encodedId}/messages$`), handler: () => json({ reply: { ...message("opaque-reply", "character", "Encoded send arrived", aria.id), sessionId: opaqueId } }) },
+      {
+        method: "POST",
+        match: new RegExp(`/api/sessions/${encodedId}/messages$`),
+        handler: () =>
+          json({
+            reply: { ...message("opaque-reply", "character", "Encoded send arrived", aria.id), sessionId: opaqueId },
+          }),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -771,7 +2077,9 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send to Aria" }));
     await screen.findByText("Encoded send arrived");
 
-    const calls = vi.mocked(fetch).mock.calls.map(([input, init]) => `${(init?.method ?? "GET").toUpperCase()} ${String(input)}`);
+    const calls = vi
+      .mocked(fetch)
+      .mock.calls.map(([input, init]) => `${(init?.method ?? "GET").toUpperCase()} ${String(input)}`);
     expect(calls).toContain(`GET /api/sessions/${encodedId}`);
     expect(calls).toContain(`GET /api/sessions/${encodedId}/context`);
     expect(calls).toContain(`POST /api/sessions/${encodedId}/messages`);
@@ -779,23 +2087,38 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("cancels a pending room hydration on Back and ignores its late success", async () => {
-    const attached = { sessionId: baseSession.id, title: "Delayed room", participantNames: [aria.name, rowan.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Delayed room",
+      participantNames: [aria.name, rowan.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     const hydration = deferred<Response>();
     installFetch([aria, rowan], [baseSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [attached], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [attached], eligible: [] }),
+      },
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => hydration.promise },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
     await openAdvancedCampaign();
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
-    expect((screen.getByRole("button", { name: "Open attached room 1 of 1" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Open attached room 1 of 1" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
     await screen.findByRole("heading", { name: "Campaigns & worlds" });
-    hydration.resolve(json({ session: baseSession, messages: [message("late-room", "character", "Must not open", aria.id)] }));
+    hydration.resolve(
+      json({ session: baseSession, messages: [message("late-room", "character", "Must not open", aria.id)] }),
+    );
     await hydration.promise;
     await Promise.resolve();
     expect(screen.queryByText("Must not open")).toBeNull();
@@ -803,16 +2126,38 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("does not request room history when Back cancels its pending campaign preflight", async () => {
-    const attached = { sessionId: baseSession.id, title: "Delayed preflight", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Delayed preflight",
+      participantNames: [aria.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     const preflight = deferred<Response>();
     let detailReads = 0;
     let sessionReads = 0;
     installFetch([aria], [baseSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => ++detailReads === 1 ? json(campaignDetail) : preflight.promise },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [attached], eligible: [] }) },
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => { sessionReads += 1; return json({ session: baseSession, messages: [] }); } },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => (++detailReads === 1 ? json(campaignDetail) : preflight.promise),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [attached], eligible: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () => {
+          sessionReads += 1;
+          return json({ session: baseSession, messages: [] });
+        },
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -829,14 +2174,28 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("retains an unacknowledged return refresh across Campaigns, then consumes it once on reopen", async () => {
-    const attached = { sessionId: baseSession.id, title: "Return room", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Return room",
+      participantNames: [aria.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     const interruptedRefresh = deferred<Response>();
     let roomReads = 0;
     installFetch([aria], [baseSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => { roomReads += 1; return roomReads === 2 ? interruptedRefresh.promise : json({ attached: [attached], eligible: [] }); } },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => {
+          roomReads += 1;
+          return roomReads === 2 ? interruptedRefresh.promise : json({ attached: [attached], eligible: [] });
+        },
+      },
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
     );
     await openLibrary();
@@ -862,14 +2221,28 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("retains an unacknowledged missing-room refresh across Campaigns and consumes it on reopen", async () => {
-    const attached = { sessionId: baseSession.id, title: "Missing room", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Missing room",
+      participantNames: [aria.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     const interruptedRefresh = deferred<Response>();
     let roomReads = 0;
     installFetch([aria], [baseSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => { roomReads += 1; return roomReads === 2 ? interruptedRefresh.promise : json({ attached: [attached], eligible: [] }); } },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => {
+          roomReads += 1;
+          return roomReads === 2 ? interruptedRefresh.promise : json({ attached: [attached], eligible: [] });
+        },
+      },
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ error: "missing" }, 404) },
     );
     await openLibrary();
@@ -892,14 +2265,32 @@ describe("persistence and multi-character frontend", () => {
     const firstHydration = deferred<Response>();
     const secondHydration = deferred<Response>();
     const attached = [
-      { sessionId: baseSession.id, title: "Duplicate", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false },
-      { sessionId: secondSession.id, title: "Duplicate", participantNames: [rowan.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-04T00:00:00.000Z", stopped: false },
+      {
+        sessionId: baseSession.id,
+        title: "Duplicate",
+        participantNames: [aria.name],
+        createdAt: baseSession.createdAt,
+        attachedAt: "2030-01-03T00:00:00.000Z",
+        stopped: false,
+      },
+      {
+        sessionId: secondSession.id,
+        title: "Duplicate",
+        participantNames: [rowan.name],
+        createdAt: baseSession.createdAt,
+        attachedAt: "2030-01-04T00:00:00.000Z",
+        stopped: false,
+      },
     ];
     installFetch([aria, rowan], [baseSession, secondSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached, eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached, eligible: [] }),
+      },
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => firstHydration.promise },
       { method: "GET", match: /\/api\/sessions\/sess-2$/, handler: () => secondHydration.promise },
     );
@@ -912,9 +2303,13 @@ describe("persistence and multi-character frontend", () => {
       first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       second.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    secondHydration.resolve(json({ session: secondSession, messages: [message("second-wins", "character", "Second room wins", rowan.id)] }));
+    secondHydration.resolve(
+      json({ session: secondSession, messages: [message("second-wins", "character", "Second room wins", rowan.id)] }),
+    );
     await screen.findByText("Second room wins");
-    firstHydration.resolve(json({ session: baseSession, messages: [message("first-late", "character", "First room is stale", aria.id)] }));
+    firstHydration.resolve(
+      json({ session: baseSession, messages: [message("first-late", "character", "First room is stale", aria.id)] }),
+    );
     await firstHydration.promise;
     await Promise.resolve();
     expect(screen.queryByText("First room is stale")).toBeNull();
@@ -925,14 +2320,32 @@ describe("persistence and multi-character frontend", () => {
     [500, "Room could not be opened. Please try again."],
     [404, "That room is no longer available. Latest campaign rooms are being refreshed."],
   ] as const)("keeps room hydration %s failures on campaign detail", async (status, expected) => {
-    const attached = { sessionId: baseSession.id, title: "Unavailable room", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Unavailable room",
+      participantNames: [aria.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     let roomReads = 0;
     installFetch([aria], [baseSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => { roomReads += 1; return json({ attached: [attached], eligible: [] }); } },
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ error: "private hydration detail" }, status) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => {
+          roomReads += 1;
+          return json({ attached: [attached], eligible: [] });
+        },
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () => json({ error: "private hydration detail" }, status),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -940,25 +2353,50 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
     const alert = await screen.findByText(expected);
     expect(alert.getAttribute("role")).toBe("alert");
-    await waitFor(() => expect(document.activeElement).toBe(status === 404
-      ? screen.getByRole("heading", { name: "Rooms" })
-      : alert));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(status === 404 ? screen.getByRole("heading", { name: "Rooms" }) : alert),
+    );
     expect(screen.getByRole("heading", { name: campaignAccess.name })).toBeTruthy();
     expect(document.body.textContent).not.toContain("private hydration detail");
     await waitFor(() => expect(roomReads).toBe(status === 404 ? 2 : 1));
   });
 
   it("treats a campaign-detail preflight 404 as authoritative campaign unavailability", async () => {
-    const attached = { sessionId: baseSession.id, title: "Unavailable campaign", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Unavailable campaign",
+      participantNames: [aria.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     let detailReads = 0;
     let roomReads = 0;
     let sessionReads = 0;
     installFetch([aria], [baseSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => ++detailReads === 1 ? json(campaignDetail) : json({ error: "private campaign detail" }, 404) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => { roomReads += 1; return json({ attached: [attached], eligible: [] }); } },
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => { sessionReads += 1; return json({ session: baseSession, messages: [] }); } },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => (++detailReads === 1 ? json(campaignDetail) : json({ error: "private campaign detail" }, 404)),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => {
+          roomReads += 1;
+          return json({ attached: [attached], eligible: [] });
+        },
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () => {
+          sessionReads += 1;
+          return json({ session: baseSession, messages: [] });
+        },
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -968,21 +2406,41 @@ describe("persistence and multi-character frontend", () => {
     expect(screen.queryByRole("heading", { name: "Rooms" })).toBeNull();
     expect(screen.queryByRole("button", { name: "← Campaigns" })).toBeNull();
     expect(screen.queryByText("Room could not be opened. Please try again.")).toBeNull();
-    expect(screen.queryByText("That room is no longer available. Latest campaign rooms are being refreshed.")).toBeNull();
+    expect(
+      screen.queryByText("That room is no longer available. Latest campaign rooms are being refreshed."),
+    ).toBeNull();
     await waitFor(() => expect(roomReads).toBe(1));
     expect(sessionReads).toBe(0);
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaigns" }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaigns" }),
+    );
   });
 
   it("rejects a valid but mismatched room hydration without changing campaign origin", async () => {
-    const attached = { sessionId: baseSession.id, title: "Requested room", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: "Requested room",
+      participantNames: [aria.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     const wrongSession = { ...baseSession, id: "different-opaque-room", title: "Wrong room" };
     installFetch([aria], [baseSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [attached], eligible: [] }) },
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: wrongSession, messages: [message("wrong", "character", "Must stay hidden", aria.id)] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [attached], eligible: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () =>
+          json({ session: wrongSession, messages: [message("wrong", "character", "Must stay hidden", aria.id)] }),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -992,36 +2450,76 @@ describe("persistence and multi-character frontend", () => {
     await waitFor(() => expect(document.activeElement).toBe(failure));
     expect(screen.getByRole("heading", { name: campaignAccess.name })).toBeTruthy();
     expect(screen.queryByText("Must stay hidden")).toBeNull();
-    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id });
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+      view: "campaign-detail",
+      campaignId: campaignAccess.id,
+    });
   });
 
   it("falls a mismatched restored campaign room back to its exact campaign with a generic local failure", async () => {
     const wrongSession = { ...baseSession, id: "restored-mismatch", title: "Wrong restored room" };
     installFetch([aria], [baseSession], true);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id, campaignId: campaignAccess.id, chatReturnCampaignId: campaignAccess.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "chat",
+        sessionId: baseSession.id,
+        campaignId: campaignAccess.id,
+        chatReturnCampaignId: campaignAccess.id,
+      }),
+    );
     routes.push(
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: wrongSession, messages: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () => json({ session: wrongSession, messages: [] }),
+      },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
     );
     render(<App />);
     await screen.findByRole("heading", { name: campaignAccess.name });
     expect(screen.getByText("Room could not be opened. Please try again.")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: wrongSession.title })).toBeNull();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-detail",
+        campaignId: campaignAccess.id,
+      }),
+    );
   });
 
   it("opens, persists, restores, and backs out of an ID-free character workspace without changing the browser URL", async () => {
-    const rosterEntry = { id: "workspace-entry-secret", characterId: "workspace-persona-secret", name: "Workspace Persona" };
-    const workspace = { character: {
-      name: rosterEntry.name, race: { name: "Avelune", description: "Moonlit people." }, background: { name: "Rainledger", description: "Records journeys." },
-      classes: [{ name: "Pathmender", description: "Restores paths.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [],
-    } };
+    const rosterEntry = {
+      id: "workspace-entry-secret",
+      characterId: "workspace-persona-secret",
+      name: "Workspace Persona",
+    };
+    const workspace = {
+      character: {
+        name: rosterEntry.name,
+        race: { name: "Avelune", description: "Moonlit people." },
+        background: { name: "Rainledger", description: "Records journeys." },
+        classes: [{ name: "Pathmender", description: "Restores paths.", level: 1 }],
+        attributes: [],
+        proficiencies: [],
+        choices: [],
+        resources: [],
+      },
+    };
     installFetch([aria], [], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [rosterEntry] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/workspace-entry-secret\/workspace$/, handler: () => json(workspace) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [rosterEntry] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/workspace-entry-secret\/workspace$/,
+        handler: () => json(workspace),
+      },
     );
     window.history.replaceState({}, "", "/unchanged?local=yes");
     await openLibrary();
@@ -1031,17 +2529,30 @@ describe("persistence and multi-character frontend", () => {
     const workspaceHeading = await screen.findByRole("heading", { name: rosterEntry.name });
     await waitFor(() => expect(document.activeElement).toBe(workspaceHeading));
     expect(window.location.pathname + window.location.search).toBe("/unchanged?local=yes");
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
-      view: "campaign-character", campaignId: campaignAccess.id, campaignCharacterId: rosterEntry.id,
-    }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-character",
+        campaignId: campaignAccess.id,
+        campaignCharacterId: rosterEntry.id,
+      }),
+    );
     expect(document.body.outerHTML).not.toMatch(/workspace-(?:entry|persona)-secret/);
     fireEvent.click(screen.getByRole("button", { name: "← Back to campaign" }));
     const returnedHeading = await screen.findByRole("heading", { name: campaignAccess.name });
     await waitFor(() => expect(document.activeElement).toBe(returnedHeading));
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").campaignCharacterId).toBeUndefined());
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").campaignCharacterId).toBeUndefined(),
+    );
 
     cleanup();
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character", campaignId: campaignAccess.id, campaignCharacterId: rosterEntry.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-character",
+        campaignId: campaignAccess.id,
+        campaignCharacterId: rosterEntry.id,
+      }),
+    );
     render(<App />);
     await screen.findByRole("heading", { name: rosterEntry.name });
     expect(window.location.pathname + window.location.search).toBe("/unchanged?local=yes");
@@ -1049,21 +2560,113 @@ describe("persistence and multi-character frontend", () => {
 
   it("restores a scoped sheet focus request, falls back with focus, and restores focus to its workspace trigger", async () => {
     const rosterEntry = { id: "sheet-entry", characterId: "sheet-persona", name: "Sheet Persona" };
-    const workspace = { character: { name: rosterEntry.name, race: { name: "Avelune", description: "Moonlit." }, background: { name: "Guide", description: "Guides." }, classes: [{ name: "Warden", description: "Wards.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] } };
-    const derived = { maxHp: 10, defenses: { guard: 11, evasion: 12, will: 13 }, initiative: 2, speed: 30, carryingLimit: 100, spellAttack: 3, saveDc: 11,
-      explanations: ["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"].map((statistic) => ({ statistic, formula: "server", inputs: {}, result: 1 })) };
-    const sheet = { sheet: workspace.character, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: "2030-01-01T00:00:00.000Z" } };
-    const progression = { campaignId: campaignAccess.id, campaignCharacterId: rosterEntry.id, profile: { profileId: "profile", rulesProfileId: "rules", mode: "xp", maxLevel: 1, thresholds: [{ level: 1, xp: 0 }] }, classRef: { kind: "class", packId: "pack", packVersion: "1", definitionId: "warden" }, level: 1, totalXp: 0, milestoneCount: 0, revision: 0, pendingChoices: [], knownAbilities: [], knownSpells: [], derived, updatedAt: "2030-01-01T00:00:00.000Z" };
-    const preview = { campaignId: campaignAccess.id, campaignCharacterId: rosterEntry.id, previewRevision: 0, previewToken: "a".repeat(64), mode: "xp", currentLevel: 1, eligibleLevel: 1, totalXp: 0, milestoneCount: 0, pendingChoices: [], levels: [] };
+    const workspace = {
+      character: {
+        name: rosterEntry.name,
+        race: { name: "Avelune", description: "Moonlit." },
+        background: { name: "Guide", description: "Guides." },
+        classes: [{ name: "Warden", description: "Wards.", level: 1 }],
+        attributes: [],
+        proficiencies: [],
+        choices: [],
+        resources: [],
+      },
+    };
+    const derived = {
+      maxHp: 10,
+      defenses: { guard: 11, evasion: 12, will: 13 },
+      initiative: 2,
+      speed: 30,
+      carryingLimit: 100,
+      spellAttack: 3,
+      saveDc: 11,
+      explanations: [
+        "max-hp",
+        "defense-guard",
+        "defense-evasion",
+        "defense-will",
+        "initiative",
+        "speed",
+        "carrying-limit",
+        "spell-attack",
+        "save-dc",
+      ].map((statistic) => ({ statistic, formula: "server", inputs: {}, result: 1 })),
+    };
+    const sheet = {
+      sheet: workspace.character,
+      derived,
+      progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: "2030-01-01T00:00:00.000Z" },
+    };
+    const progression = {
+      campaignId: campaignAccess.id,
+      campaignCharacterId: rosterEntry.id,
+      profile: {
+        profileId: "profile",
+        rulesProfileId: "rules",
+        mode: "xp",
+        maxLevel: 1,
+        thresholds: [{ level: 1, xp: 0 }],
+      },
+      classRef: { kind: "class", packId: "pack", packVersion: "1", definitionId: "warden" },
+      level: 1,
+      totalXp: 0,
+      milestoneCount: 0,
+      revision: 0,
+      pendingChoices: [],
+      knownAbilities: [],
+      knownSpells: [],
+      derived,
+      updatedAt: "2030-01-01T00:00:00.000Z",
+    };
+    const preview = {
+      campaignId: campaignAccess.id,
+      campaignCharacterId: rosterEntry.id,
+      previewRevision: 0,
+      previewToken: "a".repeat(64),
+      mode: "xp",
+      currentLevel: 1,
+      eligibleLevel: 1,
+      totalXp: 0,
+      milestoneCount: 0,
+      pendingChoices: [],
+      levels: [],
+    };
     installFetch([aria], [], true, true);
     routes.push(
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/sheet$/, handler: () => json(sheet) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/content$/, handler: () => json({ error: "not configured" }, 404) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/workspace$/, handler: () => json(workspace) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/progression$/, handler: () => json({ progression }) },
-      { method: "POST", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/progression\/preview$/, handler: () => json({ preview }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/sheet$/,
+        handler: () => json(sheet),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/content$/,
+        handler: () => json({ error: "not configured" }, 404),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/workspace$/,
+        handler: () => json(workspace),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/progression$/,
+        handler: () => json({ progression }),
+      },
+      {
+        method: "POST",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/progression\/preview$/,
+        handler: () => json({ preview }),
+      },
     );
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character-sheet", campaignId: campaignAccess.id, campaignCharacterId: rosterEntry.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-character-sheet",
+        campaignId: campaignAccess.id,
+        campaignCharacterId: rosterEntry.id,
+      }),
+    );
     render(<App />);
     const sheetHeading = await screen.findByRole("heading", { name: rosterEntry.name });
     await waitFor(() => expect(document.activeElement).toBe(sheetHeading));
@@ -1073,8 +2676,19 @@ describe("persistence and multi-character frontend", () => {
     cleanup();
 
     installFetch([aria], [], true, false);
-    routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/workspace$/, handler: () => json(workspace) });
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character-sheet", campaignId: campaignAccess.id, campaignCharacterId: rosterEntry.id }));
+    routes.push({
+      method: "GET",
+      match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/workspace$/,
+      handler: () => json(workspace),
+    });
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-character-sheet",
+        campaignId: campaignAccess.id,
+        campaignCharacterId: rosterEntry.id,
+      }),
+    );
     render(<App />);
     const fallbackHeading = await screen.findByRole("heading", { name: rosterEntry.name });
     await waitFor(() => expect(document.activeElement).toBe(fallbackHeading));
@@ -1085,25 +2699,122 @@ describe("persistence and multi-character frontend", () => {
     const first = { id: "sheet-first", characterId: "persona-first", name: "First Sheet" };
     const second = { id: "sheet-second", characterId: "persona-second", name: "Second Sheet" };
     const firstWorkspace = deferred<Response>();
-    const workspaceFor = (name: string) => ({ character: { name, race: { name: "Avelune", description: "Moonlit." }, background: { name: "Guide", description: "Guides." }, classes: [{ name: "Warden", description: "Wards.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] } });
-    const derived = { maxHp: 10, defenses: { guard: 11, evasion: 12, will: 13 }, initiative: 2, speed: 30, carryingLimit: 100, spellAttack: 3, saveDc: 11,
-      explanations: ["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"].map((statistic) => ({ statistic, formula: "server", inputs: {}, result: 1 })) };
-    const sheetFor = (name: string) => ({ sheet: workspaceFor(name).character, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: "2030-01-01T00:00:00.000Z" } });
-    const progressionFor = (campaignCharacterId: string) => ({ campaignId: campaignAccess.id, campaignCharacterId, profile: { profileId: "profile", rulesProfileId: "rules", mode: "xp", maxLevel: 1, thresholds: [{ level: 1, xp: 0 }] }, classRef: { kind: "class", packId: "pack", packVersion: "1", definitionId: "warden" }, level: 1, totalXp: 0, milestoneCount: 0, revision: 0, pendingChoices: [], knownAbilities: [], knownSpells: [], derived, updatedAt: "2030-01-01T00:00:00.000Z" });
+    const workspaceFor = (name: string) => ({
+      character: {
+        name,
+        race: { name: "Avelune", description: "Moonlit." },
+        background: { name: "Guide", description: "Guides." },
+        classes: [{ name: "Warden", description: "Wards.", level: 1 }],
+        attributes: [],
+        proficiencies: [],
+        choices: [],
+        resources: [],
+      },
+    });
+    const derived = {
+      maxHp: 10,
+      defenses: { guard: 11, evasion: 12, will: 13 },
+      initiative: 2,
+      speed: 30,
+      carryingLimit: 100,
+      spellAttack: 3,
+      saveDc: 11,
+      explanations: [
+        "max-hp",
+        "defense-guard",
+        "defense-evasion",
+        "defense-will",
+        "initiative",
+        "speed",
+        "carrying-limit",
+        "spell-attack",
+        "save-dc",
+      ].map((statistic) => ({ statistic, formula: "server", inputs: {}, result: 1 })),
+    };
+    const sheetFor = (name: string) => ({
+      sheet: workspaceFor(name).character,
+      derived,
+      progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: "2030-01-01T00:00:00.000Z" },
+    });
+    const progressionFor = (campaignCharacterId: string) => ({
+      campaignId: campaignAccess.id,
+      campaignCharacterId,
+      profile: {
+        profileId: "profile",
+        rulesProfileId: "rules",
+        mode: "xp",
+        maxLevel: 1,
+        thresholds: [{ level: 1, xp: 0 }],
+      },
+      classRef: { kind: "class", packId: "pack", packVersion: "1", definitionId: "warden" },
+      level: 1,
+      totalXp: 0,
+      milestoneCount: 0,
+      revision: 0,
+      pendingChoices: [],
+      knownAbilities: [],
+      knownSpells: [],
+      derived,
+      updatedAt: "2030-01-01T00:00:00.000Z",
+    });
     installFetch([aria], [], true, true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [first, second] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/content$/, handler: () => json({ error: "not configured" }, 404) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [first, second] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/content$/,
+        handler: () => json({ error: "not configured" }, 404),
+      },
       { method: "GET", match: /\/characters\/sheet-first\/sheet$/, handler: () => json(sheetFor(first.name)) },
       { method: "GET", match: /\/characters\/sheet-second\/sheet$/, handler: () => json(sheetFor(second.name)) },
       { method: "GET", match: /\/characters\/sheet-first\/workspace$/, handler: () => firstWorkspace.promise },
-      { method: "GET", match: /\/characters\/sheet-second\/workspace$/, handler: () => json(workspaceFor(second.name)) },
-      { method: "GET", match: /\/characters\/sheet-first\/progression$/, handler: () => json({ progression: progressionFor(first.id) }) },
-      { method: "GET", match: /\/characters\/sheet-second\/progression$/, handler: () => json({ progression: progressionFor(second.id) }) },
-      { method: "POST", match: /\/characters\/(?:sheet-first|sheet-second)\/progression\/preview$/, handler: () => json({ preview: { previewRevision: 0, previewToken: "a".repeat(64), mode: "xp", currentLevel: 1, eligibleLevel: 1, totalXp: 0, milestoneCount: 0, pendingChoices: [], levels: [] } }) },
+      {
+        method: "GET",
+        match: /\/characters\/sheet-second\/workspace$/,
+        handler: () => json(workspaceFor(second.name)),
+      },
+      {
+        method: "GET",
+        match: /\/characters\/sheet-first\/progression$/,
+        handler: () => json({ progression: progressionFor(first.id) }),
+      },
+      {
+        method: "GET",
+        match: /\/characters\/sheet-second\/progression$/,
+        handler: () => json({ progression: progressionFor(second.id) }),
+      },
+      {
+        method: "POST",
+        match: /\/characters\/(?:sheet-first|sheet-second)\/progression\/preview$/,
+        handler: () =>
+          json({
+            preview: {
+              previewRevision: 0,
+              previewToken: "a".repeat(64),
+              mode: "xp",
+              currentLevel: 1,
+              eligibleLevel: 1,
+              totalXp: 0,
+              milestoneCount: 0,
+              pendingChoices: [],
+              levels: [],
+            },
+          }),
+      },
     );
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character-sheet", campaignId: campaignAccess.id, campaignCharacterId: first.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-character-sheet",
+        campaignId: campaignAccess.id,
+        campaignCharacterId: first.id,
+      }),
+    );
     render(<App />);
     await screen.findByRole("heading", { name: first.name });
     fireEvent.click(screen.getByRole("button", { name: "← Character workspace" }));
@@ -1126,75 +2837,132 @@ describe("persistence and multi-character frontend", () => {
     installFetch([aria], [], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [rosterEntry] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/missing-workspace-entry\/workspace$/, handler: () => json({ error: "private missing" }, 404) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [rosterEntry] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/missing-workspace-entry\/workspace$/,
+        handler: () => json({ error: "private missing" }, 404),
+      },
     );
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }),
+    );
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Open character Missing Workspace, character 1 of 1" }));
     const detailHeading = await screen.findByRole("heading", { name: campaignAccess.name });
     await waitFor(() => expect(document.activeElement).toBe(detailHeading));
     expect(document.body.textContent).not.toContain("private missing");
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id }));
-  });
-
-  it.each(["back", "404"] as const)("consumes the workspace %s campaign-heading focus without replaying it after Campaigns/reopen", async (outcome) => {
-    const rosterEntry = { id: `one-shot-${outcome}`, characterId: `one-shot-persona-${outcome}`, name: "One Shot" };
-    const workspace = { character: {
-      name: rosterEntry.name, race: { name: "Avelune", description: "Moonlit people." }, background: { name: "Rainledger", description: "Records journeys." },
-      classes: [], attributes: [], proficiencies: [], choices: [], resources: [],
-    } };
-    let reopenedDetailResolve!: (response: Response) => void;
-    const reopenedDetail = new Promise<Response>((resolve) => { reopenedDetailResolve = resolve; });
-    let delayReopenedDetail = false;
-    installFetch([aria], [], true);
-    routes.push(
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => delayReopenedDetail ? reopenedDetail : json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [rosterEntry] }) },
-      { method: "GET", match: new RegExp(`/api/rpg/v1/campaigns/campaign-one/characters/${rosterEntry.id}/workspace$`), handler: () => outcome === "404" ? json({ error: "private missing" }, 404) : json(workspace) },
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-detail",
+        campaignId: campaignAccess.id,
+      }),
     );
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
-    render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Open character One Shot, character 1 of 1" }));
-    if (outcome === "back") {
-      await screen.findByRole("heading", { name: rosterEntry.name });
-      fireEvent.click(screen.getByRole("button", { name: "← Back to campaign" }));
-    }
-    const returnedHeading = await screen.findByRole("heading", { name: campaignAccess.name });
-    await waitFor(() => expect(document.activeElement).toBe(returnedHeading));
-
-    fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
-    await screen.findByRole("button", { name: `Open campaign ${campaignAccess.name}` });
-    const anchor = document.createElement("button");
-    document.body.append(anchor);
-    anchor.focus();
-    delayReopenedDetail = true;
-    await openAdvancedCampaign();
-    reopenedDetailResolve(json(campaignDetail));
-    await screen.findByRole("heading", { name: campaignAccess.name });
-    await Promise.resolve();
-    expect(document.activeElement).toBe(anchor);
-    anchor.remove();
   });
+
+  it.each(["back", "404"] as const)(
+    "consumes the workspace %s campaign-heading focus without replaying it after Campaigns/reopen",
+    async (outcome) => {
+      const rosterEntry = { id: `one-shot-${outcome}`, characterId: `one-shot-persona-${outcome}`, name: "One Shot" };
+      const workspace = {
+        character: {
+          name: rosterEntry.name,
+          race: { name: "Avelune", description: "Moonlit people." },
+          background: { name: "Rainledger", description: "Records journeys." },
+          classes: [],
+          attributes: [],
+          proficiencies: [],
+          choices: [],
+          resources: [],
+        },
+      };
+      let reopenedDetailResolve!: (response: Response) => void;
+      const reopenedDetail = new Promise<Response>((resolve) => {
+        reopenedDetailResolve = resolve;
+      });
+      let delayReopenedDetail = false;
+      installFetch([aria], [], true);
+      routes.push(
+        { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
+        {
+          method: "GET",
+          match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+          handler: () => (delayReopenedDetail ? reopenedDetail : json(campaignDetail)),
+        },
+        {
+          method: "GET",
+          match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+          handler: () => json({ characters: [rosterEntry] }),
+        },
+        {
+          method: "GET",
+          match: new RegExp(`/api/rpg/v1/campaigns/campaign-one/characters/${rosterEntry.id}/workspace$`),
+          handler: () => (outcome === "404" ? json({ error: "private missing" }, 404) : json(workspace)),
+        },
+      );
+      localStorage.setItem(
+        "velvet.navigation.v1",
+        JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }),
+      );
+      render(<App />);
+      fireEvent.click(await screen.findByRole("button", { name: "Open character One Shot, character 1 of 1" }));
+      if (outcome === "back") {
+        await screen.findByRole("heading", { name: rosterEntry.name });
+        fireEvent.click(screen.getByRole("button", { name: "← Back to campaign" }));
+      }
+      const returnedHeading = await screen.findByRole("heading", { name: campaignAccess.name });
+      await waitFor(() => expect(document.activeElement).toBe(returnedHeading));
+
+      fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
+      await screen.findByRole("button", { name: `Open campaign ${campaignAccess.name}` });
+      const anchor = document.createElement("button");
+      document.body.append(anchor);
+      anchor.focus();
+      delayReopenedDetail = true;
+      await openAdvancedCampaign();
+      reopenedDetailResolve(json(campaignDetail));
+      await screen.findByRole("heading", { name: campaignAccess.name });
+      await Promise.resolve();
+      expect(document.activeElement).toBe(anchor);
+      anchor.remove();
+    },
+  );
 
   it("restores malformed workspace navigation to detail or campaigns and feature-falls home", async () => {
     installFetch([aria], [], true);
-    routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) });
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character", campaignId: campaignAccess.id, campaignCharacterId: "bad/id" }));
+    routes.push({
+      method: "GET",
+      match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+      handler: () => json(campaignDetail),
+    });
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-character", campaignId: campaignAccess.id, campaignCharacterId: "bad/id" }),
+    );
     render(<App />);
     await screen.findByRole("heading", { name: campaignAccess.name });
     cleanup();
 
     installFetch([aria], [], true);
     routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) });
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character", campaignId: "bad/id", campaignCharacterId: "entry" }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-character", campaignId: "bad/id", campaignCharacterId: "entry" }),
+    );
     render(<App />);
     await screen.findByRole("heading", { name: "Campaigns & worlds" });
     cleanup();
 
     installFetch([aria], [], false);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character", campaignId: campaignAccess.id, campaignCharacterId: "entry" }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-character", campaignId: campaignAccess.id, campaignCharacterId: "entry" }),
+    );
     await openLibrary();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("home"));
   });
@@ -1204,13 +2972,21 @@ describe("persistence and multi-character frontend", () => {
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ error: "private compatibility detail" }, 404) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ error: "private compatibility detail" }, 404),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
     await openAdvancedCampaign();
     await screen.findByRole("heading", { name: campaignAccess.name });
-    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).endsWith("/campaign-one/characters"))).toBe(true));
+    await waitFor(() =>
+      expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).endsWith("/campaign-one/characters"))).toBe(
+        true,
+      ),
+    );
     expect(screen.queryByRole("heading", { name: "Characters" })).toBeNull();
     expect(document.body.textContent).not.toContain("private compatibility detail");
     expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail" });
@@ -1223,14 +2999,29 @@ describe("persistence and multi-character frontend", () => {
     let patchBody: Record<string, unknown> | null = null;
     let listCalls = 0;
     routes.push(
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => { listCalls += 1; return json({ campaigns: [{ ...campaignAccess, name: currentName, updatedAt }] }); } },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json({ campaign: { ...campaignDetail.campaign, name: currentName, updatedAt } }) },
-      { method: "PATCH", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: (body) => {
-        patchBody = body as Record<string, unknown>;
-        currentName = (patchBody as { name: string }).name;
-        updatedAt = "2030-01-03T00:00:00.000Z";
-        return json({ campaign: { id: campaignAccess.id, name: currentName, updatedAt } });
-      } },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns$/,
+        handler: () => {
+          listCalls += 1;
+          return json({ campaigns: [{ ...campaignAccess, name: currentName, updatedAt }] });
+        },
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json({ campaign: { ...campaignDetail.campaign, name: currentName, updatedAt } }),
+      },
+      {
+        method: "PATCH",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: (body) => {
+          patchBody = body as Record<string, unknown>;
+          currentName = (patchBody as { name: string }).name;
+          updatedAt = "2030-01-03T00:00:00.000Z";
+          return json({ campaign: { id: campaignAccess.id, name: currentName, updatedAt } });
+        },
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -1253,14 +3044,25 @@ describe("persistence and multi-character frontend", () => {
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(detail) },
-      { method: "PUT", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/starter-setup$/, handler: (body) => {
-        setupBody = body;
-        detail = { campaign: { ...campaignDetail.campaign, updatedAt: "2030-01-03T00:00:00.000Z", content: {
-          status: "configured", rulesProfileId: "velvet:rules:original-narrative",
-          contentPacks: [{ packId: "velvet:original-starter", packVersion: "1.0.0+d15042935818" }],
-        } } };
-        return json(detail);
-      } },
+      {
+        method: "PUT",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/starter-setup$/,
+        handler: (body) => {
+          setupBody = body;
+          detail = {
+            campaign: {
+              ...campaignDetail.campaign,
+              updatedAt: "2030-01-03T00:00:00.000Z",
+              content: {
+                status: "configured",
+                rulesProfileId: "velvet:rules:original-narrative",
+                contentPacks: [{ packId: "velvet:original-starter", packVersion: "1.0.0+d15042935818" }],
+              },
+            },
+          };
+          return json(detail);
+        },
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -1284,10 +3086,46 @@ describe("persistence and multi-character frontend", () => {
     let optionsCalls = 0;
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => { rosterCalls += 1; return json({ characters: used ? [{ id: "app-entry-secret", characterId: "app-persona-secret", name: "App Persona" }] : [] }); } },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/creation-options$/, handler: () => { optionsCalls += 1; return json({ ...appCreationOptions, personas: appCreationOptions.personas.map((persona) => ({ ...persona, alreadyUsed: used })) }); } },
-      { method: "POST", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => { postCalls += 1; used = true; return json({ character: { id: "app-entry-secret", characterId: "app-persona-secret", name: "App Persona" } }, 201); } },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+        handler: () => json(configuredCampaignDetail),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => {
+          rosterCalls += 1;
+          return json({
+            characters: used
+              ? [{ id: "app-entry-secret", characterId: "app-persona-secret", name: "App Persona" }]
+              : [],
+          });
+        },
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/creation-options$/,
+        handler: () => {
+          optionsCalls += 1;
+          return json({
+            ...appCreationOptions,
+            personas: appCreationOptions.personas.map((persona) => ({ ...persona, alreadyUsed: used })),
+          });
+        },
+      },
+      {
+        method: "POST",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => {
+          postCalls += 1;
+          used = true;
+          return json(
+            { character: { id: "app-entry-secret", characterId: "app-persona-secret", name: "App Persona" } },
+            201,
+          );
+        },
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
@@ -1306,74 +3144,153 @@ describe("persistence and multi-character frontend", () => {
 
   it("restores campaign detail while reconciling stale character selections", async () => {
     installFetch([aria], [], true);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id, selectedIds: [aria.id, "gone"], primaryId: "gone" }));
-    routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) });
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-detail",
+        campaignId: campaignAccess.id,
+        selectedIds: [aria.id, "gone"],
+        primaryId: "gone",
+      }),
+    );
+    routes.push({
+      method: "GET",
+      match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/,
+      handler: () => json(campaignDetail),
+    });
     render(<App />);
     await screen.findByRole("heading", { name: campaignAccess.name });
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id, selectedIds: [aria.id], primaryId: aria.id }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "campaign-detail",
+        campaignId: campaignAccess.id,
+        selectedIds: [aria.id],
+        primaryId: aria.id,
+      }),
+    );
   });
 
   it("reconciles missing restored detail to campaigns and clears its ID", async () => {
     installFetch([aria], [], true);
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: "missing" }));
     routes.push(
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/missing$/, handler: () => json({ error: "private missing" }, 404) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/missing$/,
+        handler: () => json({ error: "private missing" }, 404),
+      },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) },
     );
     render(<App />);
     await screen.findByRole("heading", { name: "Campaigns & worlds" });
     expect(screen.queryByText("private missing")).toBeNull();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaigns" }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaigns" }),
+    );
     expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").campaignId).toBeUndefined();
   });
 
   it("falls home when persisted campaign detail is feature unavailable", async () => {
     installFetch([aria], [], false);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }),
+    );
     await openLibrary();
     expect(screen.queryByText(campaignAccess.name)).toBeNull();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("home"));
   });
 
   it("sends and continues as the selected target speaker", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
-    const first = message("m1", "character", "Welcome", aria.id); let sendBody: Record<string, unknown> | null = null; let continueBody: Record<string, unknown> | null = null;
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    const first = message("m1", "character", "Welcome", aria.id);
+    let sendBody: Record<string, unknown> | null = null;
+    let continueBody: Record<string, unknown> | null = null;
     routes.push(
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [first] }) },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/messages$/, handler: (body) => { sendBody = body as Record<string, unknown>; const reply = message("m2", "character", "Rowan reply", rowan.id); return json({ reply, messages: [first, message("u1", "user", "hello"), reply] }); } },
-      { method: "GET", match: /\/api\/sessions\/sess-1\/messages\/m2\/siblings$/, handler: () => json({ siblings: [], activeMessageId: null, activeLeafId: null }) },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/continue$/, handler: (body) => { continueBody = body as Record<string, unknown>; const reply = message("m3", "character", "Rowan continues", rowan.id); return json({ reply, messages: [first, reply] }); } },
-      { method: "GET", match: /\/api\/sessions\/sess-1\/messages\/m3\/siblings$/, handler: () => json({ siblings: [], activeMessageId: null, activeLeafId: null }) },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () => json({ session: baseSession, messages: [first] }),
+      },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1\/messages$/,
+        handler: (body) => {
+          sendBody = body as Record<string, unknown>;
+          const reply = message("m2", "character", "Rowan reply", rowan.id);
+          return json({ reply, messages: [first, message("u1", "user", "hello"), reply] });
+        },
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1\/messages\/m2\/siblings$/,
+        handler: () => json({ siblings: [], activeMessageId: null, activeLeafId: null }),
+      },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1\/continue$/,
+        handler: (body) => {
+          continueBody = body as Record<string, unknown>;
+          const reply = message("m3", "character", "Rowan continues", rowan.id);
+          return json({ reply, messages: [first, reply] });
+        },
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1\/messages\/m3\/siblings$/,
+        handler: () => json({ siblings: [], activeMessageId: null, activeLeafId: null }),
+      },
     );
-    render(<App />); await screen.findByText("Welcome");
+    render(<App />);
+    await screen.findByText("Welcome");
     fireEvent.change(screen.getByLabelText("Target speaker"), { target: { value: rowan.id } });
-    fireEvent.change(screen.getByPlaceholderText("Write a message…"), { target: { value: "hello" } }); fireEvent.click(screen.getByRole("button", { name: "Send to Rowan" }));
-    await screen.findByText("Rowan reply"); expect(sendBody).toMatchObject({ content: "hello", speakerCharacterId: rowan.id });
-    fireEvent.click(screen.getByRole("button", { name: "Continue as Rowan" })); await screen.findByText("Rowan continues"); expect(continueBody).toEqual({ speakerCharacterId: rowan.id });
+    fireEvent.change(screen.getByPlaceholderText("Write a message…"), { target: { value: "hello" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send to Rowan" }));
+    await screen.findByText("Rowan reply");
+    expect(sendBody).toMatchObject({ content: "hello", speakerCharacterId: rowan.id });
+    fireEvent.click(screen.getByRole("button", { name: "Continue as Rowan" }));
+    await screen.findByText("Rowan continues");
+    expect(continueBody).toEqual({ speakerCharacterId: rowan.id });
   });
 
   it.each([false, true])("stops room automation after a stream failure (user accepted: %s)", async (accepted) => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     const user = message("accepted-user", "user", "I open the door.");
     const continuation = vi.fn(() => sse([{ event: "room_done", data: { messages: [], replies: [] } }]));
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/room-turn$/, handler: () => sse([...(accepted ? [{ event: "user_message", data: { message: user } }] : []), { event: "error", data: { error: "Room provider unavailable" } }]) },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1\/room-turn$/,
+        handler: () =>
+          sse([
+            ...(accepted ? [{ event: "user_message", data: { message: user } }] : []),
+            { event: "error", data: { error: "Room provider unavailable" } },
+          ]),
+      },
       { method: "POST", match: /\/api\/sessions\/sess-1\/room-continue$/, handler: continuation },
     );
-    render(<App />); await screen.findByText(/scene is ready/i);
+    render(<App />);
+    await screen.findByText(/scene is ready/i);
     fireEvent.change(screen.getByPlaceholderText("Write a message…"), { target: { value: user.content } });
     fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
     await screen.findByRole("alert");
-    await waitFor(() => expect((screen.getByPlaceholderText("Write a message…") as HTMLInputElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText("Write a message…") as HTMLInputElement).disabled).toBe(false),
+    );
     expect(screen.getByRole("alert").textContent).toBe("Room provider unavailable");
     expect(continuation).not.toHaveBeenCalled();
-    expect((screen.getByPlaceholderText("Write a message…") as HTMLInputElement).value).toBe(accepted ? "" : user.content);
+    expect((screen.getByPlaceholderText("Write a message…") as HTMLInputElement).value).toBe(
+      accepted ? "" : user.content,
+    );
     expect(screen.queryByText(user.content, { selector: ".message p" }) !== null).toBe(accepted);
   });
 
   it("does not launch automatic room rounds after leaving a pending conversation", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     const pending = deferred<Response>();
     const continuation = vi.fn(() => sse([{ event: "room_done", data: { messages: [], replies: [] } }]));
     routes.push(
@@ -1381,40 +3298,82 @@ describe("persistence and multi-character frontend", () => {
       { method: "POST", match: /\/api\/sessions\/sess-1\/room-turn$/, handler: () => pending.promise },
       { method: "POST", match: /\/api\/sessions\/sess-1\/room-continue$/, handler: continuation },
     );
-    render(<App />); await screen.findByText(/scene is ready/i);
+    render(<App />);
+    await screen.findByText(/scene is ready/i);
     fireEvent.change(screen.getByPlaceholderText("Write a message…"), { target: { value: "I open the door." } });
     fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
     fireEvent.click(screen.getByRole("button", { name: "← Library" }));
     await screen.findByRole("heading", { name: "Characters" });
-    await act(async () => pending.resolve(sse([{ event: "room_done", data: { session: baseSession, messages: [], replies: [] } }])));
+    await act(async () =>
+      pending.resolve(sse([{ event: "room_done", data: { session: baseSession, messages: [], replies: [] } }])),
+    );
     expect(continuation).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Characters" })).toBeTruthy();
   });
 
   it("does not offer destructive reply alternatives behind an unanswered user message", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     const first = message("u1", "user", "Which path?");
     const reply = { ...message("m1", "character", "Take the bridge.", aria.id), parentId: first.id };
     const unanswered = { ...message("u2", "user", "I cross the bridge."), parentId: reply.id };
-    routes.push({ method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [first, reply, unanswered] }) });
-    render(<App />); await screen.findByText(unanswered.content);
+    routes.push({
+      method: "GET",
+      match: /\/api\/sessions\/sess-1$/,
+      handler: () => json({ session: baseSession, messages: [first, reply, unanswered] }),
+    });
+    render(<App />);
+    await screen.findByText(unanswered.content);
     expect(screen.queryByRole("button", { name: "Regenerate reply" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Retry last turn" })).toBeNull();
     expect(screen.getByRole("button", { name: "Continue as Aria" }).hasAttribute("disabled")).toBe(false);
   });
 
   it("restores saved alternative replies on reopen and refreshes scene context when switching", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     const user = message("u1", "user", "Which path?");
     const first = { ...message("m1", "character", "Take the bridge.", aria.id), parentId: user.id };
     const second = { ...message("m2", "character", "Take the tunnel.", aria.id), parentId: user.id, swipeIndex: 1 };
     let active = second;
     let contextReads = 0;
     routes.push(
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [user, active] }) },
-      { method: "GET", match: /\/api\/sessions\/sess-1\/messages\/m[12]\/siblings$/, handler: () => json({ siblings: [first, second], activeMessageId: active.id }) },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/messages\/m1\/activate$/, handler: () => { active = first; return json({ messages: [user, active] }); } },
-      { method: "GET", match: /\/api\/sessions\/sess-1\/context$/, handler: () => { contextReads += 1; return json({ context: { sourceOfTruth: active.content, editableSource: "", participants: [], recentEvents: [], rememberedFacts: [], activeLore: [], openThreads: [] } }); } },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () => json({ session: baseSession, messages: [user, active] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1\/messages\/m[12]\/siblings$/,
+        handler: () => json({ siblings: [first, second], activeMessageId: active.id }),
+      },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1\/messages\/m1\/activate$/,
+        handler: () => {
+          active = first;
+          return json({ messages: [user, active] });
+        },
+      },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1\/context$/,
+        handler: () => {
+          contextReads += 1;
+          return json({
+            context: {
+              sourceOfTruth: active.content,
+              editableSource: "",
+              participants: [],
+              recentEvents: [],
+              rememberedFacts: [],
+              activeLore: [],
+              openThreads: [],
+            },
+          });
+        },
+      },
     );
     render(<App />);
     await screen.findByText("2/2");
@@ -1427,27 +3386,75 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("sends one message to the room and renders all selected replies", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
-    let roomBody: Record<string, unknown> | null = null; let continuationBody: Record<string, unknown> | null = null; let continuationCalls = 0;
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    let roomBody: Record<string, unknown> | null = null;
+    let continuationBody: Record<string, unknown> | null = null;
+    let continuationCalls = 0;
     const user = message("u1", "user", "What does everyone think?");
     const ariaReply = { ...message("m1", "character", "Aria offers a plan", aria.id), parentId: user.id };
     const rowanReply = { ...message("m2", "character", "Rowan challenges it", rowan.id), parentId: ariaReply.id };
     const ariaContinues = { ...message("m3", "character", "Aria answers Rowan", aria.id), parentId: rowanReply.id };
-    const rowanContinues = { ...message("m4", "character", "Rowan responds again", rowan.id), parentId: ariaContinues.id };
+    const rowanContinues = {
+      ...message("m4", "character", "Rowan responds again", rowan.id),
+      parentId: ariaContinues.id,
+    };
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/room-turn$/, handler: (body) => { roomBody = body as Record<string, unknown>; const result = { userMessage: user, replies: [ariaReply, rowanReply], selectedSpeakerIds: [aria.id, rowan.id], routing: "model", messages: [user, ariaReply, rowanReply] }; return sse([{ event: "user_message", data: { message: user } }, { event: "room_reply", data: { reply: ariaReply, index: 0, total: 2 } }, { event: "room_reply", data: { reply: rowanReply, index: 1, total: 2 } }, { event: "room_done", data: result }]); } },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/room-continue$/, handler: (body) => { continuationCalls += 1; continuationBody = body as Record<string, unknown>; const result = { replies: [ariaContinues, rowanContinues], selectedSpeakerIds: [aria.id, rowan.id], routing: "model", messages: [user, ariaReply, rowanReply, ariaContinues, rowanContinues] }; return sse([{ event: "room_reply", data: { reply: ariaContinues, index: 0, total: 2 } }, { event: "room_reply", data: { reply: rowanContinues, index: 1, total: 2 } }, { event: "room_done", data: result }]); } },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1\/room-turn$/,
+        handler: (body) => {
+          roomBody = body as Record<string, unknown>;
+          const result = {
+            userMessage: user,
+            replies: [ariaReply, rowanReply],
+            selectedSpeakerIds: [aria.id, rowan.id],
+            routing: "model",
+            messages: [user, ariaReply, rowanReply],
+          };
+          return sse([
+            { event: "user_message", data: { message: user } },
+            { event: "room_reply", data: { reply: ariaReply, index: 0, total: 2 } },
+            { event: "room_reply", data: { reply: rowanReply, index: 1, total: 2 } },
+            { event: "room_done", data: result },
+          ]);
+        },
+      },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1\/room-continue$/,
+        handler: (body) => {
+          continuationCalls += 1;
+          continuationBody = body as Record<string, unknown>;
+          const result = {
+            replies: [ariaContinues, rowanContinues],
+            selectedSpeakerIds: [aria.id, rowan.id],
+            routing: "model",
+            messages: [user, ariaReply, rowanReply, ariaContinues, rowanContinues],
+          };
+          return sse([
+            { event: "room_reply", data: { reply: ariaContinues, index: 0, total: 2 } },
+            { event: "room_reply", data: { reply: rowanContinues, index: 1, total: 2 } },
+            { event: "room_done", data: result },
+          ]);
+        },
+      },
     );
-    render(<App />); await screen.findByText(/scene is ready/i);
-    fireEvent.change(screen.getByPlaceholderText("Write a message…"), { target: { value: "What does everyone think?" } });
+    render(<App />);
+    await screen.findByText(/scene is ready/i);
+    fireEvent.change(screen.getByPlaceholderText("Write a message…"), {
+      target: { value: "What does everyone think?" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
     await screen.findByText("Aria offers a plan");
     await screen.findByText("Rowan challenges it");
     const ariaBubble = screen.getByText("Aria offers a plan").closest(".message") as HTMLElement;
     const rowanBubble = screen.getByText("Rowan challenges it").closest(".message") as HTMLElement;
     expect(ariaBubble.style.getPropertyValue("--speaker-hue")).not.toBe("");
-    expect(ariaBubble.style.getPropertyValue("--speaker-hue")).not.toBe(rowanBubble.style.getPropertyValue("--speaker-hue"));
+    expect(ariaBubble.style.getPropertyValue("--speaker-hue")).not.toBe(
+      rowanBubble.style.getPropertyValue("--speaker-hue"),
+    );
     expect(roomBody).toEqual({ content: "What does everyone think?", maxSpeakers: 2 });
     expect(continuationCalls).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Give room another turn" }));
@@ -1458,32 +3465,64 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("opens and reuses a persistent private chat for the selected room agent", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
-    const privateSession = { ...baseSession, id: "solo-rowan", characterId: rowan.id, primaryCharacterId: rowan.id, participants: [rowan], title: "" };
-    const privateMessage = { ...message("private-1", "character", "Private history", rowan.id), sessionId: privateSession.id };
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    const privateSession = {
+      ...baseSession,
+      id: "solo-rowan",
+      characterId: rowan.id,
+      primaryCharacterId: rowan.id,
+      participants: [rowan],
+      title: "",
+    };
+    const privateMessage = {
+      ...message("private-1", "character", "Private history", rowan.id),
+      sessionId: privateSession.id,
+    };
     let privateBody: unknown = null;
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "POST", match: /\/api\/sessions\/solo$/, handler: (body) => { privateBody = body; return json({ session: privateSession, messages: [privateMessage], created: false }); } },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/solo$/,
+        handler: (body) => {
+          privateBody = body;
+          return json({ session: privateSession, messages: [privateMessage], created: false });
+        },
+      },
     );
-    render(<App />); await screen.findByText(/scene is ready/i);
+    render(<App />);
+    await screen.findByText(/scene is ready/i);
     fireEvent.change(screen.getByLabelText("Target speaker"), { target: { value: rowan.id } });
     fireEvent.click(screen.getByRole("button", { name: "Private chat with Rowan" }));
     await screen.findByText("Private history");
     expect(privateBody).toEqual({ characterId: rowan.id });
     expect(screen.queryByRole("button", { name: /Private chat with/ })).toBeNull();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").sessionId).toBe("solo-rowan"));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").sessionId).toBe("solo-rowan"),
+    );
   });
 
   it("preserves campaign Back origin on private failure and ignores private completion after Back", async () => {
-    const attached = { sessionId: baseSession.id, title: baseSession.title, participantNames: [aria.name, rowan.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: baseSession.id,
+      title: baseSession.title,
+      participantNames: [aria.name, rowan.name],
+      createdAt: baseSession.createdAt,
+      attachedAt: "2030-01-03T00:00:00.000Z",
+      stopped: false,
+    };
     const first = deferred<Response>();
     const latePrivate = { ...baseSession, id: "late-private", participants: [aria], title: "Late private" };
     installFetch([aria, rowan], [baseSession], true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [attached], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [attached], eligible: [] }),
+      },
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
       { method: "POST", match: /\/api\/sessions\/solo$/, handler: () => first.promise },
     );
@@ -1493,10 +3532,23 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
     await screen.findByRole("button", { name: "← Back to campaign" });
     fireEvent.click(screen.getByRole("button", { name: "Private chat with Aria" }));
-    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").chatReturnCampaignId).toBe(campaignAccess.id);
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").chatReturnCampaignId).toBe(
+      campaignAccess.id,
+    );
     fireEvent.click(screen.getByRole("button", { name: "← Back to campaign" }));
     await screen.findByRole("heading", { name: campaignAccess.name });
-    first.resolve(json({ session: latePrivate, messages: [{ ...message("late-private-message", "character", "Must not replace campaign", aria.id), sessionId: latePrivate.id }], created: true }));
+    first.resolve(
+      json({
+        session: latePrivate,
+        messages: [
+          {
+            ...message("late-private-message", "character", "Must not replace campaign", aria.id),
+            sessionId: latePrivate.id,
+          },
+        ],
+        created: true,
+      }),
+    );
     await first.promise;
     await Promise.resolve();
     expect(screen.getByRole("heading", { name: campaignAccess.name })).toBeTruthy();
@@ -1505,20 +3557,37 @@ describe("persistence and multi-character frontend", () => {
 
   it("does not clear the current campaign room or Back origin when private open fails", async () => {
     installFetch([aria, rowan], [baseSession], true);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id, campaignId: campaignAccess.id, chatReturnCampaignId: campaignAccess.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "chat",
+        sessionId: baseSession.id,
+        campaignId: campaignAccess.id,
+        chatReturnCampaignId: campaignAccess.id,
+      }),
+    );
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "POST", match: /\/api\/sessions\/solo$/, handler: () => Promise.reject(new TypeError("private network detail")) },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/solo$/,
+        handler: () => Promise.reject(new TypeError("private network detail")),
+      },
     );
-    render(<App />); await screen.findByText(/scene is ready/i);
+    render(<App />);
+    await screen.findByText(/scene is ready/i);
     fireEvent.click(screen.getByRole("button", { name: "Private chat with Aria" }));
     await screen.findByText("Could not open private chat.");
     expect(screen.getByRole("heading", { name: baseSession.title })).toBeTruthy();
     expect(screen.getByRole("button", { name: "← Back to campaign" })).toBeTruthy();
     expect(document.body.textContent).not.toContain("private network detail");
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
-      view: "chat", sessionId: baseSession.id, chatReturnCampaignId: campaignAccess.id,
-    }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "chat",
+        sessionId: baseSession.id,
+        chatReturnCampaignId: campaignAccess.id,
+      }),
+    );
   });
 
   it.each([
@@ -1526,23 +3595,43 @@ describe("persistence and multi-character frontend", () => {
     ["extra participant", { ...baseSession, id: "wrong-solo-extra", participants: [aria, rowan] }],
     ["wrong participant", { ...baseSession, id: "wrong-solo-participant", participants: [rowan] }],
     ["wrong primary", { ...baseSession, id: "wrong-solo-primary", participants: [aria], primaryCharacterId: rowan.id }],
-    ["wrong compatibility alias", { ...baseSession, id: "wrong-solo-alias", participants: [aria], characterId: rowan.id }],
+    [
+      "wrong compatibility alias",
+      { ...baseSession, id: "wrong-solo-alias", participants: [aria], characterId: rowan.id },
+    ],
   ])("rejects private response binding with %s and preserves campaign room origin", async (_label, returnedSession) => {
     installFetch([aria, rowan], [baseSession], true);
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id, campaignId: campaignAccess.id, chatReturnCampaignId: campaignAccess.id }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "chat",
+        sessionId: baseSession.id,
+        campaignId: campaignAccess.id,
+        chatReturnCampaignId: campaignAccess.id,
+      }),
+    );
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
-      { method: "POST", match: /\/api\/sessions\/solo$/, handler: () => json({ session: returnedSession, messages: [], created: false }) },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/solo$/,
+        handler: () => json({ session: returnedSession, messages: [], created: false }),
+      },
     );
-    render(<App />); await screen.findByText(/scene is ready/i);
+    render(<App />);
+    await screen.findByText(/scene is ready/i);
     fireEvent.click(screen.getByRole("button", { name: "Private chat with Aria" }));
     await screen.findByText("Could not open private chat.");
     expect(screen.getByRole("heading", { name: baseSession.title })).toBeTruthy();
     expect(screen.getByRole("button", { name: "← Back to campaign" })).toBeTruthy();
     if (returnedSession.id) expect(document.body.textContent).not.toContain(String(returnedSession.id));
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
-      view: "chat", sessionId: baseSession.id, chatReturnCampaignId: campaignAccess.id,
-    }));
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+        view: "chat",
+        sessionId: baseSession.id,
+        chatReturnCampaignId: campaignAccess.id,
+      }),
+    );
   });
 
   it("disables replacement and mutation actions while private hydration is pending", async () => {
@@ -1554,29 +3643,61 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
       { method: "POST", match: /\/api\/sessions\/solo$/, handler: () => ariaOpen.promise },
     );
-    render(<App />); await screen.findByText(/scene is ready/i);
+    render(<App />);
+    await screen.findByText(/scene is ready/i);
     fireEvent.click(screen.getByRole("button", { name: "Private chat with Aria" }));
     for (const name of ["Prompt & settings", "End session", "Private chat with Aria", "Continue as Aria"]) {
       expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
     }
     expect((screen.getByLabelText("Target speaker") as HTMLSelectElement).disabled).toBe(true);
     expect((screen.getByPlaceholderText("Write a message…") as HTMLInputElement).disabled).toBe(true);
-    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).endsWith("/api/sessions/solo"))).toHaveLength(1);
+    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).endsWith("/api/sessions/solo"))).toHaveLength(
+      1,
+    );
 
-    ariaOpen.resolve(json({ session: ariaPrivate, messages: [{ ...message("latest-private-message", "character", "Bound private wins", aria.id), sessionId: ariaPrivate.id }], created: true }));
+    ariaOpen.resolve(
+      json({
+        session: ariaPrivate,
+        messages: [
+          {
+            ...message("latest-private-message", "character", "Bound private wins", aria.id),
+            sessionId: ariaPrivate.id,
+          },
+        ],
+        created: true,
+      }),
+    );
     await screen.findByText("Bound private wins");
     expect(screen.queryByRole("heading", { name: baseSession.title })).toBeNull();
   });
 
   it("ignores a late stop from the old room after private chat replacement succeeds", async () => {
     const stop = deferred<Response>();
-    const privateSession = { ...baseSession, id: "private-after-stop", characterId: aria.id, primaryCharacterId: aria.id, participants: [aria], title: "Private winner" };
+    const privateSession = {
+      ...baseSession,
+      id: "private-after-stop",
+      characterId: aria.id,
+      primaryCharacterId: aria.id,
+      participants: [aria],
+      title: "Private winner",
+    };
     installFetch();
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
       { method: "POST", match: /\/api\/sessions\/sess-1\/stop$/, handler: () => stop.promise },
-      { method: "POST", match: /\/api\/sessions\/solo$/, handler: () => json({ session: privateSession, messages: [{ ...message("private-wins", "character", "Private state wins", aria.id), sessionId: privateSession.id }], created: true }) },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/solo$/,
+        handler: () =>
+          json({
+            session: privateSession,
+            messages: [
+              { ...message("private-wins", "character", "Private state wins", aria.id), sessionId: privateSession.id },
+            ],
+            created: true,
+          }),
+      },
     );
     render(<App />);
     await screen.findByText(/scene is ready/i);
@@ -1594,12 +3715,22 @@ describe("persistence and multi-character frontend", () => {
 
   it("keeps a mismatched save-and-start hydration on the safe library with a generic error", async () => {
     const saved = { ...aria, id: "newly-saved" };
-    const created = { ...baseSession, id: "created-session", characterId: saved.id, primaryCharacterId: saved.id, participants: [saved] };
+    const created = {
+      ...baseSession,
+      id: "created-session",
+      characterId: saved.id,
+      primaryCharacterId: saved.id,
+      participants: [saved],
+    };
     installFetch([], []);
     routes.push(
       { method: "POST", match: /\/api\/characters$/, handler: () => json(saved, 201) },
       { method: "POST", match: /\/api\/sessions$/, handler: () => json(created, 201) },
-      { method: "GET", match: /\/api\/sessions\/created-session$/, handler: () => json({ session: { ...created, id: "different-session" }, messages: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/created-session$/,
+        handler: () => json({ session: { ...created, id: "different-session" }, messages: [] }),
+      },
     );
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "New character" }));
@@ -1617,15 +3748,35 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("opens the resizable prompt studio and saves an underlying layer", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
-    let templates = [{ id: "character.final", label: "Final turn", description: "Final instructions", defaultTemplate: "Default {{target.name}}", template: "Default {{target.name}}", placeholders: ["target.name"], overridden: false }];
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    let templates = [
+      {
+        id: "character.final",
+        label: "Final turn",
+        description: "Final instructions",
+        defaultTemplate: "Default {{target.name}}",
+        template: "Default {{target.name}}",
+        placeholders: ["target.name"],
+        overridden: false,
+      },
+    ];
     let savedTemplate = "";
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
       { method: "GET", match: /\/api\/prompt-templates$/, handler: () => json({ templates }) },
-      { method: "PUT", match: /\/api\/prompt-templates\/character.final$/, handler: (body) => { savedTemplate = (body as { template: string }).template; templates = [{ ...templates[0]!, template: savedTemplate, overridden: true }]; return json({ templates }); } },
+      {
+        method: "PUT",
+        match: /\/api\/prompt-templates\/character.final$/,
+        handler: (body) => {
+          savedTemplate = (body as { template: string }).template;
+          templates = [{ ...templates[0]!, template: savedTemplate, overridden: true }];
+          return json({ templates });
+        },
+      },
     );
-    render(<App />); await screen.findByText(/scene is ready/i);
+    render(<App />);
+    await screen.findByText(/scene is ready/i);
     fireEvent.click(screen.getByRole("button", { name: "Prompt & settings" }));
     const separator = screen.getByRole("separator", { name: "Resize settings pane" });
     expect(separator).toBeTruthy();
@@ -1639,15 +3790,25 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("only offers regenerate and retry when the latest character reply has a user parent", async () => {
-    installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
+    installFetch();
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     const user = { ...message("u1", "user", "Tell me more"), parentId: null };
     const reply = { ...message("m1", "character", "Aria replies", aria.id), parentId: user.id };
     const continuation = { ...message("m2", "character", "Rowan adds a thought", rowan.id), parentId: reply.id };
     routes.push(
-      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [user, reply] }) },
-      { method: "POST", match: /\/api\/sessions\/sess-1\/continue$/, handler: () => json({ reply: continuation, messages: [user, reply, continuation] }) },
+      {
+        method: "GET",
+        match: /\/api\/sessions\/sess-1$/,
+        handler: () => json({ session: baseSession, messages: [user, reply] }),
+      },
+      {
+        method: "POST",
+        match: /\/api\/sessions\/sess-1\/continue$/,
+        handler: () => json({ reply: continuation, messages: [user, reply, continuation] }),
+      },
     );
-    render(<App />); await screen.findByText("Aria replies");
+    render(<App />);
+    await screen.findByText("Aria replies");
     expect(screen.getByRole("button", { name: "Regenerate reply" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry last turn" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue as Aria" }));
@@ -1658,49 +3819,140 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("shows closed sessions as readable but not writable", async () => {
-    const closed = { ...baseSession, state: "closed" as const, stoppedAt: "2026-01-02T00:00:00.000Z", stopReason: "user-stop" };
-    installFetch([aria, rowan], [closed]); routes.push({ method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: closed, messages: [message("m1", "character", "Saved ending", aria.id)] }) });
-    await openLibrary(); fireEvent.click(screen.getByRole("button", { name: /^Night watch/ }));
-    await screen.findByText("Saved ending"); expect(screen.getByText(/no longer writable/)).toBeTruthy(); expect(screen.getByPlaceholderText("Session ended").hasAttribute("disabled")).toBe(true); expect(screen.getByRole("button", { name: /Continue as/ }).hasAttribute("disabled")).toBe(true);
+    const closed = {
+      ...baseSession,
+      state: "closed" as const,
+      stoppedAt: "2026-01-02T00:00:00.000Z",
+      stopReason: "user-stop",
+    };
+    installFetch([aria, rowan], [closed]);
+    routes.push({
+      method: "GET",
+      match: /\/api\/sessions\/sess-1$/,
+      handler: () => json({ session: closed, messages: [message("m1", "character", "Saved ending", aria.id)] }),
+    });
+    await openLibrary();
+    fireEvent.click(screen.getByRole("button", { name: /^Night watch/ }));
+    await screen.findByText("Saved ending");
+    expect(screen.getByText(/no longer writable/)).toBeTruthy();
+    expect(screen.getByPlaceholderText("Session ended").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: /Continue as/ }).hasAttribute("disabled")).toBe(true);
   });
 
   it("deletes session history from the library after confirmation", async () => {
-    const savedSessions = [baseSession]; installFetch([aria, rowan], savedSessions); let deletedId = "";
-    routes.push({ method: "DELETE", match: /\/api\/sessions\/sess-1$/, handler: () => { deletedId = baseSession.id; savedSessions.splice(0); return json({ ok: true }); } });
+    const savedSessions = [baseSession];
+    installFetch([aria, rowan], savedSessions);
+    let deletedId = "";
+    routes.push({
+      method: "DELETE",
+      match: /\/api\/sessions\/sess-1$/,
+      handler: () => {
+        deletedId = baseSession.id;
+        savedSessions.splice(0);
+        return json({ ok: true });
+      },
+    });
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "home", sessionId: baseSession.id }));
     await openLibrary();
     fireEvent.click(screen.getByRole("button", { name: "Delete session: Night watch" }));
     await screen.findByText("No sessions yet.");
     expect(deletedId).toBe(baseSession.id);
     expect(vi.mocked(confirm)).toHaveBeenCalledWith(expect.stringContaining("messages and summary"));
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").sessionId).toBeUndefined());
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").sessionId).toBeUndefined(),
+    );
   });
 
   it("manages active, pending, and forgotten memory lifecycle", async () => {
-    installFetch([aria], []); let memories = [{ id: "mem-1", characterId: aria.id, kind: "fact", content: "Likes stars", sourceTurnId: "manual", createdAt: "", userApproved: false, forgottenAt: null as string | null }];
+    installFetch([aria], []);
+    let memories = [
+      {
+        id: "mem-1",
+        characterId: aria.id,
+        kind: "fact",
+        content: "Likes stars",
+        sourceTurnId: "manual",
+        createdAt: "",
+        userApproved: false,
+        forgottenAt: null as string | null,
+      },
+    ];
     routes.push(
       { method: "GET", match: /\/api\/characters\/char-1\/memories$/, handler: () => json({ memories }) },
-      { method: "PATCH", match: /\/api\/memories\/mem-1$/, handler: (body) => { memories = [{ ...memories[0]!, ...(body as object) }]; return json(memories[0]); } },
-      { method: "DELETE", match: /\/api\/memories\/mem-1$/, handler: () => { memories[0]!.forgottenAt = "now"; return json({ ok: true, forgottenAt: "now" }); } },
-      { method: "POST", match: /\/api\/memories\/mem-1\/restore$/, handler: () => { memories[0]!.forgottenAt = null; return json(memories[0]); } },
+      {
+        method: "PATCH",
+        match: /\/api\/memories\/mem-1$/,
+        handler: (body) => {
+          memories = [{ ...memories[0]!, ...(body as object) }];
+          return json(memories[0]);
+        },
+      },
+      {
+        method: "DELETE",
+        match: /\/api\/memories\/mem-1$/,
+        handler: () => {
+          memories[0]!.forgottenAt = "now";
+          return json({ ok: true, forgottenAt: "now" });
+        },
+      },
+      {
+        method: "POST",
+        match: /\/api\/memories\/mem-1\/restore$/,
+        handler: () => {
+          memories[0]!.forgottenAt = null;
+          return json(memories[0]);
+        },
+      },
     );
-    await openLibrary(); fireEvent.click(screen.getByRole("button", { name: "Memory" }));
-    await screen.findByRole("tab", { name: /pending 1/ }); fireEvent.click(screen.getByRole("tab", { name: /pending 1/ })); await screen.findByText("Likes stars"); fireEvent.click(screen.getByRole("button", { name: "Approve" }));
-    const activeTab = await screen.findByRole("tab", { name: /active 1/ }); fireEvent.click(activeTab); await screen.findByText("Likes stars"); fireEvent.click(screen.getByRole("button", { name: "Forget" }));
-    const forgottenTab = await screen.findByRole("tab", { name: /forgotten 1/ }); fireEvent.click(forgottenTab); await screen.findByText("Likes stars"); fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await openLibrary();
+    fireEvent.click(screen.getByRole("button", { name: "Memory" }));
+    await screen.findByRole("tab", { name: /pending 1/ });
+    fireEvent.click(screen.getByRole("tab", { name: /pending 1/ }));
+    await screen.findByText("Likes stars");
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    const activeTab = await screen.findByRole("tab", { name: /active 1/ });
+    fireEvent.click(activeTab);
+    await screen.findByText("Likes stars");
+    fireEvent.click(screen.getByRole("button", { name: "Forget" }));
+    const forgottenTab = await screen.findByRole("tab", { name: /forgotten 1/ });
+    fireEvent.click(forgottenTab);
+    await screen.findByText("Likes stars");
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
     await waitFor(() => expect(screen.getByRole("tab", { name: /forgotten 0/ })).toBeTruthy());
   });
 
   it("creates lore scoped to many characters and supports global scope", async () => {
-    installFetch(); let lorePayload: Record<string, unknown> | null = null;
+    installFetch();
+    let lorePayload: Record<string, unknown> | null = null;
     routes.push(
       { method: "GET", match: /\/api\/lore$/, handler: () => json({ lore: [] }) },
-      { method: "POST", match: /\/api\/lore$/, handler: (body) => { lorePayload = body as Record<string, unknown>; return json({ id: "l1", createdAt: "", ...(body as object), characterId: aria.id }, 201); } },
+      {
+        method: "POST",
+        match: /\/api\/lore$/,
+        handler: (body) => {
+          lorePayload = body as Record<string, unknown>;
+          return json({ id: "l1", createdAt: "", ...(body as object), characterId: aria.id }, 201);
+        },
+      },
     );
-    await openLibrary(); fireEvent.click(screen.getByRole("button", { name: "World lore" })); await screen.findByRole("heading", { name: "Lore library" });
-    const scopeChecks = screen.getAllByRole("checkbox"); fireEvent.click(scopeChecks[2]!); fireEvent.click(scopeChecks[3]!);
-    fireEvent.change(screen.getByPlaceholderText("moon gate, old harbor"), { target: { value: "harbor, moon" } }); fireEvent.change(screen.getByPlaceholderText(/World details/), { target: { value: "The harbor closes at midnight." } }); fireEvent.click(screen.getByRole("button", { name: "Add lore" }));
-    await waitFor(() => expect(lorePayload).toMatchObject({ characterIds: [aria.id, rowan.id], keys: ["harbor", "moon"], content: "The harbor closes at midnight." }));
+    await openLibrary();
+    fireEvent.click(screen.getByRole("button", { name: "World lore" }));
+    await screen.findByRole("heading", { name: "Lore library" });
+    const scopeChecks = screen.getAllByRole("checkbox");
+    fireEvent.click(scopeChecks[2]!);
+    fireEvent.click(scopeChecks[3]!);
+    fireEvent.change(screen.getByPlaceholderText("moon gate, old harbor"), { target: { value: "harbor, moon" } });
+    fireEvent.change(screen.getByPlaceholderText(/World details/), {
+      target: { value: "The harbor closes at midnight." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add lore" }));
+    await waitFor(() =>
+      expect(lorePayload).toMatchObject({
+        characterIds: [aria.id, rowan.id],
+        keys: ["harbor", "moon"],
+        content: "The harbor closes at midnight.",
+      }),
+    );
   });
 });
 
@@ -1708,65 +3960,272 @@ describe("character builder and advancement safety flows", () => {
   const at = "2030-01-01T00:00:00.000Z";
   const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
   const ref = (kind: string, id: string) => ({ kind, packId: "pack", packVersion: "1", definitionId: id });
-  const derived = { maxHp: 10, defenses: { guard: 11, evasion: 12, will: 13 }, initiative: 2, speed: 30, carryingLimit: 150, spellAttack: 3, saveDc: 11,
-    explanations: ["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"].map((statistic) => ({ statistic, formula: "server formula", inputs: {}, result: 10 })) };
-  function draft(id = "draft-one", complete = false) { return { id, campaignId: "campaign", personaId: "persona", status: "active", durability: "durable", expiresAt: null, effectivelyExpired: false, revision: 1, rulesProfileId: "rules", rulesetId: "velvet-starter-v1", rulesetVersion: "1.0.0",
-    pins: [{ packId: "pack", packVersion: "1", publicationDigest: "a".repeat(64) }], allocation: { method: "standard-array", scores },
-    selections: complete ? { race: ref("race", "race"), background: ref("background", "background"), class: ref("class", "class"), starterGrant: "kit" } : { race: null, background: null, class: null, starterGrant: null },
-    choiceGroups: [{ id: "race", required: true, options: [{ reference: ref("race", "race"), name: `Race ${id}`, description: "Server race." }] }, { id: "background", required: true, options: [{ reference: ref("background", "background"), name: "Guide", description: "Server background." }] }, { id: "class", required: true, options: [{ reference: ref("class", "class"), name: "Warden", description: "Server class." }] }, { id: "starter-grant", required: true, options: ["kit", "currency"] }],
-    completion: complete ? { complete: true, issues: [] } : { complete: false, issues: [{ code: "missing-race", path: "selections.race", message: "Choose a race" }] }, derivedPreview: complete ? derived : null,
-    startingGrants: complete ? [{ kind: "item", reference: ref("item", "bedroll"), quantity: 1, source: "background-kit" }] : [], createdAt: at, updatedAt: at }; }
-  const sheet = { sheet: { name: "Persona", race: { name: "Race", description: "Race." }, background: { name: "Guide", description: "Guide." }, classes: [{ name: "Warden", description: "Warden.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] }, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: at } };
+  const derived = {
+    maxHp: 10,
+    defenses: { guard: 11, evasion: 12, will: 13 },
+    initiative: 2,
+    speed: 30,
+    carryingLimit: 150,
+    spellAttack: 3,
+    saveDc: 11,
+    explanations: [
+      "max-hp",
+      "defense-guard",
+      "defense-evasion",
+      "defense-will",
+      "initiative",
+      "speed",
+      "carrying-limit",
+      "spell-attack",
+      "save-dc",
+    ].map((statistic) => ({ statistic, formula: "server formula", inputs: {}, result: 10 })),
+  };
+  function draft(id = "draft-one", complete = false) {
+    return {
+      id,
+      campaignId: "campaign",
+      personaId: "persona",
+      status: "active",
+      durability: "durable",
+      expiresAt: null,
+      effectivelyExpired: false,
+      revision: 1,
+      rulesProfileId: "rules",
+      rulesetId: "velvet-starter-v1",
+      rulesetVersion: "1.0.0",
+      pins: [{ packId: "pack", packVersion: "1", publicationDigest: "a".repeat(64) }],
+      allocation: { method: "standard-array", scores },
+      selections: complete
+        ? {
+            race: ref("race", "race"),
+            background: ref("background", "background"),
+            class: ref("class", "class"),
+            starterGrant: "kit",
+          }
+        : { race: null, background: null, class: null, starterGrant: null },
+      choiceGroups: [
+        {
+          id: "race",
+          required: true,
+          options: [{ reference: ref("race", "race"), name: `Race ${id}`, description: "Server race." }],
+        },
+        {
+          id: "background",
+          required: true,
+          options: [{ reference: ref("background", "background"), name: "Guide", description: "Server background." }],
+        },
+        {
+          id: "class",
+          required: true,
+          options: [{ reference: ref("class", "class"), name: "Warden", description: "Server class." }],
+        },
+        { id: "starter-grant", required: true, options: ["kit", "currency"] },
+      ],
+      completion: complete
+        ? { complete: true, issues: [] }
+        : { complete: false, issues: [{ code: "missing-race", path: "selections.race", message: "Choose a race" }] },
+      derivedPreview: complete ? derived : null,
+      startingGrants: complete
+        ? [{ kind: "item", reference: ref("item", "bedroll"), quantity: 1, source: "background-kit" }]
+        : [],
+      createdAt: at,
+      updatedAt: at,
+    };
+  }
+  const sheet = {
+    sheet: {
+      name: "Persona",
+      race: { name: "Race", description: "Race." },
+      background: { name: "Guide", description: "Guide." },
+      classes: [{ name: "Warden", description: "Warden.", level: 1 }],
+      attributes: [],
+      proficiencies: [],
+      choices: [],
+      resources: [],
+    },
+    derived,
+    progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: at },
+  };
 
-  beforeEach(() => { resetCharacterBuilderPageModuleStateForTests(); resetLevelUpWizardModuleStateForTests(); localStorage.removeItem("velvet.character-builder.ambiguous-creates.v1"); });
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, "", "/"); });
+  beforeEach(() => {
+    resetCharacterBuilderPageModuleStateForTests();
+    resetLevelUpWizardModuleStateForTests();
+    localStorage.removeItem("velvet.character-builder.ambiguous-creates.v1");
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
+  });
 
   it("ignores an out-of-order draft load from the prior route identity", async () => {
-    const first = deferred<any>(); const second = deferred<any>();
-    const api = { create: vi.fn(), get: vi.fn((_: string, id: string) => id === "draft-one" ? first.promise : second.promise), update: vi.fn(), finalize: vi.fn(), getSheet: vi.fn() } as any;
-    const base = { campaignId: "campaign", personas: [{ id: "persona", name: "Persona" }], api, onBack: vi.fn(), onUnavailable: vi.fn(), onEditPersona: vi.fn(), onOpenCharacter: vi.fn() };
+    const first = deferred<any>();
+    const second = deferred<any>();
+    const api = {
+      create: vi.fn(),
+      get: vi.fn((_: string, id: string) => (id === "draft-one" ? first.promise : second.promise)),
+      update: vi.fn(),
+      finalize: vi.fn(),
+      getSheet: vi.fn(),
+    } as any;
+    const base = {
+      campaignId: "campaign",
+      personas: [{ id: "persona", name: "Persona" }],
+      api,
+      onBack: vi.fn(),
+      onUnavailable: vi.fn(),
+      onEditPersona: vi.fn(),
+      onOpenCharacter: vi.fn(),
+    };
     const view = render(<CharacterBuilderPage {...base} initialDraftId="draft-one" />);
     view.rerender(<CharacterBuilderPage {...base} initialDraftId="draft-two" />);
-    await act(async () => { second.resolve(draft("draft-two")); });
+    await act(async () => {
+      second.resolve(draft("draft-two"));
+    });
     expect(await screen.findByText("Race draft-two")).toBeTruthy();
-    await act(async () => { first.resolve(draft("draft-one")); });
+    await act(async () => {
+      first.resolve(draft("draft-one"));
+    });
     expect(screen.queryByText("Race draft-one")).toBeNull();
   });
 
   it("shows the selected class prepared-spell group and autosaves its multi-select patch", async () => {
-    const bless = ref("spell", "bless"); const cureWounds = ref("spell", "cure-wounds");
-    const cleric = { ...draft(), selections: { race: ref("race", "race"), background: ref("background", "background"), class: ref("class", "cleric"), starterGrant: "kit", preparedSpells: [] },
-      choiceGroups: [...draft().choiceGroups, { id: "prepared-spells", required: true, options: [{ reference: bless, name: "Bless", description: "A blessing." }, { reference: cureWounds, name: "Cure Wounds", description: "Healing." }] }],
-      completion: { complete: false, issues: [{ code: "missing-prepared-spells", path: "selections.preparedSpells", message: "Select each exact prepared spell" }] } };
-    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(cleric), update: vi.fn().mockResolvedValue({ draft: cleric, receipt: {} }), finalize: vi.fn(), getSheet: vi.fn() } as any;
-    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
+    const bless = ref("spell", "bless");
+    const cureWounds = ref("spell", "cure-wounds");
+    const cleric = {
+      ...draft(),
+      selections: {
+        race: ref("race", "race"),
+        background: ref("background", "background"),
+        class: ref("class", "cleric"),
+        starterGrant: "kit",
+        preparedSpells: [],
+      },
+      choiceGroups: [
+        ...draft().choiceGroups,
+        {
+          id: "prepared-spells",
+          required: true,
+          options: [
+            { reference: bless, name: "Bless", description: "A blessing." },
+            { reference: cureWounds, name: "Cure Wounds", description: "Healing." },
+          ],
+        },
+      ],
+      completion: {
+        complete: false,
+        issues: [
+          {
+            code: "missing-prepared-spells",
+            path: "selections.preparedSpells",
+            message: "Select each exact prepared spell",
+          },
+        ],
+      },
+    };
+    const api = {
+      create: vi.fn(),
+      get: vi.fn().mockResolvedValue(cleric),
+      update: vi.fn().mockResolvedValue({ draft: cleric, receipt: {} }),
+      finalize: vi.fn(),
+      getSheet: vi.fn(),
+    } as any;
+    render(
+      <CharacterBuilderPage
+        campaignId="campaign"
+        personas={[{ id: "persona", name: "Persona" }]}
+        initialDraftId="draft-one"
+        api={api}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onEditPersona={vi.fn()}
+        onOpenCharacter={vi.fn()}
+      />,
+    );
     fireEvent.click(await screen.findByRole("checkbox", { name: /Bless/ }));
-    await waitFor(() => expect(api.update).toHaveBeenCalledWith("campaign", "draft-one", expect.objectContaining({ selections: { preparedSpells: [bless] } })));
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith(
+        "campaign",
+        "draft-one",
+        expect.objectContaining({ selections: { preparedSpells: [bless] } }),
+      ),
+    );
   });
 
   it("restores only the active campaign draft and clears it on explicit new-builder reopen", async () => {
-    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftIds: { "campaign-one": "draft-one", "campaign-two": "draft-two" } }));
+    localStorage.setItem(
+      "velvet.navigation.v1",
+      JSON.stringify({
+        view: "campaign-character-builder",
+        campaignId: "campaign-one",
+        characterDraftIds: { "campaign-one": "draft-one", "campaign-two": "draft-two" },
+      }),
+    );
     installFetch([aria], [], true, true);
     routes.push(
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-drafts\/draft-one$/, handler: () => json({ ...draft(), campaignId: "campaign-one", personaId: aria.id }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-drafts\/draft-one$/,
+        handler: () => json({ ...draft(), campaignId: "campaign-one", personaId: aria.id }),
+      },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,
+        handler: () => json({ characters: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,
+        handler: () => json({ characters: [], rolls: [] }),
+      },
+      {
+        method: "GET",
+        match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,
+        handler: () => json({ attached: [], eligible: [] }),
+      },
     );
-    render(<App />); expect(await screen.findByText("Race draft-one")).toBeTruthy();
+    render(<App />);
+    expect(await screen.findByText("Race draft-one")).toBeTruthy();
     expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes("draft-two"))).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "← Back to campaign" }));
     fireEvent.click(await screen.findByRole("button", { name: "Build playable character" }));
     expect(await screen.findByRole("heading", { name: "Choose or create a persona" })).toBeTruthy();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").characterDraftIds).toEqual({ "campaign-two": "draft-two" }));
-    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).endsWith("/character-drafts/draft-one"))).toHaveLength(1);
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").characterDraftIds).toEqual({
+        "campaign-two": "draft-two",
+      }),
+    );
+    expect(
+      vi.mocked(fetch).mock.calls.filter(([input]) => String(input).endsWith("/character-drafts/draft-one")),
+    ).toHaveLength(1);
   });
 
   it.each(["finalized", "missing"] as const)("routes a %s restored draft to an explicit new draft", async (outcome) => {
     const clear = vi.fn();
-    const api = { create: vi.fn(), get: outcome === "finalized" ? vi.fn().mockResolvedValue({ ...draft(), status: "finalized" }) : vi.fn().mockRejectedValue(new ApiError(404, "masked")), update: vi.fn(), finalize: vi.fn(), getSheet: vi.fn() } as any;
-    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onDraftIdentity={clear} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
+    const api = {
+      create: vi.fn(),
+      get:
+        outcome === "finalized"
+          ? vi.fn().mockResolvedValue({ ...draft(), status: "finalized" })
+          : vi.fn().mockRejectedValue(new ApiError(404, "masked")),
+      update: vi.fn(),
+      finalize: vi.fn(),
+      getSheet: vi.fn(),
+    } as any;
+    render(
+      <CharacterBuilderPage
+        campaignId="campaign"
+        personas={[{ id: "persona", name: "Persona" }]}
+        initialDraftId="draft-one"
+        api={api}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onDraftIdentity={clear}
+        onEditPersona={vi.fn()}
+        onOpenCharacter={vi.fn()}
+      />,
+    );
     if (outcome === "finalized") fireEvent.click(await screen.findByRole("button", { name: "Start a new draft" }));
     else {
       await screen.findByText(/saved draft is no longer available/i);
@@ -1774,89 +4233,306 @@ describe("character builder and advancement safety flows", () => {
     }
     expect(await screen.findByRole("heading", { name: "Choose or create a persona" })).toBeTruthy();
     expect(api.create).not.toHaveBeenCalled();
-    expect(clear).toHaveBeenCalledWith(null); expect(api.finalize).not.toHaveBeenCalled();
+    expect(clear).toHaveBeenCalledWith(null);
+    expect(api.finalize).not.toHaveBeenCalled();
   });
 
   it("shows exact grants before confirmation, finalizes once, and refreshes the sheet", async () => {
-    const final = { character: { id: "character", createdAt: at, updatedAt: at }, sheet: { id: "sheet", race: ref("race", "race"), background: ref("background", "background"), classes: [{ class: ref("class", "class"), level: 1 }], attributes: [], proficiencies: [], choices: [], createdAt: at, updatedAt: at }, resources: [{ name: "health", current: 10, max: 10 }], receipt: { idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at, derived, startingGrants: [] } };
-    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(draft("draft-one", true)), update: vi.fn(), finalize: vi.fn().mockResolvedValue(final), getSheet: vi.fn().mockResolvedValue(sheet) } as any;
-    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
+    const final = {
+      character: { id: "character", createdAt: at, updatedAt: at },
+      sheet: {
+        id: "sheet",
+        race: ref("race", "race"),
+        background: ref("background", "background"),
+        classes: [{ class: ref("class", "class"), level: 1 }],
+        attributes: [],
+        proficiencies: [],
+        choices: [],
+        createdAt: at,
+        updatedAt: at,
+      },
+      resources: [{ name: "health", current: 10, max: 10 }],
+      receipt: {
+        idempotencyKey: "final-key",
+        revisionBefore: 1,
+        revisionAfter: 2,
+        occurredAt: at,
+        derived,
+        startingGrants: [],
+      },
+    };
+    const api = {
+      create: vi.fn(),
+      get: vi.fn().mockResolvedValue(draft("draft-one", true)),
+      update: vi.fn(),
+      finalize: vi.fn().mockResolvedValue(final),
+      getSheet: vi.fn().mockResolvedValue(sheet),
+    } as any;
+    render(
+      <CharacterBuilderPage
+        campaignId="campaign"
+        personas={[{ id: "persona", name: "Persona" }]}
+        initialDraftId="draft-one"
+        api={api}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onEditPersona={vi.fn()}
+        onOpenCharacter={vi.fn()}
+      />,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Next: Review" }));
     expect(await screen.findByText(/1 × item/)).toBeTruthy();
     expect(api.finalize).not.toHaveBeenCalled();
-    const finalize = screen.getByRole("button", { name: "Finalize playable character once" }); expect((finalize as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole("checkbox")); await waitFor(() => expect((finalize as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(finalize);
+    const finalize = screen.getByRole("button", { name: "Finalize playable character once" });
+    expect((finalize as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox"));
+    await waitFor(() => expect((finalize as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(finalize);
     expect(await screen.findByText(/Finalization receipt confirmed/)).toBeTruthy();
-    expect(api.finalize).toHaveBeenCalledTimes(1); expect(api.getSheet).toHaveBeenCalledWith("campaign", "character");
+    expect(api.finalize).toHaveBeenCalledTimes(1);
+    expect(api.getSheet).toHaveBeenCalledWith("campaign", "character");
   });
 
   it("preserves the public finalization receipt when only the sheet refresh fails", async () => {
-    const final = { character: { id: "created-character", createdAt: at, updatedAt: at }, sheet: { id: "sheet", race: ref("race", "race"), background: ref("background", "background"), classes: [{ class: ref("class", "class"), level: 1 }], attributes: [], proficiencies: [], choices: [], createdAt: at, updatedAt: at }, resources: [{ name: "health", current: 10, max: 10 }], receipt: { idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at, derived, startingGrants: [] } };
-    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(draft("draft-one", true)), update: vi.fn(), finalize: vi.fn().mockResolvedValue(final), getSheet: vi.fn().mockRejectedValueOnce(new TypeError("offline")).mockResolvedValueOnce(sheet) } as any;
-    const open = vi.fn(); const clearDraft = vi.fn();
-    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onDraftIdentity={clearDraft} onEditPersona={vi.fn()} onOpenCharacter={open} />);
+    const final = {
+      character: { id: "created-character", createdAt: at, updatedAt: at },
+      sheet: {
+        id: "sheet",
+        race: ref("race", "race"),
+        background: ref("background", "background"),
+        classes: [{ class: ref("class", "class"), level: 1 }],
+        attributes: [],
+        proficiencies: [],
+        choices: [],
+        createdAt: at,
+        updatedAt: at,
+      },
+      resources: [{ name: "health", current: 10, max: 10 }],
+      receipt: {
+        idempotencyKey: "final-key",
+        revisionBefore: 1,
+        revisionAfter: 2,
+        occurredAt: at,
+        derived,
+        startingGrants: [],
+      },
+    };
+    const api = {
+      create: vi.fn(),
+      get: vi.fn().mockResolvedValue(draft("draft-one", true)),
+      update: vi.fn(),
+      finalize: vi.fn().mockResolvedValue(final),
+      getSheet: vi.fn().mockRejectedValueOnce(new TypeError("offline")).mockResolvedValueOnce(sheet),
+    } as any;
+    const open = vi.fn();
+    const clearDraft = vi.fn();
+    render(
+      <CharacterBuilderPage
+        campaignId="campaign"
+        personas={[{ id: "persona", name: "Persona" }]}
+        initialDraftId="draft-one"
+        api={api}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onDraftIdentity={clearDraft}
+        onEditPersona={vi.fn()}
+        onOpenCharacter={open}
+      />,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Next: Review" }));
     expect(api.finalize).not.toHaveBeenCalled();
-    await screen.findByText(/1 × item/); fireEvent.click(screen.getByRole("checkbox")); fireEvent.click(await screen.findByRole("button", { name: "Finalize playable character once" }));
+    await screen.findByText(/1 × item/);
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(await screen.findByRole("button", { name: "Finalize playable character once" }));
     expect(await screen.findByText(/character was created and confirmed by receipt/)).toBeTruthy();
     expect(screen.getByText(/Created character/).textContent).toContain("created-character");
-    expect(api.finalize).toHaveBeenCalledTimes(1); expect(clearDraft).toHaveBeenCalledWith(null);
-    fireEvent.click(screen.getByRole("button", { name: "Open created character" })); expect(open).toHaveBeenCalledWith("created-character");
+    expect(api.finalize).toHaveBeenCalledTimes(1);
+    expect(clearDraft).toHaveBeenCalledWith(null);
+    fireEvent.click(screen.getByRole("button", { name: "Open created character" }));
+    expect(open).toHaveBeenCalledWith("created-character");
     fireEvent.click(screen.getByRole("button", { name: "Retry authoritative sheet GET" }));
-    await screen.findByText(/Authoritative character sheet refreshed/); expect(api.finalize).toHaveBeenCalledTimes(1); expect(api.getSheet).toHaveBeenCalledTimes(2);
+    await screen.findByText(/Authoritative character sheet refreshed/);
+    expect(api.finalize).toHaveBeenCalledTimes(1);
+    expect(api.getSheet).toHaveBeenCalledTimes(2);
   });
 
   it("persists an ambiguous create intent across a simulated document reload without replay", async () => {
-    const api = { create: vi.fn().mockRejectedValue(new TypeError("connection lost")), get: vi.fn(), update: vi.fn(), finalize: vi.fn(), getSheet: vi.fn() } as any;
-    const props = { campaignId: "campaign", personas: [{ id: "persona", name: "Persona" }], api, onBack: vi.fn(), onUnavailable: vi.fn(), onReviewCampaignRoster: vi.fn(), onEditPersona: vi.fn(), onOpenCharacter: vi.fn(), focusHeadingRequest: 9 };
+    const api = {
+      create: vi.fn().mockRejectedValue(new TypeError("connection lost")),
+      get: vi.fn(),
+      update: vi.fn(),
+      finalize: vi.fn(),
+      getSheet: vi.fn(),
+    } as any;
+    const props = {
+      campaignId: "campaign",
+      personas: [{ id: "persona", name: "Persona" }],
+      api,
+      onBack: vi.fn(),
+      onUnavailable: vi.fn(),
+      onReviewCampaignRoster: vi.fn(),
+      onEditPersona: vi.fn(),
+      onOpenCharacter: vi.fn(),
+      focusHeadingRequest: 9,
+    };
     render(<CharacterBuilderPage {...props} />);
-    const heading = screen.getByRole("heading", { name: "Character builder" }); await waitFor(() => expect(document.activeElement).toBe(heading));
+    const heading = screen.getByRole("heading", { name: "Character builder" });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     fireEvent.click(screen.getByRole("button", { name: "Next: Rules choices" }));
     expect(api.create).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Create draft with this allocation" }));
-    expect(await screen.findByText(/outcome is uncertain/)).toBeTruthy(); expect(api.create).toHaveBeenCalledTimes(1);
-    const marker = localStorage.getItem("velvet.character-builder.ambiguous-creates.v1"); expect(marker).toContain("idempotencyKey");
-    cleanup(); resetCharacterBuilderPageModuleStateForTests();
+    expect(await screen.findByText(/outcome is uncertain/)).toBeTruthy();
+    expect(api.create).toHaveBeenCalledTimes(1);
+    const marker = localStorage.getItem("velvet.character-builder.ambiguous-creates.v1");
+    expect(marker).toContain("idempotencyKey");
+    cleanup();
+    resetCharacterBuilderPageModuleStateForTests();
     render(<CharacterBuilderPage {...props} focusHeadingRequest={10} />);
     expect(await screen.findByRole("heading", { name: "Review unresolved draft creation" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next: Rules choices" }));
-    expect((screen.getByRole("button", { name: "Create draft with this allocation" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Create draft with this allocation" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Create draft with this allocation" }));
     expect(api.create).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Review authoritative campaign roster" })); expect(props.onReviewCampaignRoster).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole("checkbox")); fireEvent.click(screen.getByRole("button", { name: "Clear reviewed lock without replaying POST" }));
-    expect(localStorage.getItem("velvet.character-builder.ambiguous-creates.v1")).toBe("{}"); expect(api.create).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Review authoritative campaign roster" }));
+    expect(props.onReviewCampaignRoster).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Clear reviewed lock without replaying POST" }));
+    expect(localStorage.getItem("velvet.character-builder.ambiguous-creates.v1")).toBe("{}");
+    expect(api.create).toHaveBeenCalledTimes(1);
   });
 
   it("validates standard-array uniqueness and point-buy budget before create", async () => {
-    const onContinue = vi.fn(); render(<AttributeAllocator onContinue={onContinue} />);
-    const create = screen.getByRole("button", { name: "Create draft with this allocation" }); expect((create as HTMLButtonElement).disabled).toBe(false);
+    const onContinue = vi.fn();
+    render(<AttributeAllocator onContinue={onContinue} />);
+    const create = screen.getByRole("button", { name: "Create draft with this allocation" });
+    expect((create as HTMLButtonElement).disabled).toBe(false);
     fireEvent.change(screen.getByLabelText("Might score"), { target: { value: "14" } });
-    expect(await screen.findByText(/Assign each standard-array value exactly once/)).toBeTruthy(); expect((create as HTMLButtonElement).disabled).toBe(true); fireEvent.click(create); expect(onContinue).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Assign each standard-array value exactly once/)).toBeTruthy();
+    expect((create as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(create);
+    expect(onContinue).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("radio", { name: "Point Buy" }));
-    expect(await screen.findByText(/Point-buy budget: 25 \/ 27/)).toBeTruthy(); expect((create as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText("Might score"), { target: { value: "15" } }); fireEvent.click(create); expect(onContinue).toHaveBeenCalledWith({ method: "point-buy", scores });
+    expect(await screen.findByText(/Point-buy budget: 25 \/ 27/)).toBeTruthy();
+    expect((create as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Might score"), { target: { value: "15" } });
+    fireEvent.click(create);
+    expect(onContinue).toHaveBeenCalledWith({ method: "point-buy", scores });
   });
 
   it("shows persisted dice and rerolls a server-roll draft once", async () => {
-    const allocation = { method: "server-roll", algorithm: "velvet-4d6-drop-first-lowest-v1", scores, terms: ["might", "agility", "resolve", "insight", "presence", "craft"].map((attributeId) => ({ attributeId, dice: [6, 5, 4, 1], droppedIndex: 3, score: scores[attributeId as keyof typeof scores] })) };
+    const allocation = {
+      method: "server-roll",
+      algorithm: "velvet-4d6-drop-first-lowest-v1",
+      scores,
+      terms: ["might", "agility", "resolve", "insight", "presence", "craft"].map((attributeId) => ({
+        attributeId,
+        dice: [6, 5, 4, 1],
+        droppedIndex: 3,
+        score: scores[attributeId as keyof typeof scores],
+      })),
+    };
     const rolledDraft = { ...draft(), allocation };
-    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(rolledDraft), update: vi.fn(), reroll: vi.fn().mockResolvedValue({ draft: { ...rolledDraft, revision: 2 }, receipt: { revisionBefore: 1, revisionAfter: 2 } }), finalize: vi.fn(), getSheet: vi.fn() } as any;
-    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
+    const api = {
+      create: vi.fn(),
+      get: vi.fn().mockResolvedValue(rolledDraft),
+      update: vi.fn(),
+      reroll: vi.fn().mockResolvedValue({
+        draft: { ...rolledDraft, revision: 2 },
+        receipt: { revisionBefore: 1, revisionAfter: 2 },
+      }),
+      finalize: vi.fn(),
+      getSheet: vi.fn(),
+    } as any;
+    render(
+      <CharacterBuilderPage
+        campaignId="campaign"
+        personas={[{ id: "persona", name: "Persona" }]}
+        initialDraftId="draft-one"
+        api={api}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onEditPersona={vi.fn()}
+        onOpenCharacter={vi.fn()}
+      />,
+    );
     const reroll = await screen.findByRole("button", { name: "Reroll all stats" });
-    fireEvent.click(screen.getByText("Show auditable dice")); expect(screen.getByText("might", { selector: "strong" })).toBeTruthy();
-    fireEvent.click(reroll); expect(await screen.findByText(/New roll saved at revision 2/)).toBeTruthy();
+    fireEvent.click(screen.getByText("Show auditable dice"));
+    expect(screen.getByText("might", { selector: "strong" })).toBeTruthy();
+    fireEvent.click(reroll);
+    expect(await screen.findByText(/New roll saved at revision 2/)).toBeTruthy();
     expect(api.reroll).toHaveBeenCalledTimes(1);
   });
 
   it("renders every crossed level and leaves the reviewed preview after one rejected apply", async () => {
     const ability = ref("ability", "moon-step");
-    const state = { campaignId: "campaign", campaignCharacterId: "character", profile: { profileId: "profile", rulesProfileId: "rules", mode: "xp", maxLevel: 3, thresholds: [{ level: 1, xp: 0 }, { level: 2, xp: 10 }, { level: 3, xp: 30 }] }, classRef: ref("class", "warden"), level: 1, totalXp: 30, milestoneCount: 0, revision: 4, pendingChoices: [], knownAbilities: [], knownSpells: [], derived, updatedAt: at };
-    const level = (value: number) => ({ level: value, hp: { maxBefore: 10, maxAfter: 15, currentBefore: 8, currentAfter: 13, gain: 5 }, proficiency: { before: 2, after: value === 3 ? 3 : 2 }, resources: [], fixedAbilities: [], selectedAbilities: [ability], spells: [], derivedBefore: derived, derivedAfter: { ...derived, maxHp: 15 } });
-    const preview = { campaignId: "campaign", campaignCharacterId: "character", previewRevision: 4, previewToken: "b".repeat(64), mode: "xp", currentLevel: 1, eligibleLevel: 3, totalXp: 30, milestoneCount: 0, pendingChoices: [{ level: 2, choiceId: "choice", kind: "ability", required: true, options: [ability, ref("ability", "sun-step")] }], levels: [level(2), level(3)] };
-    const api = { getProgression: vi.fn().mockResolvedValue(state), getSheet: vi.fn().mockResolvedValue(sheet), preview: vi.fn().mockResolvedValue(preview), apply: vi.fn().mockRejectedValue(new ApiError(409, "rejected")) } as any;
+    const state = {
+      campaignId: "campaign",
+      campaignCharacterId: "character",
+      profile: {
+        profileId: "profile",
+        rulesProfileId: "rules",
+        mode: "xp",
+        maxLevel: 3,
+        thresholds: [
+          { level: 1, xp: 0 },
+          { level: 2, xp: 10 },
+          { level: 3, xp: 30 },
+        ],
+      },
+      classRef: ref("class", "warden"),
+      level: 1,
+      totalXp: 30,
+      milestoneCount: 0,
+      revision: 4,
+      pendingChoices: [],
+      knownAbilities: [],
+      knownSpells: [],
+      derived,
+      updatedAt: at,
+    };
+    const level = (value: number) => ({
+      level: value,
+      hp: { maxBefore: 10, maxAfter: 15, currentBefore: 8, currentAfter: 13, gain: 5 },
+      proficiency: { before: 2, after: value === 3 ? 3 : 2 },
+      resources: [],
+      fixedAbilities: [],
+      selectedAbilities: [ability],
+      spells: [],
+      derivedBefore: derived,
+      derivedAfter: { ...derived, maxHp: 15 },
+    });
+    const preview = {
+      campaignId: "campaign",
+      campaignCharacterId: "character",
+      previewRevision: 4,
+      previewToken: "b".repeat(64),
+      mode: "xp",
+      currentLevel: 1,
+      eligibleLevel: 3,
+      totalXp: 30,
+      milestoneCount: 0,
+      pendingChoices: [
+        {
+          level: 2,
+          choiceId: "choice",
+          kind: "ability",
+          required: true,
+          options: [ability, ref("ability", "sun-step")],
+        },
+      ],
+      levels: [level(2), level(3)],
+    };
+    const api = {
+      getProgression: vi.fn().mockResolvedValue(state),
+      getSheet: vi.fn().mockResolvedValue(sheet),
+      preview: vi.fn().mockResolvedValue(preview),
+      apply: vi.fn().mockRejectedValue(new ApiError(409, "rejected")),
+    } as any;
     render(<LevelUpWizard campaignId="campaign" campaignCharacterId="character" api={api} />);
-    expect(await screen.findByRole("heading", { name: "Level 2" })).toBeTruthy(); expect(screen.getByRole("heading", { name: "Level 3" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Level 2" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Level 3" })).toBeTruthy();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "pack:1:moon-step" } });
     expect(screen.queryByRole("button", { name: "Apply reviewed levels once" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Level 3" })).toBeNull();
@@ -1864,12 +4540,21 @@ describe("character builder and advancement safety flows", () => {
     await screen.findByText("Exact advancement changes are ready for review.");
     fireEvent.click(screen.getByRole("button", { name: "Apply reviewed levels once" }));
     expect(await screen.findByText(/reviewed preview and sheet remain unchanged/)).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Level 3" })).toBeTruthy(); expect(api.apply).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { name: "Level 3" })).toBeTruthy();
+    expect(api.apply).toHaveBeenCalledTimes(1);
   });
 
   it("treats progression role absence as unavailable without exposing server detail", async () => {
-    const unavailable = vi.fn(); const api = { getProgression: vi.fn().mockRejectedValue(new ApiError(404, "private role")), getSheet: vi.fn().mockResolvedValue(sheet), preview: vi.fn(), apply: vi.fn() } as any;
-    render(<LevelUpWizard campaignId="campaign" campaignCharacterId="character" api={api} onUnavailable={unavailable} />);
+    const unavailable = vi.fn();
+    const api = {
+      getProgression: vi.fn().mockRejectedValue(new ApiError(404, "private role")),
+      getSheet: vi.fn().mockResolvedValue(sheet),
+      preview: vi.fn(),
+      apply: vi.fn(),
+    } as any;
+    render(
+      <LevelUpWizard campaignId="campaign" campaignCharacterId="character" api={api} onUnavailable={unavailable} />,
+    );
     await waitFor(() => expect(unavailable).toHaveBeenCalledOnce());
     expect(document.body.textContent).not.toContain("private role");
   });

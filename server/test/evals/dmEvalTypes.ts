@@ -1,11 +1,27 @@
 export const DM_EVAL_CATEGORIES = [
-  "injection-declaration", "injection-canon", "injection-history", "injection-tool-result", "injection-preference",
-  "abstention", "exact-tool-selection", "authorization", "confirmation", "hidden-data", "receipt-grounding",
-  "replay", "continuity", "temporal", "contradictory-recap", "npc-knowledge", "player-agency", "limits",
+  "injection-declaration",
+  "injection-canon",
+  "injection-history",
+  "injection-tool-result",
+  "injection-preference",
+  "abstention",
+  "exact-tool-selection",
+  "authorization",
+  "confirmation",
+  "hidden-data",
+  "receipt-grounding",
+  "replay",
+  "continuity",
+  "temporal",
+  "contradictory-recap",
+  "npc-knowledge",
+  "player-agency",
+  "limits",
 ] as const;
 
-export type DmEvalCategory = typeof DM_EVAL_CATEGORIES[number];
-export type DmOutcome = "completed" | "awaiting-confirmation" | "mechanics-committed" | "fallback" | "in-progress" | "refused";
+export type DmEvalCategory = (typeof DM_EVAL_CATEGORIES)[number];
+export type DmOutcome =
+  "completed" | "awaiting-confirmation" | "mechanics-committed" | "fallback" | "in-progress" | "refused";
 
 export interface DmToolCall {
   id: string;
@@ -71,9 +87,19 @@ export interface DmEvalCorpus {
 }
 
 export type DmGradeFailureCode =
-  | "outcome" | "tool-policy" | "tool-arguments" | "duplicate-tool-call" | "confirmation-bypass"
-  | "missing-fact" | "forbidden-fact" | "unreceipted-mechanic" | "hidden-data-leak" | "narration"
-  | "duplicate-mechanics" | "late-response" | "limit";
+  | "outcome"
+  | "tool-policy"
+  | "tool-arguments"
+  | "duplicate-tool-call"
+  | "confirmation-bypass"
+  | "missing-fact"
+  | "forbidden-fact"
+  | "unreceipted-mechanic"
+  | "hidden-data-leak"
+  | "narration"
+  | "duplicate-mechanics"
+  | "late-response"
+  | "limit";
 
 export interface DmGradeResult {
   passed: boolean;

@@ -29,7 +29,13 @@ async function createCharacter(app: ReturnType<typeof buildApp>, name: string): 
 
 async function createSession(
   app: ReturnType<typeof buildApp>,
-  payload: { characterId?: string; characterIds?: string[]; primaryCharacterId?: string; title?: string; presetId?: string },
+  payload: {
+    characterId?: string;
+    characterIds?: string[];
+    primaryCharacterId?: string;
+    title?: string;
+    presetId?: string;
+  },
 ): Promise<Session> {
   const response = await app.inject({ method: "POST", url: "/api/sessions", payload });
   expect(response.statusCode).toBe(201);
@@ -41,7 +47,11 @@ describe("session query api characterization", () => {
     const app = buildApp();
     await app.ready();
 
-    const exact = await app.inject({ method: "GET", url: "/api/sessions", headers: { "x-request-id": "session-list" } });
+    const exact = await app.inject({
+      method: "GET",
+      url: "/api/sessions",
+      headers: { "x-request-id": "session-list" },
+    });
     expect(exact.statusCode).toBe(200);
     expect(exact.headers["x-request-id"]).toBe("session-list");
     expect(exact.json()).toEqual({ sessions: [] });
@@ -72,17 +82,29 @@ describe("session query api characterization", () => {
     const stopped = stoppedResponse.json() as Session;
 
     expect(Object.keys(open)).toEqual([
-      "id", "characterId", "primaryCharacterId", "participants", "title", "state", "presetId",
-      "consentLog", "activeLeafId", "createdAt", "stoppedAt", "stopReason",
+      "id",
+      "characterId",
+      "primaryCharacterId",
+      "participants",
+      "title",
+      "state",
+      "presetId",
+      "consentLog",
+      "activeLeafId",
+      "createdAt",
+      "stoppedAt",
+      "stopReason",
     ]);
     expect(open.participants).toEqual([primary]);
-    expect(open.consentLog).toEqual([{
-      id: expect.any(String),
-      at: expect.any(String),
-      scope: "scene-created",
-      granted: true,
-      note: "Fictional adult character confirmed at creation.",
-    }]);
+    expect(open.consentLog).toEqual([
+      {
+        id: expect.any(String),
+        at: expect.any(String),
+        scope: "scene-created",
+        granted: true,
+        note: "Fictional adult character confirmed at creation.",
+      },
+    ]);
     expect(new Date(open.consentLog[0]!.at).toISOString()).toBe(open.consentLog[0]!.at);
     expect(open).toMatchObject({
       characterId: primary.id,
@@ -121,10 +143,18 @@ describe("session query api characterization", () => {
     const group = await createSession(app, { characterIds: [one.id, two.id], primaryCharacterId: one.id });
     const stopped = (await app.inject({ method: "POST", url: `/api/sessions/${group.id}/stop` })).json() as Session;
 
-    expect((await app.inject({ method: "GET", url: `/api/sessions?characterId=${two.id}` })).json()).toEqual({ sessions: [stopped] });
-    expect((await app.inject({ method: "GET", url: `/api/sessions?characterId=${one.id}` })).json()).toEqual({ sessions: [solo, stopped] });
-    expect((await app.inject({ method: "GET", url: "/api/sessions?characterId=unknown" })).json()).toEqual({ sessions: [] });
-    expect((await app.inject({ method: "GET", url: "/api/sessions?characterId=" })).json()).toEqual({ sessions: [solo, stopped] });
+    expect((await app.inject({ method: "GET", url: `/api/sessions?characterId=${two.id}` })).json()).toEqual({
+      sessions: [stopped],
+    });
+    expect((await app.inject({ method: "GET", url: `/api/sessions?characterId=${one.id}` })).json()).toEqual({
+      sessions: [solo, stopped],
+    });
+    expect((await app.inject({ method: "GET", url: "/api/sessions?characterId=unknown" })).json()).toEqual({
+      sessions: [],
+    });
+    expect((await app.inject({ method: "GET", url: "/api/sessions?characterId=" })).json()).toEqual({
+      sessions: [solo, stopped],
+    });
     await app.close();
   });
 
@@ -133,7 +163,11 @@ describe("session query api characterization", () => {
     const character = await createCharacter(app, "Quiet");
     const session = await createSession(app, { characterId: character.id });
 
-    const detail = await app.inject({ method: "GET", url: `/api/sessions/${session.id}`, headers: { "x-request-id": "session-detail" } });
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/sessions/${session.id}`,
+      headers: { "x-request-id": "session-detail" },
+    });
     expect(detail.statusCode).toBe(200);
     expect(detail.headers["x-request-id"]).toBe("session-detail");
     expect(detail.json()).toEqual({ session, messages: [] });
@@ -156,7 +190,11 @@ describe("session query api characterization", () => {
   it("exposes equal active messages with speaker, usage, and branch metadata", async () => {
     provider = await startFakeProvider("The navigator confirms the route.");
     const app = buildApp();
-    await app.inject({ method: "PUT", url: "/api/provider", payload: { baseUrl: provider.baseUrl, model: "query-test-model" } });
+    await app.inject({
+      method: "PUT",
+      url: "/api/provider",
+      payload: { baseUrl: provider.baseUrl, model: "query-test-model" },
+    });
     const character = await createCharacter(app, "Navigator");
     const session = await createSession(app, { characterId: character.id });
     const turn = await app.inject({
@@ -216,8 +254,12 @@ describe("session query api characterization", () => {
     const swipedMessages = swiped.json().messages as Message[];
     expect(swipedMessages).toHaveLength(2);
     expect(swipedMessages.map((message) => message.id)).not.toContain(activeMessages[1]!.id);
-    expect((await app.inject({ method: "GET", url: `/api/sessions/${session.id}` })).json().messages).toEqual(swipedMessages);
-    expect((await app.inject({ method: "GET", url: `/api/sessions/${session.id}/messages` })).json()).toEqual({ messages: swipedMessages });
+    expect((await app.inject({ method: "GET", url: `/api/sessions/${session.id}` })).json().messages).toEqual(
+      swipedMessages,
+    );
+    expect((await app.inject({ method: "GET", url: `/api/sessions/${session.id}/messages` })).json()).toEqual({
+      messages: swipedMessages,
+    });
     await app.close();
   });
 });

@@ -12,7 +12,8 @@ const HOSTILE = "I attack the nearest foe!";
 
 type Fixture = Awaited<ReturnType<typeof dmFixture>>;
 
-const openDb = (): DatabaseDriver.Database => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+const openDb = (): DatabaseDriver.Database =>
+  new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
 const countOf = (db: DatabaseDriver.Database, sql: string, ...params: unknown[]): number =>
   (db.prepare(sql).get(...params) as { n: number }).n;
 
@@ -35,13 +36,20 @@ function demoteLocalOwner(f: Fixture): void {
   const db = openDb();
   db.exec("BEGIN");
   try {
-    db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('encounter-nonowner','Encounter non-owner',0)").run();
-    db.prepare("UPDATE campaign_memberships SET role='player' WHERE campaign_id=? AND principal_id=?").run(f.campaign.id, OWNER);
+    db.prepare(
+      "INSERT INTO principals(id,display_name,is_local) VALUES('encounter-nonowner','Encounter non-owner',0)",
+    ).run();
+    db.prepare("UPDATE campaign_memberships SET role='player' WHERE campaign_id=? AND principal_id=?").run(
+      f.campaign.id,
+      OWNER,
+    );
     db.prepare("UPDATE campaigns SET owner_principal_id='encounter-nonowner' WHERE id=?").run(f.campaign.id);
-    db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,'owner','2036-01-01T00:00:00.000Z')")
-      .run(f.campaign.id, "encounter-nonowner");
-    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='encounter-nonowner' WHERE campaign_id=? AND actor_id=?")
-      .run(f.campaign.id, f.actorId);
+    db.prepare(
+      "INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,'owner','2036-01-01T00:00:00.000Z')",
+    ).run(f.campaign.id, "encounter-nonowner");
+    db.prepare(
+      "UPDATE campaign_actor_private_state SET controller_principal_id='encounter-nonowner' WHERE campaign_id=? AND actor_id=?",
+    ).run(f.campaign.id, f.actorId);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -55,7 +63,10 @@ const appFor = (f: Fixture) => buildApp({ campaignRepositoryFactory: () => f.rep
 const encounterUrl = (campaignId: string, sessionId: string, actorId: string) =>
   `/api/rpg/v1/campaigns/${campaignId}/rooms/${sessionId}/actors/${actorId}/freeform-encounter-commands`;
 const post = (url: string, payload: Record<string, unknown>) => ({
-  method: "POST" as const, url, headers: { "content-type": "application/json" }, payload,
+  method: "POST" as const,
+  url,
+  headers: { "content-type": "application/json" },
+  payload,
 });
 
 describe("freeform encounter HTTP command", () => {
@@ -64,10 +75,7 @@ describe("freeform encounter HTTP command", () => {
     const f = await dmFixture();
     const app = appFor(f);
 
-    const response = await app.inject(post(
-      encounterUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: HOSTILE },
-    ));
+    const response = await app.inject(post(encounterUrl(f.campaign.id, f.session.id, f.actorId), { text: HOSTILE }));
     expect(response.statusCode, response.body).toBe(200);
     const body = response.json();
     expect(body.classification).toMatchObject({ intent: "materialize-encounter" });
@@ -79,17 +87,28 @@ describe("freeform encounter HTTP command", () => {
     expect(body.materialization.startReceipt.idempotencyKey).toBeTruthy();
 
     const db = openDb();
-    expect(db.prepare("SELECT status,session_id FROM encounter WHERE encounter_id=?").get(body.materialization.encounterId))
-      .toEqual({ status: "active", session_id: f.session.id });
+    expect(
+      db.prepare("SELECT status,session_id FROM encounter WHERE encounter_id=?").get(body.materialization.encounterId),
+    ).toEqual({ status: "active", session_id: f.session.id });
     // The start command generated exactly one deterministic tactical map.
-    const map = db.prepare(`SELECT map_id,active,encounter_id FROM tactical_maps_v58
-      WHERE campaign_id=? AND session_id=? AND encounter_id=?`).get(f.campaign.id, f.session.id, body.materialization.encounterId) as
-      { map_id: string; active: number; encounter_id: string };
+    const map = db
+      .prepare(
+        `SELECT map_id,active,encounter_id FROM tactical_maps_v58
+      WHERE campaign_id=? AND session_id=? AND encounter_id=?`,
+      )
+      .get(f.campaign.id, f.session.id, body.materialization.encounterId) as {
+      map_id: string;
+      active: number;
+      encounter_id: string;
+    };
     expect(map.map_id).toBe(body.materialization.tacticalMapId);
     expect(map.active).toBe(1);
     for (const receipt of [body.materialization.createReceipt, body.materialization.startReceipt]) {
-      expect(db.prepare("SELECT 1 FROM combat_receipts_v27 WHERE encounter_id=? AND command_id=?")
-        .get(body.materialization.encounterId, receipt.commandId)).toBeTruthy();
+      expect(
+        db
+          .prepare("SELECT 1 FROM combat_receipts_v27 WHERE encounter_id=? AND command_id=?")
+          .get(body.materialization.encounterId, receipt.commandId),
+      ).toBeTruthy();
     }
     db.close();
     await app.close();
@@ -130,10 +149,7 @@ describe("freeform encounter HTTP command", () => {
     // authorization fails closed before any encounter is created.
     demoteLocalOwner(f);
 
-    const response = await app.inject(post(
-      encounterUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: HOSTILE },
-    ));
+    const response = await app.inject(post(encounterUrl(f.campaign.id, f.session.id, f.actorId), { text: HOSTILE }));
     expect(response.statusCode, response.body).toBe(404);
     expect(response.json()).toMatchObject({ code: "RPG_FREEFORM_ENCOUNTER_NOT_FOUND" });
 
@@ -148,10 +164,12 @@ describe("freeform encounter HTTP command", () => {
     const f = await dmFixture();
     const app = appFor(f);
 
-    const response = await app.inject(post(
-      encounterUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: HOSTILE, candidateId: "ffe-not-a-real-candidate" },
-    ));
+    const response = await app.inject(
+      post(encounterUrl(f.campaign.id, f.session.id, f.actorId), {
+        text: HOSTILE,
+        candidateId: "ffe-not-a-real-candidate",
+      }),
+    );
     expect(response.statusCode, response.body).toBe(409);
     expect(response.json()).toMatchObject({ code: "RPG_FREEFORM_ENCOUNTER_CONFLICT" });
 
@@ -188,8 +206,21 @@ describe("freeform encounter HTTP command", () => {
     const db = openDb();
     expect(countOf(db, "SELECT count(*) n FROM encounter WHERE campaign_id=?", f.campaign.id)).toBe(1);
     expect(countOf(db, "SELECT count(*) n FROM encounter_lifecycle_v31 WHERE campaign_id=?", f.campaign.id)).toBe(1);
-    expect(countOf(db, "SELECT count(*) n FROM tactical_maps_v58 WHERE campaign_id=? AND encounter_id=?", f.campaign.id, firstBody.materialization.encounterId)).toBe(1);
-    expect(countOf(db, "SELECT count(*) n FROM combat_receipts_v27 WHERE encounter_id=?", firstBody.materialization.encounterId)).toBe(2);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM tactical_maps_v58 WHERE campaign_id=? AND encounter_id=?",
+        f.campaign.id,
+        firstBody.materialization.encounterId,
+      ),
+    ).toBe(1);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM combat_receipts_v27 WHERE encounter_id=?",
+        firstBody.materialization.encounterId,
+      ),
+    ).toBe(2);
     db.close();
     await app.close();
   });
@@ -208,11 +239,21 @@ describe("freeform encounter HTTP command", () => {
     expect(blocked.json()).toMatchObject({ code: "RPG_FREEFORM_ENCOUNTER_CONFLICT" });
 
     // Cancel it through the encounter lifecycle route.
-    const cancelled = await app.inject(post(`/api/rpg/v1/encounters/${prepared.encounterId}/cancel-commands`,
-      { expectedRevision: prepared.revision, idempotencyKey: "cancel-blocking-prepare" }));
+    const cancelled = await app.inject(
+      post(`/api/rpg/v1/encounters/${prepared.encounterId}/cancel-commands`, {
+        expectedRevision: prepared.revision,
+        idempotencyKey: "cancel-blocking-prepare",
+      }),
+    );
     expect(cancelled.statusCode, cancelled.body).toBe(200);
-    expect(cancelled.json()).toMatchObject({ encounter: { encounterId: prepared.encounterId, status: "cancelled", combatId: null },
-      receipt: { idempotencyKey: "cancel-blocking-prepare", revisionBefore: prepared.revision, revisionAfter: prepared.revision + 1 } });
+    expect(cancelled.json()).toMatchObject({
+      encounter: { encounterId: prepared.encounterId, status: "cancelled", combatId: null },
+      receipt: {
+        idempotencyKey: "cancel-blocking-prepare",
+        revisionBefore: prepared.revision,
+        revisionAfter: prepared.revision + 1,
+      },
+    });
 
     // The freeform route now materializes instead of conflicting.
     const materialized = await app.inject(freeform);
@@ -221,8 +262,12 @@ describe("freeform encounter HTTP command", () => {
     expect(materialized.json().materialization.status).toBe("materialized");
 
     const db = openDb();
-    expect(countOf(db, "SELECT count(*) n FROM encounter WHERE campaign_id=? AND status='active'", f.campaign.id)).toBe(1);
-    expect(db.prepare("SELECT status FROM encounter WHERE encounter_id=?").get(prepared.encounterId)).toEqual({ status: "cancelled" });
+    expect(countOf(db, "SELECT count(*) n FROM encounter WHERE campaign_id=? AND status='active'", f.campaign.id)).toBe(
+      1,
+    );
+    expect(db.prepare("SELECT status FROM encounter WHERE encounter_id=?").get(prepared.encounterId)).toEqual({
+      status: "cancelled",
+    });
     db.close();
     await app.close();
   });

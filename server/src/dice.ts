@@ -57,15 +57,10 @@ export function parseDiceExpression(input: unknown): NormalizedDiceExpression {
  * completes before the first dependency call, and each result is accepted or
  * rejected immediately without clamping or retrying.
  */
-export function evaluateDiceExpression(
-  input: unknown,
-  rng: RandomNumberGenerator,
-): DiceRollResult {
+export function evaluateDiceExpression(input: unknown, rng: RandomNumberGenerator): DiceRollResult {
   const normalized = parseDiceExpression(input);
-  const physicalCount = normalized.selection.type === "advantage"
-    || normalized.selection.type === "disadvantage"
-    ? 2
-    : normalized.count;
+  const physicalCount =
+    normalized.selection.type === "advantage" || normalized.selection.type === "disadvantage" ? 2 : normalized.count;
   const values: number[] = [];
 
   for (let index = 0; index < physicalCount; index += 1) {
@@ -81,15 +76,11 @@ export function evaluateDiceExpression(
   if (selection.type === "all") {
     values.forEach((_, index) => keptIndexes.add(index));
   } else {
-    const keepCount = selection.type === "keep_highest" || selection.type === "keep_lowest"
-      ? selection.count
-      : 1;
+    const keepCount = selection.type === "keep_highest" || selection.type === "keep_lowest" ? selection.count : 1;
     const keepHigh = selection.type === "keep_highest" || selection.type === "advantage";
     const indexes = values.map((_, index) => index);
     indexes.sort((left, right) => {
-      const valueOrder = keepHigh
-        ? values[right]! - values[left]!
-        : values[left]! - values[right]!;
+      const valueOrder = keepHigh ? values[right]! - values[left]! : values[left]! - values[right]!;
       // Stable selection is explicit rather than relying on engine sort stability.
       return valueOrder === 0 ? left - right : valueOrder;
     });
@@ -97,10 +88,7 @@ export function evaluateDiceExpression(
   }
 
   const terms = values.map((value, index) => ({ value, kept: keptIndexes.has(index) }));
-  const total = terms.reduce(
-    (sum, term) => sum + (term.kept ? term.value : 0),
-    normalized.modifier,
-  );
+  const total = terms.reduce((sum, term) => sum + (term.kept ? term.value : 0), normalized.modifier);
 
   return diceRollResultSchema.parse({
     expression: input as string, // parseDiceExpression proved the exact source type and grammar.

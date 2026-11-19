@@ -45,22 +45,30 @@ function seed() {
     db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(id, id);
   }
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
       VALUES (?, 'Reads', 'timeline-reads', 'local-owner', ?, ?),
-             ('other-campaign', 'Other', 'other-timeline', 'local-owner', ?, ?)`).run(campaignId, AT, AT, AT, AT);
-    db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at)
-      VALUES ('timeline-reads', ?, ?), ('other-timeline', 'other-campaign', ?)`).run(campaignId, AT, AT);
+             ('other-campaign', 'Other', 'other-timeline', 'local-owner', ?, ?)`,
+    ).run(campaignId, AT, AT, AT, AT);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id, campaign_id, created_at)
+      VALUES ('timeline-reads', ?, ?), ('other-timeline', 'other-campaign', ?)`,
+    ).run(campaignId, AT, AT);
     for (const [id, role] of [
-      ["local-owner", "owner"], ["gm", "gm"], ["player-one", "player"],
-      ["player-two", "player"], ["observer", "observer"],
+      ["local-owner", "owner"],
+      ["gm", "gm"],
+      ["player-one", "player"],
+      ["player-two", "player"],
+      ["observer", "observer"],
     ] as const) {
       db.prepare("INSERT INTO campaign_memberships VALUES (?, ?, ?, ?)").run(campaignId, id, role, AT);
     }
     db.prepare("INSERT INTO campaign_memberships VALUES ('other-campaign', 'local-owner', 'owner', ?)").run(AT);
   })();
-  db.prepare("INSERT INTO characters VALUES ('persona-a', 'A', 20, 'hero', '', 1, 0, ?), ('persona-b', 'B', 20, 'hero', '', 1, 0, ?)")
-    .run(AT, AT);
+  db.prepare(
+    "INSERT INTO characters VALUES ('persona-a', 'A', 20, 'hero', '', 1, 0, ?), ('persona-b', 'B', 20, 'hero', '', 1, 0, ?)",
+  ).run(AT, AT);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Description', '[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core', '1', 'profile', 'Core', 'Description', '[]', 0)").run();
   const definition = db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', ?, ?, ?, 'Description', '[]')");
@@ -101,7 +109,8 @@ describe("role-sensitive campaign-character queries", () => {
     expect(repository.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     expect(repository.getCampaignCharacterRoster("app-owner", campaignId)).toBeNull();
     expect(repository.getCampaignCharacterRoster("local-owner", "other-campaign")).toEqual({
-      campaignId: "other-campaign", characters: [],
+      campaignId: "other-campaign",
+      characters: [],
     });
     expect(JSON.stringify(expected)).not.toMatch(/controller|private|sheet|actor/i);
     repository.close();
@@ -123,17 +132,35 @@ describe("role-sensitive campaign-character queries", () => {
   });
 
   it.each([
-    ["class", "INSERT INTO rpg_character_classes VALUES ('campaign-reads', 'missing-sheet', 0, 'core', '1', 'class', 'fighter', 1)"],
+    [
+      "class",
+      "INSERT INTO rpg_character_classes VALUES ('campaign-reads', 'missing-sheet', 0, 'core', '1', 'class', 'fighter', 1)",
+    ],
     ["attribute", "INSERT INTO rpg_character_attributes VALUES ('campaign-reads', 'missing-sheet', 0, 'strength', 10)"],
-    ["proficiency", "INSERT INTO rpg_character_proficiencies VALUES ('campaign-reads', 'missing-sheet', 0, 'skill', 'survival')"],
-    ["choice", "INSERT INTO rpg_character_choices VALUES ('campaign-reads', 'missing-sheet', 0, 'choice', 'core', '1', 'class', 'fighter')"],
-    ["private state", "INSERT INTO campaign_actor_private_state VALUES ('missing-actor', 'campaign-reads', 'player-one', 'orphan secret')"],
-    ["sheet", `INSERT INTO rpg_campaign_sheets VALUES
+    [
+      "proficiency",
+      "INSERT INTO rpg_character_proficiencies VALUES ('campaign-reads', 'missing-sheet', 0, 'skill', 'survival')",
+    ],
+    [
+      "choice",
+      "INSERT INTO rpg_character_choices VALUES ('campaign-reads', 'missing-sheet', 0, 'choice', 'core', '1', 'class', 'fighter')",
+    ],
+    [
+      "private state",
+      "INSERT INTO campaign_actor_private_state VALUES ('missing-actor', 'campaign-reads', 'player-one', 'orphan secret')",
+    ],
+    [
+      "sheet",
+      `INSERT INTO rpg_campaign_sheets VALUES
       ('orphan-sheet', 'campaign-reads', 'missing-character', 'core', '1', 'race', 'human',
-       'core', '1', 'background', 'sage', '${AT}', '${AT}')`],
-    ["actor", `INSERT INTO campaign_actors VALUES
+       'core', '1', 'background', 'sage', '${AT}', '${AT}')`,
+    ],
+    [
+      "actor",
+      `INSERT INTO campaign_actors VALUES
       ('orphan-actor', 'campaign-reads', 'missing-character', 'missing-sheet',
-       'player-character', 'principal', '${AT}', '${AT}')`],
+       'player-character', 'principal', '${AT}', '${AT}')`,
+    ],
   ])("loudly rejects an authorized empty roster with an attributable orphan %s", (_kind, insertSql) => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
@@ -150,8 +177,9 @@ describe("role-sensitive campaign-character queries", () => {
     db.prepare("UPDATE campaigns SET owner_principal_id = 'player-one' WHERE id = ?").run(campaignId);
     db.close();
 
-    expect(() => repository.getCampaignCharacterRoster("observer", campaignId))
-      .toThrow("campaign character roster is malformed");
+    expect(() => repository.getCampaignCharacterRoster("observer", campaignId)).toThrow(
+      "campaign character roster is malformed",
+    );
     expect(repository.getCampaignCharacterRoster("local-owner", campaignId)).toBeNull();
     expect(repository.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     repository.close();
@@ -161,13 +189,13 @@ describe("role-sensitive campaign-character queries", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
-    db.prepare("UPDATE campaign_characters SET campaign_id = 'other-campaign' WHERE campaign_id = ?")
-      .run(campaignId);
+    db.prepare("UPDATE campaign_characters SET campaign_id = 'other-campaign' WHERE campaign_id = ?").run(campaignId);
     db.close();
 
     for (const actor of ["gm", "player-one", "observer"]) {
-      expect(() => repository.getCampaignCharacterRoster(actor, campaignId))
-        .toThrow("campaign character roster is malformed");
+      expect(() => repository.getCampaignCharacterRoster(actor, campaignId)).toThrow(
+        "campaign character roster is malformed",
+      );
     }
     expect(repository.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     repository.close();
@@ -186,10 +214,10 @@ describe("role-sensitive campaign-character queries", () => {
         VALUES ('other-campaign', 'foreign-missing-sheet', 0, 'strength', 10);`);
     db.close();
 
-    expect(repository.getCampaignCharacterRoster("observer", campaignId))
-      .toEqual({ campaignId, characters: [] });
-    expect(() => repository.getCampaignCharacterRoster("local-owner", "other-campaign"))
-      .toThrow("campaign character roster is malformed");
+    expect(repository.getCampaignCharacterRoster("observer", campaignId)).toEqual({ campaignId, characters: [] });
+    expect(() => repository.getCampaignCharacterRoster("local-owner", "other-campaign")).toThrow(
+      "campaign character roster is malformed",
+    );
     repository.close();
   });
 
@@ -206,8 +234,9 @@ describe("role-sensitive campaign-character queries", () => {
       INSERT INTO rpg_actor_resources VALUES ('campaign-reads', 'missing-actor', 'hp', 1, 2);`);
     db.close();
 
-    expect(() => repository.getCampaignCharacterRoster("observer", campaignId))
-      .toThrow("campaign character roster is malformed");
+    expect(() => repository.getCampaignCharacterRoster("observer", campaignId)).toThrow(
+      "campaign character roster is malformed",
+    );
     repository.close();
   });
 
@@ -235,10 +264,12 @@ describe("role-sensitive campaign-character queries", () => {
         ('campaign-reads', 'foreign-actor', 'hp', 1, 2);`);
     db.close();
 
-    expect(() => repository.getCampaignCharacterRoster("observer", campaignId))
-      .toThrow("campaign character roster is malformed");
-    expect(repository.getCampaignCharacterRoster("local-owner", "other-campaign")?.characters)
-      .toEqual([{ id: "foreign-cc", characterId: "persona-a", name: "A" }]);
+    expect(() => repository.getCampaignCharacterRoster("observer", campaignId)).toThrow(
+      "campaign character roster is malformed",
+    );
+    expect(repository.getCampaignCharacterRoster("local-owner", "other-campaign")?.characters).toEqual([
+      { id: "foreign-cc", characterId: "persona-a", name: "A" },
+    ]);
     repository.close();
   });
 
@@ -252,8 +283,9 @@ describe("role-sensitive campaign-character queries", () => {
 
     expect(repository.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     expect(repository.getCampaignCharacterRoster("local-owner", campaignId)).toBeNull();
-    expect(() => repository.getCampaignCharacterRoster("gm", campaignId))
-      .toThrow("campaign character roster is malformed");
+    expect(() => repository.getCampaignCharacterRoster("gm", campaignId)).toThrow(
+      "campaign character roster is malformed",
+    );
     repository.close();
   });
 
@@ -270,10 +302,10 @@ describe("role-sensitive campaign-character queries", () => {
       INSERT INTO rpg_actor_resources VALUES ('other-campaign', 'missing-actor', 'hp', 1, 2);`);
     db.close();
 
-    expect(repository.getCampaignCharacterRoster("observer", campaignId))
-      .toEqual({ campaignId, characters: [] });
-    expect(() => repository.getCampaignCharacterRoster("local-owner", "other-campaign"))
-      .toThrow("campaign character roster is malformed");
+    expect(repository.getCampaignCharacterRoster("observer", campaignId)).toEqual({ campaignId, characters: [] });
+    expect(() => repository.getCampaignCharacterRoster("local-owner", "other-campaign")).toThrow(
+      "campaign character roster is malformed",
+    );
     repository.close();
   });
 
@@ -295,8 +327,9 @@ describe("role-sensitive campaign-character queries", () => {
     const db = new DatabaseDriver(dbPath());
     db.prepare("UPDATE characters SET name = ? WHERE id = 'persona-a'").run(name);
     db.close();
-    expect(() => repository.getCampaignCharacterRoster("observer", campaignId))
-      .toThrow("campaign character roster is malformed");
+    expect(() => repository.getCampaignCharacterRoster("observer", campaignId)).toThrow(
+      "campaign character roster is malformed",
+    );
     expect(repository.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     repository.close();
   });
@@ -308,7 +341,10 @@ describe("role-sensitive campaign-character queries", () => {
     const nextId = vi.fn(() => "unused");
     const integer = vi.fn(() => 1);
     const repository = createRepository({
-      dataDir: dataDir(), clock: { now }, ids: { nextId }, rng: { integer },
+      dataDir: dataDir(),
+      clock: { now },
+      ids: { nextId },
+      rng: { integer },
     });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
@@ -344,8 +380,9 @@ describe("role-sensitive campaign-character queries", () => {
     })();
     db.close();
     const reopened = createCorruptionTestRepository({ dataDir: dataDir() });
-    expect(() => reopened.getCampaignCharacterRoster("gm", campaignId))
-      .toThrow("campaign character roster is malformed");
+    expect(() => reopened.getCampaignCharacterRoster("gm", campaignId)).toThrow(
+      "campaign character roster is malformed",
+    );
     expect(reopened.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     reopened.close();
   });
@@ -357,16 +394,21 @@ describe("role-sensitive campaign-character queries", () => {
     db.prepare("UPDATE campaigns SET owner_principal_id = 'player-one' WHERE id = ?").run(campaignId);
     expect(repository.getCampaignCharacterRoster("local-owner", campaignId)).toBeNull();
     db.close();
-    expect(() => repository.getCampaignCharacterRoster("gm", campaignId))
-      .toThrow("campaign character roster is malformed");
+    expect(() => repository.getCampaignCharacterRoster("gm", campaignId)).toThrow(
+      "campaign character roster is malformed",
+    );
     expect(repository.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     repository.close();
   });
 
   it.each([
     ["malformed campaign owner role", "", "UPDATE campaigns SET owner_role = 'gm' WHERE id = 'campaign-reads'"],
-    ["duplicate owner membership", "DROP INDEX idx_campaign_memberships_one_owner", `INSERT INTO campaign_memberships
-      (campaign_id, principal_id, role, created_at) VALUES ('campaign-reads', 'app-owner', 'owner', '${AT}')`],
+    [
+      "duplicate owner membership",
+      "DROP INDEX idx_campaign_memberships_one_owner",
+      `INSERT INTO campaign_memberships
+      (campaign_id, principal_id, role, created_at) VALUES ('campaign-reads', 'app-owner', 'owner', '${AT}')`,
+    ],
   ])("loudly rejects %s for every authorized roster role while masking outsiders", (_kind, preparationSql, sql) => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
@@ -377,8 +419,9 @@ describe("role-sensitive campaign-character queries", () => {
     db.close();
 
     for (const actor of ["local-owner", "gm", "player-one", "observer"]) {
-      expect(() => repository.getCampaignCharacterRoster(actor, campaignId))
-        .toThrow("campaign character roster is malformed");
+      expect(() => repository.getCampaignCharacterRoster(actor, campaignId)).toThrow(
+        "campaign character roster is malformed",
+      );
     }
     expect(repository.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     repository.close();
@@ -396,8 +439,9 @@ describe("role-sensitive campaign-character queries", () => {
     // owner-integrity failure from the same statement snapshot.
     expect(repository.getCampaignCharacterRoster("local-owner", campaignId)).toBeNull();
     for (const actor of ["gm", "player-one", "observer"]) {
-      expect(() => repository.getCampaignCharacterRoster(actor, campaignId))
-        .toThrow("campaign character roster is malformed");
+      expect(() => repository.getCampaignCharacterRoster(actor, campaignId)).toThrow(
+        "campaign character roster is malformed",
+      );
     }
     expect(repository.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();
     repository.close();
@@ -415,28 +459,31 @@ describe("role-sensitive campaign-character queries", () => {
       expect(unit.getCampaignCharacterRoster("player-one", campaignId)?.characters[0]?.name).toBe("A");
     });
     expect(repository.getCampaignCharacterRoster("player-one", campaignId)?.characters[0]?.name).toBe("Concurrent");
-    expect(() => expired!.getCampaignCharacterRoster("bad actor", "bad campaign"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.getCampaignCharacterRoster("bad actor", "bad campaign")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
-    expect(() => repository.getCampaignCharacterRoster("bad actor", "bad campaign"))
-      .toThrow("repository is closed");
+    expect(() => repository.getCampaignCharacterRoster("bad actor", "bad campaign")).toThrow("repository is closed");
     expect(repoModule).not.toHaveProperty("getCampaignCharacterRoster");
   });
 
   it("returns the resolved ID-free workspace for every intact role and masks unavailable targets", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
-    db.prepare("INSERT INTO rpg_character_attributes VALUES (?, 'sheet-a', 9, 'tech:strength', 14)")
-      .run(campaignId);
-    db.prepare("INSERT INTO rpg_character_proficiencies VALUES (?, 'sheet-a', 7, 'skill', 'tech:stealth')")
-      .run(campaignId);
-    db.prepare(`INSERT INTO rpg_character_choices VALUES
-      (?, 'sheet-a', 5, 'tech:choice', 'core', '1', 'class', 'fighter')`).run(campaignId);
+    db.prepare("INSERT INTO rpg_character_attributes VALUES (?, 'sheet-a', 9, 'tech:strength', 14)").run(campaignId);
+    db.prepare("INSERT INTO rpg_character_proficiencies VALUES (?, 'sheet-a', 7, 'skill', 'tech:stealth')").run(
+      campaignId,
+    );
+    db.prepare(
+      `INSERT INTO rpg_character_choices VALUES
+      (?, 'sheet-a', 5, 'tech:choice', 'core', '1', 'class', 'fighter')`,
+    ).run(campaignId);
     db.prepare("INSERT INTO rpg_actor_resources VALUES (?, 'actor-a', 'tech:hp', 3, 9)").run(campaignId);
     // Workspace reads deliberately ignore private payload columns entirely.
     db.pragma("ignore_check_constraints = ON");
-    db.prepare("UPDATE campaign_actor_private_state SET private_notes = ? WHERE actor_id = 'actor-a'")
-      .run("private-poison".repeat(1_000));
+    db.prepare("UPDATE campaign_actor_private_state SET private_notes = ? WHERE actor_id = 'actor-a'").run(
+      "private-poison".repeat(1_000),
+    );
     db.close();
 
     const expected = {
@@ -449,9 +496,16 @@ describe("role-sensitive campaign-character queries", () => {
         classes: [{ name: "Fighter", description: "Description", level: 2 }],
         attributes: [{ label: "Attribute 1", value: 14 }],
         proficiencies: [{ category: "skill", label: "Skill proficiency 1" }],
-        choices: [{ label: "Choice 1", selection: {
-          kind: "class", name: "Fighter", description: "Description",
-        } }],
+        choices: [
+          {
+            label: "Choice 1",
+            selection: {
+              kind: "class",
+              name: "Fighter",
+              description: "Description",
+            },
+          },
+        ],
         resources: [{ label: "Resource 1", current: 3, max: 9 }],
       },
     };
@@ -497,11 +551,11 @@ describe("role-sensitive campaign-character queries", () => {
       expect(unit.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")?.character.name).toBe("A");
     });
     expect(repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")?.character.name).toBe("Concurrent");
-    expect(() => expired!.getCampaignCharacterWorkspace("bad", "bad", "bad"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.getCampaignCharacterWorkspace("bad", "bad", "bad")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
-    expect(() => repository.getCampaignCharacterWorkspace("bad", "bad", "bad"))
-      .toThrow("repository is closed");
+    expect(() => repository.getCampaignCharacterWorkspace("bad", "bad", "bad")).toThrow("repository is closed");
     expect(repoModule).not.toHaveProperty("getCampaignCharacterWorkspace");
   });
 
@@ -517,24 +571,43 @@ describe("role-sensitive campaign-character queries", () => {
     db.pragma("foreign_keys = OFF");
     db.exec(mutation);
     db.close();
-    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a"))
-      .toThrow("campaign character workspace is malformed");
+    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")).toThrow(
+      "campaign character workspace is malformed",
+    );
     expect(repository.getCampaignCharacterWorkspace("nonmember", campaignId, "cc-a")).toBeNull();
     repository.close();
   });
 
   it.each([
-    ["sheet", `INSERT INTO rpg_campaign_sheets VALUES
+    [
+      "sheet",
+      `INSERT INTO rpg_campaign_sheets VALUES
       ('detached-sheet', 'campaign-reads', 'missing-root', 'core', '1', 'race', 'human',
-       'core', '1', 'background', 'sage', '${AT}', '${AT}')`],
-    ["actor", `INSERT INTO campaign_actors VALUES
+       'core', '1', 'background', 'sage', '${AT}', '${AT}')`,
+    ],
+    [
+      "actor",
+      `INSERT INTO campaign_actors VALUES
       ('detached-actor', 'campaign-reads', 'missing-root', 'missing-sheet',
-       'player-character', 'principal', '${AT}', '${AT}')`],
-    ["private state", "INSERT INTO campaign_actor_private_state VALUES ('detached-actor', 'campaign-reads', 'player-one', 'must-not-be-selected')"],
-    ["class", "INSERT INTO rpg_character_classes VALUES ('campaign-reads', 'missing-sheet', 0, 'core', '1', 'class', 'fighter', 1)"],
+       'player-character', 'principal', '${AT}', '${AT}')`,
+    ],
+    [
+      "private state",
+      "INSERT INTO campaign_actor_private_state VALUES ('detached-actor', 'campaign-reads', 'player-one', 'must-not-be-selected')",
+    ],
+    [
+      "class",
+      "INSERT INTO rpg_character_classes VALUES ('campaign-reads', 'missing-sheet', 0, 'core', '1', 'class', 'fighter', 1)",
+    ],
     ["attribute", "INSERT INTO rpg_character_attributes VALUES ('campaign-reads', 'missing-sheet', 0, 'orphan', 1)"],
-    ["proficiency", "INSERT INTO rpg_character_proficiencies VALUES ('campaign-reads', 'missing-sheet', 0, 'skill', 'orphan')"],
-    ["choice", "INSERT INTO rpg_character_choices VALUES ('campaign-reads', 'missing-sheet', 0, 'orphan', 'core', '1', 'class', 'fighter')"],
+    [
+      "proficiency",
+      "INSERT INTO rpg_character_proficiencies VALUES ('campaign-reads', 'missing-sheet', 0, 'skill', 'orphan')",
+    ],
+    [
+      "choice",
+      "INSERT INTO rpg_character_choices VALUES ('campaign-reads', 'missing-sheet', 0, 'orphan', 'core', '1', 'class', 'fighter')",
+    ],
     ["actor resource", "INSERT INTO rpg_actor_resources VALUES ('campaign-reads', 'missing-actor', 'hp', 1, 2)"],
   ])("rejects a campaign-attributable detached/orphan workspace %s beside a valid root", (_family, sql) => {
     const repository = seed();
@@ -543,8 +616,9 @@ describe("role-sensitive campaign-character queries", () => {
     db.exec(sql);
     db.close();
 
-    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a"))
-      .toThrow("campaign character workspace is malformed");
+    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")).toThrow(
+      "campaign character workspace is malformed",
+    );
     expect(repository.getCampaignCharacterWorkspace("nonmember", campaignId, "cc-a")).toBeNull();
     repository.close();
   });
@@ -572,18 +646,33 @@ describe("role-sensitive campaign-character queries", () => {
   });
 
   it.each([
-    ["missing membership", `DELETE FROM campaign_memberships
-      WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two'`],
-    ["membership from another campaign only", `DELETE FROM campaign_memberships
+    [
+      "missing membership",
+      `DELETE FROM campaign_memberships
+      WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two'`,
+    ],
+    [
+      "membership from another campaign only",
+      `DELETE FROM campaign_memberships
       WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two';
-      INSERT INTO campaign_memberships VALUES ('other-campaign', 'player-two', 'player', '${AT}')`],
+      INSERT INTO campaign_memberships VALUES ('other-campaign', 'player-two', 'player', '${AT}')`,
+    ],
     ["orphan principal", "DELETE FROM principals WHERE id = 'player-two'"],
-    ["unrecognized role", `UPDATE campaign_memberships SET role = 'future-role'
-      WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two'`],
-    ["ineligible observer role", `UPDATE campaign_memberships SET role = 'observer'
-      WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two'`],
-    ["malformed timestamp", `UPDATE campaign_memberships SET created_at = 'not-a-time'
-      WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two'`],
+    [
+      "unrecognized role",
+      `UPDATE campaign_memberships SET role = 'future-role'
+      WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two'`,
+    ],
+    [
+      "ineligible observer role",
+      `UPDATE campaign_memberships SET role = 'observer'
+      WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two'`,
+    ],
+    [
+      "malformed timestamp",
+      `UPDATE campaign_memberships SET created_at = 'not-a-time'
+      WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-two'`,
+    ],
   ])("rejects attributable non-target private-state controller %s while masking outsiders", (_family, sql) => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
@@ -592,8 +681,9 @@ describe("role-sensitive campaign-character queries", () => {
     db.exec(sql);
     db.close();
 
-    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a"))
-      .toThrow("campaign character workspace is malformed");
+    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")).toThrow(
+      "campaign character workspace is malformed",
+    );
     expect(repository.getCampaignCharacterWorkspace("nonmember", campaignId, "cc-a")).toBeNull();
     repository.close();
   });
@@ -624,8 +714,14 @@ describe("role-sensitive campaign-character queries", () => {
     ["actor timestamp", "UPDATE campaign_actors SET updated_at = '2020-01-01T00:00:00.000Z' WHERE id = 'actor-a'"],
     ["persona name", "UPDATE characters SET name = x'80' WHERE id = 'persona-a'"],
     ["class raw type", "UPDATE rpg_character_classes SET level = 'two' WHERE sheet_id = 'sheet-a'"],
-    ["attribute raw type", "INSERT INTO rpg_character_attributes VALUES ('campaign-reads', 'sheet-a', 'bad', 'bad', 1.5)"],
-    ["proficiency raw type", "INSERT INTO rpg_character_proficiencies VALUES ('campaign-reads', 'sheet-a', 1, 7, 'bad')"],
+    [
+      "attribute raw type",
+      "INSERT INTO rpg_character_attributes VALUES ('campaign-reads', 'sheet-a', 'bad', 'bad', 1.5)",
+    ],
+    [
+      "proficiency raw type",
+      "INSERT INTO rpg_character_proficiencies VALUES ('campaign-reads', 'sheet-a', 1, 7, 'bad')",
+    ],
     ["resource raw type", "INSERT INTO rpg_actor_resources VALUES ('campaign-reads', 'actor-a', 'hp', 1.5, 2)"],
   ])("rejects malformed workspace %s persistence after authorization", (_family, sql) => {
     const repository = seed();
@@ -634,8 +730,9 @@ describe("role-sensitive campaign-character queries", () => {
     db.pragma("ignore_check_constraints = ON");
     db.exec(sql);
     db.close();
-    expect(() => repository.getCampaignCharacterWorkspace("observer", campaignId, "cc-a"))
-      .toThrow("campaign character workspace is malformed");
+    expect(() => repository.getCampaignCharacterWorkspace("observer", campaignId, "cc-a")).toThrow(
+      "campaign character workspace is malformed",
+    );
     expect(repository.getCampaignCharacterWorkspace("nonmember", campaignId, "cc-a")).toBeNull();
     repository.close();
   });
@@ -643,15 +740,24 @@ describe("role-sensitive campaign-character queries", () => {
   it.each([
     ["missing selected profile", "DELETE FROM campaign_rules_profiles WHERE campaign_id = 'campaign-reads'"],
     ["missing global profile", "DELETE FROM rpg_rules_profiles WHERE rules_profile_id = 'profile'"],
-    ["unsealed pack", "DROP TRIGGER rpg_content_packs_prevent_update; UPDATE rpg_content_packs SET sealed = 0 WHERE pack_id = 'core'"],
-    ["mismatched pin profile", "UPDATE campaign_content_packs SET rules_profile_id = 'missing-profile' WHERE campaign_id = 'campaign-reads'"],
+    [
+      "unsealed pack",
+      "DROP TRIGGER rpg_content_packs_prevent_update; UPDATE rpg_content_packs SET sealed = 0 WHERE pack_id = 'core'",
+    ],
+    [
+      "mismatched pin profile",
+      "UPDATE campaign_content_packs SET rules_profile_id = 'missing-profile' WHERE campaign_id = 'campaign-reads'",
+    ],
     ["malformed race definition", "UPDATE rpg_definitions SET tags = x'80' WHERE kind = 'race'"],
     ["malformed background definition", "UPDATE rpg_definitions SET description = x'80' WHERE kind = 'background'"],
     ["malformed class definition", "UPDATE rpg_definitions SET name = ' ' WHERE kind = 'class'"],
-    ["malformed choice definition", `DROP TRIGGER rpg_definitions_prevent_sealed_insert;
+    [
+      "malformed choice definition",
+      `DROP TRIGGER rpg_definitions_prevent_sealed_insert;
       INSERT INTO rpg_definitions VALUES ('core', '1', 'ability', 'bad-choice', 'Bad', 'Description', x'80');
       INSERT INTO rpg_character_choices VALUES
-        ('campaign-reads', 'sheet-a', 0, 'choice', 'core', '1', 'ability', 'bad-choice')`],
+        ('campaign-reads', 'sheet-a', 0, 'choice', 'core', '1', 'ability', 'bad-choice')`,
+    ],
   ])("rejects workspace %s ancestry or metadata corruption", (_family, sql) => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
@@ -663,15 +769,20 @@ describe("role-sensitive campaign-character queries", () => {
       DROP TRIGGER campaign_content_packs_require_sealed_update;`);
     db.exec(sql);
     db.close();
-    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a"))
-      .toThrow("campaign character workspace is malformed");
+    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")).toThrow(
+      "campaign character workspace is malformed",
+    );
     repository.close();
   });
 
   it.each([
     ["owner_role", "", "UPDATE campaigns SET owner_role = 'gm' WHERE id = 'campaign-reads'"],
-    ["duplicate owner", "DROP INDEX idx_campaign_memberships_one_owner", `INSERT INTO campaign_memberships
-      VALUES ('campaign-reads', 'app-owner', 'owner', '${AT}')`],
+    [
+      "duplicate owner",
+      "DROP INDEX idx_campaign_memberships_one_owner",
+      `INSERT INTO campaign_memberships
+      VALUES ('campaign-reads', 'app-owner', 'owner', '${AT}')`,
+    ],
   ])("rejects workspace %s corruption for members while masking stale/outsider access", (_family, prep, sql) => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
@@ -681,8 +792,9 @@ describe("role-sensitive campaign-character queries", () => {
     db.exec(sql);
     db.close();
     for (const actor of ["local-owner", "gm", "player-one", "observer"]) {
-      expect(() => repository.getCampaignCharacterWorkspace(actor, campaignId, "cc-a"))
-        .toThrow("campaign character workspace is malformed");
+      expect(() => repository.getCampaignCharacterWorkspace(actor, campaignId, "cc-a")).toThrow(
+        "campaign character workspace is malformed",
+      );
     }
     expect(repository.getCampaignCharacterWorkspace("nonmember", campaignId, "cc-a")).toBeNull();
     repository.close();
@@ -696,45 +808,48 @@ describe("role-sensitive campaign-character queries", () => {
       for (let index = 0; index < 129; index += 1) insert.run(campaignId, `resource-${index}`);
     })();
     db.close();
-    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a"))
-      .toThrow("campaign character workspace is malformed");
+    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")).toThrow(
+      "campaign character workspace is malformed",
+    );
     repository.close();
   });
 
-  it.each(["classes", "attributes", "proficiencies", "choices"] as const)(
-    "enforces workspace MAX+1 %s",
-    (family) => {
-      const repository = seed();
-      const db = new DatabaseDriver(dbPath());
-      db.pragma("foreign_keys = OFF");
-      db.pragma("ignore_check_constraints = ON");
-      db.transaction(() => {
-        if (family === "classes") {
-          db.exec("DROP TRIGGER rpg_definitions_prevent_sealed_insert");
-          const definition = db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', 'class', ?, ?, 'Description', '[]')");
-          const item = db.prepare("INSERT INTO rpg_character_classes VALUES (?, 'sheet-a', ?, 'core', '1', 'class', ?, 1)");
-          for (let index = 1; index <= 16; index += 1) {
-            definition.run(`class-${index}`, `Class ${index}`);
-            item.run(campaignId, index, `class-${index}`);
-          }
-        } else if (family === "attributes") {
-          const item = db.prepare("INSERT INTO rpg_character_attributes VALUES (?, 'sheet-a', ?, ?, 1)");
-          for (let index = 0; index <= 64; index += 1) item.run(campaignId, index, `attribute-${index}`);
-        } else if (family === "proficiencies") {
-          const item = db.prepare("INSERT INTO rpg_character_proficiencies VALUES (?, 'sheet-a', ?, 'skill', ?)");
-          for (let index = 0; index <= 128; index += 1) item.run(campaignId, index, `proficiency-${index}`);
-        } else {
-          const item = db.prepare(`INSERT INTO rpg_character_choices
-            VALUES (?, 'sheet-a', ?, ?, 'core', '1', 'class', 'fighter')`);
-          for (let index = 0; index <= 128; index += 1) item.run(campaignId, index, `choice-${index}`);
+  it.each(["classes", "attributes", "proficiencies", "choices"] as const)("enforces workspace MAX+1 %s", (family) => {
+    const repository = seed();
+    const db = new DatabaseDriver(dbPath());
+    db.pragma("foreign_keys = OFF");
+    db.pragma("ignore_check_constraints = ON");
+    db.transaction(() => {
+      if (family === "classes") {
+        db.exec("DROP TRIGGER rpg_definitions_prevent_sealed_insert");
+        const definition = db.prepare(
+          "INSERT INTO rpg_definitions VALUES ('core', '1', 'class', ?, ?, 'Description', '[]')",
+        );
+        const item = db.prepare(
+          "INSERT INTO rpg_character_classes VALUES (?, 'sheet-a', ?, 'core', '1', 'class', ?, 1)",
+        );
+        for (let index = 1; index <= 16; index += 1) {
+          definition.run(`class-${index}`, `Class ${index}`);
+          item.run(campaignId, index, `class-${index}`);
         }
-      })();
-      db.close();
-      expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a"))
-        .toThrow("campaign character workspace is malformed");
-      repository.close();
-    },
-  );
+      } else if (family === "attributes") {
+        const item = db.prepare("INSERT INTO rpg_character_attributes VALUES (?, 'sheet-a', ?, ?, 1)");
+        for (let index = 0; index <= 64; index += 1) item.run(campaignId, index, `attribute-${index}`);
+      } else if (family === "proficiencies") {
+        const item = db.prepare("INSERT INTO rpg_character_proficiencies VALUES (?, 'sheet-a', ?, 'skill', ?)");
+        for (let index = 0; index <= 128; index += 1) item.run(campaignId, index, `proficiency-${index}`);
+      } else {
+        const item = db.prepare(`INSERT INTO rpg_character_choices
+            VALUES (?, 'sheet-a', ?, ?, 'core', '1', 'class', 'fighter')`);
+        for (let index = 0; index <= 128; index += 1) item.run(campaignId, index, `choice-${index}`);
+      }
+    })();
+    db.close();
+    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")).toThrow(
+      "campaign character workspace is malformed",
+    );
+    repository.close();
+  });
 
   it.each(["position", "identity"] as const)("rejects duplicate workspace attribute %s evidence", (kind) => {
     const repository = seed();
@@ -755,8 +870,9 @@ describe("role-sensitive campaign-character queries", () => {
       kind === "position" ? "other" : "duplicate",
     );
     db.close();
-    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a"))
-      .toThrow("campaign character workspace is malformed");
+    expect(() => repository.getCampaignCharacterWorkspace("gm", campaignId, "cc-a")).toThrow(
+      "campaign character workspace is malformed",
+    );
     repository.close();
   });
 
@@ -768,8 +884,9 @@ describe("role-sensitive campaign-character queries", () => {
     const db = new DatabaseDriver(dbPath());
     db.prepare("UPDATE campaign_actor_private_state SET private_notes = ? WHERE actor_id = 'actor-a'").run(accepted);
 
-    expect(repository.getCampaignCharacter("player-one", campaignId, "cc-a")?.projection.actor)
-      .toMatchObject({ privateNotes: accepted });
+    expect(repository.getCampaignCharacter("player-one", campaignId, "cc-a")?.projection.actor).toMatchObject({
+      privateNotes: accepted,
+    });
     db.pragma("ignore_check_constraints = ON");
     db.prepare("UPDATE campaign_actor_private_state SET private_notes = ? WHERE actor_id = 'actor-a'").run(rejected);
     db.close();
@@ -780,18 +897,29 @@ describe("role-sensitive campaign-character queries", () => {
   it("returns privileged or public strict reads solely from campaign membership", () => {
     const repository = seed();
     for (const principalId of ["local-owner", "gm"] as const) {
-      expect(repository.listCampaignCharacters(principalId, campaignId).map((read) => read.access))
-        .toEqual(["privileged", "privileged"]);
+      expect(repository.listCampaignCharacters(principalId, campaignId).map((read) => read.access)).toEqual([
+        "privileged",
+        "privileged",
+      ]);
     }
     const playerOne = repository.listCampaignCharacters("player-one", campaignId);
-    expect(playerOne.map((read) => [read.projection.campaignCharacter.id, read.access]))
-      .toEqual([["cc-a", "privileged"], ["cc-b", "public"]]);
-    expect(playerOne[0]?.projection.actor).toMatchObject({ controllerPrincipalId: "player-one", privateNotes: "one-secret" });
+    expect(playerOne.map((read) => [read.projection.campaignCharacter.id, read.access])).toEqual([
+      ["cc-a", "privileged"],
+      ["cc-b", "public"],
+    ]);
+    expect(playerOne[0]?.projection.actor).toMatchObject({
+      controllerPrincipalId: "player-one",
+      privateNotes: "one-secret",
+    });
     expect(playerOne[1]?.projection.actor).not.toHaveProperty("controllerPrincipalId");
     expect(JSON.stringify(playerOne[1])).not.toContain("two-secret");
-    expect(repository.listCampaignCharacters("player-two", campaignId).map((read) => read.access))
-      .toEqual(["public", "privileged"]);
-    expect(repository.listCampaignCharacters("observer", campaignId).every((read) => read.access === "public")).toBe(true);
+    expect(repository.listCampaignCharacters("player-two", campaignId).map((read) => read.access)).toEqual([
+      "public",
+      "privileged",
+    ]);
+    expect(repository.listCampaignCharacters("observer", campaignId).every((read) => read.access === "public")).toBe(
+      true,
+    );
     expect(repository.listCampaignCharacters("nonmember", campaignId)).toEqual([]);
     expect(repository.getCampaignCharacter("nonmember", campaignId, "cc-a")).toBeNull();
 
@@ -805,8 +933,9 @@ describe("role-sensitive campaign-character queries", () => {
 
   it("gets the same strict aggregate by actor identity with role-gated secrets", () => {
     const repository = seed();
-    expect(repository.getCampaignCharacterByActorId("local-owner", campaignId, "actor-a"))
-      .toEqual(repository.getCampaignCharacter("local-owner", campaignId, "cc-a"));
+    expect(repository.getCampaignCharacterByActorId("local-owner", campaignId, "actor-a")).toEqual(
+      repository.getCampaignCharacter("local-owner", campaignId, "cc-a"),
+    );
     expect(repository.getCampaignCharacterByActorId("gm", campaignId, "actor-a")?.access).toBe("privileged");
     expect(repository.getCampaignCharacterByActorId("player-one", campaignId, "actor-a")?.access).toBe("privileged");
     const otherPlayer = repository.getCampaignCharacterByActorId("player-two", campaignId, "actor-a");
@@ -832,13 +961,15 @@ describe("role-sensitive campaign-character queries", () => {
     expect(repository.getCampaignCharacterByActorId("gm", campaignId, "actor-a")?.access).toBe("privileged");
 
     db.pragma("ignore_check_constraints = ON");
-    db.prepare("UPDATE campaign_memberships SET role = 'future-role' WHERE campaign_id = ? AND principal_id = 'observer'")
-      .run(campaignId);
+    db.prepare(
+      "UPDATE campaign_memberships SET role = 'future-role' WHERE campaign_id = ? AND principal_id = 'observer'",
+    ).run(campaignId);
     expect(repository.listCampaignCharacters("observer", campaignId)).toEqual([]);
     expect(repository.getCampaignCharacterByActorId("observer", campaignId, "actor-a")).toBeNull();
     db.prepare("DELETE FROM principals WHERE id = 'gm'").run();
     expect(repository.getCampaignCharacterByActorId("gm", campaignId, "actor-a")).toBeNull();
-    deleteCampaignForCorruptionTest(db,campaignId);db.prepare("DELETE FROM campaigns WHERE id = ?").run(campaignId);
+    deleteCampaignForCorruptionTest(db, campaignId);
+    db.prepare("DELETE FROM campaigns WHERE id = ?").run(campaignId);
     db.close();
     expect(repository.getCampaignCharacterByActorId("player-one", campaignId, "actor-a")).toBeNull();
     repository.close();
@@ -848,8 +979,9 @@ describe("role-sensitive campaign-character queries", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("ignore_check_constraints = ON");
-    db.prepare("UPDATE campaign_actor_private_state SET private_notes = ? WHERE actor_id = 'actor-a'")
-      .run("x".repeat(MAX_PRIVATE_NOTES_LENGTH + 1));
+    db.prepare("UPDATE campaign_actor_private_state SET private_notes = ? WHERE actor_id = 'actor-a'").run(
+      "x".repeat(MAX_PRIVATE_NOTES_LENGTH + 1),
+    );
     db.close();
     expect(repository.getCampaignCharacterByActorId("observer", campaignId, "actor-a")?.access).toBe("public");
     expect(repository.getCampaignCharacterByActorId("player-two", campaignId, "actor-a")?.access).toBe("public");
@@ -865,8 +997,9 @@ describe("role-sensitive campaign-character queries", () => {
     db.prepare("DELETE FROM campaign_actors WHERE id = 'actor-a'").run();
     db.close();
     for (const principal of ["local-owner", "gm", "player-one", "player-two", "observer"]) {
-      expect(() => repository.getCampaignCharacterByActorId(principal, campaignId, "actor-a"))
-        .toThrow("campaign character aggregate is incomplete");
+      expect(() => repository.getCampaignCharacterByActorId(principal, campaignId, "actor-a")).toThrow(
+        "campaign character aggregate is incomplete",
+      );
       expect(repository.getCampaignCharacterByActorId(principal, campaignId, "genuinely-missing")).toBeNull();
     }
     expect(repository.getCampaignCharacterByActorId("nonmember", campaignId, "actor-a")).toBeNull();
@@ -885,13 +1018,19 @@ describe("role-sensitive campaign-character queries", () => {
     corruptDb.close();
 
     const invocations: Array<{ invoke: () => unknown; parameters: string[]; actorLookup?: boolean }> = [
-      { invoke: () => repository.listCampaignCharacters("gm", campaignId),
-        parameters: ["gm", "gm", "gm", "gm", campaignId] },
-      { invoke: () => repository.getCampaignCharacter("gm", campaignId, "cc-a"),
-        parameters: ["gm", "gm", "gm", "gm", campaignId, "cc-a"] },
-      { invoke: () => repository.getCampaignCharacterByActorId("gm", campaignId, "actor-a"),
+      {
+        invoke: () => repository.listCampaignCharacters("gm", campaignId),
+        parameters: ["gm", "gm", "gm", "gm", campaignId],
+      },
+      {
+        invoke: () => repository.getCampaignCharacter("gm", campaignId, "cc-a"),
+        parameters: ["gm", "gm", "gm", "gm", campaignId, "cc-a"],
+      },
+      {
+        invoke: () => repository.getCampaignCharacterByActorId("gm", campaignId, "actor-a"),
         parameters: ["gm", "gm", "gm", campaignId, "actor-a", campaignId, "actor-a", "gm", campaignId],
-        actorLookup: true },
+        actorLookup: true,
+      },
     ];
     for (const { invoke, parameters, actorLookup } of invocations) {
       const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
@@ -947,17 +1086,23 @@ describe("role-sensitive campaign-character queries", () => {
 
     db.prepare("DELETE FROM rpg_character_classes WHERE sheet_id = 'sheet-a'").run();
     expect(() => repository.getCampaignCharacter("observer", campaignId, "cc-a")).toThrow();
-    db.prepare(`INSERT INTO rpg_character_classes
-      VALUES (?, 'sheet-a', 0, 'core', '1', 'class', 'fighter', 2)`).run(campaignId);
+    db.prepare(
+      `INSERT INTO rpg_character_classes
+      VALUES (?, 'sheet-a', 0, 'core', '1', 'class', 'fighter', 2)`,
+    ).run(campaignId);
 
     db.prepare("DELETE FROM campaign_actor_private_state WHERE actor_id = 'actor-a'").run();
     expect(() => repository.getCampaignCharacter("observer", campaignId, "cc-a")).toThrow("aggregate is incomplete");
-    db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor-a', ?, 'player-one', 'one-secret')").run(campaignId);
+    db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor-a', ?, 'player-one', 'one-secret')").run(
+      campaignId,
+    );
 
     db.prepare("DELETE FROM campaign_actors WHERE id = 'actor-a'").run();
     expect(() => repository.getCampaignCharacter("observer", campaignId, "cc-a")).toThrow("aggregate is incomplete");
-    db.prepare(`INSERT INTO campaign_actors VALUES
-      ('actor-a', ?, 'cc-a', 'sheet-a', 'player-character', 'principal', ?, ?)`).run(campaignId, AT, AT);
+    db.prepare(
+      `INSERT INTO campaign_actors VALUES
+      ('actor-a', ?, 'cc-a', 'sheet-a', 'player-character', 'principal', ?, ?)`,
+    ).run(campaignId, AT, AT);
 
     db.prepare("DELETE FROM rpg_campaign_sheets WHERE id = 'sheet-a'").run();
     db.close();
@@ -970,22 +1115,52 @@ describe("role-sensitive campaign-character queries", () => {
 
   it.each([
     ["legacy character parent", "DELETE FROM characters WHERE id = 'persona-a'"],
-    ["campaign-character campaign link", "UPDATE campaign_characters SET campaign_id = 'other-campaign' WHERE id = 'cc-a'"],
+    [
+      "campaign-character campaign link",
+      "UPDATE campaign_characters SET campaign_id = 'other-campaign' WHERE id = 'cc-a'",
+    ],
     ["sheet campaign link", "UPDATE rpg_campaign_sheets SET campaign_id = 'other-campaign' WHERE id = 'sheet-a'"],
     ["sheet character link", "UPDATE rpg_campaign_sheets SET campaign_character_id = 'missing' WHERE id = 'sheet-a'"],
     ["actor character link", "UPDATE campaign_actors SET campaign_character_id = 'missing' WHERE id = 'actor-a'"],
     ["actor sheet link", "UPDATE campaign_actors SET sheet_id = 'sheet-b' WHERE id = 'actor-a'"],
     ["private-state parent", "DELETE FROM campaign_actor_private_state WHERE actor_id = 'actor-a'"],
-    ["private-state campaign", "UPDATE campaign_actor_private_state SET campaign_id = 'other-campaign' WHERE actor_id = 'actor-a'"],
-    ["controller principal", "UPDATE campaign_actor_private_state SET controller_principal_id = 'missing' WHERE actor_id = 'actor-a'"],
-    ["controller membership", "DELETE FROM campaign_memberships WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-one'"],
-    ["sheet content pin", "DELETE FROM campaign_content_packs WHERE campaign_id = 'campaign-reads' AND pack_id = 'core'"],
-    ["sheet content definition", "DROP TRIGGER rpg_definitions_prevent_delete; DELETE FROM rpg_definitions WHERE pack_id = 'core' AND pack_version = '1' AND kind = 'race'"],
-    ["class campaign parent", "UPDATE rpg_character_classes SET campaign_id = 'other-campaign' WHERE sheet_id = 'sheet-a'"],
+    [
+      "private-state campaign",
+      "UPDATE campaign_actor_private_state SET campaign_id = 'other-campaign' WHERE actor_id = 'actor-a'",
+    ],
+    [
+      "controller principal",
+      "UPDATE campaign_actor_private_state SET controller_principal_id = 'missing' WHERE actor_id = 'actor-a'",
+    ],
+    [
+      "controller membership",
+      "DELETE FROM campaign_memberships WHERE campaign_id = 'campaign-reads' AND principal_id = 'player-one'",
+    ],
+    [
+      "sheet content pin",
+      "DELETE FROM campaign_content_packs WHERE campaign_id = 'campaign-reads' AND pack_id = 'core'",
+    ],
+    [
+      "sheet content definition",
+      "DROP TRIGGER rpg_definitions_prevent_delete; DELETE FROM rpg_definitions WHERE pack_id = 'core' AND pack_version = '1' AND kind = 'race'",
+    ],
+    [
+      "class campaign parent",
+      "UPDATE rpg_character_classes SET campaign_id = 'other-campaign' WHERE sheet_id = 'sheet-a'",
+    ],
     ["class sheet parent", "UPDATE rpg_character_classes SET sheet_id = 'missing' WHERE sheet_id = 'sheet-a'"],
-    ["attribute sheet parent", "INSERT INTO rpg_character_attributes VALUES ('campaign-reads', 'missing', 0, 'orphan', 1)"],
-    ["proficiency sheet parent", "INSERT INTO rpg_character_proficiencies VALUES ('campaign-reads', 'missing', 0, 'skill', 'orphan')"],
-    ["choice content and sheet parents", "INSERT INTO rpg_character_choices VALUES ('campaign-reads', 'missing', 0, 'choice', 'missing', '1', 'item', 'missing')"],
+    [
+      "attribute sheet parent",
+      "INSERT INTO rpg_character_attributes VALUES ('campaign-reads', 'missing', 0, 'orphan', 1)",
+    ],
+    [
+      "proficiency sheet parent",
+      "INSERT INTO rpg_character_proficiencies VALUES ('campaign-reads', 'missing', 0, 'skill', 'orphan')",
+    ],
+    [
+      "choice content and sheet parents",
+      "INSERT INTO rpg_character_choices VALUES ('campaign-reads', 'missing', 0, 'choice', 'missing', '1', 'item', 'missing')",
+    ],
   ])("rejects authorized actor aggregate corruption in the %s ancestry family", (_family, mutation) => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
@@ -993,10 +1168,12 @@ describe("role-sensitive campaign-character queries", () => {
     db.pragma("ignore_check_constraints = ON");
     db.exec(mutation);
     db.close();
-    expect(() => repository.getCampaignCharacterByActorId("gm", campaignId, "actor-a"))
-      .toThrow("campaign character aggregate is incomplete");
-    expect(() => repository.listCampaignCharacters("gm", campaignId))
-      .toThrow("campaign character aggregate is incomplete");
+    expect(() => repository.getCampaignCharacterByActorId("gm", campaignId, "actor-a")).toThrow(
+      "campaign character aggregate is incomplete",
+    );
+    expect(() => repository.listCampaignCharacters("gm", campaignId)).toThrow(
+      "campaign character aggregate is incomplete",
+    );
     if (_family === "campaign-character campaign link") {
       expect(repository.getCampaignCharacter("gm", campaignId, "cc-a")).toBeNull();
     } else {
@@ -1046,23 +1223,28 @@ describe("role-sensitive campaign-character queries", () => {
     let expired: RepositoryUnitOfWork | undefined;
     repository.transaction((unit) => {
       expired = unit;
-      expect(unit.listCampaignCharacters("player-one", campaignId))
-        .toEqual(repository.listCampaignCharacters("player-one", campaignId));
+      expect(unit.listCampaignCharacters("player-one", campaignId)).toEqual(
+        repository.listCampaignCharacters("player-one", campaignId),
+      );
       expect(unit.getCampaignCharacter("observer", campaignId, "cc-a")?.access).toBe("public");
       expect(unit.getCampaignCharacterByActorId("observer", campaignId, "actor-a")?.access).toBe("public");
     });
-    expect(() => expired!.listCampaignCharacters("bad actor", "bad campaign"))
-      .toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getCampaignCharacter("bad actor", "bad campaign", "bad character"))
-      .toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getCampaignCharacterByActorId("bad actor", "bad campaign", "bad actor id"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.listCampaignCharacters("bad actor", "bad campaign")).toThrow(
+      "transaction unit of work is no longer active",
+    );
+    expect(() => expired!.getCampaignCharacter("bad actor", "bad campaign", "bad character")).toThrow(
+      "transaction unit of work is no longer active",
+    );
+    expect(() => expired!.getCampaignCharacterByActorId("bad actor", "bad campaign", "bad actor id")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     expect(repoModule).not.toHaveProperty("listCampaignCharacters");
     expect(repoModule).not.toHaveProperty("getCampaignCharacter");
     expect(repoModule).not.toHaveProperty("getCampaignCharacterByActorId");
     repository.close();
     expect(() => repository.listCampaignCharacters("bad actor", "bad campaign")).toThrow("repository is closed");
-    expect(() => repository.getCampaignCharacterByActorId("bad actor", "bad campaign", "bad actor id"))
-      .toThrow("repository is closed");
+    expect(() => repository.getCampaignCharacterByActorId("bad actor", "bad campaign", "bad actor id")).toThrow(
+      "repository is closed",
+    );
   });
 });

@@ -169,7 +169,9 @@ describe("RPG command contracts", () => {
     expect(setActorAttributePayloadSchema.safeParse({ ...command.payload, attributeId: "bad id" }).success).toBe(false);
     expect(setActorAttributePayloadSchema.safeParse({ ...command.payload, extra: true }).success).toBe(false);
     expect(setActorAttributeCommandSchema.safeParse({ ...command, extra: true }).success).toBe(false);
-    expect(setActorAttributeCommandSchema.safeParse({ ...command, payload: { ...command.payload, extra: true } }).success).toBe(false);
+    expect(
+      setActorAttributeCommandSchema.safeParse({ ...command, payload: { ...command.payload, extra: true } }).success,
+    ).toBe(false);
   });
 
   it("keeps the existing attribute command contract unchanged", () => {
@@ -184,7 +186,13 @@ describe("RPG command contracts", () => {
     expect(rpgCommandSchema.parse(command)).toEqual(command);
     expect(rpgCommandSchema.parse(resourceCommand)).toEqual(resourceCommand);
     expect(rpgCommandSchema.parse(diceCommand)).toEqual(diceCommand);
-    for (const type of ["roll_dice", "check_actor_skill", "deal_damage", "set_actor_resource", "initialize_actor_resources"]) {
+    for (const type of [
+      "roll_dice",
+      "check_actor_skill",
+      "deal_damage",
+      "set_actor_resource",
+      "initialize_actor_resources",
+    ]) {
       expect(rpgCommandSchema.safeParse({ type, payload: {} }).success).toBe(false);
     }
 
@@ -233,13 +241,24 @@ describe("RPG command contracts", () => {
   it("defines one strict actor-resource initialization using the shared bounded state", () => {
     expect(initializeActorResourcePayloadSchema).toBe(actorResourceInitializedEventDataSchema);
     expect(initializeActorResourceCommandSchema.parse(resourceCommand)).toEqual(resourceCommand);
-    expect(initializeActorResourceCommandSchema.parse({
-      ...resourceCommand, payload: { name: "empty", current: 0, max: 0 },
-    }).payload.max).toBe(0);
-    expect(initializeActorResourcePayloadSchema.safeParse({ ...resourceCommand.payload, current: 11 }).success).toBe(false);
-    expect(initializeActorResourcePayloadSchema.safeParse({ ...resourceCommand.payload, current: 1.5 }).success).toBe(false);
-    expect(initializeActorResourcePayloadSchema.safeParse({ ...resourceCommand.payload, name: " HP" }).success).toBe(false);
-    expect(initializeActorResourcePayloadSchema.safeParse({ ...resourceCommand.payload, extra: true }).success).toBe(false);
+    expect(
+      initializeActorResourceCommandSchema.parse({
+        ...resourceCommand,
+        payload: { name: "empty", current: 0, max: 0 },
+      }).payload.max,
+    ).toBe(0);
+    expect(initializeActorResourcePayloadSchema.safeParse({ ...resourceCommand.payload, current: 11 }).success).toBe(
+      false,
+    );
+    expect(initializeActorResourcePayloadSchema.safeParse({ ...resourceCommand.payload, current: 1.5 }).success).toBe(
+      false,
+    );
+    expect(initializeActorResourcePayloadSchema.safeParse({ ...resourceCommand.payload, name: " HP" }).success).toBe(
+      false,
+    );
+    expect(initializeActorResourcePayloadSchema.safeParse({ ...resourceCommand.payload, extra: true }).success).toBe(
+      false,
+    );
     expect(initializeActorResourceCommandSchema.safeParse({ ...resourceCommand, extra: true }).success).toBe(false);
   });
 
@@ -249,7 +268,14 @@ describe("RPG command contracts", () => {
     expect(commandEnvelopeSchema.parse({ ...envelope, command: diceCommand }).command).toEqual(diceCommand);
     expect(commandEnvelopeSchema.parse({ ...envelope, sourceTurnId: null }).sourceTurnId).toBeNull();
     for (const field of [
-      "commandId", "idempotencyKey", "campaignId", "timelineId", "actorId", "expectedRevision", "sourceTurnId", "command",
+      "commandId",
+      "idempotencyKey",
+      "campaignId",
+      "timelineId",
+      "actorId",
+      "expectedRevision",
+      "sourceTurnId",
+      "command",
     ] as const) {
       expect(commandEnvelopeSchema.safeParse(without(envelope, field)).success).toBe(false);
     }
@@ -261,7 +287,9 @@ describe("RPG command contracts", () => {
 
   it("requires strict unequal actor-attribute event data", () => {
     expect(actorAttributeSetEventDataSchema.parse(event.data)).toEqual(event.data);
-    expect(actorAttributeSetEventDataSchema.safeParse({ ...event.data, valueAfter: event.data.valueBefore }).success).toBe(false);
+    expect(
+      actorAttributeSetEventDataSchema.safeParse({ ...event.data, valueAfter: event.data.valueBefore }).success,
+    ).toBe(false);
     for (const field of ["attributeId", "valueBefore", "valueAfter"] as const) {
       expect(actorAttributeSetEventDataSchema.safeParse(without(event.data, field)).success).toBe(false);
     }
@@ -276,7 +304,16 @@ describe("RPG command contracts", () => {
     expect(actorAttributeSetEventSchema.parse(event)).toEqual(event);
     expect(actorAttributeSetEventSchema.parse({ ...event, sourceTurnId: null }).sourceTurnId).toBeNull();
     for (const field of [
-      "eventId", "commandId", "campaignId", "timelineId", "actorId", "sourceTurnId", "type", "revision", "occurredAt", "data",
+      "eventId",
+      "commandId",
+      "campaignId",
+      "timelineId",
+      "actorId",
+      "sourceTurnId",
+      "type",
+      "revision",
+      "occurredAt",
+      "data",
     ] as const) {
       expect(actorAttributeSetEventSchema.safeParse(without(event, field)).success).toBe(false);
     }
@@ -285,8 +322,11 @@ describe("RPG command contracts", () => {
     expect(actorAttributeSetEventSchema.safeParse({ ...event, revision: 0 }).success).toBe(false);
     expect(actorAttributeSetEventSchema.safeParse({ ...event, revision: Number.MAX_SAFE_INTEGER }).success).toBe(true);
     for (const occurredAt of [
-      "2030-04-05T06:07:08Z", "2030-04-05T06:07:08.09Z", "2030-04-05T06:07:08.009+00:00",
-      "2030-04-05T07:07:08.009+01:00", "not-a-time",
+      "2030-04-05T06:07:08Z",
+      "2030-04-05T06:07:08.09Z",
+      "2030-04-05T06:07:08.009+00:00",
+      "2030-04-05T07:07:08.009+01:00",
+      "not-a-time",
     ]) {
       expect(actorAttributeSetEventSchema.safeParse({ ...event, occurredAt }).success).toBe(false);
     }
@@ -296,16 +336,32 @@ describe("RPG command contracts", () => {
   it("defines a strict initialized event with the standard unchanged envelope", () => {
     expect(actorResourceInitializedEventSchema.parse(resourceEvent)).toEqual(resourceEvent);
     for (const field of [
-      "eventId", "commandId", "campaignId", "timelineId", "actorId", "sourceTurnId", "type", "revision", "occurredAt", "data",
+      "eventId",
+      "commandId",
+      "campaignId",
+      "timelineId",
+      "actorId",
+      "sourceTurnId",
+      "type",
+      "revision",
+      "occurredAt",
+      "data",
     ] as const) {
       expect(actorResourceInitializedEventSchema.safeParse(without(resourceEvent, field)).success).toBe(false);
     }
     expect(actorResourceInitializedEventSchema.safeParse({ ...resourceEvent, revision: 0 }).success).toBe(false);
-    expect(actorResourceInitializedEventSchema.safeParse({
-      ...resourceEvent, data: { ...resourceEvent.data, current: resourceEvent.data.max + 1 },
-    }).success).toBe(false);
-    expect(actorResourceInitializedEventSchema.safeParse({ ...resourceEvent, resourceId: "resource-one" }).success).toBe(false);
-    expect(actorResourceInitializedEventSchema.safeParse({ ...resourceEvent, updatedAt: resourceEvent.occurredAt }).success).toBe(false);
+    expect(
+      actorResourceInitializedEventSchema.safeParse({
+        ...resourceEvent,
+        data: { ...resourceEvent.data, current: resourceEvent.data.max + 1 },
+      }).success,
+    ).toBe(false);
+    expect(
+      actorResourceInitializedEventSchema.safeParse({ ...resourceEvent, resourceId: "resource-one" }).success,
+    ).toBe(false);
+    expect(
+      actorResourceInitializedEventSchema.safeParse({ ...resourceEvent, updatedAt: resourceEvent.occurredAt }).success,
+    ).toBe(false);
   });
 
   it("defines one public dice event whose strict data is the structured roll result", () => {
@@ -314,7 +370,16 @@ describe("RPG command contracts", () => {
     expect(actorDiceRolledEventSchema.parse(diceEvent)).toEqual(diceEvent);
     expectTypeOf<typeof actorDiceRolledEventDataSchema._output>().toEqualTypeOf<DiceRollResult>();
     for (const field of [
-      "eventId", "commandId", "campaignId", "timelineId", "actorId", "sourceTurnId", "type", "revision", "occurredAt", "data",
+      "eventId",
+      "commandId",
+      "campaignId",
+      "timelineId",
+      "actorId",
+      "sourceTurnId",
+      "type",
+      "revision",
+      "occurredAt",
+      "data",
     ] as const) {
       expect(actorDiceRolledEventSchema.safeParse(without(diceEvent, field)).success).toBe(false);
     }
@@ -323,10 +388,12 @@ describe("RPG command contracts", () => {
       expect(actorDiceRolledEventSchema.safeParse({ ...diceEvent, [field]: {} }).success).toBe(false);
     }
     expect(actorDiceRolledEventSchema.safeParse({ ...diceEvent, revision: 0 }).success).toBe(false);
-    expect(actorDiceRolledEventSchema.safeParse({
-      ...diceEvent,
-      data: { ...diceResult, total: diceResult.total + 1 },
-    }).success).toBe(false);
+    expect(
+      actorDiceRolledEventSchema.safeParse({
+        ...diceEvent,
+        data: { ...diceResult, total: diceResult.total + 1 },
+      }).success,
+    ).toBe(false);
   });
 
   it("exposes exactly three event discriminants and narrows every inferred variant", () => {
@@ -334,7 +401,13 @@ describe("RPG command contracts", () => {
     expect(rpgEventSchema.parse(event)).toEqual(event);
     expect(rpgEventSchema.parse(resourceEvent)).toEqual(resourceEvent);
     expect(rpgEventSchema.parse(diceEvent)).toEqual(diceEvent);
-    for (const type of ["dice_rolled", "actor_check_resolved", "damage_dealt", "actor_resource_set", "actor_resources_initialized"]) {
+    for (const type of [
+      "dice_rolled",
+      "actor_check_resolved",
+      "damage_dealt",
+      "actor_resource_set",
+      "actor_resources_initialized",
+    ]) {
       expect(rpgEventSchema.safeParse({ ...event, type }).success).toBe(false);
     }
 
@@ -365,7 +438,9 @@ describe("RPG command contracts", () => {
     expect(commandReceiptSchema.safeParse({ ...receipt, events: [] }).success).toBe(false);
     expect(commandReceiptSchema.safeParse({ ...receipt, events: [event, event] }).success).toBe(false);
     expect(commandReceiptSchema.safeParse({ ...receipt, revisionAfter: receipt.revisionBefore }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({ ...receipt, revisionAfter: receipt.revisionAfter + 1 }).success).toBe(false);
+    expect(commandReceiptSchema.safeParse({ ...receipt, revisionAfter: receipt.revisionAfter + 1 }).success).toBe(
+      false,
+    );
 
     const finalReceipt = {
       ...receipt,
@@ -377,40 +452,73 @@ describe("RPG command contracts", () => {
   });
 
   it("rejects every receipt-to-event identity or revision mismatch", () => {
-    expect(commandReceiptSchema.safeParse({
-      ...receipt, events: [{ ...event, revision: receipt.revisionAfter + 1 }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...receipt, events: [{ ...event, commandId: "command-two" }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...receipt, events: [{ ...event, campaignId: "campaign-two" }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...resourceReceipt, events: [{ ...resourceEvent, revision: resourceReceipt.revisionAfter + 1 }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...resourceReceipt, events: [{ ...resourceEvent, commandId: "command-two" }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...resourceReceipt, events: [{ ...resourceEvent, campaignId: "campaign-two" }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...diceReceipt, events: [{ ...diceEvent, revision: diceReceipt.revisionAfter + 1 }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...diceReceipt, events: [{ ...diceEvent, commandId: "command-two" }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...diceReceipt, events: [{ ...diceEvent, campaignId: "campaign-two" }],
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...diceReceipt, revisionAfter: diceReceipt.revisionBefore,
-    }).success).toBe(false);
-    expect(commandReceiptSchema.safeParse({
-      ...diceReceipt, revisionAfter: diceReceipt.revisionAfter + 1,
-      events: [{ ...diceEvent, revision: diceReceipt.revisionAfter + 1 }],
-    }).success).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...receipt,
+        events: [{ ...event, revision: receipt.revisionAfter + 1 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...receipt,
+        events: [{ ...event, commandId: "command-two" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...receipt,
+        events: [{ ...event, campaignId: "campaign-two" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...resourceReceipt,
+        events: [{ ...resourceEvent, revision: resourceReceipt.revisionAfter + 1 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...resourceReceipt,
+        events: [{ ...resourceEvent, commandId: "command-two" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...resourceReceipt,
+        events: [{ ...resourceEvent, campaignId: "campaign-two" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...diceReceipt,
+        events: [{ ...diceEvent, revision: diceReceipt.revisionAfter + 1 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...diceReceipt,
+        events: [{ ...diceEvent, commandId: "command-two" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...diceReceipt,
+        events: [{ ...diceEvent, campaignId: "campaign-two" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...diceReceipt,
+        revisionAfter: diceReceipt.revisionBefore,
+      }).success,
+    ).toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...diceReceipt,
+        revisionAfter: diceReceipt.revisionAfter + 1,
+        events: [{ ...diceEvent, revision: diceReceipt.revisionAfter + 1 }],
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects unknown, narration, public-fact, and speculative fields at every exposed level", () => {
@@ -420,8 +528,12 @@ describe("RPG command contracts", () => {
       expect(actorAttributeSetEventSchema.safeParse({ ...event, [field]: [] }).success).toBe(false);
       expect(actorDiceRolledEventSchema.safeParse({ ...diceEvent, [field]: [] }).success).toBe(false);
     }
-    expect(commandReceiptSchema.safeParse({ ...receipt, events: [{ ...event, data: { ...event.data, narration: "changed" } }] }).success)
-      .toBe(false);
+    expect(
+      commandReceiptSchema.safeParse({
+        ...receipt,
+        events: [{ ...event, data: { ...event.data, narration: "changed" } }],
+      }).success,
+    ).toBe(false);
   });
 
   it("exports the inferred envelope type with the required nullable field", () => {

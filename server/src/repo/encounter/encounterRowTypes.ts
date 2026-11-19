@@ -20,14 +20,16 @@ export function projectCombatLogRows(
 ): CombatLogEntry[] {
   return rows.flatMap((row, index) => {
     try {
-      return [combatLogEntrySchema.parse({
-        logEntryId: row.log_id,
-        campaignId,
-        encounterId,
-        sequence: index + 1,
-        occurredAt: row.occurred_at,
-        event: JSON.parse(row.log_json),
-      })];
+      return [
+        combatLogEntrySchema.parse({
+          logEntryId: row.log_id,
+          campaignId,
+          encounterId,
+          sequence: index + 1,
+          occurredAt: row.occurred_at,
+          event: JSON.parse(row.log_json),
+        }),
+      ];
     } catch {
       return [];
     }

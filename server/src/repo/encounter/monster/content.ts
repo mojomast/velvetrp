@@ -12,18 +12,28 @@ export type PinnedEnemyDefinition = ReturnType<typeof enemyTemplateCatalogDefini
 export type PinnedAbilityDefinition = ReturnType<typeof abilityCatalogDefinitionSchema.parse>;
 
 /** Returns the executable melee attack step for an ability, or null. */
-export function monsterAttackStepFromAbility(enemy: PinnedEnemyDefinition, ability: PinnedAbilityDefinition): MonsterAttackStep | null {
+export function monsterAttackStepFromAbility(
+  enemy: PinnedEnemyDefinition,
+  ability: PinnedAbilityDefinition,
+): MonsterAttackStep | null {
   const profile = enemy.mechanics.combatProfile;
   if (!profile) return null;
   const effect = ability.mechanics.effects[0] as
-    | { type?: string; damageType?: string; dice?: { count?: number; sides?: number; modifier?: number } }
-    | undefined;
-  if (ability.mechanics.actionCost !== "action" || ability.mechanics.target !== "enemy" || effect?.type !== "damage") return null;
+    { type?: string; damageType?: string; dice?: { count?: number; sides?: number; modifier?: number } } | undefined;
+  if (ability.mechanics.actionCost !== "action" || ability.mechanics.target !== "enemy" || effect?.type !== "damage")
+    return null;
   const dice = effect.dice;
   if (!dice) return null;
   const { count, sides, modifier } = dice;
-  if (typeof count !== "number" || typeof sides !== "number" || typeof modifier !== "number"
-      || !Number.isInteger(count) || !Number.isInteger(sides) || !Number.isInteger(modifier)) return null;
+  if (
+    typeof count !== "number" ||
+    typeof sides !== "number" ||
+    typeof modifier !== "number" ||
+    !Number.isInteger(count) ||
+    !Number.isInteger(sides) ||
+    !Number.isInteger(modifier)
+  )
+    return null;
   return Object.freeze({
     abilityId: ability.reference.definitionId,
     label: ability.name,
@@ -35,10 +45,15 @@ export function monsterAttackStepFromAbility(enemy: PinnedEnemyDefinition, abili
 }
 
 /** The ordered executable attack steps available to a pinned enemy. */
-export function monsterAttackStepsFromContent(enemy: PinnedEnemyDefinition, abilities: readonly PinnedAbilityDefinition[]): readonly MonsterAttackStep[] {
-  return Object.freeze(abilities
-    .map((ability) => monsterAttackStepFromAbility(enemy, ability))
-    .filter((step): step is MonsterAttackStep => step !== null));
+export function monsterAttackStepsFromContent(
+  enemy: PinnedEnemyDefinition,
+  abilities: readonly PinnedAbilityDefinition[],
+): readonly MonsterAttackStep[] {
+  return Object.freeze(
+    abilities
+      .map((ability) => monsterAttackStepFromAbility(enemy, ability))
+      .filter((step): step is MonsterAttackStep => step !== null),
+  );
 }
 
 /**
@@ -47,15 +62,22 @@ export function monsterAttackStepsFromContent(enemy: PinnedEnemyDefinition, abil
  * referenced on-hit save rider (Wolf Knockdown); a standalone save action is
  * used when the enemy's first executable ability only forces a save.
  */
-export function monsterActionPlanFromContent(enemy: PinnedEnemyDefinition, abilities: readonly PinnedAbilityDefinition[]): MonsterActionPlan | null {
+export function monsterActionPlanFromContent(
+  enemy: PinnedEnemyDefinition,
+  abilities: readonly PinnedAbilityDefinition[],
+): MonsterActionPlan | null {
   const steps = monsterAttackStepsFromContent(enemy, abilities);
   const multiattack = planMonsterMultiattack(enemy.reference.definitionId, steps);
   if (multiattack) return multiattack;
   const step = steps[0] ?? null;
   if (!step) {
-    const standalone = abilities.map((ability) => planMonsterSave(ability.reference.definitionId)).find((plan): plan is MonsterSavePlan => plan !== null);
+    const standalone = abilities
+      .map((ability) => planMonsterSave(ability.reference.definitionId))
+      .find((plan): plan is MonsterSavePlan => plan !== null);
     return standalone ?? null;
   }
-  const onHit = abilities.map((ability) => planMonsterSave(ability.reference.definitionId)).find((plan): plan is MonsterSavePlan => plan !== null);
+  const onHit = abilities
+    .map((ability) => planMonsterSave(ability.reference.definitionId))
+    .find((plan): plan is MonsterSavePlan => plan !== null);
   return Object.freeze({ kind: "attack", step, ...(onHit ? { onHit } : {}) });
 }

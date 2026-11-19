@@ -99,8 +99,11 @@ export function reviewCandidates(
   const includeFlagged = options.includeFlaggedFallbacks === true;
   return records
     .filter((record) => options.lane === undefined || record.lane === options.lane)
-    .filter((record) => record.confidenceBand === "act"
-      || (includeFlagged && record.confidenceBand === "fallback" && hasFlags(record.selection)))
+    .filter(
+      (record) =>
+        record.confidenceBand === "act" ||
+        (includeFlagged && record.confidenceBand === "fallback" && hasFlags(record.selection)),
+    )
     .map((record) => ({
       decisionId: record.decisionId,
       lane: record.lane,
@@ -114,11 +117,16 @@ export function reviewCandidates(
       questions: record.questions,
       answers: record.answers,
     }))
-    .filter((candidate) => options.maxSignal === undefined
-      || (candidate.topSignal !== null && candidate.topSignal <= options.maxSignal))
-    .sort((left, right) => (left.topSignal ?? 1) - (right.topSignal ?? 1)
-      || left.createdAt.localeCompare(right.createdAt)
-      || left.decisionId.localeCompare(right.decisionId))
+    .filter(
+      (candidate) =>
+        options.maxSignal === undefined || (candidate.topSignal !== null && candidate.topSignal <= options.maxSignal),
+    )
+    .sort(
+      (left, right) =>
+        (left.topSignal ?? 1) - (right.topSignal ?? 1) ||
+        left.createdAt.localeCompare(right.createdAt) ||
+        left.decisionId.localeCompare(right.decisionId),
+    )
     .slice(0, limit);
 }
 
@@ -172,22 +180,29 @@ export function renderReviewSheet(
   const lines: string[] = [];
   lines.push("# System One decision review sheet");
   lines.push("");
-  if (options.generatedAt) lines.push(`Generated ${options.generatedAt} by \`scripts/review-system-one-decisions.ts\`.`);
+  if (options.generatedAt)
+    lines.push(`Generated ${options.generatedAt} by \`scripts/review-system-one-decisions.ts\`.`);
   if (options.source) lines.push(`Source: ${options.source}.`);
   if (options.generatedAt || options.source) lines.push("");
   lines.push("## Summary");
   lines.push("");
   lines.push(`- Candidates: ${summary.total}`);
-  lines.push(`- Reviewed: ${summary.reviewed} (${summary.correct} correct, ${summary.incorrect} incorrect, ${summary.unjudged} unjudged)`);
-  lines.push(`- Lanes with an incorrect verdict: ${summary.incorrectLanes.length > 0 ? summary.incorrectLanes.join(", ") : "—"}`);
+  lines.push(
+    `- Reviewed: ${summary.reviewed} (${summary.correct} correct, ${summary.incorrect} incorrect, ${summary.unjudged} unjudged)`,
+  );
+  lines.push(
+    `- Lanes with an incorrect verdict: ${summary.incorrectLanes.length > 0 ? summary.incorrectLanes.join(", ") : "—"}`,
+  );
   lines.push("");
   lines.push("## Queue");
   lines.push("");
   lines.push("| # | Decision | Lane | Band | Signal | Shadow | Verdict |");
   lines.push("| ---: | --- | --- | --- | ---: | --- | --- |");
   candidates.forEach((candidate, index) => {
-    lines.push(`| ${index + 1} | ${candidate.decisionId} | ${candidate.lane} | ${candidate.confidenceBand}`
-      + ` | ${formatSignal(candidate.topSignal)} | ${candidate.shadow ? "yes" : "no"} | ${candidate.verdict ?? "unjudged"} |`);
+    lines.push(
+      `| ${index + 1} | ${candidate.decisionId} | ${candidate.lane} | ${candidate.confidenceBand}` +
+        ` | ${formatSignal(candidate.topSignal)} | ${candidate.shadow ? "yes" : "no"} | ${candidate.verdict ?? "unjudged"} |`,
+    );
   });
   lines.push("");
   lines.push("## Decisions");

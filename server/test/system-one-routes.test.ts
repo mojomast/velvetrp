@@ -34,9 +34,14 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  if (savedBaseUrl === undefined) delete process.env.TYPESAFE_BASE_URL; else process.env.TYPESAFE_BASE_URL = savedBaseUrl;
-  if (savedApiKey === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = savedApiKey;
-  if (server) { await new Promise<void>((resolve) => server?.close(() => resolve())); server = null; }
+  if (savedBaseUrl === undefined) delete process.env.TYPESAFE_BASE_URL;
+  else process.env.TYPESAFE_BASE_URL = savedBaseUrl;
+  if (savedApiKey === undefined) delete process.env.TYPESAFE_API_KEY;
+  else process.env.TYPESAFE_API_KEY = savedApiKey;
+  if (server) {
+    await new Promise<void>((resolve) => server?.close(() => resolve()));
+    server = null;
+  }
 });
 
 describe("System One provider api", () => {
@@ -55,8 +60,20 @@ describe("System One provider api", () => {
     const body = response.json();
     expect(response.statusCode).toBe(200);
     expect(Object.keys(body)).toEqual([
-      "id", "providerType", "enabled", "laneModes", "shadowAdventurePayload", "baseUrl", "model", "hasApiKey", "requestTimeoutSeconds",
-      "pricing", "budget", "confidencePolicy", "confidenceCalibration", "updatedAt",
+      "id",
+      "providerType",
+      "enabled",
+      "laneModes",
+      "shadowAdventurePayload",
+      "baseUrl",
+      "model",
+      "hasApiKey",
+      "requestTimeoutSeconds",
+      "pricing",
+      "budget",
+      "confidencePolicy",
+      "confidenceCalibration",
+      "updatedAt",
     ]);
     expect(body.id).toBe("system-one");
     expect(body.enabled).toBe(false);
@@ -136,7 +153,11 @@ describe("System One provider api", () => {
   it("rejects invalid patches", async () => {
     const app = buildApp();
     expect((await app.inject({ method: "PUT", url: "/api/provider/system-one", payload: [] })).statusCode).toBe(400);
-    const badUrl = await app.inject({ method: "PUT", url: "/api/provider/system-one", payload: { baseUrl: "http://api.typesafe.ai/v1" } });
+    const badUrl = await app.inject({
+      method: "PUT",
+      url: "/api/provider/system-one",
+      payload: { baseUrl: "http://api.typesafe.ai/v1" },
+    });
     expect(badUrl.statusCode).toBe(400);
     expect(badUrl.json()).toMatchObject({ error: "invalid baseUrl" });
     await app.close();
@@ -152,14 +173,52 @@ describe("System One provider api", () => {
     const app = buildApp();
 
     expect((await app.inject({ method: "GET", url: "/api/provider/system-one/preflight" })).statusCode).toBe(404);
-    expect((await app.inject({ method: "POST", url: "/api/provider/system-one/preflight", payload: {}, headers: { "content-type": "text/plain" } })).statusCode).toBe(415);
-    expect((await app.inject({ method: "POST", url: "/api/provider/system-one/preflight?probe=1", headers: { "content-type": "application/json" }, payload: {} })).statusCode).toBe(400);
-    expect((await app.inject({ method: "POST", url: "/api/provider/system-one/preflight", headers: { "content-type": "application/json" }, payload: { extra: true } })).statusCode).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/provider/system-one/preflight",
+          payload: {},
+          headers: { "content-type": "text/plain" },
+        })
+      ).statusCode,
+    ).toBe(415);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/provider/system-one/preflight?probe=1",
+          headers: { "content-type": "application/json" },
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/provider/system-one/preflight",
+          headers: { "content-type": "application/json" },
+          payload: { extra: true },
+        })
+      ).statusCode,
+    ).toBe(400);
 
-    const response = await app.inject({ method: "POST", url: "/api/provider/system-one/preflight", headers: { "content-type": "application/json" }, payload: {} });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/provider/system-one/preflight",
+      headers: { "content-type": "application/json" },
+      payload: {},
+    });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
-    expect(response.json()).toMatchObject({ enabled: false, configured: true, ok: true, model: "jev-1.13.0", requestId: "req_route" });
+    expect(response.json()).toMatchObject({
+      enabled: false,
+      configured: true,
+      ok: true,
+      model: "jev-1.13.0",
+      requestId: "req_route",
+    });
     expect(JSON.stringify(response.json())).not.toMatch(/route-secret|authorization|bearer/i);
     await app.close();
   });
@@ -168,7 +227,12 @@ describe("System One provider api", () => {
     process.env.TYPESAFE_BASE_URL = "http://127.0.0.1:1";
     process.env.TYPESAFE_API_KEY = "route-secret";
     const app = buildApp();
-    const response = await app.inject({ method: "POST", url: "/api/provider/system-one/preflight", headers: { "content-type": "application/json" }, payload: {} });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/provider/system-one/preflight",
+      headers: { "content-type": "application/json" },
+      payload: {},
+    });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ ok: false, failure: { kind: "transport" } });
     await app.close();

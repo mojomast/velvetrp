@@ -50,7 +50,8 @@ export async function addMemoryFacts(characterId: string, facts: NewMemoryFact[]
   );
   const uniqueFacts = facts.filter((fact) => {
     const key = fact.content.trim().toLocaleLowerCase();
-    if (!key || seen.has(key) || existing.get(fact.sourceTurnId, characterId, fact.content, fact.sourceTurnId)) return false;
+    if (!key || seen.has(key) || existing.get(fact.sourceTurnId, characterId, fact.content, fact.sourceTurnId))
+      return false;
     seen.add(key);
     return true;
   });
@@ -88,7 +89,11 @@ export async function addMemoryFacts(characterId: string, facts: NewMemoryFact[]
 }
 
 /** Optional ancestry excludes discarded same-session facts before applying the limit. */
-export async function listApprovedMemories(characterId: string, limit = 8, scope?: { sessionId: string; sourceTurnIds: string[] }): Promise<MemoryFact[]> {
+export async function listApprovedMemories(
+  characterId: string,
+  limit = 8,
+  scope?: { sessionId: string; sourceTurnIds: string[] },
+): Promise<MemoryFact[]> {
   const rows = getRepositoryDatabase()
     .prepare(
       `SELECT * FROM memories
@@ -117,7 +122,8 @@ export async function listAllMemories(characterId: string): Promise<MemoryFact[]
 
 export async function setMemoryApproval(id: string, userApproved: boolean): Promise<MemoryFact | null> {
   const db = getRepositoryDatabase();
-  const row = db.prepare("SELECT * FROM memories WHERE id = ? AND forgotten_at IS NULL").get(id) as MemoryRow | undefined;
+  const row = db.prepare("SELECT * FROM memories WHERE id = ? AND forgotten_at IS NULL").get(id) as
+    MemoryRow | undefined;
   if (!row) return null;
   db.prepare("UPDATE memories SET user_approved = ? WHERE id = ?").run(userApproved ? 1 : 0, id);
   return toMemory({ ...row, user_approved: userApproved ? 1 : 0 });
@@ -135,9 +141,9 @@ export async function updateMemory(
   const current = await getMemory(id);
   if (!current) return null;
   const next = { ...current, ...patch };
-  getRepositoryDatabase().prepare("UPDATE memories SET kind = ?, content = ?, user_approved = ?, forgotten_at = ? WHERE id = ?").run(
-    next.kind, next.content, next.userApproved ? 1 : 0, next.forgottenAt, id,
-  );
+  getRepositoryDatabase()
+    .prepare("UPDATE memories SET kind = ?, content = ?, user_approved = ?, forgotten_at = ? WHERE id = ?")
+    .run(next.kind, next.content, next.userApproved ? 1 : 0, next.forgottenAt, id);
   return getMemory(id);
 }
 
@@ -147,7 +153,8 @@ export async function restoreMemory(id: string): Promise<MemoryFact | null> {
 
 export async function forgetMemory(id: string): Promise<MemoryFact | null> {
   const db = getRepositoryDatabase();
-  const row = db.prepare("SELECT * FROM memories WHERE id = ? AND forgotten_at IS NULL").get(id) as MemoryRow | undefined;
+  const row = db.prepare("SELECT * FROM memories WHERE id = ? AND forgotten_at IS NULL").get(id) as
+    MemoryRow | undefined;
   if (!row) return null;
   const forgottenAt = now();
   db.prepare("UPDATE memories SET forgotten_at = ? WHERE id = ?").run(forgottenAt, id);

@@ -16,10 +16,23 @@ import path from "node:path";
  * are prerequisites; this script deliberately fails if the table needs recovery.
  */
 function parseArgs(argv) {
-  const args = { baseUrl: "http://127.0.0.1:5173", campaign: "", room: "", out: "docs/images", references: [],
+  const args = {
+    baseUrl: "http://127.0.0.1:5173",
+    campaign: "",
+    room: "",
+    out: "docs/images",
+    references: [],
     draft: "I examine the markings with my waylamp.",
-    executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH };
-  const keys = { "--base-url": "baseUrl", "--campaign": "campaign", "--room": "room", "--out": "out", "--draft": "draft", "--executable-path": "executablePath" };
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH,
+  };
+  const keys = {
+    "--base-url": "baseUrl",
+    "--campaign": "campaign",
+    "--room": "room",
+    "--out": "out",
+    "--draft": "draft",
+    "--executable-path": "executablePath",
+  };
   for (let index = 0; index < argv.length; index += 2) {
     const [flag, value] = [argv[index], argv[index + 1]];
     if (!value) throw new Error(`Missing value for ${flag}`);
@@ -35,9 +48,18 @@ const args = parseArgs(process.argv.slice(2));
 mkdirSync(args.out, { recursive: true });
 const browser = await chromium.launch(args.executablePath ? { executablePath: args.executablePath } : {});
 try {
-  const context = await browser.newContext({ viewport: { width: 1600, height: 1100 }, deviceScaleFactor: 1.5, reducedMotion: "reduce" });
+  const context = await browser.newContext({
+    viewport: { width: 1600, height: 1100 },
+    deviceScaleFactor: 1.5,
+    reducedMotion: "reduce",
+  });
   // Keep captures repeatable and prevent an automatic narration retry on a restored fixture.
-  await context.addInitScript(() => localStorage.setItem("velvet.campaign-workbench.v1", JSON.stringify({ theme: "light", density: "comfortable", autoNarrateMechanics: false })));
+  await context.addInitScript(() =>
+    localStorage.setItem(
+      "velvet.campaign-workbench.v1",
+      JSON.stringify({ theme: "light", density: "comfortable", autoNarrateMechanics: false }),
+    ),
+  );
   const page = await context.newPage();
   const writes = [];
   await page.route("**/api/**", async (route) => {
@@ -46,7 +68,9 @@ try {
       await route.abort("blockedbyclient");
     } else await route.continue();
   });
-  await page.goto(`${args.baseUrl.replace(/\/$/, "")}/#/campaign/${encodeURIComponent(args.campaign)}/play/${encodeURIComponent(args.room)}`);
+  await page.goto(
+    `${args.baseUrl.replace(/\/$/, "")}/#/campaign/${encodeURIComponent(args.campaign)}/play/${encodeURIComponent(args.room)}`,
+  );
   await expect(page.locator("[data-adventure-table]")).toBeVisible();
   const composer = page.getByRole("textbox", { name: "What do you do?", exact: true });
   await expect(composer).toBeEnabled({ timeout: 30_000 });

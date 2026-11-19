@@ -260,12 +260,10 @@ ORDER BY timeline.created_at ASC, timeline.id COLLATE BINARY ASC`;
 
 // Keep get authorization and every audit aggregate byte-for-byte shared with
 // the list boundary; only constrain the left-joined projection to its target.
-const CAMPAIGN_TIMELINE_GET_SELECT = CAMPAIGN_TIMELINE_READ_SELECT
-  .replace(
-    "LEFT JOIN campaign_timelines timeline ON timeline.campaign_id = campaign.id",
-    "LEFT JOIN campaign_timelines timeline ON timeline.campaign_id = campaign.id AND timeline.id = ?",
-  )
-  .replace("\nORDER BY timeline.created_at ASC, timeline.id COLLATE BINARY ASC", "");
+const CAMPAIGN_TIMELINE_GET_SELECT = CAMPAIGN_TIMELINE_READ_SELECT.replace(
+  "LEFT JOIN campaign_timelines timeline ON timeline.campaign_id = campaign.id",
+  "LEFT JOIN campaign_timelines timeline ON timeline.campaign_id = campaign.id AND timeline.id = ?",
+).replace("\nORDER BY timeline.created_at ASC, timeline.id COLLATE BINARY ASC", "");
 
 function toCampaignTimelineRead(row: CampaignTimelineReadRow): CampaignTimeline {
   try {
@@ -275,11 +273,14 @@ function toCampaignTimelineRead(row: CampaignTimelineReadRow): CampaignTimeline 
       role: row.actor_role,
       createdAt: row.actor_created_at,
     });
-    if (row.active_timeline_presence === null
-        || row.active_timeline_presence !== row.active_timeline_id
-        || row.active_timeline_campaign_id !== row.campaign_id
-        || row.timeline_id === null || row.timeline_campaign_id !== row.campaign_id
-        || row.timeline_created_at === null) {
+    if (
+      row.active_timeline_presence === null ||
+      row.active_timeline_presence !== row.active_timeline_id ||
+      row.active_timeline_campaign_id !== row.campaign_id ||
+      row.timeline_id === null ||
+      row.timeline_campaign_id !== row.campaign_id ||
+      row.timeline_created_at === null
+    ) {
       throw new Error();
     }
     const timeline = campaignTimelineSchema.parse({
@@ -294,11 +295,16 @@ function toCampaignTimelineRead(row: CampaignTimelineReadRow): CampaignTimeline 
     const receiptCount = revisionSchema.parse(row.receipt_count);
     const distinctCount = revisionSchema.parse(row.distinct_revision_count);
     const invalidCount = revisionSchema.parse(row.invalid_audit_count);
-    if (eventCount !== revision || commandCount !== revision || receiptCount !== revision
-        || distinctCount !== revision || invalidCount !== 0
-        || (revision === 0
-          ? row.minimum_revision !== null || row.maximum_revision !== null
-          : row.minimum_revision !== 1 || row.maximum_revision !== revision)) {
+    if (
+      eventCount !== revision ||
+      commandCount !== revision ||
+      receiptCount !== revision ||
+      distinctCount !== revision ||
+      invalidCount !== 0 ||
+      (revision === 0
+        ? row.minimum_revision !== null || row.maximum_revision !== null
+        : row.minimum_revision !== 1 || row.maximum_revision !== revision)
+    ) {
       throw new Error();
     }
     return timeline;
@@ -314,7 +320,8 @@ export function listCampaignTimelinesSync(
 ): CampaignTimeline[] {
   const principalId = resourceIdSchema.parse(actorPrincipalId);
   const normalizedCampaignId = resourceIdSchema.parse(campaignId);
-  const rows = db.prepare(CAMPAIGN_TIMELINE_READ_SELECT)
+  const rows = db
+    .prepare(CAMPAIGN_TIMELINE_READ_SELECT)
     .all(principalId, normalizedCampaignId) as CampaignTimelineReadRow[];
   return rows.map(toCampaignTimelineRead);
 }
@@ -328,8 +335,8 @@ export function getCampaignTimelineSync(
   const principalId = resourceIdSchema.parse(actorPrincipalId);
   const normalizedCampaignId = resourceIdSchema.parse(campaignId);
   const normalizedTimelineId = resourceIdSchema.parse(timelineId);
-  const row = db.prepare(CAMPAIGN_TIMELINE_GET_SELECT)
-    .get(normalizedTimelineId, principalId, normalizedCampaignId) as CampaignTimelineReadRow | undefined;
+  const row = db.prepare(CAMPAIGN_TIMELINE_GET_SELECT).get(normalizedTimelineId, principalId, normalizedCampaignId) as
+    CampaignTimelineReadRow | undefined;
   if (!row) return null;
   if (row.timeline_id !== null) return toCampaignTimelineRead(row);
 
@@ -342,15 +349,21 @@ export function getCampaignTimelineSync(
       role: row.actor_role,
       createdAt: row.actor_created_at,
     });
-    if (row.active_timeline_presence === null
-        || row.active_timeline_presence !== row.active_timeline_id
-        || row.active_timeline_campaign_id !== row.campaign_id
-        || revisionSchema.parse(row.invalid_audit_count) !== 0
-        || row.timeline_campaign_id !== null || row.timeline_revision !== null
-        || row.timeline_created_at !== null || row.minimum_revision !== null
-        || row.maximum_revision !== null || row.event_count !== 0
-        || row.command_count !== 0 || row.receipt_count !== 0
-        || row.distinct_revision_count !== 0) {
+    if (
+      row.active_timeline_presence === null ||
+      row.active_timeline_presence !== row.active_timeline_id ||
+      row.active_timeline_campaign_id !== row.campaign_id ||
+      revisionSchema.parse(row.invalid_audit_count) !== 0 ||
+      row.timeline_campaign_id !== null ||
+      row.timeline_revision !== null ||
+      row.timeline_created_at !== null ||
+      row.minimum_revision !== null ||
+      row.maximum_revision !== null ||
+      row.event_count !== 0 ||
+      row.command_count !== 0 ||
+      row.receipt_count !== 0 ||
+      row.distinct_revision_count !== 0
+    ) {
       throw new Error();
     }
     return null;

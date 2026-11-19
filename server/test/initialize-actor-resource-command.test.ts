@@ -27,7 +27,8 @@ function dbPath(): string {
 }
 
 function withoutTriggers(db: DatabaseDriver.Database, names: string[], action: () => void): void {
-  const rows = db.prepare(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN (${names.map(() => "?").join(",")})`)
+  const rows = db
+    .prepare(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN (${names.map(() => "?").join(",")})`)
     .all(...names) as Array<{ name: string; sql: string }>;
   if (rows.length !== names.length) throw new Error("corruption fixture triggers are incomplete");
   try {
@@ -42,31 +43,43 @@ function seed(): void {
   createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }).close();
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys = ON");
-  db.prepare(`INSERT INTO principals VALUES
+  db.prepare(
+    `INSERT INTO principals VALUES
     ('gm', 'GM', 0), ('player', 'Player', 0), ('observer', 'Observer', 0),
-    ('application-only', 'Application owner only', 0)`).run();
+    ('application-only', 'Application owner only', 0)`,
+  ).run();
   db.prepare("UPDATE application_owner SET principal_id = 'application-only' WHERE singleton = 1").run();
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
       VALUES ('campaign-one', 'One', 'timeline-one', 'local-owner', ?, ?),
-             ('campaign-two', 'Two', 'timeline-two', 'local-owner', ?, ?)`).run(BEFORE, BEFORE, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES
+             ('campaign-two', 'Two', 'timeline-two', 'local-owner', ?, ?)`,
+    ).run(BEFORE, BEFORE, BEFORE, BEFORE);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES
       ('timeline-one', 'campaign-one', ?), ('timeline-old', 'campaign-one', ?),
-      ('timeline-two', 'campaign-two', ?)`).run(BEFORE, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO campaign_memberships VALUES
+      ('timeline-two', 'campaign-two', ?)`,
+    ).run(BEFORE, BEFORE, BEFORE);
+    db.prepare(
+      `INSERT INTO campaign_memberships VALUES
       ('campaign-one', 'local-owner', 'owner', ?), ('campaign-one', 'gm', 'gm', ?),
       ('campaign-one', 'player', 'player', ?), ('campaign-one', 'observer', 'observer', ?),
-      ('campaign-two', 'local-owner', 'owner', ?)`).run(BEFORE, BEFORE, BEFORE, BEFORE, BEFORE);
+      ('campaign-two', 'local-owner', 'owner', ?)`,
+    ).run(BEFORE, BEFORE, BEFORE, BEFORE, BEFORE);
   })();
-  db.prepare(`INSERT INTO characters VALUES
+  db.prepare(
+    `INSERT INTO characters VALUES
     ('persona-one', 'One', 30, 'hero', '', 1, 0, ?),
     ('persona-other', 'Other', 30, 'hero', '', 1, 0, ?),
-    ('persona-two', 'Two', 30, 'hero', '', 1, 0, ?)`).run(BEFORE, BEFORE, BEFORE);
+    ('persona-two', 'Two', 30, 'hero', '', 1, 0, ?)`,
+  ).run(BEFORE, BEFORE, BEFORE);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Description', '[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core', '1', 'profile', 'Core', 'Description', '[]', 0)").run();
   db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', 'race', 'human', 'Human', 'Description', '[]')").run();
-  db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', 'background', 'sage', 'Sage', 'Description', '[]')").run();
+  db.prepare(
+    "INSERT INTO rpg_definitions VALUES ('core', '1', 'background', 'sage', 'Sage', 'Description', '[]')",
+  ).run();
   db.prepare("UPDATE rpg_content_packs SET sealed = 1").run();
   for (const campaign of ["campaign-one", "campaign-two"]) {
     db.prepare("INSERT INTO campaign_rules_profiles VALUES (?, 'profile')").run(campaign);
@@ -77,18 +90,29 @@ function seed(): void {
     ["other", "campaign-one", "persona-other"],
     ["two", "campaign-two", "persona-two"],
   ]) {
-    db.prepare("INSERT INTO campaign_characters VALUES (?, ?, ?, ?, ?)")
-      .run(`cc-${suffix}`, campaign, persona, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO rpg_campaign_sheets VALUES
-      (?, ?, ?, 'core', '1', 'race', 'human', 'core', '1', 'background', 'sage', ?, ?)`)
-      .run(`sheet-${suffix}`, campaign, `cc-${suffix}`, BEFORE, BEFORE);
-    db.prepare("INSERT INTO rpg_character_attributes VALUES (?, ?, 0, 'strength', 10)")
-      .run(campaign, `sheet-${suffix}`);
-    db.prepare(`INSERT INTO campaign_actors
-      VALUES (?, ?, ?, ?, 'player-character', 'principal', ?, ?)`)
-      .run(`actor-${suffix}`, campaign, `cc-${suffix}`, `sheet-${suffix}`, BEFORE, BEFORE);
-    db.prepare("INSERT INTO campaign_actor_private_state VALUES (?, ?, 'local-owner', NULL)")
-      .run(`actor-${suffix}`, campaign);
+    db.prepare("INSERT INTO campaign_characters VALUES (?, ?, ?, ?, ?)").run(
+      `cc-${suffix}`,
+      campaign,
+      persona,
+      BEFORE,
+      BEFORE,
+    );
+    db.prepare(
+      `INSERT INTO rpg_campaign_sheets VALUES
+      (?, ?, ?, 'core', '1', 'race', 'human', 'core', '1', 'background', 'sage', ?, ?)`,
+    ).run(`sheet-${suffix}`, campaign, `cc-${suffix}`, BEFORE, BEFORE);
+    db.prepare("INSERT INTO rpg_character_attributes VALUES (?, ?, 0, 'strength', 10)").run(
+      campaign,
+      `sheet-${suffix}`,
+    );
+    db.prepare(
+      `INSERT INTO campaign_actors
+      VALUES (?, ?, ?, ?, 'player-character', 'principal', ?, ?)`,
+    ).run(`actor-${suffix}`, campaign, `cc-${suffix}`, `sheet-${suffix}`, BEFORE, BEFORE);
+    db.prepare("INSERT INTO campaign_actor_private_state VALUES (?, ?, 'local-owner', NULL)").run(
+      `actor-${suffix}`,
+      campaign,
+    );
   }
   db.close();
 }
@@ -120,18 +144,24 @@ function snapshot() {
 
 function fiveWrites(commandId = "command-one", key = "key-one", name = "hp") {
   return [
-    { sql: `INSERT INTO campaign_commands
+    {
+      sql: `INSERT INTO campaign_commands
       (campaign_id, command_id, idempotency_key, timeline_id, actor_id, expected_revision,
        source_turn_id, type, resource_name, resource_current, resource_max) VALUES
       ('campaign-one', ?, ?, 'timeline-one', 'actor-one', 0, 'turn-one',
-       'initialize_actor_resource', ?, 5, 10)`, params: [commandId, key, name] },
+       'initialize_actor_resource', ?, 5, 10)`,
+      params: [commandId, key, name],
+    },
     { sql: "INSERT INTO rpg_actor_resources VALUES ('campaign-one', 'actor-one', ?, 5, 10)", params: [name] },
     { sql: "UPDATE campaign_timelines SET revision = 1 WHERE id = 'timeline-one'" },
-    { sql: `INSERT INTO campaign_events
+    {
+      sql: `INSERT INTO campaign_events
       (event_id, campaign_id, command_id, timeline_id, actor_id, source_turn_id, type,
        revision, occurred_at, resource_name, resource_current, resource_max) VALUES
       ('event-worker', 'campaign-one', ?, 'timeline-one', 'actor-one', 'turn-one',
-       'actor_resource_initialized', 1, ?, ?, 5, 10)`, params: [commandId, AT, name] },
+       'actor_resource_initialized', 1, ?, ?, 5, 10)`,
+      params: [commandId, AT, name],
+    },
     { sql: "INSERT INTO command_receipts VALUES ('campaign-one', ?, 0, 1, 'event-worker')", params: [commandId] },
   ];
 }
@@ -141,15 +171,21 @@ describe("initialize actor resource command", () => {
     seed();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
     for (const command of [
       { type: "set_actor_attribute", payload: { attributeId: "strength", value: 11 } },
       { type: "roll_actor_dice", payload: { expression: "1d20" } },
     ] as const) {
-      expect(() => repository.executeInitializeActorResource("local-owner", {
-        ...envelope,
-        command,
-      })).toThrow("requires an initialize_actor_resource command");
+      expect(() =>
+        repository.executeInitializeActorResource("local-owner", {
+          ...envelope,
+          command,
+        }),
+      ).toThrow("requires an initialize_actor_resource command");
     }
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
@@ -160,20 +196,34 @@ describe("initialize actor resource command", () => {
     seed();
     const repository = factory();
     expect(repository.executeInitializeActorResource("local-owner", envelope)).toEqual({
-      commandId: "command-one", campaignId: "campaign-one", revisionBefore: 0, revisionAfter: 1,
-      events: [{
-        eventId: "event-one", commandId: "command-one", campaignId: "campaign-one",
-        timelineId: "timeline-one", actorId: "actor-one", sourceTurnId: "turn-one",
-        type: "actor_resource_initialized", revision: 1, occurredAt: AT,
-        data: { name: "hp", current: 5, max: 10 },
-      }],
+      commandId: "command-one",
+      campaignId: "campaign-one",
+      revisionBefore: 0,
+      revisionAfter: 1,
+      events: [
+        {
+          eventId: "event-one",
+          commandId: "command-one",
+          campaignId: "campaign-one",
+          timelineId: "timeline-one",
+          actorId: "actor-one",
+          sourceTurnId: "turn-one",
+          type: "actor_resource_initialized",
+          revision: 1,
+          occurredAt: AT,
+          data: { name: "hp", current: 5, max: 10 },
+        },
+      ],
     });
     repository.close();
     const state = snapshot();
-    expect(state.resources).toEqual([{ campaign_id: "campaign-one", actor_id: "actor-one", name: "hp", current: 5, max: 10 }]);
+    expect(state.resources).toEqual([
+      { campaign_id: "campaign-one", actor_id: "actor-one", name: "hp", current: 5, max: 10 },
+    ]);
     expect(state.timeline).toEqual({ revision: 1 });
-    expect([state.campaignTime, state.characterTime, state.sheetTime, state.actorTime])
-      .toEqual(Array(4).fill({ updated_at: BEFORE }));
+    expect([state.campaignTime, state.characterTime, state.sheetTime, state.actorTime]).toEqual(
+      Array(4).fill({ updated_at: BEFORE }),
+    );
   });
 
   it("writes command, resource, timeline, event, and receipt in order", () => {
@@ -192,8 +242,11 @@ describe("initialize actor resource command", () => {
     repository.executeInitializeActorResource("local-owner", envelope);
     repository.close();
     const verify = new DatabaseDriver(dbPath(), { readonly: true });
-    expect((verify.prepare("SELECT name FROM resource_write_order ORDER BY position").all() as Array<{ name: string }>).map(({ name }) => name))
-      .toEqual(["command", "resource", "timeline", "event", "receipt"]);
+    expect(
+      (verify.prepare("SELECT name FROM resource_write_order ORDER BY position").all() as Array<{ name: string }>).map(
+        ({ name }) => name,
+      ),
+    ).toEqual(["command", "resource", "timeline", "event", "receipt"]);
     verify.close();
   });
 
@@ -204,16 +257,23 @@ describe("initialize actor resource command", () => {
     repository.close();
   });
 
-  it.each(["player", "observer", "application-only", "missing"])("denies %s without disclosure or dependencies", (principal) => {
-    seed();
-    const nextId = vi.fn(() => "unused");
-    const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => repository.executeInitializeActorResource(principal, envelope)).toThrow("command unavailable");
-    expect(nextId).not.toHaveBeenCalled();
-    expect(now).not.toHaveBeenCalled();
-    repository.close();
-  });
+  it.each(["player", "observer", "application-only", "missing"])(
+    "denies %s without disclosure or dependencies",
+    (principal) => {
+      seed();
+      const nextId = vi.fn(() => "unused");
+      const now = vi.fn(() => new Date(AT));
+      const repository = createRepository({
+        dataDir: process.env.VELVET_DATA_DIR as string,
+        ids: { nextId },
+        clock: { now },
+      });
+      expect(() => repository.executeInitializeActorResource(principal, envelope)).toThrow("command unavailable");
+      expect(nextId).not.toHaveBeenCalled();
+      expect(now).not.toHaveBeenCalled();
+      repository.close();
+    },
+  );
 
   it.each([
     ["missing principal", "DELETE FROM principals WHERE id = 'local-owner'", "campaign_memberships"],
@@ -223,12 +283,14 @@ describe("initialize actor resource command", () => {
     seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
-    if(mutation.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare(mutation).run();
+    if (mutation.startsWith("DELETE FROM campaigns")) deleteCampaignForCorruptionTest(db, "campaign-one");
+    db.prepare(mutation).run();
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow(`foreign-key violation in ${table}`);
+    expect(() =>
+      createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }),
+    ).toThrow(`foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -273,8 +335,9 @@ describe("initialize actor resource command", () => {
     seed();
     const repository = factory();
     repository.executeInitializeActorResource("local-owner", envelope);
-    expect(() => repository.executeInitializeActorResource("local-owner", { ...envelope, ...patch } as CommandEnvelope))
-      .toThrow("identity collision");
+    expect(() =>
+      repository.executeInitializeActorResource("local-owner", { ...envelope, ...patch } as CommandEnvelope),
+    ).toThrow("identity collision");
     repository.close();
   });
 
@@ -299,8 +362,9 @@ describe("initialize actor resource command", () => {
       ...envelope,
       command: { type: "set_actor_attribute", payload: { attributeId: "strength", value: 11 } },
     });
-    expect(() => repository.executeInitializeActorResource("local-owner", { ...envelope, ...identities }))
-      .toThrow("identity collision");
+    expect(() => repository.executeInitializeActorResource("local-owner", { ...envelope, ...identities })).toThrow(
+      "identity collision",
+    );
     repository.close();
   });
 
@@ -312,11 +376,14 @@ describe("initialize actor resource command", () => {
       clock: { now: () => new Date(AT) },
     });
     repository.executeInitializeActorResource("local-owner", {
-      ...envelope, idempotencyKey: "key-a",
+      ...envelope,
+      idempotencyKey: "key-a",
       command: { type: "initialize_actor_resource", payload: { name: "mana", current: 1, max: 2 } },
     });
     repository.executeInitializeActorResource("local-owner", {
-      ...envelope, commandId: "command-b", expectedRevision: 1,
+      ...envelope,
+      commandId: "command-b",
+      expectedRevision: 1,
       command: { type: "initialize_actor_resource", payload: { name: "stamina", current: 1, max: 2 } },
     });
     expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow("identity collision");
@@ -330,8 +397,15 @@ describe("initialize actor resource command", () => {
     db.close();
     const repository = factory();
     expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow("already exists");
-    const upper = { ...envelope, command: { type: "initialize_actor_resource" as const, payload: { name: "HP", current: 5, max: 10 } } };
-    expect(repository.executeInitializeActorResource("local-owner", upper).events[0].data).toEqual({ name: "HP", current: 5, max: 10 });
+    const upper = {
+      ...envelope,
+      command: { type: "initialize_actor_resource" as const, payload: { name: "HP", current: 5, max: 10 } },
+    };
+    expect(repository.executeInitializeActorResource("local-owner", upper).events[0].data).toEqual({
+      name: "HP",
+      current: 5,
+      max: 10,
+    });
     repository.close();
   });
 
@@ -343,8 +417,9 @@ describe("initialize actor resource command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow("foreign-key violation in rpg_actor_resources");
+    expect(() =>
+      createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }),
+    ).toThrow("foreign-key violation in rpg_actor_resources");
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -357,7 +432,11 @@ describe("initialize actor resource command", () => {
     seed();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
     expect(() => repository.executeInitializeActorResource("local-owner", { ...envelope, ...patch })).toThrow(message);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
@@ -377,8 +456,18 @@ describe("initialize actor resource command", () => {
   });
 
   it.each([
-    ["missing audit", ["command_receipts_prevent_delete", "campaign_events_prevent_delete"], "DELETE FROM command_receipts; DELETE FROM campaign_events;", "incomplete"],
-    ["changed event payload", ["campaign_events_prevent_update"], "UPDATE campaign_events SET resource_current = 6;", "invalid"],
+    [
+      "missing audit",
+      ["command_receipts_prevent_delete", "campaign_events_prevent_delete"],
+      "DELETE FROM command_receipts; DELETE FROM campaign_events;",
+      "incomplete",
+    ],
+    [
+      "changed event payload",
+      ["campaign_events_prevent_update"],
+      "UPDATE campaign_events SET resource_current = 6;",
+      "invalid",
+    ],
   ])("rejects malformed retry: %s", (_label, triggers, mutation, message) => {
     seed();
     const first = factory();
@@ -397,8 +486,16 @@ describe("initialize actor resource command", () => {
   });
 
   it.each([
-    ["missing timeline parent", "PRAGMA foreign_keys = OFF; DELETE FROM campaign_timelines WHERE id = 'timeline-one';", "campaign_timeline_events"],
-    ["missing actor parent", "PRAGMA foreign_keys = OFF; DELETE FROM campaign_actors WHERE id = 'actor-one';", "campaign_events"],
+    [
+      "missing timeline parent",
+      "PRAGMA foreign_keys = OFF; DELETE FROM campaign_timelines WHERE id = 'timeline-one';",
+      "campaign_timeline_events",
+    ],
+    [
+      "missing actor parent",
+      "PRAGMA foreign_keys = OFF; DELETE FROM campaign_actors WHERE id = 'actor-one';",
+      "campaign_events",
+    ],
   ])("rejects malformed retry corruption at startup: %s", (_label, mutation, table) => {
     seed();
     const first = factory();
@@ -409,8 +506,9 @@ describe("initialize actor resource command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow(`foreign-key violation in ${table}`);
+    expect(() =>
+      createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }),
+    ).toThrow(`foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -432,7 +530,11 @@ describe("initialize actor resource command", () => {
 
   it.each([
     ["missing character", "DELETE FROM campaign_characters WHERE id = 'cc-one'", "rpg_campaign_sheets"],
-    ["mismatched sheet", "UPDATE campaign_actors SET sheet_id = 'sheet-other' WHERE id = 'actor-one'", "campaign_actors"],
+    [
+      "mismatched sheet",
+      "UPDATE campaign_actors SET sheet_id = 'sheet-other' WHERE id = 'actor-one'",
+      "campaign_actors",
+    ],
   ])("rejects malformed ancestry at startup: %s", (_label, mutation, table) => {
     seed();
     const db = new DatabaseDriver(dbPath());
@@ -447,8 +549,18 @@ describe("initialize actor resource command", () => {
     const calls: string[] = [];
     const repository = createRepository({
       dataDir: process.env.VELVET_DATA_DIR as string,
-      ids: { nextId: vi.fn(() => { calls.push("id"); return "event-one"; }) },
-      clock: { now: vi.fn(() => { calls.push("clock"); return new Date(AT); }) },
+      ids: {
+        nextId: vi.fn(() => {
+          calls.push("id");
+          return "event-one";
+        }),
+      },
+      clock: {
+        now: vi.fn(() => {
+          calls.push("clock");
+          return new Date(AT);
+        }),
+      },
     });
     repository.executeInitializeActorResource("local-owner", envelope);
     expect(calls).toEqual(["id", "clock"]);
@@ -457,14 +569,30 @@ describe("initialize actor resource command", () => {
 
   it.each([
     ["malformed ID", () => "bad id", () => new Date(AT)],
-    ["throwing ID", () => { throw new Error("ID failed"); }, () => new Date(AT)],
+    [
+      "throwing ID",
+      () => {
+        throw new Error("ID failed");
+      },
+      () => new Date(AT),
+    ],
     ["invalid clock", () => "event-one", () => new Date("invalid")],
-    ["throwing clock", () => "event-one", () => { throw new Error("clock failed"); }],
+    [
+      "throwing clock",
+      () => "event-one",
+      () => {
+        throw new Error("clock failed");
+      },
+    ],
   ])("rejects %s atomically with ordered dependencies", (_label, generate, readClock) => {
     seed();
     const nextId = vi.fn(generate);
     const now = vi.fn(readClock);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
     expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow();
     expect(snapshot().resources).toEqual([]);
     expect(nextId).toHaveBeenCalledOnce();
@@ -478,15 +606,22 @@ describe("initialize actor resource command", () => {
     const repository = factory();
     const db = new DatabaseDriver(dbPath());
     db.exec("DROP TRIGGER campaign_timelines_advance_revision");
-    db.prepare("UPDATE campaign_timelines SET revision = ? WHERE id = 'timeline-one'")
-      .run(Number.MAX_SAFE_INTEGER - 1);
+    db.prepare("UPDATE campaign_timelines SET revision = ? WHERE id = 'timeline-one'").run(Number.MAX_SAFE_INTEGER - 1);
     db.close();
-    expect(repository.executeInitializeActorResource("local-owner", {
-      ...envelope, expectedRevision: Number.MAX_SAFE_INTEGER - 1,
-    }).revisionAfter).toBe(Number.MAX_SAFE_INTEGER);
-    expect(() => repository.executeInitializeActorResource("local-owner", {
-      ...envelope, commandId: "overflow", idempotencyKey: "overflow", expectedRevision: Number.MAX_SAFE_INTEGER,
-    })).toThrow();
+    expect(
+      repository.executeInitializeActorResource("local-owner", {
+        ...envelope,
+        expectedRevision: Number.MAX_SAFE_INTEGER - 1,
+      }).revisionAfter,
+    ).toBe(Number.MAX_SAFE_INTEGER);
+    expect(() =>
+      repository.executeInitializeActorResource("local-owner", {
+        ...envelope,
+        commandId: "overflow",
+        idempotencyKey: "overflow",
+        expectedRevision: Number.MAX_SAFE_INTEGER,
+      }),
+    ).toThrow();
     repository.close();
   });
 
@@ -543,13 +678,21 @@ describe("initialize actor resource command", () => {
     ["different winner", fiveWrites("winner", "winner-key", "mana"), "revision"],
     ["same ID", fiveWrites("command-one", "winner-key"), "collision"],
     ["same key", fiveWrites("winner", "key-one"), "collision"],
-    ["timeline switch", [{ sql: "UPDATE campaigns SET active_timeline_id = 'timeline-old' WHERE id = 'campaign-one'" }], "inactive"],
+    [
+      "timeline switch",
+      [{ sql: "UPDATE campaigns SET active_timeline_id = 'timeline-old' WHERE id = 'campaign-one'" }],
+      "inactive",
+    ],
   ] as const)("re-resolves a blocked waiter after %s", async (_label, statements, outcome) => {
     seed();
     const writer = await startLockedWrite(dbPath(), [...statements]);
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
     if (outcome === "receipt") {
       expect(repository.executeInitializeActorResource("gm", envelope).events[0]?.eventId).toBe("event-worker");
     } else {
@@ -569,20 +712,32 @@ describe("initialize actor resource command", () => {
     // Open the repository before the worker takes the write lock: opening the store can stall
     // under parallel fork load, and doing it inside the lock window could let the worker commit
     // before the command ever observes the lock.
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
     // Hold the write lock past the repository's 5s busy_timeout; the extra margin is load
     // headroom for scheduling delay between the lock signal and the command, not a relaxed assertion.
-    const writer = await startLockedWrite(dbPath(), [{
-      sql: "UPDATE campaigns SET name = 'Worker held lock' WHERE id = 'campaign-one'",
-    }], 9_000);
-    expect(() => repository.executeInitializeActorResource("local-owner", envelope))
-      .toThrow(/database is locked|SQLITE_BUSY/i);
+    const writer = await startLockedWrite(
+      dbPath(),
+      [
+        {
+          sql: "UPDATE campaigns SET name = 'Worker held lock' WHERE id = 'campaign-one'",
+        },
+      ],
+      9_000,
+    );
+    expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow(
+      /database is locked|SQLITE_BUSY/i,
+    );
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
     expect(snapshot()).toEqual(before);
     await writer.done;
-    expect(repository.executeInitializeActorResource("local-owner", envelope).events[0]?.eventId)
-      .toBe("event-after-busy");
+    expect(repository.executeInitializeActorResource("local-owner", envelope).events[0]?.eventId).toBe(
+      "event-after-busy",
+    );
     repository.close();
   }, 20_000); // Load headroom: the lock is deliberately held for 9s and parallel forks can stretch setup/scheduling.
 
@@ -590,15 +745,20 @@ describe("initialize actor resource command", () => {
     seed();
     expect(repoModule).not.toHaveProperty("executeInitializeActorResource");
     const repository = factory();
-    expect(repository.transaction((unit) => {
-      // @ts-expect-error factory-only command must stay excluded from the unit of work contract
-      void unit.executeInitializeActorResource;
-      return "executeInitializeActorResource" in unit;
-    })).toBe(false);
-    expect(() => repository.transaction(() => repository.executeInitializeActorResource("bad actor", {} as CommandEnvelope)))
-      .toThrow("cannot run inside a repository transaction");
+    expect(
+      repository.transaction((unit) => {
+        // @ts-expect-error factory-only command must stay excluded from the unit of work contract
+        void unit.executeInitializeActorResource;
+        return "executeInitializeActorResource" in unit;
+      }),
+    ).toBe(false);
+    expect(() =>
+      repository.transaction(() => repository.executeInitializeActorResource("bad actor", {} as CommandEnvelope)),
+    ).toThrow("cannot run inside a repository transaction");
     expect(repository.executeInitializeActorResource("local-owner", envelope)).not.toBeInstanceOf(Promise);
     repository.close();
-    expect(() => repository.executeInitializeActorResource("bad actor", {} as CommandEnvelope)).toThrow("repository is closed");
+    expect(() => repository.executeInitializeActorResource("bad actor", {} as CommandEnvelope)).toThrow(
+      "repository is closed",
+    );
   });
 });

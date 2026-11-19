@@ -140,7 +140,8 @@ function createFakeClient() {
       const ids = behavior.kind === "accepted-ids" ? behavior.ids : [nextServiceId()];
       const id = ids[0];
       if (!id) throw new Error("fake client requires at least one service id");
-      for (const serviceId of ids) register(serviceId, request.prompt, request.seed ?? 0, request.steps ?? 50, request.cfg ?? 3);
+      for (const serviceId of ids)
+        register(serviceId, request.prompt, request.seed ?? 0, request.steps ?? 50, request.cfg ?? 3);
       return { outcome: "accepted", id, batch: "batch-1" };
     },
     async batch(request: Supra2BatchRequestInput): Promise<Supra2BatchResult> {
@@ -150,9 +151,8 @@ function createFakeClient() {
       if (behavior.kind === "uncertain") return { outcome: "uncertain", reason: "timeout" };
       if (behavior.kind === "http") throw new Supra2ImageHttpError(behavior.status);
       const count = request.count ?? 1;
-      const ids = behavior.kind === "accepted-ids"
-        ? behavior.ids
-        : Array.from({ length: count }, () => nextServiceId());
+      const ids =
+        behavior.kind === "accepted-ids" ? behavior.ids : Array.from({ length: count }, () => nextServiceId());
       const id = ids[0];
       if (!id) throw new Error("fake client requires at least one service id");
       for (const serviceId of ids) {
@@ -217,19 +217,21 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
 });
 
-function createHarness(options: {
-  roles?: Record<string, SceneImageRole | null>;
-  deniedCampaigns?: string[];
-  worker?: Partial<SceneImageWorkerOptions>;
-  authorize?: SceneImageAuthorizer;
-} = {}): Harness {
+function createHarness(
+  options: {
+    roles?: Record<string, SceneImageRole | null>;
+    deniedCampaigns?: string[];
+    worker?: Partial<SceneImageWorkerOptions>;
+    authorize?: SceneImageAuthorizer;
+  } = {},
+): Harness {
   const dir = mkdtempSync(join(tmpdir(), "velvet-scene-image-"));
   const fake = createFakeClient();
   const clock = createClock();
   const roles: Record<string, SceneImageRole | null> = options.roles ?? { owner: "owner", gm: "gm", player: "player" };
   const denied = new Set(options.deniedCampaigns ?? []);
   const authorize: SceneImageAuthorizer = options.authorize ?? {
-    role: (principalId, campaignId) => denied.has(campaignId) ? null : roles[principalId] ?? null,
+    role: (principalId, campaignId) => (denied.has(campaignId) ? null : (roles[principalId] ?? null)),
   };
   const service = createSceneImageService({
     dataDir: dir,
@@ -310,11 +312,13 @@ describe("scene image settings", () => {
     expect(first.receipt).toMatchObject({ revisionBefore: 0, revisionAfter: 1, replayed: false });
     expect(harness.service.getSettings("owner", CAMPAIGN).settings.mode).toBe("automatic");
 
-    const stale = sceneError(() => harness.service.updateSettings("owner", CAMPAIGN, {
-      patch: { mode: "manual" },
-      expectedRevision: 0,
-      idempotencyKey: "settings-stale",
-    }));
+    const stale = sceneError(() =>
+      harness.service.updateSettings("owner", CAMPAIGN, {
+        patch: { mode: "manual" },
+        expectedRevision: 0,
+        idempotencyKey: "settings-stale",
+      }),
+    );
     expect(stale.statusCode).toBe(409);
 
     const replay = harness.service.updateSettings("owner", CAMPAIGN, {
@@ -325,22 +329,34 @@ describe("scene image settings", () => {
     expect(replay.revision).toBe(1);
     expect(replay.receipt.replayed).toBe(true);
 
-    expect(sceneError(() => harness.service.updateSettings("owner", CAMPAIGN, {
-      patch: { mode: "manual" },
-      expectedRevision: 0,
-      idempotencyKey: "settings-1",
-    })).statusCode).toBe(409);
-    expect(sceneError(() => harness.service.updateSettings("owner", CAMPAIGN, {
-      patch: { mode: "sometimes" } as unknown as SceneImageSettingsPatch,
-      expectedRevision: 1,
-      idempotencyKey: "settings-invalid",
-    })).statusCode).toBe(400);
+    expect(
+      sceneError(() =>
+        harness.service.updateSettings("owner", CAMPAIGN, {
+          patch: { mode: "manual" },
+          expectedRevision: 0,
+          idempotencyKey: "settings-1",
+        }),
+      ).statusCode,
+    ).toBe(409);
+    expect(
+      sceneError(() =>
+        harness.service.updateSettings("owner", CAMPAIGN, {
+          patch: { mode: "sometimes" } as unknown as SceneImageSettingsPatch,
+          expectedRevision: 1,
+          idempotencyKey: "settings-invalid",
+        }),
+      ).statusCode,
+    ).toBe(400);
     expect(sceneError(() => harness.service.getSettings("player", CAMPAIGN)).statusCode).toBe(403);
-    expect(sceneError(() => harness.service.updateSettings("player", CAMPAIGN, {
-      patch: { enabled: true },
-      expectedRevision: 1,
-      idempotencyKey: "settings-player",
-    })).statusCode).toBe(403);
+    expect(
+      sceneError(() =>
+        harness.service.updateSettings("player", CAMPAIGN, {
+          patch: { enabled: true },
+          expectedRevision: 1,
+          idempotencyKey: "settings-player",
+        }),
+      ).statusCode,
+    ).toBe(403);
 
     const gmUpdate = harness.service.updateSettings("gm", CAMPAIGN, {
       patch: { guidance: 1 },
@@ -354,7 +370,9 @@ describe("scene image settings", () => {
   it("authorizes through the repository database and locks the sidecar", () => {
     const dir = mkdtempSync(join(tmpdir(), "velvet-scene-image-repo-"));
     const repo = new Database(join(dir, "velvet.sqlite"));
-    repo.exec("CREATE TABLE campaign_memberships(campaign_id TEXT NOT NULL, principal_id TEXT NOT NULL, role TEXT NOT NULL)");
+    repo.exec(
+      "CREATE TABLE campaign_memberships(campaign_id TEXT NOT NULL, principal_id TEXT NOT NULL, role TEXT NOT NULL)",
+    );
     const insert = repo.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role) VALUES(?,?,?)");
     insert.run(CAMPAIGN, "owner", "owner");
     insert.run(CAMPAIGN, "gm", "gm");
@@ -362,9 +380,19 @@ describe("scene image settings", () => {
     repo.close();
 
     const fake = createFakeClient();
-    const service = createSceneImageService({ dataDir: dir, client: fake.client, clock: createClock(), ids: createIds() });
+    const service = createSceneImageService({
+      dataDir: dir,
+      client: fake.client,
+      clock: createClock(),
+      ids: createIds(),
+    });
     const emptyDir = mkdtempSync(join(tmpdir(), "velvet-scene-image-empty-"));
-    const lonely = createSceneImageService({ dataDir: emptyDir, client: fake.client, clock: createClock(), ids: createIds() });
+    const lonely = createSceneImageService({
+      dataDir: emptyDir,
+      client: fake.client,
+      clock: createClock(),
+      ids: createIds(),
+    });
     cleanups.push(() => {
       service.close();
       lonely.close();
@@ -376,12 +404,14 @@ describe("scene image settings", () => {
     expect(sceneError(() => service.getSettings("player", CAMPAIGN)).statusCode).toBe(403);
     expect(sceneError(() => service.getSettings("outsider", CAMPAIGN)).statusCode).toBe(404);
 
-    const second = sceneError(() => createSceneImageService({
-      dataDir: dir,
-      client: fake.client,
-      clock: createClock(),
-      ids: createIds(),
-    }));
+    const second = sceneError(() =>
+      createSceneImageService({
+        dataDir: dir,
+        client: fake.client,
+        clock: createClock(),
+        ids: createIds(),
+      }),
+    );
     expect(second.statusCode).toBe(503);
     expect(second.message).toMatch(/already owned/);
 
@@ -393,15 +423,36 @@ describe("scene image enqueue", () => {
   it("requires a DM in the campaign and validates the request", () => {
     const harness = createHarness({ deniedCampaigns: ["camp-9"] });
     enable(harness);
-    expect(sceneError(() => harness.service.enqueue("player", CAMPAIGN, sampleEnqueue(), key("enqueue"))).statusCode).toBe(403);
-    expect(sceneError(() => harness.service.enqueue("owner", "camp-9", sampleEnqueue(), key("enqueue"))).statusCode).toBe(404);
+    expect(
+      sceneError(() => harness.service.enqueue("player", CAMPAIGN, sampleEnqueue(), key("enqueue"))).statusCode,
+    ).toBe(403);
+    expect(
+      sceneError(() => harness.service.enqueue("owner", "camp-9", sampleEnqueue(), key("enqueue"))).statusCode,
+    ).toBe(404);
     expect(sceneError(() => harness.service.getSettings("owner", "camp-9")).statusCode).toBe(404);
     expect(sceneError(() => harness.service.getJob("owner", "camp-9", "id-0001")).statusCode).toBe(404);
-    expect(sceneError(() => harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), prompt: "  " }, key("enqueue"))).statusCode).toBe(400);
-    expect(sceneError(() => harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), steps: 5 }, key("enqueue"))).statusCode).toBe(400);
-    expect(sceneError(() => harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), guidance: 12 }, key("enqueue"))).statusCode).toBe(400);
-    expect(sceneError(() => harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), kind: "batch", count: 33 }, key("enqueue"))).statusCode).toBe(400);
-    expect(sceneError(() => harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), kind: "single", count: 2 }, key("enqueue"))).statusCode).toBe(400);
+    expect(
+      sceneError(() => harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), prompt: "  " }, key("enqueue")))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      sceneError(() => harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), steps: 5 }, key("enqueue")))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      sceneError(() => harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), guidance: 12 }, key("enqueue")))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      sceneError(() =>
+        harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), kind: "batch", count: 33 }, key("enqueue")),
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      sceneError(() =>
+        harness.service.enqueue("owner", CAMPAIGN, { ...sampleEnqueue(), kind: "single", count: 2 }, key("enqueue")),
+      ).statusCode,
+    ).toBe(400);
     expect(harness.fake.state.generateCalls).toHaveLength(0);
   });
 
@@ -443,7 +494,12 @@ describe("scene image enqueue", () => {
     expect(cooling.refusal?.code).toBe("cooldown");
     expect(cooling.refusal?.cooldownEndsAt).toBe("2030-01-01T00:02:00.000Z");
 
-    const manualBypass = harness.service.enqueue("owner", CAMPAIGN, sampleEnqueue({ prompt: "manual bypass" }), key("enqueue"));
+    const manualBypass = harness.service.enqueue(
+      "owner",
+      CAMPAIGN,
+      sampleEnqueue({ prompt: "manual bypass" }),
+      key("enqueue"),
+    );
     expect(manualBypass.refusal).toBeNull();
     expect(manualBypass.job?.status).toBe("queued");
 
@@ -600,8 +656,16 @@ describe("scene image queue and cache", () => {
     const freshDone = await submitAndSettle(harness, fresh.jobId);
     expect(freshDone.status).toBe("done");
     const activeAsset = freshDone.assetId;
-    harness.service.selectImage("owner", CAMPAIGN, { sessionId: "session-1", sceneKey: "scene-1", assetId: activeAsset!, expectedRevision: 0, idempotencyKey: "publish-current" });
-    expect(harness.service.listGallery("owner", CAMPAIGN).images.find((image) => image.assetId === activeAsset)?.selected).toBe(true);
+    harness.service.selectImage("owner", CAMPAIGN, {
+      sessionId: "session-1",
+      sceneKey: "scene-1",
+      assetId: activeAsset!,
+      expectedRevision: 0,
+      idempotencyKey: "publish-current",
+    });
+    expect(
+      harness.service.listGallery("owner", CAMPAIGN).images.find((image) => image.assetId === activeAsset)?.selected,
+    ).toBe(true);
 
     const stale = enqueueOk(harness, "old scene", { sceneRevision: 4, seed: 12 });
     const staleDone = await submitAndSettle(harness, stale.jobId);
@@ -626,7 +690,13 @@ describe("scene image retention and reads", () => {
     const third = enqueueOk(harness, "retention three", { seed: 3 });
     const thirdDone = await submitAndSettle(harness, third.jobId);
     expect(thirdDone.assetId).not.toBeNull();
-    harness.service.selectImage("owner", CAMPAIGN, { sessionId: "session-1", sceneKey: "scene-1", assetId: thirdDone.assetId!, expectedRevision: 0, idempotencyKey: "publish-retained" });
+    harness.service.selectImage("owner", CAMPAIGN, {
+      sessionId: "session-1",
+      sceneKey: "scene-1",
+      assetId: thirdDone.assetId!,
+      expectedRevision: 0,
+      idempotencyKey: "publish-retained",
+    });
 
     const pruned = harness.service.prune();
     expect(pruned.assets).toBeGreaterThanOrEqual(1);
@@ -653,18 +723,32 @@ describe("scene image retention and reads", () => {
     expect(assetId).not.toBe("");
     expect(harness.service.listGallery("player", CAMPAIGN, { sessionId: "session-1" }).images).toHaveLength(0);
     expect(sceneError(() => harness.service.readAsset("player", CAMPAIGN, assetId)).statusCode).toBe(403);
-    const selectionInput = { sessionId: "session-1", sceneKey: "scene-1", assetId, expectedRevision: 0, idempotencyKey: "publish-authorized" };
+    const selectionInput = {
+      sessionId: "session-1",
+      sceneKey: "scene-1",
+      assetId,
+      expectedRevision: 0,
+      idempotencyKey: "publish-authorized",
+    };
     const selected = harness.service.selectImage("owner", CAMPAIGN, selectionInput);
     expect(selected.receipt.revisionAfter).toBe(1);
     expect(harness.service.selectImage("owner", CAMPAIGN, selectionInput).receipt.replayed).toBe(true);
-    expect(sceneError(() => harness.service.selectImage("owner", CAMPAIGN, { ...selectionInput, idempotencyKey: "stale-writer" })).statusCode).toBe(409);
-    expect(harness.service.listGallery("player", CAMPAIGN, { sessionId: "session-1" }).images[0]?.selections).toEqual([{ sceneKey: "scene-1", revision: 1 }]);
+    expect(
+      sceneError(() =>
+        harness.service.selectImage("owner", CAMPAIGN, { ...selectionInput, idempotencyKey: "stale-writer" }),
+      ).statusCode,
+    ).toBe(409);
+    expect(harness.service.listGallery("player", CAMPAIGN, { sessionId: "session-1" }).images[0]?.selections).toEqual([
+      { sceneKey: "scene-1", revision: 1 },
+    ]);
 
     const dmGallery = harness.service.listGallery("owner", CAMPAIGN);
     expect(dmGallery.images).toHaveLength(1);
     expect(dmGallery.images[0]?.selected).toBe(true);
     expect(dmGallery.jobs).toHaveLength(1);
-    expect(harness.service.listGallery("player", CAMPAIGN, { sessionId: "session-1" }).images.map((image) => image.assetId)).toEqual([assetId]);
+    expect(
+      harness.service.listGallery("player", CAMPAIGN, { sessionId: "session-1" }).images.map((image) => image.assetId),
+    ).toEqual([assetId]);
     expect(harness.service.listGallery("player", CAMPAIGN, { sessionId: "session-2" }).images).toHaveLength(0);
     expect(sceneError(() => harness.service.listGallery("player", CAMPAIGN)).statusCode).toBe(400);
     expect(sceneError(() => harness.service.getJob("player", CAMPAIGN, job.jobId)).statusCode).toBe(403);
@@ -676,7 +760,9 @@ describe("scene image retention and reads", () => {
     const stale = enqueueOk(harness, "unpublished scene", { seed: 22, sceneRevision: 0 });
     const staleDone = await submitAndSettle(harness, stale.jobId);
     expect(staleDone.status).toBe("done");
-    expect(sceneError(() => harness.service.readAsset("player", CAMPAIGN, staleDone.assetId ?? "")).statusCode).toBe(403);
+    expect(sceneError(() => harness.service.readAsset("player", CAMPAIGN, staleDone.assetId ?? "")).statusCode).toBe(
+      403,
+    );
     expect(harness.service.readAsset("owner", CAMPAIGN, staleDone.assetId ?? "").bytes.byteLength).toBeGreaterThan(0);
 
     expect(sceneError(() => harness.service.readAsset("owner", "camp-9", assetId)).statusCode).toBe(404);

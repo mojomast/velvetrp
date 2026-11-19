@@ -15,7 +15,9 @@ import {
 export const REGION_PACK_SECTIONS = ["outline", "locations", "factions", "npcs", "quests", "clues", "story"] as const;
 
 /** Only `linked.encounters` adds a section; every other hint is advisory prose. */
-export function regionPackSections(linked: CampaignRegionPackLinked | undefined): CampaignContentGenerationRequest["sections"] {
+export function regionPackSections(
+  linked: CampaignRegionPackLinked | undefined,
+): CampaignContentGenerationRequest["sections"] {
   const sections: CampaignContentGenerationRequest["sections"] = [...REGION_PACK_SECTIONS];
   if (linked?.encounters === true) sections.push("encounters");
   return sections;
@@ -49,20 +51,35 @@ export function buildRegionPackBrief(input: RegionPackBriefInput): string {
     "Connections permit travel only fromLocationKey -> toLocationKey. Every new location must be reachable from the starting location or required accepted anchor by following these directions. Add explicit reverse connections for intended return travel.",
   ];
   if (input.anchorRequired) {
-    lines.push(`The campaign already has an immutable starting location. Do not re-anchor it. Connect at least one connection to the accepted anchor location '${input.anchorLocationKey}', and keep every new location reachable from that anchor.`);
+    lines.push(
+      `The campaign already has an immutable starting location. Do not re-anchor it. Connect at least one connection to the accepted anchor location '${input.anchorLocationKey}', and keep every new location reachable from that anchor.`,
+    );
   } else {
-    lines.push("Set the outline startLocationKey to one of the new locations in this pack (self-anchoring). The server designates it as the campaign starting location.");
+    lines.push(
+      "Set the outline startLocationKey to one of the new locations in this pack (self-anchoring). The server designates it as the campaign starting location.",
+    );
   }
   if (input.anchorLocationKey && !input.anchorRequired) {
-    lines.push(`You may additionally connect the new region to the accepted anchor location '${input.anchorLocationKey}'.`);
+    lines.push(
+      `You may additionally connect the new region to the accepted anchor location '${input.anchorLocationKey}'.`,
+    );
   }
   if (wants(linked.factions)) lines.push("Link at least one faction to the new area.");
   if (wants(linked.npcs)) lines.push("Link at least one NPC to a new location (and optionally a new faction).");
-  if (wants(linked.quests)) lines.push("Create at least one quest whose locationKeys use new locations in this pack and whose objectives are actionable in the opening area.");
+  if (wants(linked.quests))
+    lines.push(
+      "Create at least one quest whose locationKeys use new locations in this pack and whose objectives are actionable in the opening area.",
+    );
   if (wants(linked.clues)) lines.push("Create at least one clue that resolves to a new location or to accepted canon.");
-  if (wants(linked.storyNodes)) lines.push("Create public opening story nodes and relationships that connect the region to the campaign premise.");
-  if (linked.encounters === true) lines.push("Prepare at least one narrative encounter plan tied to the new area; do not assume combat without an exact pinned catalog enemy reference.");
-  lines.push("Keep every public field spoiler-free and every unrevealed discovery, hazard, or secret in GM-only artifacts.");
+  if (wants(linked.storyNodes))
+    lines.push("Create public opening story nodes and relationships that connect the region to the campaign premise.");
+  if (linked.encounters === true)
+    lines.push(
+      "Prepare at least one narrative encounter plan tied to the new area; do not assume combat without an exact pinned catalog enemy reference.",
+    );
+  lines.push(
+    "Keep every public field spoiler-free and every unrevealed discovery, hazard, or secret in GM-only artifacts.",
+  );
   return lines.join("\n");
 }
 
@@ -83,9 +100,22 @@ export interface RegionPackValidationInput {
 }
 
 const artifactFields = [
-  "outlines", "arcs", "locations", "connections", "factions", "npcs", "quests", "encounters",
-  "clues", "storyNodes", "storyRelationships", "lore", "questItems", "monsterConcepts",
-  "handouts", "scenePrompts",
+  "outlines",
+  "arcs",
+  "locations",
+  "connections",
+  "factions",
+  "npcs",
+  "quests",
+  "encounters",
+  "clues",
+  "storyNodes",
+  "storyRelationships",
+  "lore",
+  "questItems",
+  "monsterConcepts",
+  "handouts",
+  "scenePrompts",
 ] as const;
 
 /** Every generated artifact key in stable collection order. */
@@ -100,12 +130,15 @@ export function regionPackArtifactKeys(content: GeneratedCampaignContentProvider
  * additionally enforces the graph and anchoring guarantees a region pack needs.
  */
 export function validateRegionPack(content: GeneratedCampaignContentProvider, input: RegionPackValidationInput): void {
-  const fail = (message: string): never => { throw new RegionPackValidationError(message); };
+  const fail = (message: string): never => {
+    throw new RegionPackValidationError(message);
+  };
 
   const locations = content.locations;
   if (locations.length > MAX_REGION_PACK_LOCATIONS) fail("region pack exceeds the location bound");
   if (locations.length < MIN_REGION_PACK_LOCATIONS) fail("region pack needs at least four locations");
-  if (locationCountMismatch(locations.length, input.locationCount)) fail("region pack location count is outside the requested bound");
+  if (locationCountMismatch(locations.length, input.locationCount))
+    fail("region pack location count is outside the requested bound");
 
   const connections = content.connections;
   if (connections.length > MAX_REGION_PACK_CONNECTIONS) fail("region pack exceeds the connection bound");
@@ -118,7 +151,8 @@ export function validateRegionPack(content: GeneratedCampaignContentProvider, in
 
   const packKeys = new Set(locations.map((location) => location.key));
   if (packKeys.size !== locations.length) fail("region pack location keys must be unique");
-  for (const location of locations) if (location.visibility !== "public") fail("region pack opening locations must be public");
+  for (const location of locations)
+    if (location.visibility !== "public") fail("region pack opening locations must be public");
 
   const anchor = input.anchorLocationKey;
   if (anchor !== undefined) {
@@ -138,8 +172,10 @@ export function validateRegionPack(content: GeneratedCampaignContentProvider, in
   const allowedEndpoint = (key: string) => packKeys.has(key) || key === anchor;
   for (const connection of connections) {
     if (connection.visibility !== "public") fail("region pack opening connections must be public");
-    if (connection.fromLocationKey === connection.toLocationKey) fail("region pack connections cannot connect a location to itself");
-    if (!allowedEndpoint(connection.fromLocationKey) || !allowedEndpoint(connection.toLocationKey)) fail("region pack connection endpoint must resolve in-pack or to the accepted anchor");
+    if (connection.fromLocationKey === connection.toLocationKey)
+      fail("region pack connections cannot connect a location to itself");
+    if (!allowedEndpoint(connection.fromLocationKey) || !allowedEndpoint(connection.toLocationKey))
+      fail("region pack connection endpoint must resolve in-pack or to the accepted anchor");
     const signature = `${connection.fromLocationKey}\u0000${connection.toLocationKey}`;
     if (directed.has(signature)) fail("region pack contains a duplicate directed connection");
     directed.add(signature);
@@ -161,12 +197,19 @@ export function validateRegionPack(content: GeneratedCampaignContentProvider, in
       for (const neighbor of adjacency.get(current) ?? []) if (!reachable.has(neighbor)) stack.push(neighbor);
     }
   }
-  if (reachable.size !== nodes.size) fail("region pack location graph must be connected by directed paths from its start or required anchor");
+  if (reachable.size !== nodes.size)
+    fail("region pack location graph must be connected by directed paths from its start or required anchor");
 
   const resolves = (key: string) => packKeys.has(key) || input.acceptedLocationKeys.has(key);
-  for (const npc of content.npcs) if (npc.locationKey !== undefined && !resolves(npc.locationKey)) fail("region pack NPC location must resolve in-pack or to accepted canon");
-  for (const quest of content.quests) for (const locationKey of quest.locationKeys) if (!resolves(locationKey)) fail("region pack quest location must resolve in-pack or to accepted canon");
-  for (const clue of content.clues) if (clue.locationKey !== undefined && !resolves(clue.locationKey)) fail("region pack clue location must resolve in-pack or to accepted canon");
+  for (const npc of content.npcs)
+    if (npc.locationKey !== undefined && !resolves(npc.locationKey))
+      fail("region pack NPC location must resolve in-pack or to accepted canon");
+  for (const quest of content.quests)
+    for (const locationKey of quest.locationKeys)
+      if (!resolves(locationKey)) fail("region pack quest location must resolve in-pack or to accepted canon");
+  for (const clue of content.clues)
+    if (clue.locationKey !== undefined && !resolves(clue.locationKey))
+      fail("region pack clue location must resolve in-pack or to accepted canon");
 }
 
 function locationCountMismatch(actual: number, requested: number): boolean {

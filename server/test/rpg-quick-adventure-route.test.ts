@@ -12,8 +12,12 @@ useTmpDataDir();
 const URL = "/api/rpg/v1/quick-adventures";
 const FLAGS = ["FEATURE_RPG_CAMPAIGN", "FEATURE_RPG_MECHANICS", "FEATURE_RPG_COMBAT"] as const;
 
-beforeEach(() => { for (const flag of FLAGS) process.env[flag] = "true"; });
-afterEach(() => { for (const flag of FLAGS) delete process.env[flag]; });
+beforeEach(() => {
+  for (const flag of FLAGS) process.env[flag] = "true";
+});
+afterEach(() => {
+  for (const flag of FLAGS) delete process.env[flag];
+});
 
 describe("POST /api/rpg/v1/quick-adventures", () => {
   it("creates a published campaign with an active room, replays the same key, and builds anew for a new key", async () => {
@@ -28,8 +32,9 @@ describe("POST /api/rpg/v1/quick-adventures", () => {
       try {
         expect(repository.getCampaignAdministration("local-owner", body.campaignId)?.status).toBe("published");
         expect(repository.getSession(body.sessionId)?.state).toBe("active");
-        expect(repository.listCampaignCharacters("local-owner", body.campaignId).map((entry) => entry.projection.actor.id))
-          .toContain(body.actorId);
+        expect(
+          repository.listCampaignCharacters("local-owner", body.campaignId).map((entry) => entry.projection.actor.id),
+        ).toContain(body.actorId);
       } finally {
         repository.close();
       }
@@ -56,7 +61,12 @@ describe("POST /api/rpg/v1/quick-adventures", () => {
   it("rejects malformed requests before building anything", async () => {
     const app = buildApp();
     try {
-      for (const payload of [{}, { idempotencyKey: "" }, { idempotencyKey: "has spaces" }, { idempotencyKey: "ok", extra: true }]) {
+      for (const payload of [
+        {},
+        { idempotencyKey: "" },
+        { idempotencyKey: "has spaces" },
+        { idempotencyKey: "ok", extra: true },
+      ]) {
         const response = await app.inject({ method: "POST", url: URL, payload });
         expect(response.statusCode).toBe(400);
         expect(response.json()).toMatchObject({ code: "RPG_INVALID_REQUEST" });

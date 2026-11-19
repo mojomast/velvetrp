@@ -63,13 +63,23 @@ async function fixture() {
   );
 
   const createActor = (name: string, key: string): { actorId: string; personaId: string } => {
-    const persona = repo.createCharacter({ name, age: 30, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
+    const persona = repo.createCharacter({
+      name,
+      age: 30,
+      archetype: "Warden",
+      boundaries: "",
+      fictionalConfirmed: true,
+    });
     const draft = repo.createCharacterDraft(OWNER, campaign.id, {
-      personaId: persona.id, controllerPrincipalId: OWNER, durability: "durable",
-      allocation: { method: "standard-array", scores } as any, idempotencyKey: `${key}-draft`,
+      personaId: persona.id,
+      controllerPrincipalId: OWNER,
+      durability: "durable",
+      allocation: { method: "standard-array", scores } as any,
+      idempotencyKey: `${key}-draft`,
     });
     const selected = repo.updateCharacterDraft(OWNER, draft.draft.id, {
-      expectedRevision: 0, idempotencyKey: `${key}-select`,
+      expectedRevision: 0,
+      idempotencyKey: `${key}-select`,
       selections: {
         race: reference(CHARACTER_SELECTIONS.race),
         background: reference(CHARACTER_SELECTIONS.background),
@@ -78,7 +88,8 @@ async function fixture() {
       },
     } as any);
     const actorId = repo.finalizeCharacterDraft(OWNER, draft.draft.id, {
-      expectedRevision: selected.draft.revision, idempotencyKey: `${key}-finalize`,
+      expectedRevision: selected.draft.revision,
+      idempotencyKey: `${key}-finalize`,
     }).receipt.actorId;
     return { actorId, personaId: persona.id };
   };
@@ -90,7 +101,13 @@ async function fixture() {
 
   let npcRevision = 0;
   const createNpc = (name: string, description: string, key: string) => {
-    const persona = repo.createCharacter({ name, age: 40, archetype: "Commoner", boundaries: "", fictionalConfirmed: true });
+    const persona = repo.createCharacter({
+      name,
+      age: 40,
+      archetype: "Commoner",
+      boundaries: "",
+      fictionalConfirmed: true,
+    });
     return repo.createCampaignNpc(OWNER, campaign.id, {
       personaId: persona.id,
       publicState: { name, description },
@@ -104,13 +121,22 @@ async function fixture() {
 
   const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
   db.pragma("foreign_keys=ON");
-  for (const [principalId, role] of [[PLAYER, "player"], [PLAYER_TWO, "player"], [OBSERVER, "observer"]] as const) {
+  for (const [principalId, role] of [
+    [PLAYER, "player"],
+    [PLAYER_TWO, "player"],
+    [OBSERVER, "observer"],
+  ] as const) {
     db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principalId, principalId);
-    db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)")
-      .run(campaign.id, principalId, role, AT);
+    db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)").run(
+      campaign.id,
+      principalId,
+      role,
+      AT,
+    );
   }
-  db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE campaign_id=? AND actor_id=?")
-    .run(PLAYER, campaign.id, hero.actorId);
+  db.prepare(
+    "UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE campaign_id=? AND actor_id=?",
+  ).run(PLAYER, campaign.id, hero.actorId);
 
   const clock = { now: () => new Date(AT) };
   let depsSequence = 0;
@@ -147,11 +173,15 @@ function expectInitiationFailure(run: () => unknown, code: CombatInitiationFailu
 }
 
 function tacticalMap(db: DatabaseDriver.Database, encounterId: string) {
-  const map = db.prepare("SELECT map_id,mode,active FROM tactical_maps_v58 WHERE encounter_id=?")
-    .get(encounterId) as { map_id: string; mode: string; active: number } | undefined;
+  const map = db.prepare("SELECT map_id,mode,active FROM tactical_maps_v58 WHERE encounter_id=?").get(encounterId) as
+    { map_id: string; mode: string; active: number } | undefined;
   if (!map) throw new Error("combat tactical map was not generated");
-  const tokens = db.prepare(`SELECT combatant_id,label,disposition FROM tactical_map_tokens_v58
-    WHERE map_id=? ORDER BY token_id`).all(map.map_id) as Array<{ combatant_id: string; label: string; disposition: string }>;
+  const tokens = db
+    .prepare(
+      `SELECT combatant_id,label,disposition FROM tactical_map_tokens_v58
+    WHERE map_id=? ORDER BY token_id`,
+    )
+    .all(map.map_id) as Array<{ combatant_id: string; label: string; disposition: string }>;
   return { map, tokens };
 }
 
@@ -159,16 +189,33 @@ describe("initiateCombatFromTarget", () => {
   it.each([true, false])("includes nearby party actors only (colocated=%s)", async (colocated) => {
     const f = await fixture();
     try {
-      for (const location of ["party-a", "party-b"]) f.db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,visibility,created_at) VALUES(?,?,?,'public',?)").run(location, f.campaign.id, location, AT);
-      f.db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(f.campaign.id, f.hero.actorId, "party-a", f.session.id, AT);
-      f.db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(f.campaign.id, f.rival.actorId, colocated ? "party-a" : "party-b", f.session.id, AT);
+      for (const location of ["party-a", "party-b"])
+        f.db
+          .prepare(
+            "INSERT INTO campaign_locations_v28(location_id,campaign_id,public_name,visibility,created_at) VALUES(?,?,?,'public',?)",
+          )
+          .run(location, f.campaign.id, location, AT);
+      f.db
+        .prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)")
+        .run(f.campaign.id, f.hero.actorId, "party-a", f.session.id, AT);
+      f.db
+        .prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)")
+        .run(f.campaign.id, f.rival.actorId, colocated ? "party-a" : "party-b", f.session.id, AT);
       const result = initiateCombatFromTarget(f.db, f.deps, input(f));
-      expect(result.combat.combatants.some((actor) => actor.kind === "actor" && actor.actorId === f.rival.actorId)).toBe(colocated);
-      f.db.prepare("DELETE FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?").run(f.campaign.id, f.rival.actorId);
+      expect(
+        result.combat.combatants.some((actor) => actor.kind === "actor" && actor.actorId === f.rival.actorId),
+      ).toBe(colocated);
+      f.db
+        .prepare("DELETE FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?")
+        .run(f.campaign.id, f.rival.actorId);
       const retry = initiateCombatFromTarget(f.db, f.deps, input(f));
-      expect(retry.combat.combatants.map((actor) => actor.combatantId)).toEqual(result.combat.combatants.map((actor) => actor.combatantId));
+      expect(retry.combat.combatants.map((actor) => actor.combatantId)).toEqual(
+        result.combat.combatants.map((actor) => actor.combatantId),
+      );
       expect(initiateCombatFromTarget(f.db, f.deps, input(f)).encounterId).toBe(result.encounterId);
-    } finally { f.db.close(); }
+    } finally {
+      f.db.close();
+    }
   });
   it("starts player-initiated combat against a commoner NPC with pinned template and automatic tactical map", async () => {
     const f = await fixture();
@@ -185,29 +232,39 @@ describe("initiateCombatFromTarget", () => {
     });
     expect(result.combatId).toBe(result.encounterId);
 
-    expect(f.db.prepare("SELECT status FROM encounter WHERE encounter_id=?").get(result.encounterId))
-      .toEqual({ status: "active" });
-    expect(f.db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(result.encounterId))
-      .toEqual({ revision: result.combat.revision });
+    expect(f.db.prepare("SELECT status FROM encounter WHERE encounter_id=?").get(result.encounterId)).toEqual({
+      status: "active",
+    });
+    expect(
+      f.db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(result.encounterId),
+    ).toEqual({ revision: result.combat.revision });
 
     const combatants = result.combat.combatants;
     expect(combatants).toHaveLength(2);
     expect(combatants.find((combatant) => combatant.kind === "actor")).toMatchObject({
-      kind: "actor", actorId: f.hero.actorId, team: "allies",
+      kind: "actor",
+      actorId: f.hero.actorId,
+      team: "allies",
     });
     const enemy = combatants.find((combatant) => combatant.kind === "enemy")!;
     expect(enemy).toMatchObject({ team: "enemies", template: { definitionId: CULTIST } });
     expect(enemy).toMatchObject({ displayName: "Old Hob" });
-    expect(f.db.prepare("SELECT pack_id,pack_version,definition_id FROM encounter_enemy_provenance_v31 WHERE combatant_id=?")
-      .get(enemy.combatantId)).toMatchObject({
-        pack_id: enemyTemplate(CULTIST).reference.packId, definition_id: CULTIST,
-      });
+    expect(
+      f.db
+        .prepare("SELECT pack_id,pack_version,definition_id FROM encounter_enemy_provenance_v31 WHERE combatant_id=?")
+        .get(enemy.combatantId),
+    ).toMatchObject({
+      pack_id: enemyTemplate(CULTIST).reference.packId,
+      definition_id: CULTIST,
+    });
 
     const { map, tokens } = tacticalMap(f.db, result.encounterId);
     expect(map).toMatchObject({ mode: "combat", active: 1 });
     expect(tokens).toHaveLength(2);
     expect(tokens.find((token) => token.combatant_id === enemy.combatantId)).toEqual({
-      combatant_id: enemy.combatantId, label: "Old Hob", disposition: "hostile",
+      combatant_id: enemy.combatantId,
+      label: "Old Hob",
+      disposition: "hostile",
     });
     expect(tokens.find((token) => token.disposition === "friendly")?.label).toBe("Aster Vale");
     expect(result.combat.encounterId).toBe(result.encounterId);
@@ -216,44 +273,74 @@ describe("initiateCombatFromTarget", () => {
 
   it("starts combat against another actor and teams the target as an enemy", async () => {
     const f = await fixture();
-    const result = initiateCombatFromTarget(f.db, f.deps, input(f, { target: { kind: "actor", actorId: f.rival.actorId } }));
+    const result = initiateCombatFromTarget(
+      f.db,
+      f.deps,
+      input(f, { target: { kind: "actor", actorId: f.rival.actorId } }),
+    );
 
     expect(result.tier).toBeUndefined();
     expect(result.template).toBeUndefined();
     expect(result.combat.combatants).toHaveLength(2);
-    expect(result.combat.combatants.find((combatant) => combatant.kind === "actor" && combatant.actorId === f.hero.actorId))
-      .toMatchObject({ team: "allies" });
-    const enemy = result.combat.combatants.find((combatant) => combatant.kind === "actor" && combatant.actorId === f.rival.actorId);
+    expect(
+      result.combat.combatants.find((combatant) => combatant.kind === "actor" && combatant.actorId === f.hero.actorId),
+    ).toMatchObject({ team: "allies" });
+    const enemy = result.combat.combatants.find(
+      (combatant) => combatant.kind === "actor" && combatant.actorId === f.rival.actorId,
+    );
     expect(enemy).toMatchObject({ kind: "actor", team: "enemies" });
-    expect(f.db.prepare("SELECT count(*) count FROM encounter_enemy_provenance_v31 WHERE encounter_id=?")
-      .get(result.encounterId)).toEqual({ count: 0 });
+    expect(
+      f.db
+        .prepare("SELECT count(*) count FROM encounter_enemy_provenance_v31 WHERE encounter_id=?")
+        .get(result.encounterId),
+    ).toEqual({ count: 0 });
 
     const { tokens } = tacticalMap(f.db, result.encounterId);
     expect(tokens.find((token) => token.combatant_id === enemy!.combatantId)).toEqual({
-      combatant_id: enemy!.combatantId, label: "Bram the Bold", disposition: "hostile",
+      combatant_id: enemy!.combatantId,
+      label: "Bram the Bold",
+      disposition: "hostile",
     });
   });
 
   it("rejects unauthorized principals, foreign campaigns and unknown targets with typed failures", async () => {
     const f = await fixture();
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps, input(f, { principalId: OBSERVER })),
-      "COMBAT_INITIATION_FORBIDDEN");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps, input(f, { principalId: PLAYER_TWO })),
-      "COMBAT_INITIATION_FORBIDDEN");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps, input(f, { campaignId: "foreign-campaign" })),
-      "COMBAT_INITIATION_CAMPAIGN_NOT_FOUND");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps, input(f, { principalId: STRANGER })),
-      "COMBAT_INITIATION_CAMPAIGN_NOT_FOUND");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps, input(f, { actorId: "missing-actor" })),
-      "COMBAT_INITIATION_ACTOR_NOT_FOUND");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps,
-      input(f, { target: { kind: "npc", npcId: "missing-npc" } })), "COMBAT_INITIATION_TARGET_NOT_FOUND");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps,
-      input(f, { target: { kind: "actor", actorId: "missing-actor" } })), "COMBAT_INITIATION_TARGET_NOT_FOUND");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps,
-      input(f, { target: { kind: "actor", actorId: f.hero.actorId } })), "COMBAT_INITIATION_CONFLICT");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps, { ...input(f), target: null } as any),
-      "COMBAT_INITIATION_INVALID_INPUT");
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { principalId: OBSERVER })),
+      "COMBAT_INITIATION_FORBIDDEN",
+    );
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { principalId: PLAYER_TWO })),
+      "COMBAT_INITIATION_FORBIDDEN",
+    );
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { campaignId: "foreign-campaign" })),
+      "COMBAT_INITIATION_CAMPAIGN_NOT_FOUND",
+    );
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { principalId: STRANGER })),
+      "COMBAT_INITIATION_CAMPAIGN_NOT_FOUND",
+    );
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { actorId: "missing-actor" })),
+      "COMBAT_INITIATION_ACTOR_NOT_FOUND",
+    );
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { target: { kind: "npc", npcId: "missing-npc" } })),
+      "COMBAT_INITIATION_TARGET_NOT_FOUND",
+    );
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { target: { kind: "actor", actorId: "missing-actor" } })),
+      "COMBAT_INITIATION_TARGET_NOT_FOUND",
+    );
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { target: { kind: "actor", actorId: f.hero.actorId } })),
+      "COMBAT_INITIATION_CONFLICT",
+    );
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, { ...input(f), target: null } as any),
+      "COMBAT_INITIATION_INVALID_INPUT",
+    );
     // Every failure above rolled back without leaving an encounter behind.
     expect(f.db.prepare("SELECT count(*) count FROM encounter").get()).toEqual({ count: 0 });
     expect(f.db.prepare("SELECT count(*) count FROM combatant").get()).toEqual({ count: 0 });
@@ -262,14 +349,23 @@ describe("initiateCombatFromTarget", () => {
   it("rejects a second encounter while one is already active and maps key reuse to a conflict", async () => {
     const f = await fixture();
     const first = initiateCombatFromTarget(f.db, f.deps, input(f, { idempotencyKey: "initiate-keyed" }));
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps,
-      input(f, { target: { kind: "npc", npcId: f.watchman.npcId } })), "COMBAT_INITIATION_ACTIVE_ENCOUNTER");
-    expectInitiationFailure(() => initiateCombatFromTarget(f.db, f.deps,
-      input(f, { idempotencyKey: "initiate-keyed", target: { kind: "npc", npcId: f.watchman.npcId } })),
-      "COMBAT_INITIATION_CONFLICT");
+    expectInitiationFailure(
+      () => initiateCombatFromTarget(f.db, f.deps, input(f, { target: { kind: "npc", npcId: f.watchman.npcId } })),
+      "COMBAT_INITIATION_ACTIVE_ENCOUNTER",
+    );
+    expectInitiationFailure(
+      () =>
+        initiateCombatFromTarget(
+          f.db,
+          f.deps,
+          input(f, { idempotencyKey: "initiate-keyed", target: { kind: "npc", npcId: f.watchman.npcId } }),
+        ),
+      "COMBAT_INITIATION_CONFLICT",
+    );
     expect(f.db.prepare("SELECT count(*) count FROM encounter").get()).toEqual({ count: 1 });
-    expect(f.db.prepare("SELECT count(*) count FROM encounter WHERE encounter_id<>?").get(first.encounterId))
-      .toEqual({ count: 0 });
+    expect(f.db.prepare("SELECT count(*) count FROM encounter WHERE encounter_id<>?").get(first.encounterId)).toEqual({
+      count: 0,
+    });
   });
 
   it("converges on the same encounter and combat for a repeated request", async () => {
@@ -282,13 +378,19 @@ describe("initiateCombatFromTarget", () => {
     expect(second.tier).toBe(first.tier);
     expect(second.template).toEqual(first.template);
     expect(second.combat).toEqual(first.combat);
-    expect(f.db.prepare("SELECT count(*) count FROM encounter WHERE campaign_id=?").get(f.campaign.id))
-      .toEqual({ count: 1 });
-    expect(f.db.prepare("SELECT count(*) count FROM combatant WHERE encounter_id=?").get(first.encounterId))
-      .toEqual({ count: 2 });
-    expect(f.db.prepare("SELECT count(*) count FROM tactical_maps_v58 WHERE encounter_id=?").get(first.encounterId))
-      .toEqual({ count: 1 });
-    expect(f.db.prepare("SELECT count(*) count FROM encounter_enemy_provenance_v31 WHERE encounter_id=?").get(first.encounterId))
-      .toEqual({ count: 1 });
+    expect(f.db.prepare("SELECT count(*) count FROM encounter WHERE campaign_id=?").get(f.campaign.id)).toEqual({
+      count: 1,
+    });
+    expect(f.db.prepare("SELECT count(*) count FROM combatant WHERE encounter_id=?").get(first.encounterId)).toEqual({
+      count: 2,
+    });
+    expect(
+      f.db.prepare("SELECT count(*) count FROM tactical_maps_v58 WHERE encounter_id=?").get(first.encounterId),
+    ).toEqual({ count: 1 });
+    expect(
+      f.db
+        .prepare("SELECT count(*) count FROM encounter_enemy_provenance_v31 WHERE encounter_id=?")
+        .get(first.encounterId),
+    ).toEqual({ count: 1 });
   });
 });

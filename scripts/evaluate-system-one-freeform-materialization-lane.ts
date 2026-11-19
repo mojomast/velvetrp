@@ -31,7 +31,11 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyCalibration, fitPlattCalibration, type PlattCalibration } from "../server/src/agent/systemOneCalibration.js";
+import {
+  applyCalibration,
+  fitPlattCalibration,
+  type PlattCalibration,
+} from "../server/src/agent/systemOneCalibration.js";
 import {
   FREEFORM_MATERIALIZATION_ACTION_FAMILY,
   buildFreeformMaterializationQuestions,
@@ -111,299 +115,711 @@ const c = (
  */
 export const FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS: readonly FreeformMaterializationBenchmarkCase[] = [
   // ---------------------------- materialize-location (8) ----------------------------
-  { id: "loc-1", category: "materialize-location", holdout: false,
+  {
+    id: "loc-1",
+    category: "materialize-location",
+    holdout: false,
     attempt: "I set out for the Glassblower's District, past the old tannery.",
-    candidates: [c("materialize-location", "Glassblower's District", "ffc-loc-glassblower"), c("materialize-npc", "The glassblower", "ffn-glassblower")],
-    expected: { band: "act", candidateId: "ffc-loc-glassblower", kind: "materialize-location" } },
-  { id: "loc-2", category: "materialize-location", holdout: true,
+    candidates: [
+      c("materialize-location", "Glassblower's District", "ffc-loc-glassblower"),
+      c("materialize-npc", "The glassblower", "ffn-glassblower"),
+    ],
+    expected: { band: "act", candidateId: "ffc-loc-glassblower", kind: "materialize-location" },
+  },
+  {
+    id: "loc-2",
+    category: "materialize-location",
+    holdout: true,
     attempt: "We walk to the Sunken Chapel by the river wall.",
-    candidates: [c("materialize-location", "The Sunken Chapel", "ffc-loc-sunken-chapel"), c("new-clue", "The river wall sigil", "ffl-river-sigil")],
-    expected: { band: "act", candidateId: "ffc-loc-sunken-chapel", kind: "materialize-location" } },
-  { id: "loc-3", category: "materialize-location", holdout: false,
+    candidates: [
+      c("materialize-location", "The Sunken Chapel", "ffc-loc-sunken-chapel"),
+      c("new-clue", "The river wall sigil", "ffl-river-sigil"),
+    ],
+    expected: { band: "act", candidateId: "ffc-loc-sunken-chapel", kind: "materialize-location" },
+  },
+  {
+    id: "loc-3",
+    category: "materialize-location",
+    holdout: false,
     attempt: "I travel to the Old Watchtower on the ridge.",
-    candidates: [c("materialize-location", "The Old Watchtower", "ffc-loc-watchtower"), c("hostile-encounter", "A patrol on the ridge", "ffe-ridge-patrol")],
-    expected: { band: "act", candidateId: "ffc-loc-watchtower", kind: "materialize-location" } },
-  { id: "loc-4", category: "materialize-location", holdout: false,
+    candidates: [
+      c("materialize-location", "The Old Watchtower", "ffc-loc-watchtower"),
+      c("hostile-encounter", "A patrol on the ridge", "ffe-ridge-patrol"),
+    ],
+    expected: { band: "act", candidateId: "ffc-loc-watchtower", kind: "materialize-location" },
+  },
+  {
+    id: "loc-4",
+    category: "materialize-location",
+    holdout: false,
     attempt: "Let's head down to the Dockside Market.",
-    candidates: [c("materialize-location", "The Dockside Market", "ffc-loc-dockside"), c("shop-stock", "A dockside stall", "ffsc-dockside-stall")],
-    expected: { band: "act", candidateId: "ffc-loc-dockside", kind: "materialize-location" } },
-  { id: "loc-5", category: "materialize-location", holdout: true,
+    candidates: [
+      c("materialize-location", "The Dockside Market", "ffc-loc-dockside"),
+      c("shop-stock", "A dockside stall", "ffsc-dockside-stall"),
+    ],
+    expected: { band: "act", candidateId: "ffc-loc-dockside", kind: "materialize-location" },
+  },
+  {
+    id: "loc-5",
+    category: "materialize-location",
+    holdout: true,
     attempt: "I make for the Ashen Grove beyond the bridge.",
-    candidates: [c("materialize-location", "The Ashen Grove", "ffc-loc-ashen-grove"), c("materialize-npc", "A hermit of the grove", "ffn-ashen-hermit")],
-    expected: { band: "act", candidateId: "ffc-loc-ashen-grove", kind: "materialize-location" } },
-  { id: "loc-6", category: "materialize-location", holdout: false,
+    candidates: [
+      c("materialize-location", "The Ashen Grove", "ffc-loc-ashen-grove"),
+      c("materialize-npc", "A hermit of the grove", "ffn-ashen-hermit"),
+    ],
+    expected: { band: "act", candidateId: "ffc-loc-ashen-grove", kind: "materialize-location" },
+  },
+  {
+    id: "loc-6",
+    category: "materialize-location",
+    holdout: false,
     // Wrong-candidate trap: two locations are offered; the attempt names only the mill.
     attempt: "We ride to the ruined mill at the ford.",
-    candidates: [c("materialize-location", "The Ford Crossing", "ffc-loc-ford"), c("materialize-location", "The Ruined Mill", "ffc-loc-mill")],
-    expected: { band: "act", candidateId: "ffc-loc-mill", kind: "materialize-location" } },
-  { id: "loc-7", category: "materialize-location", holdout: false,
+    candidates: [
+      c("materialize-location", "The Ford Crossing", "ffc-loc-ford"),
+      c("materialize-location", "The Ruined Mill", "ffc-loc-mill"),
+    ],
+    expected: { band: "act", candidateId: "ffc-loc-mill", kind: "materialize-location" },
+  },
+  {
+    id: "loc-7",
+    category: "materialize-location",
+    holdout: false,
     attempt: "I go north to the Frozen Steps.",
-    candidates: [c("materialize-location", "The Frozen Steps", "ffc-loc-frozen-steps"), c("hostile-encounter", "Something on the steps", "ffe-frozen-steps")],
-    expected: { band: "act", candidateId: "ffc-loc-frozen-steps", kind: "materialize-location" } },
-  { id: "loc-8", category: "materialize-location", holdout: true,
+    candidates: [
+      c("materialize-location", "The Frozen Steps", "ffc-loc-frozen-steps"),
+      c("hostile-encounter", "Something on the steps", "ffe-frozen-steps"),
+    ],
+    expected: { band: "act", candidateId: "ffc-loc-frozen-steps", kind: "materialize-location" },
+  },
+  {
+    id: "loc-8",
+    category: "materialize-location",
+    holdout: true,
     attempt: "I head for the lighthouse at the point.",
-    candidates: [c("materialize-location", "The Point Lighthouse", "ffc-loc-lighthouse"), c("new-clue", "A keeper's log", "ffl-keeper-log")],
-    expected: { band: "act", candidateId: "ffc-loc-lighthouse", kind: "materialize-location" } },
+    candidates: [
+      c("materialize-location", "The Point Lighthouse", "ffc-loc-lighthouse"),
+      c("new-clue", "A keeper's log", "ffl-keeper-log"),
+    ],
+    expected: { band: "act", candidateId: "ffc-loc-lighthouse", kind: "materialize-location" },
+  },
 
   // ---------------------------- materialize-npc (8) ----------------------------
-  { id: "npc-1", category: "materialize-npc", holdout: false,
+  {
+    id: "npc-1",
+    category: "materialize-npc",
+    holdout: false,
     attempt: "I ask the blacksmith, Marta, about the north gate.",
-    candidates: [c("materialize-npc", "Marta the blacksmith", "ffn-marta"), c("materialize-location", "The north gate", "ffc-north-gate")],
-    expected: { band: "act", candidateId: "ffn-marta", kind: "materialize-npc" } },
-  { id: "npc-2", category: "materialize-npc", holdout: true,
+    candidates: [
+      c("materialize-npc", "Marta the blacksmith", "ffn-marta"),
+      c("materialize-location", "The north gate", "ffc-north-gate"),
+    ],
+    expected: { band: "act", candidateId: "ffn-marta", kind: "materialize-npc" },
+  },
+  {
+    id: "npc-2",
+    category: "materialize-npc",
+    holdout: true,
     attempt: "I greet Captain Vale and ask for orders.",
-    candidates: [c("materialize-npc", "Captain Vale", "ffn-vale"), c("hostile-encounter", "Vale's guards", "ffe-vale-guards")],
-    expected: { band: "act", candidateId: "ffn-vale", kind: "materialize-npc" } },
-  { id: "npc-3", category: "materialize-npc", holdout: false,
+    candidates: [
+      c("materialize-npc", "Captain Vale", "ffn-vale"),
+      c("hostile-encounter", "Vale's guards", "ffe-vale-guards"),
+    ],
+    expected: { band: "act", candidateId: "ffn-vale", kind: "materialize-npc" },
+  },
+  {
+    id: "npc-3",
+    category: "materialize-npc",
+    holdout: false,
     attempt: "I speak with the innkeeper, Hob Corr.",
-    candidates: [c("materialize-npc", "Hob Corr the innkeeper", "ffn-hob-corr"), c("new-clue", "The inn's ledger", "ffl-inn-ledger")],
-    expected: { band: "act", candidateId: "ffn-hob-corr", kind: "materialize-npc" } },
-  { id: "npc-4", category: "materialize-npc", holdout: false,
+    candidates: [
+      c("materialize-npc", "Hob Corr the innkeeper", "ffn-hob-corr"),
+      c("new-clue", "The inn's ledger", "ffl-inn-ledger"),
+    ],
+    expected: { band: "act", candidateId: "ffn-hob-corr", kind: "materialize-npc" },
+  },
+  {
+    id: "npc-4",
+    category: "materialize-npc",
+    holdout: false,
     attempt: "I approach the herbalist named Sela.",
-    candidates: [c("materialize-npc", "Sela the herbalist", "ffn-sela"), c("shop-stock", "Sela's remedies", "ffsc-sela-remedies")],
-    expected: { band: "act", candidateId: "ffn-sela", kind: "materialize-npc" } },
-  { id: "npc-5", category: "materialize-npc", holdout: true,
+    candidates: [
+      c("materialize-npc", "Sela the herbalist", "ffn-sela"),
+      c("shop-stock", "Sela's remedies", "ffsc-sela-remedies"),
+    ],
+    expected: { band: "act", candidateId: "ffn-sela", kind: "materialize-npc" },
+  },
+  {
+    id: "npc-5",
+    category: "materialize-npc",
+    holdout: true,
     attempt: "I call out to the ferryman, Old Doran.",
-    candidates: [c("materialize-npc", "Old Doran the ferryman", "ffn-doran"), c("materialize-location", "The ferry landing", "ffc-ferry-landing")],
-    expected: { band: "act", candidateId: "ffn-doran", kind: "materialize-npc" } },
-  { id: "npc-6", category: "materialize-npc", holdout: false,
+    candidates: [
+      c("materialize-npc", "Old Doran the ferryman", "ffn-doran"),
+      c("materialize-location", "The ferry landing", "ffc-ferry-landing"),
+    ],
+    expected: { band: "act", candidateId: "ffn-doran", kind: "materialize-npc" },
+  },
+  {
+    id: "npc-6",
+    category: "materialize-npc",
+    holdout: false,
     // Wrong-candidate trap: two people are offered; the attempt names the watch captain only.
     attempt: "I introduce myself to the watch captain, Rook.",
-    candidates: [c("materialize-npc", "Rook the watch captain", "ffn-rook"), c("materialize-npc", "Rook's scribe", "ffn-rook-scribe")],
-    expected: { band: "act", candidateId: "ffn-rook", kind: "materialize-npc" } },
-  { id: "npc-7", category: "materialize-npc", holdout: false,
+    candidates: [
+      c("materialize-npc", "Rook the watch captain", "ffn-rook"),
+      c("materialize-npc", "Rook's scribe", "ffn-rook-scribe"),
+    ],
+    expected: { band: "act", candidateId: "ffn-rook", kind: "materialize-npc" },
+  },
+  {
+    id: "npc-7",
+    category: "materialize-npc",
+    holdout: false,
     attempt: "I ask the merchant Fenn about the road ahead.",
-    candidates: [c("materialize-npc", "Fenn the merchant", "ffn-fenn"), c("materialize-location", "The east road", "ffc-east-road")],
-    expected: { band: "act", candidateId: "ffn-fenn", kind: "materialize-npc" } },
-  { id: "npc-8", category: "materialize-npc", holdout: true,
+    candidates: [
+      c("materialize-npc", "Fenn the merchant", "ffn-fenn"),
+      c("materialize-location", "The east road", "ffc-east-road"),
+    ],
+    expected: { band: "act", candidateId: "ffn-fenn", kind: "materialize-npc" },
+  },
+  {
+    id: "npc-8",
+    category: "materialize-npc",
+    holdout: true,
     attempt: "I seek out the priest, Brother Ansel.",
-    candidates: [c("materialize-npc", "Brother Ansel", "ffn-ansel"), c("new-clue", "Ansel's scripture", "ffl-ansel-scripture")],
-    expected: { band: "act", candidateId: "ffn-ansel", kind: "materialize-npc" } },
+    candidates: [
+      c("materialize-npc", "Brother Ansel", "ffn-ansel"),
+      c("new-clue", "Ansel's scripture", "ffl-ansel-scripture"),
+    ],
+    expected: { band: "act", candidateId: "ffn-ansel", kind: "materialize-npc" },
+  },
 
   // ---------------------------- hostile-encounter (8) ----------------------------
-  { id: "enc-1", category: "hostile-encounter", holdout: false,
+  {
+    id: "enc-1",
+    category: "hostile-encounter",
+    holdout: false,
     attempt: "I draw my sword and attack the goblins at the camp.",
-    candidates: [c("hostile-encounter", "Goblin camp", "ffe-goblin-camp"), c("materialize-location", "The goblin camp", "ffc-goblin-camp")],
-    expected: { band: "act", candidateId: "ffe-goblin-camp", kind: "hostile-encounter" } },
-  { id: "enc-2", category: "hostile-encounter", holdout: true,
+    candidates: [
+      c("hostile-encounter", "Goblin camp", "ffe-goblin-camp"),
+      c("materialize-location", "The goblin camp", "ffc-goblin-camp"),
+    ],
+    expected: { band: "act", candidateId: "ffe-goblin-camp", kind: "hostile-encounter" },
+  },
+  {
+    id: "enc-2",
+    category: "hostile-encounter",
+    holdout: true,
     attempt: "I charge the wolf pack with my spear.",
-    candidates: [c("hostile-encounter", "The wolf pack", "ffe-wolf-pack"), c("materialize-npc", "A wounded trapper", "ffn-trappers")],
-    expected: { band: "act", candidateId: "ffe-wolf-pack", kind: "hostile-encounter" } },
-  { id: "enc-3", category: "hostile-encounter", holdout: false,
+    candidates: [
+      c("hostile-encounter", "The wolf pack", "ffe-wolf-pack"),
+      c("materialize-npc", "A wounded trapper", "ffn-trappers"),
+    ],
+    expected: { band: "act", candidateId: "ffe-wolf-pack", kind: "hostile-encounter" },
+  },
+  {
+    id: "enc-3",
+    category: "hostile-encounter",
+    holdout: false,
     attempt: "We ambush the bandits on the road.",
-    candidates: [c("hostile-encounter", "The roadside bandits", "ffe-road-bandits"), c("new-clue", "Signs of the bandits", "ffl-bandit-signs")],
-    expected: { band: "act", candidateId: "ffe-road-bandits", kind: "hostile-encounter" } },
-  { id: "enc-4", category: "hostile-encounter", holdout: false,
+    candidates: [
+      c("hostile-encounter", "The roadside bandits", "ffe-road-bandits"),
+      c("new-clue", "Signs of the bandits", "ffl-bandit-signs"),
+    ],
+    expected: { band: "act", candidateId: "ffe-road-bandits", kind: "hostile-encounter" },
+  },
+  {
+    id: "enc-4",
+    category: "hostile-encounter",
+    holdout: false,
     attempt: "I fire my bow at the approaching troll.",
-    candidates: [c("hostile-encounter", "The bridge troll", "ffe-bridge-troll"), c("materialize-location", "The bridge", "ffc-bridge")],
-    expected: { band: "act", candidateId: "ffe-bridge-troll", kind: "hostile-encounter" } },
-  { id: "enc-5", category: "hostile-encounter", holdout: true,
+    candidates: [
+      c("hostile-encounter", "The bridge troll", "ffe-bridge-troll"),
+      c("materialize-location", "The bridge", "ffc-bridge"),
+    ],
+    expected: { band: "act", candidateId: "ffe-bridge-troll", kind: "hostile-encounter" },
+  },
+  {
+    id: "enc-5",
+    category: "hostile-encounter",
+    holdout: true,
     attempt: "I swing my axe at the skeleton.",
-    candidates: [c("hostile-encounter", "The risen skeleton", "ffe-skeleton"), c("new-clue", "The defiled grave", "ffl-defiled-grave")],
-    expected: { band: "act", candidateId: "ffe-skeleton", kind: "hostile-encounter" } },
-  { id: "enc-6", category: "hostile-encounter", holdout: false,
+    candidates: [
+      c("hostile-encounter", "The risen skeleton", "ffe-skeleton"),
+      c("new-clue", "The defiled grave", "ffl-defiled-grave"),
+    ],
+    expected: { band: "act", candidateId: "ffe-skeleton", kind: "hostile-encounter" },
+  },
+  {
+    id: "enc-6",
+    category: "hostile-encounter",
+    holdout: false,
     attempt: "I threaten the thugs and raise my blade.",
-    candidates: [c("hostile-encounter", "The alley thugs", "ffe-alley-thugs"), c("materialize-npc", "The alley lookout", "ffn-alley-lookout")],
-    expected: { band: "act", candidateId: "ffe-alley-thugs", kind: "hostile-encounter" } },
-  { id: "enc-7", category: "hostile-encounter", holdout: false,
+    candidates: [
+      c("hostile-encounter", "The alley thugs", "ffe-alley-thugs"),
+      c("materialize-npc", "The alley lookout", "ffn-alley-lookout"),
+    ],
+    expected: { band: "act", candidateId: "ffe-alley-thugs", kind: "hostile-encounter" },
+  },
+  {
+    id: "enc-7",
+    category: "hostile-encounter",
+    holdout: false,
     attempt: "I lunge at the giant spider.",
-    candidates: [c("hostile-encounter", "The giant spider", "ffe-giant-spider"), c("new-clue", "Old webbing", "ffl-old-webbing")],
-    expected: { band: "act", candidateId: "ffe-giant-spider", kind: "hostile-encounter" } },
-  { id: "enc-8", category: "hostile-encounter", holdout: true,
+    candidates: [
+      c("hostile-encounter", "The giant spider", "ffe-giant-spider"),
+      c("new-clue", "Old webbing", "ffl-old-webbing"),
+    ],
+    expected: { band: "act", candidateId: "ffe-giant-spider", kind: "hostile-encounter" },
+  },
+  {
+    id: "enc-8",
+    category: "hostile-encounter",
+    holdout: true,
     attempt: "I open fire on the raiders.",
-    candidates: [c("hostile-encounter", "The river raiders", "ffe-river-raiders"), c("materialize-location", "The river ford", "ffc-river-ford")],
-    expected: { band: "act", candidateId: "ffe-river-raiders", kind: "hostile-encounter" } },
+    candidates: [
+      c("hostile-encounter", "The river raiders", "ffe-river-raiders"),
+      c("materialize-location", "The river ford", "ffc-river-ford"),
+    ],
+    expected: { band: "act", candidateId: "ffe-river-raiders", kind: "hostile-encounter" },
+  },
 
   // ---------------------------- shop-stock (6) ----------------------------
-  { id: "shop-1", category: "shop-stock", holdout: false,
+  {
+    id: "shop-1",
+    category: "shop-stock",
+    holdout: false,
     attempt: "I ask the merchant to show me her wares.",
-    candidates: [c("shop-stock", "The merchant's wares", "ffsc-merchant-wares"), c("materialize-npc", "The merchant", "ffn-merchant")],
-    expected: { band: "act", candidateId: "ffsc-merchant-wares", kind: "shop-stock" } },
-  { id: "shop-2", category: "shop-stock", holdout: true,
+    candidates: [
+      c("shop-stock", "The merchant's wares", "ffsc-merchant-wares"),
+      c("materialize-npc", "The merchant", "ffn-merchant"),
+    ],
+    expected: { band: "act", candidateId: "ffsc-merchant-wares", kind: "shop-stock" },
+  },
+  {
+    id: "shop-2",
+    category: "shop-stock",
+    holdout: true,
     attempt: "I browse the apothecary's stock of potions.",
-    candidates: [c("shop-stock", "The apothecary's stock", "ffsc-apothecary-stock"), c("materialize-npc", "The apothecary", "ffn-apothecary")],
-    expected: { band: "act", candidateId: "ffsc-apothecary-stock", kind: "shop-stock" } },
-  { id: "shop-3", category: "shop-stock", holdout: false,
+    candidates: [
+      c("shop-stock", "The apothecary's stock", "ffsc-apothecary-stock"),
+      c("materialize-npc", "The apothecary", "ffn-apothecary"),
+    ],
+    expected: { band: "act", candidateId: "ffsc-apothecary-stock", kind: "shop-stock" },
+  },
+  {
+    id: "shop-3",
+    category: "shop-stock",
+    holdout: false,
     attempt: "What does the smith have for sale?",
-    candidates: [c("shop-stock", "The smith's stock", "ffsc-smith-stock"), c("new-clue", "The smith's order book", "ffl-smith-order-book")],
-    expected: { band: "act", candidateId: "ffsc-smith-stock", kind: "shop-stock" } },
-  { id: "shop-4", category: "shop-stock", holdout: false,
+    candidates: [
+      c("shop-stock", "The smith's stock", "ffsc-smith-stock"),
+      c("new-clue", "The smith's order book", "ffl-smith-order-book"),
+    ],
+    expected: { band: "act", candidateId: "ffsc-smith-stock", kind: "shop-stock" },
+  },
+  {
+    id: "shop-4",
+    category: "shop-stock",
+    holdout: false,
     attempt: "I want to see the fletcher's inventory.",
-    candidates: [c("shop-stock", "The fletcher's inventory", "ffsc-fletcher-inventory"), c("materialize-npc", "The fletcher", "ffn-fletcher")],
-    expected: { band: "act", candidateId: "ffsc-fletcher-inventory", kind: "shop-stock" } },
-  { id: "shop-5", category: "shop-stock", holdout: true,
+    candidates: [
+      c("shop-stock", "The fletcher's inventory", "ffsc-fletcher-inventory"),
+      c("materialize-npc", "The fletcher", "ffn-fletcher"),
+    ],
+    expected: { band: "act", candidateId: "ffsc-fletcher-inventory", kind: "shop-stock" },
+  },
+  {
+    id: "shop-5",
+    category: "shop-stock",
+    holdout: true,
     attempt: "I ask the trader what goods are available.",
-    candidates: [c("shop-stock", "The trader's goods", "ffsc-trader-goods"), c("materialize-location", "The trading post", "ffc-trading-post")],
-    expected: { band: "act", candidateId: "ffsc-trader-goods", kind: "shop-stock" } },
-  { id: "shop-6", category: "shop-stock", holdout: false,
+    candidates: [
+      c("shop-stock", "The trader's goods", "ffsc-trader-goods"),
+      c("materialize-location", "The trading post", "ffc-trading-post"),
+    ],
+    expected: { band: "act", candidateId: "ffsc-trader-goods", kind: "shop-stock" },
+  },
+  {
+    id: "shop-6",
+    category: "shop-stock",
+    holdout: false,
     attempt: "I look over the caravan's stall for anything useful.",
-    candidates: [c("shop-stock", "The caravan's stall", "ffsc-caravan-stall"), c("materialize-npc", "The caravan master", "ffn-caravan-master")],
-    expected: { band: "act", candidateId: "ffsc-caravan-stall", kind: "shop-stock" } },
+    candidates: [
+      c("shop-stock", "The caravan's stall", "ffsc-caravan-stall"),
+      c("materialize-npc", "The caravan master", "ffn-caravan-master"),
+    ],
+    expected: { band: "act", candidateId: "ffsc-caravan-stall", kind: "shop-stock" },
+  },
 
   // ---------------------------- new-clue (6) ----------------------------
-  { id: "clue-1", category: "new-clue", holdout: false,
+  {
+    id: "clue-1",
+    category: "new-clue",
+    holdout: false,
     attempt: "I search the room for clues about the drowned courier.",
-    candidates: [c("new-clue", "The drowned courier", "ffl-drowned-courier"), c("materialize-npc", "The innkeeper", "ffn-innkeeper")],
-    expected: { band: "act", candidateId: "ffl-drowned-courier", kind: "new-clue" } },
-  { id: "clue-2", category: "new-clue", holdout: true,
+    candidates: [
+      c("new-clue", "The drowned courier", "ffl-drowned-courier"),
+      c("materialize-npc", "The innkeeper", "ffn-innkeeper"),
+    ],
+    expected: { band: "act", candidateId: "ffl-drowned-courier", kind: "new-clue" },
+  },
+  {
+    id: "clue-2",
+    category: "new-clue",
+    holdout: true,
     attempt: "I investigate the strange sigil carved on the door.",
-    candidates: [c("new-clue", "The carved sigil", "ffl-carved-sigil"), c("materialize-location", "The sealed door", "ffc-sealed-door")],
-    expected: { band: "act", candidateId: "ffl-carved-sigil", kind: "new-clue" } },
-  { id: "clue-3", category: "new-clue", holdout: false,
+    candidates: [
+      c("new-clue", "The carved sigil", "ffl-carved-sigil"),
+      c("materialize-location", "The sealed door", "ffc-sealed-door"),
+    ],
+    expected: { band: "act", candidateId: "ffl-carved-sigil", kind: "new-clue" },
+  },
+  {
+    id: "clue-3",
+    category: "new-clue",
+    holdout: false,
     attempt: "I ask around about the rumor of the missing shipment.",
-    candidates: [c("new-clue", "The missing shipment", "ffl-missing-shipment"), c("materialize-npc", "A dockworker", "ffn-dockworker")],
-    expected: { band: "act", candidateId: "ffl-missing-shipment", kind: "new-clue" } },
-  { id: "clue-4", category: "new-clue", holdout: false,
+    candidates: [
+      c("new-clue", "The missing shipment", "ffl-missing-shipment"),
+      c("materialize-npc", "A dockworker", "ffn-dockworker"),
+    ],
+    expected: { band: "act", candidateId: "ffl-missing-shipment", kind: "new-clue" },
+  },
+  {
+    id: "clue-4",
+    category: "new-clue",
+    holdout: false,
     attempt: "I examine the ledger for a lead on the smuggling ring.",
-    candidates: [c("new-clue", "The smuggling ring", "ffl-smuggling-ring"), c("shop-stock", "A fence's wares", "ffsc-fence-wares")],
-    expected: { band: "act", candidateId: "ffl-smuggling-ring", kind: "new-clue" } },
-  { id: "clue-5", category: "new-clue", holdout: true,
+    candidates: [
+      c("new-clue", "The smuggling ring", "ffl-smuggling-ring"),
+      c("shop-stock", "A fence's wares", "ffsc-fence-wares"),
+    ],
+    expected: { band: "act", candidateId: "ffl-smuggling-ring", kind: "new-clue" },
+  },
+  {
+    id: "clue-5",
+    category: "new-clue",
+    holdout: true,
     attempt: "I look into the old legend of the hollow king.",
-    candidates: [c("new-clue", "The hollow king", "ffl-hollow-king"), c("materialize-location", "The barrow", "ffc-barrow")],
-    expected: { band: "act", candidateId: "ffl-hollow-king", kind: "new-clue" } },
-  { id: "clue-6", category: "new-clue", holdout: false,
+    candidates: [
+      c("new-clue", "The hollow king", "ffl-hollow-king"),
+      c("materialize-location", "The barrow", "ffc-barrow"),
+    ],
+    expected: { band: "act", candidateId: "ffl-hollow-king", kind: "new-clue" },
+  },
+  {
+    id: "clue-6",
+    category: "new-clue",
+    holdout: false,
     attempt: "I search for evidence of who poisoned the well.",
-    candidates: [c("new-clue", "The poisoned well", "ffl-poisoned-well"), c("materialize-npc", "The water carrier", "ffn-water-carrier")],
-    expected: { band: "act", candidateId: "ffl-poisoned-well", kind: "new-clue" } },
+    candidates: [
+      c("new-clue", "The poisoned well", "ffl-poisoned-well"),
+      c("materialize-npc", "The water carrier", "ffn-water-carrier"),
+    ],
+    expected: { band: "act", candidateId: "ffl-poisoned-well", kind: "new-clue" },
+  },
 
   // ---------------------------- materialize-faction (4) ----------------------------
-  { id: "faction-1", category: "materialize-faction", holdout: false,
+  {
+    id: "faction-1",
+    category: "materialize-faction",
+    holdout: false,
     attempt: "I look for the local thieves' guild.",
-    candidates: [c("materialize-faction", "The thieves' guild", "fff-thieves-guild"), c("materialize-npc", "The guildmaster", "ffn-guildmaster")],
-    expected: { band: "act", candidateId: "fff-thieves-guild", kind: "materialize-faction" } },
-  { id: "faction-2", category: "materialize-faction", holdout: true,
+    candidates: [
+      c("materialize-faction", "The thieves' guild", "fff-thieves-guild"),
+      c("materialize-npc", "The guildmaster", "ffn-guildmaster"),
+    ],
+    expected: { band: "act", candidateId: "fff-thieves-guild", kind: "materialize-faction" },
+  },
+  {
+    id: "faction-2",
+    category: "materialize-faction",
+    holdout: true,
     attempt: "I ask around for the mages guild.",
-    candidates: [c("materialize-faction", "The mages guild", "fff-mages-guild"), c("materialize-location", "The guildhall", "ffc-guildhall")],
-    expected: { band: "act", candidateId: "fff-mages-guild", kind: "materialize-faction" } },
-  { id: "faction-3", category: "materialize-faction", holdout: false,
+    candidates: [
+      c("materialize-faction", "The mages guild", "fff-mages-guild"),
+      c("materialize-location", "The guildhall", "ffc-guildhall"),
+    ],
+    expected: { band: "act", candidateId: "fff-mages-guild", kind: "materialize-faction" },
+  },
+  {
+    id: "faction-3",
+    category: "materialize-faction",
+    holdout: false,
     // Wrong-candidate trap: two factions are offered; the attempt names the smiths guild only.
     attempt: "I want to find the smiths guild.",
-    candidates: [c("materialize-faction", "The merchants guild", "fff-merchants-guild"), c("materialize-faction", "The smiths guild", "fff-smiths-guild")],
-    expected: { band: "act", candidateId: "fff-smiths-guild", kind: "materialize-faction" } },
-  { id: "faction-4", category: "materialize-faction", holdout: true,
+    candidates: [
+      c("materialize-faction", "The merchants guild", "fff-merchants-guild"),
+      c("materialize-faction", "The smiths guild", "fff-smiths-guild"),
+    ],
+    expected: { band: "act", candidateId: "fff-smiths-guild", kind: "materialize-faction" },
+  },
+  {
+    id: "faction-4",
+    category: "materialize-faction",
+    holdout: true,
     attempt: "I seek out the order of the silver flame.",
-    candidates: [c("materialize-faction", "The order of the silver flame", "fff-silver-flame"), c("new-clue", "Tales of the silver flame", "ffl-silver-flame-tales")],
-    expected: { band: "act", candidateId: "fff-silver-flame", kind: "materialize-faction" } },
+    candidates: [
+      c("materialize-faction", "The order of the silver flame", "fff-silver-flame"),
+      c("new-clue", "Tales of the silver flame", "ffl-silver-flame-tales"),
+    ],
+    expected: { band: "act", candidateId: "fff-silver-flame", kind: "materialize-faction" },
+  },
 
   // ---------------------------- materialize-quest (4) ----------------------------
-  { id: "quest-1", category: "materialize-quest", holdout: false,
+  {
+    id: "quest-1",
+    category: "materialize-quest",
+    holdout: false,
     attempt: "I want steady work.",
-    candidates: [c("materialize-quest", "A bounty on the road bandits", "ffq-road-bandits"), c("materialize-npc", "The quest giver", "ffn-quest-giver")],
-    expected: { band: "act", candidateId: "ffq-road-bandits", kind: "materialize-quest" } },
-  { id: "quest-2", category: "materialize-quest", holdout: true,
+    candidates: [
+      c("materialize-quest", "A bounty on the road bandits", "ffq-road-bandits"),
+      c("materialize-npc", "The quest giver", "ffn-quest-giver"),
+    ],
+    expected: { band: "act", candidateId: "ffq-road-bandits", kind: "materialize-quest" },
+  },
+  {
+    id: "quest-2",
+    category: "materialize-quest",
+    holdout: true,
     attempt: "Do you have any jobs for me?",
-    candidates: [c("materialize-quest", "Escort the merchant caravan", "ffq-escort-caravan"), c("shop-stock", "The caravan's wares", "ffsc-caravan-wares")],
-    expected: { band: "act", candidateId: "ffq-escort-caravan", kind: "materialize-quest" } },
-  { id: "quest-3", category: "materialize-quest", holdout: false,
+    candidates: [
+      c("materialize-quest", "Escort the merchant caravan", "ffq-escort-caravan"),
+      c("shop-stock", "The caravan's wares", "ffsc-caravan-wares"),
+    ],
+    expected: { band: "act", candidateId: "ffq-escort-caravan", kind: "materialize-quest" },
+  },
+  {
+    id: "quest-3",
+    category: "materialize-quest",
+    holdout: false,
     // Wrong-candidate trap: two quests are offered; the attempt names the bandit hunt only.
     attempt: "I offer to hunt the road bandits.",
-    candidates: [c("materialize-quest", "Clear the ruined mill", "ffq-clear-mill"), c("materialize-quest", "Hunt the road bandits", "ffq-hunt-bandits")],
-    expected: { band: "act", candidateId: "ffq-hunt-bandits", kind: "materialize-quest" } },
-  { id: "quest-4", category: "materialize-quest", holdout: true,
+    candidates: [
+      c("materialize-quest", "Clear the ruined mill", "ffq-clear-mill"),
+      c("materialize-quest", "Hunt the road bandits", "ffq-hunt-bandits"),
+    ],
+    expected: { band: "act", candidateId: "ffq-hunt-bandits", kind: "materialize-quest" },
+  },
+  {
+    id: "quest-4",
+    category: "materialize-quest",
+    holdout: true,
     attempt: "I look for a contract to guard the eastern road.",
-    candidates: [c("materialize-quest", "Guard the eastern road", "ffq-guard-road"), c("materialize-location", "The eastern road", "ffc-eastern-road")],
-    expected: { band: "act", candidateId: "ffq-guard-road", kind: "materialize-quest" } },
+    candidates: [
+      c("materialize-quest", "Guard the eastern road", "ffq-guard-road"),
+      c("materialize-location", "The eastern road", "ffc-eastern-road"),
+    ],
+    expected: { band: "act", candidateId: "ffq-guard-road", kind: "materialize-quest" },
+  },
 
   // ---------------------------- materialize-rumor (4) ----------------------------
-  { id: "rumor-1", category: "materialize-rumor", holdout: false,
+  {
+    id: "rumor-1",
+    category: "materialize-rumor",
+    holdout: false,
     attempt: "I listen for gossip about the pale tide.",
-    candidates: [c("materialize-rumor", "The pale tide", "ffr-pale-tide"), c("new-clue", "Signs of the pale tide", "ffl-pale-tide-signs")],
-    expected: { band: "act", candidateId: "ffr-pale-tide", kind: "materialize-rumor" } },
-  { id: "rumor-2", category: "materialize-rumor", holdout: true,
+    candidates: [
+      c("materialize-rumor", "The pale tide", "ffr-pale-tide"),
+      c("new-clue", "Signs of the pale tide", "ffl-pale-tide-signs"),
+    ],
+    expected: { band: "act", candidateId: "ffr-pale-tide", kind: "materialize-rumor" },
+  },
+  {
+    id: "rumor-2",
+    category: "materialize-rumor",
+    holdout: true,
     attempt: "I ask around about rumors of the drowned courier.",
-    candidates: [c("materialize-rumor", "The drowned courier", "ffr-drowned-courier"), c("materialize-npc", "A dockworker", "ffn-rumor-dockworker")],
-    expected: { band: "act", candidateId: "ffr-drowned-courier", kind: "materialize-rumor" } },
-  { id: "rumor-3", category: "materialize-rumor", holdout: false,
+    candidates: [
+      c("materialize-rumor", "The drowned courier", "ffr-drowned-courier"),
+      c("materialize-npc", "A dockworker", "ffn-rumor-dockworker"),
+    ],
+    expected: { band: "act", candidateId: "ffr-drowned-courier", kind: "materialize-rumor" },
+  },
+  {
+    id: "rumor-3",
+    category: "materialize-rumor",
+    holdout: false,
     // Wrong-candidate trap: two rumors are offered; the attempt names the hollow king only.
     attempt: "I ask for the rumor about the hollow king.",
-    candidates: [c("materialize-rumor", "The pale tide", "ffr-pale-tide-2"), c("materialize-rumor", "The hollow king", "ffr-hollow-king")],
-    expected: { band: "act", candidateId: "ffr-hollow-king", kind: "materialize-rumor" } },
-  { id: "rumor-4", category: "materialize-rumor", holdout: true,
+    candidates: [
+      c("materialize-rumor", "The pale tide", "ffr-pale-tide-2"),
+      c("materialize-rumor", "The hollow king", "ffr-hollow-king"),
+    ],
+    expected: { band: "act", candidateId: "ffr-hollow-king", kind: "materialize-rumor" },
+  },
+  {
+    id: "rumor-4",
+    category: "materialize-rumor",
+    holdout: true,
     attempt: "I want to hear the gossip on the missing shipment.",
-    candidates: [c("materialize-rumor", "The missing shipment", "ffr-missing-shipment"), c("shop-stock", "A fence's wares", "ffsc-rumor-fence-wares")],
-    expected: { band: "act", candidateId: "ffr-missing-shipment", kind: "materialize-rumor" } },
+    candidates: [
+      c("materialize-rumor", "The missing shipment", "ffr-missing-shipment"),
+      c("shop-stock", "A fence's wares", "ffsc-rumor-fence-wares"),
+    ],
+    expected: { band: "act", candidateId: "ffr-missing-shipment", kind: "materialize-rumor" },
+  },
 
   // ---------------------------- hold (6): narration is sufficient ----------------------------
-  { id: "hold-1", category: "hold", holdout: false,
+  {
+    id: "hold-1",
+    category: "hold",
+    holdout: false,
     attempt: "I describe my character sharpening her sword by the fire while we talk.",
     candidates: [c("materialize-location", "The campsite", "ffc-campsite")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "hold-2", category: "hold", holdout: true,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "hold-2",
+    category: "hold",
+    holdout: true,
     attempt: "I look around the room and take in the scene.",
     candidates: [c("materialize-location", "The common room", "ffc-common-room")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "hold-3", category: "hold", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "hold-3",
+    category: "hold",
+    holdout: false,
     attempt: "I nod to my companions and say we should rest here a while.",
     candidates: [c("materialize-location", "A resting place", "ffc-resting-place")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "hold-4", category: "hold", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "hold-4",
+    category: "hold",
+    holdout: false,
     attempt: "I recount what happened at the gate yesterday.",
     candidates: [c("new-clue", "The gate incident", "ffl-gate-incident")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "hold-5", category: "hold", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "hold-5",
+    category: "hold",
+    holdout: false,
     attempt: "I retell the legend of the order of the silver flame to my companions.",
     candidates: [c("materialize-faction", "The order of the silver flame", "fff-hold-silver-flame")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "hold-6", category: "hold", holdout: true,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "hold-6",
+    category: "hold",
+    holdout: true,
     attempt: "I mention the jobs I have already done, to pass the time.",
     candidates: [c("materialize-quest", "An old job", "ffq-hold-old-job")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
 
   // ---------------------------- illegal (6): adding content now is not legal ----------------------------
-  { id: "illegal-1", category: "illegal", holdout: false,
+  {
+    id: "illegal-1",
+    category: "illegal",
+    holdout: false,
     attempt: "I declare that the king is secretly my brother and summon his royal guard.",
     candidates: [c("materialize-npc", "The royal guard", "ffn-royal-guard")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "illegal-2", category: "illegal", holdout: true,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "illegal-2",
+    category: "illegal",
+    holdout: true,
     attempt: "I decree that a dragon has always roosted in the town square.",
     candidates: [c("hostile-encounter", "The town-square dragon", "ffe-town-dragon")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "illegal-3", category: "illegal", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "illegal-3",
+    category: "illegal",
+    holdout: false,
     attempt: "I invent a new god and found a temple in the market.",
     candidates: [c("materialize-location", "The new temple", "ffc-new-temple")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "illegal-4", category: "illegal", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "illegal-4",
+    category: "illegal",
+    holdout: false,
     attempt: "I declare the war over and the enemy army gone.",
     candidates: [c("hostile-encounter", "The vanished army", "ffe-vanished-army")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "illegal-5", category: "illegal", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "illegal-5",
+    category: "illegal",
+    holdout: false,
     attempt: "I declare the guild's grandmaster is secretly my father and they owe me fealty.",
     candidates: [c("materialize-faction", "The thieves' guild", "fff-illegal-thieves-guild")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "illegal-6", category: "illegal", holdout: true,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "illegal-6",
+    category: "illegal",
+    holdout: true,
     attempt: "I invent a rumor that the king is dead and spread it as established truth.",
     candidates: [c("materialize-rumor", "The king's death", "ffr-illegal-king-death")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
 
   // ---------------------------- duplicate (7): the content already exists ----------------------------
-  { id: "duplicate-1", category: "duplicate", holdout: false,
+  {
+    id: "duplicate-1",
+    category: "duplicate",
+    holdout: false,
     attempt: "We already mapped the Glassblower's District; I walk back there.",
     candidates: [c("materialize-location", "Glassblower's District", "ffc-dup-glassblower")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "duplicate-2", category: "duplicate", holdout: true,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "duplicate-2",
+    category: "duplicate",
+    holdout: true,
     attempt: "I greet Marta the blacksmith, whom we already met.",
     candidates: [c("materialize-npc", "Marta the blacksmith", "ffn-dup-marta")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "duplicate-3", category: "duplicate", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "duplicate-3",
+    category: "duplicate",
+    holdout: false,
     attempt: "I go back to the Sunken Chapel that we cleared last session.",
     candidates: [c("materialize-location", "The Sunken Chapel", "ffc-dup-sunken-chapel")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "duplicate-4", category: "duplicate", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "duplicate-4",
+    category: "duplicate",
+    holdout: false,
     attempt: "I speak again with Captain Vale, who already gave us orders.",
     candidates: [c("materialize-npc", "Captain Vale", "ffn-dup-vale")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "duplicate-5", category: "duplicate", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "duplicate-5",
+    category: "duplicate",
+    holdout: false,
     attempt: "I already found the thieves' guild; I ask about it again.",
     candidates: [c("materialize-faction", "The thieves' guild", "fff-dup-thieves-guild")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "duplicate-6", category: "duplicate", holdout: true,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "duplicate-6",
+    category: "duplicate",
+    holdout: true,
     attempt: "I ask for the same road bandit bounty we already accepted.",
     candidates: [c("materialize-quest", "The road bandit bounty", "ffq-dup-road-bandits")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
-  { id: "duplicate-7", category: "duplicate", holdout: false,
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
+  {
+    id: "duplicate-7",
+    category: "duplicate",
+    holdout: false,
     attempt: "I already heard the rumor about the pale tide.",
     candidates: [c("materialize-rumor", "The pale tide", "ffr-dup-pale-tide")],
-    expected: { band: "fallback", candidateId: null, kind: null } },
+    expected: { band: "fallback", candidateId: null, kind: null },
+  },
 ];
 
 /** Recursively sorts object keys so the corpus digest is independent of literal key order. */
@@ -420,7 +836,9 @@ function canonical(value: unknown): unknown {
 }
 
 function digestOf(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(canonical(value)))
+    .digest("hex");
 }
 
 /** Pinned digest of the frozen corpus; a test fails when the corpus drifts from this value. */
@@ -437,9 +855,7 @@ export const FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST = digestOf(
 );
 
 /** The fixed action-threshold grid, low to high. Selection uses the development split only. */
-export const FREEFORM_MATERIALIZATION_THRESHOLD_GRID = [
-  0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75,
-] as const;
+export const FREEFORM_MATERIALIZATION_THRESHOLD_GRID = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75] as const;
 
 /** The shipped review threshold; selection never changes it (freeform composition uses only action). */
 export const FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD = 0.5;
@@ -501,9 +917,7 @@ export function gradeFreeformDecision(
   expected: FreeformBenchmarkExpectation,
 ): boolean {
   if (expected.band === "act") {
-    return decision.band === "act"
-      && decision.candidateId === expected.candidateId
-      && decision.kind === expected.kind;
+    return decision.band === "act" && decision.candidateId === expected.candidateId && decision.kind === expected.kind;
   }
   return decision.band !== "act";
 }
@@ -529,9 +943,7 @@ export function toFreeformSample(
   };
 }
 
-function isActedSample(
-  sample: FreeformBenchmarkSample,
-): sample is FreeformBenchmarkSample & { topSignal: number } {
+function isActedSample(sample: FreeformBenchmarkSample): sample is FreeformBenchmarkSample & { topSignal: number } {
   return sample.acted && sample.topSignal !== null && Number.isFinite(sample.topSignal);
 }
 
@@ -563,9 +975,7 @@ const rate = (numerator: number, denominator: number): number => (denominator ==
  * while the gate scores the calibrated map over every acted sample (the map the lane would ship
  * with). Deferrals never enter the gate.
  */
-export function evaluateFreeformBenchmark(
-  samples: readonly FreeformBenchmarkSample[],
-): FreeformBenchmarkEvaluation {
+export function evaluateFreeformBenchmark(samples: readonly FreeformBenchmarkSample[]): FreeformBenchmarkEvaluation {
   const acted = samples.filter(isActedSample);
   const devSamples = acted.filter((sample) => !sample.holdout);
   const holdoutSamples = acted.filter((sample) => sample.holdout);
@@ -723,8 +1133,14 @@ export function evaluateFreeformDevSelection(
     points.push({
       threshold,
       calibration: fitted,
-      dev: splitReport(samples.filter((sample) => !sample.holdout), fitted),
-      holdout: splitReport(samples.filter((sample) => sample.holdout), fitted),
+      dev: splitReport(
+        samples.filter((sample) => !sample.holdout),
+        fitted,
+      ),
+      holdout: splitReport(
+        samples.filter((sample) => sample.holdout),
+        fitted,
+      ),
     });
   }
 
@@ -736,18 +1152,22 @@ export function evaluateFreeformDevSelection(
   let selectedBy: FreeformDevSelection["selectedBy"] = "none";
   if (gated.length > 0) {
     selectedBy = "dev-gate";
-    selected = gated.reduce((current, point) => better(current, point, [
-      (value) => value.dev.distinctActed,
-      (value) => value.dev.accuracy,
-      (value) => value.dev.accuracyLowerBound,
-    ]));
+    selected = gated.reduce((current, point) =>
+      better(current, point, [
+        (value) => value.dev.distinctActed,
+        (value) => value.dev.accuracy,
+        (value) => value.dev.accuracyLowerBound,
+      ]),
+    );
   } else if (descriptive.length > 0) {
     selectedBy = "dev-best";
-    selected = descriptive.reduce((current, point) => better(current, point, [
-      (value) => value.dev.accuracy,
-      (value) => value.dev.accuracyLowerBound,
-      (value) => value.dev.distinctActed,
-    ]));
+    selected = descriptive.reduce((current, point) =>
+      better(current, point, [
+        (value) => value.dev.accuracy,
+        (value) => value.dev.accuracyLowerBound,
+        (value) => value.dev.distinctActed,
+      ]),
+    );
     reasons.push(
       "no development threshold passed the development gate; the selected point is descriptive only and cannot promote",
     );
@@ -793,12 +1213,14 @@ export function proposeSelectionPromotionRecord(
     },
   };
   return {
-    evaluatedBindings: [systemOneEvaluationBinding(
-      PROMOTION_LANE,
-      calibratedSettings,
-      responseModel,
-      FREEFORM_MATERIALIZATION_ACTION_FAMILY,
-    )],
+    evaluatedBindings: [
+      systemOneEvaluationBinding(
+        PROMOTION_LANE,
+        calibratedSettings,
+        responseModel,
+        FREEFORM_MATERIALIZATION_ACTION_FAMILY,
+      ),
+    ],
     metrics: {
       samples: point.holdout.samples,
       accuracy: round4(point.holdout.accuracy),
@@ -844,12 +1266,14 @@ export function proposePromotionRecord(
     expectedCalibrationError: round4(evaluation.all.calibrated.expectedCalibrationError),
   };
   return {
-    evaluatedBindings: [systemOneEvaluationBinding(
-      PROMOTION_LANE,
-      calibratedSettings,
-      responseModel,
-      FREEFORM_MATERIALIZATION_ACTION_FAMILY,
-    )],
+    evaluatedBindings: [
+      systemOneEvaluationBinding(
+        PROMOTION_LANE,
+        calibratedSettings,
+        responseModel,
+        FREEFORM_MATERIALIZATION_ACTION_FAMILY,
+      ),
+    ],
     metrics,
     calibration: { a: round4(evaluation.fitted.a), b: round4(evaluation.fitted.b) },
     promotedAt,
@@ -929,42 +1353,63 @@ export function renderFreeformBenchmark(input: {
   evaluation: FreeformBenchmarkEvaluation;
   proposedRecord: SystemOnePromotionRecord | null;
 }): string {
-  const { generatedAt, model, responseModel, baseUrl, repeats, thresholds, samples, calls, evaluation, proposedRecord } = input;
+  const {
+    generatedAt,
+    model,
+    responseModel,
+    baseUrl,
+    repeats,
+    thresholds,
+    samples,
+    calls,
+    evaluation,
+    proposedRecord,
+  } = input;
   const summaries = summarizeFreeformCases(samples);
   const okCalls = calls.filter((call) => call.ok).length;
   const latencies = calls.map((call) => call.latencyMs);
   const meanLatency = latencies.length === 0 ? 0 : latencies.reduce((sum, value) => sum + value, 0) / latencies.length;
   const expectedText = (entry: FreeformMaterializationBenchmarkCase): string =>
-    entry.expected.band === "act"
-      ? `act → ${entry.expected.candidateId}`
-      : "fallback (no materialization)";
+    entry.expected.band === "act" ? `act → ${entry.expected.candidateId}` : "fallback (no materialization)";
   const lines: string[] = [];
   lines.push("# System One (Jev) freeform-materialization benchmark");
   lines.push("");
-  lines.push(`Generated ${generatedAt} by \`scripts/evaluate-system-one-freeform-materialization-lane.ts\` using the live System One adapter.`);
+  lines.push(
+    `Generated ${generatedAt} by \`scripts/evaluate-system-one-freeform-materialization-lane.ts\` using the live System One adapter.`,
+  );
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
-  lines.push("The `freeform-materialization` lane is advisory and bounded: the server owns a closed candidate set (a location, NPC, encounter, shop, clue, faction, quest, or rumor the deterministic classifier would author), and the lane may only select one authored candidate id/kind or fail closed to no action. It never authors prose, stats, prices, stock, or a state mutation. The battery is two `noul` gates (`needs_content`, `legal`) plus one aggregate `choice` over the exact authored ids and an explicit `none_of_these`; `composeFreeformMaterializationDecision` requires every signal at the action threshold to act.");
+  lines.push(
+    "The `freeform-materialization` lane is advisory and bounded: the server owns a closed candidate set (a location, NPC, encounter, shop, clue, faction, quest, or rumor the deterministic classifier would author), and the lane may only select one authored candidate id/kind or fail closed to no action. It never authors prose, stats, prices, stock, or a state mutation. The battery is two `noul` gates (`needs_content`, `legal`) plus one aggregate `choice` over the exact authored ids and an explicit `none_of_these`; `composeFreeformMaterializationDecision` requires every signal at the action threshold to act.",
+  );
   lines.push("");
-  lines.push("The corpus is **frozen and provider-free**: the attempts, candidate sets, and labels are hand-authored fixtures, and no case carries provider output. The evaluation runs the real adapter once per case. Positives exercise all eight kinds, including wrong-candidate traps where two same-kind candidates are offered and the attempt names only one. Negatives are hard holds: narration is sufficient, adding content now is illegal under canon/readiness, or the named content already exists (duplicate). A `fallback` label is correct only when the lane does not act; acting there is a false act and an acted error. Only `act` samples score the gate, so a deferral is coverage, not an acted error.");
+  lines.push(
+    "The corpus is **frozen and provider-free**: the attempts, candidate sets, and labels are hand-authored fixtures, and no case carries provider output. The evaluation runs the real adapter once per case. Positives exercise all eight kinds, including wrong-candidate traps where two same-kind candidates are offered and the attempt names only one. Negatives are hard holds: narration is sufficient, adding content now is illegal under canon/readiness, or the named content already exists (duplicate). A `fallback` label is correct only when the lane does not act; acting there is a false act and an acted error. Only `act` samples score the gate, so a deferral is coverage, not an acted error.",
+  );
   lines.push("");
   lines.push("| Setting | Value |");
   lines.push("| --- | --- |");
   lines.push(`| Requested model | \`${model}\` |`);
   lines.push(`| Response model | \`${responseModel ?? "unknown"}\` |`);
   lines.push(`| Base URL | \`${baseUrl}\` |`);
-  lines.push(`| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`);
+  lines.push(
+    `| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`,
+  );
   lines.push(`| Repeats | ${repeats} |`);
   lines.push(`| Corpus digest (sha256) | \`${FREEFORM_MATERIALIZATION_CORPUS_DIGEST}\` |`);
-  lines.push(`| Corpus | ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases x ${repeats} repeats = ${samples.length} calls (${okCalls} transport calls succeeded) |`);
+  lines.push(
+    `| Corpus | ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases x ${repeats} repeats = ${samples.length} calls (${okCalls} transport calls succeeded) |`,
+  );
   lines.push("");
   lines.push("## Corpus");
   lines.push("");
   lines.push("| Case | Category | Split | Attempt | Expected |");
   lines.push("| --- | --- | :---: | --- | --- |");
   for (const entry of FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS) {
-    lines.push(`| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${entry.attempt} | ${expectedText(entry)} |`);
+    lines.push(
+      `| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${entry.attempt} | ${expectedText(entry)} |`,
+    );
   }
   lines.push("");
   lines.push("## Per-case results (all repeats)");
@@ -972,7 +1417,9 @@ export function renderFreeformBenchmark(input: {
   lines.push("| Case | Category | Bands (act/confirm/fallback) | Acted | Correct | Deferred | Mean signal |");
   lines.push("| --- | --- | --- | ---: | ---: | ---: | ---: |");
   for (const summary of summaries) {
-    lines.push(`| ${summary.id} | ${summary.category} | ${summary.bands.act}/${summary.bands.confirm}/${summary.bands.fallback} | ${summary.acted}/${summary.calls} | ${summary.correct}/${summary.calls} | ${summary.deferred}/${summary.calls} | ${summary.meanSignal.toFixed(3)} |`);
+    lines.push(
+      `| ${summary.id} | ${summary.category} | ${summary.bands.act}/${summary.bands.confirm}/${summary.bands.fallback} | ${summary.acted}/${summary.calls} | ${summary.correct}/${summary.calls} | ${summary.deferred}/${summary.calls} | ${summary.meanSignal.toFixed(3)} |`,
+    );
   }
   lines.push("");
   if (samples.length !== summaries.reduce((sum, summary) => sum + summary.calls, 0)) {
@@ -984,14 +1431,26 @@ export function renderFreeformBenchmark(input: {
   lines.push("");
   lines.push("| Split | Signal | Brier | ECE |");
   lines.push("| --- | --- | ---: | ---: |");
-  lines.push(`| held-out acted (${evaluation.holdoutSamples}) | raw | ${evaluation.holdout.raw.brier.toFixed(4)} | ${evaluation.holdout.raw.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| held-out acted (${evaluation.holdoutSamples}) | calibrated | ${evaluation.holdout.calibrated.brier.toFixed(4)} | ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| all acted (${evaluation.actedSamples}) | raw | ${evaluation.all.raw.brier.toFixed(4)} | ${evaluation.all.raw.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| all acted (${evaluation.actedSamples}) | calibrated | ${evaluation.all.calibrated.brier.toFixed(4)} | ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(
+    `| held-out acted (${evaluation.holdoutSamples}) | raw | ${evaluation.holdout.raw.brier.toFixed(4)} | ${evaluation.holdout.raw.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| held-out acted (${evaluation.holdoutSamples}) | calibrated | ${evaluation.holdout.calibrated.brier.toFixed(4)} | ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| all acted (${evaluation.actedSamples}) | raw | ${evaluation.all.raw.brier.toFixed(4)} | ${evaluation.all.raw.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| all acted (${evaluation.actedSamples}) | calibrated | ${evaluation.all.calibrated.brier.toFixed(4)} | ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)} |`,
+  );
   lines.push("");
-  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${evaluation.fitted.a.toFixed(4)}, b = ${evaluation.fitted.b.toFixed(4)}.`);
+  lines.push(
+    `Map: \`sigmoid(a * logit(p) + b)\` with a = ${evaluation.fitted.a.toFixed(4)}, b = ${evaluation.fitted.b.toFixed(4)}.`,
+  );
   lines.push("");
-  lines.push(`Acted accuracy ${pct(evaluation.accuracy)} over ${evaluation.actedSamples} acted sample(s); ${evaluation.deferredPositive} labelled act(s) deferred, ${evaluation.falseActs} false act(s), ${evaluation.actedErrors} acted error(s). Mean transport latency ${meanLatency.toFixed(0)} ms.`);
+  lines.push(
+    `Acted accuracy ${pct(evaluation.accuracy)} over ${evaluation.actedSamples} acted sample(s); ${evaluation.deferredPositive} labelled act(s) deferred, ${evaluation.falseActs} false act(s), ${evaluation.actedErrors} acted error(s). Mean transport latency ${meanLatency.toFixed(0)} ms.`,
+  );
   lines.push("");
   lines.push(`## Promotion gate — \`${PROMOTION_LANE}\``);
   lines.push("");
@@ -1000,7 +1459,9 @@ export function renderFreeformBenchmark(input: {
   if (evaluation.gate.reasons.length === 0) lines.push("All gates passed.");
   else for (const reason of evaluation.gate.reasons) lines.push(`- ${reason}`);
   lines.push("");
-  lines.push(`Gate: samples ${evaluation.gate.gates.minSamples}+, accuracy ${pct(evaluation.gate.gates.minAccuracy)}+, Wilson lower bound ${evaluation.gate.gates.minAccuracyLowerBound ?? "n/a"}+, Brier <= ${evaluation.gate.gates.maxBrier}, ECE <= ${evaluation.gate.gates.maxExpectedCalibrationError}.`);
+  lines.push(
+    `Gate: samples ${evaluation.gate.gates.minSamples}+, accuracy ${pct(evaluation.gate.gates.minAccuracy)}+, Wilson lower bound ${evaluation.gate.gates.minAccuracyLowerBound ?? "n/a"}+, Brier <= ${evaluation.gate.gates.maxBrier}, ECE <= ${evaluation.gate.gates.maxExpectedCalibrationError}.`,
+  );
   lines.push("");
   if (proposedRecord) {
     lines.push("Proposed promotion record:");
@@ -1009,15 +1470,25 @@ export function renderFreeformBenchmark(input: {
     lines.push(JSON.stringify(proposedRecord, null, 2));
     lines.push("```");
   } else {
-    lines.push("No promotion record is proposed: the gate did not pass or no real response model was captured, so the lane keeps its record-only shadow behavior.");
+    lines.push(
+      "No promotion record is proposed: the gate did not pass or no real response model was captured, so the lane keeps its record-only shadow behavior.",
+    );
   }
   lines.push("");
   lines.push("## Observations");
   lines.push("");
-  lines.push(`- **Coverage.** ${evaluation.deferredPositive} of the labelled act cases deferred; a deferral leaves the deterministic classifier/hold in place and is coverage, not an acted error.`);
-  lines.push(`- **Safety.** ${evaluation.falseActs} labelled hold/illegal/duplicate case(s) were acted on; each is an acted error that costs accuracy.`);
-  lines.push("- **Honesty.** The corpus is small and provider-free in its ground truth; a passing gate with no acted error is a promotion candidate, not proof, and cannot test the calibration error tail. The held-out rows are the unbiased calibration estimate, while the gate scores the calibrated map over every acted sample.");
-  lines.push("- **No active path by default.** The lane is only invoked by an opt-in call site that requires `enabled`, an `active` lane mode, and a matching promotion binding; otherwise the deterministic classifier owns materialization.");
+  lines.push(
+    `- **Coverage.** ${evaluation.deferredPositive} of the labelled act cases deferred; a deferral leaves the deterministic classifier/hold in place and is coverage, not an acted error.`,
+  );
+  lines.push(
+    `- **Safety.** ${evaluation.falseActs} labelled hold/illegal/duplicate case(s) were acted on; each is an acted error that costs accuracy.`,
+  );
+  lines.push(
+    "- **Honesty.** The corpus is small and provider-free in its ground truth; a passing gate with no acted error is a promotion candidate, not proof, and cannot test the calibration error tail. The held-out rows are the unbiased calibration estimate, while the gate scores the calibrated map over every acted sample.",
+  );
+  lines.push(
+    "- **No active path by default.** The lane is only invoked by an opt-in call site that requires `enabled`, an `active` lane mode, and a matching promotion binding; otherwise the deterministic classifier owns materialization.",
+  );
   lines.push("");
   lines.push("## Reproduce");
   lines.push("");
@@ -1041,18 +1512,42 @@ interface GateRow {
 /** Every base gate as observed-vs-required, whether it passed or not. */
 export function promotionGateRows(metrics: PromotionCalibrationMetrics, result: SystemOnePromotionResult): GateRow[] {
   const gates = result.gates;
-  const lowerBound = metrics.samples === 0
-    ? 0
-    : wilsonLowerBound(Math.round(metrics.accuracy * metrics.samples), metrics.samples);
+  const lowerBound =
+    metrics.samples === 0 ? 0 : wilsonLowerBound(Math.round(metrics.accuracy * metrics.samples), metrics.samples);
   const rows: GateRow[] = [
-    { criterion: "samples", observed: `${metrics.samples}`, required: `>= ${gates.minSamples}`, pass: metrics.samples >= gates.minSamples },
-    { criterion: "accuracy", observed: metrics.accuracy.toFixed(4), required: `>= ${gates.minAccuracy.toFixed(4)}`, pass: metrics.accuracy >= gates.minAccuracy },
+    {
+      criterion: "samples",
+      observed: `${metrics.samples}`,
+      required: `>= ${gates.minSamples}`,
+      pass: metrics.samples >= gates.minSamples,
+    },
+    {
+      criterion: "accuracy",
+      observed: metrics.accuracy.toFixed(4),
+      required: `>= ${gates.minAccuracy.toFixed(4)}`,
+      pass: metrics.accuracy >= gates.minAccuracy,
+    },
   ];
   if (gates.minAccuracyLowerBound !== undefined) {
-    rows.push({ criterion: "Wilson lower bound", observed: lowerBound.toFixed(4), required: `>= ${gates.minAccuracyLowerBound.toFixed(4)}`, pass: lowerBound >= gates.minAccuracyLowerBound });
+    rows.push({
+      criterion: "Wilson lower bound",
+      observed: lowerBound.toFixed(4),
+      required: `>= ${gates.minAccuracyLowerBound.toFixed(4)}`,
+      pass: lowerBound >= gates.minAccuracyLowerBound,
+    });
   }
-  rows.push({ criterion: "Brier", observed: metrics.brier.toFixed(4), required: `<= ${gates.maxBrier.toFixed(4)}`, pass: metrics.brier <= gates.maxBrier });
-  rows.push({ criterion: "ECE", observed: metrics.expectedCalibrationError.toFixed(4), required: `<= ${gates.maxExpectedCalibrationError.toFixed(4)}`, pass: metrics.expectedCalibrationError <= gates.maxExpectedCalibrationError });
+  rows.push({
+    criterion: "Brier",
+    observed: metrics.brier.toFixed(4),
+    required: `<= ${gates.maxBrier.toFixed(4)}`,
+    pass: metrics.brier <= gates.maxBrier,
+  });
+  rows.push({
+    criterion: "ECE",
+    observed: metrics.expectedCalibrationError.toFixed(4),
+    required: `<= ${gates.maxExpectedCalibrationError.toFixed(4)}`,
+    pass: metrics.expectedCalibrationError <= gates.maxExpectedCalibrationError,
+  });
   return rows;
 }
 
@@ -1090,18 +1585,35 @@ export function renderFreeformSelectionBenchmark(input: {
   calls: readonly RawCall[];
   proposedRecord: SystemOnePromotionRecord | null;
 }): string {
-  const { generatedAt, model, responseModel, baseUrl, repeats, shippedThresholds, selection, observations, calls, proposedRecord } = input;
+  const {
+    generatedAt,
+    model,
+    responseModel,
+    baseUrl,
+    repeats,
+    shippedThresholds,
+    selection,
+    observations,
+    calls,
+    proposedRecord,
+  } = input;
   const okCalls = calls.filter((call) => call.ok).length;
   const lines: string[] = [];
   const selected = selection.selected;
-  const reviewThreshold = selected ? Math.min(FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD, selected.threshold) : FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD;
+  const reviewThreshold = selected
+    ? Math.min(FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD, selected.threshold)
+    : FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD;
   lines.push("# System One (Jev) freeform-materialization benchmark — development selection");
   lines.push("");
-  lines.push(`Generated ${generatedAt} by \`scripts/evaluate-system-one-freeform-materialization-lane.ts --dev-select\`.`);
+  lines.push(
+    `Generated ${generatedAt} by \`scripts/evaluate-system-one-freeform-materialization-lane.ts --dev-select\`.`,
+  );
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
-  lines.push("The bounded `freeform-materialization` battery is two `noul` gates (`needs_content`, `legal`) plus one aggregate `choice` over the exact server-authored candidate ids and an explicit `none_of_these`. The lane may only select an authored candidate or fail closed; it never authors prose, stats, prices, stock, or a state mutation. The raw answers from one live run are retained, so every threshold on the fixed grid is recomposed with `composeFreeformMaterializationDecision` unchanged — no model is re-asked. The action threshold and the monotonic Platt map are selected on the **development split only**; the frozen **holdout** is scored once at the selected threshold. A holdout pass at a descriptive (non-development-gate-qualified) point never promotes.");
+  lines.push(
+    "The bounded `freeform-materialization` battery is two `noul` gates (`needs_content`, `legal`) plus one aggregate `choice` over the exact server-authored candidate ids and an explicit `none_of_these`. The lane may only select an authored candidate or fail closed; it never authors prose, stats, prices, stock, or a state mutation. The raw answers from one live run are retained, so every threshold on the fixed grid is recomposed with `composeFreeformMaterializationDecision` unchanged — no model is re-asked. The action threshold and the monotonic Platt map are selected on the **development split only**; the frozen **holdout** is scored once at the selected threshold. A holdout pass at a descriptive (non-development-gate-qualified) point never promotes.",
+  );
   lines.push("");
   lines.push("| Setting | Value |");
   lines.push("| --- | --- |");
@@ -1109,34 +1621,50 @@ export function renderFreeformSelectionBenchmark(input: {
   lines.push(`| Response model | \`${responseModel ?? "unknown"}\` |`);
   lines.push(`| Base URL | \`${baseUrl}\` |`);
   lines.push(`| Repeats per case | ${repeats} |`);
-  lines.push(`| Shipped thresholds (action / review) | ${shippedThresholds.actionThreshold} / ${shippedThresholds.reviewThreshold} |`);
-  lines.push(`| Threshold grid | ${FREEFORM_MATERIALIZATION_THRESHOLD_GRID.map((value) => value.toFixed(2)).join(", ")} |`);
+  lines.push(
+    `| Shipped thresholds (action / review) | ${shippedThresholds.actionThreshold} / ${shippedThresholds.reviewThreshold} |`,
+  );
+  lines.push(
+    `| Threshold grid | ${FREEFORM_MATERIALIZATION_THRESHOLD_GRID.map((value) => value.toFixed(2)).join(", ")} |`,
+  );
   lines.push(`| Corpus digest | \`${FREEFORM_MATERIALIZATION_CORPUS_DIGEST}\` |`);
   lines.push(`| Development-split digest | \`${FREEFORM_MATERIALIZATION_DEV_DIGEST}\` |`);
   lines.push(`| Holdout-split digest | \`${FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST}\` |`);
-  lines.push(`| Calls | ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases x ${repeats} = ${calls.length} (${okCalls} succeeded) |`);
+  lines.push(
+    `| Calls | ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases x ${repeats} = ${calls.length} (${okCalls} succeeded) |`,
+  );
   lines.push("");
   lines.push("## Development threshold sweep (selection input)");
   lines.push("");
-  lines.push("Calibration and the gate are computed per development threshold; the selected row is marked. Holdout columns are not shown here so selection cannot see them.");
+  lines.push(
+    "Calibration and the gate are computed per development threshold; the selected row is marked. Holdout columns are not shown here so selection cannot see them.",
+  );
   lines.push("");
-  lines.push("| Threshold | Dev acted (repeats) | Dev distinct acted | Dev accuracy | Dev Wilson LB | Dev Brier (cal) | Dev ECE (cal) | Dev gate |");
+  lines.push(
+    "| Threshold | Dev acted (repeats) | Dev distinct acted | Dev accuracy | Dev Wilson LB | Dev Brier (cal) | Dev ECE (cal) | Dev gate |",
+  );
   lines.push("| ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: |");
   for (const point of selection.grid) {
     const marker = selected && point.threshold === selected.threshold ? " **←**" : "";
-    lines.push(`| ${point.threshold.toFixed(2)}${marker} | ${point.dev.samples} | ${point.dev.distinctActed} | ${pct(point.dev.accuracy)} | ${point.dev.accuracyLowerBound.toFixed(4)} | ${point.dev.calibrated.brier.toFixed(4)} | ${point.dev.calibrated.expectedCalibrationError.toFixed(4)} | ${point.dev.gate.promoted ? "pass" : "fail"} |`);
+    lines.push(
+      `| ${point.threshold.toFixed(2)}${marker} | ${point.dev.samples} | ${point.dev.distinctActed} | ${pct(point.dev.accuracy)} | ${point.dev.accuracyLowerBound.toFixed(4)} | ${point.dev.calibrated.brier.toFixed(4)} | ${point.dev.calibrated.expectedCalibrationError.toFixed(4)} | ${point.dev.gate.promoted ? "pass" : "fail"} |`,
+    );
   }
   lines.push("");
   const gated = selection.grid.filter((point) => point.dev.gate.promoted).map((point) => point.threshold.toFixed(2));
-  lines.push(gated.length > 0
-    ? `Development thresholds whose own gate passes: ${gated.join(", ")}.`
-    : "No development threshold passes its own gate.");
+  lines.push(
+    gated.length > 0
+      ? `Development thresholds whose own gate passes: ${gated.join(", ")}.`
+      : "No development threshold passes its own gate.",
+  );
   for (const reason of selection.reasons) lines.push(`- ${reason}`);
   lines.push("");
   lines.push("## Selected threshold");
   lines.push("");
   if (selected) {
-    lines.push(`Selected action threshold **${selected.threshold.toFixed(2)}** (review ${reviewThreshold}), by \`${selection.selectedBy}\`, fit on the development split: Platt \`sigmoid(a * logit(p) + b)\` with a = ${selected.calibration.a.toFixed(4)}, b = ${selected.calibration.b.toFixed(4)}. Development-gate qualified: **${selection.devGateQualified ? "yes" : "no"}**.`);
+    lines.push(
+      `Selected action threshold **${selected.threshold.toFixed(2)}** (review ${reviewThreshold}), by \`${selection.selectedBy}\`, fit on the development split: Platt \`sigmoid(a * logit(p) + b)\` with a = ${selected.calibration.a.toFixed(4)}, b = ${selected.calibration.b.toFixed(4)}. Development-gate qualified: **${selection.devGateQualified ? "yes" : "no"}**.`,
+    );
   } else {
     lines.push("No threshold produced an acted development sample; nothing is selectable.");
   }
@@ -1144,12 +1672,18 @@ export function renderFreeformSelectionBenchmark(input: {
   if (selected) {
     lines.push("## Frozen-holdout gate at the selected threshold");
     lines.push("");
-    lines.push(`Holdout acted **${selected.holdout.samples}** repeated samples across **${selected.holdout.distinctActed}** distinct cases (${selected.holdout.actedErrors} acted error(s)); accuracy ${pct(selected.holdout.accuracy)}.`);
+    lines.push(
+      `Holdout acted **${selected.holdout.samples}** repeated samples across **${selected.holdout.distinctActed}** distinct cases (${selected.holdout.actedErrors} acted error(s)); accuracy ${pct(selected.holdout.accuracy)}.`,
+    );
     lines.push("");
     lines.push("| Holdout signal | Brier | ECE |");
     lines.push("| --- | ---: | ---: |");
-    lines.push(`| raw | ${selected.holdout.raw.brier.toFixed(4)} | ${selected.holdout.raw.expectedCalibrationError.toFixed(4)} |`);
-    lines.push(`| calibrated (development map) | ${selected.holdout.calibrated.brier.toFixed(4)} | ${selected.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`);
+    lines.push(
+      `| raw | ${selected.holdout.raw.brier.toFixed(4)} | ${selected.holdout.raw.expectedCalibrationError.toFixed(4)} |`,
+    );
+    lines.push(
+      `| calibrated (development map) | ${selected.holdout.calibrated.brier.toFixed(4)} | ${selected.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`,
+    );
     lines.push("");
     gateTable(lines, metricsOfSplit(selected.holdout), selected.holdout.gate);
     lines.push("");
@@ -1180,7 +1714,9 @@ export function renderFreeformSelectionBenchmark(input: {
       const correct = rows.filter((row) => row.correct);
       const bands = new Set(rows.map((row) => row.band));
       const expectedText = entry.expected.band === "act" ? `act → ${entry.expected.candidateId}` : "fallback";
-      lines.push(`| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${expectedText} | ${acted.length}/${rows.length} | ${acted.length > 0 ? "yes" : "no"} | ${correct.length}/${rows.length} | ${[...bands].join("/")} |`);
+      lines.push(
+        `| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${expectedText} | ${acted.length}/${rows.length} | ${acted.length > 0 ? "yes" : "no"} | ${correct.length}/${rows.length} | ${[...bands].join("/")} |`,
+      );
     }
     lines.push("");
   } else {
@@ -1189,12 +1725,18 @@ export function renderFreeformSelectionBenchmark(input: {
   lines.push("");
   lines.push("## Post-hoc holdout diagnostic scan (NOT used for selection)");
   lines.push("");
-  lines.push("Holdout metrics at every grid threshold, shown only to characterize the frozen split after selection. Selection used the development columns above.");
+  lines.push(
+    "Holdout metrics at every grid threshold, shown only to characterize the frozen split after selection. Selection used the development columns above.",
+  );
   lines.push("");
-  lines.push("| Threshold | Holdout acted (repeats) | Distinct | Accuracy | Wilson LB | Brier (cal) | ECE (cal) | Holdout gate |");
+  lines.push(
+    "| Threshold | Holdout acted (repeats) | Distinct | Accuracy | Wilson LB | Brier (cal) | ECE (cal) | Holdout gate |",
+  );
   lines.push("| ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: |");
   for (const point of selection.grid) {
-    lines.push(`| ${point.threshold.toFixed(2)} | ${point.holdout.samples} | ${point.holdout.distinctActed} | ${pct(point.holdout.accuracy)} | ${point.holdout.accuracyLowerBound.toFixed(4)} | ${point.holdout.calibrated.brier.toFixed(4)} | ${point.holdout.calibrated.expectedCalibrationError.toFixed(4)} | ${point.holdout.gate.promoted ? "pass" : "fail"} |`);
+    lines.push(
+      `| ${point.threshold.toFixed(2)} | ${point.holdout.samples} | ${point.holdout.distinctActed} | ${pct(point.holdout.accuracy)} | ${point.holdout.accuracyLowerBound.toFixed(4)} | ${point.holdout.calibrated.brier.toFixed(4)} | ${point.holdout.calibrated.expectedCalibrationError.toFixed(4)} | ${point.holdout.gate.promoted ? "pass" : "fail"} |`,
+    );
   }
   lines.push("");
   if (proposedRecord) {
@@ -1206,15 +1748,25 @@ export function renderFreeformSelectionBenchmark(input: {
   } else {
     lines.push("## No promotion record");
     lines.push("");
-    lines.push("The holdout gate did not pass at a development-gate-qualified threshold, or no real response model was captured, so the lane keeps its record-only shadow behavior and no calibration or threshold is shipped.");
+    lines.push(
+      "The holdout gate did not pass at a development-gate-qualified threshold, or no real response model was captured, so the lane keeps its record-only shadow behavior and no calibration or threshold is shipped.",
+    );
   }
   lines.push("");
   lines.push("## Honesty");
   lines.push("");
-  lines.push("- Selection used the development split only; the holdout was scored once at the selected threshold and drives the gate.");
-  lines.push("- The gate counts repeated acted samples; the distinct acted-case count is reported alongside because repeats from one case are not independent evidence.");
-  lines.push("- A frozen, provider-free corpus with no acted error is a promotion candidate, not proof; it cannot test the calibration's error tail.");
-  lines.push("- The lane has no default active path; an opt-in call site requires `enabled`, an `active` lane mode, and a matching promotion binding.");
+  lines.push(
+    "- Selection used the development split only; the holdout was scored once at the selected threshold and drives the gate.",
+  );
+  lines.push(
+    "- The gate counts repeated acted samples; the distinct acted-case count is reported alongside because repeats from one case are not independent evidence.",
+  );
+  lines.push(
+    "- A frozen, provider-free corpus with no acted error is a promotion candidate, not proof; it cannot test the calibration's error tail.",
+  );
+  lines.push(
+    "- The lane has no default active path; an opt-in call site requires `enabled`, an `active` lane mode, and a matching promotion binding.",
+  );
   lines.push("");
   lines.push("## Reproduce");
   lines.push("");
@@ -1276,17 +1828,29 @@ async function main(): Promise<void> {
           latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
         });
         calls.push({
-          caseId: benchmarkCase.id, category: benchmarkCase.category, repeat, ok: true,
+          caseId: benchmarkCase.id,
+          category: benchmarkCase.category,
+          repeat,
+          ok: true,
           latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
-          band: composed.band, candidateId: composed.candidateId, topSignal: composed.topSignal,
+          band: composed.band,
+          candidateId: composed.candidateId,
+          topSignal: composed.topSignal,
           correct: sample.correct,
         });
       } catch (error) {
         const failure = error instanceof Error ? error.message : "error";
         calls.push({
-          caseId: benchmarkCase.id, category: benchmarkCase.category, repeat, ok: false, error: failure,
+          caseId: benchmarkCase.id,
+          category: benchmarkCase.category,
+          repeat,
+          ok: false,
+          error: failure,
           latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
-          band: null, candidateId: null, topSignal: null, correct: false,
+          band: null,
+          candidateId: null,
+          topSignal: null,
+          correct: false,
         });
         process.stderr.write(`\n${benchmarkCase.id} repeat ${repeat} failed: ${failure}`);
       }
@@ -1297,7 +1861,11 @@ async function main(): Promise<void> {
   if (samples.length === 0) throw new Error("no freeform-materialization calls succeeded; nothing to evaluate");
 
   if (devSelect) {
-    const selection = evaluateFreeformDevSelection(observations, FREEFORM_MATERIALIZATION_THRESHOLD_GRID, FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD);
+    const selection = evaluateFreeformDevSelection(
+      observations,
+      FREEFORM_MATERIALIZATION_THRESHOLD_GRID,
+      FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD,
+    );
     const proposedRecord = proposeSelectionPromotionRecord(selection, settings, responseModel, promotedAt);
     const selected = selection.selected;
     const markdown = renderFreeformSelectionBenchmark({
@@ -1315,21 +1883,42 @@ async function main(): Promise<void> {
     await writeFile(outPath, markdown, "utf8");
     await writeFile(
       outPath.replace(/\.md$/, ".json"),
-      `${JSON.stringify({
-        mode: "dev-select", model, responseModel, repeats, shippedThresholds: thresholds, reviewThreshold: FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD,
-        corpusDigest: FREEFORM_MATERIALIZATION_CORPUS_DIGEST,
-        devDigest: FREEFORM_MATERIALIZATION_DEV_DIGEST,
-        holdoutDigest: FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST,
-        grid: FREEFORM_MATERIALIZATION_THRESHOLD_GRID,
-        corpus: FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS, observations, calls, selection, proposedRecord,
-      }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          mode: "dev-select",
+          model,
+          responseModel,
+          repeats,
+          shippedThresholds: thresholds,
+          reviewThreshold: FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD,
+          corpusDigest: FREEFORM_MATERIALIZATION_CORPUS_DIGEST,
+          devDigest: FREEFORM_MATERIALIZATION_DEV_DIGEST,
+          holdoutDigest: FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST,
+          grid: FREEFORM_MATERIALIZATION_THRESHOLD_GRID,
+          corpus: FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS,
+          observations,
+          calls,
+          selection,
+          proposedRecord,
+        },
+        null,
+        2,
+      )}\n`,
       "utf8",
     );
-    console.log(`corpus ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases, repeats ${repeats}, dev digest ${FREEFORM_MATERIALIZATION_DEV_DIGEST}, holdout digest ${FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST}`);
+    console.log(
+      `corpus ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases, repeats ${repeats}, dev digest ${FREEFORM_MATERIALIZATION_DEV_DIGEST}, holdout digest ${FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST}`,
+    );
     if (selected) {
-      console.log(`selected t=${selected.threshold.toFixed(2)} by ${selection.selectedBy} (dev-gate-qualified=${selection.devGateQualified}); dev acted ${selected.dev.samples}/${selected.dev.distinctActed} distinct acc ${(selected.dev.accuracy * 100).toFixed(1)}%`);
-      console.log(`holdout acted ${selected.holdout.samples} repeats / ${selected.holdout.distinctActed} distinct, acc ${(selected.holdout.accuracy * 100).toFixed(1)}%, cal brier=${selected.holdout.calibrated.brier.toFixed(4)} ece=${selected.holdout.calibrated.expectedCalibrationError.toFixed(4)}`);
-      console.log(`holdout gate: promoted=${selected.holdout.gate.promoted}${selected.holdout.gate.reasons.length ? ` reasons=${selected.holdout.gate.reasons.join("; ")}` : ""}`);
+      console.log(
+        `selected t=${selected.threshold.toFixed(2)} by ${selection.selectedBy} (dev-gate-qualified=${selection.devGateQualified}); dev acted ${selected.dev.samples}/${selected.dev.distinctActed} distinct acc ${(selected.dev.accuracy * 100).toFixed(1)}%`,
+      );
+      console.log(
+        `holdout acted ${selected.holdout.samples} repeats / ${selected.holdout.distinctActed} distinct, acc ${(selected.holdout.accuracy * 100).toFixed(1)}%, cal brier=${selected.holdout.calibrated.brier.toFixed(4)} ece=${selected.holdout.calibrated.expectedCalibrationError.toFixed(4)}`,
+      );
+      console.log(
+        `holdout gate: promoted=${selected.holdout.gate.promoted}${selected.holdout.gate.reasons.length ? ` reasons=${selected.holdout.gate.reasons.join("; ")}` : ""}`,
+      );
     } else {
       console.log("no selectable threshold; holdout gate not scored");
     }
@@ -1355,17 +1944,37 @@ async function main(): Promise<void> {
   await writeFile(outPath, markdown, "utf8");
   await writeFile(
     outPath.replace(/\.md$/, ".json"),
-    `${JSON.stringify({
-      model, responseModel, repeats, thresholds, corpusDigest: FREEFORM_MATERIALIZATION_CORPUS_DIGEST,
-      corpus: FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS, samples, calls, evaluation, proposedRecord,
-    }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        model,
+        responseModel,
+        repeats,
+        thresholds,
+        corpusDigest: FREEFORM_MATERIALIZATION_CORPUS_DIGEST,
+        corpus: FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS,
+        samples,
+        calls,
+        evaluation,
+        proposedRecord,
+      },
+      null,
+      2,
+    )}\n`,
     "utf8",
   );
 
-  console.log(`corpus ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases, digest ${FREEFORM_MATERIALIZATION_CORPUS_DIGEST}`);
-  console.log(`acted ${evaluation.actedSamples}/${evaluation.totalSamples}, accuracy ${(evaluation.accuracy * 100).toFixed(1)}%, deferred positives ${evaluation.deferredPositive}, false acts ${evaluation.falseActs}`);
-  console.log(`calibrated brier=${evaluation.all.calibrated.brier.toFixed(4)} ece=${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}; map a=${evaluation.fitted.a.toFixed(4)} b=${evaluation.fitted.b.toFixed(4)}`);
-  console.log(`gate: promoted=${evaluation.gate.promoted}${evaluation.gate.reasons.length ? ` reasons=${evaluation.gate.reasons.join("; ")}` : ""}`);
+  console.log(
+    `corpus ${FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.length} cases, digest ${FREEFORM_MATERIALIZATION_CORPUS_DIGEST}`,
+  );
+  console.log(
+    `acted ${evaluation.actedSamples}/${evaluation.totalSamples}, accuracy ${(evaluation.accuracy * 100).toFixed(1)}%, deferred positives ${evaluation.deferredPositive}, false acts ${evaluation.falseActs}`,
+  );
+  console.log(
+    `calibrated brier=${evaluation.all.calibrated.brier.toFixed(4)} ece=${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}; map a=${evaluation.fitted.a.toFixed(4)} b=${evaluation.fitted.b.toFixed(4)}`,
+  );
+  console.log(
+    `gate: promoted=${evaluation.gate.promoted}${evaluation.gate.reasons.length ? ` reasons=${evaluation.gate.reasons.join("; ")}` : ""}`,
+  );
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }
 

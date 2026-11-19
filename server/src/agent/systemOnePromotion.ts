@@ -88,10 +88,28 @@ export const DEFAULT_SYSTEM_ONE_LANE_GATES: Record<SystemOneLane, SystemOneLaneG
   "director-selection": { ...BASE_LANE_GATE },
   "adventure-selection": { ...BASE_LANE_GATE },
   "narration-verification": { ...BASE_LANE_GATE },
-  "memory-reranking": { minSamples: 20, minAccuracy: 0.85, minAccuracyLowerBound: 0.75, maxBrier: 0.15, maxExpectedCalibrationError: 0.15 },
+  "memory-reranking": {
+    minSamples: 20,
+    minAccuracy: 0.85,
+    minAccuracyLowerBound: 0.75,
+    maxBrier: 0.15,
+    maxExpectedCalibrationError: 0.15,
+  },
   "speaker-routing": { ...BASE_LANE_GATE },
-  guardrails: { minSamples: 30, minAccuracy: 0.95, minAccuracyLowerBound: 0.85, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
-  "cost-router": { minSamples: 30, minAccuracy: 0.95, minAccuracyLowerBound: 0.85, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
+  guardrails: {
+    minSamples: 30,
+    minAccuracy: 0.95,
+    minAccuracyLowerBound: 0.85,
+    maxBrier: 0.05,
+    maxExpectedCalibrationError: 0.05,
+  },
+  "cost-router": {
+    minSamples: 30,
+    minAccuracy: 0.95,
+    minAccuracyLowerBound: 0.85,
+    maxBrier: 0.05,
+    maxExpectedCalibrationError: 0.05,
+  },
   // Shadow-only lane: the gate and an execution contract exist so a future passing evaluation can
   // bind, but there is deliberately no production promotion record and no activation path, so the
   // lane cannot grant authority. See docs/freeform-materialization.md for the remaining evidence.
@@ -138,9 +156,7 @@ function validateGate(gate: SystemOneLaneGate): void {
     throw new RangeError(`gate maxBrier must be within [0, 1]: ${gate.maxBrier}`);
   }
   if (!validUnitRate(gate.maxExpectedCalibrationError)) {
-    throw new RangeError(
-      `gate maxExpectedCalibrationError must be within [0, 1]: ${gate.maxExpectedCalibrationError}`,
-    );
+    throw new RangeError(`gate maxExpectedCalibrationError must be within [0, 1]: ${gate.maxExpectedCalibrationError}`);
   }
   validateOptionalUnitRate(gate.minAccuracyLowerBound, "minAccuracyLowerBound");
   validateOptionalUnitRate(gate.minActedRate, "minActedRate");
@@ -163,9 +179,7 @@ function validateCoverage(coverage: NonNullable<SystemOneGateContext["coverage"]
     coverage.actedSamples < 0 ||
     coverage.actedSamples > coverage.opportunities
   ) {
-    throw new RangeError(
-      `gate coverage actedSamples must be within [0, opportunities]: ${coverage.actedSamples}`,
-    );
+    throw new RangeError(`gate coverage actedSamples must be within [0, opportunities]: ${coverage.actedSamples}`);
   }
 }
 
@@ -207,9 +221,7 @@ export function evaluatePromotionGate(
     // Zero samples carry no evidence, so the lower bound is 0 rather than undefined; the
     // `minSamples` reason above already records the empty holdout.
     const lowerBound =
-      metrics.samples === 0
-        ? 0
-        : wilsonLowerBound(Math.round(metrics.accuracy * metrics.samples), metrics.samples);
+      metrics.samples === 0 ? 0 : wilsonLowerBound(Math.round(metrics.accuracy * metrics.samples), metrics.samples);
     if (lowerBound < gates.minAccuracyLowerBound) {
       reasons.push(
         `accuracy lower bound below minimum: ${lowerBound.toFixed(4)} < ${gates.minAccuracyLowerBound.toFixed(4)}`,
@@ -265,9 +277,7 @@ export function evaluatePromotionGate(
 /** Throws when a lane is not ready to promote, naming the lane and every failed gate. */
 export function assertPromoted(result: SystemOnePromotionResult): void {
   if (!result.promoted) {
-    throw new Error(
-      `System One lane "${result.lane}" is not ready for promotion: ${result.reasons.join("; ")}`,
-    );
+    throw new Error(`System One lane "${result.lane}" is not ready for promotion: ${result.reasons.join("; ")}`);
   }
 }
 
@@ -383,7 +393,7 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-rerank-benchmark.md",
   },
-  "guardrails": {
+  guardrails: {
     // scripts/evaluate-system-one-guardrails-lane.ts, re-derived under the production-shaped gate
     // protocol (no `uid` decorrelator): 171 live calls over a 56-case frozen corpus plus 1
     // confirmed harvested live case (a benign "Who should inspect the signal?" message), 3
@@ -416,7 +426,12 @@ export function promotionRecord(lane: SystemOneLane): SystemOnePromotionRecord |
  */
 export function isLanePromoted(lane: SystemOneLane, current?: SystemOneEvaluationBinding): boolean {
   const record = promotionRecord(lane);
-  if (!record || !current || current.lane !== lane
-    || !record.evaluatedBindings?.some(binding => matchesSystemOneBinding(binding, current))) return false;
+  if (
+    !record ||
+    !current ||
+    current.lane !== lane ||
+    !record.evaluatedBindings?.some((binding) => matchesSystemOneBinding(binding, current))
+  )
+    return false;
   return evaluatePromotionGate(lane, record.metrics).promoted;
 }

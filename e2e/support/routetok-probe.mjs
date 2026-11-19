@@ -19,30 +19,47 @@ export function buildProbePayload(scenario, model = DEFAULT_MODEL) {
     return {
       model,
       messages: [
-        { role: "system", content: "Select exactly one advertised legal travel candidate matching the player intent. Return no prose." },
-        { role: "user", content: "From Parc des Pionniers, travel specifically to Place La Salle, not Pointe-Saint-Gilles." },
-      ],
-      tools: [{ type: "function", function: {
-        name: "exact_actor_travel.select",
-        description: "Select one exact labeled travel route.",
-        parameters: {
-          ...objectSchema({
-            candidateId: { type: "string", enum: candidates.map(({ candidateId }) => candidateId) },
-            kind: { type: "string", enum: ["actor.travel"] },
-            version: { type: "string", enum: ["v1"] },
-            choices: { type: "array", maxItems: 0 },
-          }, ["candidateId", "kind", "version", "choices"]),
-          oneOf: candidates.map(({ candidateId, description }) => ({
-            ...objectSchema({
-              candidateId: { type: "string", const: candidateId },
-              kind: { type: "string", const: "actor.travel" },
-              version: { type: "string", const: "v1" },
-              choices: { type: "array", maxItems: 0 },
-            }, ["candidateId", "kind", "version", "choices"]),
-            description,
-          })),
+        {
+          role: "system",
+          content: "Select exactly one advertised legal travel candidate matching the player intent. Return no prose.",
         },
-      } }],
+        {
+          role: "user",
+          content: "From Parc des Pionniers, travel specifically to Place La Salle, not Pointe-Saint-Gilles.",
+        },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "exact_actor_travel.select",
+            description: "Select one exact labeled travel route.",
+            parameters: {
+              ...objectSchema(
+                {
+                  candidateId: { type: "string", enum: candidates.map(({ candidateId }) => candidateId) },
+                  kind: { type: "string", enum: ["actor.travel"] },
+                  version: { type: "string", enum: ["v1"] },
+                  choices: { type: "array", maxItems: 0 },
+                },
+                ["candidateId", "kind", "version", "choices"],
+              ),
+              oneOf: candidates.map(({ candidateId, description }) => ({
+                ...objectSchema(
+                  {
+                    candidateId: { type: "string", const: candidateId },
+                    kind: { type: "string", const: "actor.travel" },
+                    version: { type: "string", const: "v1" },
+                    choices: { type: "array", maxItems: 0 },
+                  },
+                  ["candidateId", "kind", "version", "choices"],
+                ),
+                description,
+              })),
+            },
+          },
+        },
+      ],
       tool_choice: "auto",
       stream: false,
       max_tokens: 512,
@@ -51,32 +68,54 @@ export function buildProbePayload(scenario, model = DEFAULT_MODEL) {
 
   if (scenario === "planning-inventory") {
     const candidates = [
-      { candidateId: "candidate-unequip", digest: "a".repeat(64), description: "Unequip one Waylamp from the hand slot and retain it." },
-      { candidateId: "candidate-drop", digest: "b".repeat(64), description: "Drop one Waylamp and remove it from inventory." },
+      {
+        candidateId: "candidate-unequip",
+        digest: "a".repeat(64),
+        description: "Unequip one Waylamp from the hand slot and retain it.",
+      },
+      {
+        candidateId: "candidate-drop",
+        digest: "b".repeat(64),
+        description: "Drop one Waylamp and remove it from inventory.",
+      },
     ];
     return {
       model,
       messages: [
-        { role: "system", content: "Select exactly one advertised inventory candidate matching the player intent. Return no prose." },
+        {
+          role: "system",
+          content: "Select exactly one advertised inventory candidate matching the player intent. Return no prose.",
+        },
         { role: "user", content: "Unequip the Waylamp from my hand. Do not drop it." },
       ],
-      tools: [{ type: "function", function: {
-        name: "exact_inventory_action.select",
-        description: "Select one exact labeled inventory action.",
-        parameters: {
-          ...objectSchema({
-            candidateId: { type: "string", enum: candidates.map(({ candidateId }) => candidateId) },
-            digest: { type: "string", enum: candidates.map(({ digest }) => digest) },
-          }, ["candidateId", "digest"]),
-          oneOf: candidates.map(({ candidateId, digest, description }) => ({
-            ...objectSchema({
-              candidateId: { type: "string", const: candidateId },
-              digest: { type: "string", const: digest },
-            }, ["candidateId", "digest"]),
-            description,
-          })),
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "exact_inventory_action.select",
+            description: "Select one exact labeled inventory action.",
+            parameters: {
+              ...objectSchema(
+                {
+                  candidateId: { type: "string", enum: candidates.map(({ candidateId }) => candidateId) },
+                  digest: { type: "string", enum: candidates.map(({ digest }) => digest) },
+                },
+                ["candidateId", "digest"],
+              ),
+              oneOf: candidates.map(({ candidateId, digest, description }) => ({
+                ...objectSchema(
+                  {
+                    candidateId: { type: "string", const: candidateId },
+                    digest: { type: "string", const: digest },
+                  },
+                  ["candidateId", "digest"],
+                ),
+                description,
+              })),
+            },
+          },
         },
-      } }],
+      ],
       tool_choice: "auto",
       stream: false,
       max_tokens: 512,
@@ -87,14 +126,23 @@ export function buildProbePayload(scenario, model = DEFAULT_MODEL) {
     return {
       model,
       messages: [
-        { role: "system", content: "Call submit_adventure_narration exactly once. The verified travel receipt establishes arrival at Place La Salle." },
+        {
+          role: "system",
+          content:
+            "Call submit_adventure_narration exactly once. The verified travel receipt establishes arrival at Place La Salle.",
+        },
         { role: "user", content: "Write concise second-person narration grounded only in that receipt." },
       ],
-      tools: [{ type: "function", function: {
-        name: "submit_adventure_narration",
-        description: "Submit final grounded narration.",
-        parameters: objectSchema({ narration: { type: "string", minLength: 1, maxLength: 8_000 } }, ["narration"]),
-      } }],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "submit_adventure_narration",
+            description: "Submit final grounded narration.",
+            parameters: objectSchema({ narration: { type: "string", minLength: 1, maxLength: 8_000 } }, ["narration"]),
+          },
+        },
+      ],
       tool_choice: { type: "function", function: { name: "submit_adventure_narration" } },
       stream: false,
       max_tokens: 768,
@@ -108,20 +156,41 @@ export function validateProbeResponse(scenario, payload) {
   const call = payload?.choices?.[0]?.message?.tool_calls?.[0]?.function;
   if (!call || typeof call.arguments !== "string") return { valid: false, selected: null };
   let args;
-  try { args = JSON.parse(call.arguments); } catch { return { valid: false, selected: null }; }
+  try {
+    args = JSON.parse(call.arguments);
+  } catch {
+    return { valid: false, selected: null };
+  }
   if (scenario === "planning-travel") {
-    return { valid: call.name === "exact_actor_travel.select" && args.candidateId === "candidate-place", selected: args.candidateId ?? null };
+    return {
+      valid: call.name === "exact_actor_travel.select" && args.candidateId === "candidate-place",
+      selected: args.candidateId ?? null,
+    };
   }
   if (scenario === "planning-inventory") {
-    return { valid: call.name === "exact_inventory_action.select" && args.candidateId === "candidate-unequip" && args.digest === "a".repeat(64), selected: args.candidateId ?? null };
+    return {
+      valid:
+        call.name === "exact_inventory_action.select" &&
+        args.candidateId === "candidate-unequip" &&
+        args.digest === "a".repeat(64),
+      selected: args.candidateId ?? null,
+    };
   }
-  return { valid: call.name === "submit_adventure_narration" && typeof args.narration === "string" && args.narration.includes("Place La Salle"), selected: null };
+  return {
+    valid:
+      call.name === "submit_adventure_narration" &&
+      typeof args.narration === "string" &&
+      args.narration.includes("Place La Salle"),
+    selected: null,
+  };
 }
 
 function parseArgs(argv) {
   const scenario = argv[0];
   if (!["planning-travel", "planning-inventory", "narration"].includes(scenario)) {
-    throw new Error("usage: node e2e/support/routetok-probe.mjs <planning-travel|planning-inventory|narration> [--model <id>]");
+    throw new Error(
+      "usage: node e2e/support/routetok-probe.mjs <planning-travel|planning-inventory|narration> [--model <id>]",
+    );
   }
   let model = DEFAULT_MODEL;
   for (let index = 1; index < argv.length; index += 1) {
@@ -152,7 +221,11 @@ async function main() {
   });
   const text = await response.text();
   let payload = null;
-  try { payload = JSON.parse(text); } catch { /* invalid responses remain safely summarized */ }
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    /* invalid responses remain safely summarized */
+  }
   const validation = response.ok ? validateProbeResponse(scenario, payload) : { valid: false, selected: null };
   const result = {
     scenario,
@@ -166,12 +239,14 @@ async function main() {
     valid: validation.valid,
     selected: validation.selected,
     errorCode: payload?.error?.code ?? null,
-    usage: payload?.usage ? {
-      promptTokens: payload.usage.prompt_tokens ?? null,
-      completionTokens: payload.usage.completion_tokens ?? null,
-      totalTokens: payload.usage.total_tokens ?? null,
-      cost: payload.usage.cost ?? null,
-    } : null,
+    usage: payload?.usage
+      ? {
+          promptTokens: payload.usage.prompt_tokens ?? null,
+          completionTokens: payload.usage.completion_tokens ?? null,
+          totalTokens: payload.usage.total_tokens ?? null,
+          cost: payload.usage.cost ?? null,
+        }
+      : null,
   };
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (!response.ok || !validation.valid) process.exitCode = 1;

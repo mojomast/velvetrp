@@ -15,12 +15,7 @@ import {
 } from "@velvet/contracts";
 import { ORIGINAL_STARTER_MANIFEST } from "../../content/originalStarterManifest.js";
 import type { CampaignCharacterCreationOptionsResponse } from "../../types.js";
-import {
-  sameMetadata,
-  toContentPack,
-  toRpgDefinition,
-  toRulesProfile,
-} from "./campaignContentRowMappers.js";
+import { sameMetadata, toContentPack, toRpgDefinition, toRulesProfile } from "./campaignContentRowMappers.js";
 
 interface CampaignCharacterCreationOptionsRow {
   actor_campaign_id: unknown;
@@ -117,12 +112,17 @@ function getCampaignCharacterCreationOptionsSync(
   const starterBackground = ORIGINAL_STARTER_MANIFEST.backgrounds[0]!;
   const starterClass = ORIGINAL_STARTER_MANIFEST.classes[0]!;
   const expectedDefinitions = [
-    ...ORIGINAL_STARTER_MANIFEST.classes, ...ORIGINAL_STARTER_MANIFEST.races,
-    ...ORIGINAL_STARTER_MANIFEST.backgrounds, ...ORIGINAL_STARTER_MANIFEST.items,
-    ...ORIGINAL_STARTER_MANIFEST.spells, ...ORIGINAL_STARTER_MANIFEST.abilities,
+    ...ORIGINAL_STARTER_MANIFEST.classes,
+    ...ORIGINAL_STARTER_MANIFEST.races,
+    ...ORIGINAL_STARTER_MANIFEST.backgrounds,
+    ...ORIGINAL_STARTER_MANIFEST.items,
+    ...ORIGINAL_STARTER_MANIFEST.spells,
+    ...ORIGINAL_STARTER_MANIFEST.abilities,
     ...ORIGINAL_STARTER_MANIFEST.enemies,
   ];
-  const rows = db.prepare(`WITH authorized AS (
+  const rows = db
+    .prepare(
+      `WITH authorized AS (
       SELECT membership.campaign_id AS actor_campaign_id,
         membership.principal_id AS actor_principal_id,
         membership.role AS actor_role,
@@ -278,7 +278,9 @@ function getCampaignCharacterCreationOptionsSync(
       ON profile.rules_profile_id = selected_state.selected_rules_profile_id
     LEFT JOIN characters persona ON 1 = 1
     ORDER BY persona.created_at ASC, persona.id COLLATE BINARY ASC
-    LIMIT ${MAX_CAMPAIGN_CHARACTER_PERSONAS + 1}`).all({
+    LIMIT ${MAX_CAMPAIGN_CHARACTER_PERSONAS + 1}`,
+    )
+    .all({
       actorId,
       campaignId: id,
       starterPackId: ORIGINAL_STARTER_MANIFEST.packId,
@@ -297,8 +299,11 @@ function getCampaignCharacterCreationOptionsSync(
       role: first.actor_role,
       createdAt: first.actor_created_at,
     });
-    if (authorization.campaignId !== id || authorization.principalId !== actorId
-      || !["owner", "gm"].includes(authorization.role)) {
+    if (
+      authorization.campaignId !== id ||
+      authorization.principalId !== actorId ||
+      !["owner", "gm"].includes(authorization.role)
+    ) {
       malformedCampaignCharacterCreationOptions();
     }
     const campaign = campaignSchema.parse({
@@ -309,8 +314,13 @@ function getCampaignCharacterCreationOptionsSync(
       createdAt: first.campaign_created_at,
       updatedAt: first.campaign_updated_at,
     });
-    if (campaign.id !== id || first.owner_role_count !== 1 || first.exact_owner_count !== 1
-      || first.active_timeline_count !== 1 || first.campaign_owner_role !== "owner") {
+    if (
+      campaign.id !== id ||
+      first.owner_role_count !== 1 ||
+      first.exact_owner_count !== 1 ||
+      first.active_timeline_count !== 1 ||
+      first.campaign_owner_role !== "owner"
+    ) {
       malformedCampaignCharacterCreationOptions();
     }
     const ownerMembership = campaignMembershipReadSchema.parse({
@@ -319,8 +329,12 @@ function getCampaignCharacterCreationOptionsSync(
       role: first.owner_membership_role,
       createdAt: first.owner_membership_created_at,
     });
-    if (ownerMembership.campaignId !== id || ownerMembership.principalId !== campaign.ownerPrincipalId
-      || ownerMembership.role !== "owner") malformedCampaignCharacterCreationOptions();
+    if (
+      ownerMembership.campaignId !== id ||
+      ownerMembership.principalId !== campaign.ownerPrincipalId ||
+      ownerMembership.role !== "owner"
+    )
+      malformedCampaignCharacterCreationOptions();
     const activeTimeline = campaignTimelineSchema.parse({
       id: campaign.activeTimelineId,
       campaignId: campaign.id,
@@ -330,21 +344,28 @@ function getCampaignCharacterCreationOptionsSync(
     if (activeTimeline.id !== campaign.activeTimelineId || activeTimeline.campaignId !== id) {
       malformedCampaignCharacterCreationOptions();
     }
-    if (rows.some((row) => row.actor_campaign_id !== first.actor_campaign_id
-      || row.actor_principal_id !== first.actor_principal_id
-      || row.actor_role !== first.actor_role
-      || row.actor_created_at !== first.actor_created_at
-      || row.campaign_id !== first.campaign_id
-      || row.selected_count !== first.selected_count
-      || row.selected_rules_profile_id !== first.selected_rules_profile_id
-      || row.pin_count !== first.pin_count
-      || row.persona_count !== first.persona_count
-      || row.campaign_link_count !== first.campaign_link_count)) {
+    if (
+      rows.some(
+        (row) =>
+          row.actor_campaign_id !== first.actor_campaign_id ||
+          row.actor_principal_id !== first.actor_principal_id ||
+          row.actor_role !== first.actor_role ||
+          row.actor_created_at !== first.actor_created_at ||
+          row.campaign_id !== first.campaign_id ||
+          row.selected_count !== first.selected_count ||
+          row.selected_rules_profile_id !== first.selected_rules_profile_id ||
+          row.pin_count !== first.pin_count ||
+          row.persona_count !== first.persona_count ||
+          row.campaign_link_count !== first.campaign_link_count,
+      )
+    ) {
       malformedCampaignCharacterCreationOptions();
     }
 
-    if (first.persona_count > MAX_CAMPAIGN_CHARACTER_PERSONAS
-      || first.campaign_link_count > MAX_CAMPAIGN_CHARACTER_PERSONAS) {
+    if (
+      first.persona_count > MAX_CAMPAIGN_CHARACTER_PERSONAS ||
+      first.campaign_link_count > MAX_CAMPAIGN_CHARACTER_PERSONAS
+    ) {
       malformedCampaignCharacterCreationOptions();
     }
     const links = JSON.parse(first.campaign_links_json) as CreationOptionsLinkRow[];
@@ -365,9 +386,14 @@ function getCampaignCharacterCreationOptionsSync(
     if (personaRows.length !== first.persona_count) malformedCampaignCharacterCreationOptions();
     const knownPersonas = new Set<string>();
     const personas = personaRows.map((row) => {
-      if (row.persona_id === null || row.persona_name === null || row.persona_created_at === null
-        || row.persona_fictional_confirmed !== 1 || row.persona_is_real_person !== 0
-        || (row.already_used !== 0 && row.already_used !== 1)) {
+      if (
+        row.persona_id === null ||
+        row.persona_name === null ||
+        row.persona_created_at === null ||
+        row.persona_fictional_confirmed !== 1 ||
+        row.persona_is_real_person !== 0 ||
+        (row.already_used !== 0 && row.already_used !== 1)
+      ) {
         return malformedCampaignCharacterCreationOptions();
       }
       utcIsoTimestampSchema.parse(row.persona_created_at);
@@ -389,8 +415,13 @@ function getCampaignCharacterCreationOptionsSync(
       if (first.pin_count !== 0) malformedCampaignCharacterCreationOptions();
       return null;
     }
-    if (first.selected_count !== 1 || first.profile_rules_profile_id === null
-      || first.profile_name === null || first.profile_description === null || first.profile_tags === null) {
+    if (
+      first.selected_count !== 1 ||
+      first.profile_rules_profile_id === null ||
+      first.profile_name === null ||
+      first.profile_description === null ||
+      first.profile_tags === null
+    ) {
       malformedCampaignCharacterCreationOptions();
     }
     const profile = toRulesProfile({
@@ -399,18 +430,25 @@ function getCampaignCharacterCreationOptionsSync(
       description: first.profile_description,
       tags: first.profile_tags,
     });
-    if (profile.rulesProfileId !== first.selected_rules_profile_id
-      || first.pin_count > MAX_CAMPAIGN_CONTENT_PACKS) {
+    if (profile.rulesProfileId !== first.selected_rules_profile_id || first.pin_count > MAX_CAMPAIGN_CONTENT_PACKS) {
       malformedCampaignCharacterCreationOptions();
     }
     const pins = JSON.parse(first.pins_json) as CreationOptionsPinRow[];
     if (!Array.isArray(pins) || pins.length !== first.pin_count) malformedCampaignCharacterCreationOptions();
     const parsedPins = pins.map((pin) => {
-      if (pin.campaignId !== id || pin.pinRulesProfileId !== profile.rulesProfileId
-        || pin.packId !== pin.storedPackId || pin.packVersion !== pin.storedPackVersion
-        || pin.packRulesProfileId !== profile.rulesProfileId || pin.sealed !== 1
-        || typeof pin.storedPackId !== "string" || typeof pin.storedPackVersion !== "string"
-        || typeof pin.name !== "string" || typeof pin.description !== "string" || typeof pin.tags !== "string") {
+      if (
+        pin.campaignId !== id ||
+        pin.pinRulesProfileId !== profile.rulesProfileId ||
+        pin.packId !== pin.storedPackId ||
+        pin.packVersion !== pin.storedPackVersion ||
+        pin.packRulesProfileId !== profile.rulesProfileId ||
+        pin.sealed !== 1 ||
+        typeof pin.storedPackId !== "string" ||
+        typeof pin.storedPackVersion !== "string" ||
+        typeof pin.name !== "string" ||
+        typeof pin.description !== "string" ||
+        typeof pin.tags !== "string"
+      ) {
         return malformedCampaignCharacterCreationOptions();
       }
       return toContentPack({
@@ -423,12 +461,15 @@ function getCampaignCharacterCreationOptionsSync(
       });
     });
 
-    const starterPack = parsedPins.length === 1
-      && parsedPins[0]!.packId === ORIGINAL_STARTER_MANIFEST.packId
-      && parsedPins[0]!.packVersion === ORIGINAL_STARTER_MANIFEST.packVersion;
+    const starterPack =
+      parsedPins.length === 1 &&
+      parsedPins[0]!.packId === ORIGINAL_STARTER_MANIFEST.packId &&
+      parsedPins[0]!.packVersion === ORIGINAL_STARTER_MANIFEST.packVersion;
     if (profile.rulesProfileId !== ORIGINAL_STARTER_MANIFEST.rulesProfileId || !starterPack) return null;
-    if (!sameMetadata(profile, ORIGINAL_STARTER_MANIFEST.rulesProfile)
-      || !sameMetadata(parsedPins[0]!, ORIGINAL_STARTER_MANIFEST)) {
+    if (
+      !sameMetadata(profile, ORIGINAL_STARTER_MANIFEST.rulesProfile) ||
+      !sameMetadata(parsedPins[0]!, ORIGINAL_STARTER_MANIFEST)
+    ) {
       malformedCampaignCharacterCreationOptions();
     }
 
@@ -439,26 +480,37 @@ function getCampaignCharacterCreationOptionsSync(
     if (!Array.isArray(rawDefinitions) || rawDefinitions.length !== expectedDefinitions.length) {
       malformedCampaignCharacterCreationOptions();
     }
-    const installedDefinitions = new Map(rawDefinitions.map((raw) => {
-      if (raw.packId !== ORIGINAL_STARTER_MANIFEST.packId
-        || raw.packVersion !== ORIGINAL_STARTER_MANIFEST.packVersion
-        || typeof raw.kind !== "string" || typeof raw.definitionId !== "string"
-        || typeof raw.name !== "string" || typeof raw.description !== "string" || typeof raw.tags !== "string") {
-        return malformedCampaignCharacterCreationOptions();
-      }
-      const definition = toRpgDefinition({
-        kind: raw.kind,
-        definition_id: raw.definitionId,
-        name: raw.name,
-        description: raw.description,
-        tags: raw.tags,
-      });
-      return [`${definition.kind}:${definition.definitionId}`, definition] as const;
-    }));
-    if (installedDefinitions.size !== expectedDefinitions.length || expectedDefinitions.some((expected) => {
-      const definition = installedDefinitions.get(`${expected.kind}:${expected.definitionId}`);
-      return definition === undefined || !sameMetadata(definition, expected);
-    })) malformedCampaignCharacterCreationOptions();
+    const installedDefinitions = new Map(
+      rawDefinitions.map((raw) => {
+        if (
+          raw.packId !== ORIGINAL_STARTER_MANIFEST.packId ||
+          raw.packVersion !== ORIGINAL_STARTER_MANIFEST.packVersion ||
+          typeof raw.kind !== "string" ||
+          typeof raw.definitionId !== "string" ||
+          typeof raw.name !== "string" ||
+          typeof raw.description !== "string" ||
+          typeof raw.tags !== "string"
+        ) {
+          return malformedCampaignCharacterCreationOptions();
+        }
+        const definition = toRpgDefinition({
+          kind: raw.kind,
+          definition_id: raw.definitionId,
+          name: raw.name,
+          description: raw.description,
+          tags: raw.tags,
+        });
+        return [`${definition.kind}:${definition.definitionId}`, definition] as const;
+      }),
+    );
+    if (
+      installedDefinitions.size !== expectedDefinitions.length ||
+      expectedDefinitions.some((expected) => {
+        const definition = installedDefinitions.get(`${expected.kind}:${expected.definitionId}`);
+        return definition === undefined || !sameMetadata(definition, expected);
+      })
+    )
+      malformedCampaignCharacterCreationOptions();
 
     const response = campaignCharacterCreationOptionsResponseSchema.parse({
       campaignId: id,
@@ -477,22 +529,35 @@ function getCampaignCharacterCreationOptionsSync(
           description: ORIGINAL_STARTER_MANIFEST.description,
         },
         race: {
-          reference: { packId: ORIGINAL_STARTER_MANIFEST.packId,
+          reference: {
+            packId: ORIGINAL_STARTER_MANIFEST.packId,
             packVersion: ORIGINAL_STARTER_MANIFEST.packVersion,
-            definitionId: starterRace.definitionId, kind: starterRace.kind },
-          name: starterRace.name, description: starterRace.description,
+            definitionId: starterRace.definitionId,
+            kind: starterRace.kind,
+          },
+          name: starterRace.name,
+          description: starterRace.description,
         },
         background: {
-          reference: { packId: ORIGINAL_STARTER_MANIFEST.packId,
+          reference: {
+            packId: ORIGINAL_STARTER_MANIFEST.packId,
             packVersion: ORIGINAL_STARTER_MANIFEST.packVersion,
-            definitionId: starterBackground.definitionId, kind: starterBackground.kind },
-          name: starterBackground.name, description: starterBackground.description,
+            definitionId: starterBackground.definitionId,
+            kind: starterBackground.kind,
+          },
+          name: starterBackground.name,
+          description: starterBackground.description,
         },
         class: {
-          reference: { packId: ORIGINAL_STARTER_MANIFEST.packId,
+          reference: {
+            packId: ORIGINAL_STARTER_MANIFEST.packId,
             packVersion: ORIGINAL_STARTER_MANIFEST.packVersion,
-            definitionId: starterClass.definitionId, kind: starterClass.kind },
-          name: starterClass.name, description: starterClass.description, level: 1,
+            definitionId: starterClass.definitionId,
+            kind: starterClass.kind,
+          },
+          name: starterClass.name,
+          description: starterClass.description,
+          level: 1,
         },
       },
     });

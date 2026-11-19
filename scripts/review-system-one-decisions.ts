@@ -13,17 +13,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  applyReviewAnnotations,
-  renderReviewSheet,
-  reviewCandidates,
-} from "../server/src/agent/systemOneReview.js";
+import { applyReviewAnnotations, renderReviewSheet, reviewCandidates } from "../server/src/agent/systemOneReview.js";
 import type { ReviewQueueOptions, ReviewVerdict } from "../server/src/agent/systemOneReview.js";
-import {
-  closeRepo,
-  listRecentSystemOneDecisions,
-  listSystemOneDecisionsByLane,
-} from "../server/src/repo/index.js";
+import { closeRepo, listRecentSystemOneDecisions, listSystemOneDecisionsByLane } from "../server/src/repo/index.js";
 import { resolveDataDir } from "../server/src/repo/db/connection.js";
 import { SYSTEM_ONE_LANES } from "../server/src/types.js";
 import type { SystemOneLane } from "../server/src/types.js";
@@ -56,16 +48,16 @@ export function parseReviewArgs(argv: readonly string[]): ReviewCliOptions {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]!;
     if (arg === "--lane" || arg.startsWith("--lane=")) {
-      const raw = arg === "--lane" ? argv[index += 1] : arg.slice("--lane=".length);
+      const raw = arg === "--lane" ? argv[(index += 1)] : arg.slice("--lane=".length);
       if (raw === undefined || !isSystemOneLane(raw)) throw new Error(`unknown lane: ${raw}`);
       lane = raw;
     } else if (arg === "--limit" || arg.startsWith("--limit=")) {
-      const raw = arg === "--limit" ? argv[index += 1] : arg.slice("--limit=".length);
+      const raw = arg === "--limit" ? argv[(index += 1)] : arg.slice("--limit=".length);
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) throw new Error(`--limit requires a number, received ${raw ?? "nothing"}`);
       limit = Math.max(MIN_LIMIT, Math.min(MAX_LIMIT, Math.trunc(parsed)));
     } else if (arg === "--max-signal" || arg.startsWith("--max-signal=")) {
-      const raw = arg === "--max-signal" ? argv[index += 1] : arg.slice("--max-signal=".length);
+      const raw = arg === "--max-signal" ? argv[(index += 1)] : arg.slice("--max-signal=".length);
       const parsed = Number(raw);
       if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
         throw new Error(`--max-signal requires a number in [0,1], received ${raw ?? "nothing"}`);
@@ -74,17 +66,17 @@ export function parseReviewArgs(argv: readonly string[]): ReviewCliOptions {
     } else if (arg === "--include-flagged") {
       includeFlaggedFallbacks = true;
     } else if (arg === "--annotations" || arg.startsWith("--annotations=")) {
-      const value = arg === "--annotations" ? argv[index += 1] : arg.slice("--annotations=".length);
+      const value = arg === "--annotations" ? argv[(index += 1)] : arg.slice("--annotations=".length);
       if (!value || value.trim() === "") throw new Error("--annotations requires a path");
       annotations = value;
     } else if (arg === "--out" || arg.startsWith("--out=")) {
-      const value = arg === "--out" ? argv[index += 1] : arg.slice("--out=".length);
+      const value = arg === "--out" ? argv[(index += 1)] : arg.slice("--out=".length);
       if (!value || value.trim() === "") throw new Error("--out requires a path");
       out = path.resolve(value);
     } else if (arg === "--help" || arg === "-h") {
       process.stdout.write(
-        "usage: review-system-one-decisions.ts [--lane <lane-id>] [--limit 1..200]"
-        + " [--max-signal 0..1] [--include-flagged] [--annotations <path.json>] [--out <path>]\n",
+        "usage: review-system-one-decisions.ts [--lane <lane-id>] [--limit 1..200]" +
+          " [--max-signal 0..1] [--include-flagged] [--annotations <path.json>] [--out <path>]\n",
       );
       process.exit(0);
     } else {
@@ -124,13 +116,16 @@ async function main(): Promise<void> {
   const dataDir = resolveDataDir();
   const databasePath = path.join(dataDir, SQLITE_FILENAME);
   if (!existsSync(databasePath)) {
-    throw new Error(`no Velvet database found at ${databasePath}; set VELVET_DATA_DIR or run the server once to create it`);
+    throw new Error(
+      `no Velvet database found at ${databasePath}; set VELVET_DATA_DIR or run the server once to create it`,
+    );
   }
   try {
     const queryLimit = Math.min(1_000, Math.max(options.limit * 5, 50));
-    const records = options.lane !== null
-      ? listSystemOneDecisionsByLane(options.lane, queryLimit)
-      : listRecentSystemOneDecisions(queryLimit);
+    const records =
+      options.lane !== null
+        ? listSystemOneDecisionsByLane(options.lane, queryLimit)
+        : listRecentSystemOneDecisions(queryLimit);
 
     const reviewOptions: ReviewQueueOptions = {
       limit: options.limit,

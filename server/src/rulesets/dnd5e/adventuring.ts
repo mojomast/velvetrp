@@ -35,9 +35,30 @@ export const DND_5E_TRAVEL_HOURS_PER_DAY = 8;
  * stealthily; only a slow pace allows Stealth.
  */
 export const DND_5E_TRAVEL_PACES: Readonly<Record<Dnd5eTravelPace, Dnd5eTravelPaceProfile>> = Object.freeze({
-  fast: Object.freeze({ pace: "fast", feetPerMinute: 400, milesPerHour: 4, milesPerDay: 30, passivePerceptionPenalty: 5, canStealth: false }),
-  normal: Object.freeze({ pace: "normal", feetPerMinute: 300, milesPerHour: 3, milesPerDay: 24, passivePerceptionPenalty: 0, canStealth: false }),
-  slow: Object.freeze({ pace: "slow", feetPerMinute: 200, milesPerHour: 2, milesPerDay: 18, passivePerceptionPenalty: 0, canStealth: true }),
+  fast: Object.freeze({
+    pace: "fast",
+    feetPerMinute: 400,
+    milesPerHour: 4,
+    milesPerDay: 30,
+    passivePerceptionPenalty: 5,
+    canStealth: false,
+  }),
+  normal: Object.freeze({
+    pace: "normal",
+    feetPerMinute: 300,
+    milesPerHour: 3,
+    milesPerDay: 24,
+    passivePerceptionPenalty: 0,
+    canStealth: false,
+  }),
+  slow: Object.freeze({
+    pace: "slow",
+    feetPerMinute: 200,
+    milesPerHour: 2,
+    milesPerDay: 18,
+    passivePerceptionPenalty: 0,
+    canStealth: true,
+  }),
 });
 
 export type Dnd5eTravelPlan = Readonly<{
@@ -85,17 +106,22 @@ export type Dnd5eForcedMarchResolution = Readonly<{
  * makes a Constitution saving throw at the end of the hour; the DC is 10 + 1
  * for each hour past 8. Each failure adds one level of exhaustion.
  */
-export function resolveDnd5eForcedMarch(input: Readonly<{
-  hours: number;
-  constitutionScore: number;
-  proficiencyBonus?: number;
-  /** One d20 roll per hour beyond the eighth. */
-  saveRolls?: readonly number[];
-}>): Dnd5eForcedMarchResolution {
+export function resolveDnd5eForcedMarch(
+  input: Readonly<{
+    hours: number;
+    constitutionScore: number;
+    proficiencyBonus?: number;
+    /** One d20 roll per hour beyond the eighth. */
+    saveRolls?: readonly number[];
+  }>,
+): Dnd5eForcedMarchResolution {
   requireNonNegativeInteger(input.hours, "travel hours");
   const forcedHours = Math.max(0, input.hours - DND_5E_TRAVEL_HOURS_PER_DAY);
   const rolls = input.saveRolls ?? [];
-  if (rolls.length !== forcedHours) throw new RangeError(`forced march requires exactly ${forcedHours} Constitution save roll${forcedHours === 1 ? "" : "s"}`);
+  if (rolls.length !== forcedHours)
+    throw new RangeError(
+      `forced march requires exactly ${forcedHours} Constitution save roll${forcedHours === 1 ? "" : "s"}`,
+    );
   const proficiencyBonus = input.proficiencyBonus ?? 0;
   requireNonNegativeInteger(proficiencyBonus, "proficiency bonus");
   const saves = rolls.map((d20, index) => {
@@ -104,7 +130,12 @@ export function resolveDnd5eForcedMarch(input: Readonly<{
     const resolution = resolveDnd5eCheck({ d20, abilityScore: input.constitutionScore, proficiencyBonus, dc });
     return Object.freeze({ hour, dc, d20, total: resolution.total, success: resolution.success });
   });
-  return Object.freeze({ hours: input.hours, forcedHours, exhaustionLevels: saves.filter((save) => !save.success).length, saves: frozenList(saves) });
+  return Object.freeze({
+    hours: input.hours,
+    forcedHours,
+    exhaustionLevels: saves.filter((save) => !save.success).length,
+    saves: frozenList(saves),
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -191,7 +222,8 @@ export type Dnd5eFoodAndWaterResolution = Readonly<{
 }>;
 
 function requireNonNegativeNumber(value: number, name: string): void {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new RangeError(`${name} must be a non-negative number`);
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+    throw new RangeError(`${name} must be a non-negative number`);
 }
 
 /**
@@ -208,7 +240,9 @@ export function resolveDnd5eFoodAndWater(input: Dnd5eFoodAndWaterInput): Dnd5eFo
   requireNonNegativeInteger(daysWithoutFood, "days without food");
   const foodExhaustion = Math.max(0, daysWithoutFood - starvationGraceDays);
 
-  const waterGallonsRequired = input.hotWeather ? DND_5E_DEPRIVATION.waterGallonsPerDayHot : DND_5E_DEPRIVATION.waterGallonsPerDay;
+  const waterGallonsRequired = input.hotWeather
+    ? DND_5E_DEPRIVATION.waterGallonsPerDayHot
+    : DND_5E_DEPRIVATION.waterGallonsPerDay;
   const waterConsumed = input.waterGallons ?? 0;
   requireNonNegativeNumber(waterConsumed, "water gallons");
   const existingExhaustion = input.existingExhaustion ?? 0;
@@ -225,7 +259,12 @@ export function resolveDnd5eFoodAndWater(input: Dnd5eFoodAndWaterInput): Dnd5eFo
     if (d20 === undefined) throw new RangeError("half water rations require a Constitution save roll");
     const proficiencyBonus = input.proficiencyBonus ?? 0;
     requireNonNegativeInteger(proficiencyBonus, "proficiency bonus");
-    const check = resolveDnd5eCheck({ d20, abilityScore: input.constitutionScore, proficiencyBonus, dc: DND_5E_DEPRIVATION.dehydrationSaveDc });
+    const check = resolveDnd5eCheck({
+      d20,
+      abilityScore: input.constitutionScore,
+      proficiencyBonus,
+      dc: DND_5E_DEPRIVATION.dehydrationSaveDc,
+    });
     waterSave = Object.freeze({ dc: check.dc, d20: check.d20, total: check.total, success: check.success });
     if (!check.success) waterExhaustion = existingExhaustion > 0 ? 2 : 1;
   } else {
@@ -275,37 +314,73 @@ export type Dnd5eEnvironmentalHazard = Readonly<{
  * succeeds. Strong wind and heavy precipitation impose listed effects and
  * require no save in the SRD.
  */
-export const DND_5E_ENVIRONMENTAL_HAZARDS: Readonly<Record<Dnd5eEnvironmentalHazardId, Dnd5eEnvironmentalHazard>> = Object.freeze({
-  "extreme-cold": Object.freeze({
-    id: "extreme-cold", name: "Extreme Cold", saveAbility: "constitution", baseDc: 10, dcIncreasePerInterval: 0,
-    intervalHours: 1, exhaustionPerFailure: 1, protectedAutomaticallySucceeds: true, damage: null, damageIntervalHours: null,
-    effects: frozenList(["gain one level of exhaustion on a failed save at the end of each hour"]),
-  }),
-  "extreme-heat": Object.freeze({
-    id: "extreme-heat", name: "Extreme Heat", saveAbility: "constitution", baseDc: 5, dcIncreasePerInterval: 1,
-    intervalHours: 1, exhaustionPerFailure: 1, protectedAutomaticallySucceeds: true, damage: null, damageIntervalHours: null,
-    effects: frozenList(["gain one level of exhaustion on a failed save at the end of each hour", "the save DC increases by 1 each hour after the first"]),
-  }),
-  "strong-wind": Object.freeze({
-    id: "strong-wind", name: "Strong Wind", saveAbility: null, baseDc: 0, dcIncreasePerInterval: 0,
-    intervalHours: 1, exhaustionPerFailure: 0, protectedAutomaticallySucceeds: false, damage: null, damageIntervalHours: null,
-    effects: frozenList([
-      "disadvantage on ranged weapon attack rolls",
-      "disadvantage on Wisdom (Perception) checks that rely on hearing",
-      "open flames are extinguished and fog is dispersed",
-      "nonmagical flying is nearly impossible; a flying creature must land or fall",
-    ]),
-  }),
-  "heavy-precipitation": Object.freeze({
-    id: "heavy-precipitation", name: "Heavy Precipitation", saveAbility: null, baseDc: 0, dcIncreasePerInterval: 0,
-    intervalHours: 1, exhaustionPerFailure: 0, protectedAutomaticallySucceeds: false, damage: null, damageIntervalHours: null,
-    effects: frozenList([
-      "the area is lightly obscured",
-      "disadvantage on Wisdom (Perception) checks that rely on sight",
-      "open flames are extinguished",
-    ]),
-  }),
-});
+export const DND_5E_ENVIRONMENTAL_HAZARDS: Readonly<Record<Dnd5eEnvironmentalHazardId, Dnd5eEnvironmentalHazard>> =
+  Object.freeze({
+    "extreme-cold": Object.freeze({
+      id: "extreme-cold",
+      name: "Extreme Cold",
+      saveAbility: "constitution",
+      baseDc: 10,
+      dcIncreasePerInterval: 0,
+      intervalHours: 1,
+      exhaustionPerFailure: 1,
+      protectedAutomaticallySucceeds: true,
+      damage: null,
+      damageIntervalHours: null,
+      effects: frozenList(["gain one level of exhaustion on a failed save at the end of each hour"]),
+    }),
+    "extreme-heat": Object.freeze({
+      id: "extreme-heat",
+      name: "Extreme Heat",
+      saveAbility: "constitution",
+      baseDc: 5,
+      dcIncreasePerInterval: 1,
+      intervalHours: 1,
+      exhaustionPerFailure: 1,
+      protectedAutomaticallySucceeds: true,
+      damage: null,
+      damageIntervalHours: null,
+      effects: frozenList([
+        "gain one level of exhaustion on a failed save at the end of each hour",
+        "the save DC increases by 1 each hour after the first",
+      ]),
+    }),
+    "strong-wind": Object.freeze({
+      id: "strong-wind",
+      name: "Strong Wind",
+      saveAbility: null,
+      baseDc: 0,
+      dcIncreasePerInterval: 0,
+      intervalHours: 1,
+      exhaustionPerFailure: 0,
+      protectedAutomaticallySucceeds: false,
+      damage: null,
+      damageIntervalHours: null,
+      effects: frozenList([
+        "disadvantage on ranged weapon attack rolls",
+        "disadvantage on Wisdom (Perception) checks that rely on hearing",
+        "open flames are extinguished and fog is dispersed",
+        "nonmagical flying is nearly impossible; a flying creature must land or fall",
+      ]),
+    }),
+    "heavy-precipitation": Object.freeze({
+      id: "heavy-precipitation",
+      name: "Heavy Precipitation",
+      saveAbility: null,
+      baseDc: 0,
+      dcIncreasePerInterval: 0,
+      intervalHours: 1,
+      exhaustionPerFailure: 0,
+      protectedAutomaticallySucceeds: false,
+      damage: null,
+      damageIntervalHours: null,
+      effects: frozenList([
+        "the area is lightly obscured",
+        "disadvantage on Wisdom (Perception) checks that rely on sight",
+        "open flames are extinguished",
+      ]),
+    }),
+  });
 
 export type Dnd5eHazardSave = Readonly<{ interval: number; dc: number; d20: number; total: number; success: boolean }>;
 
@@ -358,9 +433,13 @@ export function resolveDnd5eHazardExposure(input: Dnd5eHazardExposureInput): Dnd
       exhaustionGained = 0;
       reasons.push(`protection automatically succeeds against ${hazard.name.toLowerCase()}`);
     } else if (saveCount > 0) {
-      if (input.constitutionScore === undefined) throw new RangeError("a Constitution score is required for this hazard");
+      if (input.constitutionScore === undefined)
+        throw new RangeError("a Constitution score is required for this hazard");
       const rolls = input.saveRolls ?? [];
-      if (rolls.length !== saveCount) throw new RangeError(`${hazard.name.toLowerCase()} requires exactly ${saveCount} save roll${saveCount === 1 ? "" : "s"}`);
+      if (rolls.length !== saveCount)
+        throw new RangeError(
+          `${hazard.name.toLowerCase()} requires exactly ${saveCount} save roll${saveCount === 1 ? "" : "s"}`,
+        );
       const proficiencyBonus = input.proficiencyBonus ?? 0;
       requireNonNegativeInteger(proficiencyBonus, "proficiency bonus");
       saves = rolls.map((d20, index) => {
@@ -428,29 +507,84 @@ export type Dnd5ePoisonModel = Readonly<{
 /** Bounded SRD poison models: save, onset, interval, damage, and condition. */
 export const DND_5E_POISON_MODELS: Readonly<Record<string, Dnd5ePoisonModel>> = Object.freeze({
   "assassins-blood": Object.freeze({
-    id: "assassins-blood", name: "Assassin's Blood", delivery: "ingested", saveAbility: "constitution", saveDc: 10,
-    onset: "immediate", intervalHours: 0, damage: Object.freeze({ count: 1, sides: 12 }), damageType: "poison",
-    halfDamageOnSuccess: true, condition: "poisoned", conditionHours: 24, failByFiveEffect: null, recoverySuccesses: 0,
+    id: "assassins-blood",
+    name: "Assassin's Blood",
+    delivery: "ingested",
+    saveAbility: "constitution",
+    saveDc: 10,
+    onset: "immediate",
+    intervalHours: 0,
+    damage: Object.freeze({ count: 1, sides: 12 }),
+    damageType: "poison",
+    halfDamageOnSuccess: true,
+    condition: "poisoned",
+    conditionHours: 24,
+    failByFiveEffect: null,
+    recoverySuccesses: 0,
   }),
   "basic-poison": Object.freeze({
-    id: "basic-poison", name: "Basic Poison", delivery: "injury", saveAbility: "constitution", saveDc: 10,
-    onset: "immediate", intervalHours: 0, damage: Object.freeze({ count: 1, sides: 4 }), damageType: "poison",
-    halfDamageOnSuccess: false, condition: "poisoned", conditionHours: 0, failByFiveEffect: null, recoverySuccesses: 0,
+    id: "basic-poison",
+    name: "Basic Poison",
+    delivery: "injury",
+    saveAbility: "constitution",
+    saveDc: 10,
+    onset: "immediate",
+    intervalHours: 0,
+    damage: Object.freeze({ count: 1, sides: 4 }),
+    damageType: "poison",
+    halfDamageOnSuccess: false,
+    condition: "poisoned",
+    conditionHours: 0,
+    failByFiveEffect: null,
+    recoverySuccesses: 0,
   }),
   "drow-poison": Object.freeze({
-    id: "drow-poison", name: "Drow Poison", delivery: "injury", saveAbility: "constitution", saveDc: 13,
-    onset: "immediate", intervalHours: 0, damage: null, damageType: null, halfDamageOnSuccess: false,
-    condition: "poisoned", conditionHours: 1, failByFiveEffect: "unconscious", recoverySuccesses: 0,
+    id: "drow-poison",
+    name: "Drow Poison",
+    delivery: "injury",
+    saveAbility: "constitution",
+    saveDc: 13,
+    onset: "immediate",
+    intervalHours: 0,
+    damage: null,
+    damageType: null,
+    halfDamageOnSuccess: false,
+    condition: "poisoned",
+    conditionHours: 1,
+    failByFiveEffect: "unconscious",
+    recoverySuccesses: 0,
   }),
   "purple-worm-poison": Object.freeze({
-    id: "purple-worm-poison", name: "Purple Worm Poison", delivery: "injury", saveAbility: "constitution", saveDc: 15,
-    onset: "immediate", intervalHours: 0, damage: Object.freeze({ count: 12, sides: 6 }), damageType: "poison",
-    halfDamageOnSuccess: true, condition: null, conditionHours: 0, failByFiveEffect: null, recoverySuccesses: 0,
+    id: "purple-worm-poison",
+    name: "Purple Worm Poison",
+    delivery: "injury",
+    saveAbility: "constitution",
+    saveDc: 15,
+    onset: "immediate",
+    intervalHours: 0,
+    damage: Object.freeze({ count: 12, sides: 6 }),
+    damageType: "poison",
+    halfDamageOnSuccess: true,
+    condition: null,
+    conditionHours: 0,
+    failByFiveEffect: null,
+    recoverySuccesses: 0,
   }),
   "serpent-venom": Object.freeze({
-    id: "serpent-venom", name: "Serpent Venom", delivery: "injury", saveAbility: "constitution", saveDc: 11,
-    onset: "immediate", intervalHours: 0, damage: Object.freeze({ count: 3, sides: 6 }), damageType: "poison",
-    halfDamageOnSuccess: true, condition: null, conditionHours: 0, failByFiveEffect: null, recoverySuccesses: 0,
+    id: "serpent-venom",
+    name: "Serpent Venom",
+    delivery: "injury",
+    saveAbility: "constitution",
+    saveDc: 11,
+    onset: "immediate",
+    intervalHours: 0,
+    damage: Object.freeze({ count: 3, sides: 6 }),
+    damageType: "poison",
+    halfDamageOnSuccess: true,
+    condition: null,
+    conditionHours: 0,
+    failByFiveEffect: null,
+    recoverySuccesses: 0,
   }),
 });
 
@@ -493,19 +627,33 @@ export function resolveDnd5ePoisonExposure(input: Dnd5ePoisonExposureInput): Dnd
   const poison = resolvePoisonModel(input.poison);
   const proficiencyBonus = input.proficiencyBonus ?? 0;
   requireNonNegativeInteger(proficiencyBonus, "proficiency bonus");
-  const check = resolveDnd5eCheck({ d20: input.d20, abilityScore: input.constitutionScore, proficiencyBonus, dc: poison.saveDc });
+  const check = resolveDnd5eCheck({
+    d20: input.d20,
+    abilityScore: input.constitutionScore,
+    proficiencyBonus,
+    dc: poison.saveDc,
+  });
   const reasons: string[] = [];
   let damage = 0;
   let damageEvidence: DamageRollResolution | null = null;
   if (poison.damage) {
     const resolution = resolveDnd5eDamageRoll({ dice: [poison.damage], rolls: [input.damageRolls ?? []] });
     damageEvidence = resolution;
-    damage = check.success && poison.halfDamageOnSuccess ? Math.floor(resolution.total / 2) : check.success ? 0 : resolution.total;
+    damage =
+      check.success && poison.halfDamageOnSuccess
+        ? Math.floor(resolution.total / 2)
+        : check.success
+          ? 0
+          : resolution.total;
   }
   const failedByFive = poison.saveDc - check.total >= 5;
   const condition = check.success ? null : poison.condition;
   const failByFiveEffect = !check.success && failedByFive ? poison.failByFiveEffect : null;
-  if (check.success) reasons.push("successful save avoids the condition" + (poison.halfDamageOnSuccess && poison.damage ? " and halves the damage" : ""));
+  if (check.success)
+    reasons.push(
+      "successful save avoids the condition" +
+        (poison.halfDamageOnSuccess && poison.damage ? " and halves the damage" : ""),
+    );
   if (failByFiveEffect) reasons.push(`failed the save by 5 or more: ${failByFiveEffect}`);
   return Object.freeze({
     poison: poison.id,
@@ -545,16 +693,43 @@ export type Dnd5eDiseaseModel = Readonly<{
 /** Bounded SRD disease models: incubation, interval saves, and effects. */
 export const DND_5E_DISEASE_MODELS: Readonly<Record<string, Dnd5eDiseaseModel>> = Object.freeze({
   "cackle-fever": Object.freeze({
-    id: "cackle-fever", name: "Cackle Fever", saveAbility: "constitution", saveDc: 13, incubationDays: 3, intervalDays: 1,
-    damage: Object.freeze({ count: 1, sides: 6 }), damageType: "psychic", exhaustionPerInterval: 0, effect: null, recoverySuccesses: 3,
+    id: "cackle-fever",
+    name: "Cackle Fever",
+    saveAbility: "constitution",
+    saveDc: 13,
+    incubationDays: 3,
+    intervalDays: 1,
+    damage: Object.freeze({ count: 1, sides: 6 }),
+    damageType: "psychic",
+    exhaustionPerInterval: 0,
+    effect: null,
+    recoverySuccesses: 3,
   }),
   "sewer-plague": Object.freeze({
-    id: "sewer-plague", name: "Sewer Plague", saveAbility: "constitution", saveDc: 11, incubationDays: 3, intervalDays: 1,
-    damage: null, damageType: null, exhaustionPerInterval: 1, effect: null, recoverySuccesses: 3,
+    id: "sewer-plague",
+    name: "Sewer Plague",
+    saveAbility: "constitution",
+    saveDc: 11,
+    incubationDays: 3,
+    intervalDays: 1,
+    damage: null,
+    damageType: null,
+    exhaustionPerInterval: 1,
+    effect: null,
+    recoverySuccesses: 3,
   }),
   "sight-rot": Object.freeze({
-    id: "sight-rot", name: "Sight Rot", saveAbility: "constitution", saveDc: 15, incubationDays: 1, intervalDays: 1,
-    damage: null, damageType: null, exhaustionPerInterval: 0, effect: "blinded", recoverySuccesses: 0,
+    id: "sight-rot",
+    name: "Sight Rot",
+    saveAbility: "constitution",
+    saveDc: 15,
+    incubationDays: 1,
+    intervalDays: 1,
+    damage: null,
+    damageType: null,
+    exhaustionPerInterval: 0,
+    effect: "blinded",
+    recoverySuccesses: 0,
   }),
 });
 
@@ -599,7 +774,12 @@ export function resolveDnd5eDiseaseInterval(input: Dnd5eDiseaseIntervalInput): D
   requireNonNegativeInteger(proficiencyBonus, "proficiency bonus");
   const priorSuccesses = input.priorSuccesses ?? 0;
   requireNonNegativeInteger(priorSuccesses, "prior disease successes");
-  const check = resolveDnd5eCheck({ d20: input.d20, abilityScore: input.constitutionScore, proficiencyBonus, dc: disease.saveDc });
+  const check = resolveDnd5eCheck({
+    d20: input.d20,
+    abilityScore: input.constitutionScore,
+    proficiencyBonus,
+    dc: disease.saveDc,
+  });
   const successes = check.success ? priorSuccesses + 1 : 0;
   const recovered = disease.recoverySuccesses > 0 && successes >= disease.recoverySuccesses;
   const reasons: string[] = [];
@@ -651,9 +831,17 @@ export const DND_5E_LIFESTYLES: readonly Dnd5eLifestyle[] = Object.freeze([
   Object.freeze({ id: "aristocratic", name: "Aristocratic", costSpPerDay: 100 }),
 ]);
 
-export type Dnd5eLifestyleExpense = Readonly<{ lifestyle: Dnd5eLifestyleId; name: string; days: number; costSp: number; costGp: number }>;
+export type Dnd5eLifestyleExpense = Readonly<{
+  lifestyle: Dnd5eLifestyleId;
+  name: string;
+  days: number;
+  costSp: number;
+  costGp: number;
+}>;
 
-export function resolveDnd5eLifestyleExpense(input: Readonly<{ lifestyle: Dnd5eLifestyleId; days: number }>): Dnd5eLifestyleExpense {
+export function resolveDnd5eLifestyleExpense(
+  input: Readonly<{ lifestyle: Dnd5eLifestyleId; days: number }>,
+): Dnd5eLifestyleExpense {
   const tier = DND_5E_LIFESTYLES.find((entry) => entry.id === input.lifestyle);
   if (!tier) throw new Error(`unknown lifestyle: ${input.lifestyle}`);
   requireNonNegativeInteger(input.days, "lifestyle days");
@@ -680,25 +868,55 @@ export type Dnd5eDowntimeActivity = Readonly<{
 }>;
 
 /** Bounded SRD downtime activities and their day counts and outcomes. */
-export const DND_5E_DOWNTIME_ACTIVITIES: Readonly<Record<Dnd5eDowntimeActivityId, Dnd5eDowntimeActivity>> = Object.freeze({
-  crafting: Object.freeze({
-    id: "crafting", name: "Crafting", minimumDays: 1, costPerDayGp: 2.5, outputValuePerDayGp: 5, requiresToolProficiency: true,
-    saveAbility: null, saveDc: null, effects: frozenList(["craft nonmagical items with a market value of up to 5 gp per day"]),
-  }),
-  training: Object.freeze({
-    id: "training", name: "Training", minimumDays: 250, costPerDayGp: 1, outputValuePerDayGp: 0, requiresToolProficiency: false,
-    saveAbility: null, saveDc: null, effects: frozenList(["gain proficiency with a tool or language"]),
-  }),
-  researching: Object.freeze({
-    id: "researching", name: "Researching", minimumDays: 1, costPerDayGp: 1, outputValuePerDayGp: 0, requiresToolProficiency: false,
-    saveAbility: null, saveDc: null, effects: frozenList(["uncover lore or information"]),
-  }),
-  recuperating: Object.freeze({
-    id: "recuperating", name: "Recuperating", minimumDays: 3, costPerDayGp: 1, outputValuePerDayGp: 0, requiresToolProficiency: false,
-    saveAbility: "constitution", saveDc: 15,
-    effects: frozenList(["end one effect preventing hit point recovery, one ability-score reduction, or one hit point maximum reduction"]),
-  }),
-});
+export const DND_5E_DOWNTIME_ACTIVITIES: Readonly<Record<Dnd5eDowntimeActivityId, Dnd5eDowntimeActivity>> =
+  Object.freeze({
+    crafting: Object.freeze({
+      id: "crafting",
+      name: "Crafting",
+      minimumDays: 1,
+      costPerDayGp: 2.5,
+      outputValuePerDayGp: 5,
+      requiresToolProficiency: true,
+      saveAbility: null,
+      saveDc: null,
+      effects: frozenList(["craft nonmagical items with a market value of up to 5 gp per day"]),
+    }),
+    training: Object.freeze({
+      id: "training",
+      name: "Training",
+      minimumDays: 250,
+      costPerDayGp: 1,
+      outputValuePerDayGp: 0,
+      requiresToolProficiency: false,
+      saveAbility: null,
+      saveDc: null,
+      effects: frozenList(["gain proficiency with a tool or language"]),
+    }),
+    researching: Object.freeze({
+      id: "researching",
+      name: "Researching",
+      minimumDays: 1,
+      costPerDayGp: 1,
+      outputValuePerDayGp: 0,
+      requiresToolProficiency: false,
+      saveAbility: null,
+      saveDc: null,
+      effects: frozenList(["uncover lore or information"]),
+    }),
+    recuperating: Object.freeze({
+      id: "recuperating",
+      name: "Recuperating",
+      minimumDays: 3,
+      costPerDayGp: 1,
+      outputValuePerDayGp: 0,
+      requiresToolProficiency: false,
+      saveAbility: "constitution",
+      saveDc: 15,
+      effects: frozenList([
+        "end one effect preventing hit point recovery, one ability-score reduction, or one hit point maximum reduction",
+      ]),
+    }),
+  });
 
 export type Dnd5eDowntimeInput = Readonly<{
   activity: Dnd5eDowntimeActivityId;
@@ -727,20 +945,39 @@ export function planDnd5eDowntime(input: Dnd5eDowntimeInput): Dnd5eDowntimePlan 
   requireNonNegativeInteger(input.days, "downtime days");
   const completed = input.days >= activity.minimumDays;
   const reasons: string[] = [];
-  if (!completed) reasons.push(`${activity.name.toLowerCase()} requires at least ${activity.minimumDays} day${activity.minimumDays === 1 ? "" : "s"}`);
+  if (!completed)
+    reasons.push(
+      `${activity.name.toLowerCase()} requires at least ${activity.minimumDays} day${activity.minimumDays === 1 ? "" : "s"}`,
+    );
   const costGp = activity.costPerDayGp * input.days;
   const outputValueGp = activity.outputValuePerDayGp * input.days;
   let save: Dnd5eDowntimePlan["save"] = null;
   let effects: readonly string[] = [];
   if (completed && activity.saveAbility && activity.saveDc !== null) {
-    if (input.constitutionScore === undefined || input.d20 === undefined) throw new RangeError(`${activity.name.toLowerCase()} requires a Constitution score and a save roll`);
+    if (input.constitutionScore === undefined || input.d20 === undefined)
+      throw new RangeError(`${activity.name.toLowerCase()} requires a Constitution score and a save roll`);
     const proficiencyBonus = input.proficiencyBonus ?? 0;
     requireNonNegativeInteger(proficiencyBonus, "proficiency bonus");
-    const check = resolveDnd5eCheck({ d20: input.d20, abilityScore: input.constitutionScore, proficiencyBonus, dc: activity.saveDc });
+    const check = resolveDnd5eCheck({
+      d20: input.d20,
+      abilityScore: input.constitutionScore,
+      proficiencyBonus,
+      dc: activity.saveDc,
+    });
     save = Object.freeze({ dc: check.dc, d20: check.d20, total: check.total, success: check.success });
     effects = check.success ? activity.effects : frozenList([]);
   } else if (completed) {
     effects = activity.effects;
   }
-  return Object.freeze({ activity: activity.id, name: activity.name, days: input.days, completed, costGp, outputValueGp, save, effects, reasons: frozenList(reasons) });
+  return Object.freeze({
+    activity: activity.id,
+    name: activity.name,
+    days: input.days,
+    completed,
+    costGp,
+    outputValueGp,
+    save,
+    effects,
+    reasons: frozenList(reasons),
+  });
 }

@@ -6,7 +6,8 @@ afterEach(cleanup);
 
 describe("TradeInboxPanel", () => {
   it("requires an exact trade ID before accepting or cancelling", () => {
-    const onAccept = vi.fn(), onCancel = vi.fn();
+    const onAccept = vi.fn(),
+      onCancel = vi.fn();
     render(<TradeInboxPanel onAccept={onAccept} onCancel={onCancel} />);
     expect((screen.getByRole("button", { name: "Accept trade" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("Trade ID"), { target: { value: "trade-9" } });

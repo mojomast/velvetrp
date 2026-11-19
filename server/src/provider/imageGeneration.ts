@@ -94,7 +94,10 @@ export function validateImageGenerationBaseUrl(raw: string): { ok: true } | { ok
   }
   if (url.protocol === "https:") return { ok: true };
   if (url.protocol === "http:" && isPrivateImageGenerationHost(url.hostname)) return { ok: true };
-  return { ok: false, reason: "baseUrl must use https, or http for loopback, RFC1918 private, or Tailscale CGNAT/tailnet hosts" };
+  return {
+    ok: false,
+    reason: "baseUrl must use https, or http for loopback, RFC1918 private, or Tailscale CGNAT/tailnet hosts",
+  };
 }
 
 /**
@@ -107,11 +110,19 @@ export function validateImageGenerationBaseUrl(raw: string): { ok: true } | { ok
 export function readImageGenerationConfig(env: NodeJS.ProcessEnv = process.env): ImageGenerationConfig {
   const requested = env.VELVET_IMAGES_ENABLED === "true";
   const timeoutMs = Number(env.VELVET_IMAGES_TIMEOUT_MS ?? IMAGE_GENERATION_DEFAULT_TIMEOUT_MS);
-  if (!Number.isInteger(timeoutMs) || timeoutMs < IMAGE_GENERATION_MIN_TIMEOUT_MS || timeoutMs > IMAGE_GENERATION_MAX_TIMEOUT_MS) {
+  if (
+    !Number.isInteger(timeoutMs) ||
+    timeoutMs < IMAGE_GENERATION_MIN_TIMEOUT_MS ||
+    timeoutMs > IMAGE_GENERATION_MAX_TIMEOUT_MS
+  ) {
     throw new Error("Image generation timeout must be an integer within 1000–600000ms");
   }
   const maxBytes = Number(env.VELVET_IMAGES_MAX_BYTES ?? IMAGE_GENERATION_DEFAULT_MAX_BYTES);
-  if (!Number.isInteger(maxBytes) || maxBytes < IMAGE_GENERATION_MIN_MAX_BYTES || maxBytes > IMAGE_GENERATION_MAX_MAX_BYTES) {
+  if (
+    !Number.isInteger(maxBytes) ||
+    maxBytes < IMAGE_GENERATION_MIN_MAX_BYTES ||
+    maxBytes > IMAGE_GENERATION_MAX_MAX_BYTES
+  ) {
     throw new Error("Image generation byte budget must be an integer within 1024–67108864 bytes");
   }
   const rawBaseUrl = (env.VELVET_IMAGES_BASE_URL ?? "").trim();
@@ -215,7 +226,8 @@ async function readBoundedBody(response: Response, limit: number): Promise<Uint8
       if (done) break;
       if (!value) continue;
       bytes += value.byteLength;
-      if (bytes > limit) throw new ImageGenerationPayloadTooLargeError("Image generation response exceeded the byte budget");
+      if (bytes > limit)
+        throw new ImageGenerationPayloadTooLargeError("Image generation response exceeded the byte budget");
       chunks.push(value);
     }
   } finally {
@@ -313,9 +325,13 @@ export function createImageGenerationClient(options: ImageGenerationClientOption
         if (response.status >= REDIRECT_STATUS_MIN && response.status <= REDIRECT_STATUS_MAX) {
           throw new ImageGenerationTransportError("Image generation redirect refused");
         }
-        if (!response.ok) throw new ImageGenerationHttpError(response.status, await readBoundedDetail(response, config.token));
-        const parsed = imageGenerationHealthSchema.safeParse(parseJsonBody(await readBoundedBody(response, HEALTH_BYTE_LIMIT)));
-        if (!parsed.success) throw new ImageGenerationProtocolError("Image generation health response did not match the declared schema");
+        if (!response.ok)
+          throw new ImageGenerationHttpError(response.status, await readBoundedDetail(response, config.token));
+        const parsed = imageGenerationHealthSchema.safeParse(
+          parseJsonBody(await readBoundedBody(response, HEALTH_BYTE_LIMIT)),
+        );
+        if (!parsed.success)
+          throw new ImageGenerationProtocolError("Image generation health response did not match the declared schema");
         return parsed.data;
       });
     },
@@ -339,10 +355,12 @@ export function createImageGenerationClient(options: ImageGenerationClientOption
         if (response.status >= REDIRECT_STATUS_MIN && response.status <= REDIRECT_STATUS_MAX) {
           throw new ImageGenerationTransportError("Image generation redirect refused");
         }
-        if (!response.ok) throw new ImageGenerationHttpError(response.status, await readBoundedDetail(response, config.token));
+        if (!response.ok)
+          throw new ImageGenerationHttpError(response.status, await readBoundedDetail(response, config.token));
         const bytes = await readBoundedBody(response, responseByteCeiling(config.maxBytes));
         const parsed = imageGenerationResultSchema.safeParse(parseJsonBody(bytes));
-        if (!parsed.success) throw new ImageGenerationProtocolError("Image generation response did not match the declared schema");
+        if (!parsed.success)
+          throw new ImageGenerationProtocolError("Image generation response did not match the declared schema");
         for (const image of parsed.data.images) {
           if (base64DecodedByteEstimate(image.base64) > config.maxBytes) {
             throw new ImageGenerationPayloadTooLargeError("Image generation response exceeded the byte budget");

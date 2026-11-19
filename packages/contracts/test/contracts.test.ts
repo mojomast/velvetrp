@@ -54,11 +54,16 @@ describe("spellcasting contracts", () => {
   it("requires a spell reference and explicit component declarations", () => {
     const value = castSpellCommandRequestSchema.parse({
       powerRef: { kind: "spell", packId: "srd-5.1", packVersion: "1.0.0", definitionId: "bless" },
-      targetIds: ["actor:one"], choices: [], expectedRevision: 0, idempotencyKey: "spell-cast-1",
+      targetIds: ["actor:one"],
+      choices: [],
+      expectedRevision: 0,
+      idempotencyKey: "spell-cast-1",
       components: { verbal: true, somatic: true, material: true },
     });
     expect(value.components.material).toBe(true);
-    expect(() => castSpellCommandRequestSchema.parse({ ...value, powerRef: { ...value.powerRef, kind: "ability" } })).toThrow();
+    expect(() =>
+      castSpellCommandRequestSchema.parse({ ...value, powerRef: { ...value.powerRef, kind: "ability" } }),
+    ).toThrow();
   });
 });
 
@@ -72,7 +77,14 @@ describe("feature flag contracts", () => {
   });
 
   it("requires every RPG feature to be an explicit boolean", () => {
-    const flags = { campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false };
+    const flags = {
+      campaign: false,
+      mechanics: false,
+      combat: false,
+      studio: false,
+      remoteAuthentication: false,
+      systemOne: false,
+    };
     expect(rpgFeatureFlagsSchema.parse(flags)).toEqual(flags);
     expect(() => rpgFeatureFlagsSchema.parse({ ...flags, combat: 1 })).toThrow();
   });
@@ -105,13 +117,15 @@ describe("campaign contracts", () => {
     expectTypeOf(request).toMatchTypeOf<CampaignStarterSetupRequest>();
     expectTypeOf<CampaignStarterSetupResponse>().toEqualTypeOf<CampaignDetailResponse>();
     expect(ORIGINAL_STARTER_ID).toBe(`${ORIGINAL_STARTER_PACK_ID}@${ORIGINAL_STARTER_PACK_VERSION}`);
-    expect(ORIGINAL_STARTER_PRESENTATION.starterId)
-      .toBe(`${ORIGINAL_STARTER_PRESENTATION.pack.id}@${ORIGINAL_STARTER_PRESENTATION.pack.version}`);
+    expect(ORIGINAL_STARTER_PRESENTATION.starterId).toBe(
+      `${ORIGINAL_STARTER_PRESENTATION.pack.id}@${ORIGINAL_STARTER_PRESENTATION.pack.version}`,
+    );
   });
 
   it("exports one strict client-safe starter presentation", () => {
-    expect(originalStarterPresentationSchema.parse(ORIGINAL_STARTER_PRESENTATION))
-      .toEqual(ORIGINAL_STARTER_PRESENTATION);
+    expect(originalStarterPresentationSchema.parse(ORIGINAL_STARTER_PRESENTATION)).toEqual(
+      ORIGINAL_STARTER_PRESENTATION,
+    );
     expect(ORIGINAL_STARTER_PRESENTATION).toMatchObject({
       starterId: ORIGINAL_STARTER_ID,
       rulesProfile: { id: "velvet:rules:original-narrative", name: "Velvet Original Narrative" },
@@ -120,7 +134,9 @@ describe("campaign contracts", () => {
       backgrounds: [{ name: "Rainledger" }],
       classes: [{ name: "Pathmender" }],
     });
-    expect(originalStarterPresentationSchema.safeParse({ ...ORIGINAL_STARTER_PRESENTATION, extra: true }).success).toBe(false);
+    expect(originalStarterPresentationSchema.safeParse({ ...ORIGINAL_STARTER_PRESENTATION, extra: true }).success).toBe(
+      false,
+    );
   });
 
   it("deep-freezes every layer of the parsed starter presentation", () => {
@@ -130,23 +146,41 @@ describe("campaign contracts", () => {
       for (const child of Object.values(value)) expectDeeplyFrozen(child);
     };
     expectDeeplyFrozen(ORIGINAL_STARTER_PRESENTATION);
-    expectTypeOf(ORIGINAL_STARTER_PRESENTATION)
-      .toEqualTypeOf<DeepReadonly<OriginalStarterPresentation>>();
+    expectTypeOf(ORIGINAL_STARTER_PRESENTATION).toEqualTypeOf<DeepReadonly<OriginalStarterPresentation>>();
 
     const mutationAttempts = [
-      () => { (ORIGINAL_STARTER_PRESENTATION as unknown as { starterId: string }).starterId = "mutation"; },
-      () => { (ORIGINAL_STARTER_PRESENTATION.rulesProfile as unknown as { name: string }).name = "Mutation"; },
-      () => { (ORIGINAL_STARTER_PRESENTATION.pack as unknown as { version: string }).version = "9.9.9"; },
-      () => { (ORIGINAL_STARTER_PRESENTATION.classes as unknown as unknown[]).push({}); },
-      () => { (ORIGINAL_STARTER_PRESENTATION.classes[0] as unknown as { name: string }).name = "Mutation"; },
-      () => { (ORIGINAL_STARTER_PRESENTATION.races as unknown as unknown[]).splice(0, 1); },
-      () => { (ORIGINAL_STARTER_PRESENTATION.races[0] as unknown as { description: string }).description = "Mutation"; },
-      () => { (ORIGINAL_STARTER_PRESENTATION.backgrounds as unknown as unknown[]).pop(); },
-      () => { (ORIGINAL_STARTER_PRESENTATION.backgrounds[0] as unknown as { id: string }).id = "mutation"; },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION as unknown as { starterId: string }).starterId = "mutation";
+      },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION.rulesProfile as unknown as { name: string }).name = "Mutation";
+      },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION.pack as unknown as { version: string }).version = "9.9.9";
+      },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION.classes as unknown as unknown[]).push({});
+      },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION.classes[0] as unknown as { name: string }).name = "Mutation";
+      },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION.races as unknown as unknown[]).splice(0, 1);
+      },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION.races[0] as unknown as { description: string }).description = "Mutation";
+      },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION.backgrounds as unknown as unknown[]).pop();
+      },
+      () => {
+        (ORIGINAL_STARTER_PRESENTATION.backgrounds[0] as unknown as { id: string }).id = "mutation";
+      },
     ];
     for (const mutate of mutationAttempts) expect(mutate).toThrow(TypeError);
-    expect(originalStarterPresentationSchema.parse(ORIGINAL_STARTER_PRESENTATION))
-      .toEqual(ORIGINAL_STARTER_PRESENTATION);
+    expect(originalStarterPresentationSchema.parse(ORIGINAL_STARTER_PRESENTATION)).toEqual(
+      ORIGINAL_STARTER_PRESENTATION,
+    );
   });
 
   it("normalizes a strict bounded creation input", () => {
@@ -217,8 +251,12 @@ describe("campaign contracts", () => {
       expect(campaignRenameRequestSchema.safeParse(invalid).success).toBe(false);
     }
     expect(campaignRenameResponseSchema.safeParse({ campaign: { ...campaign, id: "bad id" } }).success).toBe(false);
-    expect(campaignRenameResponseSchema.safeParse({ campaign: { ...campaign, updatedAt: "not-a-time" } }).success).toBe(false);
-    expect(campaignRenameResponseSchema.safeParse({ campaign: { ...campaign, ownerPrincipalId: "local-owner" } }).success).toBe(false);
+    expect(campaignRenameResponseSchema.safeParse({ campaign: { ...campaign, updatedAt: "not-a-time" } }).success).toBe(
+      false,
+    );
+    expect(
+      campaignRenameResponseSchema.safeParse({ campaign: { ...campaign, ownerPrincipalId: "local-owner" } }).success,
+    ).toBe(false);
     expect(campaignRenameResponseSchema.safeParse({ campaign, extra: true }).success).toBe(false);
   });
 
@@ -327,7 +365,9 @@ describe("campaign contracts", () => {
     expect(campaignListResponseSchema.parse({ campaigns: [] })).toEqual({ campaigns: [] });
     expect(campaignListResponseSchema.safeParse({ campaigns: [campaign], unknown: true }).success).toBe(false);
     expect(campaignListResponseSchema.safeParse({ campaign: [campaign] }).success).toBe(false);
-    expect(campaignListResponseSchema.safeParse({ campaigns: [{ ...campaign, actorRole: "admin" }] }).success).toBe(false);
+    expect(campaignListResponseSchema.safeParse({ campaigns: [{ ...campaign, actorRole: "admin" }] }).success).toBe(
+      false,
+    );
   });
 
   it("infers only the campaign list response wire fields", () => {
@@ -368,7 +408,12 @@ describe("campaign contracts", () => {
     expect(campaignDetailSchema.parse(unconfigured)).toEqual(unconfigured);
     expect(campaignDetailResponseSchema.parse({ campaign: configured })).toEqual({ campaign: configured });
     expect(Object.keys(campaignDetailSchema.shape)).toEqual([
-      "id", "name", "actorRole", "createdAt", "updatedAt", "content",
+      "id",
+      "name",
+      "actorRole",
+      "createdAt",
+      "updatedAt",
+      "content",
     ]);
     for (const invalid of [
       { ...unconfigured, ownerPrincipalId: "local-owner" },
@@ -383,7 +428,10 @@ describe("campaign contracts", () => {
         content: {
           status: "configured",
           rulesProfileId: "rules-one",
-          contentPacks: [{ packId: "same", packVersion: "1" }, { packId: "same", packVersion: "2" }],
+          contentPacks: [
+            { packId: "same", packVersion: "1" },
+            { packId: "same", packVersion: "2" },
+          ],
         },
       },
     ]) {
@@ -403,25 +451,30 @@ describe("campaign contracts", () => {
         content:
           | { status: "unconfigured" }
           | {
-            status: "configured";
-            rulesProfileId: string;
-            contentPacks: Array<{ packId: string; packVersion: string }>;
-          };
+              status: "configured";
+              rulesProfileId: string;
+              contentPacks: Array<{ packId: string; packVersion: string }>;
+            };
       };
     }>();
   });
 
   it("validates strict add-campaign-membership input for member roles only", () => {
     for (const role of ["gm", "player", "observer"] as const) {
-      expect(addCampaignMembershipInputSchema.parse({ principalId: "principal-one", role }))
-        .toEqual({ principalId: "principal-one", role });
+      expect(addCampaignMembershipInputSchema.parse({ principalId: "principal-one", role })).toEqual({
+        principalId: "principal-one",
+        role,
+      });
     }
-    expect(addCampaignMembershipInputSchema.safeParse({ principalId: "principal-one", role: "owner" }).success)
-      .toBe(false);
-    expect(addCampaignMembershipInputSchema.safeParse({ principalId: "invalid principal", role: "gm" }).success)
-      .toBe(false);
-    expect(addCampaignMembershipInputSchema.safeParse({ principalId: "principal-one", role: "gm", unknown: true }).success)
-      .toBe(false);
+    expect(addCampaignMembershipInputSchema.safeParse({ principalId: "principal-one", role: "owner" }).success).toBe(
+      false,
+    );
+    expect(addCampaignMembershipInputSchema.safeParse({ principalId: "invalid principal", role: "gm" }).success).toBe(
+      false,
+    );
+    expect(
+      addCampaignMembershipInputSchema.safeParse({ principalId: "principal-one", role: "gm", unknown: true }).success,
+    ).toBe(false);
   });
 
   it("validates the exact campaign membership projection", () => {
@@ -433,7 +486,9 @@ describe("campaign contracts", () => {
     } as const;
     expect(campaignMembershipSchema.parse(membership)).toEqual(membership);
     expect(campaignMembershipSchema.safeParse({ ...membership, role: "owner" }).success).toBe(false);
-    expect(campaignMembershipSchema.safeParse({ ...membership, createdAt: "2030-04-05T06:07:08Z" }).success).toBe(false);
+    expect(campaignMembershipSchema.safeParse({ ...membership, createdAt: "2030-04-05T06:07:08Z" }).success).toBe(
+      false,
+    );
     expect(campaignMembershipSchema.safeParse({ ...membership, unknown: true }).success).toBe(false);
   });
 
@@ -449,12 +504,15 @@ describe("campaign contracts", () => {
     }
 
     expect(campaignMembershipReadSchema.safeParse({ ...membership, role: "admin" }).success).toBe(false);
-    expect(campaignMembershipReadSchema.safeParse({ ...membership, role: "gm", campaignId: "invalid campaign" }).success)
-      .toBe(false);
-    expect(campaignMembershipReadSchema.safeParse({ ...membership, role: "gm", principalId: "invalid principal" }).success)
-      .toBe(false);
-    expect(campaignMembershipReadSchema.safeParse({ ...membership, role: "gm", createdAt: "2030-04-05T06:07:08Z" }).success)
-      .toBe(false);
+    expect(
+      campaignMembershipReadSchema.safeParse({ ...membership, role: "gm", campaignId: "invalid campaign" }).success,
+    ).toBe(false);
+    expect(
+      campaignMembershipReadSchema.safeParse({ ...membership, role: "gm", principalId: "invalid principal" }).success,
+    ).toBe(false);
+    expect(
+      campaignMembershipReadSchema.safeParse({ ...membership, role: "gm", createdAt: "2030-04-05T06:07:08Z" }).success,
+    ).toBe(false);
     expect(campaignMembershipReadSchema.safeParse({ ...membership, role: "gm", unknown: true }).success).toBe(false);
     const completeMembership = { ...membership, role: "gm" as const };
     for (const requiredField of ["campaignId", "principalId", "role", "createdAt"] as const) {
@@ -480,14 +538,17 @@ describe("campaign contracts", () => {
     } as const;
     expect(campaignMembershipReadSchema.safeParse(ownerMembership).success).toBe(true);
     expect(campaignMembershipSchema.safeParse(ownerMembership).success).toBe(false);
-    expect(addCampaignMembershipInputSchema.safeParse({ principalId: "principal-one", role: "owner" }).success)
-      .toBe(false);
+    expect(addCampaignMembershipInputSchema.safeParse({ principalId: "principal-one", role: "owner" }).success).toBe(
+      false,
+    );
   });
 
   it("validates strict campaign-session attachment input with an opaque legacy session ID", () => {
     const input = { campaignId: "campaign-one", sessionId: " session/legacy value " };
     expect(attachCampaignSessionInputSchema.parse(input)).toEqual(input);
-    expect(attachCampaignSessionInputSchema.safeParse({ ...input, campaignId: "invalid campaign" }).success).toBe(false);
+    expect(attachCampaignSessionInputSchema.safeParse({ ...input, campaignId: "invalid campaign" }).success).toBe(
+      false,
+    );
     expect(attachCampaignSessionInputSchema.safeParse({ ...input, sessionId: "" }).success).toBe(false);
     expect(attachCampaignSessionInputSchema.safeParse({ ...input, unknown: true }).success).toBe(false);
   });
@@ -495,7 +556,9 @@ describe("campaign contracts", () => {
   it("validates strict campaign-session detach input with an opaque preserved session ID", () => {
     const input = { campaignId: "campaign-one", sessionId: " session/legacy value " };
     expect(detachCampaignSessionInputSchema.parse(input)).toEqual(input);
-    expect(detachCampaignSessionInputSchema.safeParse({ ...input, campaignId: "invalid campaign" }).success).toBe(false);
+    expect(detachCampaignSessionInputSchema.safeParse({ ...input, campaignId: "invalid campaign" }).success).toBe(
+      false,
+    );
     expect(detachCampaignSessionInputSchema.safeParse({ ...input, sessionId: "" }).success).toBe(false);
     expect(detachCampaignSessionInputSchema.safeParse({ ...input, unknown: true }).success).toBe(false);
   });
@@ -508,7 +571,9 @@ describe("campaign contracts", () => {
     };
     expect(campaignSessionAttachmentSchema.parse(attachment)).toEqual(attachment);
     expect(campaignSessionAttachmentSchema.safeParse({ ...attachment, sessionId: "" }).success).toBe(false);
-    expect(campaignSessionAttachmentSchema.safeParse({ ...attachment, attachedAt: "2030-04-05T06:07:08Z" }).success).toBe(false);
+    expect(
+      campaignSessionAttachmentSchema.safeParse({ ...attachment, attachedAt: "2030-04-05T06:07:08Z" }).success,
+    ).toBe(false);
     expect(campaignSessionAttachmentSchema.safeParse({ ...attachment, unknown: true }).success).toBe(false);
   });
 });
@@ -530,14 +595,16 @@ describe("API problem contracts", () => {
 
   it("rejects invalid statuses and unsafe request IDs", () => {
     expect(requestIdSchema.safeParse("unsafe\nheader").success).toBe(false);
-    expect(apiProblemSchema.safeParse({
-      type: "https://velvet.local/problems/error",
-      title: "Error",
-      status: 200,
-      detail: "bad status",
-      code: "ERROR",
-      requestId: "request-1",
-      error: "bad status",
-    }).success).toBe(false);
+    expect(
+      apiProblemSchema.safeParse({
+        type: "https://velvet.local/problems/error",
+        title: "Error",
+        status: 200,
+        detail: "bad status",
+        code: "ERROR",
+        requestId: "request-1",
+        error: "bad status",
+      }).success,
+    ).toBe(false);
   });
 });

@@ -1,6 +1,11 @@
 import { boundedTriggerMatches } from "./engine.js";
 import type {
-  BoundedReactionTrigger, ReactionEvent, ReactionEventKind, ReactionMatchContext, ReactionResponseKind, ReactionSubject,
+  BoundedReactionTrigger,
+  ReactionEvent,
+  ReactionEventKind,
+  ReactionMatchContext,
+  ReactionResponseKind,
+  ReactionSubject,
   ReadyAction,
 } from "./types.js";
 
@@ -29,15 +34,17 @@ const MAX_READY_ROUNDS = 10;
  * vocabulary, an optional reach/range cap, and a hard expiry so a readied
  * action can never become an unbounded script.
  */
-export function planDnd5eReadyAction(input: Readonly<{
-  readyId: string;
-  reactorCombatantId: string;
-  responseKind: ReactionResponseKind;
-  responseId: string;
-  trigger: Dnd5eReadyTrigger;
-  round: number;
-  expiresAtRound: number;
-}>): Dnd5eReadyPlan {
+export function planDnd5eReadyAction(
+  input: Readonly<{
+    readyId: string;
+    reactorCombatantId: string;
+    responseKind: ReactionResponseKind;
+    responseId: string;
+    trigger: Dnd5eReadyTrigger;
+    round: number;
+    expiresAtRound: number;
+  }>,
+): Dnd5eReadyPlan {
   const reasons: string[] = [];
   if (!input.readyId) reasons.push("ready action ID is required");
   if (!input.reactorCombatantId) reasons.push("reactor combatant ID is required");
@@ -45,15 +52,24 @@ export function planDnd5eReadyAction(input: Readonly<{
   if (!RESPONSE_KINDS.has(input.responseKind)) reasons.push("ready response kind is invalid");
   if (!EVENTS.has(input.trigger.event)) reasons.push("ready trigger event is invalid");
   if (!SUBJECTS.has(input.trigger.subject)) reasons.push("ready trigger subject is invalid");
-  if (input.trigger.maxDistanceFeet !== undefined
-    && (!Number.isInteger(input.trigger.maxDistanceFeet) || input.trigger.maxDistanceFeet < 0 || input.trigger.maxDistanceFeet > 1_000)) {
+  if (
+    input.trigger.maxDistanceFeet !== undefined &&
+    (!Number.isInteger(input.trigger.maxDistanceFeet) ||
+      input.trigger.maxDistanceFeet < 0 ||
+      input.trigger.maxDistanceFeet > 1_000)
+  ) {
     reasons.push("ready trigger reach must be a bounded integer");
   }
   if (!Number.isInteger(input.round) || input.round < 1) reasons.push("ready round is invalid");
-  if (!Number.isInteger(input.expiresAtRound) || input.expiresAtRound <= input.round || input.expiresAtRound > input.round + MAX_READY_ROUNDS) {
+  if (
+    !Number.isInteger(input.expiresAtRound) ||
+    input.expiresAtRound <= input.round ||
+    input.expiresAtRound > input.round + MAX_READY_ROUNDS
+  ) {
     reasons.push("ready action must expire within a bounded number of rounds");
   }
-  if (reasons.length > 0) return Object.freeze({ kind: "ready", legal: false, reasons: Object.freeze(reasons), ready: null });
+  if (reasons.length > 0)
+    return Object.freeze({ kind: "ready", legal: false, reasons: Object.freeze(reasons), ready: null });
   const trigger: BoundedReactionTrigger = Object.freeze({ ...input.trigger });
   const ready: ReadyAction = Object.freeze({
     readyId: input.readyId,
@@ -68,7 +84,10 @@ export function planDnd5eReadyAction(input: Readonly<{
 
 /** A readied action fires only while it is unexpired and its bounded trigger matches. */
 export function readyActionFires(
-  ready: ReadyAction, event: ReactionEvent, context: ReactionMatchContext, currentRound: number,
+  ready: ReadyAction,
+  event: ReactionEvent,
+  context: ReactionMatchContext,
+  currentRound: number,
 ): boolean {
   if (!Number.isInteger(currentRound) || currentRound > ready.expiresAtRound) return false;
   return boundedTriggerMatches(ready.trigger, event, context);

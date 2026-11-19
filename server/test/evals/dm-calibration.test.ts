@@ -90,7 +90,9 @@ describe("probability-aware calibration grading", () => {
       { id: "hidden-data-leak", predictedProbability: 0.6, correct: false },
       { id: "stale-replay", predictedProbability: 0.3, correct: false },
     ];
-    const report = gradeCalibration(scenarios.map(({ predictedProbability, correct }) => ({ predictedProbability, correct })));
+    const report = gradeCalibration(
+      scenarios.map(({ predictedProbability, correct }) => ({ predictedProbability, correct })),
+    );
     // Brier = (0.0025 + 0.04 + 0.36 + 0.09) / 4 = 0.123125.
     expect(report).toEqual({
       count: 4,

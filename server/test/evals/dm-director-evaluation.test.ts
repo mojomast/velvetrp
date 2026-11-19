@@ -16,24 +16,42 @@ const database = () => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!
 const DIRECTOR_SECRET = "SECRET_GM_ONLY:the-mayor-is-the-traitor";
 const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value !== null && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>)
-    .sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
+  if (value !== null && typeof value === "object")
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`)
+      .join(",")}}`;
   return JSON.stringify(value);
 };
-const rubric = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/dm-evals/director-rubric.v1.json", import.meta.url)), "utf8")) as {
-  version: string; dimensions: Array<{ id: string; description: string; anchors: { pass: string; fail: string } }>;
+const rubric = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../fixtures/dm-evals/director-rubric.v1.json", import.meta.url)), "utf8"),
+) as {
+  version: string;
+  dimensions: Array<{ id: string; description: string; anchors: { pass: string; fail: string } }>;
 };
 
 type Fixture = Awaited<ReturnType<typeof dmFixture>>;
-const select = (candidate: { candidateId: string; digest: string }) => ({ candidateId: candidate.candidateId, digest: candidate.digest });
+const select = (candidate: { candidateId: string; digest: string }) => ({
+  candidateId: candidate.candidateId,
+  digest: candidate.digest,
+});
 
 /** Deterministic candidate-choice oracle: build a state, then read the exact advertised action set. */
 function plan(f: Fixture, key: string) {
   f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: `${key}-ai` });
-  const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, { intent: "open", expectedModeRevision: 1, idempotencyKey: key });
+  const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+    intent: "open",
+    expectedModeRevision: 1,
+    idempotencyKey: key,
+  });
   const work = f.repo.claimDmPlanning("local-owner", run.runId, "eval", "eval");
   const candidates = work?.candidates ?? [];
-  return { run, work, candidates, actions: [...new Set(candidates.map((candidate) => candidate.action as CampaignDmCandidate["action"]))].sort() };
+  return {
+    run,
+    work,
+    candidates,
+    actions: [...new Set(candidates.map((candidate) => candidate.action as CampaignDmCandidate["action"]))].sort(),
+  };
 }
 
 async function gmOnlyFixture(key: string) {
@@ -43,15 +61,27 @@ async function gmOnlyFixture(key: string) {
   });
   const context = f.repo.getCampaignGenerationContext("local-owner", f.campaign.id, [])!;
   const draft = f.repo.createGenerationDraft("local-owner", {
-    campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, kind: "content-pack",
-    stagedContent: { kind: "campaign-content", requestDigest: "a".repeat(64), baseContentRevision: context.revision, dependencyDigests: {}, ...content },
+    campaignId: f.campaign.id,
+    timelineId: f.campaign.activeTimelineId,
+    kind: "content-pack",
+    stagedContent: {
+      kind: "campaign-content",
+      requestDigest: "a".repeat(64),
+      baseContentRevision: context.revision,
+      dependencyDigests: {},
+      ...content,
+    },
     validation: { valid: true, issues: [], validatedAt: f.options.clock.now().toISOString() },
-    expectedCampaignRevision: f.repo.getCampaignAdministration("local-owner", f.campaign.id)!.revision, idempotencyKey: `${key}-draft`,
+    expectedCampaignRevision: f.repo.getCampaignAdministration("local-owner", f.campaign.id)!.revision,
+    idempotencyKey: `${key}-draft`,
   });
   f.repo.recordCampaignGenerationCandidate(draft.draftId, content, []);
   f.repo.applyCampaignContentGenerationDraftAtomically("local-owner", {
-    draftId: draft.draftId, expectedDraftRevision: 0, expectedCampaignRevision: draft.campaignRevision,
-    idempotencyKey: `${key}-accept`, selectedArtifactKeys: ["secret"],
+    draftId: draft.draftId,
+    expectedDraftRevision: 0,
+    expectedCampaignRevision: draft.campaignRevision,
+    idempotencyKey: `${key}-accept`,
+    selectedArtifactKeys: ["secret"],
   });
   return f;
 }
@@ -76,8 +106,9 @@ describe("deterministic director candidate-choice oracle", () => {
     const hidden = await gmOnlyFixture("oracle-hidden");
     const hiddenPlan = plan(hidden, "oracle-hidden-plan");
     expect(hiddenPlan.actions).toEqual([]);
-    expect(hidden.repo.getDmRun("local-owner", hidden.campaign.id, hidden.session.id, hiddenPlan.run.runId).blockers)
-      .toContain("story-public-rendering-required");
+    expect(
+      hidden.repo.getDmRun("local-owner", hidden.campaign.id, hidden.session.id, hiddenPlan.run.runId).blockers,
+    ).toContain("story-public-rendering-required");
     hidden.repo.close();
   });
 
@@ -92,11 +123,15 @@ describe("deterministic director candidate-choice oracle", () => {
     const committed = f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, run.runId);
     expect(committed.receipts.map(({ action }) => action)).toEqual(["ambient-beat", "advance-time"]);
     const db = database();
-    expect(db.prepare("SELECT action FROM dm_composition_receipts WHERE run_id=? ORDER BY ordinal").all(run.runId))
-      .toEqual([{ action: "ambient-beat" }, { action: "advance-time" }]);
+    expect(
+      db.prepare("SELECT action FROM dm_composition_receipts WHERE run_id=? ORDER BY ordinal").all(run.runId),
+    ).toEqual([{ action: "ambient-beat" }, { action: "advance-time" }]);
     expect(db.prepare("SELECT count(*) n FROM dm_world_time_receipts WHERE run_id=?").get(run.runId)).toEqual({ n: 1 });
-    expect(db.prepare("SELECT elapsed_minutes FROM world_expeditions_v60 WHERE campaign_id=? AND session_id=?").get(f.campaign.id, f.session.id))
-      .toEqual({ elapsed_minutes: DM_WORLD_TIME_STEP_MINUTES });
+    expect(
+      db
+        .prepare("SELECT elapsed_minutes FROM world_expeditions_v60 WHERE campaign_id=? AND session_id=?")
+        .get(f.campaign.id, f.session.id),
+    ).toEqual({ elapsed_minutes: DM_WORLD_TIME_STEP_MINUTES });
     db.close();
     expect(f.repo.getDmNarrationWork("local-owner", run.runId)!.context).toMatchObject({ transition: true });
     f.repo.close();
@@ -118,8 +153,9 @@ describe("deterministic director candidate-choice oracle", () => {
 describe("director rubric fixtures and predeclared rates", () => {
   it("freezes the rubric corpus digest and the authority string", () => {
     expect(rubric.version).toBe("v1");
-    expect(createHash("sha256").update(canonical(rubric)).digest("hex"))
-      .toBe("7044aeb5e6fd11a0010f97a4bc1ad77fc32653f7407559b15c894a8b8af2c274");
+    expect(createHash("sha256").update(canonical(rubric)).digest("hex")).toBe(
+      "7044aeb5e6fd11a0010f97a4bc1ad77fc32653f7407559b15c894a8b8af2c274",
+    );
     expect(DIRECTOR_SECRET).toBe("SECRET_GM_ONLY:the-mayor-is-the-traitor");
   });
 

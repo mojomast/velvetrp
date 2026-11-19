@@ -124,7 +124,10 @@ export function composeRerankOrder(
   const deterministic = Number.isFinite(weights.deterministic) && weights.deterministic > 0 ? weights.deterministic : 0;
   const model = Number.isFinite(weights.model) && weights.model > 0 ? weights.model : 0;
   const totalWeight = deterministic + model;
-  const maxRank = candidates.reduce((max, candidate) => Math.max(max, Number.isFinite(candidate.rank) ? candidate.rank : 0), 0);
+  const maxRank = candidates.reduce(
+    (max, candidate) => Math.max(max, Number.isFinite(candidate.rank) ? candidate.rank : 0),
+    0,
+  );
   const rankScore = (rank: number): number => (maxRank <= 0 ? 1 : Math.max(0, Math.min(1, 1 - rank / maxRank)));
 
   const fused: Record<string, number> = {};
@@ -136,9 +139,11 @@ export function composeRerankOrder(
 
   for (const candidate of candidates) {
     const relevanceAnswer = answers[`${RERANK_RELEVANCE_PREFIX}${candidate.candidateId}`];
-    const normalized = relevanceAnswer && relevanceAnswer.type === "score" ? normalizeRelevance(relevanceAnswer.score) : null;
+    const normalized =
+      relevanceAnswer && relevanceAnswer.type === "score" ? normalizeRelevance(relevanceAnswer.score) : null;
     const answersAnswer = answers[`${RERANK_ANSWERS_PREFIX}${candidate.candidateId}`];
-    const answersSignal = answersAnswer && answersAnswer.type === "noul" && validSignal(answersAnswer.noul) ? answersAnswer.noul : null;
+    const answersSignal =
+      answersAnswer && answersAnswer.type === "noul" && validSignal(answersAnswer.noul) ? answersAnswer.noul : null;
     if (normalized !== null || answersSignal !== null) usable = true;
     const rank = Number.isFinite(candidate.rank) ? candidate.rank : 0;
     const rankValue = rankScore(rank);
@@ -151,9 +156,8 @@ export function composeRerankOrder(
       sawAnswers = true;
       maxAnswers = Math.max(maxAnswers, answersSignal);
     }
-    fused[candidate.candidateId] = totalWeight <= 0
-      ? rankValue
-      : (deterministic * rankValue + model * modelScore) / totalWeight;
+    fused[candidate.candidateId] =
+      totalWeight <= 0 ? rankValue : (deterministic * rankValue + model * modelScore) / totalWeight;
   }
 
   if (!usable) {
@@ -171,11 +175,12 @@ export function composeRerankOrder(
     .sort((left, right) => (fused[right.candidateId] ?? -1) - (fused[left.candidateId] ?? -1) || left.rank - right.rank)
     .map((candidate) => candidate.candidateId);
 
-  const band = maxAnswers >= thresholds.actionThreshold
-    ? "act"
-    : maxAnswers >= thresholds.reviewThreshold
-      ? "confirm"
-      : "fallback";
+  const band =
+    maxAnswers >= thresholds.actionThreshold
+      ? "act"
+      : maxAnswers >= thresholds.reviewThreshold
+        ? "confirm"
+        : "fallback";
 
   return { order, fused, relevance, answers: answerMap, band, topSignal: sawAnswers ? maxAnswers : null };
 }

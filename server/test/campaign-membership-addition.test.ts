@@ -31,11 +31,15 @@ function seed(): void {
     db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(id, name);
   }
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
-      VALUES ('campaign-one', 'Campaign', 'timeline-one', 'local-owner', ?, ?)`).run(campaignAt, campaignAt);
-    db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at)
-      VALUES ('timeline-one', 'campaign-one', ?)`).run(campaignAt);
+      VALUES ('campaign-one', 'Campaign', 'timeline-one', 'local-owner', ?, ?)`,
+    ).run(campaignAt, campaignAt);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id, campaign_id, created_at)
+      VALUES ('timeline-one', 'campaign-one', ?)`,
+    ).run(campaignAt);
     db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-one', 'local-owner', 'owner', ?)").run(campaignAt);
   }).immediate();
   db.close();
@@ -52,60 +56,72 @@ function snapshot(): { campaigns: unknown[]; memberships: unknown[] } {
 }
 
 describe("factory campaign membership addition", () => {
-  it.each(["gm", "player", "observer"] as const)("returns and persists an exact %s membership with one clock and no IDs", (role) => {
-    seed();
-    const nextId = vi.fn(() => "unused");
-    const clockNow = vi.fn(() => new Date(memberAt));
-    const repository = createRepository({ dataDir: dataDir(), ids: { nextId }, clock: { now: clockNow } });
+  it.each(["gm", "player", "observer"] as const)(
+    "returns and persists an exact %s membership with one clock and no IDs",
+    (role) => {
+      seed();
+      const nextId = vi.fn(() => "unused");
+      const clockNow = vi.fn(() => new Date(memberAt));
+      const repository = createRepository({ dataDir: dataDir(), ids: { nextId }, clock: { now: clockNow } });
 
-    const membership = repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target",
-      role,
-    });
+      const membership = repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role,
+      });
 
-    expect(membership).toEqual({
-      campaignId: "campaign-one",
-      principalId: "principal-target",
-      role,
-      createdAt: memberAt,
-    });
-    expect(Object.keys(membership)).toEqual(["campaignId", "principalId", "role", "createdAt"]);
-    expect(clockNow).toHaveBeenCalledOnce();
-    expect(nextId).not.toHaveBeenCalled();
-    repository.close();
+      expect(membership).toEqual({
+        campaignId: "campaign-one",
+        principalId: "principal-target",
+        role,
+        createdAt: memberAt,
+      });
+      expect(Object.keys(membership)).toEqual(["campaignId", "principalId", "role", "createdAt"]);
+      expect(clockNow).toHaveBeenCalledOnce();
+      expect(nextId).not.toHaveBeenCalled();
+      repository.close();
 
-    const rows = snapshot();
-    expect(rows.memberships).toEqual([
-      { campaign_id: "campaign-one", principal_id: "local-owner", role: "owner", created_at: campaignAt },
-      { campaign_id: "campaign-one", principal_id: "principal-target", role, created_at: memberAt },
-    ]);
-    expect(rows.campaigns).toEqual([{
-      id: "campaign-one",
-      name: "Campaign",
-      active_timeline_id: "timeline-one",
-      owner_principal_id: "local-owner",
-      owner_role: "owner",
-      created_at: campaignAt,
-      updated_at: memberAt,
-      lifecycle_status: "draft",
-      settings: '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
-      administration_revision: 1,
-    }]);
-  });
+      const rows = snapshot();
+      expect(rows.memberships).toEqual([
+        { campaign_id: "campaign-one", principal_id: "local-owner", role: "owner", created_at: campaignAt },
+        { campaign_id: "campaign-one", principal_id: "principal-target", role, created_at: memberAt },
+      ]);
+      expect(rows.campaigns).toEqual([
+        {
+          id: "campaign-one",
+          name: "Campaign",
+          active_timeline_id: "timeline-one",
+          owner_principal_id: "local-owner",
+          owner_role: "owner",
+          created_at: campaignAt,
+          updated_at: memberAt,
+          lifecycle_status: "draft",
+          settings:
+            '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
+          administration_revision: 1,
+        },
+      ]);
+    },
+  );
 
   it("returns a same-role membership idempotently without clock use or another campaign update", () => {
     seed();
     const first = createRepository({ dataDir: dataDir(), clock: { now: () => new Date(memberAt) } });
     const expected = first.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "player",
+      principalId: "principal-target",
+      role: "player",
     });
     first.close();
-    const clockNow = vi.fn(() => { throw new Error("clock must not run"); });
+    const clockNow = vi.fn(() => {
+      throw new Error("clock must not run");
+    });
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    expect(repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "player",
-    })).toEqual(expected);
+    expect(
+      repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "player",
+      }),
+    ).toEqual(expected);
     expect(clockNow).not.toHaveBeenCalled();
     repository.close();
     expect(snapshot().memberships).toHaveLength(2);
@@ -120,12 +136,18 @@ describe("factory campaign membership addition", () => {
     const clockNow = vi.fn(() => new Date(memberAt));
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    expect(() => repository.addCampaignMembership("principal-app-owner", "campaign-one", {
-      principalId: "principal-target", role: "gm",
-    })).toThrow("requires the campaign owner");
-    expect(repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "gm",
-    }).role).toBe("gm");
+    expect(() =>
+      repository.addCampaignMembership("principal-app-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "gm",
+      }),
+    ).toThrow("requires the campaign owner");
+    expect(
+      repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "gm",
+      }).role,
+    ).toBe("gm");
     expect(clockNow).toHaveBeenCalledOnce();
     repository.close();
   });
@@ -133,14 +155,20 @@ describe("factory campaign membership addition", () => {
   it.each(["gm", "player", "observer"] as const)("denies a %s actor before target lookup or clock use", (role) => {
     seed();
     const db = new DatabaseDriver(databasePath());
-    db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-one', 'principal-target', ?, ?)").run(role, campaignAt);
+    db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-one', 'principal-target', ?, ?)").run(
+      role,
+      campaignAt,
+    );
     db.close();
     const clockNow = vi.fn(() => new Date(memberAt));
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    expect(() => repository.addCampaignMembership("principal-target", "campaign-one", {
-      principalId: "principal-missing", role: "player",
-    })).toThrow("requires the campaign owner");
+    expect(() =>
+      repository.addCampaignMembership("principal-target", "campaign-one", {
+        principalId: "principal-missing",
+        role: "player",
+      }),
+    ).toThrow("requires the campaign owner");
     expect(clockNow).not.toHaveBeenCalled();
     repository.close();
   });
@@ -149,15 +177,24 @@ describe("factory campaign membership addition", () => {
     seed();
     const repository = createRepository({ dataDir: dataDir() });
 
-    expect(() => repository.addCampaignMembership("principal-target", "campaign-missing", {
-      principalId: "principal-missing", role: "player",
-    })).toThrow("campaign not found");
-    expect(() => repository.addCampaignMembership("principal-target", "campaign-one", {
-      principalId: "principal-missing", role: "player",
-    })).toThrow("requires the campaign owner");
-    expect(() => repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-missing", role: "player",
-    })).toThrow("target principal not found");
+    expect(() =>
+      repository.addCampaignMembership("principal-target", "campaign-missing", {
+        principalId: "principal-missing",
+        role: "player",
+      }),
+    ).toThrow("campaign not found");
+    expect(() =>
+      repository.addCampaignMembership("principal-target", "campaign-one", {
+        principalId: "principal-missing",
+        role: "player",
+      }),
+    ).toThrow("requires the campaign owner");
+    expect(() =>
+      repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-missing",
+        role: "player",
+      }),
+    ).toThrow("target principal not found");
     repository.close();
   });
 
@@ -169,12 +206,18 @@ describe("factory campaign membership addition", () => {
     const clockNow = vi.fn(() => new Date(memberAt));
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    expect(() => repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "player",
-    })).toThrow("different membership role");
-    expect(() => repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "local-owner", role: "observer",
-    })).toThrow("campaign owner cannot receive a member role");
+    expect(() =>
+      repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "player",
+      }),
+    ).toThrow("different membership role");
+    expect(() =>
+      repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "local-owner",
+        role: "observer",
+      }),
+    ).toThrow("campaign owner cannot receive a member role");
     expect(clockNow).not.toHaveBeenCalled();
     repository.close();
   });
@@ -199,7 +242,13 @@ describe("factory campaign membership addition", () => {
   });
 
   it.each([
-    ["clock failure", vi.fn(() => { throw new Error("clock unavailable"); }), "clock unavailable"],
+    [
+      "clock failure",
+      vi.fn(() => {
+        throw new Error("clock unavailable");
+      }),
+      "clock unavailable",
+    ],
     ["malformed clock", vi.fn(() => ({ toISOString: () => "not-a-time" }) as Date), undefined],
     ["backward clock", vi.fn(() => new Date("2030-04-05T06:07:08.008Z")), "cannot precede"],
   ])("rejects %s and leaves both rows unchanged", (_label, clockNow, message) => {
@@ -207,9 +256,11 @@ describe("factory campaign membership addition", () => {
     const before = snapshot();
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    const operation = () => repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "player",
-    });
+    const operation = () =>
+      repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "player",
+      });
     if (message) expect(operation).toThrow(message);
     else expect(operation).toThrow();
     expect(clockNow).toHaveBeenCalledOnce();
@@ -221,9 +272,12 @@ describe("factory campaign membership addition", () => {
     seed();
     const repository = createRepository({ dataDir: dataDir(), clock: { now: () => new Date(campaignAt) } });
 
-    expect(repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "observer",
-    }).createdAt).toBe(campaignAt);
+    expect(
+      repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "observer",
+      }).createdAt,
+    ).toBe(campaignAt);
     repository.close();
   });
 
@@ -231,18 +285,23 @@ describe("factory campaign membership addition", () => {
     seed();
     const before = snapshot();
     const db = new DatabaseDriver(databasePath());
-    db.exec(stage === "insert"
-      ? `CREATE TRIGGER reject_membership BEFORE INSERT ON campaign_memberships
+    db.exec(
+      stage === "insert"
+        ? `CREATE TRIGGER reject_membership BEFORE INSERT ON campaign_memberships
           BEGIN SELECT RAISE(ABORT, 'membership rejected'); END;`
-      : `CREATE TRIGGER reject_campaign_update BEFORE UPDATE ON campaigns
-          BEGIN SELECT RAISE(ABORT, 'campaign update rejected'); END;`);
+        : `CREATE TRIGGER reject_campaign_update BEFORE UPDATE ON campaigns
+          BEGIN SELECT RAISE(ABORT, 'campaign update rejected'); END;`,
+    );
     db.close();
     const clockNow = vi.fn(() => new Date(memberAt));
     const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    expect(() => repository.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "gm",
-    })).toThrow(stage === "insert" ? "membership rejected" : "campaign update rejected");
+    expect(() =>
+      repository.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "gm",
+      }),
+    ).toThrow(stage === "insert" ? "membership rejected" : "campaign update rejected");
     expect(clockNow).toHaveBeenCalledOnce();
     repository.close();
     expect(snapshot()).toEqual(before);
@@ -251,19 +310,28 @@ describe("factory campaign membership addition", () => {
   it("serializes competing repository instances and neither retries nor reclocks resolved conflicts", () => {
     seed();
     const firstClock = vi.fn(() => new Date(memberAt));
-    const secondClock = vi.fn(() => { throw new Error("second clock must not run"); });
+    const secondClock = vi.fn(() => {
+      throw new Error("second clock must not run");
+    });
     const first = createRepository({ dataDir: dataDir(), clock: { now: firstClock } });
     const second = createRepository({ dataDir: dataDir(), clock: { now: secondClock } });
 
     const expected = first.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "player",
+      principalId: "principal-target",
+      role: "player",
     });
-    expect(second.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "player",
-    })).toEqual(expected);
-    expect(() => second.addCampaignMembership("local-owner", "campaign-one", {
-      principalId: "principal-target", role: "gm",
-    })).toThrow("different membership role");
+    expect(
+      second.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "player",
+      }),
+    ).toEqual(expected);
+    expect(() =>
+      second.addCampaignMembership("local-owner", "campaign-one", {
+        principalId: "principal-target",
+        role: "gm",
+      }),
+    ).toThrow("different membership role");
     expect(firstClock).toHaveBeenCalledOnce();
     expect(secondClock).not.toHaveBeenCalled();
     first.close();
@@ -277,13 +345,21 @@ describe("factory campaign membership addition", () => {
     const clockNow = vi.fn(() => new Date(memberAt));
     const repository = createRepository({ dataDir: dataDir(), ids: { nextId }, clock: { now: clockNow } });
 
-    expect(() => repository.transaction(() => repository.addCampaignMembership("invalid actor", "invalid campaign", {
-      principalId: "invalid target", role: "player",
-    }))).toThrow("campaign membership addition cannot run inside a repository transaction");
+    expect(() =>
+      repository.transaction(() =>
+        repository.addCampaignMembership("invalid actor", "invalid campaign", {
+          principalId: "invalid target",
+          role: "player",
+        }),
+      ),
+    ).toThrow("campaign membership addition cannot run inside a repository transaction");
     repository.close();
-    expect(() => repository.addCampaignMembership("invalid actor", "invalid campaign", {
-      principalId: "invalid target", role: "player",
-    })).toThrow("repository is closed");
+    expect(() =>
+      repository.addCampaignMembership("invalid actor", "invalid campaign", {
+        principalId: "invalid target",
+        role: "player",
+      }),
+    ).toThrow("repository is closed");
     expect(nextId).not.toHaveBeenCalled();
     expect(clockNow).not.toHaveBeenCalled();
   });

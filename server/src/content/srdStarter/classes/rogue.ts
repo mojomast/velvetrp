@@ -70,9 +70,15 @@ export function rogueDefinition(refs: StarterReferences) {
   return {
     reference: classRef(refs, ROGUE_SLUG),
     name: "Rogue",
-    description: "Bounded SRD 5.1 Rogue progression covers levels 1-20 as metadata; Sneak Attack, Expertise, Evasion, and the Thief archetype remain unsupported at runtime.",
+    description:
+      "Bounded SRD 5.1 Rogue progression covers levels 1-20 as metadata; Sneak Attack, Expertise, Evasion, and the Thief archetype remain unsupported at runtime.",
     tags: ["srd-5.1", "rogue", UNSUPPORTED_TAG],
-    mechanics: { hitDie: ROGUE_HIT_DIE, primaryAttribute: "dexterity", savingAttributes: ["dexterity", "intelligence"], levelRefs: ROGUE_LEVEL_NUMBERS.map((level) => levelReference(refs, level)) },
+    mechanics: {
+      hitDie: ROGUE_HIT_DIE,
+      primaryAttribute: "dexterity",
+      savingAttributes: ["dexterity", "intelligence"],
+      levelRefs: ROGUE_LEVEL_NUMBERS.map((level) => levelReference(refs, level)),
+    },
   };
 }
 
@@ -89,22 +95,51 @@ export function rogueLevels(refs: StarterReferences) {
         ...base.mechanics,
         proficiencyBonus: proficiencyBonusFor(level),
         hpGain: ROGUE_HP_GAIN,
-        ...(level === 3 ? { progressionChoices: [{ choiceId: "rogue-subclass", required: true as const, count: 1 as const, kind: "subclass" as const, options: [subclass] }] } : {}),
+        ...(level === 3
+          ? {
+              progressionChoices: [
+                {
+                  choiceId: "rogue-subclass",
+                  required: true as const,
+                  count: 1 as const,
+                  kind: "subclass" as const,
+                  options: [subclass],
+                },
+              ],
+            }
+          : {}),
       },
     };
   };
   return [
-    { reference: refs.rogueOne, name: "Rogue Level 1", description: featureDescription(1), tags: featureTags(1), mechanics: { classRef: classReference, level: 1, proficiencyBonus: proficiencyBonusFor(1), hpGain: ROGUE_HIT_DIE, abilityRefs: [refs.sneakAttack], spellRefs: [] as string[], resourceGrants: [{ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 }] } },
+    {
+      reference: refs.rogueOne,
+      name: "Rogue Level 1",
+      description: featureDescription(1),
+      tags: featureTags(1),
+      mechanics: {
+        classRef: classReference,
+        level: 1,
+        proficiencyBonus: proficiencyBonusFor(1),
+        hpGain: ROGUE_HIT_DIE,
+        abilityRefs: [refs.sneakAttack],
+        spellRefs: [] as string[],
+        resourceGrants: [{ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 }],
+      },
+    },
     ...ROGUE_LEVEL_NUMBERS.slice(1).map(unsupportedLevel),
   ];
 }
 
 export function rogueSubclasses(refs: StarterReferences) {
-  return [{
-    reference: subclassReference(refs),
-    name: "Thief",
-    description: "Bounded SRD 5.1 Thief subclass metadata bound to the Rogue class at level 3; its features remain unsupported at runtime.",
-    tags: ["srd-5.1", "subclass", "rogue"],
-    mechanics: { classRef: refs.rogue, level: 3, abilityRefs: [] as string[] },
-  }];
+  return [
+    {
+      reference: subclassReference(refs),
+      name: "Thief",
+      description:
+        "Bounded SRD 5.1 Thief subclass metadata bound to the Rogue class at level 3; its features remain unsupported at runtime.",
+      tags: ["srd-5.1", "subclass", "rogue"],
+      mechanics: { classRef: refs.rogue, level: 3, abilityRefs: [] as string[] },
+    },
+  ];
 }

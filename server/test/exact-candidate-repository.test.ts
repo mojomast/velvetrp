@@ -1,163 +1,1049 @@
 import { createHash } from "node:crypto";
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
-import { describe,expect,it } from "vitest";
-import { computeExactCandidateActionDigest,computeExactCandidateEnvelopeDigest,type InternalExactCandidate } from "@velvet/contracts";
-import { createRepository,ExactCandidateAuthorizationError,ExactCandidateConflictError,ExactCandidateIntegrityError } from "../src/repo/index.js";
+import { describe, expect, it } from "vitest";
+import {
+  computeExactCandidateActionDigest,
+  computeExactCandidateEnvelopeDigest,
+  type InternalExactCandidate,
+} from "@velvet/contracts";
+import {
+  createRepository,
+  ExactCandidateAuthorizationError,
+  ExactCandidateConflictError,
+  ExactCandidateIntegrityError,
+} from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
-const AT="2035-01-01T00:00:00.000Z",EXPIRES="2035-01-01T00:05:00.000Z";
-const crypto={sha256:(frame:string)=>createHash("sha256").update(frame).digest("hex")};
-const file=()=>path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite");
-let sequence=0;
-const repo=(at=AT)=>createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>new Date(at)},ids:{nextId:()=>`candidate-test-${++sequence}`}});
+const AT = "2035-01-01T00:00:00.000Z",
+  EXPIRES = "2035-01-01T00:05:00.000Z";
+const crypto = { sha256: (frame: string) => createHash("sha256").update(frame).digest("hex") };
+const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
+let sequence = 0;
+const repo = (at = AT) =>
+  createRepository({
+    dataDir: process.env.VELVET_DATA_DIR!,
+    clock: { now: () => new Date(at) },
+    ids: { nextId: () => `candidate-test-${++sequence}` },
+  });
 
-function seed(){const initial=repo();const campaign=initial.createCampaign("local-owner",{name:"Candidates"});initial.close();const db=new DatabaseDriver(file());db.pragma("foreign_keys=ON");
-  db.prepare("INSERT INTO principals VALUES('player','Player',0),('member','Member',0),('observer','Observer',0),('outsider','Outsider',0)").run();db.prepare("INSERT INTO campaign_memberships VALUES(?,'player','player',?),(?,'member','player',?),(?,'observer','observer',?)").run(campaign.id,AT,campaign.id,AT,campaign.id,AT);
-  db.prepare("INSERT INTO characters VALUES('persona','Hero',30,'hero','',1,0,?)").run(AT);db.prepare("INSERT INTO rpg_rules_profiles VALUES('p','P','P','[]')").run();
-  db.prepare("INSERT INTO rpg_content_packs VALUES('pack','1','p','P','P','[]',0)").run();db.prepare("INSERT INTO rpg_definitions VALUES('pack','1','race','r','R','R','[]'),('pack','1','background','b','B','B','[]')").run();db.prepare("UPDATE rpg_content_packs SET sealed=1").run();
-  db.prepare("INSERT INTO campaign_rules_profiles VALUES(?,'p')").run(campaign.id);db.prepare("INSERT INTO campaign_content_packs VALUES(?,'pack','1','p')").run(campaign.id);
-  db.prepare("INSERT INTO campaign_characters VALUES('cc',?,'persona',?,?)").run(campaign.id,AT,AT);db.prepare("INSERT INTO rpg_campaign_sheets VALUES('sheet',?,'cc','pack','1','race','r','pack','1','background','b',?,?)").run(campaign.id,AT,AT);
-  db.prepare("INSERT INTO campaign_actors VALUES('actor',?,'cc','sheet','player-character','principal',?,?)").run(campaign.id,AT,AT);db.prepare("INSERT INTO campaign_actor_private_state VALUES('actor',?,'player','private')").run(campaign.id);
-  db.prepare("INSERT INTO sessions(id,character_id,title,state,preset_id,created_at) VALUES('session','persona','Room','active','default',?)").run(AT);db.prepare("INSERT INTO session_characters VALUES('session','persona',0)").run();db.prepare("INSERT INTO campaign_sessions VALUES('session',?,?)").run(campaign.id,AT);db.close();
-  const r=repo();const turn=r.createAdventureTurn("player",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:"travel",expectedCampaignRevision:0,idempotencyKey:"turn"});r.close();return{campaignId:campaign.id,turnId:turn.turnId};}
-function candidate(campaignId:string,turnId:string,candidateId:string,routeOption:number,edge:string):InternalExactCandidate {const unsigned:any={candidateId,kind:"actor.travel",version:"v1",purpose:"execute-once",scope:{campaignId,sessionId:"session",actorId:"actor",principalId:"player",connectionId:`adventure-turn:${turnId}`,authorizationEffect:"none"},label:{format:"message-key-v1",key:"candidate.actor.travel.label",routeOption},summary:{format:"message-key-v1",key:"candidate.actor.travel.summary"},canonicalActionDigest:"0".repeat(64),canonicalEnvelopeDigest:"0".repeat(64),privateParameters:{kind:"actor.travel",connectionId:edge,partyActorIds:["actor"]},expectedRevisions:[{domain:"world",revision:0}],policy:{kind:"actor.travel",result:"allowed",reason:"legal-visible-connection"},confirmation:{requirement:"not-required",decision:{state:"not-applicable"}},quote:{kind:"not-applicable"},issuedAt:AT,expiresAt:EXPIRES,supersession:{state:"current"},execution:{state:"unexecuted"},executionRequiresAuthorityRecheck:true};
-  const action={...unsigned,canonicalActionDigest:computeExactCandidateActionDigest(unsigned,crypto)};return{...action,canonicalEnvelopeDigest:computeExactCandidateEnvelopeDigest(action,crypto)};}
-const issue=(turnId:string,idempotencyKey:string,candidates:InternalExactCandidate[])=>({turnId,idempotencyKey,worldRevision:0,candidates});
-
-describe("v46 exact candidate persistence",()=>{
-  it("persists exact ordered batches across restart, replays without IDs, and masks outsiders",()=>{const ids=seed();let r=repo();const values=[candidate(ids.campaignId,ids.turnId,"candidate-a",1,"edge-a"),candidate(ids.campaignId,ids.turnId,"candidate-b",2,"edge-b")];const issued=r.issueExactCandidateBatch("player",issue(ids.turnId,"batch",values));r.close();const before=sequence;r=repo();expect(r.issueExactCandidateBatch("player",issue(ids.turnId,"batch",values))).toEqual(issued);expect(sequence).toBe(before);expect(r.getExactCandidateBatch("outsider",issued.batchId)).toBeNull();expect(r.getExactCandidate("outsider","candidate-a")).toBeNull();r.close();});
-  it("fails closed above 32 and at expiry, and allows only explicit same-scope supersession",()=>{const ids=seed();let r=repo();const one=candidate(ids.campaignId,ids.turnId,"many",1,"edge");expect(()=>r.issueExactCandidateBatch("player",issue(ids.turnId,"too-many",Array.from({length:33},()=>one)))).toThrow(ExactCandidateConflictError);
-    const values=[candidate(ids.campaignId,ids.turnId,"old",1,"edge-a"),candidate(ids.campaignId,ids.turnId,"new",2,"edge-b")];r.issueExactCandidateBatch("player",issue(ids.turnId,"ok",values));expect(r.supersedeExactCandidate("player","old","new").supersession.state).toBe("superseded");expect(()=>r.supersedeExactCandidate("player","new","old")).toThrow(ExactCandidateConflictError);r.close();r=repo(EXPIRES);expect(r.observeExactCandidateExpiry("player","new").candidateId).toBe("new");r.close();});
-  it("detects canonical frame tampering without disclosing it to an outsider",()=>{const ids=seed();const r=repo();r.issueExactCandidateBatch("player",issue(ids.turnId,"tamper",[candidate(ids.campaignId,ids.turnId,"tampered",1,"edge")]));expect(r.getExactCandidate("outsider","tampered")).toBeNull();const db=new DatabaseDriver(file());db.pragma("recursive_triggers=OFF");db.exec("DROP TRIGGER exact_candidates_v46_immutable_update_v46");db.prepare("UPDATE exact_candidates_v46 SET action_frame='{}' WHERE candidate_id='tampered'").run();expect(()=>r.getExactCandidate("player","tampered")).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
-  it("requires exact scoped current control for reads and replay before integrity",()=>{const ids=seed();const r=repo();const values=[candidate(ids.campaignId,ids.turnId,"private",1,"edge")];const batch=r.issueExactCandidateBatch("player",issue(ids.turnId,"private-batch",values));
-    for(const principal of ["local-owner","member","observer","outsider"]){expect(r.getExactCandidate(principal,"private")).toBeNull();expect(r.getExactCandidateBatch(principal,batch.batchId)).toBeNull();}
-    const db=new DatabaseDriver(file());db.prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);const before=sequence;
-    expect(r.getExactCandidate("player","private")).toBeNull();expect(()=>r.issueExactCandidateBatch("player",issue(ids.turnId,"private-batch",values))).toThrow(ExactCandidateAuthorizationError);expect(sequence).toBe(before);db.close();r.close();});
-  it("persists and exactly replays empty batches using one server clock and no candidate IDs",()=>{const ids=seed();const before=sequence;let clockCalls=0;const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>{clockCalls++;return new Date(AT);}},ids:{nextId:()=>`empty-${++sequence}`}});
-    const empty=r.issueExactCandidateBatch("player",issue(ids.turnId,"empty",[]));expect(empty.candidates).toEqual([]);expect(empty.issuedAt).toBe(AT);expect(empty.expiresAt).toBe(EXPIRES);expect(sequence).toBe(before+1);expect(clockCalls).toBe(1);
-    expect(r.issueExactCandidateBatch("player",issue(ids.turnId,"empty",[]))).toEqual(empty);expect(sequence).toBe(before+1);expect(clockCalls).toBe(1);r.close();});
-  it("fails validation before clock or IDs and detects duplicated batch, position, and lifecycle corruption",()=>{const ids=seed();let clockCalls=0,idCalls=0;const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>{clockCalls++;return new Date(AT);}},ids:{nextId:()=>{idCalls++;return `failure-${idCalls}`;}}});
-    const one=candidate(ids.campaignId,ids.turnId,"corrupt",1,"edge");expect(()=>r.issueExactCandidateBatch("player",issue(ids.turnId,"over",Array.from({length:33},()=>one)))).toThrow();expect({clockCalls,idCalls}).toEqual({clockCalls:0,idCalls:0});
-    const batch=r.issueExactCandidateBatch("player",issue(ids.turnId,"corrupt-batch",[one]));const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");db.pragma("recursive_triggers=OFF");db.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46;DROP TRIGGER exact_candidates_v46_immutable_update_v46");
-    db.prepare("UPDATE exact_candidate_batches_v46 SET session_id='wrong' WHERE batch_id=?").run(batch.batchId);expect(()=>r.getExactCandidateBatch("player",batch.batchId)).toThrow(ExactCandidateIntegrityError);
-    db.prepare("UPDATE exact_candidate_batches_v46 SET session_id='session'").run();db.prepare("UPDATE exact_candidates_v46 SET position=2").run();expect(()=>r.getExactCandidateBatch("player",batch.batchId)).toThrow(ExactCandidateIntegrityError);
-    db.prepare("UPDATE exact_candidates_v46 SET position=1,envelope_json=json_set(envelope_json,'$.execution.state','receipt-linked')").run();expect(()=>r.getExactCandidate("player","corrupt")).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
-  it("reconstructs expiration observations and rejects malformed observation or supersession cycles",()=>{const ids=seed();let r=repo();const values=[candidate(ids.campaignId,ids.turnId,"cycle-a",1,"edge-a"),candidate(ids.campaignId,ids.turnId,"cycle-b",2,"edge-b")];r.issueExactCandidateBatch("player",issue(ids.turnId,"lifecycle",values));r.close();r=repo("2035-01-01T00:01:00.000Z");r.supersedeExactCandidate("player","cycle-a","cycle-b");r.close();r=repo(EXPIRES);r.observeExactCandidateExpiry("player","cycle-a");expect(r.getExactCandidate("player","cycle-a")?.candidateId).toBe("cycle-a");
-    const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");db.pragma("recursive_triggers=OFF");db.exec("DROP TRIGGER exact_candidate_expirations_v46_immutable_update_v46");db.prepare("UPDATE exact_candidate_expirations_v46 SET connection_id='wrong'").run();expect(()=>r.getExactCandidate("player","cycle-a")).toThrow(ExactCandidateIntegrityError);db.prepare("UPDATE exact_candidate_expirations_v46 SET connection_id=?").run(`adventure-turn:${ids.turnId}`);
-    db.prepare("INSERT INTO exact_candidate_supersessions_v46 VALUES(?,?,?,?,?,?,?,?,?,?,?)").run("cycle-b","cycle-a",ids.campaignId,ids.turnId,"session","actor","player",`adventure-turn:${ids.turnId}`,"actor.travel","v1","2035-01-01T00:01:00.000Z");expect(()=>r.getExactCandidate("player","cycle-a")).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
-  it.each(["campaign_id","session_id","actor_id"] as const)("binds batch %s to the authoritative turn before envelope reconstruction",(column)=>{const ids=seed();const r=repo();const value=candidate(ids.campaignId,ids.turnId,`turn-bind-${column}`,1,"edge");const batch=r.issueExactCandidateBatch("player",issue(ids.turnId,`turn-bind-${column}`,[value]));const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");db.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46");db.prepare(`UPDATE exact_candidate_batches_v46 SET ${column}='wrong' WHERE batch_id=?`).run(batch.batchId);
-    expect(r.getExactCandidateBatch("outsider",batch.batchId)).toBeNull();expect(()=>r.getExactCandidateBatch("player",batch.batchId)).toThrow(ExactCandidateIntegrityError);expect(r.getExactCandidate("outsider",value.candidateId)).toBeNull();expect(()=>r.getExactCandidate("player",value.candidateId)).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
-  it("rejects malformed lifecycle timestamps as integrity corruption while masking outsiders",()=>{const ids=seed();let r=repo();const values=[candidate(ids.campaignId,ids.turnId,"time-a",1,"edge-a"),candidate(ids.campaignId,ids.turnId,"time-b",2,"edge-b")];const batch=r.issueExactCandidateBatch("player",issue(ids.turnId,"timestamps",values));r.close();r=repo("2035-01-01T00:01:00.000Z");r.supersedeExactCandidate("player","time-a","time-b");r.close();r=repo(EXPIRES);r.observeExactCandidateExpiry("player","time-a");const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");db.pragma("ignore_check_constraints=ON");db.exec("DROP TRIGGER exact_candidate_expirations_v46_immutable_update_v46;DROP TRIGGER exact_candidate_supersessions_v46_immutable_update_v46");
-    db.prepare("UPDATE exact_candidate_expirations_v46 SET observed_at='not-a-time'").run();expect(r.getExactCandidate("outsider","time-a")).toBeNull();expect(()=>r.getExactCandidate("player","time-a")).toThrow(ExactCandidateIntegrityError);db.prepare("UPDATE exact_candidate_expirations_v46 SET observed_at=?").run(EXPIRES);db.prepare("UPDATE exact_candidate_supersessions_v46 SET superseded_at='not-a-time'").run();expect(r.getExactCandidateBatch("outsider",batch.batchId)).toBeNull();expect(()=>r.getExactCandidateBatch("player",batch.batchId)).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
-  it("authorizes from the turn before treating a corrupted duplicated principal as integrity",()=>{const ids=seed();const r=repo();const value=candidate(ids.campaignId,ids.turnId,"principal-corrupt",1,"edge");const batch=r.issueExactCandidateBatch("player",issue(ids.turnId,"principal-corrupt",[value]));const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");db.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46;DROP TRIGGER exact_candidates_v46_immutable_update_v46");db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='member'").run(ids.campaignId);db.prepare("UPDATE exact_candidate_batches_v46 SET principal_id='member' WHERE batch_id=?").run(batch.batchId);db.prepare("UPDATE exact_candidates_v46 SET principal_id='member' WHERE candidate_id=?").run(value.candidateId);
-    expect(r.getExactCandidateBatch("member",batch.batchId)).toBeNull();expect(r.getExactCandidate("member",value.candidateId)).toBeNull();expect(()=>r.getExactCandidateBatch("player",batch.batchId)).toThrow(ExactCandidateIntegrityError);expect(()=>r.getExactCandidate("player",value.candidateId)).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
-  it("rolls back a regressed-clock supersession and succeeds on retry with valid time",()=>{const ids=seed();let r=repo();const values=[candidate(ids.campaignId,ids.turnId,"clock-source",1,"edge-a"),candidate(ids.campaignId,ids.turnId,"clock-replacement",2,"edge-b")];r.issueExactCandidateBatch("player",issue(ids.turnId,"clock-supersession",values));r.close();r=repo("2034-12-31T23:59:59.999Z");expect(()=>r.supersedeExactCandidate("player","clock-source","clock-replacement")).toThrow(ExactCandidateConflictError);let db=new DatabaseDriver(file());expect(db.prepare("SELECT count(*) count FROM exact_candidate_supersessions_v46").get()).toEqual({count:0});db.close();r.close();r=repo("2035-01-01T00:01:00.000Z");expect(r.supersedeExactCandidate("player","clock-source","clock-replacement").supersession.state).toBe("superseded");db=new DatabaseDriver(file(),{readonly:true});expect(db.prepare("SELECT count(*) count FROM exact_candidate_supersessions_v46").get()).toEqual({count:1});db.close();r.close();});
-  it("allows only the authoritative turn principal to issue, even when another owner or GM has current authority",()=>{const ids=seed();let db=new DatabaseDriver(file());db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='member'").run(ids.campaignId);db.close();let clockCalls=0,idCalls=0;const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>{clockCalls++;return new Date(AT);}},ids:{nextId:()=>{idCalls++;return `turn-principal-${idCalls}`;}}});const values=[candidate(ids.campaignId,ids.turnId,"turn-principal-candidate",1,"edge")];
-    for(const principal of ["local-owner","member"]){expect(()=>r.issueExactCandidateBatch(principal,issue(ids.turnId,"turn-principal",values))).toThrow(ExactCandidateAuthorizationError);expect({clockCalls,idCalls}).toEqual({clockCalls:0,idCalls:0});}
-    db=new DatabaseDriver(file(),{readonly:true});expect(db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46").get()).toEqual({count:0});expect(db.prepare("SELECT count(*) count FROM exact_candidates_v46").get()).toEqual({count:0});db.close();
-    expect(r.issueExactCandidateBatch("player",issue(ids.turnId,"turn-principal",values)).candidates.map(({candidateId})=>candidateId)).toEqual(["turn-principal-candidate"]);expect({clockCalls,idCalls}).toEqual({clockCalls:1,idCalls:1});r.close();});
+function seed() {
+  const initial = repo();
+  const campaign = initial.createCampaign("local-owner", { name: "Candidates" });
+  initial.close();
+  const db = new DatabaseDriver(file());
+  db.pragma("foreign_keys=ON");
+  db.prepare(
+    "INSERT INTO principals VALUES('player','Player',0),('member','Member',0),('observer','Observer',0),('outsider','Outsider',0)",
+  ).run();
+  db.prepare(
+    "INSERT INTO campaign_memberships VALUES(?,'player','player',?),(?,'member','player',?),(?,'observer','observer',?)",
+  ).run(campaign.id, AT, campaign.id, AT, campaign.id, AT);
+  db.prepare("INSERT INTO characters VALUES('persona','Hero',30,'hero','',1,0,?)").run(AT);
+  db.prepare("INSERT INTO rpg_rules_profiles VALUES('p','P','P','[]')").run();
+  db.prepare("INSERT INTO rpg_content_packs VALUES('pack','1','p','P','P','[]',0)").run();
+  db.prepare(
+    "INSERT INTO rpg_definitions VALUES('pack','1','race','r','R','R','[]'),('pack','1','background','b','B','B','[]')",
+  ).run();
+  db.prepare("UPDATE rpg_content_packs SET sealed=1").run();
+  db.prepare("INSERT INTO campaign_rules_profiles VALUES(?,'p')").run(campaign.id);
+  db.prepare("INSERT INTO campaign_content_packs VALUES(?,'pack','1','p')").run(campaign.id);
+  db.prepare("INSERT INTO campaign_characters VALUES('cc',?,'persona',?,?)").run(campaign.id, AT, AT);
+  db.prepare(
+    "INSERT INTO rpg_campaign_sheets VALUES('sheet',?,'cc','pack','1','race','r','pack','1','background','b',?,?)",
+  ).run(campaign.id, AT, AT);
+  db.prepare("INSERT INTO campaign_actors VALUES('actor',?,'cc','sheet','player-character','principal',?,?)").run(
+    campaign.id,
+    AT,
+    AT,
+  );
+  db.prepare("INSERT INTO campaign_actor_private_state VALUES('actor',?,'player','private')").run(campaign.id);
+  db.prepare(
+    "INSERT INTO sessions(id,character_id,title,state,preset_id,created_at) VALUES('session','persona','Room','active','default',?)",
+  ).run(AT);
+  db.prepare("INSERT INTO session_characters VALUES('session','persona',0)").run();
+  db.prepare("INSERT INTO campaign_sessions VALUES('session',?,?)").run(campaign.id, AT);
+  db.close();
+  const r = repo();
+  const turn = r.createAdventureTurn("player", {
+    campaignId: campaign.id,
+    timelineId: campaign.activeTimelineId,
+    sessionId: "session",
+    actorId: "actor",
+    declaration: "travel",
+    expectedCampaignRevision: 0,
+    idempotencyKey: "turn",
+  });
+  r.close();
+  return { campaignId: campaign.id, turnId: turn.turnId };
+}
+function candidate(
+  campaignId: string,
+  turnId: string,
+  candidateId: string,
+  routeOption: number,
+  edge: string,
+): InternalExactCandidate {
+  const unsigned: any = {
+    candidateId,
+    kind: "actor.travel",
+    version: "v1",
+    purpose: "execute-once",
+    scope: {
+      campaignId,
+      sessionId: "session",
+      actorId: "actor",
+      principalId: "player",
+      connectionId: `adventure-turn:${turnId}`,
+      authorizationEffect: "none",
+    },
+    label: { format: "message-key-v1", key: "candidate.actor.travel.label", routeOption },
+    summary: { format: "message-key-v1", key: "candidate.actor.travel.summary" },
+    canonicalActionDigest: "0".repeat(64),
+    canonicalEnvelopeDigest: "0".repeat(64),
+    privateParameters: { kind: "actor.travel", connectionId: edge, partyActorIds: ["actor"] },
+    expectedRevisions: [{ domain: "world", revision: 0 }],
+    policy: { kind: "actor.travel", result: "allowed", reason: "legal-visible-connection" },
+    confirmation: { requirement: "not-required", decision: { state: "not-applicable" } },
+    quote: { kind: "not-applicable" },
+    issuedAt: AT,
+    expiresAt: EXPIRES,
+    supersession: { state: "current" },
+    execution: { state: "unexecuted" },
+    executionRequiresAuthorityRecheck: true,
+  };
+  const action = { ...unsigned, canonicalActionDigest: computeExactCandidateActionDigest(unsigned, crypto) };
+  return { ...action, canonicalEnvelopeDigest: computeExactCandidateEnvelopeDigest(action, crypto) };
+}
+const issue = (turnId: string, idempotencyKey: string, candidates: InternalExactCandidate[]) => ({
+  turnId,
+  idempotencyKey,
+  worldRevision: 0,
+  candidates,
 });
 
-function seedTravelWorld(ids:{campaignId:string;turnId:string},routes:Array<{id:string;visibility?:"public"|"discovered"|"gm";destinationVisibility?:"public"|"discovered"|"gm";state?:"open"|"closed";requirement?:"none"|"discovery"|"faction_reputation";minimum?:number}>){
-  const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");
-  const location=db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,NULL,?,'','public',?)");
-  location.run("origin",ids.campaignId,"Origin",AT);
-  for(const route of routes)db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,NULL,?,'',?,?)")
-    .run(`destination-${route.id}`,ids.campaignId,`Destination ${route.id}`,route.destinationVisibility??"public",AT);
-  if(routes.some((route)=>route.requirement==="faction_reputation"))db.prepare("INSERT INTO campaign_factions_v28 VALUES('faction',?,'Faction','public',?)").run(ids.campaignId,AT);
-  const connection=db.prepare("INSERT INTO campaign_location_connections_v28 VALUES(?,?,?,?,?,?,?,?,?,?)");
-  for(const route of routes)connection.run(route.id,ids.campaignId,"origin",`destination-${route.id}`,route.visibility??"public",route.state??"open",route.requirement??"none",route.requirement==="faction_reputation"?"faction":null,route.requirement==="faction_reputation"?(route.minimum??0):null,AT);
-  db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(ids.campaignId,"actor","origin","session",AT);
+describe("v46 exact candidate persistence", () => {
+  it("persists exact ordered batches across restart, replays without IDs, and masks outsiders", () => {
+    const ids = seed();
+    let r = repo();
+    const values = [
+      candidate(ids.campaignId, ids.turnId, "candidate-a", 1, "edge-a"),
+      candidate(ids.campaignId, ids.turnId, "candidate-b", 2, "edge-b"),
+    ];
+    const issued = r.issueExactCandidateBatch("player", issue(ids.turnId, "batch", values));
+    r.close();
+    const before = sequence;
+    r = repo();
+    expect(r.issueExactCandidateBatch("player", issue(ids.turnId, "batch", values))).toEqual(issued);
+    expect(sequence).toBe(before);
+    expect(r.getExactCandidateBatch("outsider", issued.batchId)).toBeNull();
+    expect(r.getExactCandidate("outsider", "candidate-a")).toBeNull();
+    r.close();
+  });
+  it("fails closed above 32 and at expiry, and allows only explicit same-scope supersession", () => {
+    const ids = seed();
+    let r = repo();
+    const one = candidate(ids.campaignId, ids.turnId, "many", 1, "edge");
+    expect(() =>
+      r.issueExactCandidateBatch(
+        "player",
+        issue(
+          ids.turnId,
+          "too-many",
+          Array.from({ length: 33 }, () => one),
+        ),
+      ),
+    ).toThrow(ExactCandidateConflictError);
+    const values = [
+      candidate(ids.campaignId, ids.turnId, "old", 1, "edge-a"),
+      candidate(ids.campaignId, ids.turnId, "new", 2, "edge-b"),
+    ];
+    r.issueExactCandidateBatch("player", issue(ids.turnId, "ok", values));
+    expect(r.supersedeExactCandidate("player", "old", "new").supersession.state).toBe("superseded");
+    expect(() => r.supersedeExactCandidate("player", "new", "old")).toThrow(ExactCandidateConflictError);
+    r.close();
+    r = repo(EXPIRES);
+    expect(r.observeExactCandidateExpiry("player", "new").candidateId).toBe("new");
+    r.close();
+  });
+  it("detects canonical frame tampering without disclosing it to an outsider", () => {
+    const ids = seed();
+    const r = repo();
+    r.issueExactCandidateBatch(
+      "player",
+      issue(ids.turnId, "tamper", [candidate(ids.campaignId, ids.turnId, "tampered", 1, "edge")]),
+    );
+    expect(r.getExactCandidate("outsider", "tampered")).toBeNull();
+    const db = new DatabaseDriver(file());
+    db.pragma("recursive_triggers=OFF");
+    db.exec("DROP TRIGGER exact_candidates_v46_immutable_update_v46");
+    db.prepare("UPDATE exact_candidates_v46 SET action_frame='{}' WHERE candidate_id='tampered'").run();
+    expect(() => r.getExactCandidate("player", "tampered")).toThrow(ExactCandidateIntegrityError);
+    db.close();
+    r.close();
+  });
+  it("requires exact scoped current control for reads and replay before integrity", () => {
+    const ids = seed();
+    const r = repo();
+    const values = [candidate(ids.campaignId, ids.turnId, "private", 1, "edge")];
+    const batch = r.issueExactCandidateBatch("player", issue(ids.turnId, "private-batch", values));
+    for (const principal of ["local-owner", "member", "observer", "outsider"]) {
+      expect(r.getExactCandidate(principal, "private")).toBeNull();
+      expect(r.getExactCandidateBatch(principal, batch.batchId)).toBeNull();
+    }
+    const db = new DatabaseDriver(file());
+    db.prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id='player'").run(
+      ids.campaignId,
+    );
+    const before = sequence;
+    expect(r.getExactCandidate("player", "private")).toBeNull();
+    expect(() => r.issueExactCandidateBatch("player", issue(ids.turnId, "private-batch", values))).toThrow(
+      ExactCandidateAuthorizationError,
+    );
+    expect(sequence).toBe(before);
+    db.close();
+    r.close();
+  });
+  it("persists and exactly replays empty batches using one server clock and no candidate IDs", () => {
+    const ids = seed();
+    const before = sequence;
+    let clockCalls = 0;
+    const r = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR!,
+      clock: {
+        now: () => {
+          clockCalls++;
+          return new Date(AT);
+        },
+      },
+      ids: { nextId: () => `empty-${++sequence}` },
+    });
+    const empty = r.issueExactCandidateBatch("player", issue(ids.turnId, "empty", []));
+    expect(empty.candidates).toEqual([]);
+    expect(empty.issuedAt).toBe(AT);
+    expect(empty.expiresAt).toBe(EXPIRES);
+    expect(sequence).toBe(before + 1);
+    expect(clockCalls).toBe(1);
+    expect(r.issueExactCandidateBatch("player", issue(ids.turnId, "empty", []))).toEqual(empty);
+    expect(sequence).toBe(before + 1);
+    expect(clockCalls).toBe(1);
+    r.close();
+  });
+  it("fails validation before clock or IDs and detects duplicated batch, position, and lifecycle corruption", () => {
+    const ids = seed();
+    let clockCalls = 0,
+      idCalls = 0;
+    const r = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR!,
+      clock: {
+        now: () => {
+          clockCalls++;
+          return new Date(AT);
+        },
+      },
+      ids: {
+        nextId: () => {
+          idCalls++;
+          return `failure-${idCalls}`;
+        },
+      },
+    });
+    const one = candidate(ids.campaignId, ids.turnId, "corrupt", 1, "edge");
+    expect(() =>
+      r.issueExactCandidateBatch(
+        "player",
+        issue(
+          ids.turnId,
+          "over",
+          Array.from({ length: 33 }, () => one),
+        ),
+      ),
+    ).toThrow();
+    expect({ clockCalls, idCalls }).toEqual({ clockCalls: 0, idCalls: 0 });
+    const batch = r.issueExactCandidateBatch("player", issue(ids.turnId, "corrupt-batch", [one]));
+    const db = new DatabaseDriver(file());
+    db.pragma("foreign_keys=OFF");
+    db.pragma("recursive_triggers=OFF");
+    db.exec(
+      "DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46;DROP TRIGGER exact_candidates_v46_immutable_update_v46",
+    );
+    db.prepare("UPDATE exact_candidate_batches_v46 SET session_id='wrong' WHERE batch_id=?").run(batch.batchId);
+    expect(() => r.getExactCandidateBatch("player", batch.batchId)).toThrow(ExactCandidateIntegrityError);
+    db.prepare("UPDATE exact_candidate_batches_v46 SET session_id='session'").run();
+    db.prepare("UPDATE exact_candidates_v46 SET position=2").run();
+    expect(() => r.getExactCandidateBatch("player", batch.batchId)).toThrow(ExactCandidateIntegrityError);
+    db.prepare(
+      "UPDATE exact_candidates_v46 SET position=1,envelope_json=json_set(envelope_json,'$.execution.state','receipt-linked')",
+    ).run();
+    expect(() => r.getExactCandidate("player", "corrupt")).toThrow(ExactCandidateIntegrityError);
+    db.close();
+    r.close();
+  });
+  it("reconstructs expiration observations and rejects malformed observation or supersession cycles", () => {
+    const ids = seed();
+    let r = repo();
+    const values = [
+      candidate(ids.campaignId, ids.turnId, "cycle-a", 1, "edge-a"),
+      candidate(ids.campaignId, ids.turnId, "cycle-b", 2, "edge-b"),
+    ];
+    r.issueExactCandidateBatch("player", issue(ids.turnId, "lifecycle", values));
+    r.close();
+    r = repo("2035-01-01T00:01:00.000Z");
+    r.supersedeExactCandidate("player", "cycle-a", "cycle-b");
+    r.close();
+    r = repo(EXPIRES);
+    r.observeExactCandidateExpiry("player", "cycle-a");
+    expect(r.getExactCandidate("player", "cycle-a")?.candidateId).toBe("cycle-a");
+    const db = new DatabaseDriver(file());
+    db.pragma("foreign_keys=OFF");
+    db.pragma("recursive_triggers=OFF");
+    db.exec("DROP TRIGGER exact_candidate_expirations_v46_immutable_update_v46");
+    db.prepare("UPDATE exact_candidate_expirations_v46 SET connection_id='wrong'").run();
+    expect(() => r.getExactCandidate("player", "cycle-a")).toThrow(ExactCandidateIntegrityError);
+    db.prepare("UPDATE exact_candidate_expirations_v46 SET connection_id=?").run(`adventure-turn:${ids.turnId}`);
+    db.prepare("INSERT INTO exact_candidate_supersessions_v46 VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(
+      "cycle-b",
+      "cycle-a",
+      ids.campaignId,
+      ids.turnId,
+      "session",
+      "actor",
+      "player",
+      `adventure-turn:${ids.turnId}`,
+      "actor.travel",
+      "v1",
+      "2035-01-01T00:01:00.000Z",
+    );
+    expect(() => r.getExactCandidate("player", "cycle-a")).toThrow(ExactCandidateIntegrityError);
+    db.close();
+    r.close();
+  });
+  it.each(["campaign_id", "session_id", "actor_id"] as const)(
+    "binds batch %s to the authoritative turn before envelope reconstruction",
+    (column) => {
+      const ids = seed();
+      const r = repo();
+      const value = candidate(ids.campaignId, ids.turnId, `turn-bind-${column}`, 1, "edge");
+      const batch = r.issueExactCandidateBatch("player", issue(ids.turnId, `turn-bind-${column}`, [value]));
+      const db = new DatabaseDriver(file());
+      db.pragma("foreign_keys=OFF");
+      db.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46");
+      db.prepare(`UPDATE exact_candidate_batches_v46 SET ${column}='wrong' WHERE batch_id=?`).run(batch.batchId);
+      expect(r.getExactCandidateBatch("outsider", batch.batchId)).toBeNull();
+      expect(() => r.getExactCandidateBatch("player", batch.batchId)).toThrow(ExactCandidateIntegrityError);
+      expect(r.getExactCandidate("outsider", value.candidateId)).toBeNull();
+      expect(() => r.getExactCandidate("player", value.candidateId)).toThrow(ExactCandidateIntegrityError);
+      db.close();
+      r.close();
+    },
+  );
+  it("rejects malformed lifecycle timestamps as integrity corruption while masking outsiders", () => {
+    const ids = seed();
+    let r = repo();
+    const values = [
+      candidate(ids.campaignId, ids.turnId, "time-a", 1, "edge-a"),
+      candidate(ids.campaignId, ids.turnId, "time-b", 2, "edge-b"),
+    ];
+    const batch = r.issueExactCandidateBatch("player", issue(ids.turnId, "timestamps", values));
+    r.close();
+    r = repo("2035-01-01T00:01:00.000Z");
+    r.supersedeExactCandidate("player", "time-a", "time-b");
+    r.close();
+    r = repo(EXPIRES);
+    r.observeExactCandidateExpiry("player", "time-a");
+    const db = new DatabaseDriver(file());
+    db.pragma("foreign_keys=OFF");
+    db.pragma("ignore_check_constraints=ON");
+    db.exec(
+      "DROP TRIGGER exact_candidate_expirations_v46_immutable_update_v46;DROP TRIGGER exact_candidate_supersessions_v46_immutable_update_v46",
+    );
+    db.prepare("UPDATE exact_candidate_expirations_v46 SET observed_at='not-a-time'").run();
+    expect(r.getExactCandidate("outsider", "time-a")).toBeNull();
+    expect(() => r.getExactCandidate("player", "time-a")).toThrow(ExactCandidateIntegrityError);
+    db.prepare("UPDATE exact_candidate_expirations_v46 SET observed_at=?").run(EXPIRES);
+    db.prepare("UPDATE exact_candidate_supersessions_v46 SET superseded_at='not-a-time'").run();
+    expect(r.getExactCandidateBatch("outsider", batch.batchId)).toBeNull();
+    expect(() => r.getExactCandidateBatch("player", batch.batchId)).toThrow(ExactCandidateIntegrityError);
+    db.close();
+    r.close();
+  });
+  it("authorizes from the turn before treating a corrupted duplicated principal as integrity", () => {
+    const ids = seed();
+    const r = repo();
+    const value = candidate(ids.campaignId, ids.turnId, "principal-corrupt", 1, "edge");
+    const batch = r.issueExactCandidateBatch("player", issue(ids.turnId, "principal-corrupt", [value]));
+    const db = new DatabaseDriver(file());
+    db.pragma("foreign_keys=OFF");
+    db.exec(
+      "DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46;DROP TRIGGER exact_candidates_v46_immutable_update_v46",
+    );
+    db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='member'").run(
+      ids.campaignId,
+    );
+    db.prepare("UPDATE exact_candidate_batches_v46 SET principal_id='member' WHERE batch_id=?").run(batch.batchId);
+    db.prepare("UPDATE exact_candidates_v46 SET principal_id='member' WHERE candidate_id=?").run(value.candidateId);
+    expect(r.getExactCandidateBatch("member", batch.batchId)).toBeNull();
+    expect(r.getExactCandidate("member", value.candidateId)).toBeNull();
+    expect(() => r.getExactCandidateBatch("player", batch.batchId)).toThrow(ExactCandidateIntegrityError);
+    expect(() => r.getExactCandidate("player", value.candidateId)).toThrow(ExactCandidateIntegrityError);
+    db.close();
+    r.close();
+  });
+  it("rolls back a regressed-clock supersession and succeeds on retry with valid time", () => {
+    const ids = seed();
+    let r = repo();
+    const values = [
+      candidate(ids.campaignId, ids.turnId, "clock-source", 1, "edge-a"),
+      candidate(ids.campaignId, ids.turnId, "clock-replacement", 2, "edge-b"),
+    ];
+    r.issueExactCandidateBatch("player", issue(ids.turnId, "clock-supersession", values));
+    r.close();
+    r = repo("2034-12-31T23:59:59.999Z");
+    expect(() => r.supersedeExactCandidate("player", "clock-source", "clock-replacement")).toThrow(
+      ExactCandidateConflictError,
+    );
+    let db = new DatabaseDriver(file());
+    expect(db.prepare("SELECT count(*) count FROM exact_candidate_supersessions_v46").get()).toEqual({ count: 0 });
+    db.close();
+    r.close();
+    r = repo("2035-01-01T00:01:00.000Z");
+    expect(r.supersedeExactCandidate("player", "clock-source", "clock-replacement").supersession.state).toBe(
+      "superseded",
+    );
+    db = new DatabaseDriver(file(), { readonly: true });
+    expect(db.prepare("SELECT count(*) count FROM exact_candidate_supersessions_v46").get()).toEqual({ count: 1 });
+    db.close();
+    r.close();
+  });
+  it("allows only the authoritative turn principal to issue, even when another owner or GM has current authority", () => {
+    const ids = seed();
+    let db = new DatabaseDriver(file());
+    db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='member'").run(
+      ids.campaignId,
+    );
+    db.close();
+    let clockCalls = 0,
+      idCalls = 0;
+    const r = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR!,
+      clock: {
+        now: () => {
+          clockCalls++;
+          return new Date(AT);
+        },
+      },
+      ids: {
+        nextId: () => {
+          idCalls++;
+          return `turn-principal-${idCalls}`;
+        },
+      },
+    });
+    const values = [candidate(ids.campaignId, ids.turnId, "turn-principal-candidate", 1, "edge")];
+    for (const principal of ["local-owner", "member"]) {
+      expect(() => r.issueExactCandidateBatch(principal, issue(ids.turnId, "turn-principal", values))).toThrow(
+        ExactCandidateAuthorizationError,
+      );
+      expect({ clockCalls, idCalls }).toEqual({ clockCalls: 0, idCalls: 0 });
+    }
+    db = new DatabaseDriver(file(), { readonly: true });
+    expect(db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46").get()).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM exact_candidates_v46").get()).toEqual({ count: 0 });
+    db.close();
+    expect(
+      r
+        .issueExactCandidateBatch("player", issue(ids.turnId, "turn-principal", values))
+        .candidates.map(({ candidateId }) => candidateId),
+    ).toEqual(["turn-principal-candidate"]);
+    expect({ clockCalls, idCalls }).toEqual({ clockCalls: 1, idCalls: 1 });
+    r.close();
+  });
+});
+
+function seedTravelWorld(
+  ids: { campaignId: string; turnId: string },
+  routes: Array<{
+    id: string;
+    visibility?: "public" | "discovered" | "gm";
+    destinationVisibility?: "public" | "discovered" | "gm";
+    state?: "open" | "closed";
+    requirement?: "none" | "discovery" | "faction_reputation";
+    minimum?: number;
+  }>,
+) {
+  const db = new DatabaseDriver(file());
+  db.pragma("foreign_keys=OFF");
+  const location = db.prepare(
+    "INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,NULL,?,'','public',?)",
+  );
+  location.run("origin", ids.campaignId, "Origin", AT);
+  for (const route of routes)
+    db.prepare(
+      "INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,NULL,?,'',?,?)",
+    ).run(
+      `destination-${route.id}`,
+      ids.campaignId,
+      `Destination ${route.id}`,
+      route.destinationVisibility ?? "public",
+      AT,
+    );
+  if (routes.some((route) => route.requirement === "faction_reputation"))
+    db.prepare("INSERT INTO campaign_factions_v28 VALUES('faction',?,'Faction','public',?)").run(ids.campaignId, AT);
+  const connection = db.prepare("INSERT INTO campaign_location_connections_v28 VALUES(?,?,?,?,?,?,?,?,?,?)");
+  for (const route of routes)
+    connection.run(
+      route.id,
+      ids.campaignId,
+      "origin",
+      `destination-${route.id}`,
+      route.visibility ?? "public",
+      route.state ?? "open",
+      route.requirement ?? "none",
+      route.requirement === "faction_reputation" ? "faction" : null,
+      route.requirement === "faction_reputation" ? (route.minimum ?? 0) : null,
+      AT,
+    );
+  db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(
+    ids.campaignId,
+    "actor",
+    "origin",
+    "session",
+    AT,
+  );
   db.close();
 }
 
-describe("M5.4 actor.travel candidate generation",()=>{
-  it("generates only legal player routes in stable binary order with private exact parameters",()=>{const ids=seed();seedTravelWorld(ids,[
-    {id:"route-b"},{id:"route-a"},{id:"closed",state:"closed"},{id:"gm-only",visibility:"gm"},
-    {id:"undiscovered",visibility:"discovered"},{id:"discovery-required",requirement:"discovery"},
-    {id:"reputation-denied",requirement:"faction_reputation",minimum:1},{id:"reputation-allowed",requirement:"faction_reputation",minimum:0},
-  ]);const db=new DatabaseDriver(file());db.prepare("INSERT INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(ids.campaignId,"actor","destination-discovery-required",AT);db.close();
-    const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"generate"});
-    expect(batch.worldRevision).toBe(0);expect(batch.candidates.map((value)=>value.privateParameters.connectionId)).toEqual(["discovery-required","reputation-allowed","route-a","route-b"]);
-    expect(batch.candidates.map((value)=>value.label.routeOption)).toEqual([1,2,3,4]);expect(batch.candidates.every((value)=>value.policy.reason==="legal-visible-connection"&&value.privateParameters.partyActorIds[0]==="actor")).toBe(true);
-    expect(batch.candidates.map((value)=>value.label.destination)).toEqual(["Destination discovery-required","Destination reputation-allowed","Destination route-a","Destination route-b"]);
-    expect(batch.candidates.every((value)=>value.label.origin==="Origin")).toBe(true);
-    expect(JSON.stringify(batch.candidates.map(({label,summary})=>({label,summary})))).not.toContain('"connectionId"');r.close();});
+describe("M5.4 actor.travel candidate generation", () => {
+  it("generates only legal player routes in stable binary order with private exact parameters", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [
+      { id: "route-b" },
+      { id: "route-a" },
+      { id: "closed", state: "closed" },
+      { id: "gm-only", visibility: "gm" },
+      { id: "undiscovered", visibility: "discovered" },
+      { id: "discovery-required", requirement: "discovery" },
+      { id: "reputation-denied", requirement: "faction_reputation", minimum: 1 },
+      { id: "reputation-allowed", requirement: "faction_reputation", minimum: 0 },
+    ]);
+    const db = new DatabaseDriver(file());
+    db.prepare("INSERT INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(
+      ids.campaignId,
+      "actor",
+      "destination-discovery-required",
+      AT,
+    );
+    db.close();
+    const r = repo();
+    const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "generate" });
+    expect(batch.worldRevision).toBe(0);
+    expect(batch.candidates.map((value) => value.privateParameters.connectionId)).toEqual([
+      "discovery-required",
+      "reputation-allowed",
+      "route-a",
+      "route-b",
+    ]);
+    expect(batch.candidates.map((value) => value.label.routeOption)).toEqual([1, 2, 3, 4]);
+    expect(
+      batch.candidates.every(
+        (value) =>
+          value.policy.reason === "legal-visible-connection" && value.privateParameters.partyActorIds[0] === "actor",
+      ),
+    ).toBe(true);
+    expect(batch.candidates.map((value) => value.label.destination)).toEqual([
+      "Destination discovery-required",
+      "Destination reputation-allowed",
+      "Destination route-a",
+      "Destination route-b",
+    ]);
+    expect(batch.candidates.every((value) => value.label.origin === "Origin")).toBe(true);
+    expect(JSON.stringify(batch.candidates.map(({ label, summary }) => ({ label, summary })))).not.toContain(
+      '"connectionId"',
+    );
+    r.close();
+  });
 
-  it("applies GM visibility while retaining discovery and faction requirements",()=>{const ids=seed();seedTravelWorld(ids,[
-    {id:"gm-open",visibility:"gm"},{id:"gm-discovery",visibility:"gm",requirement:"discovery"},{id:"gm-reputation",visibility:"gm",requirement:"faction_reputation",minimum:1},
-  ]);const db=new DatabaseDriver(file());db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);db.close();
-    const r=repo();expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"gm"}).candidates.map((value)=>value.privateParameters.connectionId)).toEqual(["gm-open"]);r.close();});
+  it("applies GM visibility while retaining discovery and faction requirements", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [
+      { id: "gm-open", visibility: "gm" },
+      { id: "gm-discovery", visibility: "gm", requirement: "discovery" },
+      { id: "gm-reputation", visibility: "gm", requirement: "faction_reputation", minimum: 1 },
+    ]);
+    const db = new DatabaseDriver(file());
+    db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='player'").run(
+      ids.campaignId,
+    );
+    db.close();
+    const r = repo();
+    expect(
+      r
+        .generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "gm" })
+        .candidates.map((value) => value.privateParameters.connectionId),
+    ).toEqual(["gm-open"]);
+    r.close();
+  });
 
-  it("requires player-safe connection and destination for provider generation and execution",()=>{const ids=seed();seedTravelWorld(ids,[
-    {id:"safe"},{id:"public-hidden-destination",destinationVisibility:"gm"},
-  ]);const db=new DatabaseDriver(file());db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);db.close();
-    const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"provider-player:visibility",audienceMode:"player"});
-    expect(batch.candidates.map((value)=>value.privateParameters.connectionId)).toEqual(["safe"]);
-    const manual=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"manual-gm"});expect(manual.candidates).toHaveLength(2);
-    const hidden=manual.candidates.find((value)=>value.privateParameters.connectionId==="public-hidden-destination")!;
-    const raw=new DatabaseDriver(file());raw.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46");
-    raw.prepare("UPDATE exact_candidate_batches_v46 SET idempotency_key='provider-player:forged' WHERE batch_id=?").run(manual.batchId);raw.close();
-    expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection:{candidateId:hidden.candidateId,kind:"actor.travel",version:"v1",choices:[]}})).toThrow();r.close();});
+  it("requires player-safe connection and destination for provider generation and execution", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "safe" }, { id: "public-hidden-destination", destinationVisibility: "gm" }]);
+    const db = new DatabaseDriver(file());
+    db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='player'").run(
+      ids.campaignId,
+    );
+    db.close();
+    const r = repo();
+    const batch = r.generateActorTravelCandidates("player", {
+      turnId: ids.turnId,
+      idempotencyKey: "provider-player:visibility",
+      audienceMode: "player",
+    });
+    expect(batch.candidates.map((value) => value.privateParameters.connectionId)).toEqual(["safe"]);
+    const manual = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "manual-gm" });
+    expect(manual.candidates).toHaveLength(2);
+    const hidden = manual.candidates.find(
+      (value) => value.privateParameters.connectionId === "public-hidden-destination",
+    )!;
+    const raw = new DatabaseDriver(file());
+    raw.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46");
+    raw
+      .prepare("UPDATE exact_candidate_batches_v46 SET idempotency_key='provider-player:forged' WHERE batch_id=?")
+      .run(manual.batchId);
+    raw.close();
+    expect(() =>
+      r.executeExactActorTravelCandidate("player", {
+        turnId: ids.turnId,
+        selection: { candidateId: hidden.candidateId, kind: "actor.travel", version: "v1", choices: [] },
+      }),
+    ).toThrow();
+    r.close();
+  });
 
-  it("persists an exact empty batch",()=>{const ids=seed();seedTravelWorld(ids,[{id:"closed",state:"closed"}]);const r=repo();expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"empty-generated"}).candidates).toEqual([]);r.close();});
+  it("persists an exact empty batch", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "closed", state: "closed" }]);
+    const r = repo();
+    expect(
+      r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "empty-generated" }).candidates,
+    ).toEqual([]);
+    r.close();
+  });
 
-  it("fails closed above 32 legal routes without writes",()=>{const ids=seed();seedTravelWorld(ids,Array.from({length:33},(_,index)=>({id:`route-${String(index).padStart(2,"0")}`})));const r=repo();expect(()=>r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"overflow"})).toThrow(ExactCandidateConflictError);r.close();
-    const db=new DatabaseDriver(file(),{readonly:true});expect(db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE turn_id=?").get(ids.turnId)).toEqual({count:0});expect(db.prepare("SELECT count(*) count FROM exact_candidates_v46 WHERE turn_id=?").get(ids.turnId)).toEqual({count:0});db.close();});
+  it("fails closed above 32 legal routes without writes", () => {
+    const ids = seed();
+    seedTravelWorld(
+      ids,
+      Array.from({ length: 33 }, (_, index) => ({ id: `route-${String(index).padStart(2, "0")}` })),
+    );
+    const r = repo();
+    expect(() => r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "overflow" })).toThrow(
+      ExactCandidateConflictError,
+    );
+    r.close();
+    const db = new DatabaseDriver(file(), { readonly: true });
+    expect(
+      db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE turn_id=?").get(ids.turnId),
+    ).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM exact_candidates_v46 WHERE turn_id=?").get(ids.turnId)).toEqual({
+      count: 0,
+    });
+    db.close();
+  });
 
   it.each([
-    {name:"persisted collision",ids:["persisted-candidate"]},
-    {name:"duplicate generated IDs",ids:["duplicate","duplicate"]},
-  ])("rejects $name without persisting a generated batch",({ids:generatedIds})=>{const ids=seed();seedTravelWorld(ids,[{id:"road-a"},{id:"road-b"}]);
-    if(generatedIds[0]==="persisted-candidate"){const setup=repo();setup.issueExactCandidateBatch("player",issue(ids.turnId,"prior",[candidate(ids.campaignId,ids.turnId,"persisted-candidate",1,"road-a")]));setup.close();}
-    let index=0;const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>new Date(AT)},ids:{nextId:()=>generatedIds[index++]??`unused-${index}`}});
-    expect(()=>r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"collision"})).toThrow(ExactCandidateConflictError);r.close();
-    const db=new DatabaseDriver(file(),{readonly:true});expect(db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE idempotency_key='collision'").get()).toEqual({count:0});db.close();});
+    { name: "persisted collision", ids: ["persisted-candidate"] },
+    { name: "duplicate generated IDs", ids: ["duplicate", "duplicate"] },
+  ])("rejects $name without persisting a generated batch", ({ ids: generatedIds }) => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road-a" }, { id: "road-b" }]);
+    if (generatedIds[0] === "persisted-candidate") {
+      const setup = repo();
+      setup.issueExactCandidateBatch(
+        "player",
+        issue(ids.turnId, "prior", [candidate(ids.campaignId, ids.turnId, "persisted-candidate", 1, "road-a")]),
+      );
+      setup.close();
+    }
+    let index = 0;
+    const r = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR!,
+      clock: { now: () => new Date(AT) },
+      ids: { nextId: () => generatedIds[index++] ?? `unused-${index}` },
+    });
+    expect(() =>
+      r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "collision" }),
+    ).toThrow(ExactCandidateConflictError);
+    r.close();
+    const db = new DatabaseDriver(file(), { readonly: true });
+    expect(
+      db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE idempotency_key='collision'").get(),
+    ).toEqual({ count: 0 });
+    db.close();
+  });
 
-  it("replays before world, clock, and ID dependencies and exposes no tuple lookup",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);let clockCalls=0,idCalls=0;const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>{clockCalls++;return new Date(AT);}},ids:{nextId:()=>`generated-${++idCalls}`}});
-    const first=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"replay-first"});const before={clockCalls,idCalls};const db=new DatabaseDriver(file());db.prepare("DELETE FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id='actor'").run(ids.campaignId);db.prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);db.close();
-    expect(()=>r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"replay-first"})).toThrow(ExactCandidateAuthorizationError);expect({clockCalls,idCalls}).toEqual(before);
+  it("replays before world, clock, and ID dependencies and exposes no tuple lookup", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    let clockCalls = 0,
+      idCalls = 0;
+    const r = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR!,
+      clock: {
+        now: () => {
+          clockCalls++;
+          return new Date(AT);
+        },
+      },
+      ids: { nextId: () => `generated-${++idCalls}` },
+    });
+    const first = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "replay-first" });
+    const before = { clockCalls, idCalls };
+    const db = new DatabaseDriver(file());
+    db.prepare("DELETE FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id='actor'").run(ids.campaignId);
+    db.prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id='player'").run(
+      ids.campaignId,
+    );
+    db.close();
+    expect(() =>
+      r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "replay-first" }),
+    ).toThrow(ExactCandidateAuthorizationError);
+    expect({ clockCalls, idCalls }).toEqual(before);
     expect("getExactCandidateBatchByIssueKey" in r).toBe(false);
-    const restore=new DatabaseDriver(file());restore.prepare("UPDATE campaign_memberships SET role='player' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);restore.close();expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"replay-first"})).toEqual(first);expect({clockCalls,idCalls}).toEqual(before);r.close();});
+    const restore = new DatabaseDriver(file());
+    restore
+      .prepare("UPDATE campaign_memberships SET role='player' WHERE campaign_id=? AND principal_id='player'")
+      .run(ids.campaignId);
+    restore.close();
+    expect(r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "replay-first" })).toEqual(
+      first,
+    );
+    expect({ clockCalls, idCalls }).toEqual(before);
+    r.close();
+  });
 
-  it("rejects stale turn authority and session semantics without issuing",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const db=new DatabaseDriver(file());db.prepare("UPDATE sessions SET state='closed',stopped_at=? WHERE id='session'").run(AT);db.close();const r=repo();expect(()=>r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"stale"})).toThrow(ExactCandidateAuthorizationError);r.close();
-    const audit=new DatabaseDriver(file(),{readonly:true});expect(audit.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE turn_id=?").get(ids.turnId)).toEqual({count:0});audit.close();});
-  it("replays a generated batch after its session stops while current authority remains",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);let clockCalls=0,idCalls=0;
-    const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>{clockCalls++;return new Date(AT);}},ids:{nextId:()=>`stopped-replay-${++idCalls}`}});
-    const first=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"stopped-replay"}),before={clockCalls,idCalls};
-    const db=new DatabaseDriver(file());db.prepare("UPDATE sessions SET state='closed',stopped_at=? WHERE id='session'").run(AT);db.close();
-    expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"stopped-replay"})).toEqual(first);expect({clockCalls,idCalls}).toEqual(before);r.close();});
+  it("rejects stale turn authority and session semantics without issuing", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    const db = new DatabaseDriver(file());
+    db.prepare("UPDATE sessions SET state='closed',stopped_at=? WHERE id='session'").run(AT);
+    db.close();
+    const r = repo();
+    expect(() => r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "stale" })).toThrow(
+      ExactCandidateAuthorizationError,
+    );
+    r.close();
+    const audit = new DatabaseDriver(file(), { readonly: true });
+    expect(
+      audit.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE turn_id=?").get(ids.turnId),
+    ).toEqual({ count: 0 });
+    audit.close();
+  });
+  it("replays a generated batch after its session stops while current authority remains", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    let clockCalls = 0,
+      idCalls = 0;
+    const r = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR!,
+      clock: {
+        now: () => {
+          clockCalls++;
+          return new Date(AT);
+        },
+      },
+      ids: { nextId: () => `stopped-replay-${++idCalls}` },
+    });
+    const first = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "stopped-replay" }),
+      before = { clockCalls, idCalls };
+    const db = new DatabaseDriver(file());
+    db.prepare("UPDATE sessions SET state='closed',stopped_at=? WHERE id='session'").run(AT);
+    db.close();
+    expect(r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "stopped-replay" })).toEqual(
+      first,
+    );
+    expect({ clockCalls, idCalls }).toEqual(before);
+    r.close();
+  });
 });
 
-describe("v47 atomic exact actor travel execution",()=>{
-  it("atomically executes, receipt-links, persists, and replays one exact candidate across restart",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);
-    let r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"execute-batch"});const selected={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};
-    const result=r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection:selected});expect(result.linkedCandidate.execution).toMatchObject({state:"receipt-linked",receiptId:result.executionId,
-      binding:{commandId:result.actorTravelResult.receipt.commandId}});expect(result.actorTravelResult.locations[0]).toMatchObject({actorId:"actor",locationId:"destination-road"});r.close();
-    const before=sequence;r=repo(EXPIRES);expect(r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection:selected})).toEqual(result);expect(sequence).toBe(before);r.close();
-    const db=new DatabaseDriver(file(),{readonly:true});expect(db.prepare("SELECT count(*) count FROM exact_candidate_executions_v47").get()).toEqual({count:1});expect(db.prepare("SELECT count(*) count FROM world_commands_v28 WHERE idempotency_key=?").get(`exact-candidate:${batch.candidates[0]!.canonicalActionDigest}`)).toEqual({count:1});db.close();});
+describe("v47 atomic exact actor travel execution", () => {
+  it("atomically executes, receipt-links, persists, and replays one exact candidate across restart", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    let r = repo();
+    const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "execute-batch" });
+    const selected = {
+      candidateId: batch.candidates[0]!.candidateId,
+      kind: "actor.travel" as const,
+      version: "v1" as const,
+      choices: [] as [],
+    };
+    const result = r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection: selected });
+    expect(result.linkedCandidate.execution).toMatchObject({
+      state: "receipt-linked",
+      receiptId: result.executionId,
+      binding: { commandId: result.actorTravelResult.receipt.commandId },
+    });
+    expect(result.actorTravelResult.locations[0]).toMatchObject({ actorId: "actor", locationId: "destination-road" });
+    r.close();
+    const before = sequence;
+    r = repo(EXPIRES);
+    expect(r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection: selected })).toEqual(result);
+    expect(sequence).toBe(before);
+    r.close();
+    const db = new DatabaseDriver(file(), { readonly: true });
+    expect(db.prepare("SELECT count(*) count FROM exact_candidate_executions_v47").get()).toEqual({ count: 1 });
+    expect(
+      db
+        .prepare("SELECT count(*) count FROM world_commands_v28 WHERE idempotency_key=?")
+        .get(`exact-candidate:${batch.candidates[0]!.canonicalActionDigest}`),
+    ).toEqual({ count: 1 });
+    db.close();
+  });
 
-  it("replays after stop and world changes, but denies replay after current control is lost",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"durable"});const selection={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};const first=r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection});
-    const db=new DatabaseDriver(file());db.prepare("UPDATE sessions SET state='closed',stopped_at=? WHERE id='session'").run(EXPIRES);db.prepare("UPDATE world_mutation_revisions_v28 SET revision=revision+1,updated_at=? WHERE campaign_id=? AND session_id='session'").run(EXPIRES,ids.campaignId);expect(r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection})).toEqual(first);
-    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='member' WHERE campaign_id=? AND actor_id='actor'").run(ids.campaignId);expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection})).toThrow(ExactCandidateAuthorizationError);db.close();r.close();});
+  it("replays after stop and world changes, but denies replay after current control is lost", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    const r = repo();
+    const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "durable" });
+    const selection = {
+      candidateId: batch.candidates[0]!.candidateId,
+      kind: "actor.travel" as const,
+      version: "v1" as const,
+      choices: [] as [],
+    };
+    const first = r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection });
+    const db = new DatabaseDriver(file());
+    db.prepare("UPDATE sessions SET state='closed',stopped_at=? WHERE id='session'").run(EXPIRES);
+    db.prepare(
+      "UPDATE world_mutation_revisions_v28 SET revision=revision+1,updated_at=? WHERE campaign_id=? AND session_id='session'",
+    ).run(EXPIRES, ids.campaignId);
+    expect(r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection })).toEqual(first);
+    db.prepare(
+      "UPDATE campaign_actor_private_state SET controller_principal_id='member' WHERE campaign_id=? AND actor_id='actor'",
+    ).run(ids.campaignId);
+    expect(() => r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection })).toThrow(
+      ExactCandidateAuthorizationError,
+    );
+    db.close();
+    r.close();
+  });
 
-  it("rolls back every world write when the final immutable link insert fails",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"rollback"});const selection={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};
-    const db=new DatabaseDriver(file());db.exec("CREATE TRIGGER force_v47_link_failure BEFORE INSERT ON exact_candidate_executions_v47 BEGIN SELECT RAISE(ABORT,'forced link failure');END;");expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection})).toThrow();db.exec("DROP TRIGGER force_v47_link_failure");
-    for(const table of ["exact_candidate_executions_v47","world_commands_v28","world_receipts_v28","world_events_v28","world_travel_party_members_v28","world_travel_destinations_v28"])expect(db.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({count:0});expect(db.prepare("SELECT location_id,state_revision FROM campaign_actor_locations_v28 WHERE actor_id='actor'").get()).toEqual({location_id:"origin",state_revision:0});db.close();r.close();});
+  it("rolls back every world write when the final immutable link insert fails", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    const r = repo();
+    const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "rollback" });
+    const selection = {
+      candidateId: batch.candidates[0]!.candidateId,
+      kind: "actor.travel" as const,
+      version: "v1" as const,
+      choices: [] as [],
+    };
+    const db = new DatabaseDriver(file());
+    db.exec(
+      "CREATE TRIGGER force_v47_link_failure BEFORE INSERT ON exact_candidate_executions_v47 BEGIN SELECT RAISE(ABORT,'forced link failure');END;",
+    );
+    expect(() => r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection })).toThrow();
+    db.exec("DROP TRIGGER force_v47_link_failure");
+    for (const table of [
+      "exact_candidate_executions_v47",
+      "world_commands_v28",
+      "world_receipts_v28",
+      "world_events_v28",
+      "world_travel_party_members_v28",
+      "world_travel_destinations_v28",
+    ])
+      expect(db.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({ count: 0 });
+    expect(
+      db.prepare("SELECT location_id,state_revision FROM campaign_actor_locations_v28 WHERE actor_id='actor'").get(),
+    ).toEqual({ location_id: "origin", state_revision: 0 });
+    db.close();
+    r.close();
+  });
 
-  it("verifies the complete original batch before replay while allowing derived supersession",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road-a"},{id:"road-b"}]);let r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"batch-replay"});const selection={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};const first=r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection});r.close();r=repo("2035-01-01T00:01:00.000Z");r.supersedeExactCandidate("player",batch.candidates[0]!.candidateId,batch.candidates[1]!.candidateId);expect(r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection})).toEqual(first);
-    const db=new DatabaseDriver(file());db.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46");db.prepare("UPDATE exact_candidate_batches_v46 SET request_digest=? WHERE batch_id=?").run("f".repeat(64),batch.batchId);expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection})).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
+  it("verifies the complete original batch before replay while allowing derived supersession", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road-a" }, { id: "road-b" }]);
+    let r = repo();
+    const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "batch-replay" });
+    const selection = {
+      candidateId: batch.candidates[0]!.candidateId,
+      kind: "actor.travel" as const,
+      version: "v1" as const,
+      choices: [] as [],
+    };
+    const first = r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection });
+    r.close();
+    r = repo("2035-01-01T00:01:00.000Z");
+    r.supersedeExactCandidate("player", batch.candidates[0]!.candidateId, batch.candidates[1]!.candidateId);
+    expect(r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection })).toEqual(first);
+    const db = new DatabaseDriver(file());
+    db.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46");
+    db.prepare("UPDATE exact_candidate_batches_v46 SET request_digest=? WHERE batch_id=?").run(
+      "f".repeat(64),
+      batch.batchId,
+    );
+    expect(() => r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection })).toThrow(
+      ExactCandidateIntegrityError,
+    );
+    db.close();
+    r.close();
+  });
 
-  it("rejects mismatched replay selection and masks a different GM",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"selection-replay"});const selection={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection});expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection:{...selection,choices:[{}] as never}})).toThrow();
-    const db=new DatabaseDriver(file());db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='member'").run(ids.campaignId);expect(()=>r.executeExactActorTravelCandidate("member",{turnId:ids.turnId,selection})).toThrow(ExactCandidateAuthorizationError);db.close();r.close();});
+  it("rejects mismatched replay selection and masks a different GM", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    const r = repo();
+    const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "selection-replay" });
+    const selection = {
+      candidateId: batch.candidates[0]!.candidateId,
+      kind: "actor.travel" as const,
+      version: "v1" as const,
+      choices: [] as [],
+    };
+    r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection });
+    expect(() =>
+      r.executeExactActorTravelCandidate("player", {
+        turnId: ids.turnId,
+        selection: { ...selection, choices: [{}] as never },
+      }),
+    ).toThrow();
+    const db = new DatabaseDriver(file());
+    db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='member'").run(
+      ids.campaignId,
+    );
+    expect(() => r.executeExactActorTravelCandidate("member", { turnId: ids.turnId, selection })).toThrow(
+      ExactCandidateAuthorizationError,
+    );
+    db.close();
+    r.close();
+  });
 
-  it.each(["request_digest","result_digest"] as const)("detects persisted world %s corruption on replay",(column)=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:`world-${column}`});const selection={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};const result=r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection});const db=new DatabaseDriver(file());const table=column==="request_digest"?"world_commands_v28":"world_receipts_v28";db.exec(`DROP TRIGGER ${table}_immutable_update`);db.prepare(`UPDATE ${table} SET ${column}=? WHERE command_id=?`).run("f".repeat(64),result.actorTravelResult.receipt.commandId);expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection})).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
+  it.each(["request_digest", "result_digest"] as const)("detects persisted world %s corruption on replay", (column) => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    const r = repo();
+    const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: `world-${column}` });
+    const selection = {
+      candidateId: batch.candidates[0]!.candidateId,
+      kind: "actor.travel" as const,
+      version: "v1" as const,
+      choices: [] as [],
+    };
+    const result = r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection });
+    const db = new DatabaseDriver(file());
+    const table = column === "request_digest" ? "world_commands_v28" : "world_receipts_v28";
+    db.exec(`DROP TRIGGER ${table}_immutable_update`);
+    db.prepare(`UPDATE ${table} SET ${column}=? WHERE command_id=?`).run(
+      "f".repeat(64),
+      result.actorTravelResult.receipt.commandId,
+    );
+    expect(() => r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection })).toThrow(
+      ExactCandidateIntegrityError,
+    );
+    db.close();
+    r.close();
+  });
 
-  it("detects v47 cross-binding corruption on replay",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"link-corrupt"});const selection={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection});const db=new DatabaseDriver(file());db.exec("DROP TRIGGER exact_candidate_executions_v47_immutable_update_v47");db.prepare("UPDATE exact_candidate_executions_v47 SET selection_digest=?").run("f".repeat(64));expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection})).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
+  it("detects v47 cross-binding corruption on replay", () => {
+    const ids = seed();
+    seedTravelWorld(ids, [{ id: "road" }]);
+    const r = repo();
+    const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: "link-corrupt" });
+    const selection = {
+      candidateId: batch.candidates[0]!.candidateId,
+      kind: "actor.travel" as const,
+      version: "v1" as const,
+      choices: [] as [],
+    };
+    r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection });
+    const db = new DatabaseDriver(file());
+    db.exec("DROP TRIGGER exact_candidate_executions_v47_immutable_update_v47");
+    db.prepare("UPDATE exact_candidate_executions_v47 SET selection_digest=?").run("f".repeat(64));
+    expect(() => r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection })).toThrow(
+      ExactCandidateIntegrityError,
+    );
+    db.close();
+    r.close();
+  });
 
-  it.each(["event","destination","party"] as const)("detects corrupted world %s evidence while masking outsiders",(kind)=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:`evidence-${kind}`});const selection={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};const result=r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection});const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");if(kind==="event"){db.exec("DROP TRIGGER world_events_v28_immutable_update");db.prepare("UPDATE world_events_v28 SET event_json=? WHERE command_id=?").run('{"destinationLocationId":"wrong","travelId":"wrong"}',result.actorTravelResult.receipt.commandId);}else if(kind==="destination")db.prepare("DELETE FROM world_travel_destinations_v28 WHERE command_id=?").run(result.actorTravelResult.receipt.commandId);else db.prepare("DELETE FROM world_travel_party_members_v28 WHERE command_id=?").run(result.actorTravelResult.receipt.commandId);expect(()=>r.executeExactActorTravelCandidate("member",{turnId:ids.turnId,selection})).toThrow(ExactCandidateAuthorizationError);expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection})).toThrow(ExactCandidateIntegrityError);db.close();r.close();});
+  it.each(["event", "destination", "party"] as const)(
+    "detects corrupted world %s evidence while masking outsiders",
+    (kind) => {
+      const ids = seed();
+      seedTravelWorld(ids, [{ id: "road" }]);
+      const r = repo();
+      const batch = r.generateActorTravelCandidates("player", {
+        turnId: ids.turnId,
+        idempotencyKey: `evidence-${kind}`,
+      });
+      const selection = {
+        candidateId: batch.candidates[0]!.candidateId,
+        kind: "actor.travel" as const,
+        version: "v1" as const,
+        choices: [] as [],
+      };
+      const result = r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection });
+      const db = new DatabaseDriver(file());
+      db.pragma("foreign_keys=OFF");
+      if (kind === "event") {
+        db.exec("DROP TRIGGER world_events_v28_immutable_update");
+        db.prepare("UPDATE world_events_v28 SET event_json=? WHERE command_id=?").run(
+          '{"destinationLocationId":"wrong","travelId":"wrong"}',
+          result.actorTravelResult.receipt.commandId,
+        );
+      } else if (kind === "destination")
+        db.prepare("DELETE FROM world_travel_destinations_v28 WHERE command_id=?").run(
+          result.actorTravelResult.receipt.commandId,
+        );
+      else
+        db.prepare("DELETE FROM world_travel_party_members_v28 WHERE command_id=?").run(
+          result.actorTravelResult.receipt.commandId,
+        );
+      expect(() => r.executeExactActorTravelCandidate("member", { turnId: ids.turnId, selection })).toThrow(
+        ExactCandidateAuthorizationError,
+      );
+      expect(() => r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection })).toThrow(
+        ExactCandidateIntegrityError,
+      );
+      db.close();
+      r.close();
+    },
+  );
 
-  it.each(["selection_candidate_id","travel_id","party_actor_ids_json"] as const)("rejects direct v47 insertion with inconsistent %s",(column)=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:`ddl-${column}`});const selection={candidateId:batch.candidates[0]!.candidateId,kind:"actor.travel" as const,version:"v1" as const,choices:[] as []};r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection});const db=new DatabaseDriver(file());db.exec("DROP TRIGGER exact_candidate_executions_v47_immutable_delete_v47");const row=db.prepare("SELECT * FROM exact_candidate_executions_v47").get() as Record<string,unknown>;db.prepare("DELETE FROM exact_candidate_executions_v47").run();row.execution_id=`copy-${column}`;row.candidate_id=`copy-${column}`;row[column]=column==="party_actor_ids_json"?'["wrong"]':"wrong";const keys=Object.keys(row);expect(()=>db.prepare(`INSERT INTO exact_candidate_executions_v47(${keys.join(",")}) VALUES(${keys.map(()=>"?").join(",")})`).run(...Object.values(row))).toThrow("v47 exact candidate execution binding is invalid");db.close();r.close();});
+  it.each(["selection_candidate_id", "travel_id", "party_actor_ids_json"] as const)(
+    "rejects direct v47 insertion with inconsistent %s",
+    (column) => {
+      const ids = seed();
+      seedTravelWorld(ids, [{ id: "road" }]);
+      const r = repo();
+      const batch = r.generateActorTravelCandidates("player", { turnId: ids.turnId, idempotencyKey: `ddl-${column}` });
+      const selection = {
+        candidateId: batch.candidates[0]!.candidateId,
+        kind: "actor.travel" as const,
+        version: "v1" as const,
+        choices: [] as [],
+      };
+      r.executeExactActorTravelCandidate("player", { turnId: ids.turnId, selection });
+      const db = new DatabaseDriver(file());
+      db.exec("DROP TRIGGER exact_candidate_executions_v47_immutable_delete_v47");
+      const row = db.prepare("SELECT * FROM exact_candidate_executions_v47").get() as Record<string, unknown>;
+      db.prepare("DELETE FROM exact_candidate_executions_v47").run();
+      row.execution_id = `copy-${column}`;
+      row.candidate_id = `copy-${column}`;
+      row[column] = column === "party_actor_ids_json" ? '["wrong"]' : "wrong";
+      const keys = Object.keys(row);
+      expect(() =>
+        db
+          .prepare(
+            `INSERT INTO exact_candidate_executions_v47(${keys.join(",")}) VALUES(${keys.map(() => "?").join(",")})`,
+          )
+          .run(...Object.values(row)),
+      ).toThrow("v47 exact candidate execution binding is invalid");
+      db.close();
+      r.close();
+    },
+  );
 });

@@ -2,8 +2,14 @@ import { ApiError } from "../../api";
 import type { NarrativeMutationState } from "./narrativeMutationRegistry";
 
 const DEFINITE_CODES = new Set([
-  "RPG_WORLD_STALE", "RPG_TRAVEL_CONFLICT", "RPG_NPC_CONFLICT", "RPG_FACTION_CONFLICT",
-  "RPG_QUEST_STALE", "RPG_QUEST_CONFLICT", "RPG_STORY_STALE", "RPG_STORY_CONFLICT",
+  "RPG_WORLD_STALE",
+  "RPG_TRAVEL_CONFLICT",
+  "RPG_NPC_CONFLICT",
+  "RPG_FACTION_CONFLICT",
+  "RPG_QUEST_STALE",
+  "RPG_QUEST_CONFLICT",
+  "RPG_STORY_STALE",
+  "RPG_STORY_CONFLICT",
 ]);
 
 export function isDefiniteNarrativeRejection(error: unknown): boolean {
@@ -15,18 +21,66 @@ export function receiptFrom(result: unknown): NarrativeMutationState["receipt"] 
   const receipt = (result as { receipt?: unknown }).receipt;
   if (typeof receipt !== "object" || receipt === null) return undefined;
   const value = receipt as Record<string, unknown>;
-  return typeof value.idempotencyKey === "string" && typeof value.revisionBefore === "number"
-    && typeof value.revisionAfter === "number" && typeof value.occurredAt === "string"
-    ? {idempotencyKey:value.idempotencyKey,revisionBefore:value.revisionBefore,revisionAfter:value.revisionAfter,occurredAt:value.occurredAt} : undefined;
+  return typeof value.idempotencyKey === "string" &&
+    typeof value.revisionBefore === "number" &&
+    typeof value.revisionAfter === "number" &&
+    typeof value.occurredAt === "string"
+    ? {
+        idempotencyKey: value.idempotencyKey,
+        revisionBefore: value.revisionBefore,
+        revisionAfter: value.revisionAfter,
+        occurredAt: value.occurredAt,
+      }
+    : undefined;
 }
 
-export function NarrativeMutationStatus({ mutation, onRefresh }: { mutation: NarrativeMutationState | null; onRefresh?: () => void }) {
+export function NarrativeMutationStatus({
+  mutation,
+  onRefresh,
+}: {
+  mutation: NarrativeMutationState | null;
+  onRefresh?: () => void;
+}) {
   if (!mutation) return null;
   const blocking = mutation.phase !== "consumed";
-  return <section className={blocking ? "studio-lock" : "studio-receipt"} role={blocking ? "alert" : "status"}>
-    <h2>{mutation.phase === "ambiguous" || mutation.phase === "pending" ? "Command outcome unresolved" : mutation.refresh === "partial" ? "Confirmed command; refresh partial" : "Confirmed command receipt"}</h2>
-    <p><strong>{mutation.operation}</strong> was submitted once at <time>{mutation.startedAt}</time>. {blocking ? "Duplicate and automatic replay are blocked." : "Authoritative role-filtered state was refreshed."}</p>
-    {mutation.receipt && <dl><div><dt>Revision</dt><dd>{mutation.receipt.revisionBefore} → {mutation.receipt.revisionAfter}</dd></div><div><dt>Occurred</dt><dd>{mutation.receipt.occurredAt}</dd></div><div><dt>Receipt key</dt><dd><code>{mutation.receipt.idempotencyKey}</code></dd></div></dl>}
-    {blocking && onRefresh && <button type="button" className="ghost" onClick={onRefresh}>Refresh authoritative state</button>}
-  </section>;
+  return (
+    <section className={blocking ? "studio-lock" : "studio-receipt"} role={blocking ? "alert" : "status"}>
+      <h2>
+        {mutation.phase === "ambiguous" || mutation.phase === "pending"
+          ? "Command outcome unresolved"
+          : mutation.refresh === "partial"
+            ? "Confirmed command; refresh partial"
+            : "Confirmed command receipt"}
+      </h2>
+      <p>
+        <strong>{mutation.operation}</strong> was submitted once at <time>{mutation.startedAt}</time>.{" "}
+        {blocking ? "Duplicate and automatic replay are blocked." : "Authoritative role-filtered state was refreshed."}
+      </p>
+      {mutation.receipt && (
+        <dl>
+          <div>
+            <dt>Revision</dt>
+            <dd>
+              {mutation.receipt.revisionBefore} → {mutation.receipt.revisionAfter}
+            </dd>
+          </div>
+          <div>
+            <dt>Occurred</dt>
+            <dd>{mutation.receipt.occurredAt}</dd>
+          </div>
+          <div>
+            <dt>Receipt key</dt>
+            <dd>
+              <code>{mutation.receipt.idempotencyKey}</code>
+            </dd>
+          </div>
+        </dl>
+      )}
+      {blocking && onRefresh && (
+        <button type="button" className="ghost" onClick={onRefresh}>
+          Refresh authoritative state
+        </button>
+      )}
+    </section>
+  );
 }

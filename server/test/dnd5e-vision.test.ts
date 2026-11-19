@@ -32,25 +32,54 @@ describe("SRD 5.1 obscurement", () => {
 describe("SRD 5.1 vision resolution", () => {
   it("blocks sight in darkness without a special sense", () => {
     const result = resolveDnd5eVision({ light: "darkness", obscurement: "none", distanceFeet: 30 });
-    expect(result).toMatchObject({ visible: false, unseen: true, attackDisadvantageAgainst: true, attackDisadvantageWhileUnseen: true, seesInDarkness: false });
+    expect(result).toMatchObject({
+      visible: false,
+      unseen: true,
+      attackDisadvantageAgainst: true,
+      attackDisadvantageWhileUnseen: true,
+      seesInDarkness: false,
+    });
   });
 
   it("reveals darkness within darkvision range but not beyond it", () => {
-    const near = resolveDnd5eVision({ light: "darkness", obscurement: "none", senses: ["darkvision"], senseRangeFeet: 60, distanceFeet: 30 });
+    const near = resolveDnd5eVision({
+      light: "darkness",
+      obscurement: "none",
+      senses: ["darkvision"],
+      senseRangeFeet: 60,
+      distanceFeet: 30,
+    });
     expect(near).toMatchObject({ visible: true, unseen: false, seesInDarkness: true });
-    const far = resolveDnd5eVision({ light: "darkness", obscurement: "none", senses: ["darkvision"], senseRangeFeet: 60, distanceFeet: 90 });
+    const far = resolveDnd5eVision({
+      light: "darkness",
+      obscurement: "none",
+      senses: ["darkvision"],
+      senseRangeFeet: 60,
+      distanceFeet: 90,
+    });
     expect(far).toMatchObject({ visible: false, unseen: true });
   });
 
   it("lets blindsight and truesight ignore darkness and obscurement entirely", () => {
     for (const sense of ["blindsight", "truesight"] as const) {
-      const result = resolveDnd5eVision({ light: "darkness", obscurement: "heavily-obscured", senses: [sense], distanceFeet: 100 });
+      const result = resolveDnd5eVision({
+        light: "darkness",
+        obscurement: "heavily-obscured",
+        senses: [sense],
+        distanceFeet: 100,
+      });
       expect(result).toMatchObject({ visible: true, unseen: false, effectiveObscurement: "none" });
     }
   });
 
   it("does not let darkvision see through heavy obscurement", () => {
-    const result = resolveDnd5eVision({ light: "bright-light", obscurement: "heavily-obscured", senses: ["darkvision"], senseRangeFeet: 60, distanceFeet: 10 });
+    const result = resolveDnd5eVision({
+      light: "bright-light",
+      obscurement: "heavily-obscured",
+      senses: ["darkvision"],
+      senseRangeFeet: 60,
+      distanceFeet: 10,
+    });
     expect(result).toMatchObject({ visible: false, unseen: true, effectiveObscurement: "heavily-obscured" });
   });
 

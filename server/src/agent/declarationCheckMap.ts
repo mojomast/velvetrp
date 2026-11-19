@@ -44,23 +44,104 @@ export interface DeclarationCheckVerbEntry {
 
 /** The 18 SRD 5.1 skill labels with their abilities, exactly as `adventureCheckRepo.ts` renders them. */
 export const DECLARATION_CHECK_SKILL_LABELS = Object.freeze([
-  ["Strength", "Athletics"], ["Dexterity", "Acrobatics"], ["Dexterity", "Sleight of Hand"], ["Dexterity", "Stealth"],
-  ["Intelligence", "Arcana"], ["Intelligence", "History"], ["Intelligence", "Investigation"], ["Intelligence", "Nature"],
-  ["Intelligence", "Religion"], ["Wisdom", "Animal Handling"], ["Wisdom", "Insight"], ["Wisdom", "Medicine"],
-  ["Wisdom", "Perception"], ["Wisdom", "Survival"], ["Charisma", "Deception"], ["Charisma", "Intimidation"],
-  ["Charisma", "Performance"], ["Charisma", "Persuasion"],
+  ["Strength", "Athletics"],
+  ["Dexterity", "Acrobatics"],
+  ["Dexterity", "Sleight of Hand"],
+  ["Dexterity", "Stealth"],
+  ["Intelligence", "Arcana"],
+  ["Intelligence", "History"],
+  ["Intelligence", "Investigation"],
+  ["Intelligence", "Nature"],
+  ["Intelligence", "Religion"],
+  ["Wisdom", "Animal Handling"],
+  ["Wisdom", "Insight"],
+  ["Wisdom", "Medicine"],
+  ["Wisdom", "Perception"],
+  ["Wisdom", "Survival"],
+  ["Charisma", "Deception"],
+  ["Charisma", "Intimidation"],
+  ["Charisma", "Performance"],
+  ["Charisma", "Persuasion"],
 ] as const);
 
-const MAGIC_CONTEXTS = Object.freeze(["magic", "magical", "arcane", "spell", "spells", "rune", "runes", "enchantment", "curse", "curses", "artifact", "artifacts"]);
+const MAGIC_CONTEXTS = Object.freeze([
+  "magic",
+  "magical",
+  "arcane",
+  "spell",
+  "spells",
+  "rune",
+  "runes",
+  "enchantment",
+  "curse",
+  "curses",
+  "artifact",
+  "artifacts",
+]);
 const HISTORY_CONTEXTS = Object.freeze(["history", "histories", "historical", "legend", "legends", "lore"]);
-const NATURE_CONTEXTS = Object.freeze(["nature", "natural", "plant", "plants", "animal", "animals", "beast", "beasts", "forest", "forests", "weather"]);
-const RELIGION_CONTEXTS = Object.freeze(["god", "gods", "goddess", "goddesses", "temple", "temples", "divine", "religion", "religious", "holy", "shrine", "shrines", "rite", "rites", "ritual", "rituals"]);
-const ANIMAL_CONTEXTS = Object.freeze(["animal", "animals", "beast", "beasts", "horse", "horses", "dog", "dogs", "wolf", "wolves", "creature", "creatures", "steed", "steeds"]);
+const NATURE_CONTEXTS = Object.freeze([
+  "nature",
+  "natural",
+  "plant",
+  "plants",
+  "animal",
+  "animals",
+  "beast",
+  "beasts",
+  "forest",
+  "forests",
+  "weather",
+]);
+const RELIGION_CONTEXTS = Object.freeze([
+  "god",
+  "gods",
+  "goddess",
+  "goddesses",
+  "temple",
+  "temples",
+  "divine",
+  "religion",
+  "religious",
+  "holy",
+  "shrine",
+  "shrines",
+  "rite",
+  "rites",
+  "ritual",
+  "rituals",
+]);
+const ANIMAL_CONTEXTS = Object.freeze([
+  "animal",
+  "animals",
+  "beast",
+  "beasts",
+  "horse",
+  "horses",
+  "dog",
+  "dogs",
+  "wolf",
+  "wolves",
+  "creature",
+  "creatures",
+  "steed",
+  "steeds",
+]);
 const RECALL_TRIGGERS = Object.freeze(["recall", "remember"]);
 
-const entry = (ability: string, skill: string, confidence: "strong" | "weak", triggers: readonly string[],
-  contexts?: readonly string[]): DeclarationCheckVerbEntry => Object.freeze({ ability, skill, confidence, triggers: Object.freeze([...triggers]),
-    ...(contexts ? { contexts } : {}) });
+const entry = (
+  ability: string,
+  skill: string,
+  confidence: "strong" | "weak",
+  triggers: readonly string[],
+  contexts?: readonly string[],
+): DeclarationCheckVerbEntry =>
+  Object.freeze({
+    ability,
+    skill,
+    confidence,
+    triggers: Object.freeze([...triggers]),
+    ...(contexts ? { contexts } : {}),
+  });
 
 /**
  * The exported verb table: strong entries may resolve a held turn, weak entries never do. Each
@@ -70,7 +151,16 @@ export const DECLARATION_CHECK_VERBS: readonly DeclarationCheckVerbEntry[] = Obj
   // Wisdom
   entry("Wisdom", "Perception", "strong", ["look", "spot", "observe", "watch", "listen", "hear"]),
   entry("Wisdom", "Perception", "weak", ["scan", "glance", "survey", "peer", "notice"]),
-  entry("Wisdom", "Insight", "strong", ["sense motive", "read someone", "read somebody", "read him", "read her", "read them", "read the room", "insight"]),
+  entry("Wisdom", "Insight", "strong", [
+    "sense motive",
+    "read someone",
+    "read somebody",
+    "read him",
+    "read her",
+    "read them",
+    "read the room",
+    "insight",
+  ]),
   entry("Wisdom", "Insight", "weak", ["read"]),
   entry("Wisdom", "Survival", "strong", ["track", "forage", "navigate", "survive"]),
   entry("Wisdom", "Survival", "weak", ["hunt", "scout", "follow tracks"]),
@@ -79,7 +169,14 @@ export const DECLARATION_CHECK_VERBS: readonly DeclarationCheckVerbEntry[] = Obj
   entry("Wisdom", "Animal Handling", "strong", ["calm", "soothe", "handle", "approach"], ANIMAL_CONTEXTS),
   entry("Wisdom", "Animal Handling", "weak", ["animal handling"]),
   // Intelligence
-  entry("Intelligence", "Investigation", "strong", ["search", "inspect", "examine", "investigate", "check for traps", "check for trap"]),
+  entry("Intelligence", "Investigation", "strong", [
+    "search",
+    "inspect",
+    "examine",
+    "investigate",
+    "check for traps",
+    "check for trap",
+  ]),
   entry("Intelligence", "Investigation", "weak", ["check", "study", "analyze", "scrutinize"]),
   entry("Intelligence", "Arcana", "strong", RECALL_TRIGGERS, MAGIC_CONTEXTS),
   entry("Intelligence", "Arcana", "weak", ["arcana"]),
@@ -97,7 +194,14 @@ export const DECLARATION_CHECK_VERBS: readonly DeclarationCheckVerbEntry[] = Obj
   entry("Dexterity", "Acrobatics", "weak", ["vault", "flip"]),
   entry("Dexterity", "Stealth", "strong", ["sneak", "hide", "creep", "skulk"]),
   entry("Dexterity", "Stealth", "weak", ["tiptoe", "silently", "stealthily", "quietly"]),
-  entry("Dexterity", "Sleight of Hand", "strong", ["pick a lock", "pick the lock", "pick lock", "pickpocket", "palm", "steal"]),
+  entry("Dexterity", "Sleight of Hand", "strong", [
+    "pick a lock",
+    "pick the lock",
+    "pick lock",
+    "pickpocket",
+    "palm",
+    "steal",
+  ]),
   entry("Dexterity", "Sleight of Hand", "weak", ["filch", "snatch", "swipe"]),
   // Charisma
   entry("Charisma", "Persuasion", "strong", ["persuade", "convince", "plead", "reason with"]),
@@ -146,29 +250,50 @@ function wordForms(word: string): ReadonlySet<string> {
     forms.add(`${word.slice(0, -1)}ing`);
   }
   if (word.endsWith("y")) {
-    forms.delete(`${word}s`); forms.delete(`${word}ed`); forms.delete(`${word}d`);
-    forms.add(`${word.slice(0, -1)}ies`); forms.add(`${word.slice(0, -1)}ied`);
+    forms.delete(`${word}s`);
+    forms.delete(`${word}ed`);
+    forms.delete(`${word}d`);
+    forms.add(`${word.slice(0, -1)}ies`);
+    forms.add(`${word.slice(0, -1)}ied`);
   }
   // A short consonant-vowel-consonant verb doubles its final consonant before -ing/-ed.
-  if (word.length >= 3 && /[^aeiou]/u.test(word.at(-3)!) && /[aeiou]/u.test(word.at(-2)!) && /[^aeiouwxy]/u.test(word.at(-1)!)) {
+  if (
+    word.length >= 3 &&
+    /[^aeiou]/u.test(word.at(-3)!) &&
+    /[aeiou]/u.test(word.at(-2)!) &&
+    /[^aeiouwxy]/u.test(word.at(-1)!)
+  ) {
     forms.add(`${word}${word.slice(-1)}ing`).add(`${word}${word.slice(-1)}ed`);
   }
   formsCache.set(word, forms);
   return forms;
 }
 
-interface CompiledTrigger { source: string; forms: readonly ReadonlySet<string>[]; }
-interface CompiledEntry { ability: string; skill: string; confidence: "strong" | "weak"; triggers: readonly CompiledTrigger[]; contexts: ReadonlySet<string> | null; }
+interface CompiledTrigger {
+  source: string;
+  forms: readonly ReadonlySet<string>[];
+}
+interface CompiledEntry {
+  ability: string;
+  skill: string;
+  confidence: "strong" | "weak";
+  triggers: readonly CompiledTrigger[];
+  contexts: ReadonlySet<string> | null;
+}
 
 /** The first and last phrase tokens inflect; interior tokens (articles, prepositions) match literally. */
 function compileTrigger(trigger: string): CompiledTrigger {
   const words = trigger.split(/\s+/u);
-  return { source: trigger, forms: words.map((word, index) =>
-    index === 0 || index === words.length - 1 ? wordForms(word) : new Set([word])) };
+  return {
+    source: trigger,
+    forms: words.map((word, index) => (index === 0 || index === words.length - 1 ? wordForms(word) : new Set([word]))),
+  };
 }
 
 const COMPILED_ENTRIES: readonly CompiledEntry[] = DECLARATION_CHECK_VERBS.map((value) => ({
-  ability: value.ability, skill: value.skill, confidence: value.confidence,
+  ability: value.ability,
+  skill: value.skill,
+  confidence: value.confidence,
   triggers: value.triggers.map(compileTrigger),
   contexts: value.contexts ? new Set(value.contexts.flatMap((context) => [...wordForms(context)])) : null,
 }));
@@ -179,7 +304,10 @@ function matchesTrigger(tokens: readonly string[], trigger: CompiledTrigger): bo
   for (let start = 0; start + length <= tokens.length; start += 1) {
     let matched = true;
     for (let offset = 0; offset < length; offset += 1) {
-      if (!trigger.forms[offset]!.has(tokens[start + offset]!)) { matched = false; break; }
+      if (!trigger.forms[offset]!.has(tokens[start + offset]!)) {
+        matched = false;
+        break;
+      }
     }
     if (matched) return true;
   }
@@ -194,14 +322,23 @@ function matchesEntry(tokens: readonly string[], value: CompiledEntry): string |
   return trigger.source;
 }
 
-const QUESTION_START = /^(?:where|what|who|whom|whose|why|when|how|which|is|are|was|were|do|does|did|can|could|should|would|will|shall|have|has|had|am|may|might|must)\b/u;
+const QUESTION_START =
+  /^(?:where|what|who|whom|whose|why|when|how|which|is|are|was|were|do|does|did|can|could|should|would|will|shall|have|has|had|am|may|might|must)\b/u;
 const QUESTION_PHRASE = /^(?:please\s+)?(?:tell|explain|describe|clarify)\b/u;
-const GREETING = /^(?:hi|hello|hey|howdy|yo|greetings|good\s+(?:morning|afternoon|evening)|farewell|goodbye|bye|thanks|thank\s+you|cheers|salutations)\b/u;
-const META_TALK = /^(?:ooc\b|out\s+of\s+character\b|let'?s\s+(?:take\s+a\s+break|pause|stop|wrap\s+up|move\s+on)\b|let\s+us\s+(?:take\s+a\s+break|pause|stop|wrap\s+up|move\s+on)\b|(?:i\s+think\s+we\s+should|maybe\s+we\s+should|we\s+should|we\s+need\s+to)\b|(?:can|could|should)\s+we\s+(?:pause|stop|take\s+a\s+break)\b|what(?:'s|\s+is)\s+(?:the|my|our)\s+(?:plan|hp|health)\b|roll\s+initiative\b|let\s+me\s+think\b)/u;
+const GREETING =
+  /^(?:hi|hello|hey|howdy|yo|greetings|good\s+(?:morning|afternoon|evening)|farewell|goodbye|bye|thanks|thank\s+you|cheers|salutations)\b/u;
+const META_TALK =
+  /^(?:ooc\b|out\s+of\s+character\b|let'?s\s+(?:take\s+a\s+break|pause|stop|wrap\s+up|move\s+on)\b|let\s+us\s+(?:take\s+a\s+break|pause|stop|wrap\s+up|move\s+on)\b|(?:i\s+think\s+we\s+should|maybe\s+we\s+should|we\s+should|we\s+need\s+to)\b|(?:can|could|should)\s+we\s+(?:pause|stop|take\s+a\s+break)\b|what(?:'s|\s+is)\s+(?:the|my|our)\s+(?:plan|hp|health)\b|roll\s+initiative\b|let\s+me\s+think\b)/u;
 
-function isQuestion(text: string): boolean { return text.endsWith("?") || QUESTION_START.test(text) || QUESTION_PHRASE.test(text); }
-function isGreeting(text: string): boolean { return GREETING.test(text); }
-function isMetaTalk(text: string): boolean { return META_TALK.test(text); }
+function isQuestion(text: string): boolean {
+  return text.endsWith("?") || QUESTION_START.test(text) || QUESTION_PHRASE.test(text);
+}
+function isGreeting(text: string): boolean {
+  return GREETING.test(text);
+}
+function isMetaTalk(text: string): boolean {
+  return META_TALK.test(text);
+}
 
 /**
  * Maps a declaration to at most one SRD skill check, or null when no conservative whole-word
@@ -215,9 +352,11 @@ export function mapDeclarationToCheck(declaration: string): DeclarationCheckMapp
   if (isQuestion(lowered) || isGreeting(lowered) || isMetaTalk(lowered)) return null;
   // Classification is not adjudication. Ambiguous, negated or routine prose must
   // remain with the director rather than silently spending a mechanical turn.
-  if (/\b(?:not|never|if|unless|would|could|might|ask|says|said)\b|\b(?:don['’]t|won['’]t|can['’]t)\b/u.test(lowered)) return null;
+  if (/\b(?:not|never|if|unless|would|could|might|ask|says|said)\b|\b(?:don['’]t|won['’]t|can['’]t)\b/u.test(lowered))
+    return null;
   if (/\b(?:hello|greet|greetings|say hi)\b/u.test(lowered)) return null;
-  if (/\bclimb\b.*\b(?:ladder|stairs)\b/u.test(lowered) && !/\b(?:broken|icy|slippery|combat|danger)\b/u.test(lowered)) return null;
+  if (/\bclimb\b.*\b(?:ladder|stairs)\b/u.test(lowered) && !/\b(?:broken|icy|slippery|combat|danger)\b/u.test(lowered))
+    return null;
   // Lock picking needs a tool-aware ruling, not a fabricated Sleight of Hand roll.
   if (/\bpick(?:ing)?\b.*\block\b/u.test(lowered)) return null;
   const tokens = lowered.match(/[a-z0-9]+/gu) ?? [];
@@ -227,7 +366,11 @@ export function mapDeclarationToCheck(declaration: string): DeclarationCheckMapp
   for (const value of COMPILED_ENTRIES) {
     const trigger = matchesEntry(tokens, value);
     if (!trigger) continue;
-    (value.confidence === "strong" ? strongHits : weakHits).push({ ability: value.ability, skill: value.skill, trigger });
+    (value.confidence === "strong" ? strongHits : weakHits).push({
+      ability: value.ability,
+      skill: value.skill,
+      trigger,
+    });
   }
   const strongSkills = [...new Set(strongHits.map((hit) => hit.skill))];
   // A single strong attempt wins over weak leanings; two unrelated strong skills are ambiguous.
@@ -236,17 +379,37 @@ export function mapDeclarationToCheck(declaration: string): DeclarationCheckMapp
     const hit = strongHits.find((candidate) => candidate.skill === strongSkills[0]!)!;
     // Ordinary looking/listening provides scene framing, not evidence of an uncertain task.
     // Keep it available for provider adjudication without manufacturing a DC 15 check on hold.
-    if (hit.skill === "Perception" && !/\b(?:hidden|concealed|faint|distant|ambush|danger|invisible)\b/u.test(lowered)) {
-      return { ability: hit.ability, skill: hit.skill, confidence: "weak",
-        rationale: "Observation alone does not establish uncertainty or a need for a Perception check." };
+    if (
+      hit.skill === "Perception" &&
+      !/\b(?:hidden|concealed|faint|distant|ambush|danger|invisible)\b/u.test(lowered)
+    ) {
+      return {
+        ability: hit.ability,
+        skill: hit.skill,
+        confidence: "weak",
+        rationale: "Observation alone does not establish uncertainty or a need for a Perception check.",
+      };
     }
-    const contextual = /\b(?:icy|sheer|slippery|impossible|underwater|raging|blindfolded|broken|disadvantage|advantage)\b/u.test(lowered);
-    return { ability: hit.ability, skill: hit.skill, confidence: contextual ? "weak" : "strong",
-      rationale: contextual ? `Situational ${hit.skill} attempt requires director adjudication of difficulty and roll mode.` : `Strong ${hit.skill} trigger "${hit.trigger}" for ${hit.ability}.` };
+    const contextual =
+      /\b(?:icy|sheer|slippery|impossible|underwater|raging|blindfolded|broken|disadvantage|advantage)\b/u.test(
+        lowered,
+      );
+    return {
+      ability: hit.ability,
+      skill: hit.skill,
+      confidence: contextual ? "weak" : "strong",
+      rationale: contextual
+        ? `Situational ${hit.skill} attempt requires director adjudication of difficulty and roll mode.`
+        : `Strong ${hit.skill} trigger "${hit.trigger}" for ${hit.ability}.`,
+    };
   }
   const weakSkills = [...new Set(weakHits.map((hit) => hit.skill))];
   if (weakSkills.length !== 1) return null;
   const hit = weakHits.find((candidate) => candidate.skill === weakSkills[0]!)!;
-  return { ability: hit.ability, skill: hit.skill, confidence: "weak",
-    rationale: `Weak ${hit.skill} trigger "${hit.trigger}" for ${hit.ability}.` };
+  return {
+    ability: hit.ability,
+    skill: hit.skill,
+    confidence: "weak",
+    rationale: `Weak ${hit.skill} trigger "${hit.trigger}" for ${hit.ability}.`,
+  };
 }

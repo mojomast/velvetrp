@@ -83,37 +83,45 @@ export const FREEFORM_MATERIALIZATION_CANDIDATE_CAP = 32;
 const MAX_ATTEMPT_CHARS = 4_000;
 
 /** One server-authored materialization candidate. IDs are opaque and server-owned. */
-export const freeformMaterializationCandidateSchema = z.object({
-  candidateId: z.string().min(1).max(200),
-  kind: z.enum(FREEFORM_MATERIALIZATION_KINDS),
-  label: z.string().min(1).max(200),
-}).strict();
+export const freeformMaterializationCandidateSchema = z
+  .object({
+    candidateId: z.string().min(1).max(200),
+    kind: z.enum(FREEFORM_MATERIALIZATION_KINDS),
+    label: z.string().min(1).max(200),
+  })
+  .strict();
 
 /** The bounded, server-authored lane state: identity plus the closed candidate list. */
-export const freeformMaterializationStateSchema = z.object({
-  campaignId: z.string().min(1).max(200),
-  sessionId: z.string().min(1).max(200),
-  attempt: z.string().min(1).max(MAX_ATTEMPT_CHARS),
-  candidates: z.array(freeformMaterializationCandidateSchema).min(1).max(FREEFORM_MATERIALIZATION_CANDIDATE_CAP),
-}).strict();
+export const freeformMaterializationStateSchema = z
+  .object({
+    campaignId: z.string().min(1).max(200),
+    sessionId: z.string().min(1).max(200),
+    attempt: z.string().min(1).max(MAX_ATTEMPT_CHARS),
+    candidates: z.array(freeformMaterializationCandidateSchema).min(1).max(FREEFORM_MATERIALIZATION_CANDIDATE_CAP),
+  })
+  .strict();
 
 export type FreeformMaterializationCandidate = z.infer<typeof freeformMaterializationCandidateSchema>;
 export type FreeformMaterializationState = z.infer<typeof freeformMaterializationStateSchema>;
 
 /** The strict shape of a recorded selection; an out-of-set or malformed answer records nothing. */
-export const freeformMaterializationSelectionSchema = z.object({
-  candidateId: z.string().min(1).max(200).nullable(),
-  kind: z.enum(FREEFORM_MATERIALIZATION_KINDS).nullable(),
-  needsContent: z.boolean().nullable(),
-  legal: z.boolean().nullable(),
-  signals: z.object({
-    needsContent: z.number().min(0).max(1).nullable(),
-    legal: z.number().min(0).max(1).nullable(),
-    candidate: z.number().min(0).max(1).nullable(),
-  }).strict(),
-  topSignal: z.number().min(0).max(1).nullable(),
-  reason: z.string().min(1).max(200),
-}).strict();
+export const freeformMaterializationSelectionSchema = z
+  .object({
+    candidateId: z.string().min(1).max(200).nullable(),
+    kind: z.enum(FREEFORM_MATERIALIZATION_KINDS).nullable(),
+    needsContent: z.boolean().nullable(),
+    legal: z.boolean().nullable(),
+    signals: z
+      .object({
+        needsContent: z.number().min(0).max(1).nullable(),
+        legal: z.number().min(0).max(1).nullable(),
+        candidate: z.number().min(0).max(1).nullable(),
+      })
+      .strict(),
+    topSignal: z.number().min(0).max(1).nullable(),
+    reason: z.string().min(1).max(200),
+  })
+  .strict();
 
 /** The advisory composition of the battery over model answers. */
 export interface FreeformMaterializationDecision {
@@ -151,7 +159,8 @@ export function buildFreeformMaterializationQuestions(state: FreeformMaterializa
   const attempt = boundedAttempt(state.attempt);
   const criteria: Record<string, string | null> = {};
   for (const candidate of state.candidates) criteria[candidate.candidateId] = `${candidate.kind}: ${candidate.label}`;
-  criteria[FREEFORM_MATERIALIZATION_NONE] = "No authored candidate is appropriate; narrate a hold or use the deterministic classifier";
+  criteria[FREEFORM_MATERIALIZATION_NONE] =
+    "No authored candidate is appropriate; narrate a hold or use the deterministic classifier";
   return {
     [FREEFORM_NEEDS_CONTENT_KEY]: {
       type: "noul",
@@ -217,7 +226,9 @@ export function composeFreeformMaterializationDecision(
     legal: legalSignal,
     candidate: choice?.signal ?? null,
   };
-  const answered = [needsSignal, legalSignal, choice?.signal].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const answered = [needsSignal, legalSignal, choice?.signal].filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
   const topSignal = answered.length === 0 ? null : Math.min(...answered);
 
   const fallback = (reason: string): FreeformMaterializationDecision => ({
@@ -332,22 +343,70 @@ export async function recordFreeformMaterializationShadowDecision(
  * satisfies it structurally; a test double can too. The lane never writes a table directly.
  */
 export interface FreeformMaterializationExecutionPort {
-  materializeFreeformTravel(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    text: string, options?: { candidateId?: string }): FreeformTravelMaterialization;
-  materializeFreeformNpc(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    text: string, options?: { candidateId?: string }): FreeformNpcMaterialization;
-  materializeFreeformEncounter(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    text: string, options?: { candidateId?: string }): FreeformEncounterMaterialization;
-  materializeFreeformShop(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    merchantNpcId: string, options?: { candidateId?: string }): FreeformShopMaterialization;
-  materializeFreeformLore(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    text: string, options?: { candidateId?: string }): FreeformLoreMaterialization;
-  materializeFreeformFaction(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    text: string, options?: { candidateId?: string }): FreeformFactionMaterialization;
-  materializeFreeformQuest(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    text: string, options?: { candidateId?: string }): FreeformQuestMaterialization;
-  materializeFreeformRumor(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    text: string, options?: { candidateId?: string }): FreeformRumorMaterialization;
+  materializeFreeformTravel(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformTravelMaterialization;
+  materializeFreeformNpc(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformNpcMaterialization;
+  materializeFreeformEncounter(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformEncounterMaterialization;
+  materializeFreeformShop(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    merchantNpcId: string,
+    options?: { candidateId?: string },
+  ): FreeformShopMaterialization;
+  materializeFreeformLore(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformLoreMaterialization;
+  materializeFreeformFaction(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformFactionMaterialization;
+  materializeFreeformQuest(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformQuestMaterialization;
+  materializeFreeformRumor(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformRumorMaterialization;
 }
 
 /**
@@ -413,24 +472,104 @@ function executeFreeformMaterializationCandidate(
   const options = { candidateId };
   switch (decision.kind) {
     case "materialize-location":
-      return { kind: "materialize-location", result: port.materializeFreeformTravel(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+      return {
+        kind: "materialize-location",
+        result: port.materializeFreeformTravel(
+          principalId,
+          input.campaignId,
+          input.sessionId,
+          input.actorId,
+          input.attempt,
+          options,
+        ),
+      };
     case "materialize-npc":
-      return { kind: "materialize-npc", result: port.materializeFreeformNpc(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+      return {
+        kind: "materialize-npc",
+        result: port.materializeFreeformNpc(
+          principalId,
+          input.campaignId,
+          input.sessionId,
+          input.actorId,
+          input.attempt,
+          options,
+        ),
+      };
     case "hostile-encounter":
-      return { kind: "hostile-encounter", result: port.materializeFreeformEncounter(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+      return {
+        kind: "hostile-encounter",
+        result: port.materializeFreeformEncounter(
+          principalId,
+          input.campaignId,
+          input.sessionId,
+          input.actorId,
+          input.attempt,
+          options,
+        ),
+      };
     case "shop-stock": {
       const merchantNpcId = input.merchantNpcId?.trim();
       if (!merchantNpcId) throw new Error("a shop-stock selection requires the authored merchant");
-      return { kind: "shop-stock", result: port.materializeFreeformShop(principalId, input.campaignId, input.sessionId, input.actorId, merchantNpcId, options) };
+      return {
+        kind: "shop-stock",
+        result: port.materializeFreeformShop(
+          principalId,
+          input.campaignId,
+          input.sessionId,
+          input.actorId,
+          merchantNpcId,
+          options,
+        ),
+      };
     }
     case "new-clue":
-      return { kind: "new-clue", result: port.materializeFreeformLore(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+      return {
+        kind: "new-clue",
+        result: port.materializeFreeformLore(
+          principalId,
+          input.campaignId,
+          input.sessionId,
+          input.actorId,
+          input.attempt,
+          options,
+        ),
+      };
     case "materialize-faction":
-      return { kind: "materialize-faction", result: port.materializeFreeformFaction(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+      return {
+        kind: "materialize-faction",
+        result: port.materializeFreeformFaction(
+          principalId,
+          input.campaignId,
+          input.sessionId,
+          input.actorId,
+          input.attempt,
+          options,
+        ),
+      };
     case "materialize-quest":
-      return { kind: "materialize-quest", result: port.materializeFreeformQuest(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+      return {
+        kind: "materialize-quest",
+        result: port.materializeFreeformQuest(
+          principalId,
+          input.campaignId,
+          input.sessionId,
+          input.actorId,
+          input.attempt,
+          options,
+        ),
+      };
     case "materialize-rumor":
-      return { kind: "materialize-rumor", result: port.materializeFreeformRumor(principalId, input.campaignId, input.sessionId, input.actorId, input.attempt, options) };
+      return {
+        kind: "materialize-rumor",
+        result: port.materializeFreeformRumor(
+          principalId,
+          input.campaignId,
+          input.sessionId,
+          input.actorId,
+          input.attempt,
+          options,
+        ),
+      };
     default:
       // A null kind is already rejected before this point; fail closed if one ever reaches here.
       throw new Error("lane selection has no materialization kind");

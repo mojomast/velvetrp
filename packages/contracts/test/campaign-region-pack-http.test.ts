@@ -39,11 +39,18 @@ describe("campaign region pack contracts", () => {
   it("rejects out-of-bounds counts, blank briefs, unknown fields, and bad anchors", () => {
     expect(campaignRegionPackRequestSchema.safeParse({ ...valid, locationCount: 3 }).success).toBe(false);
     expect(campaignRegionPackRequestSchema.safeParse({ ...valid, locationCount: 17 }).success).toBe(false);
-    expect(campaignRegionPackRequestSchema.safeParse({ ...valid, locationCount: MAX_REGION_PACK_LOCATIONS }).success).toBe(true);
+    expect(
+      campaignRegionPackRequestSchema.safeParse({ ...valid, locationCount: MAX_REGION_PACK_LOCATIONS }).success,
+    ).toBe(true);
     expect(campaignRegionPackRequestSchema.safeParse({ ...valid, brief: "   " }).success).toBe(false);
     expect(campaignRegionPackRequestSchema.safeParse({ ...valid, brief: "x".repeat(2_001) }).success).toBe(false);
     expect(campaignRegionPackRequestSchema.safeParse({ ...valid, tone: "x".repeat(201) }).success).toBe(false);
-    expect(campaignRegionPackRequestSchema.safeParse({ ...valid, exclusions: Array.from({ length: MAX_REGION_PACK_EXCLUSIONS + 1 }, (_value, index) => `e${index}`) }).success).toBe(false);
+    expect(
+      campaignRegionPackRequestSchema.safeParse({
+        ...valid,
+        exclusions: Array.from({ length: MAX_REGION_PACK_EXCLUSIONS + 1 }, (_value, index) => `e${index}`),
+      }).success,
+    ).toBe(false);
     expect(campaignRegionPackRequestSchema.safeParse({ ...valid, anchorLocationKey: "Bad Key" }).success).toBe(false);
     expect(campaignRegionPackRequestSchema.safeParse({ ...valid, campaignId: "campaign-1" }).success).toBe(false);
     expect(campaignRegionPackRequestSchema.safeParse({ ...valid, locationCount: 4.5 }).success).toBe(false);
@@ -59,8 +66,13 @@ describe("campaign region pack contracts", () => {
     const response = {
       campaignId: "campaign-1",
       draft: {
-        draftId: "draft-1", campaignId: "campaign-1", kind: "campaign-content", state: "applied",
-        revision: 2, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+        draftId: "draft-1",
+        campaignId: "campaign-1",
+        kind: "campaign-content",
+        state: "applied",
+        revision: 2,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
       },
       appliedArtifactKeys: ["river-gate", "river-gate-to-bell"],
       receipt: { receiptId: "receipt-1", appliedAt: "2026-01-01T00:00:00.000Z" },
@@ -68,8 +80,18 @@ describe("campaign region pack contracts", () => {
     };
     expect(campaignRegionPackResponseSchema.parse(response)).toEqual(response);
     expect(campaignRegionPackResponseSchema.safeParse({ ...response, appliedArtifactKeys: [] }).success).toBe(false);
-    expect(campaignRegionPackResponseSchema.safeParse({ ...response, appliedArtifactKeys: Array.from({ length: 129 }, (_v, i) => `k-${i}`) }).success).toBe(false);
-    expect(campaignRegionPackResponseSchema.safeParse({ ...response, startLocation: { artifactKey: null, locationId: "loc", name: "Loc", designatedAt: "2026-01-01T00:00:00.000Z" } }).success).toBe(false);
+    expect(
+      campaignRegionPackResponseSchema.safeParse({
+        ...response,
+        appliedArtifactKeys: Array.from({ length: 129 }, (_v, i) => `k-${i}`),
+      }).success,
+    ).toBe(false);
+    expect(
+      campaignRegionPackResponseSchema.safeParse({
+        ...response,
+        startLocation: { artifactKey: null, locationId: "loc", name: "Loc", designatedAt: "2026-01-01T00:00:00.000Z" },
+      }).success,
+    ).toBe(false);
     expect(campaignRegionPackResponseSchema.parse({ ...response, startLocation: null }).startLocation).toBeNull();
     expect(campaignRegionPackResponseSchema.safeParse({ ...response, providerPayload: "private" }).success).toBe(false);
   });

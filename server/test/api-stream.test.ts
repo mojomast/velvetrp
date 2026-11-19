@@ -21,7 +21,7 @@ const validCharacter = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 };
 
 interface SseEvent {

@@ -35,7 +35,8 @@ const ownerCorruptions = [
   "missing-principal-parent",
 ] as const;
 const ownerIntegrityCases = nonOwnerCampaigns.flatMap(({ role, campaignId }) =>
-  ownerCorruptions.map((corruption) => ({ role, campaignId, corruption })));
+  ownerCorruptions.map((corruption) => ({ role, campaignId, corruption })),
+);
 
 function dataDir(): string {
   return process.env.VELVET_DATA_DIR as string;
@@ -54,23 +55,23 @@ function seedCampaigns(): void {
   const insert = db.transaction((campaign: SeedCampaign) => {
     const ownerPrincipalId = campaign.actorRole === "owner" ? actorId : "local-owner";
     const timelineId = `timeline-${campaign.id}`;
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)`).run(
-      campaign.id,
-      campaign.name,
+      VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(campaign.id, campaign.name, timelineId, ownerPrincipalId, campaign.createdAt, campaign.createdAt);
+    db.prepare("INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES (?, ?, ?)").run(
       timelineId,
-      ownerPrincipalId,
-      campaign.createdAt,
+      campaign.id,
       campaign.createdAt,
     );
-    db.prepare("INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES (?, ?, ?)")
-      .run(timelineId, campaign.id, campaign.createdAt);
-    db.prepare("INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at) VALUES (?, ?, 'owner', ?)")
-      .run(campaign.id, ownerPrincipalId, campaign.createdAt);
+    db.prepare(
+      "INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at) VALUES (?, ?, 'owner', ?)",
+    ).run(campaign.id, ownerPrincipalId, campaign.createdAt);
     if (campaign.actorRole !== "owner") {
-      db.prepare("INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at) VALUES (?, ?, ?, ?)")
-        .run(campaign.id, actorId, campaign.actorRole, campaign.createdAt);
+      db.prepare(
+        "INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at) VALUES (?, ?, ?, ?)",
+      ).run(campaign.id, actorId, campaign.actorRole, campaign.createdAt);
     }
   });
   for (const campaign of campaigns) insert.immediate(campaign);
@@ -100,10 +101,18 @@ describe("authorized campaign queries", () => {
       actorRole: "player",
     });
     expect(Object.keys(result[1]!)).toEqual([
-      "id", "name", "activeTimelineId", "ownerPrincipalId", "createdAt", "updatedAt", "actorRole",
+      "id",
+      "name",
+      "activeTimelineId",
+      "ownerPrincipalId",
+      "createdAt",
+      "updatedAt",
+      "actorRole",
     ]);
     expect(repository.listCampaigns("local-owner").map(({ id }) => id)).toEqual([
-      "campaign-a", "campaign-b", "campaign-c",
+      "campaign-a",
+      "campaign-b",
+      "campaign-c",
     ]);
     repository.close();
   });
@@ -227,16 +236,18 @@ describe("authorized campaign queries", () => {
     db.prepare("UPDATE campaigns SET owner_principal_id = 'local-owner' WHERE id = 'campaign-z'").run();
     db.exec("DROP INDEX idx_campaign_memberships_one_owner");
     db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES ('second-owner', 'Second owner', 0)").run();
-    db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-      VALUES ('campaign-b', 'second-owner', 'owner', '2030-02-02T00:00:00.000Z')`).run();
+    db.prepare(
+      `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+      VALUES ('campaign-b', 'second-owner', 'owner', '2030-02-02T00:00:00.000Z')`,
+    ).run();
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     expect(repository.getCampaign(actorId, "campaign-z")).toBeNull();
-    expect(() => repository.getCampaign("local-owner", "campaign-b"))
-      .toThrow("campaign owner authorization is malformed");
-    expect(() => repository.getCampaign(actorId, "campaign-b"))
-      .toThrow("campaign owner authorization is malformed");
+    expect(() => repository.getCampaign("local-owner", "campaign-b")).toThrow(
+      "campaign owner authorization is malformed",
+    );
+    expect(() => repository.getCampaign(actorId, "campaign-b")).toThrow("campaign owner authorization is malformed");
     expect(() => repository.listCampaigns(actorId)).toThrow("campaign owner authorization is malformed");
     repository.close();
   });
@@ -252,22 +263,26 @@ describe("authorized campaign queries", () => {
         db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = ? AND role = 'owner'").run(campaignId);
       } else if (corruption === "duplicate-membership") {
         db.exec("DROP INDEX idx_campaign_memberships_one_owner");
-        db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES ('matrix-second-owner', 'Second owner', 0)").run();
-        db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-          VALUES (?, 'matrix-second-owner', 'owner', '2030-04-01T00:00:00.000Z')`).run(campaignId);
+        db.prepare(
+          "INSERT INTO principals (id, display_name, is_local) VALUES ('matrix-second-owner', 'Second owner', 0)",
+        ).run();
+        db.prepare(
+          `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+          VALUES (?, 'matrix-second-owner', 'owner', '2030-04-01T00:00:00.000Z')`,
+        ).run(campaignId);
       } else if (corruption === "pointer-mismatch") {
         db.prepare("UPDATE campaigns SET owner_principal_id = ? WHERE id = ?").run(actorId, campaignId);
       } else if (corruption === "malformed-membership") {
-        db.prepare("UPDATE campaign_memberships SET created_at = 'not-canonical' WHERE campaign_id = ? AND role = 'owner'")
-          .run(campaignId);
+        db.prepare(
+          "UPDATE campaign_memberships SET created_at = 'not-canonical' WHERE campaign_id = ? AND role = 'owner'",
+        ).run(campaignId);
       } else {
         db.prepare("DELETE FROM principals WHERE id = 'local-owner'").run();
       }
       db.close();
       const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
-      expect(() => repository.getCampaign(actorId, campaignId))
-        .toThrow("campaign owner authorization is malformed");
+      expect(() => repository.getCampaign(actorId, campaignId)).toThrow("campaign owner authorization is malformed");
       expect(() => repository.listCampaigns(actorId)).toThrow("campaign owner authorization is malformed");
       expect(repository.getCampaign("missing-principal", campaignId)).toBeNull();
       repository.close();
@@ -293,10 +308,12 @@ describe("authorized campaign queries", () => {
     const db = new DatabaseDriver(databasePath());
     db.pragma("foreign_keys = OFF");
     db.pragma("ignore_check_constraints = ON");
-    db.prepare("UPDATE campaign_memberships SET role = 'admin' WHERE campaign_id = 'campaign-c' AND principal_id = ?")
-      .run(actorId);
+    db.prepare(
+      "UPDATE campaign_memberships SET role = 'admin' WHERE campaign_id = 'campaign-c' AND principal_id = ?",
+    ).run(actorId);
     db.prepare("DELETE FROM principals WHERE id = ?").run(actorId);
-    deleteCampaignForCorruptionTest(db,"campaign-c");db.prepare("DELETE FROM campaigns WHERE id = 'campaign-c'").run();
+    deleteCampaignForCorruptionTest(db, "campaign-c");
+    db.prepare("DELETE FROM campaigns WHERE id = 'campaign-c'").run();
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
@@ -309,8 +326,10 @@ describe("authorized campaign queries", () => {
     seedCampaigns();
     const db = new DatabaseDriver(databasePath());
     db.pragma("ignore_check_constraints = ON");
-    db.prepare(`UPDATE campaign_memberships SET created_at = 'not-canonical'
-      WHERE campaign_id = 'campaign-b' AND principal_id = ?`).run(actorId);
+    db.prepare(
+      `UPDATE campaign_memberships SET created_at = 'not-canonical'
+      WHERE campaign_id = 'campaign-b' AND principal_id = ?`,
+    ).run(actorId);
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.getCampaign(actorId, "campaign-b")).toThrow();
@@ -343,8 +362,9 @@ describe("authorized campaign queries", () => {
 
     expect(result?.actorRole).toBe("observer");
     expect(() => expired!.listCampaigns("invalid actor")).toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getCampaign("invalid actor", "invalid campaign"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.getCampaign("invalid actor", "invalid campaign")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
   });
 

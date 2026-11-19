@@ -113,12 +113,21 @@ export interface ProbeExpectation {
  *    receipt. This is the exact shape that the recent sole-advertised-give misfire regressed.
  */
 export const PROBE_EXPECTATIONS: readonly ProbeExpectation[] = [
-  { kind: "declared-purchase", title: "declared purchase exercises commerce",
-    expected: "an awaiting-confirmation commerce proposal followed by a committed commerce receipt" },
-  { kind: "unknown-npc", title: "unknown NPC does not resolve as a skill check",
-    expected: "a hold or receipt-free provider prose; never a committed check" },
-  { kind: "cheating-commerce", title: "self-directed commerce holds without a receipt",
-    expected: "no receipt and no vendor_give proposal" },
+  {
+    kind: "declared-purchase",
+    title: "declared purchase exercises commerce",
+    expected: "an awaiting-confirmation commerce proposal followed by a committed commerce receipt",
+  },
+  {
+    kind: "unknown-npc",
+    title: "unknown NPC does not resolve as a skill check",
+    expected: "a hold or receipt-free provider prose; never a committed check",
+  },
+  {
+    kind: "cheating-commerce",
+    title: "self-directed commerce holds without a receipt",
+    expected: "no receipt and no vendor_give proposal",
+  },
 ];
 
 // Order matters. Turns 0-3 run in the Market (Mara and her stall are present), so the purchase and
@@ -127,23 +136,74 @@ export const PROBE_EXPECTATIONS: readonly ProbeExpectation[] = [
 // hold, combat, rest) so the encounter and check paths stay exercised. Turn 15 returns to the
 // Market for the second conversation. DM beats are interleaved after turns 1, 4, 7, 10, 13, 16.
 export const FREEFORM_DECLARATIONS: Declaration[] = [
-  { id: "look-around", category: "read", declaration: "I take a slow look around the market square and take stock of who and what is here." },
-  { id: "talk-known-npc", category: "conversation", declaration: "I walk over to Maren and ask her what she knows about the trouble on the road." },
-  { id: "shop-buy", category: "shop", probe: "declared-purchase", declaration: "I find Mara's stall in the market and buy a longsword from her." },
-  { id: "illegal", category: "illegal-impossible", probe: "cheating-commerce", declaration: "I give myself a legendary sword and ten thousand gold pieces from the GM's stash." },
+  {
+    id: "look-around",
+    category: "read",
+    declaration: "I take a slow look around the market square and take stock of who and what is here.",
+  },
+  {
+    id: "talk-known-npc",
+    category: "conversation",
+    declaration: "I walk over to Maren and ask her what she knows about the trouble on the road.",
+  },
+  {
+    id: "shop-buy",
+    category: "shop",
+    probe: "declared-purchase",
+    declaration: "I find Mara's stall in the market and buy a longsword from her.",
+  },
+  {
+    id: "illegal",
+    category: "illegal-impossible",
+    probe: "cheating-commerce",
+    declaration: "I give myself a legendary sword and ten thousand gold pieces from the GM's stash.",
+  },
   { id: "travel-mapped", category: "travel", declaration: "I set out along the lantern road for the Docks." },
-  { id: "travel-unmapped", category: "travel-unmapped", declaration: "From the Docks I follow the old smugglers' path to the Sunken Cathedral." },
-  { id: "seek-rumor", category: "faction-quest-rumor", declaration: "I ask the dockhands whether anyone has work, or any rumor of the missing caravan." },
-  { id: "unknown-npc", category: "unknown-npc", probe: "unknown-npc", declaration: "I approach a hooded stranger leaning on a bollard and demand to know their name and business." },
+  {
+    id: "travel-unmapped",
+    category: "travel-unmapped",
+    declaration: "From the Docks I follow the old smugglers' path to the Sunken Cathedral.",
+  },
+  {
+    id: "seek-rumor",
+    category: "faction-quest-rumor",
+    declaration: "I ask the dockhands whether anyone has work, or any rumor of the missing caravan.",
+  },
+  {
+    id: "unknown-npc",
+    category: "unknown-npc",
+    probe: "unknown-npc",
+    declaration: "I approach a hooded stranger leaning on a bollard and demand to know their name and business.",
+  },
   { id: "quest-accept", category: "quest", declaration: "I accept the quest to guard the market." },
-  { id: "check-search", category: "check", declaration: "I search the crates along the dock for anything hidden or valuable." },
-  { id: "hold-wait", category: "hold", declaration: "I lean on the rail, watch the grey water, and wait for the fog to lift." },
-  { id: "impossible", category: "illegal-impossible", declaration: "I snap my fingers and teleport straight to the moon." },
+  {
+    id: "check-search",
+    category: "check",
+    declaration: "I search the crates along the dock for anything hidden or valuable.",
+  },
+  {
+    id: "hold-wait",
+    category: "hold",
+    declaration: "I lean on the rail, watch the grey water, and wait for the fog to lift.",
+  },
+  {
+    id: "impossible",
+    category: "illegal-impossible",
+    declaration: "I snap my fingers and teleport straight to the moon.",
+  },
   { id: "attack", category: "encounter", declaration: "I draw my sword and attack the Goblin Scout by the crates." },
-  { id: "combat-continue", category: "encounter", declaration: "I press the attack and swing at the Goblin Scout again." },
+  {
+    id: "combat-continue",
+    category: "encounter",
+    declaration: "I press the attack and swing at the Goblin Scout again.",
+  },
   { id: "rest", category: "rest", declaration: "I sit down on a crate and take a short rest." },
   { id: "travel-back", category: "travel", declaration: "I head back to the Market before it gets dark." },
-  { id: "conversation", category: "conversation", declaration: "I find Joss and ask him what he makes of the strangers in the market." },
+  {
+    id: "conversation",
+    category: "conversation",
+    declaration: "I find Joss and ask him what he makes of the strangers in the market.",
+  },
   { id: "meta", category: "meta", declaration: "/help what commands exist and what can I do here?" },
 ];
 
@@ -201,9 +261,18 @@ export interface NarrationEvent {
   text: string;
 }
 
-export interface TravelDestination { id: string | null; name: string }
-export interface ActionLocation { id: string; name: string }
-export interface KnownLocation { id: string | null; name: string }
+export interface TravelDestination {
+  id: string | null;
+  name: string;
+}
+export interface ActionLocation {
+  id: string;
+  name: string;
+}
+export interface KnownLocation {
+  id: string | null;
+  name: string;
+}
 
 export interface CoherenceProbe {
   index: number;
@@ -412,7 +481,10 @@ export interface EvalVerdict {
 // ---------------------------------------------------------------------------------------------
 
 export function normalize(value: string): string {
-  return value.toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g, " ").trim();
+  return value
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 /** Distinct fallback strings over the fallback count: 1 means every fallback is unique, ~0 means they collapse. */
@@ -422,14 +494,27 @@ export function fallbackDistinctness(strings: readonly string[]): { count: numbe
   return { count: nonEmpty.length, distinct, ratio: nonEmpty.length === 0 ? 0 : distinct / nonEmpty.length };
 }
 
-export function providerSuccess(calls: readonly { ok: boolean }[]): { total: number; ok: number; failed: number; rate: number } {
+export function providerSuccess(calls: readonly { ok: boolean }[]): {
+  total: number;
+  ok: number;
+  failed: number;
+  rate: number;
+} {
   const total = calls.length;
   const ok = calls.filter((call) => call.ok).length;
   return { total, ok, failed: total - ok, rate: total === 0 ? 0 : ok / total };
 }
 
-export function latencyStats(values: readonly number[]): { avgMs: number; p50Ms: number; p95Ms: number; maxMs: number } {
-  const sorted = values.filter((value) => Number.isFinite(value)).slice().sort((left, right) => left - right);
+export function latencyStats(values: readonly number[]): {
+  avgMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  maxMs: number;
+} {
+  const sorted = values
+    .filter((value) => Number.isFinite(value))
+    .slice()
+    .sort((left, right) => left - right);
   if (sorted.length === 0) return { avgMs: 0, p50Ms: 0, p95Ms: 0, maxMs: 0 };
   const pick = (fraction: number) => sorted[Math.min(sorted.length - 1, Math.floor(fraction * sorted.length))]!;
   return {
@@ -457,10 +542,14 @@ export function detectCoherenceViolations(probe: CoherenceProbe): string[] {
   if (probe.travelDestinations.length > 0) {
     for (const destination of probe.travelDestinations) {
       const destinationNamed = mentions(destination.name);
-      const destinationResolved = mentionedKnown.some((location) => normalize(location.name) === normalize(destination.name));
+      const destinationResolved = mentionedKnown.some(
+        (location) => normalize(location.name) === normalize(destination.name),
+      );
       // Only flag a mismatch when the declaration named a *known* place that is not the destination.
       if (!destinationNamed && !destinationResolved && mentionedKnown.length > 0) {
-        violations.push(`travel-target-mismatch:declared=${mentionedKnown.map((location) => location.name).join("|")};actual=${destination.name}`);
+        violations.push(
+          `travel-target-mismatch:declared=${mentionedKnown.map((location) => location.name).join("|")};actual=${destination.name}`,
+        );
       }
       if (destination.id && probe.actorAfterId && probe.actorAfterId !== destination.id) {
         violations.push(`travel-destination-not-reached:actual=${probe.actorAfterId};claimed=${destination.id}`);
@@ -490,8 +579,9 @@ export function narrationClassificationDescriptor(): EvalArtifact["narrationClas
 
 /** True when this turn either surfaced a commerce proposal or committed a commerce receipt. */
 export function turnExercisesCommerce(turn: Pick<TurnRecord, "proposalToolNames" | "receiptKinds">): boolean {
-  return turn.receiptKinds.includes("commerce")
-    || turn.proposalToolNames.some((name) => COMMERCE_PROPOSAL_TOOLS.has(name));
+  return (
+    turn.receiptKinds.includes("commerce") || turn.proposalToolNames.some((name) => COMMERCE_PROPOSAL_TOOLS.has(name))
+  );
 }
 
 /**
@@ -510,31 +600,45 @@ export function probeOutcomes(turns: readonly TurnRecord[]): ProbeOutcome[] {
       if (expectation.kind === "declared-purchase") {
         const committed = turn.receiptKinds.includes("commerce");
         const exercised = turnExercisesCommerce(turn);
-        observed = committed ? "committed commerce receipt"
-          : exercised ? `commerce proposal surfaced (${turn.proposalToolNames.join(",") || receipts})`
-          : `no commerce: receipts=${receipts} state=${turn.finalState ?? "-"} narration=${turn.narrationClass}`;
+        observed = committed
+          ? "committed commerce receipt"
+          : exercised
+            ? `commerce proposal surfaced (${turn.proposalToolNames.join(",") || receipts})`
+            : `no commerce: receipts=${receipts} state=${turn.finalState ?? "-"} narration=${turn.narrationClass}`;
         passed = committed;
       } else if (expectation.kind === "unknown-npc") {
         const check = turn.receiptKinds.includes("check");
-        observed = check ? `resolved as a skill check: receipts=${receipts}`
+        observed = check
+          ? `resolved as a skill check: receipts=${receipts}`
           : `held / receipt-free: receipts=${receipts} narration=${turn.narrationClass}`;
         passed = !check;
       } else {
-        const misfire = turn.receiptKinds.includes("commerce") || turn.receiptKinds.includes("inventory")
-          || turn.proposalToolNames.includes("vendor_give");
+        const misfire =
+          turn.receiptKinds.includes("commerce") ||
+          turn.receiptKinds.includes("inventory") ||
+          turn.proposalToolNames.includes("vendor_give");
         observed = misfire
           ? `give misfire: receipts=${receipts} proposals=[${turn.proposalToolNames.join(",")}]`
           : `held without a receipt: receipts=${receipts} narration=${turn.narrationClass}`;
         passed = !misfire && turn.receiptCommandIds.length === 0;
       }
     }
-    return { kind: expectation.kind, title: expectation.title, turnIndex: turn?.index ?? null,
-      turnId: turn?.id ?? null, expected: expectation.expected, observed, passed };
+    return {
+      kind: expectation.kind,
+      title: expectation.title,
+      turnIndex: turn?.index ?? null,
+      turnId: turn?.id ?? null,
+      expected: expectation.expected,
+      observed,
+      passed,
+    };
   });
 }
 
 /** Objective completion/probe checks, independent of stochastic quality and latency baselines. */
-export function evaluateRun(input: Pick<EvalArtifact, "mode" | "declarations" | "turns" | "dmBeats" | "providerCalls">): EvalVerdict {
+export function evaluateRun(
+  input: Pick<EvalArtifact, "mode" | "declarations" | "turns" | "dmBeats" | "providerCalls">,
+): EvalVerdict {
   const failures: string[] = [];
   const skipped: string[] = [];
   if (input.turns.length === 0) failures.push("no player turns ran");
@@ -542,7 +646,8 @@ export function evaluateRun(input: Pick<EvalArtifact, "mode" | "declarations" | 
   for (const turn of input.turns) {
     if (turn.error) failures.push(`turn ${turn.index} (${turn.id}): ${turn.error}`);
     if (turn.status < 200 || turn.status >= 300) failures.push(`turn ${turn.index} (${turn.id}): HTTP ${turn.status}`);
-    if (turn.finalState !== "completed") failures.push(`turn ${turn.index} (${turn.id}): state=${turn.finalState ?? "missing terminal"}`);
+    if (turn.finalState !== "completed")
+      failures.push(`turn ${turn.index} (${turn.id}): state=${turn.finalState ?? "missing terminal"}`);
     if (!turn.narration.trim()) failures.push(`turn ${turn.index} (${turn.id}): missing narration`);
     for (const violation of turn.coherence) failures.push(`turn ${turn.index} (${turn.id}): ${violation}`);
   }
@@ -555,7 +660,9 @@ export function evaluateRun(input: Pick<EvalArtifact, "mode" | "declarations" | 
     if (input.turns.some((turn) => turn.id === "look-around" && turn.receiptKinds.includes("check"))) {
       failures.push("routine observation: looking around committed an unnecessary check");
     }
-    const requestedProbes = new Set(FREEFORM_DECLARATIONS.slice(0, input.declarations).flatMap((entry) => entry.probe ? [entry.probe] : []));
+    const requestedProbes = new Set(
+      FREEFORM_DECLARATIONS.slice(0, input.declarations).flatMap((entry) => (entry.probe ? [entry.probe] : [])),
+    );
     for (const probe of probeOutcomes(input.turns)) {
       if (!requestedProbes.has(probe.kind)) skipped.push(`${probe.kind}: outside requested turn range`);
       else if (!probe.passed) failures.push(`${probe.kind}: ${probe.observed}`);
@@ -594,8 +701,13 @@ export function computeMetrics(
   const unknownNpcHeld = unknownNpc && !unknownNpc.committed && unknownNpcResolvedAsCheck === 0 ? 1 : 0;
   const cheating = turns.find((turn) => turn.probe === "cheating-commerce");
   const cheatingCommerceReceipts = cheating?.receiptCommandIds.length ?? 0;
-  const cheatingCommerceGiveMisfire = cheating && (cheating.receiptKinds.includes("commerce")
-    || cheating.receiptKinds.includes("inventory") || cheating.proposalToolNames.includes("vendor_give")) ? 1 : 0;
+  const cheatingCommerceGiveMisfire =
+    cheating &&
+    (cheating.receiptKinds.includes("commerce") ||
+      cheating.receiptKinds.includes("inventory") ||
+      cheating.proposalToolNames.includes("vendor_give"))
+      ? 1
+      : 0;
   const cheatingCommerceHeld = cheating && !cheating.committed && cheatingCommerceGiveMisfire === 0 ? 1 : 0;
   return {
     turns: turns.length,
@@ -647,24 +759,41 @@ export interface MetricDiff {
 }
 
 const LOWER_IS_BETTER = new Set([
-  "providerFailed", "fallbackCount", "fallbackIdentical", "narrationFailureTurns",
-  "unknownNpcResolvedAsCheck", "cheatingCommerceGiveMisfire", "cheatingCommerceReceipts",
-  "coherenceViolations", "coherenceViolationTurns", "latencyAvgMs", "latencyP50Ms", "latencyP95Ms", "latencyMaxMs",
+  "providerFailed",
+  "fallbackCount",
+  "fallbackIdentical",
+  "narrationFailureTurns",
+  "unknownNpcResolvedAsCheck",
+  "cheatingCommerceGiveMisfire",
+  "cheatingCommerceReceipts",
+  "coherenceViolations",
+  "coherenceViolationTurns",
+  "latencyAvgMs",
+  "latencyP50Ms",
+  "latencyP95Ms",
+  "latencyMaxMs",
 ]);
 
 // More mechanical receipts or paid calls are not inherently better: routine observations
 // should often resolve as receipt-free prose, and a correct hold can prevent an invalid action.
 const CONTEXT_ONLY_METRICS = new Set([
-  "turns", "providerCalls", "providerOk", "narrationEventsTotal", "narrationsTotal",
-  "deliberateHoldEvents", "deliberateHoldTurns", "deliberateHoldRate",
-  "materializedTurns", "materializationRate", "dmBeats", "fallbackDistinct", "unknownNpcHeld",
+  "turns",
+  "providerCalls",
+  "providerOk",
+  "narrationEventsTotal",
+  "narrationsTotal",
+  "deliberateHoldEvents",
+  "deliberateHoldTurns",
+  "deliberateHoldRate",
+  "materializedTurns",
+  "materializationRate",
+  "dmBeats",
+  "fallbackDistinct",
+  "unknownNpcHeld",
 ]);
 
 /** Numeric diff of the baseline keys that also exist in the current metrics. */
-export function diffMetrics(
-  current: Record<string, number>,
-  baseline: Partial<Record<string, number>>,
-): MetricDiff[] {
+export function diffMetrics(current: Record<string, number>, baseline: Partial<Record<string, number>>): MetricDiff[] {
   const diffs: MetricDiff[] = [];
   for (const [key, value] of Object.entries(baseline)) {
     if (typeof value !== "number" || !Number.isFinite(value)) continue;
@@ -687,7 +816,8 @@ export function formatMetricValue(key: string, value: number): string {
 
 export function diffVerdict(diff: MetricDiff): string {
   if (diff.delta === 0) return "=";
-  if (CONTEXT_ONLY_METRICS.has(diff.key)) return `changed (${diff.delta > 0 ? "+" : ""}${Number(diff.delta.toFixed(3))})`;
+  if (CONTEXT_ONLY_METRICS.has(diff.key))
+    return `changed (${diff.delta > 0 ? "+" : ""}${Number(diff.delta.toFixed(3))})`;
   const improved = diff.lowerIsBetter ? diff.delta < 0 : diff.delta > 0;
   return `${improved ? "better" : "worse"} (${diff.delta > 0 ? "+" : ""}${Number(diff.delta.toFixed(3))})`;
 }
@@ -697,8 +827,13 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
   lines.push("# Free-form fun evaluator");
   lines.push("");
   lines.push(`Generated: ${artifact.generatedAt}  `);
-  lines.push(`Mode: ${artifact.mode}  |  Model: ${artifact.provider.model}  |  Seed: ${artifact.seed}  |  Turns: ${artifact.declarations}`);
-  if (artifact.world) lines.push(`World: campaign=${artifact.world.campaignId} session=${artifact.world.sessionId} actor=${artifact.world.actorId}`);
+  lines.push(
+    `Mode: ${artifact.mode}  |  Model: ${artifact.provider.model}  |  Seed: ${artifact.seed}  |  Turns: ${artifact.declarations}`,
+  );
+  if (artifact.world)
+    lines.push(
+      `World: campaign=${artifact.world.campaignId} session=${artifact.world.sessionId} actor=${artifact.world.actorId}`,
+    );
   lines.push("");
   lines.push(`Result: **${artifact.verdict.passed ? "PASS" : "FAIL"}**`);
   for (const failure of artifact.verdict.failures) lines.push(`- ${failure}`);
@@ -707,7 +842,9 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
   lines.push("## Metrics");
   lines.push("");
   const baselineRecord = baseline as unknown as Record<string, number> | null;
-  const diffs = baselineRecord ? diffMetrics(artifact.metrics as unknown as Record<string, number>, baselineRecord) : [];
+  const diffs = baselineRecord
+    ? diffMetrics(artifact.metrics as unknown as Record<string, number>, baselineRecord)
+    : [];
   const diffByKey = new Map(diffs.map((diff) => [diff.key, diff]));
   lines.push("| Metric | Current | Baseline | Verdict |");
   lines.push("| --- | --- | --- | --- |");
@@ -715,7 +852,9 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
   for (const key of metricKeys) {
     const value = artifact.metrics[key];
     const diff = diffByKey.get(key as string);
-    lines.push(`| ${key} | ${formatMetricValue(key as string, value)} | ${diff ? formatMetricValue(key as string, diff.baseline) : "-"} | ${diff ? diffVerdict(diff) : "-"} |`);
+    lines.push(
+      `| ${key} | ${formatMetricValue(key as string, value)} | ${diff ? formatMetricValue(key as string, diff.baseline) : "-"} | ${diff ? diffVerdict(diff) : "-"} |`,
+    );
   }
   lines.push("");
   if (!artifact.reliability.providerCalls || !artifact.reliability.coherence) {
@@ -729,7 +868,9 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
   lines.push("| probe | turn | passed | expected | observed |");
   lines.push("| --- | --- | --- | --- | --- |");
   for (const probe of artifact.probes) {
-    lines.push(`| ${probe.kind} | ${probe.turnIndex ?? "-"} (${probe.turnId ?? "-"}) | ${probe.passed ? "yes" : "NO"} | ${probe.expected} | ${probe.observed} |`);
+    lines.push(
+      `| ${probe.kind} | ${probe.turnIndex ?? "-"} (${probe.turnId ?? "-"}) | ${probe.passed ? "yes" : "NO"} | ${probe.expected} | ${probe.observed} |`,
+    );
   }
   lines.push("");
   if (artifact.metrics.coherenceViolationTurns > 0) {
@@ -742,10 +883,14 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
   }
   lines.push("## Turns");
   lines.push("");
-  lines.push("| # | id | category | state | narration class | source | committed | receipt kinds | latency | coherence |");
+  lines.push(
+    "| # | id | category | state | narration class | source | committed | receipt kinds | latency | coherence |",
+  );
   lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const turn of artifact.turns) {
-    lines.push(`| ${turn.index} | ${turn.id} | ${turn.category} | ${turn.finalState ?? "-"} | ${turn.narrationClass} | ${turn.narrationSource} | ${turn.committed ? "yes" : "no"} | ${turn.receiptKinds.join(",") || "-"} | ${Math.round(turn.latencyMs)} ms | ${turn.coherence.length || "-"} |`);
+    lines.push(
+      `| ${turn.index} | ${turn.id} | ${turn.category} | ${turn.finalState ?? "-"} | ${turn.narrationClass} | ${turn.narrationSource} | ${turn.committed ? "yes" : "no"} | ${turn.receiptKinds.join(",") || "-"} | ${Math.round(turn.latencyMs)} ms | ${turn.coherence.length || "-"} |`,
+    );
   }
   lines.push("");
   if (artifact.dmBeats.length > 0) {
@@ -754,7 +899,9 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
     lines.push("| # | intent | state | receipts | candidates | latency |");
     lines.push("| --- | --- | --- | --- | --- | --- |");
     for (const beat of artifact.dmBeats) {
-      lines.push(`| ${beat.index} | ${beat.intent} | ${beat.state} | ${beat.receipts.join(", ") || "-"} | ${beat.candidatesOffered.length} | ${Math.round(beat.latencyMs)} ms |`);
+      lines.push(
+        `| ${beat.index} | ${beat.intent} | ${beat.state} | ${beat.receipts.join(", ") || "-"} | ${beat.candidatesOffered.length} | ${Math.round(beat.latencyMs)} ms |`,
+      );
     }
     lines.push("");
   }
@@ -765,23 +912,39 @@ export function renderMarkdown(artifact: EvalArtifact, baseline: BaselineMetrics
 // Shared HTTP helpers
 // ---------------------------------------------------------------------------------------------
 
-interface HttpResponse { status: number; headers: Record<string, any>; body: string }
+interface HttpResponse {
+  status: number;
+  headers: Record<string, any>;
+  body: string;
+}
 type Requester = (method: "GET" | "POST", pathname: string, payload?: Record<string, unknown>) => Promise<HttpResponse>;
 
 function makeRequester(hostname: string, port: number, prefix = ""): Requester {
-  return (method, pathname, payload) => new Promise<HttpResponse>((resolve, reject) => {
-    const data = payload === undefined ? undefined : JSON.stringify(payload);
-    const request = http.request({ host: hostname, port, path: `${prefix}${pathname}`, method,
-      headers: data === undefined ? {} : { "content-type": "application/json", "content-length": Buffer.byteLength(data) } },
-      (response) => {
-        let body = ""; response.setEncoding("utf8");
-        response.on("data", (chunk) => { body += chunk; });
-        response.on("end", () => resolve({ status: response.statusCode ?? 0, headers: response.headers, body }));
-      });
-    request.on("error", reject);
-    if (data !== undefined) request.write(data);
-    request.end();
-  });
+  return (method, pathname, payload) =>
+    new Promise<HttpResponse>((resolve, reject) => {
+      const data = payload === undefined ? undefined : JSON.stringify(payload);
+      const request = http.request(
+        {
+          host: hostname,
+          port,
+          path: `${prefix}${pathname}`,
+          method,
+          headers:
+            data === undefined ? {} : { "content-type": "application/json", "content-length": Buffer.byteLength(data) },
+        },
+        (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk) => {
+            body += chunk;
+          });
+          response.on("end", () => resolve({ status: response.statusCode ?? 0, headers: response.headers, body }));
+        },
+      );
+      request.on("error", reject);
+      if (data !== undefined) request.write(data);
+      request.end();
+    });
 }
 
 export function parseSse(body: string): Array<{ type: string; payload: any }> {
@@ -793,12 +956,15 @@ export function parseSse(body: string): Array<{ type: string; payload: any }> {
     try {
       const parsed = JSON.parse(dataLine.slice(6));
       events.push({ type: typeLine.slice(7).trim(), payload: parsed?.payload ?? parsed });
-    } catch { /* ignore malformed frame */ }
+    } catch {
+      /* ignore malformed frame */
+    }
   }
   return events;
 }
 
-const terminalOf = (events: Array<{ type: string; payload: any }>) => events.find((event) => event.type === "terminal")?.payload ?? null;
+const terminalOf = (events: Array<{ type: string; payload: any }>) =>
+  events.find((event) => event.type === "terminal")?.payload ?? null;
 
 interface StreamResult {
   status: number;
@@ -813,7 +979,10 @@ interface StreamResult {
 function streamOf(response: HttpResponse): StreamResult {
   const events = parseSse(response.body);
   const terminal = terminalOf(events);
-  const narration = events.filter((event) => event.type === "narration_delta").map((event) => event.payload.text).join("");
+  const narration = events
+    .filter((event) => event.type === "narration_delta")
+    .map((event) => event.payload.text)
+    .join("");
   return {
     status: response.status,
     turnId: (response.headers["x-adventure-turn-id"] as string | undefined) ?? terminal?.turn?.turnId,
@@ -826,11 +995,17 @@ function streamOf(response: HttpResponse): StreamResult {
 }
 
 /** Serializes phase-level narration so distinctness spans resume boundaries. */
-function narrationEventsOf(phases: Array<{ phase: "initial" | "resume"; narration: string; narrationSource: NarrationSource }>): NarrationEvent[] {
+function narrationEventsOf(
+  phases: Array<{ phase: "initial" | "resume"; narration: string; narrationSource: NarrationSource }>,
+): NarrationEvent[] {
   return phases
     .filter((phase) => phase.narrationSource !== "none" && phase.narration.trim().length > 0)
-    .map((phase) => ({ phase: phase.phase, source: phase.narrationSource,
-      class: classifyNarration(phase.narration, phase.narrationSource), text: phase.narration }));
+    .map((phase) => ({
+      phase: phase.phase,
+      source: phase.narrationSource,
+      class: classifyNarration(phase.narration, phase.narrationSource),
+      text: phase.narration,
+    }));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -848,7 +1023,11 @@ export interface EvalOptions {
   quiet: boolean;
 }
 
-interface Manifest { campaignId: string; sessionId: string; actorId: string }
+interface Manifest {
+  campaignId: string;
+  sessionId: string;
+  actorId: string;
+}
 
 interface ReceiptProbe {
   kinds: string[];
@@ -856,7 +1035,9 @@ interface ReceiptProbe {
   actionLocations: ActionLocation[];
 }
 
-export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifact: EvalArtifact; markdown: string; output: string; markdownPath: string }> {
+export async function runFreeformFunEval(
+  options: EvalOptions,
+): Promise<{ artifact: EvalArtifact; markdown: string; output: string; markdownPath: string }> {
   validateTurnCount(options.turns);
   const runKey = randomUUID();
   const providerConfig = await resolveProviderKey(resolveProviderConfig());
@@ -871,7 +1052,7 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
   };
 
   const createdDir = !options.dataDir;
-  const directory = options.dataDir ?? await mkdtemp(path.join(tmpdir(), "velvet-freeform-"));
+  const directory = options.dataDir ?? (await mkdtemp(path.join(tmpdir(), "velvet-freeform-")));
   process.env.VELVET_DATA_DIR = directory;
   process.env.FEATURE_RPG_CAMPAIGN = "true";
   process.env.FEATURE_RPG_MECHANICS = "true";
@@ -893,28 +1074,50 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
         if (input.promptVersion === "campaign-dm-v1") {
           try {
             const parsed = JSON.parse(String(input.messages[1]?.content ?? "{}"));
-            dmCandidates = Array.isArray(parsed.candidates) ? parsed.candidates.map((candidate: any) => String(candidate.action)) : [];
-          } catch { /* not a candidate round */ }
+            dmCandidates = Array.isArray(parsed.candidates)
+              ? parsed.candidates.map((candidate: any) => String(candidate.action))
+              : [];
+          } catch {
+            /* not a candidate round */
+          }
         }
         providerCalls.push({
-          seq, lane: input.promptVersion ?? "unknown", ok: true,
+          seq,
+          lane: input.promptVersion ?? "unknown",
+          ok: true,
           finishReason: result.provenance?.finishReason ?? "unknown",
           detail: result.message.content === null && !result.message.toolCalls?.length ? "empty-message" : "",
-          tools: result.message.toolCalls?.map((call) => call.name) ?? [], dmCandidates,
-          promptTokens: usage?.promptTokens ?? 0, completionTokens: usage?.completionTokens ?? 0,
+          tools: result.message.toolCalls?.map((call) => call.name) ?? [],
+          dmCandidates,
+          promptTokens: usage?.promptTokens ?? 0,
+          completionTokens: usage?.completionTokens ?? 0,
           totalTokens: usage?.totalTokens ?? 0,
-          costUsd: usage && price.promptPerMillion !== null && price.completionPerMillion !== null
-            ? (usage.promptTokens * price.promptPerMillion + usage.completionTokens * price.completionPerMillion) / 1_000_000 : 0,
+          costUsd:
+            usage && price.promptPerMillion !== null && price.completionPerMillion !== null
+              ? (usage.promptTokens * price.promptPerMillion + usage.completionTokens * price.completionPerMillion) /
+                1_000_000
+              : 0,
           latencyMs: Date.now() - started,
         });
         return result;
       } catch (error) {
-        const message = error instanceof ProviderHttpError
-          ? `HTTP ${error.status}: ${(error as Error).message.slice(0, 200)}` : (error as Error).message.slice(0, 200);
+        const message =
+          error instanceof ProviderHttpError
+            ? `HTTP ${error.status}: ${(error as Error).message.slice(0, 200)}`
+            : (error as Error).message.slice(0, 200);
         providerCalls.push({
-          seq, lane: input.promptVersion ?? "unknown", ok: false, finishReason: (error as Error).name,
-          detail: message, tools: [], dmCandidates: null,
-          promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, latencyMs: Date.now() - started,
+          seq,
+          lane: input.promptVersion ?? "unknown",
+          ok: false,
+          finishReason: (error as Error).name,
+          detail: message,
+          tools: [],
+          dmCandidates: null,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          costUsd: 0,
+          latencyMs: Date.now() - started,
         });
         throw error;
       }
@@ -930,7 +1133,13 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
   let manifest: Manifest | null = null;
   {
     const existing = await readFile(manifestPath, "utf8").catch(() => null);
-    if (existing) { try { manifest = JSON.parse(existing) as Manifest; } catch { manifest = null; } }
+    if (existing) {
+      try {
+        manifest = JSON.parse(existing) as Manifest;
+      } catch {
+        manifest = null;
+      }
+    }
   }
   let npcLocations = new Map<string, string>();
   let shopLocations = new Map<string, string>();
@@ -941,7 +1150,10 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     clockNow = () => new Date();
     const persisted = await readFile(worldPath, "utf8").catch(() => null);
     if (persisted) {
-      const parsed = JSON.parse(persisted) as { npcLocations?: Record<string, string>; shopLocations?: Record<string, string> };
+      const parsed = JSON.parse(persisted) as {
+        npcLocations?: Record<string, string>;
+        shopLocations?: Record<string, string>;
+      };
       npcLocations = new Map(Object.entries(parsed.npcLocations ?? {}));
       shopLocations = new Map(Object.entries(parsed.shopLocations ?? {}));
     }
@@ -956,7 +1168,11 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     const srd = SRD_5_1_STARTER_CATALOG.manifest;
     const freshRead = <T>(source: string, ...params: unknown[]): T | undefined => {
       const connection = new DatabaseDriver(path.join(directory, "velvet.sqlite"));
-      try { return connection.prepare(source).get(...params) as T | undefined; } finally { connection.close(); }
+      try {
+        return connection.prepare(source).get(...params) as T | undefined;
+      } finally {
+        connection.close();
+      }
     };
     const narrativeRevision = () => fixture.repo.listCampaignNpcs(OWNER, fixture.campaign.id)?.revision ?? 0;
     // Presence revision is not re-read after each write on a separate connection (WAL read lag);
@@ -964,47 +1180,99 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     let presenceCursor: number | null = null;
     const nextPresenceRevision = () => {
       if (presenceCursor === null) {
-        presenceCursor = freshRead<{ revision: number }>("SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?",
-          fixture.campaign.id, fixture.session.id)?.revision ?? 0;
+        presenceCursor =
+          freshRead<{ revision: number }>(
+            "SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?",
+            fixture.campaign.id,
+            fixture.session.id,
+          )?.revision ?? 0;
       }
       return presenceCursor;
     };
     const makeNpc = (name: string, description: string, locationId: string) => {
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const persona = fixture.repo.createCharacter({ name, age: 33, archetype: "Guide", boundaries: "", fictionalConfirmed: true });
+      const persona = fixture.repo.createCharacter({
+        name,
+        age: 33,
+        archetype: "Guide",
+        boundaries: "",
+        fictionalConfirmed: true,
+      });
       const npc = fixture.repo.createCampaignNpc(OWNER, fixture.campaign.id, {
-        personaId: persona.id, publicState: { name, description },
+        personaId: persona.id,
+        publicState: { name, description },
         privateState: { goals: "SECRET_GOAL", gmNotes: "SECRET_GM_NOTE", merchantState: null },
-        expectedRevision: narrativeRevision(), idempotencyKey: `ff-npc-${slug}`,
+        expectedRevision: narrativeRevision(),
+        idempotencyKey: `ff-npc-${slug}`,
       }).npc;
       const expectedPresence = nextPresenceRevision();
-      fixture.repo.mutateNpcPresence(OWNER, { campaignId: fixture.campaign.id, sessionId: fixture.session.id, npcId: npc.npcId,
-        expectedRevision: expectedPresence, idempotencyKey: `ff-place-${slug}`, mutation: { kind: "place", locationId } });
+      fixture.repo.mutateNpcPresence(OWNER, {
+        campaignId: fixture.campaign.id,
+        sessionId: fixture.session.id,
+        npcId: npc.npcId,
+        expectedRevision: expectedPresence,
+        idempotencyKey: `ff-place-${slug}`,
+        mutation: { kind: "place", locationId },
+      });
       presenceCursor = expectedPresence + 1;
       npcLocations.set(name.toLocaleLowerCase("en-US"), locationId);
       return npc;
     };
-    const mara = makeNpc("Mara", "A broad-shouldered merchant in a waxed coat, tallying stock behind a cluttered stall.", `s${seed}-market`);
+    const mara = makeNpc(
+      "Mara",
+      "A broad-shouldered merchant in a waxed coat, tallying stock behind a cluttered stall.",
+      `s${seed}-market`,
+    );
     makeNpc("Goblin Scout", "A wiry goblin scout with a notched scimitar, crouched by the crates.", `s${seed}-docks`);
 
     // Vendor plumbing copied from server/test/adventure-commerce-action.test.ts, SRD-flavoured.
     try {
       const db = new DatabaseDriver(path.join(directory, "velvet.sqlite"));
       db.pragma("foreign_keys=ON");
-      const item = { packId: srd.packId, packVersion: srd.packVersion, kind: "item", definitionId: "srd-5.1:item:longsword" };
-      const currency = { packId: srd.packId, packVersion: srd.packVersion, kind: "currency", definitionId: "srd-5.1:currency:gp" };
+      const item = {
+        packId: srd.packId,
+        packVersion: srd.packVersion,
+        kind: "item",
+        definitionId: "srd-5.1:item:longsword",
+      };
+      const currency = {
+        packId: srd.packId,
+        packVersion: srd.packVersion,
+        kind: "currency",
+        definitionId: "srd-5.1:currency:gp",
+      };
       for (const reference of [item, currency]) {
-        db.prepare("INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25 VALUES(?,?,?,?,?)")
-          .run(fixture.campaign.id, reference.packId, reference.packVersion, reference.kind, reference.definitionId);
+        db.prepare("INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25 VALUES(?,?,?,?,?)").run(
+          fixture.campaign.id,
+          reference.packId,
+          reference.packVersion,
+          reference.kind,
+          reference.definitionId,
+        );
       }
-      db.prepare("INSERT OR REPLACE INTO rpg_currency_references_v25 VALUES(?,?,?,?,?,?)")
-        .run(fixture.campaign.id, "GP", currency.packId, currency.packVersion, "currency", currency.definitionId);
-      db.prepare("INSERT OR REPLACE INTO rpg_wallets_v25 VALUES(?,?,?,?,?)")
-        .run(fixture.campaign.id, fixture.actorId, "GP", 5000, new Date().toISOString());
-      db.prepare("INSERT OR REPLACE INTO rpg_shop_definitions_v25 VALUES('mara-shop',?,?,?)")
-        .run(fixture.campaign.id, "Mara's Goods", new Date().toISOString());
-      db.prepare("INSERT OR REPLACE INTO rpg_shop_stock_v25 VALUES('mara-stock',?,'mara-shop',?,?, 'item',?,3,15,'GP')")
-        .run(fixture.campaign.id, item.packId, item.packVersion, item.definitionId);
+      db.prepare("INSERT OR REPLACE INTO rpg_currency_references_v25 VALUES(?,?,?,?,?,?)").run(
+        fixture.campaign.id,
+        "GP",
+        currency.packId,
+        currency.packVersion,
+        "currency",
+        currency.definitionId,
+      );
+      db.prepare("INSERT OR REPLACE INTO rpg_wallets_v25 VALUES(?,?,?,?,?)").run(
+        fixture.campaign.id,
+        fixture.actorId,
+        "GP",
+        5000,
+        new Date().toISOString(),
+      );
+      db.prepare("INSERT OR REPLACE INTO rpg_shop_definitions_v25 VALUES('mara-shop',?,?,?)").run(
+        fixture.campaign.id,
+        "Mara's Goods",
+        new Date().toISOString(),
+      );
+      db.prepare(
+        "INSERT OR REPLACE INTO rpg_shop_stock_v25 VALUES('mara-stock',?,'mara-shop',?,?, 'item',?,3,15,'GP')",
+      ).run(fixture.campaign.id, item.packId, item.packVersion, item.definitionId);
       db.close();
       fixture.repo.associateNpcShop(OWNER, fixture.campaign.id, mara.npcId, "mara-shop");
       fixture.repo.setShopBuyPolicy(OWNER, fixture.campaign.id, "mara-shop", "mara-stock", 8);
@@ -1015,7 +1283,10 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
 
     manifest = { campaignId: fixture.campaign.id, sessionId: fixture.session.id, actorId: fixture.actorId };
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`).catch(() => undefined);
-    await writeFile(worldPath, `${JSON.stringify({ npcLocations: Object.fromEntries(npcLocations), shopLocations: Object.fromEntries(shopLocations) }, null, 2)}\n`).catch(() => undefined);
+    await writeFile(
+      worldPath,
+      `${JSON.stringify({ npcLocations: Object.fromEntries(npcLocations), shopLocations: Object.fromEntries(shopLocations) }, null, 2)}\n`,
+    ).catch(() => undefined);
   }
 
   const campaignId = manifest.campaignId;
@@ -1029,12 +1300,21 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
 
   const worldSnapshot = () => repo.getCampaignWorld(OWNER, campaignId, sessionId);
   const gazetteer = (): Array<{ id: string; name: string }> => {
-    try { return (worldSnapshot()?.visibleLocations ?? []).map((location: any) => ({ id: location.locationId, name: location.name })); }
-    catch { return []; }
+    try {
+      return (worldSnapshot()?.visibleLocations ?? []).map((location: any) => ({
+        id: location.locationId,
+        name: location.name,
+      }));
+    } catch {
+      return [];
+    }
   };
   const actorLocationId = (): string | null => {
-    try { return worldSnapshot()?.currentLocations.find((entry: any) => entry.actorId === actorId)?.locationId ?? null; }
-    catch { return null; }
+    try {
+      return worldSnapshot()?.currentLocations.find((entry: any) => entry.actorId === actorId)?.locationId ?? null;
+    } catch {
+      return null;
+    }
   };
   const resolveLocationId = (name: string): string | null => {
     const needle = normalize(name);
@@ -1055,7 +1335,11 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     ];
     for (const [kind, probeFn] of probes) {
       let value: any;
-      try { value = probeFn(); } catch { value = null; }
+      try {
+        value = probeFn();
+      } catch {
+        value = null;
+      }
       if (!value) continue;
       probe.kinds.push(kind);
       if (kind === "travel" && typeof value.destination === "string") {
@@ -1070,7 +1354,9 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
       try {
         const generic = repo.getCommandReceipt(OWNER, campaignId, commandId);
         if (generic) probe.kinds.push(`mechanic:${generic.events.map((event: any) => event.type).join(",")}`);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     return probe;
   };
@@ -1084,22 +1370,46 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
     const turnStarted = Date.now();
     const revision = repo.getCampaignAdministration(OWNER, campaignId)!.revision;
     const record: TurnRecord = {
-      index, id: entry.id, category: entry.category, declaration: entry.declaration, probe: entry.probe ?? null,
-      status: 0, finalState: null, outcome: null, narration: "", narrationSource: "none", narrationClass: "none",
-      narrationEvents: [], committed: false, receiptKinds: [], receiptCommandIds: [], proposalToolNames: [],
-      confirmed: false, dmBeatIndex: null, providerCalls: 0, latencyMs: 0, coherence: [],
+      index,
+      id: entry.id,
+      category: entry.category,
+      declaration: entry.declaration,
+      probe: entry.probe ?? null,
+      status: 0,
+      finalState: null,
+      outcome: null,
+      narration: "",
+      narrationSource: "none",
+      narrationClass: "none",
+      narrationEvents: [],
+      committed: false,
+      receiptKinds: [],
+      receiptCommandIds: [],
+      proposalToolNames: [],
+      confirmed: false,
+      dmBeatIndex: null,
+      providerCalls: 0,
+      latencyMs: 0,
+      coherence: [],
     };
     const phases: Array<{ phase: "initial" | "resume"; narration: string; narrationSource: NarrationSource }> = [];
     let turnId: string | undefined;
     let lastState: string | null = null;
     let lastOutcome: string | null = null;
     try {
-      const first = streamOf(await request("POST", "/adventure-turns/stream", {
-        campaignId, sessionId, actorId, declaration: entry.declaration,
-        expectedRevision: revision, idempotencyKey: `ff-${runKey}-${index}`,
-      }));
+      const first = streamOf(
+        await request("POST", "/adventure-turns/stream", {
+          campaignId,
+          sessionId,
+          actorId,
+          declaration: entry.declaration,
+          expectedRevision: revision,
+          idempotencyKey: `ff-${runKey}-${index}`,
+        }),
+      );
       turnId = first.turnId;
-      lastState = first.state; lastOutcome = first.outcome;
+      lastState = first.state;
+      lastOutcome = first.outcome;
       record.status = first.status;
       phases.push({ phase: "initial", narration: first.narration, narrationSource: first.narrationSource });
       if (first.confirmationRequired?.proposalIds?.length && turnId) {
@@ -1107,15 +1417,18 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
         record.confirmed = true;
         record.proposalToolNames = (view.proposals ?? []).map((proposal: any) => String(proposal.toolName));
         const confirmed = await request("POST", `/adventure-turns/${turnId}/confirm`, {
-          proposalIds: first.confirmationRequired.proposalIds, decision: "approve",
-          expectedRevision: view.turn.revision, idempotencyKey: `ff-confirm-${runKey}-${index}`,
+          proposalIds: first.confirmationRequired.proposalIds,
+          decision: "approve",
+          expectedRevision: view.turn.revision,
+          idempotencyKey: `ff-confirm-${runKey}-${index}`,
         });
         const parsed = confirmed.status >= 200 && confirmed.status < 300 ? JSON.parse(confirmed.body) : {};
         const token = parsed.resumeToken ?? view.resumeToken;
         if (token) {
           const resumed = streamOf(await request("POST", "/adventure-turns/stream", { resumeToken: token }));
           record.status = resumed.status;
-          lastState = resumed.state; lastOutcome = resumed.outcome;
+          lastState = resumed.state;
+          lastOutcome = resumed.outcome;
           phases.push({ phase: "resume", narration: resumed.narration, narrationSource: resumed.narrationSource });
         }
       }
@@ -1124,8 +1437,10 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
       const finalPhase = phases[phases.length - 1]!;
       record.narration = finalPhase.narration;
       record.narrationSource = finalPhase.narrationSource;
-      record.narrationClass = finalPhase.narrationSource === "none" || finalPhase.narration.trim().length === 0
-        ? "none" : classifyNarration(finalPhase.narration, finalPhase.narrationSource);
+      record.narrationClass =
+        finalPhase.narrationSource === "none" || finalPhase.narration.trim().length === 0
+          ? "none"
+          : classifyNarration(finalPhase.narration, finalPhase.narrationSource);
       record.narrationEvents = narrationEventsOf(phases);
       if (turnId) {
         const view = JSON.parse((await request("GET", `/adventure-turns/${turnId}`)).body);
@@ -1152,8 +1467,13 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
       }
     }
     record.coherence = detectCoherenceViolations({
-      index, turnId: turnId ?? "", declaration: entry.declaration,
-      actorBeforeId: actorBefore, actorAfterId: actorLocationId(), travelDestinations, actionLocations,
+      index,
+      turnId: turnId ?? "",
+      declaration: entry.declaration,
+      actorBeforeId: actorBefore,
+      actorAfterId: actorLocationId(),
+      travelDestinations,
+      actionLocations,
       knownLocations: gazetteer(),
     });
     turnRecords.push(record);
@@ -1163,36 +1483,56 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
   const runDmBeat = async (index: number, intent: "open" | "continue"): Promise<DmBeatRecord> => {
     const started = Date.now();
     const control = repo.getDmControl(OWNER, campaignId);
-    const run = repo.openDmBeat(OWNER, campaignId, sessionId, { intent,
-      expectedModeRevision: control.revision, idempotencyKey: `ff-dm-${runKey}-${index}` });
+    const run = repo.openDmBeat(OWNER, campaignId, sessionId, {
+      intent,
+      expectedModeRevision: control.revision,
+      idempotencyKey: `ff-dm-${runKey}-${index}`,
+    });
     const planningCallsBefore = providerCalls.length;
     await orchestrateCampaignDmBeat(repo, OWNER, run.runId, deps);
     const executed = repo.getDmRun(OWNER, campaignId, sessionId, run.runId);
     const beat: DmBeatRecord = {
-      index, intent, state: executed.state,
+      index,
+      intent,
+      state: executed.state,
       receipts: executed.receipts.map((receipt: any) => receipt.action),
-      candidatesOffered: providerCalls.slice(planningCallsBefore)
-        .filter((call) => call.lane === "campaign-dm-v1" && call.dmCandidates).flatMap((call) => call.dmCandidates!),
-      narration: executed.narration ?? "", blockers: executed.blockers ?? [],
-      latencyMs: Date.now() - started, success: executed.state === "completed",
+      candidatesOffered: providerCalls
+        .slice(planningCallsBefore)
+        .filter((call) => call.lane === "campaign-dm-v1" && call.dmCandidates)
+        .flatMap((call) => call.dmCandidates!),
+      narration: executed.narration ?? "",
+      blockers: executed.blockers ?? [],
+      latencyMs: Date.now() - started,
+      success: executed.state === "completed",
     };
     dmBeats.push(beat);
     return beat;
   };
 
   const control = repo.getDmControl(OWNER, campaignId);
-  if (control.mode !== "ai") repo.setDmControl(OWNER, campaignId, { mode: "ai", expectedRevision: control.revision, idempotencyKey: `ff-ai-${runKey}` });
+  if (control.mode !== "ai")
+    repo.setDmControl(OWNER, campaignId, {
+      mode: "ai",
+      expectedRevision: control.revision,
+      idempotencyKey: `ff-ai-${runKey}`,
+    });
 
   const dmAfter = new Set([1, 4, 7, 10, 13, 16]);
   const limit = Math.max(0, Math.min(options.turns, FREEFORM_DECLARATIONS.length));
   for (let index = 0; index < limit; index += 1) {
     const entry = FREEFORM_DECLARATIONS[index]!;
     const record = await runPlayerTurn(entry, index);
-    if (!options.quiet) process.stderr.write(`turn ${index} ${entry.id} state=${record.finalState} class=${record.narrationClass} source=${record.narrationSource} committed=${record.committed}\n`);
+    if (!options.quiet)
+      process.stderr.write(
+        `turn ${index} ${entry.id} state=${record.finalState} class=${record.narrationClass} source=${record.narrationSource} committed=${record.committed}\n`,
+      );
     if (dmAfter.has(index)) {
       const beat = await runDmBeat(index, dmBeats.length === 0 ? "open" : "continue");
       record.dmBeatIndex = index;
-      if (!options.quiet) process.stderr.write(`  dm ${index} state=${beat.state} receipts=${beat.receipts.join(",") || "-"} candidates=${beat.candidatesOffered.length}\n`);
+      if (!options.quiet)
+        process.stderr.write(
+          `  dm ${index} state=${beat.state} receipts=${beat.receipts.join(",") || "-"} candidates=${beat.candidatesOffered.length}\n`,
+        );
     }
   }
 
@@ -1200,20 +1540,30 @@ export async function runFreeformFunEval(options: EvalOptions): Promise<{ artifa
 
   const metrics = computeMetrics(turnRecords, dmBeats, providerCalls);
   const artifact: EvalArtifact = {
-    version: 3, generatedAt: new Date().toISOString(), mode: "in-process",
+    version: 3,
+    generatedAt: new Date().toISOString(),
+    mode: "in-process",
     provider: { baseUrl: providerConfig.baseUrl, model: providerConfig.model },
-    seed: options.seed, dataDir: directory, baseUrl: null,
-    world: { campaignId, sessionId, actorId }, declarations: limit,
+    seed: options.seed,
+    dataDir: directory,
+    baseUrl: null,
+    world: { campaignId, sessionId, actorId },
+    declarations: limit,
     narrationClassification: narrationClassificationDescriptor(),
     reliability: {
-      providerCalls: true, dmCandidates: true, coherence: true,
+      providerCalls: true,
+      dmCandidates: true,
+      coherence: true,
       notes: [
         "Location coherence is a conservative heuristic over committed receipts and the resolved actor location.",
         "Narration classes: provider (source=provider-assisted), deliberate-hold (grounded server hold marker), narration-failure (every other deterministic fallback). fallbackDistinctness is computed over narration-failure events only.",
       ],
     },
     probes: probeOutcomes(turnRecords),
-    metrics, turns: turnRecords, dmBeats, providerCalls,
+    metrics,
+    turns: turnRecords,
+    dmBeats,
+    providerCalls,
     verdict: evaluateRun({ mode: "in-process", declarations: limit, turns: turnRecords, dmBeats, providerCalls }),
   };
   const markdown = renderMarkdown(artifact, options.baseline);
@@ -1247,22 +1597,36 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
   const root = options.baseUrl.replace(/\/$/, "");
   const api = root.endsWith("/api/rpg/v1") ? root : `${root}/api/rpg/v1`;
   const url = new URL(api);
-  const request = makeRequester(url.hostname, Number(url.port || (url.protocol === "https:" ? 443 : 80)), url.pathname.replace(/\/$/, ""));
+  const request = makeRequester(
+    url.hostname,
+    Number(url.port || (url.protocol === "https:" ? 443 : 80)),
+    url.pathname.replace(/\/$/, ""),
+  );
 
   const campaignId = options.campaignId;
   const sessionId = options.sessionId;
   const actorId = options.actorId;
   const controlResponse = await request("GET", `/campaigns/${campaignId}/dm`);
-  const control = controlResponse.status >= 200 && controlResponse.status < 300 ? JSON.parse(controlResponse.body) : { mode: "ai", revision: 0 };
+  const control =
+    controlResponse.status >= 200 && controlResponse.status < 300
+      ? JSON.parse(controlResponse.body)
+      : { mode: "ai", revision: 0 };
   if (control.mode !== "ai") {
-    await request("POST", `/campaigns/${campaignId}/dm/mode-commands`,
-      { mode: "ai", expectedRevision: control.revision, idempotencyKey: `ff-base-ai-${runKey}` });
+    await request("POST", `/campaigns/${campaignId}/dm/mode-commands`, {
+      mode: "ai",
+      expectedRevision: control.revision,
+      idempotencyKey: `ff-base-ai-${runKey}`,
+    });
   }
 
   const campaignRevision = async (): Promise<number> => {
     const response = await request("GET", `/campaigns/${campaignId}/rooms/${sessionId}/play-bootstrap`);
     if (response.status >= 200 && response.status < 300) {
-      try { return JSON.parse(response.body).expectedRevision ?? 0; } catch { return 0; }
+      try {
+        return JSON.parse(response.body).expectedRevision ?? 0;
+      } catch {
+        return 0;
+      }
     }
     return 0;
   };
@@ -1275,19 +1639,43 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
   for (let index = 0; index < limit; index += 1) {
     const entry = FREEFORM_DECLARATIONS[index]!;
     const record: TurnRecord = {
-      index, id: entry.id, category: entry.category, declaration: entry.declaration, probe: entry.probe ?? null,
-      status: 0, finalState: null, outcome: null, narration: "", narrationSource: "none", narrationClass: "none",
-      narrationEvents: [], committed: false, receiptKinds: [], receiptCommandIds: [], proposalToolNames: [],
-      confirmed: false, dmBeatIndex: null, providerCalls: 0, latencyMs: 0, coherence: [],
+      index,
+      id: entry.id,
+      category: entry.category,
+      declaration: entry.declaration,
+      probe: entry.probe ?? null,
+      status: 0,
+      finalState: null,
+      outcome: null,
+      narration: "",
+      narrationSource: "none",
+      narrationClass: "none",
+      narrationEvents: [],
+      committed: false,
+      receiptKinds: [],
+      receiptCommandIds: [],
+      proposalToolNames: [],
+      confirmed: false,
+      dmBeatIndex: null,
+      providerCalls: 0,
+      latencyMs: 0,
+      coherence: [],
     };
     const started = Date.now();
     try {
-      const first = streamOf(await request("POST", "/adventure-turns/stream", {
-        campaignId, sessionId, actorId, declaration: entry.declaration,
-        expectedRevision: await campaignRevision(), idempotencyKey: `ff-base-${runKey}-${index}`,
-      }));
+      const first = streamOf(
+        await request("POST", "/adventure-turns/stream", {
+          campaignId,
+          sessionId,
+          actorId,
+          declaration: entry.declaration,
+          expectedRevision: await campaignRevision(),
+          idempotencyKey: `ff-base-${runKey}-${index}`,
+        }),
+      );
       record.status = first.status;
-      let lastState = first.state; let lastOutcome = first.outcome;
+      let lastState = first.state;
+      let lastOutcome = first.outcome;
       const phases: Array<{ phase: "initial" | "resume"; narration: string; narrationSource: NarrationSource }> = [
         { phase: "initial", narration: first.narration, narrationSource: first.narrationSource },
       ];
@@ -1296,15 +1684,18 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
         record.confirmed = true;
         record.proposalToolNames = (view.proposals ?? []).map((proposal: any) => String(proposal.toolName));
         const confirmed = await request("POST", `/adventure-turns/${first.turnId}/confirm`, {
-          proposalIds: first.confirmationRequired.proposalIds, decision: "approve",
-          expectedRevision: view.turn.revision, idempotencyKey: `ff-base-confirm-${runKey}-${index}`,
+          proposalIds: first.confirmationRequired.proposalIds,
+          decision: "approve",
+          expectedRevision: view.turn.revision,
+          idempotencyKey: `ff-base-confirm-${runKey}-${index}`,
         });
         const parsed = confirmed.status >= 200 && confirmed.status < 300 ? JSON.parse(confirmed.body) : {};
         const token = parsed.resumeToken ?? view.resumeToken;
         if (token) {
           const resumed = streamOf(await request("POST", "/adventure-turns/stream", { resumeToken: token }));
           record.status = resumed.status;
-          lastState = resumed.state; lastOutcome = resumed.outcome;
+          lastState = resumed.state;
+          lastOutcome = resumed.outcome;
           phases.push({ phase: "resume", narration: resumed.narration, narrationSource: resumed.narrationSource });
         }
       }
@@ -1313,8 +1704,10 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
       const finalPhase = phases[phases.length - 1]!;
       record.narration = finalPhase.narration;
       record.narrationSource = finalPhase.narrationSource;
-      record.narrationClass = finalPhase.narrationSource === "none" || finalPhase.narration.trim().length === 0
-        ? "none" : classifyNarration(finalPhase.narration, finalPhase.narrationSource);
+      record.narrationClass =
+        finalPhase.narrationSource === "none" || finalPhase.narration.trim().length === 0
+          ? "none"
+          : classifyNarration(finalPhase.narration, finalPhase.narrationSource);
       record.narrationEvents = narrationEventsOf(phases);
       if (first.turnId) {
         const view = JSON.parse((await request("GET", `/adventure-turns/${first.turnId}`)).body);
@@ -1327,9 +1720,17 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
     }
     record.latencyMs = Date.now() - started;
     turns.push(record);
-    if (!options.quiet) process.stderr.write(`turn ${index} ${entry.id} class=${record.narrationClass} committed=${record.committed}\n`);
+    if (!options.quiet)
+      process.stderr.write(`turn ${index} ${entry.id} class=${record.narrationClass} committed=${record.committed}\n`);
     if (dmAfter.has(index)) {
-      const beat = await runBaseDmBeat(request, campaignId, sessionId, runKey, index, beats.length === 0 ? "open" : "continue");
+      const beat = await runBaseDmBeat(
+        request,
+        campaignId,
+        sessionId,
+        runKey,
+        index,
+        beats.length === 0 ? "open" : "continue",
+      );
       record.dmBeatIndex = index;
       beats.push(beat);
       if (!options.quiet) process.stderr.write(`  dm ${index} state=${beat.state}\n`);
@@ -1337,12 +1738,20 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
   }
 
   const artifact: EvalArtifact = {
-    version: 3, generatedAt: new Date().toISOString(), mode: "base-url",
-    provider: { baseUrl: root, model: "unknown" }, seed: 0, dataDir: null, baseUrl: root,
-    world: { campaignId, sessionId, actorId }, declarations: limit,
+    version: 3,
+    generatedAt: new Date().toISOString(),
+    mode: "base-url",
+    provider: { baseUrl: root, model: "unknown" },
+    seed: 0,
+    dataDir: null,
+    baseUrl: root,
+    world: { campaignId, sessionId, actorId },
+    declarations: limit,
     narrationClassification: narrationClassificationDescriptor(),
     reliability: {
-      providerCalls: false, dmCandidates: false, coherence: false,
+      providerCalls: false,
+      dmCandidates: false,
+      coherence: false,
       notes: [
         "base-url mode cannot intercept provider calls: providerSuccessRate and fallback distinctness are unreliable.",
         "base-url mode cannot resolve receipt command ids to locations: location-coherence violations are not measured.",
@@ -1351,7 +1760,10 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
       ],
     },
     probes: probeOutcomes(turns),
-    metrics: computeMetrics(turns, beats, []), turns, dmBeats: beats, providerCalls: [],
+    metrics: computeMetrics(turns, beats, []),
+    turns,
+    dmBeats: beats,
+    providerCalls: [],
     verdict: evaluateRun({ mode: "base-url", declarations: limit, turns, dmBeats: beats, providerCalls: [] }),
   };
   const markdown = renderMarkdown(artifact, options.baseline);
@@ -1362,22 +1774,48 @@ export async function runAgainstBaseUrl(options: BaseUrlOptions): Promise<EvalAr
 }
 
 async function runBaseDmBeat(
-  request: Requester, campaignId: string, sessionId: string, runKey: string, index: number, intent: "open" | "continue",
+  request: Requester,
+  campaignId: string,
+  sessionId: string,
+  runKey: string,
+  index: number,
+  intent: "open" | "continue",
 ): Promise<DmBeatRecord> {
   const started = Date.now();
   const control = JSON.parse((await request("GET", `/campaigns/${campaignId}/dm`)).body);
-  let run = JSON.parse((await request("POST", `/campaigns/${campaignId}/rooms/${sessionId}/dm/beat-commands`,
-    { intent, expectedModeRevision: control.revision, idempotencyKey: `ff-base-dm-${runKey}-${index}` })).body);
+  let run = JSON.parse(
+    (
+      await request("POST", `/campaigns/${campaignId}/rooms/${sessionId}/dm/beat-commands`, {
+        intent,
+        expectedModeRevision: control.revision,
+        idempotencyKey: `ff-base-dm-${runKey}-${index}`,
+      })
+    ).body,
+  );
   if (run.state === "awaiting-approval") {
-    const proposal = JSON.parse((await request("GET", `/campaigns/${campaignId}/rooms/${sessionId}/dm/runs/${run.runId}/proposal`)).body);
-    run = JSON.parse((await request("POST", `/campaigns/${campaignId}/rooms/${sessionId}/dm/runs/${run.runId}/decision-commands`,
-      { decision: "approved", expectedRevision: proposal.run.revision, idempotencyKey: `ff-base-dm-approve-${runKey}-${index}` })).body);
+    const proposal = JSON.parse(
+      (await request("GET", `/campaigns/${campaignId}/rooms/${sessionId}/dm/runs/${run.runId}/proposal`)).body,
+    );
+    run = JSON.parse(
+      (
+        await request("POST", `/campaigns/${campaignId}/rooms/${sessionId}/dm/runs/${run.runId}/decision-commands`, {
+          decision: "approved",
+          expectedRevision: proposal.run.revision,
+          idempotencyKey: `ff-base-dm-approve-${runKey}-${index}`,
+        })
+      ).body,
+    );
   }
   return {
-    index, intent: run.intent ?? intent, state: run.state ?? "unknown",
+    index,
+    intent: run.intent ?? intent,
+    state: run.state ?? "unknown",
     receipts: (run.receipts ?? []).map((receipt: any) => receipt.action),
-    candidatesOffered: [], narration: run.narration ?? "", blockers: run.blockers ?? [],
-    latencyMs: Date.now() - started, success: run.state === "completed",
+    candidatesOffered: [],
+    narration: run.narration ?? "",
+    blockers: run.blockers ?? [],
+    latencyMs: Date.now() - started,
+    success: run.state === "completed",
   };
 }
 
@@ -1414,15 +1852,20 @@ function printMetricTable(metrics: FreeformMetrics, baseline: BaselineMetrics | 
   for (const key of Object.keys(metrics)) {
     const value = record[key]!;
     const diff = byKey.get(key);
-    process.stdout.write(`${key.padEnd(24)} ${formatMetricValue(key, value).padStart(12)} ${(diff ? formatMetricValue(key, diff.baseline) : "-").padStart(12)}  ${diff ? diffVerdict(diff) : ""}\n`);
+    process.stdout.write(
+      `${key.padEnd(24)} ${formatMetricValue(key, value).padStart(12)} ${(diff ? formatMetricValue(key, diff.baseline) : "-").padStart(12)}  ${diff ? diffVerdict(diff) : ""}\n`,
+    );
   }
 }
 
 async function loadBaseline(args: readonly string[]): Promise<BaselineMetrics | null> {
   const baselinePath = argValue(args, "baseline");
   if (!baselinePath) return DOCUMENTED_BASELINE;
-  const parsed = JSON.parse(await readFile(baselinePath, "utf8")) as { metrics?: Record<string, number>; label?: string } & Record<string, number>;
-  return parsed.metrics ? { label: parsed.label ?? "baseline-file", ...parsed.metrics } : parsed as BaselineMetrics;
+  const parsed = JSON.parse(await readFile(baselinePath, "utf8")) as {
+    metrics?: Record<string, number>;
+    label?: string;
+  } & Record<string, number>;
+  return parsed.metrics ? { label: parsed.label ?? "baseline-file", ...parsed.metrics } : (parsed as BaselineMetrics);
 }
 
 async function main(): Promise<void> {
@@ -1435,8 +1878,14 @@ async function main(): Promise<void> {
 
   if (baseUrl) {
     const artifact = await runAgainstBaseUrl({
-      baseUrl, campaignId: argValue(args, "campaign-id"), sessionId: argValue(args, "session-id"),
-      actorId: argValue(args, "actor-id"), turns, out, baseline, quiet,
+      baseUrl,
+      campaignId: argValue(args, "campaign-id"),
+      sessionId: argValue(args, "session-id"),
+      actorId: argValue(args, "actor-id"),
+      turns,
+      out,
+      baseline,
+      quiet,
     });
     printMetricTable(artifact.metrics, baseline);
     printVerdict(artifact.verdict);
@@ -1445,10 +1894,14 @@ async function main(): Promise<void> {
   }
 
   const result = await runFreeformFunEval({
-    dataDir: argValue(args, "data-dir"), turns,
+    dataDir: argValue(args, "data-dir"),
+    turns,
     seed: Number(argValue(args, "seed") ?? 11),
     port: Number(argValue(args, "port") ?? 18814),
-    out, baseline, keep: args.includes("--keep"), quiet,
+    out,
+    baseline,
+    keep: args.includes("--keep"),
+    quiet,
   });
   printMetricTable(result.artifact.metrics, baseline);
   printVerdict(result.artifact.verdict);
@@ -1456,7 +1909,12 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  void main().catch((error) => { process.stderr.write(`${(error as Error).stack ?? error}\n`); process.exitCode = 1; });
+  void main().catch((error) => {
+    process.stderr.write(`${(error as Error).stack ?? error}\n`);
+    process.exitCode = 1;
+  });
 }
 
-function fileURLToPath(url: string): string { return url.startsWith("file:") ? new URL(url).pathname : url; }
+function fileURLToPath(url: string): string {
+  return url.startsWith("file:") ? new URL(url).pathname : url;
+}

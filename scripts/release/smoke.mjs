@@ -20,36 +20,62 @@ const port = await new Promise((resolve, reject) => {
   });
 });
 const dataDir = mkdtempSync(path.join(tmpdir(), "velvet-release-smoke-"));
-const env = { ...process.env, PORT: String(port), HOST: "127.0.0.1", VELVET_DATA_DIR: dataDir,
-  VELVET_ENV_FILE: path.join(dataDir, "no-such.env") };
+const env = {
+  ...process.env,
+  PORT: String(port),
+  HOST: "127.0.0.1",
+  VELVET_DATA_DIR: dataDir,
+  VELVET_ENV_FILE: path.join(dataDir, "no-such.env"),
+};
 for (const key of Object.keys(env)) if (key.startsWith("FEATURE_RPG_") || key.endsWith("_API_KEY")) delete env[key];
-const child = spawn(process.execPath, [path.join(dir, "server", "dist", "index.js")], { cwd: dataDir, env, stdio: ["ignore", "pipe", "pipe"] });
+const child = spawn(process.execPath, [path.join(dir, "server", "dist", "index.js")], {
+  cwd: dataDir,
+  env,
+  stdio: ["ignore", "pipe", "pipe"],
+});
 let output = "";
-child.stdout.on("data", (chunk) => { output += chunk; });
-child.stderr.on("data", (chunk) => { output += chunk; });
+child.stdout.on("data", (chunk) => {
+  output += chunk;
+});
+child.stderr.on("data", (chunk) => {
+  output += chunk;
+});
 
 const base = `http://127.0.0.1:${port}`;
 async function waitForServer() {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`server exited with ${child.exitCode}`);
-    try { await fetch(`${base}/api/rpg/v1/features`); return; } catch { await new Promise((r) => setTimeout(r, 250)); }
+    try {
+      await fetch(`${base}/api/rpg/v1/features`);
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 250));
+    }
   }
   throw new Error("server did not start in time");
 }
-function check(condition, message) { if (!condition) throw new Error(message); }
+function check(condition, message) {
+  if (!condition) throw new Error(message);
+}
 
 let failed = false;
 try {
   await waitForServer();
   const home = await fetch(`${base}/`);
-  check(home.status === 200 && (home.headers.get("content-type") ?? "").includes("text/html"), `GET / returned ${home.status}`);
+  check(
+    home.status === 200 && (home.headers.get("content-type") ?? "").includes("text/html"),
+    `GET / returned ${home.status}`,
+  );
   const deep = await fetch(`${base}/campaigns/smoke`);
   check(deep.status === 200, `deep link returned ${deep.status}`);
   const missing = await fetch(`${base}/api/release-smoke-missing`);
   check(missing.status === 404, `unknown API path returned ${missing.status}`);
   const features = await (await fetch(`${base}/api/rpg/v1/features`)).json();
-  check(features.campaign && features.mechanics && features.combat && features.studio, `RPG features not on: ${JSON.stringify(features)}`);
+  check(
+    features.campaign && features.mechanics && features.combat && features.studio,
+    `RPG features not on: ${JSON.stringify(features)}`,
+  );
   console.log(`release smoke ok (${dir})`);
 } catch (error) {
   failed = true;

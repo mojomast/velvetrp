@@ -1,7 +1,4 @@
-import {
-  CHARACTER_BUILDER_STANDARD_ARRAY,
-  SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS,
-} from "@velvet/contracts";
+import { CHARACTER_BUILDER_STANDARD_ARRAY, SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS } from "@velvet/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { createRepository, SRD_5_1_STARTER_CATALOG, type Repository } from "../src/repo/index.js";
@@ -32,10 +29,23 @@ function newRepository(): Repository {
 }
 
 function createActor(repo: Repository, campaignId: string): string {
-  const persona = repo.createCharacter({ name: "Aster", age: 30, archetype: "Fighter", boundaries: "", fictionalConfirmed: true });
+  const persona = repo.createCharacter({
+    name: "Aster",
+    age: 30,
+    archetype: "Fighter",
+    boundaries: "",
+    fictionalConfirmed: true,
+  });
   const draft = repo.createCharacterDraft("local-owner", campaignId, {
-    personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable",
-    allocation: { method: "standard-array", scores: Object.fromEntries(SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((key, i) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[i]])) as never },
+    personaId: persona.id,
+    controllerPrincipalId: "local-owner",
+    durability: "durable",
+    allocation: {
+      method: "standard-array",
+      scores: Object.fromEntries(
+        SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((key, i) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[i]]),
+      ) as never,
+    },
     idempotencyKey: "attunement-draft",
   });
   const definitions = SRD_5_1_STARTER_CATALOG.definitions;
@@ -43,26 +53,40 @@ function createActor(repo: Repository, campaignId: string): string {
   const background = definitions.find((d) => d.reference.kind === "background")!.reference;
   const klass = definitions.find((d) => d.reference.kind === "class")!.reference;
   const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, {
-    expectedRevision: 0, idempotencyKey: "attunement-select",
+    expectedRevision: 0,
+    idempotencyKey: "attunement-select",
     selections: { race, background, class: klass, starterGrant: "kit" },
   } as never);
-  return repo.finalizeCharacterDraft("local-owner", draft.draft.id, { expectedRevision: selected.draft.revision, idempotencyKey: "attunement-final" }).receipt.actorId;
+  return repo.finalizeCharacterDraft("local-owner", draft.draft.id, {
+    expectedRevision: selected.draft.revision,
+    idempotencyKey: "attunement-final",
+  }).receipt.actorId;
 }
 
 async function bootstrap() {
   const repo = newRepository();
   const campaign = repo.createCampaign("local-owner", { name: "Attunement Road" });
   repo.installSrdStarterCatalog("local-owner");
-  repo.configureSrdStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "attunement-catalog" });
+  repo.configureSrdStarterCatalog("local-owner", campaign.id, {
+    expectedRevision: 0,
+    idempotencyKey: "attunement-catalog",
+  });
   const actorId = createActor(repo, campaign.id);
-  for (const item of ["ring-of-protection", "cloak-of-elvenkind", "bracers-of-defense", "ring-of-evasion", "wand-of-magic-missiles"]) {
+  for (const item of [
+    "ring-of-protection",
+    "cloak-of-elvenkind",
+    "bracers-of-defense",
+    "ring-of-evasion",
+    "wand-of-magic-missiles",
+  ]) {
     grantSrdEquipment(campaign.id, actorId, item);
   }
   const app = buildApp({ campaignRepositoryFactory: () => repo });
   return { repo, campaign, actorId, app };
 }
 
-const url = (campaignId: string, actorId: string) => `/api/rpg/v1/campaigns/${campaignId}/actors/${actorId}/attunements`;
+const url = (campaignId: string, actorId: string) =>
+  `/api/rpg/v1/campaigns/${campaignId}/actors/${actorId}/attunements`;
 
 describe("deterministic magic-item attunement journey", () => {
   it("attunes, enforces the SRD limit and prerequisites, survives restart, and drops", async () => {
@@ -75,15 +99,28 @@ describe("deterministic magic-item attunement journey", () => {
     expect(empty.json()).toMatchObject({ campaignId: campaign.id, actorId, limit: 3, attunements: [] });
 
     const attune = (definitionId: string, satisfiedRest: "short-rest" | "long-rest" | null, key = definitionId) =>
-      app.inject({ method: "POST", url: path, headers: JSON_HEADERS, payload: { command: "attune", key, definitionId, satisfiedRest } });
+      app.inject({
+        method: "POST",
+        url: path,
+        headers: JSON_HEADERS,
+        payload: { command: "attune", key, definitionId, satisfiedRest },
+      });
 
     const missingPrerequisite = await attune(RING, null);
     expect(missingPrerequisite.statusCode).toBe(200);
-    expect(missingPrerequisite.json()).toMatchObject({ ok: false, code: "prerequisite-missing", snapshot: { attunements: [] } });
+    expect(missingPrerequisite.json()).toMatchObject({
+      ok: false,
+      code: "prerequisite-missing",
+      snapshot: { attunements: [] },
+    });
 
     const first = await attune(RING, "short-rest");
     expect(first.statusCode, first.body).toBe(200);
-    expect(first.json()).toMatchObject({ ok: true, code: null, snapshot: { limit: 3, attunements: [{ key: RING, definition: { definitionId: RING } }] } });
+    expect(first.json()).toMatchObject({
+      ok: true,
+      code: null,
+      snapshot: { limit: 3, attunements: [{ key: RING, definition: { definitionId: RING } }] },
+    });
 
     expect((await attune(CLOAK, "long-rest")).json()).toMatchObject({ ok: true });
     expect((await attune(BRACERS, "short-rest")).json()).toMatchObject({ ok: true });
@@ -105,11 +142,24 @@ describe("deterministic magic-item attunement journey", () => {
     expect(afterRestart.statusCode, afterRestart.body).toBe(200);
     expect(afterRestart.json().attunements.map((entry: { key: string }) => entry.key)).toEqual([BRACERS, CLOAK, RING]);
 
-    const drop = await restarted.inject({ method: "POST", url: path, headers: JSON_HEADERS, payload: { command: "drop", key: RING } });
+    const drop = await restarted.inject({
+      method: "POST",
+      url: path,
+      headers: JSON_HEADERS,
+      payload: { command: "drop", key: RING },
+    });
     expect(drop.statusCode, drop.body).toBe(200);
     expect(drop.json()).toMatchObject({ ok: true, snapshot: { attunements: [{ key: BRACERS }, { key: CLOAK }] } });
-    const repeatDrop = await restarted.inject({ method: "POST", url: path, headers: JSON_HEADERS, payload: { command: "drop", key: RING } });
-    expect(repeatDrop.json()).toMatchObject({ ok: true, snapshot: { attunements: [{ key: BRACERS }, { key: CLOAK }] } });
+    const repeatDrop = await restarted.inject({
+      method: "POST",
+      url: path,
+      headers: JSON_HEADERS,
+      payload: { command: "drop", key: RING },
+    });
+    expect(repeatDrop.json()).toMatchObject({
+      ok: true,
+      snapshot: { attunements: [{ key: BRACERS }, { key: CLOAK }] },
+    });
 
     await restarted.close();
     await app.close();

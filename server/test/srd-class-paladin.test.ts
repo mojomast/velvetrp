@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { paladinDefinition, paladinLevels, paladinSubclasses } from "../src/content/srdStarter/classes/paladin.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -36,8 +40,17 @@ describe("SRD 5.1 Paladin class", () => {
   it("grants the d10 hit die and Lay on Hands pool at level 1", () => {
     const levelOne = classLevelCatalogDefinitionSchema.parse(levels.find((level) => level.mechanics.level === 1)!);
     expect(levelOne.mechanics.hpGain).toBe(10);
-    expect(levelOne.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d10", maxIncrease: 1, currentIncrease: 1 });
-    expect(levelOne.mechanics.resourceGrants).toContainEqual({ resourceId: "lay-on-hands", maxIncrease: 5, currentIncrease: 5, recovery: "long-rest" });
+    expect(levelOne.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d10",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
+    expect(levelOne.mechanics.resourceGrants).toContainEqual({
+      resourceId: "lay-on-hands",
+      maxIncrease: 5,
+      currentIncrease: 5,
+      recovery: "long-rest",
+    });
   });
 
   it("offers the Oath of Devotion subclass choice at level 3", () => {

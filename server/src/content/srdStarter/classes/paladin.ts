@@ -56,9 +56,15 @@ export function paladinDefinition(refs: StarterReferences) {
   return {
     reference: refs.paladin,
     name: "Paladin",
-    description: "Bounded SRD 5.1 Paladin progression covers levels 1-20 as metadata, including the Oath of Devotion subclass choice. Smites, auras, and oath features remain unsupported at runtime.",
+    description:
+      "Bounded SRD 5.1 Paladin progression covers levels 1-20 as metadata, including the Oath of Devotion subclass choice. Smites, auras, and oath features remain unsupported at runtime.",
     tags: ["srd-5.1", PALADIN_SLUG, UNSUPPORTED_TAG],
-    mechanics: { hitDie: PALADIN_HIT_DIE, primaryAttribute: "charisma", savingAttributes: ["wisdom", "charisma"], levelRefs: PALADIN_LEVEL_NUMBERS.map((level) => levelReference(refs, level)) },
+    mechanics: {
+      hitDie: PALADIN_HIT_DIE,
+      primaryAttribute: "charisma",
+      savingAttributes: ["wisdom", "charisma"],
+      levelRefs: PALADIN_LEVEL_NUMBERS.map((level) => levelReference(refs, level)),
+    },
   };
 }
 
@@ -75,19 +81,70 @@ export function paladinLevels(refs: StarterReferences) {
     };
   };
   return [
-    { reference: levelReference(refs, 1), name: "Paladin Level 1", description: featureDescription(1), tags: ["srd-5.1", UNSUPPORTED_TAG, "paladin-1"], mechanics: { classRef: paladin, level: 1, proficiencyBonus: proficiencyBonusFor(1), hpGain: PALADIN_HIT_DIE, abilityRefs: [divineSense, layOnHands], spellRefs: [], resourceGrants: [{ resourceId: "lay-on-hands", maxIncrease: 5, currentIncrease: 5, recovery: "long-rest" }, hitDieGrant()] } },
-    { reference: levelReference(refs, 2), name: "Paladin Level 2", description: featureDescription(2), tags: ["srd-5.1", UNSUPPORTED_TAG, "paladin-2"], mechanics: { classRef: paladin, level: 2, proficiencyBonus: proficiencyBonusFor(2), hpGain: PALADIN_HP_GAIN, abilityRefs: [], spellRefs: [], resourceGrants: [hitDieGrant()] } },
-    { reference: levelReference(refs, 3), name: "Paladin Level 3", description: featureDescription(3), tags: ["srd-5.1", UNSUPPORTED_TAG, "paladin-3"], mechanics: { classRef: paladin, level: 3, proficiencyBonus: proficiencyBonusFor(3), hpGain: PALADIN_HP_GAIN, abilityRefs: [], spellRefs: [], resourceGrants: [hitDieGrant()], progressionChoices: [{ choiceId: "paladin-subclass", required: true, count: 1, kind: "subclass", options: [subclass] }] } },
+    {
+      reference: levelReference(refs, 1),
+      name: "Paladin Level 1",
+      description: featureDescription(1),
+      tags: ["srd-5.1", UNSUPPORTED_TAG, "paladin-1"],
+      mechanics: {
+        classRef: paladin,
+        level: 1,
+        proficiencyBonus: proficiencyBonusFor(1),
+        hpGain: PALADIN_HIT_DIE,
+        abilityRefs: [divineSense, layOnHands],
+        spellRefs: [],
+        resourceGrants: [
+          { resourceId: "lay-on-hands", maxIncrease: 5, currentIncrease: 5, recovery: "long-rest" },
+          hitDieGrant(),
+        ],
+      },
+    },
+    {
+      reference: levelReference(refs, 2),
+      name: "Paladin Level 2",
+      description: featureDescription(2),
+      tags: ["srd-5.1", UNSUPPORTED_TAG, "paladin-2"],
+      mechanics: {
+        classRef: paladin,
+        level: 2,
+        proficiencyBonus: proficiencyBonusFor(2),
+        hpGain: PALADIN_HP_GAIN,
+        abilityRefs: [],
+        spellRefs: [],
+        resourceGrants: [hitDieGrant()],
+      },
+    },
+    {
+      reference: levelReference(refs, 3),
+      name: "Paladin Level 3",
+      description: featureDescription(3),
+      tags: ["srd-5.1", UNSUPPORTED_TAG, "paladin-3"],
+      mechanics: {
+        classRef: paladin,
+        level: 3,
+        proficiencyBonus: proficiencyBonusFor(3),
+        hpGain: PALADIN_HP_GAIN,
+        abilityRefs: [],
+        spellRefs: [],
+        resourceGrants: [hitDieGrant()],
+        progressionChoices: [
+          { choiceId: "paladin-subclass", required: true, count: 1, kind: "subclass", options: [subclass] },
+        ],
+      },
+    },
     ...PALADIN_LEVEL_NUMBERS.slice(3).map(unsupportedLevel),
   ];
 }
 
 export function paladinSubclasses(refs: StarterReferences) {
-  return [{
-    reference: subclassReference(refs),
-    name: "Oath of Devotion",
-    description: "Bounded SRD 5.1 Oath of Devotion subclass metadata bound to the Paladin class at level 3; its oath features remain unsupported at runtime.",
-    tags: ["srd-5.1", "subclass", PALADIN_SLUG],
-    mechanics: { classRef: refs.paladin, level: 3, abilityRefs: [] as string[] },
-  }];
+  return [
+    {
+      reference: subclassReference(refs),
+      name: "Oath of Devotion",
+      description:
+        "Bounded SRD 5.1 Oath of Devotion subclass metadata bound to the Paladin class at level 3; its oath features remain unsupported at runtime.",
+      tags: ["srd-5.1", "subclass", PALADIN_SLUG],
+      mechanics: { classRef: refs.paladin, level: 3, abilityRefs: [] as string[] },
+    },
+  ];
 }

@@ -15,9 +15,16 @@ const snapshot: CampaignCharacterWorkspaceSnapshot = {
     classes: [{ name: "Fighter", description: "Martial", level: 2 }],
     attributes: [{ label: "Attribute 1", value: 12 }],
     proficiencies: [{ category: "skill", label: "Skill proficiency 1" }],
-    choices: [{ label: "Choice 1", selection: {
-      kind: "ability", name: "Focus", description: "Concentrate",
-    } }],
+    choices: [
+      {
+        label: "Choice 1",
+        selection: {
+          kind: "ability",
+          name: "Focus",
+          description: "Concentrate",
+        },
+      },
+    ],
     resources: [{ label: "Resource 1", current: 3, max: 5 }],
   },
 };
@@ -26,12 +33,18 @@ function repository(result: CampaignCharacterWorkspaceSnapshot | null = snapshot
   return {
     listCampaigns: vi.fn(() => []),
     getCampaignDetail: vi.fn(() => null),
-    createCampaign: vi.fn(() => { throw new Error("unused"); }),
+    createCampaign: vi.fn(() => {
+      throw new Error("unused");
+    }),
     getCampaignCharacterCreationOptions: vi.fn(() => null),
     getCampaignCharacterRoster: vi.fn(() => null),
     getCampaignCharacterWorkspace: vi.fn(() => result),
-    createOriginalStarterCampaignCharacter: vi.fn(() => { throw new Error("unused"); }),
-    renameCampaignIfUnchanged: vi.fn(() => { throw new Error("unused"); }),
+    createOriginalStarterCampaignCharacter: vi.fn(() => {
+      throw new Error("unused");
+    }),
+    renameCampaignIfUnchanged: vi.fn(() => {
+      throw new Error("unused");
+    }),
     close: vi.fn(),
   };
 }
@@ -47,7 +60,8 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/
     const factory = vi.fn(() => repo);
     const app = buildApp({ campaignRepositoryFactory: factory });
     const disabled = await app.inject({
-      method: "GET", url: "/api/rpg/v1/campaigns/campaign-one/characters/character-one/workspace?secret=x",
+      method: "GET",
+      url: "/api/rpg/v1/campaigns/campaign-one/characters/character-one/workspace?secret=x",
     });
     expect(disabled.statusCode).toBe(404);
     expect(disabled.headers["cache-control"]).toBe("no-store");
@@ -66,9 +80,7 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/
     expect(response.json()).toEqual({ character: snapshot.character });
     expect(response.body).not.toMatch(/campaign-one|character-one|controller|private/i);
     expect(repo.getCampaignCharacterWorkspace).toHaveBeenCalledOnce();
-    expect(repo.getCampaignCharacterWorkspace).toHaveBeenCalledWith(
-      "local-owner", "campaign-one", "character-one",
-    );
+    expect(repo.getCampaignCharacterWorkspace).toHaveBeenCalledWith("local-owner", "campaign-one", "character-one");
     await app.close();
     expect(repo.close).toHaveBeenCalledOnce();
   });
@@ -119,16 +131,23 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/
     const address = app.server.address();
     if (!address || typeof address === "string") throw new Error("no server address");
     const response = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      const request = httpRequest({
-        host: "127.0.0.1", port: address.port, method: "GET",
-        path: "/api/rpg/v1/campaigns/campaign-one/characters/character-one/workspace?",
-        headers: { "x-request-id": `workspace-bare-${enabled}` },
-      }, (incoming) => {
-        let body = "";
-        incoming.setEncoding("utf8");
-        incoming.on("data", (chunk: string) => { body += chunk; });
-        incoming.on("end", () => resolve({ status: incoming.statusCode ?? 0, body }));
-      });
+      const request = httpRequest(
+        {
+          host: "127.0.0.1",
+          port: address.port,
+          method: "GET",
+          path: "/api/rpg/v1/campaigns/campaign-one/characters/character-one/workspace?",
+          headers: { "x-request-id": `workspace-bare-${enabled}` },
+        },
+        (incoming) => {
+          let body = "";
+          incoming.setEncoding("utf8");
+          incoming.on("data", (chunk: string) => {
+            body += chunk;
+          });
+          incoming.on("end", () => resolve({ status: incoming.statusCode ?? 0, body }));
+        },
+      );
       request.on("error", reject);
       request.end();
     });
@@ -146,12 +165,14 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/
     const repo = repository(null);
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "GET", url: "/api/rpg/v1/campaigns/campaign-one/characters/missing/workspace",
+      method: "GET",
+      url: "/api/rpg/v1/campaigns/campaign-one/characters/missing/workspace",
       headers: { "x-request-id": "workspace-missing" },
     });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({
-      code: "RPG_CAMPAIGN_CHARACTER_NOT_FOUND", requestId: "workspace-missing",
+      code: "RPG_CAMPAIGN_CHARACTER_NOT_FOUND",
+      requestId: "workspace-missing",
       error: "Campaign character not found",
     });
     await app.close();
@@ -162,27 +183,36 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/
     async (kind) => {
       process.env.FEATURE_RPG_CAMPAIGN = "true";
       const repo = repository();
-      if (kind === "throw") repo.getCampaignCharacterWorkspace.mockImplementation(() => {
-        throw new Error("private sqlite /secret/path");
-      });
+      if (kind === "throw")
+        repo.getCampaignCharacterWorkspace.mockImplementation(() => {
+          throw new Error("private sqlite /secret/path");
+        });
       if (kind === "falsey") repo.getCampaignCharacterWorkspace.mockReturnValue(false as never);
-      if (kind === "wrong-campaign") repo.getCampaignCharacterWorkspace.mockReturnValue({
-        ...snapshot, campaignId: "private-other-campaign",
-      });
-      if (kind === "wrong-character") repo.getCampaignCharacterWorkspace.mockReturnValue({
-        ...snapshot, campaignCharacterId: "private-other-character",
-      });
-      if (kind === "private-output") repo.getCampaignCharacterWorkspace.mockReturnValue({
-        ...snapshot, character: { ...snapshot.character, privateNotes: "private-output-secret" } as never,
-      });
+      if (kind === "wrong-campaign")
+        repo.getCampaignCharacterWorkspace.mockReturnValue({
+          ...snapshot,
+          campaignId: "private-other-campaign",
+        });
+      if (kind === "wrong-character")
+        repo.getCampaignCharacterWorkspace.mockReturnValue({
+          ...snapshot,
+          campaignCharacterId: "private-other-character",
+        });
+      if (kind === "private-output")
+        repo.getCampaignCharacterWorkspace.mockReturnValue({
+          ...snapshot,
+          character: { ...snapshot.character, privateNotes: "private-output-secret" } as never,
+        });
       const app = buildApp({ campaignRepositoryFactory: () => repo });
       const response = await app.inject({
-        method: "GET", url: "/api/rpg/v1/campaigns/campaign-one/characters/character-one/workspace",
+        method: "GET",
+        url: "/api/rpg/v1/campaigns/campaign-one/characters/character-one/workspace",
         headers: { "x-request-id": `workspace-${kind}` },
       });
       expect(response.statusCode).toBe(500);
       expect(response.json()).toMatchObject({
-        code: "RPG_INTERNAL_ERROR", requestId: `workspace-${kind}`,
+        code: "RPG_INTERNAL_ERROR",
+        requestId: `workspace-${kind}`,
         error: "Campaign character workspace could not be loaded",
       });
       expect(response.body).not.toMatch(/secret|private-other/);
@@ -197,7 +227,8 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/
     const app = buildApp({ campaignRepositoryFactory: factory });
     for (const method of ["HEAD", "POST", "PUT", "PATCH", "DELETE"] as const) {
       const response = await app.inject({
-        method, url: "/api/rpg/v1/campaigns/campaign-one/characters/character-one/workspace",
+        method,
+        url: "/api/rpg/v1/campaigns/campaign-one/characters/character-one/workspace",
       });
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND" });
@@ -223,7 +254,10 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/
       expect(response.statusCode).toBe(400);
       expect(response.headers["content-type"]).toBe("application/json");
       expect(response.json()).toEqual({
-        error: "Bad Request", code: "FST_ERR_BAD_URL", message: "Request URL is invalid", statusCode: 400,
+        error: "Bad Request",
+        code: "FST_ERR_BAD_URL",
+        message: "Request URL is invalid",
+        statusCode: 400,
       });
     }
     await app.close();

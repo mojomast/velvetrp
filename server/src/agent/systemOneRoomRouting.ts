@@ -88,19 +88,41 @@ export function composeRoomRoutingSelection(
   scored.sort((left, right) => right.signal - left.signal);
   const acting = scored.filter((entry) => entry.band === "act").slice(0, maxSpeakers);
   if (acting.length > 0) {
-    return { band: "act", method: "threshold", speakerIds: acting.map((entry) => entry.id), topSignal: scored[0]?.signal ?? null };
+    return {
+      band: "act",
+      method: "threshold",
+      speakerIds: acting.map((entry) => entry.id),
+      topSignal: scored[0]?.signal ?? null,
+    };
   }
 
   const best = answers[ROOM_ROUTING_BEST_SPEAKER_KEY];
   // Confidence belongs to the named option, not whichever other option has most mass.
   const chosenProbability = best && best.type === "choice" ? best.probabilities[best.choice] : undefined;
-  const bestTop = typeof chosenProbability === "number" && Number.isFinite(chosenProbability)
-    && chosenProbability >= 0 && chosenProbability <= 1 ? chosenProbability : null;
-  if (best && best.type === "choice" && best.choice !== ROOM_ROUTING_NONE && participantIds.has(best.choice) && bestTop !== null && bestTop >= thresholds.reviewThreshold) {
+  const bestTop =
+    typeof chosenProbability === "number" &&
+    Number.isFinite(chosenProbability) &&
+    chosenProbability >= 0 &&
+    chosenProbability <= 1
+      ? chosenProbability
+      : null;
+  if (
+    best &&
+    best.type === "choice" &&
+    best.choice !== ROOM_ROUTING_NONE &&
+    participantIds.has(best.choice) &&
+    bestTop !== null &&
+    bestTop >= thresholds.reviewThreshold
+  ) {
     return { band: "act", method: "best-pick", speakerIds: [best.choice], topSignal: bestTop };
   }
 
   const topNoul = scored[0]?.signal ?? null;
   const signal = Math.max(topNoul ?? 0, bestTop ?? 0);
-  return { band: scored[0]?.band ?? "fallback", method: "defer", speakerIds: [], topSignal: signal > 0 ? signal : null };
+  return {
+    band: scored[0]?.band ?? "fallback",
+    method: "defer",
+    speakerIds: [],
+    topSignal: signal > 0 ? signal : null,
+  };
 }

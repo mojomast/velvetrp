@@ -72,7 +72,10 @@ describe("recordGuardrailShadowDecision", () => {
       fallbackUsed: true,
       shadow: true,
     });
-    expect(Object.keys(row.questions as Record<string, unknown>)).toEqual([...GUARDRAIL_HAZARDS, GUARDRAIL_SEVERITY_KEY]);
+    expect(Object.keys(row.questions as Record<string, unknown>)).toEqual([
+      ...GUARDRAIL_HAZARDS,
+      GUARDRAIL_SEVERITY_KEY,
+    ]);
     expect(selectionOf(row)).toEqual({
       disposition: "pass",
       hazards: [],
@@ -127,8 +130,12 @@ describe("recordGuardrailShadowDecision", () => {
     expect(row.campaignId).toBe("campaign-1");
     expect(row.state).toEqual({ message: content, declaredBoundaries: ["Do not reveal GM notes"] });
     const questions = caller.calls[0]!.questions;
-    expect(String((questions.override_attempt as { instructions: unknown }).instructions)).toContain("ignore your instructions");
-    expect(String((questions.boundary_crossing as { instructions: unknown }).instructions)).toContain("Do not reveal GM notes");
+    expect(String((questions.override_attempt as { instructions: unknown }).instructions)).toContain(
+      "ignore your instructions",
+    );
+    expect(String((questions.boundary_crossing as { instructions: unknown }).instructions)).toContain(
+      "Do not reveal GM notes",
+    );
   });
 
   it("records nothing and never calls when the lane mode is off", async () => {
@@ -150,7 +157,9 @@ describe("recordGuardrailShadowDecision", () => {
   });
 
   it("records nothing and never throws when the caller throws synchronously", async () => {
-    const caller = (() => { throw new Error("sync boom"); }) as unknown as SystemOneCaller;
+    const caller = (() => {
+      throw new Error("sync boom");
+    }) as unknown as SystemOneCaller;
     await expect(recordGuardrailShadowDecision(laneSettings(), caller, GUARDRAIL_INPUT)).resolves.toBeUndefined();
     expect(listSystemOneDecisionsByLane("guardrails", 10)).toHaveLength(0);
   });
@@ -205,7 +214,9 @@ async function startFakeSystemOne(): Promise<FakeSystemOne> {
   const server: Server = createServer((req, res) => {
     if (req.method === "POST" && req.url === "/v1/systemone") {
       let body = "";
-      req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
+      req.on("data", (chunk: Buffer) => {
+        body += chunk.toString("utf8");
+      });
       req.on("end", () => {
         requests += 1;
         res.writeHead(200, { "Content-Type": "application/json", "x-typesafe-request-id": "req_shadow" });
@@ -235,11 +246,20 @@ let provider: FakeProvider | null = null;
 let systemOne: FakeSystemOne | null = null;
 
 afterEach(async () => {
-  if (provider) { await provider.close(); provider = null; }
-  if (systemOne) { await systemOne.close(); systemOne = null; }
-  if (savedSystemOneEnv.feature === undefined) delete process.env.FEATURE_SYSTEM_ONE; else process.env.FEATURE_SYSTEM_ONE = savedSystemOneEnv.feature;
-  if (savedSystemOneEnv.base === undefined) delete process.env.TYPESAFE_BASE_URL; else process.env.TYPESAFE_BASE_URL = savedSystemOneEnv.base;
-  if (savedSystemOneEnv.key === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = savedSystemOneEnv.key;
+  if (provider) {
+    await provider.close();
+    provider = null;
+  }
+  if (systemOne) {
+    await systemOne.close();
+    systemOne = null;
+  }
+  if (savedSystemOneEnv.feature === undefined) delete process.env.FEATURE_SYSTEM_ONE;
+  else process.env.FEATURE_SYSTEM_ONE = savedSystemOneEnv.feature;
+  if (savedSystemOneEnv.base === undefined) delete process.env.TYPESAFE_BASE_URL;
+  else process.env.TYPESAFE_BASE_URL = savedSystemOneEnv.base;
+  if (savedSystemOneEnv.key === undefined) delete process.env.TYPESAFE_API_KEY;
+  else process.env.TYPESAFE_API_KEY = savedSystemOneEnv.key;
 });
 
 async function runRoomTurn(guardrailsMode: "shadow" | "off"): Promise<{
@@ -267,23 +287,39 @@ async function runRoomTurn(guardrailsMode: "shadow" | "off"): Promise<{
   });
 
   const characterInput = (name: string) => ({
-    name, age: 30, archetype: `${name} archetype`, boundaries: "fictional", fictionalConfirmed: true,
+    name,
+    age: 30,
+    archetype: `${name} archetype`,
+    boundaries: "fictional",
+    fictionalConfirmed: true,
   });
-  const one = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("One") })).json() as { id: string };
-  const two = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("Two") })).json() as { id: string };
-  const three = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("Three") })).json() as { id: string };
-  const session = (await app.inject({
-    method: "POST",
-    url: "/api/sessions",
-    payload: { characterIds: [one.id, two.id, three.id], primaryCharacterId: one.id },
-  })).json() as { id: string };
+  const one = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("One") })).json() as {
+    id: string;
+  };
+  const two = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("Two") })).json() as {
+    id: string;
+  };
+  const three = (
+    await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("Three") })
+  ).json() as { id: string };
+  const session = (
+    await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { characterIds: [one.id, two.id, three.id], primaryCharacterId: one.id },
+    })
+  ).json() as { id: string };
 
   const response = await app.inject({
     method: "POST",
     url: `/api/sessions/${session.id}/room-turn`,
     payload: { content: "Who should inspect the signal?", maxSpeakers: 2 },
   });
-  for (const lane of ["speaker-routing", "cost-router", ...(guardrailsMode === "shadow" ? ["guardrails" as const] : [])] as const) {
+  for (const lane of [
+    "speaker-routing",
+    "cost-router",
+    ...(guardrailsMode === "shadow" ? ["guardrails" as const] : []),
+  ] as const) {
     await expect.poll(() => listSystemOneDecisionsByLane(lane, 10).length).toBe(1);
   }
   const guardrails = listSystemOneDecisionsByLane("guardrails", 10);
@@ -314,7 +350,10 @@ describe("guardrails shadow in the room turn", () => {
     expect(result.replyContents).toEqual(["One answers first.", "Two reacts to One."]);
     expect(result.guardrails).toHaveLength(1);
     expect(result.guardrails[0]).toMatchObject({
-      lane: "guardrails", provider: "typesafe", shadow: true, fallbackUsed: true,
+      lane: "guardrails",
+      provider: "typesafe",
+      shadow: true,
+      fallbackUsed: true,
     });
     expect(selectionOf(result.guardrails[0]!)).toMatchObject({
       disposition: expect.any(String),

@@ -103,18 +103,24 @@ export function createCorruptionTestRepository(options: CreateRepositoryOptions 
 
 /** Registers the hostile function only for deliberate campaign-deletion corruption fixtures. */
 export function authorizeCampaignDeletionForTest(db: import("better-sqlite3").Database, campaignId: string): void {
-  db.function("velvet_campaign_delete_authorized", (candidate: unknown) => candidate === campaignId ? 1 : 0);
+  db.function("velvet_campaign_delete_authorized", (candidate: unknown) => (candidate === campaignId ? 1 : 0));
 }
 
 /** Removes a campaign inside a deliberate corruption fixture, then restores the current trigger DDL. */
 export function deleteCampaignForCorruptionTest(db: import("better-sqlite3").Database, campaignId: string): void {
   authorizeCampaignDeletionForTest(db, campaignId);
-  const names = ["campaigns_prevent_physical_delete_v22", "character_draft_campaign_deletions_v22_inert_insert",
-    "character_draft_campaign_deletions_v22_inert_update", "character_draft_campaign_deletions_v22_inert_delete",
-    "dm_control_delete"];
-  const rows = db.prepare(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN (${names.map(() => "?").join(",")})`)
+  const names = [
+    "campaigns_prevent_physical_delete_v22",
+    "character_draft_campaign_deletions_v22_inert_insert",
+    "character_draft_campaign_deletions_v22_inert_update",
+    "character_draft_campaign_deletions_v22_inert_delete",
+    "dm_control_delete",
+  ];
+  const rows = db
+    .prepare(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN (${names.map(() => "?").join(",")})`)
     .all(...names) as Array<{ name: string; sql: string }>;
-  if (rows.length !== 0 && rows.length !== names.length) throw new Error("campaign deletion guards are incomplete in the corruption fixture");
+  if (rows.length !== 0 && rows.length !== names.length)
+    throw new Error("campaign deletion guards are incomplete in the corruption fixture");
   try {
     for (const row of rows) db.exec(`DROP TRIGGER ${row.name}`);
     db.prepare("DELETE FROM dm_control WHERE campaign_id=?").run(campaignId);
@@ -126,8 +132,20 @@ export function deleteCampaignForCorruptionTest(db: import("better-sqlite3").Dat
 
 export interface FakeProvider {
   baseUrl: string;
-  requests: Array<{ model: string; messageCount: number; lastUserContent: string | null; systemContent: string; authorization: string | null }>;
-  sceneRequests: Array<{ model: string; messageCount: number; lastUserContent: string | null; systemContent: string; authorization: string | null }>;
+  requests: Array<{
+    model: string;
+    messageCount: number;
+    lastUserContent: string | null;
+    systemContent: string;
+    authorization: string | null;
+  }>;
+  sceneRequests: Array<{
+    model: string;
+    messageCount: number;
+    lastUserContent: string | null;
+    systemContent: string;
+    authorization: string | null;
+  }>;
   close: () => Promise<void>;
 }
 
@@ -171,7 +189,10 @@ export async function startFakeProvider(
             model: parsed.model ?? "",
             messageCount: messages.length,
             lastUserContent: lastUser?.content ?? null,
-            systemContent: messages.filter((message) => message.role === "system").map((message) => message.content).join("\n"),
+            systemContent: messages
+              .filter((message) => message.role === "system")
+              .map((message) => message.content)
+              .join("\n"),
             authorization: typeof req.headers.authorization === "string" ? req.headers.authorization : null,
           };
           sceneRequest = captured.systemContent.includes("SCENE STATE SYNTHESIZER");
@@ -183,7 +204,7 @@ export async function startFakeProvider(
         const respond = () => {
           const currentReply = sceneRequest
             ? "Location & time:\n- Observatory at night\nParticipants:\n- Everyone is alert\nObjects & environment:\n- A brass key is present\nRelationships & knowledge:\n- none established\nActive goals & tensions:\n- Determine what the key opens"
-            : options.replyTexts?.[replyIndex++] ?? replyText;
+            : (options.replyTexts?.[replyIndex++] ?? replyText);
           if (!stream) {
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ choices: [{ message: { content: currentReply } }] }));
@@ -194,7 +215,9 @@ export async function startFakeProvider(
             const delta = currentReply.slice(i, i + chunkSize);
             res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`);
           }
-          res.write(`data: ${JSON.stringify({ model: "fake-model", choices: [], usage: { prompt_tokens: 120, completion_tokens: 24, total_tokens: 144 } })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({ model: "fake-model", choices: [], usage: { prompt_tokens: 120, completion_tokens: 24, total_tokens: 144 } })}\n\n`,
+          );
           res.write("data: [DONE]\n\n");
           res.end();
         };
@@ -212,8 +235,9 @@ export async function startFakeProvider(
     baseUrl: `http://127.0.0.1:${port}/v1`,
     requests,
     sceneRequests,
-    close: () => new Promise<void>((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
-    }),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      }),
   };
 }

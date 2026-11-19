@@ -49,7 +49,8 @@ export const ORIGINAL_STARTER_CLASS = deepFreeze({
     kind: "class",
   },
   name: "Pathmender",
-  description: "Pathmenders travel between isolated communities, carrying news and helping neighbors restore neglected meeting places.",
+  description:
+    "Pathmenders travel between isolated communities, carrying news and helping neighbors restore neglected meeting places.",
 } as const);
 
 /** Basic finalized starter metadata, not a rules-complete character builder. */
@@ -73,5 +74,6 @@ export const ORIGINAL_STARTER_BACKGROUND = deepFreeze({
     kind: "background",
   },
   name: "Rainledger",
-  description: "Rainledgers once recorded seasonal journeys, local customs, and promises exchanged between distant settlements.",
+  description:
+    "Rainledgers once recorded seasonal journeys, local customs, and promises exchanged between distant settlements.",
 } as const);

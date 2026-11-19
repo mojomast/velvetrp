@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildDefaultPlan, parseWorldbuildingPlan, resolveExpansionKeys, worldLinkIssues, WORLDBUILDING_SECTIONS } from "./worldbuildingPlan";
+import {
+  buildDefaultPlan,
+  parseWorldbuildingPlan,
+  resolveExpansionKeys,
+  worldLinkIssues,
+  WORLDBUILDING_SECTIONS,
+} from "./worldbuildingPlan";
 import type { CampaignContentDraftView } from "@velvet/contracts";
 
 describe("whole-world planning", () => {
@@ -12,7 +18,12 @@ describe("whole-world planning", () => {
     for (const stage of plan.stages) {
       contexts[stage.id] = resolveExpansionKeys(stage, accepted);
       expect(contexts[stage.id]!.length).toBeLessThanOrEqual(16);
-      accepted[stage.id] = Object.fromEntries(Object.entries(stage.desiredCounts).map(([field, count]) => [field, Array.from({ length: count }, (_, index) => `${field}-${index}`)]));
+      accepted[stage.id] = Object.fromEntries(
+        Object.entries(stage.desiredCounts).map(([field, count]) => [
+          field,
+          Array.from({ length: count }, (_, index) => `${field}-${index}`),
+        ]),
+      );
     }
     expect(contexts.foundation).toContain("locations-0");
     expect(contexts.quests).toEqual(expect.arrayContaining(["locations-0", "arcs-0", "npcs-0"]));
@@ -21,9 +32,25 @@ describe("whole-world planning", () => {
   });
 
   it("rejects a directed dead end even when an undirected graph is connected", () => {
-    const preview = { outlines: [], npcs: [], quests: [], scenePrompts: [], locations: [{ key: "home", visibility: "public" }, { key: "away", visibility: "public" }], connections: [{ fromLocationKey: "home", toLocationKey: "away", visibility: "public" }] } as unknown as CampaignContentDraftView["preview"];
+    const preview = {
+      outlines: [],
+      npcs: [],
+      quests: [],
+      scenePrompts: [],
+      locations: [
+        { key: "home", visibility: "public" },
+        { key: "away", visibility: "public" },
+      ],
+      connections: [{ fromLocationKey: "home", toLocationKey: "away", visibility: "public" }],
+    } as unknown as CampaignContentDraftView["preview"];
     expect(worldLinkIssues(preview, {})).toEqual([expect.stringContaining("stranded destination")]);
-    preview.connections.push({ key: "return", fromLocationKey: "away", toLocationKey: "home", visibility: "public", description: "Return road" });
+    preview.connections.push({
+      key: "return",
+      fromLocationKey: "away",
+      toLocationKey: "home",
+      visibility: "public",
+      description: "Return road",
+    });
     expect(worldLinkIssues(preview, {})).toEqual([]);
   });
 });

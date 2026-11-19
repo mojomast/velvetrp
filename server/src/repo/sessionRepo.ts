@@ -3,13 +3,7 @@ import { randomUUID } from "node:crypto";
 import { now } from "../defaults.js";
 import { systemRuntime } from "../runtime.js";
 import type { Clock, IdGenerator } from "../runtime.js";
-import type {
-  Character,
-  ConsentEvent,
-  CreateSessionInput,
-  SceneState,
-  Session,
-} from "../types.js";
+import type { Character, ConsentEvent, CreateSessionInput, SceneState, Session } from "../types.js";
 import { characterFromRow } from "./characterRepo.js";
 import { getRepositoryDatabase } from "./repoContext.js";
 
@@ -61,9 +55,13 @@ function toConsentEvent(row: ConsentRow): ConsentEvent {
 }
 
 function participantsFor(db: DatabaseDriver.Database, sessionId: string): Character[] {
-  const rows = db.prepare(`SELECT c.* FROM characters c
+  const rows = db
+    .prepare(
+      `SELECT c.* FROM characters c
     JOIN session_characters sc ON sc.character_id = c.id
-    WHERE sc.session_id = ? ORDER BY sc.position ASC, sc.rowid ASC`).all(sessionId) as CharacterRow[];
+    WHERE sc.session_id = ? ORDER BY sc.position ASC, sc.rowid ASC`,
+    )
+    .all(sessionId) as CharacterRow[];
   return rows.map(characterFromRow);
 }
 
@@ -107,9 +105,10 @@ export function updateSessionContextSourceSync(
   sourceOfTruth: string,
 ): { sourceOfTruth: string; updatedAt: string } {
   const updatedAt = clock.now().toISOString();
-  db.prepare(`INSERT INTO session_context (session_id, source_of_truth, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(session_id) DO UPDATE SET source_of_truth = excluded.source_of_truth, updated_at = excluded.updated_at`)
-    .run(sessionId, sourceOfTruth, updatedAt);
+  db.prepare(
+    `INSERT INTO session_context (session_id, source_of_truth, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(session_id) DO UPDATE SET source_of_truth = excluded.source_of_truth, updated_at = excluded.updated_at`,
+  ).run(sessionId, sourceOfTruth, updatedAt);
   return { sourceOfTruth, updatedAt };
 }
 
@@ -150,18 +149,14 @@ export function addConsentEventSync(
     granted,
     note,
   };
-  const maxSeq = db.prepare("SELECT COALESCE(MAX(seq), -1) AS maxSeq FROM consent_events WHERE session_id = ?").get(sessionId) as {
+  const maxSeq = db
+    .prepare("SELECT COALESCE(MAX(seq), -1) AS maxSeq FROM consent_events WHERE session_id = ?")
+    .get(sessionId) as {
     maxSeq: number;
   };
-  db.prepare("INSERT INTO consent_events (id, session_id, seq, at, scope, granted, note) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-    event.id,
-    sessionId,
-    maxSeq.maxSeq + 1,
-    event.at,
-    event.scope,
-    event.granted ? 1 : 0,
-    event.note,
-  );
+  db.prepare(
+    "INSERT INTO consent_events (id, session_id, seq, at, scope, granted, note) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run(event.id, sessionId, maxSeq.maxSeq + 1, event.at, event.scope, event.granted ? 1 : 0, event.note);
   return event;
 }
 
@@ -193,8 +188,11 @@ function runSessionTransaction<T>(
   try {
     return db.transaction(() => {
       const result = callback(unitOfWork);
-      if (result !== null && (typeof result === "object" || typeof result === "function")
-        && typeof (result as { then?: unknown }).then === "function") {
+      if (
+        result !== null &&
+        (typeof result === "object" || typeof result === "function") &&
+        typeof (result as { then?: unknown }).then === "function"
+      ) {
         void Promise.resolve(result).catch(() => undefined);
         throw new TypeError("repository transaction callbacks must be synchronous");
       }
@@ -207,10 +205,16 @@ function runSessionTransaction<T>(
 
 export async function listSessions(characterId?: string): Promise<Session[]> {
   const db = getRepositoryDatabase();
-  const rows = (characterId
-    ? db.prepare(`SELECT s.* FROM sessions s JOIN session_characters sc ON sc.session_id = s.id
-        WHERE sc.character_id = ? ORDER BY s.created_at ASC, s.rowid ASC`).all(characterId)
-    : db.prepare("SELECT * FROM sessions ORDER BY created_at ASC, rowid ASC").all()) as SessionRow[];
+  const rows = (
+    characterId
+      ? db
+          .prepare(
+            `SELECT s.* FROM sessions s JOIN session_characters sc ON sc.session_id = s.id
+        WHERE sc.character_id = ? ORDER BY s.created_at ASC, s.rowid ASC`,
+          )
+          .all(characterId)
+      : db.prepare("SELECT * FROM sessions ORDER BY created_at ASC, rowid ASC").all()
+  ) as SessionRow[];
   return rows.map((row) => sessionFromRow(db, row));
 }
 
@@ -218,21 +222,45 @@ export async function getSession(id: string): Promise<Session | null> {
   return getSessionSync(getRepositoryDatabase(), id);
 }
 
-export async function getSessionContextSource(sessionId: string): Promise<{ sourceOfTruth: string; updatedAt: string | null; synthesizedSource: string; synthesizedUpdatedAt: string | null }> {
-  const row = getRepositoryDatabase().prepare("SELECT source_of_truth, updated_at, synthesized_source, synthesized_updated_at FROM session_context WHERE session_id = ?").get(sessionId) as
-    { source_of_truth: string; updated_at: string; synthesized_source: string; synthesized_updated_at: string | null } | undefined;
-  return { sourceOfTruth: row?.source_of_truth ?? "", updatedAt: row?.updated_at ?? null, synthesizedSource: row?.synthesized_source ?? "", synthesizedUpdatedAt: row?.synthesized_updated_at ?? null };
+export async function getSessionContextSource(sessionId: string): Promise<{
+  sourceOfTruth: string;
+  updatedAt: string | null;
+  synthesizedSource: string;
+  synthesizedUpdatedAt: string | null;
+}> {
+  const row = getRepositoryDatabase()
+    .prepare(
+      "SELECT source_of_truth, updated_at, synthesized_source, synthesized_updated_at FROM session_context WHERE session_id = ?",
+    )
+    .get(sessionId) as
+    | { source_of_truth: string; updated_at: string; synthesized_source: string; synthesized_updated_at: string | null }
+    | undefined;
+  return {
+    sourceOfTruth: row?.source_of_truth ?? "",
+    updatedAt: row?.updated_at ?? null,
+    synthesizedSource: row?.synthesized_source ?? "",
+    synthesizedUpdatedAt: row?.synthesized_updated_at ?? null,
+  };
 }
 
-export async function updateSessionContextSource(sessionId: string, sourceOfTruth: string): Promise<{ sourceOfTruth: string; updatedAt: string }> {
+export async function updateSessionContextSource(
+  sessionId: string,
+  sourceOfTruth: string,
+): Promise<{ sourceOfTruth: string; updatedAt: string }> {
   return updateSessionContextSourceSync(getRepositoryDatabase(), systemRuntime.clock, sessionId, sourceOfTruth);
 }
 
-export async function updateSessionSynthesizedSource(sessionId: string, synthesizedSource: string): Promise<{ synthesizedSource: string; updatedAt: string }> {
+export async function updateSessionSynthesizedSource(
+  sessionId: string,
+  synthesizedSource: string,
+): Promise<{ synthesizedSource: string; updatedAt: string }> {
   const updatedAt = now();
-  getRepositoryDatabase().prepare(`INSERT INTO session_context (session_id, source_of_truth, updated_at, synthesized_source, synthesized_updated_at)
+  getRepositoryDatabase()
+    .prepare(
+      `INSERT INTO session_context (session_id, source_of_truth, updated_at, synthesized_source, synthesized_updated_at)
     VALUES (?, '', ?, ?, ?)
-    ON CONFLICT(session_id) DO UPDATE SET synthesized_source = excluded.synthesized_source, synthesized_updated_at = excluded.synthesized_updated_at`)
+    ON CONFLICT(session_id) DO UPDATE SET synthesized_source = excluded.synthesized_source, synthesized_updated_at = excluded.synthesized_updated_at`,
+    )
     .run(sessionId, updatedAt, synthesizedSource, updatedAt);
   return { synthesizedSource, updatedAt };
 }
@@ -249,13 +277,15 @@ export async function createSession(input: CreateSessionInput): Promise<Session>
     title: input.title ?? "",
     state: "setup",
     presetId: input.presetId ?? "default",
-    consentLog: [{
-      id: randomUUID(),
-      at: now(),
-      scope: "scene-created",
-      granted: true,
-      note: "Fictional adult character confirmed at creation.",
-    }],
+    consentLog: [
+      {
+        id: randomUUID(),
+        at: now(),
+        scope: "scene-created",
+        granted: true,
+        note: "Fictional adult character confirmed at creation.",
+      },
+    ],
     activeLeafId: null,
     createdAt: now(),
     stoppedAt: null,
@@ -265,8 +295,19 @@ export async function createSession(input: CreateSessionInput): Promise<Session>
     db.prepare(
       `INSERT INTO sessions (id, character_id, title, state, preset_id, active_leaf_id, created_at, stopped_at, stop_reason)
        VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
-    ).run(session.id, session.characterId, session.title, session.state, session.presetId, session.createdAt, null, null);
-    const insertParticipant = db.prepare("INSERT INTO session_characters (session_id, character_id, position) VALUES (?, ?, ?)");
+    ).run(
+      session.id,
+      session.characterId,
+      session.title,
+      session.state,
+      session.presetId,
+      session.createdAt,
+      null,
+      null,
+    );
+    const insertParticipant = db.prepare(
+      "INSERT INTO session_characters (session_id, character_id, position) VALUES (?, ?, ?)",
+    );
     ids.forEach((characterId, position) => insertParticipant.run(session.id, characterId, position));
     const event = session.consentLog[0] as ConsentEvent;
     db.prepare(

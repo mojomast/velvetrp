@@ -34,7 +34,10 @@ export class CampaignStartupConflictError extends Error {}
 
 /** Structural scene-image seam; the concrete `SceneImageRouteService` satisfies it. */
 export interface CampaignStartupSceneImagePort {
-  getSettings(principalId: string, campaignId: string): {
+  getSettings(
+    principalId: string,
+    campaignId: string,
+  ): {
     settings: {
       enabled: boolean;
       steps: number;
@@ -43,8 +46,12 @@ export interface CampaignStartupSceneImagePort {
       promptOverrides: Readonly<Record<string, string>>;
     };
   };
-  enqueue(principalId: string, campaignId: string, input: SceneImageEnqueueInput,
-    idempotencyKey: string): SceneImageEnqueueResult;
+  enqueue(
+    principalId: string,
+    campaignId: string,
+    input: SceneImageEnqueueInput,
+    idempotencyKey: string,
+  ): SceneImageEnqueueResult;
 }
 
 export interface CampaignStartupDependencies {
@@ -153,12 +160,16 @@ export async function runCampaignStartup(
   if (completedOpen) {
     beat = { runId: completedOpen.runId, state: completedOpen.state };
   } else {
-    const pending = [...openRuns].reverse().find((run) => run.state === "planning" || run.state === "awaiting-approval");
-    const run = pending ?? deps.dm.openDmBeat(principalId, campaignId, sessionId, {
-      intent: "open",
-      expectedModeRevision: control.revision,
-      idempotencyKey: startupKey("open", `${campaignId}:${sessionId}:${preparationToken}`),
-    });
+    const pending = [...openRuns]
+      .reverse()
+      .find((run) => run.state === "planning" || run.state === "awaiting-approval");
+    const run =
+      pending ??
+      deps.dm.openDmBeat(principalId, campaignId, sessionId, {
+        intent: "open",
+        expectedModeRevision: control.revision,
+        idempotencyKey: startupKey("open", `${campaignId}:${sessionId}:${preparationToken}`),
+      });
     await deps.orchestrate(principalId, run.runId);
     const settled = deps.dm.getDmRun(principalId, campaignId, sessionId, run.runId);
     beat = { runId: settled.runId, state: settled.state };
@@ -184,26 +195,34 @@ export async function runCampaignStartup(
             if (imagesEnqueued.length >= CAMPAIGN_STARTUP_MAX_IMAGES) break;
             const sceneKey = `location:${location.locationId}`;
             const override = settings.promptOverrides[sceneKey];
-            const prompt = override && override.trim().length > 0 ? override.trim() : buildScenePrompt({
-              locationName: location.name,
-              focalFeature: location.description,
-              composition: "",
-              lighting: "",
-              materials: [],
-              stylePhrase: settings.stylePhrase,
-              facts: [],
-            });
+            const prompt =
+              override && override.trim().length > 0
+                ? override.trim()
+                : buildScenePrompt({
+                    locationName: location.name,
+                    focalFeature: location.description,
+                    composition: "",
+                    lighting: "",
+                    materials: [],
+                    stylePhrase: settings.stylePhrase,
+                    facts: [],
+                  });
             try {
-              const result = service.enqueue(principalId, campaignId, {
-                sessionId,
-                sceneKey,
-                sceneRevision: 0,
-                prompt,
-                steps: settings.steps,
-                guidance: settings.guidance,
-                kind: "single",
-                auto: false,
-              }, startupKey("image", `${campaignId}:${sessionId}:${location.locationId}`));
+              const result = service.enqueue(
+                principalId,
+                campaignId,
+                {
+                  sessionId,
+                  sceneKey,
+                  sceneRevision: 0,
+                  prompt,
+                  steps: settings.steps,
+                  guidance: settings.guidance,
+                  kind: "single",
+                  auto: false,
+                },
+                startupKey("image", `${campaignId}:${sessionId}:${location.locationId}`),
+              );
               imagesEnqueued.push({
                 locationId: location.locationId,
                 jobId: result.job?.jobId ?? null,
@@ -211,7 +230,12 @@ export async function runCampaignStartup(
                 skipped: result.job === null ? (result.refusal?.code ?? "refused") : null,
               });
             } catch {
-              imagesEnqueued.push({ locationId: location.locationId, jobId: null, deduped: false, skipped: "unavailable" });
+              imagesEnqueued.push({
+                locationId: location.locationId,
+                jobId: null,
+                deduped: false,
+                skipped: "unavailable",
+              });
             }
           }
         }

@@ -11,7 +11,9 @@ afterEach(() => {
 
 describe("createClientId", () => {
   it("uses randomUUID when available", () => {
-    const randomUUID = vi.fn(() => "12345678-1234-4123-8123-123456789abc" as `${string}-${string}-${string}-${string}-${string}`);
+    const randomUUID = vi.fn(
+      () => "12345678-1234-4123-8123-123456789abc" as `${string}-${string}-${string}-${string}-${string}`,
+    );
     Object.defineProperty(globalThis, "crypto", { configurable: true, value: { randomUUID } });
 
     expect(createClientId()).toBe("12345678-1234-4123-8123-123456789abc");
@@ -19,7 +21,10 @@ describe("createClientId", () => {
   });
 
   it("creates a UUID with getRandomValues when randomUUID is absent", () => {
-    const getRandomValues = vi.fn((bytes: Uint8Array) => { bytes.fill(0xab); return bytes; });
+    const getRandomValues = vi.fn((bytes: Uint8Array) => {
+      bytes.fill(0xab);
+      return bytes;
+    });
     Object.defineProperty(globalThis, "crypto", { configurable: true, value: { getRandomValues } });
 
     const id = createClientId();
@@ -30,8 +35,19 @@ describe("createClientId", () => {
   });
 
   it("tries getRandomValues when an exposed randomUUID throws", () => {
-    const getRandomValues = vi.fn((bytes: Uint8Array) => { bytes.fill(1); return bytes; });
-    Object.defineProperty(globalThis, "crypto", { configurable: true, value: { randomUUID: () => { throw new Error("insecure origin"); }, getRandomValues } });
+    const getRandomValues = vi.fn((bytes: Uint8Array) => {
+      bytes.fill(1);
+      return bytes;
+    });
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: {
+        randomUUID: () => {
+          throw new Error("insecure origin");
+        },
+        getRandomValues,
+      },
+    });
 
     expect(createClientId()).toBe("01010101-0101-4101-8101-010101010101");
     expect(getRandomValues).toHaveBeenCalledOnce();

@@ -31,9 +31,19 @@ export class CampaignDiceUnavailableError extends Error {
 }
 
 export interface CampaignDiceRepository extends Pick<Repository, "executeRollActorDiceForVisibleCharacter"> {
-  transaction<T>(callback: (unit: Pick<RepositoryUnitOfWork,
-    "getCampaign" | "getCampaignAdministration" | "getCampaignTimeline" | "getCampaignCharacterRoster"
-    | "listCampaignCharacters" | "listRecentCampaignDiceEvents">) => T): T;
+  transaction<T>(
+    callback: (
+      unit: Pick<
+        RepositoryUnitOfWork,
+        | "getCampaign"
+        | "getCampaignAdministration"
+        | "getCampaignTimeline"
+        | "getCampaignCharacterRoster"
+        | "listCampaignCharacters"
+        | "listRecentCampaignDiceEvents"
+      >,
+    ) => T,
+  ): T;
 }
 
 interface InternalVisibleCharacter {
@@ -51,31 +61,46 @@ interface DiceSnapshot {
 }
 
 function requireAuthorityAndRoster(
-  unit: Pick<RepositoryUnitOfWork,
-    "getCampaign" | "getCampaignAdministration" | "getCampaignTimeline"
-    | "getCampaignCharacterRoster" | "listCampaignCharacters">,
+  unit: Pick<
+    RepositoryUnitOfWork,
+    | "getCampaign"
+    | "getCampaignAdministration"
+    | "getCampaignTimeline"
+    | "getCampaignCharacterRoster"
+    | "listCampaignCharacters"
+  >,
   actorPrincipalId: string,
   campaignId: string,
   allowPlayer: boolean,
 ): DiceSnapshot {
   const campaign = unit.getCampaign(actorPrincipalId, campaignId);
-  if (campaign === null || (campaign.actorRole !== "owner" && campaign.actorRole !== "gm"
-      && (!allowPlayer || campaign.actorRole !== "player"))) {
+  if (
+    campaign === null ||
+    (campaign.actorRole !== "owner" && campaign.actorRole !== "gm" && (!allowPlayer || campaign.actorRole !== "player"))
+  ) {
     throw new CampaignDiceUnavailableError();
   }
   if (campaign.actorRole === "player") {
     const administration = unit.getCampaignAdministration(actorPrincipalId, campaignId);
-    if (administration === null || administration.id !== campaignId
-        || administration.activeTimelineId !== campaign.activeTimelineId
-        || administration.actorRole !== "player") {
+    if (
+      administration === null ||
+      administration.id !== campaignId ||
+      administration.activeTimelineId !== campaign.activeTimelineId ||
+      administration.actorRole !== "player"
+    ) {
       throw new Error("campaign dice authorization is inconsistent");
     }
     if (!administration.settings.allowPlayerDice) throw new CampaignDiceUnavailableError();
   }
   const timeline = unit.getCampaignTimeline(actorPrincipalId, campaignId, campaign.activeTimelineId);
   const roster = unit.getCampaignCharacterRoster(actorPrincipalId, campaignId);
-  if (timeline === null || roster === null || roster.campaignId !== campaignId
-      || timeline.campaignId !== campaignId || timeline.id !== campaign.activeTimelineId) {
+  if (
+    timeline === null ||
+    roster === null ||
+    roster.campaignId !== campaignId ||
+    timeline.campaignId !== campaignId ||
+    timeline.id !== campaign.activeTimelineId
+  ) {
     throw new Error("campaign dice snapshot is inconsistent");
   }
 
@@ -87,8 +112,7 @@ function requireAuthorityAndRoster(
     const actorId = entry.projection.actor.id;
     if (actorByCharacter.has(characterId)) throw new Error("campaign dice roster is ambiguous");
     actorByCharacter.set(characterId, actorId);
-    if (entry.access === "privileged"
-        && entry.projection.actor.controllerPrincipalId === actorPrincipalId) {
+    if (entry.access === "privileged" && entry.projection.actor.controllerPrincipalId === actorPrincipalId) {
       controlledCharacters.add(characterId);
     }
   }
@@ -106,10 +130,7 @@ function requireAuthorityAndRoster(
   return { timelineId: timeline.id, revision: timeline.revision, actorRole: campaign.actorRole, characters };
 }
 
-function safeRoll(
-  event: CampaignDiceEvent,
-  characterByActor: ReadonlyMap<string, CampaignDiceVisibleCharacter>,
-) {
+function safeRoll(event: CampaignDiceEvent, characterByActor: ReadonlyMap<string, CampaignDiceVisibleCharacter>) {
   const character = characterByActor.get(event.actorId);
   if (character === undefined) throw new Error("campaign dice history actor is no longer visible");
   return { character, occurredAt: event.occurredAt, result: event.data };
@@ -121,15 +142,15 @@ export function createCampaignDiceService(repository: CampaignDiceRepository, co
       const raw = repository.transaction((unit) => {
         const snapshot = requireAuthorityAndRoster(unit, actorPrincipalId, campaignId, true);
         const events = unit.listRecentCampaignDiceEvents(actorPrincipalId, campaignId, snapshot.timelineId);
-        const visibleCharacters = snapshot.actorRole === "player"
-          ? snapshot.characters.filter((character) => character.controlledByCaller)
-          : snapshot.characters;
-        const characterByActor = new Map(visibleCharacters.map((character) => [
-          character.actorId, character.public,
-        ]));
+        const visibleCharacters =
+          snapshot.actorRole === "player"
+            ? snapshot.characters.filter((character) => character.controlledByCaller)
+            : snapshot.characters;
+        const characterByActor = new Map(visibleCharacters.map((character) => [character.actorId, character.public]));
         return {
           characters: visibleCharacters.map((character) => character.public),
-          rolls: events.filter((event) => characterByActor.has(event.actorId))
+          rolls: events
+            .filter((event) => characterByActor.has(event.actorId))
             .map((event) => safeRoll(event, characterByActor)),
         };
       });
@@ -169,16 +190,23 @@ export function createCampaignDiceService(repository: CampaignDiceRepository, co
         ...selected.character.public,
         campaignCharacterId: selected.character.campaignCharacterId,
       };
-      const receipt = commandReceiptSchema.parse(repository.executeRollActorDiceForVisibleCharacter(
-        actorPrincipalId, envelope, binding,
-      ));
+      const receipt = commandReceiptSchema.parse(
+        repository.executeRollActorDiceForVisibleCharacter(actorPrincipalId, envelope, binding),
+      );
       const event = receipt.events[0];
-      if (receipt.commandId !== envelope.commandId || receipt.campaignId !== campaignId
-          || receipt.revisionBefore !== selected.revision || receipt.revisionAfter !== selected.revision + 1
-          || event.type !== "actor_dice_rolled" || event.commandId !== envelope.commandId
-          || event.campaignId !== campaignId || event.timelineId !== selected.timelineId
-          || event.actorId !== selected.character.actorId || event.sourceTurnId !== null
-          || event.data.expression !== request.expression) {
+      if (
+        receipt.commandId !== envelope.commandId ||
+        receipt.campaignId !== campaignId ||
+        receipt.revisionBefore !== selected.revision ||
+        receipt.revisionAfter !== selected.revision + 1 ||
+        event.type !== "actor_dice_rolled" ||
+        event.commandId !== envelope.commandId ||
+        event.campaignId !== campaignId ||
+        event.timelineId !== selected.timelineId ||
+        event.actorId !== selected.character.actorId ||
+        event.sourceTurnId !== null ||
+        event.data.expression !== request.expression
+      ) {
         throw new Error("campaign dice command output is inconsistent");
       }
       return campaignDiceRollResponseSchema.parse({

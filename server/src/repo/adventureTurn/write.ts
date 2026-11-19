@@ -2,30 +2,79 @@ import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import { z } from "zod";
 import {
-  appendToolProposalInputSchema, applyGenerationDraftInputSchema, createAdventureTurnInputSchema,
-  AGENT_TOOL_REGISTRY_VERSION, DEFAULT_AGENT_EXECUTION_LIMITS,
-  createGenerationDraftInputSchema, decideToolProposalInputSchema, decideToolProposalsInputSchema, generationDraftValidationSchema,
-  linkTurnReceiptInputSchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
-  providerCallOutcomeInputSchema, providerCallStartInputSchema, resourceIdSchema, canonicalAgentJson,
-  canonicalSha256DigestSchema, expectedRevisionSchema, idempotencyKeySchema, revisionSchema,
-  reviewGenerationDraftInputSchema, stagedGenerationContentSchema, turnMutationInputSchema,
-  updateTurnNarrationInputSchema, utcIsoTimestampSchema, gameplaySheetEntries, sheetReferenceKey, sheetContextSchema,
-  type ActorGameplaySheetResponse, type SheetContextEntry,
-  type AppendToolProposalInput, type ApplyGenerationDraftInput, type CreateAdventureTurnInput,
-  type CreateGenerationDraftInput, type DecideToolProposalInput, type DecideToolProposalsInput, type DraftMutationInput,
-  type LinkTurnReceiptInput, type PrivateAdventureTurn, type PrivateGenerationDraft,
-  type ProviderCallOutcomeInput, type ProviderCallStartInput, type ReviewGenerationDraftInput,
-  type TurnMutationInput, type UpdateTurnNarrationInput,
+  appendToolProposalInputSchema,
+  applyGenerationDraftInputSchema,
+  createAdventureTurnInputSchema,
+  AGENT_TOOL_REGISTRY_VERSION,
+  DEFAULT_AGENT_EXECUTION_LIMITS,
+  createGenerationDraftInputSchema,
+  decideToolProposalInputSchema,
+  decideToolProposalsInputSchema,
+  generationDraftValidationSchema,
+  linkTurnReceiptInputSchema,
+  privateAdventureTurnSchema,
+  privateGenerationDraftSchema,
+  providerCallOutcomeInputSchema,
+  providerCallStartInputSchema,
+  resourceIdSchema,
+  canonicalAgentJson,
+  canonicalSha256DigestSchema,
+  expectedRevisionSchema,
+  idempotencyKeySchema,
+  revisionSchema,
+  reviewGenerationDraftInputSchema,
+  stagedGenerationContentSchema,
+  turnMutationInputSchema,
+  updateTurnNarrationInputSchema,
+  utcIsoTimestampSchema,
+  gameplaySheetEntries,
+  sheetReferenceKey,
+  sheetContextSchema,
+  type ActorGameplaySheetResponse,
+  type SheetContextEntry,
+  type AppendToolProposalInput,
+  type ApplyGenerationDraftInput,
+  type CreateAdventureTurnInput,
+  type CreateGenerationDraftInput,
+  type DecideToolProposalInput,
+  type DecideToolProposalsInput,
+  type DraftMutationInput,
+  type LinkTurnReceiptInput,
+  type PrivateAdventureTurn,
+  type PrivateGenerationDraft,
+  type ProviderCallOutcomeInput,
+  type ProviderCallStartInput,
+  type ReviewGenerationDraftInput,
+  type TurnMutationInput,
+  type UpdateTurnNarrationInput,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../../runtime.js";
-import { AdventureTurnAuthorizationError, AdventureTurnConflictError, AdventureTurnExpiredError, AdventureTurnStaleError, AdventureTurnUnavailableError } from "./errors.js";
+import {
+  AdventureTurnAuthorizationError,
+  AdventureTurnConflictError,
+  AdventureTurnExpiredError,
+  AdventureTurnStaleError,
+  AdventureTurnUnavailableError,
+} from "./errors.js";
 import { createAdventureTurnReadRepository, type AdventureTurnReadRepository } from "./read.js";
 import { deriveConfirmationPolicy } from "../../agent/confirmationPolicy.js";
 import { boundAdventureQuestReceipts } from "../quest/adventureQuestBinding.js";
 
-export type { AppendToolProposalInput, ApplyGenerationDraftInput, CreateAdventureTurnInput, CreateGenerationDraftInput,
-  DecideToolProposalInput, DecideToolProposalsInput, DraftMutationInput, LinkTurnReceiptInput, ProviderCallOutcomeInput, ProviderCallStartInput,
-  ReviewGenerationDraftInput, TurnMutationInput, UpdateTurnNarrationInput };
+export type {
+  AppendToolProposalInput,
+  ApplyGenerationDraftInput,
+  CreateAdventureTurnInput,
+  CreateGenerationDraftInput,
+  DecideToolProposalInput,
+  DecideToolProposalsInput,
+  DraftMutationInput,
+  LinkTurnReceiptInput,
+  ProviderCallOutcomeInput,
+  ProviderCallStartInput,
+  ReviewGenerationDraftInput,
+  TurnMutationInput,
+  UpdateTurnNarrationInput,
+};
 
 /** One lane-origin rest proposal request binding an already-recorded decision to an advertised candidate. */
 export interface AppendAdventureRestProposalFromLaneInput {
@@ -65,7 +114,10 @@ type AggregateKind = "turn" | "draft";
 type Action = "turn" | "provider" | "draft";
 
 /** Runtime and transaction guard dependencies for M1.10 writes. */
-export interface AdventureTurnWriteContext { clock: Clock; ids: IdGenerator; guard(): void;
+export interface AdventureTurnWriteContext {
+  clock: Clock;
+  ids: IdGenerator;
+  guard(): void;
   getActorGameplaySheet?: (principalId: string, actorId: string) => ActorGameplaySheetResponse | null;
 }
 
@@ -81,7 +133,10 @@ export interface AdventureTurnWriteRepository {
    * with `origin='lane'` and the decision id, and mechanics still commit only through the ordinary
    * confirmation API. Replay-safe per decision and selection.
    */
-  appendAdventureRestProposalFromLane(principalId: string, input: AppendAdventureRestProposalFromLaneInput): PrivateAdventureTurn;
+  appendAdventureRestProposalFromLane(
+    principalId: string,
+    input: AppendAdventureRestProposalFromLaneInput,
+  ): PrivateAdventureTurn;
   /**
    * Appends the normal confirmation-required combat proposal for one advertised lane candidate.
    * The already-recorded decision, the advertised `combat-consumable`/`combat-power` digest, and
@@ -89,7 +144,10 @@ export interface AdventureTurnWriteRepository {
    * is written with `origin='lane'` and the decision id, and mechanics still commit only through
    * the ordinary confirmation API. Replay-safe per decision and selection.
    */
-  appendAdventureCombatProposalFromLane(principalId: string, input: AppendAdventureCombatProposalFromLaneInput): PrivateAdventureTurn;
+  appendAdventureCombatProposalFromLane(
+    principalId: string,
+    input: AppendAdventureCombatProposalFromLaneInput,
+  ): PrivateAdventureTurn;
   /**
    * Appends the normal confirmation-required commerce proposal for one advertised lane candidate.
    * The already-recorded decision, the advertised commerce digest, and the exact server-derived
@@ -98,7 +156,10 @@ export interface AdventureTurnWriteRepository {
    * and selection. This is the server-origin peer of the provider commerce path and never forges
    * provider evidence or spends without an approved confirmation.
    */
-  appendAdventureCommerceProposalFromLane(principalId: string, input: AppendAdventureCommerceProposalFromLaneInput): PrivateAdventureTurn;
+  appendAdventureCommerceProposalFromLane(
+    principalId: string,
+    input: AppendAdventureCommerceProposalFromLaneInput,
+  ): PrivateAdventureTurn;
   /** Persists the exact confirmation wait command and immutable result. */
   waitForToolConfirmation(principalId: string, input: TurnMutationInput): PrivateAdventureTurn;
   /** Records one exact, non-expired proposal decision. */
@@ -108,7 +169,17 @@ export interface AdventureTurnWriteRepository {
   /** Atomically records every due immutable expiry and advances the turn once. */
   expireToolProposals(principalId: string, input: TurnMutationInput): PrivateAdventureTurn;
   /** Returns a stale approved proposal to planning without changing turn identity. */
-  replanAgentProposal(principalId:string,input:{turnId:string;proposalId:string;reason:string;expectedTurnRevision:number;expectedCampaignRevision:number;idempotencyKey:string}):PrivateAdventureTurn;
+  replanAgentProposal(
+    principalId: string,
+    input: {
+      turnId: string;
+      proposalId: string;
+      reason: string;
+      expectedTurnRevision: number;
+      expectedCampaignRevision: number;
+      idempotencyKey: string;
+    },
+  ): PrivateAdventureTurn;
   /** Records provider start metadata only; no provider work runs in this transaction. */
   recordProviderCallStart(principalId: string, input: ProviderCallStartInput): PrivateAdventureTurn;
   /** Records a matching provider outcome without directly completing narration. */
@@ -126,185 +197,423 @@ export interface AdventureTurnWriteRepository {
   /** Applies an approved draft with a draft-specific receipt, never an arbitrary campaign command. */
   applyGenerationDraft(principalId: string, input: ApplyGenerationDraftInput): PrivateGenerationDraft;
   /** Reviews, applies the authoritative encounter command, and seals one draft in one SQLite transaction. */
-  applyEncounterGenerationDraftAtomically(principalId: string, input: DraftMutationInput): { draft: PrivateGenerationDraft; encounterId: string };
+  applyEncounterGenerationDraftAtomically(
+    principalId: string,
+    input: DraftMutationInput,
+  ): { draft: PrivateGenerationDraft; encounterId: string };
   /** Applies a reviewed content bundle through the campaign-content command service. */
-  applyCampaignContentGenerationDraftAtomically(principalId: string, input: DraftMutationInput & { selectedArtifactKeys: string[] }): PrivateGenerationDraft;
+  applyCampaignContentGenerationDraftAtomically(
+    principalId: string,
+    input: DraftMutationInput & { selectedArtifactKeys: string[] },
+  ): PrivateGenerationDraft;
 }
 
-const canonical = (value: unknown): string => JSON.stringify(value, (_key, nested) => nested && typeof nested === "object" && !Array.isArray(nested)
-  ? Object.fromEntries(Object.entries(nested as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right))) : nested);
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, nested) =>
+    nested && typeof nested === "object" && !Array.isArray(nested)
+      ? Object.fromEntries(
+          Object.entries(nested as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)),
+        )
+      : nested,
+  );
 const sha256 = (value: string): string => createHash("sha256").update(value).digest("hex");
-const laneProposalInputSchema = z.object({
-  turnId: resourceIdSchema,
-  decisionId: resourceIdSchema,
-  candidateId: resourceIdSchema,
-  digest: canonicalSha256DigestSchema,
-  expectedTurnRevision: expectedRevisionSchema,
-  expectedCampaignRevision: revisionSchema,
-  idempotencyKey: idempotencyKeySchema,
-}).strict();
+const laneProposalInputSchema = z
+  .object({
+    turnId: resourceIdSchema,
+    decisionId: resourceIdSchema,
+    candidateId: resourceIdSchema,
+    digest: canonicalSha256DigestSchema,
+    expectedTurnRevision: expectedRevisionSchema,
+    expectedCampaignRevision: revisionSchema,
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .strict();
 
 /** Creates synchronous, immediate coordination transactions; provider waits and deterministic commands remain separate transactions. */
-export function createAdventureTurnWriteRepository(db: Database, context: AdventureTurnWriteContext,
-  reads: AdventureTurnReadRepository = createAdventureTurnReadRepository(db)): AdventureTurnWriteRepository {
+export function createAdventureTurnWriteRepository(
+  db: Database,
+  context: AdventureTurnWriteContext,
+  reads: AdventureTurnReadRepository = createAdventureTurnReadRepository(db),
+): AdventureTurnWriteRepository {
   const now = () => utcIsoTimestampSchema.parse(context.clock.now().toISOString());
   const id = () => resourceIdSchema.parse(context.ids.nextId());
-  const immediate = <T>(work: () => T): T => { context.guard(); return db.transaction(work).immediate(); };
-  const turn = (turnId: string) => { const row = db.prepare("SELECT * FROM adventure_turns WHERE id=?").get(turnId) as any;
-    if (!row) throw new AdventureTurnUnavailableError("turn is unavailable"); return row; };
-  const draft = (draftId: string) => { const row = db.prepare("SELECT * FROM generation_drafts WHERE id=?").get(draftId) as any;
-    if (!row) throw new AdventureTurnUnavailableError("draft is unavailable"); return row; };
-  const latest = (kind: AggregateKind, campaignId: string, aggregateId: string) => db.prepare(`SELECT * FROM adventure_coordination_events_v36
-    WHERE aggregate_kind=? AND campaign_id=? AND aggregate_id=? ORDER BY resulting_revision DESC LIMIT 1`).get(kind, campaignId, aggregateId) as any;
+  const immediate = <T>(work: () => T): T => {
+    context.guard();
+    return db.transaction(work).immediate();
+  };
+  const turn = (turnId: string) => {
+    const row = db.prepare("SELECT * FROM adventure_turns WHERE id=?").get(turnId) as any;
+    if (!row) throw new AdventureTurnUnavailableError("turn is unavailable");
+    return row;
+  };
+  const draft = (draftId: string) => {
+    const row = db.prepare("SELECT * FROM generation_drafts WHERE id=?").get(draftId) as any;
+    if (!row) throw new AdventureTurnUnavailableError("draft is unavailable");
+    return row;
+  };
+  const latest = (kind: AggregateKind, campaignId: string, aggregateId: string) =>
+    db
+      .prepare(
+        `SELECT * FROM adventure_coordination_events_v36
+    WHERE aggregate_kind=? AND campaign_id=? AND aggregate_id=? ORDER BY resulting_revision DESC LIMIT 1`,
+      )
+      .get(kind, campaignId, aggregateId) as any;
   const privateTurn = (principalId: string, turnId: string) => {
-    const value = reads.getAdventureTurn(principalId, turnId); if (!value || !("declaration" in value)) throw new AdventureTurnUnavailableError("private turn is unavailable"); return value;
+    const value = reads.getAdventureTurn(principalId, turnId);
+    if (!value || !("declaration" in value)) throw new AdventureTurnUnavailableError("private turn is unavailable");
+    return value;
   };
   const privateDraft = (principalId: string, draftId: string) => {
-    const value = reads.getGenerationDraft(principalId, draftId); if (!value || !("stagedContent" in value)) throw new AdventureTurnUnavailableError("private draft is unavailable"); return value;
+    const value = reads.getGenerationDraft(principalId, draftId);
+    if (!value || !("stagedContent" in value)) throw new AdventureTurnUnavailableError("private draft is unavailable");
+    return value;
   };
 
   function authority(principalId: string, row: any, expectedCampaignRevision: number, action: Action): void {
-    const campaign = db.prepare("SELECT active_timeline_id,administration_revision,lifecycle_status FROM campaigns WHERE id=?").get(row.campaign_id) as any;
+    const campaign = db
+      .prepare("SELECT active_timeline_id,administration_revision,lifecycle_status FROM campaigns WHERE id=?")
+      .get(row.campaign_id) as any;
     if (!campaign) throw new AdventureTurnUnavailableError("campaign is unavailable");
-    if (campaign.lifecycle_status !== "draft" && campaign.lifecycle_status !== "published") throw new AdventureTurnStaleError("campaign lifecycle does not permit coordination");
+    if (campaign.lifecycle_status !== "draft" && campaign.lifecycle_status !== "published")
+      throw new AdventureTurnStaleError("campaign lifecycle does not permit coordination");
     if (campaign.active_timeline_id !== row.timeline_id) throw new AdventureTurnStaleError("active timeline changed");
-    if (campaign.administration_revision !== expectedCampaignRevision) throw new AdventureTurnStaleError("campaign revision is stale");
-    if (action !== "draft" && db.prepare("SELECT 1 FROM campaign_administration_integrations_v59 WHERE campaign_id=? AND paused=1").get(row.campaign_id))
+    if (campaign.administration_revision !== expectedCampaignRevision)
+      throw new AdventureTurnStaleError("campaign revision is stale");
+    if (
+      action !== "draft" &&
+      db
+        .prepare("SELECT 1 FROM campaign_administration_integrations_v59 WHERE campaign_id=? AND paused=1")
+        .get(row.campaign_id)
+    )
       throw new AdventureTurnStaleError("campaign adventure mutations are paused by a safety request");
-    const member = db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(row.campaign_id, principalId) as { role: string } | undefined;
-    if (!member || member.role === "observer") throw new AdventureTurnAuthorizationError("current action role is required");
-    if (action === "draft" && member.role !== "owner" && member.role !== "gm") throw new AdventureTurnAuthorizationError("owner or GM authority is required");
+    const member = db
+      .prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+      .get(row.campaign_id, principalId) as { role: string } | undefined;
+    if (!member || member.role === "observer")
+      throw new AdventureTurnAuthorizationError("current action role is required");
+    if (action === "draft" && member.role !== "owner" && member.role !== "gm")
+      throw new AdventureTurnAuthorizationError("owner or GM authority is required");
     if (row.session_id) {
-      const active = db.prepare(`SELECT 1 FROM campaign_sessions attached JOIN sessions session ON session.id=attached.session_id
-        WHERE attached.campaign_id=? AND attached.session_id=? AND session.state='active' AND session.stopped_at IS NULL`).get(row.campaign_id, row.session_id);
+      const active = db
+        .prepare(
+          `SELECT 1 FROM campaign_sessions attached JOIN sessions session ON session.id=attached.session_id
+        WHERE attached.campaign_id=? AND attached.session_id=? AND session.state='active' AND session.stopped_at IS NULL`,
+        )
+        .get(row.campaign_id, row.session_id);
       if (!active) throw new AdventureTurnStaleError("an attached active session is required");
     }
     if (action !== "draft") {
-      const participant = db.prepare(`SELECT 1 FROM campaign_actors actor JOIN campaign_characters cc
+      const participant = db
+        .prepare(
+          `SELECT 1 FROM campaign_actors actor JOIN campaign_characters cc
         ON cc.campaign_id=actor.campaign_id AND cc.id=actor.campaign_character_id JOIN session_characters participant
-        ON participant.character_id=cc.character_id WHERE actor.campaign_id=? AND actor.id=? AND participant.session_id=?`).get(row.campaign_id, row.actor_id, row.session_id);
-      if (!participant) throw new AdventureTurnAuthorizationError("the selected actor persona is not a session participant");
-      if (member.role !== "owner" && member.role !== "gm" && (member.role !== "player" || !db.prepare(`SELECT 1 FROM campaign_actor_private_state
-        WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?`).get(row.campaign_id, row.actor_id, principalId))) {
+        ON participant.character_id=cc.character_id WHERE actor.campaign_id=? AND actor.id=? AND participant.session_id=?`,
+        )
+        .get(row.campaign_id, row.actor_id, row.session_id);
+      if (!participant)
+        throw new AdventureTurnAuthorizationError("the selected actor persona is not a session participant");
+      if (
+        member.role !== "owner" &&
+        member.role !== "gm" &&
+        (member.role !== "player" ||
+          !db
+            .prepare(
+              `SELECT 1 FROM campaign_actor_private_state
+        WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?`,
+            )
+            .get(row.campaign_id, row.actor_id, principalId))
+      ) {
         throw new AdventureTurnAuthorizationError("current actor control is required");
       }
     }
   }
 
-  function attestConfirmationAuthority(row:any,proposal:any,principalId:string,decisionId:string,
-    decision:"approved"|"rejected"|"expired",at:string):void {
-    const member=db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
-      .get(row.campaign_id,principalId) as {role:"owner"|"gm"|"player"|"observer"}|undefined;
-    const controlled=Boolean(db.prepare(`SELECT 1 FROM campaign_actor_private_state
-      WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?`).get(row.campaign_id,row.actor_id,principalId));
-    const control=member?.role==="owner"||member?.role==="gm"?"all":controlled?"controlled":"none";
-    if(!member||member.role==="observer"||(member.role==="player"&&!controlled)
-      ||(decision!=="expired"&&proposal.required_authorizer==="gm"&&!['owner','gm'].includes(member.role)))
+  function attestConfirmationAuthority(
+    row: any,
+    proposal: any,
+    principalId: string,
+    decisionId: string,
+    decision: "approved" | "rejected" | "expired",
+    at: string,
+  ): void {
+    const member = db
+      .prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+      .get(row.campaign_id, principalId) as { role: "owner" | "gm" | "player" | "observer" } | undefined;
+    const controlled = Boolean(
+      db
+        .prepare(
+          `SELECT 1 FROM campaign_actor_private_state
+      WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?`,
+        )
+        .get(row.campaign_id, row.actor_id, principalId),
+    );
+    const control = member?.role === "owner" || member?.role === "gm" ? "all" : controlled ? "controlled" : "none";
+    if (
+      !member ||
+      member.role === "observer" ||
+      (member.role === "player" && !controlled) ||
+      (decision !== "expired" && proposal.required_authorizer === "gm" && !["owner", "gm"].includes(member.role))
+    )
       throw new AdventureTurnAuthorizationError("decision-time confirmation authority is required");
-    const policyDigest=createHash("sha256").update(canonicalAgentJson({version:proposal.policy_version,category:proposal.category,
-      requiresConfirmation:Boolean(proposal.policy_requires_confirmation??proposal.requires_confirmation),
-      requiredAuthorizer:proposal.required_authorizer,proposedCommandDigest:proposal.proposed_command_digest,
-      observedDomains:JSON.parse(proposal.observed_domain_revisions_json)} as never)).digest("hex");
-    const value={evidenceVersion:"v1",authorityProven:true,decisionId,campaignId:row.campaign_id,turnId:row.id,
-      proposalId:proposal.proposal_id,principalId,decision,actorId:row.actor_id,authorityRole:member.role,
-      authorityControl:control,requiredAuthorizer:proposal.required_authorizer,policyDigest,attestedAt:at};
-    const json=canonicalAgentJson(value as never);
-    db.prepare("INSERT INTO confirmation_authority_evidence_v40 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-      .run(id(),decisionId,row.campaign_id,row.id,proposal.proposal_id,principalId,decision,"v1",member.role,control,row.actor_id,
-        proposal.required_authorizer,policyDigest,json,createHash("sha256").update(json).digest("hex"),at);
+    const policyDigest = createHash("sha256")
+      .update(
+        canonicalAgentJson({
+          version: proposal.policy_version,
+          category: proposal.category,
+          requiresConfirmation: Boolean(proposal.policy_requires_confirmation ?? proposal.requires_confirmation),
+          requiredAuthorizer: proposal.required_authorizer,
+          proposedCommandDigest: proposal.proposed_command_digest,
+          observedDomains: JSON.parse(proposal.observed_domain_revisions_json),
+        } as never),
+      )
+      .digest("hex");
+    const value = {
+      evidenceVersion: "v1",
+      authorityProven: true,
+      decisionId,
+      campaignId: row.campaign_id,
+      turnId: row.id,
+      proposalId: proposal.proposal_id,
+      principalId,
+      decision,
+      actorId: row.actor_id,
+      authorityRole: member.role,
+      authorityControl: control,
+      requiredAuthorizer: proposal.required_authorizer,
+      policyDigest,
+      attestedAt: at,
+    };
+    const json = canonicalAgentJson(value as never);
+    db.prepare("INSERT INTO confirmation_authority_evidence_v40 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(
+      id(),
+      decisionId,
+      row.campaign_id,
+      row.id,
+      proposal.proposal_id,
+      principalId,
+      decision,
+      "v1",
+      member.role,
+      control,
+      row.actor_id,
+      proposal.required_authorizer,
+      policyDigest,
+      json,
+      createHash("sha256").update(json).digest("hex"),
+      at,
+    );
   }
 
   const stale = (kind: AggregateKind, row: any, expected: number) => {
-    const event = latest(kind, row.campaign_id, row.id); if (!event || event.resulting_revision !== expected) throw new AdventureTurnStaleError(`${kind} revision is stale`); return event;
+    const event = latest(kind, row.campaign_id, row.id);
+    if (!event || event.resulting_revision !== expected) throw new AdventureTurnStaleError(`${kind} revision is stale`);
+    return event;
   };
-  const replay = <T>(kind: AggregateKind, row: any, principalId: string, mutationType: string, input: { idempotencyKey: string; expectedCampaignRevision: number }, expectedRevision: number,
-    schema: { parse(value: unknown): T }): T | null => {
-    const command = db.prepare(`SELECT command.*,receipt.result_json FROM adventure_coordination_commands_v36 command
+  const replay = <T>(
+    kind: AggregateKind,
+    row: any,
+    principalId: string,
+    mutationType: string,
+    input: { idempotencyKey: string; expectedCampaignRevision: number },
+    expectedRevision: number,
+    schema: { parse(value: unknown): T },
+  ): T | null => {
+    const command = db
+      .prepare(
+        `SELECT command.*,receipt.result_json FROM adventure_coordination_commands_v36 command
       JOIN adventure_coordination_receipts_v36 receipt ON receipt.command_id=command.command_id
-      WHERE command.aggregate_kind=? AND command.campaign_id=? AND command.aggregate_id=? AND command.idempotency_key=?`)
+      WHERE command.aggregate_kind=? AND command.campaign_id=? AND command.aggregate_id=? AND command.idempotency_key=?`,
+      )
       .get(kind, row.campaign_id, row.id, input.idempotencyKey) as any;
     if (!command) return null;
-    if (command.principal_id !== principalId || command.mutation_type !== mutationType || command.request_json !== canonical(input)
-        || command.expected_revision !== expectedRevision || command.expected_campaign_revision !== input.expectedCampaignRevision) {
+    if (
+      command.principal_id !== principalId ||
+      command.mutation_type !== mutationType ||
+      command.request_json !== canonical(input) ||
+      command.expected_revision !== expectedRevision ||
+      command.expected_campaign_revision !== input.expectedCampaignRevision
+    ) {
       throw new AdventureTurnConflictError("idempotency key was reused with changed values");
     }
     return schema.parse(JSON.parse(command.result_json));
   };
-  const command = (kind: AggregateKind, row: any, principalId: string, mutationType: string, input: any, expected: number, resulting: number, at: string) => {
+  const command = (
+    kind: AggregateKind,
+    row: any,
+    principalId: string,
+    mutationType: string,
+    input: any,
+    expected: number,
+    resulting: number,
+    at: string,
+  ) => {
     const commandId = id();
-    db.prepare(`INSERT INTO adventure_coordination_commands_v36(command_id,aggregate_kind,campaign_id,aggregate_id,principal_id,mutation_type,
-      idempotency_key,expected_revision,expected_campaign_revision,resulting_revision,request_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(commandId, kind, row.campaign_id, row.id, principalId, mutationType, input.idempotencyKey, expected, input.expectedCampaignRevision, resulting, canonical(input), at);
+    db.prepare(
+      `INSERT INTO adventure_coordination_commands_v36(command_id,aggregate_kind,campaign_id,aggregate_id,principal_id,mutation_type,
+      idempotency_key,expected_revision,expected_campaign_revision,resulting_revision,request_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      commandId,
+      kind,
+      row.campaign_id,
+      row.id,
+      principalId,
+      mutationType,
+      input.idempotencyKey,
+      expected,
+      input.expectedCampaignRevision,
+      resulting,
+      canonical(input),
+      at,
+    );
     return commandId;
   };
-  const finish = <T>(kind: AggregateKind, row: any, principalId: string, mutationType: string, input: any, expected: number,
-    state: string, narration: string | null, at: string, read: () => T, sheetContext?: SheetContextEntry[]): T => {
+  const finish = <T>(
+    kind: AggregateKind,
+    row: any,
+    principalId: string,
+    mutationType: string,
+    input: any,
+    expected: number,
+    state: string,
+    narration: string | null,
+    at: string,
+    read: () => T,
+    sheetContext?: SheetContextEntry[],
+  ): T => {
     const resulting = expected + 1;
-    if (row.revision !== resulting) throw new AdventureTurnStaleError(`${kind} physical revision did not advance exactly once`);
-    const commandId = command(kind, row, principalId, mutationType, input, expected, resulting, at), eventId = id();
-    db.prepare(`INSERT INTO adventure_coordination_events_v36(event_id,command_id,aggregate_kind,campaign_id,aggregate_id,principal_id,mutation_type,
-      expected_revision,resulting_revision,resulting_state,narration_status,event_json,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(eventId, commandId, kind, row.campaign_id, row.id, principalId, mutationType, expected, resulting, state, narration, canonical({ state, narrationStatus: narration, ...(sheetContext?.length ? { sheetContext } : {}) }), at);
+    if (row.revision !== resulting)
+      throw new AdventureTurnStaleError(`${kind} physical revision did not advance exactly once`);
+    const commandId = command(kind, row, principalId, mutationType, input, expected, resulting, at),
+      eventId = id();
+    db.prepare(
+      `INSERT INTO adventure_coordination_events_v36(event_id,command_id,aggregate_kind,campaign_id,aggregate_id,principal_id,mutation_type,
+      expected_revision,resulting_revision,resulting_state,narration_status,event_json,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      eventId,
+      commandId,
+      kind,
+      row.campaign_id,
+      row.id,
+      principalId,
+      mutationType,
+      expected,
+      resulting,
+      state,
+      narration,
+      canonical({ state, narrationStatus: narration, ...(sheetContext?.length ? { sheetContext } : {}) }),
+      at,
+    );
     const result = read();
-    db.prepare(`INSERT INTO adventure_coordination_receipts_v36(command_id,event_id,aggregate_kind,campaign_id,aggregate_id,expected_revision,resulting_revision,result_json)
-      VALUES(?,?,?,?,?,?,?,?)`).run(commandId, eventId, kind, row.campaign_id, row.id, expected, resulting, canonical(result));
+    db.prepare(
+      `INSERT INTO adventure_coordination_receipts_v36(command_id,event_id,aggregate_kind,campaign_id,aggregate_id,expected_revision,resulting_revision,result_json)
+      VALUES(?,?,?,?,?,?,?,?)`,
+    ).run(commandId, eventId, kind, row.campaign_id, row.id, expected, resulting, canonical(result));
     return result;
   };
   const physicalAdvance = (row: any, state: string, narration: string, at: string) => {
-    const changed = db.prepare("UPDATE adventure_turns SET state=?,narration_status=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?")
+    const changed = db
+      .prepare(
+        "UPDATE adventure_turns SET state=?,narration_status=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?",
+      )
       .run(state, narration, at, row.id, row.revision).changes;
     if (changed !== 1) throw new AdventureTurnStaleError("physical turn revision changed");
-    row.state = state; row.narration_status = narration; row.revision += 1;
+    row.state = state;
+    row.narration_status = narration;
+    row.revision += 1;
   };
-  const root = (row: any) => { let current = row; const visited = new Set<string>(); while (current.mode !== "original") {
-    if (visited.has(current.id) || !current.prior_turn_id) throw new AdventureTurnConflictError("narration ancestry is cyclic or incomplete");
-    visited.add(current.id); current = turn(current.prior_turn_id);
-  } return current; };
-  const approvedProposals = (row: any) => db.prepare(`SELECT proposal.* FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision
+  const root = (row: any) => {
+    let current = row;
+    const visited = new Set<string>();
+    while (current.mode !== "original") {
+      if (visited.has(current.id) || !current.prior_turn_id)
+        throw new AdventureTurnConflictError("narration ancestry is cyclic or incomplete");
+      visited.add(current.id);
+      current = turn(current.prior_turn_id);
+    }
+    return current;
+  };
+  const approvedProposals = (row: any) =>
+    db
+      .prepare(
+        `SELECT proposal.* FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision
     ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
-    WHERE proposal.campaign_id=? AND proposal.turn_id=? AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`)
-    .all(row.campaign_id, row.id) as any[];
-  const commandType = (toolName: string): "set_actor_attribute" | "initialize_actor_resource" | "roll_actor_dice" | "combat_action" | "inventory_action" | "commerce_action" | "power_action" | "rest_action" | "combat_consumable_action" | "combat_power_action" | "quest_lifecycle_action" | "progression_action" => {
+    WHERE proposal.campaign_id=? AND proposal.turn_id=? AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`,
+      )
+      .all(row.campaign_id, row.id) as any[];
+  const commandType = (
+    toolName: string,
+  ):
+    | "set_actor_attribute"
+    | "initialize_actor_resource"
+    | "roll_actor_dice"
+    | "combat_action"
+    | "inventory_action"
+    | "commerce_action"
+    | "power_action"
+    | "rest_action"
+    | "combat_consumable_action"
+    | "combat_power_action"
+    | "quest_lifecycle_action"
+    | "progression_action" => {
     if (["roll", "roll-check", "roll_actor_dice"].includes(toolName)) return "roll_actor_dice";
     if (toolName === "set_actor_attribute" || toolName === "initialize_actor_resource") return toolName;
-    if(toolName==="combat_action")return "combat_action";
-    if(toolName.startsWith("inventory_item_"))return "inventory_action";
-    if(toolName.startsWith("vendor_"))return "commerce_action";
-    if(toolName==="power_use")return "power_action";
-    if(toolName==="combat_consumable_use")return "combat_consumable_action";
-    if(toolName==="combat_power_use")return "combat_power_action";
-    if(toolName==="rest_short"||toolName==="rest_long")return "rest_action";
-    if(toolName.startsWith("quest_"))return "quest_lifecycle_action";
-    if(toolName==="character_progression_apply")return "progression_action";
+    if (toolName === "combat_action") return "combat_action";
+    if (toolName.startsWith("inventory_item_")) return "inventory_action";
+    if (toolName.startsWith("vendor_")) return "commerce_action";
+    if (toolName === "power_use") return "power_action";
+    if (toolName === "combat_consumable_use") return "combat_consumable_action";
+    if (toolName === "combat_power_use") return "combat_power_action";
+    if (toolName === "rest_short" || toolName === "rest_long") return "rest_action";
+    if (toolName.startsWith("quest_")) return "quest_lifecycle_action";
+    if (toolName === "character_progression_apply") return "progression_action";
     throw new AdventureTurnConflictError("tool proposal has no supported mechanics command binding");
   };
   const insertMechanicsLink = (row: any, proposalId: string, commandId: string, at: string) => {
-    const authoritative = db.prepare(`SELECT 1 FROM campaign_commands command JOIN command_receipts receipt
+    const authoritative = db
+      .prepare(
+        `SELECT 1 FROM campaign_commands command JOIN command_receipts receipt
       ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id WHERE command.campaign_id=?
         AND command.command_id=? AND command.timeline_id=? AND command.actor_id=? AND command.source_turn_id=?
         AND command.idempotency_key=(SELECT execution_idempotency_key FROM tool_proposal_execution_bindings_v37
-          WHERE campaign_id=? AND turn_id=? AND proposal_id=?)`)
+          WHERE campaign_id=? AND turn_id=? AND proposal_id=?)`,
+      )
       .get(row.campaign_id, commandId, row.timeline_id, row.actor_id, row.id, row.campaign_id, row.id, proposalId);
     if (!authoritative) throw new AdventureTurnUnavailableError("mechanics receipt provenance is unavailable");
     const linkId = id();
-    db.prepare(`INSERT INTO turn_mechanics_links_v36(link_id,campaign_id,turn_id,root_turn_id,proposal_id,command_id,source_turn_id,linked_at)
-      VALUES(?,?,?,?,?,?,?,?)`).run(linkId, row.campaign_id, row.id, row.id, proposalId, commandId, row.id, at);
-    db.prepare(`INSERT INTO final_receipt_links(link_id,campaign_id,turn_id,draft_id,command_id,idempotency_key,linked_at)
-      VALUES(?,?,?,NULL,?,?,?)`).run(linkId, row.campaign_id, row.id, commandId, `v36:${proposalId}`, at);
+    db.prepare(
+      `INSERT INTO turn_mechanics_links_v36(link_id,campaign_id,turn_id,root_turn_id,proposal_id,command_id,source_turn_id,linked_at)
+      VALUES(?,?,?,?,?,?,?,?)`,
+    ).run(linkId, row.campaign_id, row.id, row.id, proposalId, commandId, row.id, at);
+    db.prepare(
+      `INSERT INTO final_receipt_links(link_id,campaign_id,turn_id,draft_id,command_id,idempotency_key,linked_at)
+      VALUES(?,?,?,NULL,?,?,?)`,
+    ).run(linkId, row.campaign_id, row.id, commandId, `v36:${proposalId}`, at);
   };
   const reconcile = (row: any, at: string): number => {
     const proposals = approvedProposals(row);
-    const unlinked = proposals.filter((proposal) => !db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND turn_id=? AND proposal_id=?")
-      .get(row.campaign_id, row.id, proposal.proposal_id));
-    const commands = db.prepare(`SELECT command.command_id,binding.proposal_id FROM campaign_commands command JOIN command_receipts receipt
+    const unlinked = proposals.filter(
+      (proposal) =>
+        !db
+          .prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND turn_id=? AND proposal_id=?")
+          .get(row.campaign_id, row.id, proposal.proposal_id),
+    );
+    const commands = db
+      .prepare(
+        `SELECT command.command_id,binding.proposal_id FROM campaign_commands command JOIN command_receipts receipt
       ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
       JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=command.campaign_id
         AND binding.execution_idempotency_key=command.idempotency_key AND binding.turn_id=command.source_turn_id
         AND binding.timeline_id=command.timeline_id AND binding.actor_id=command.actor_id AND binding.command_type=command.type
       WHERE command.campaign_id=? AND command.timeline_id=? AND command.actor_id=? AND command.source_turn_id=?
         AND NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link WHERE link.campaign_id=command.campaign_id AND link.command_id=command.command_id)
-      ORDER BY receipt.revision_after,command.command_id`).all(row.campaign_id, row.timeline_id, row.actor_id, row.id) as Array<{ command_id: string; proposal_id: string }>;
-    if (commands.length > unlinked.length) throw new AdventureTurnConflictError("source-turn commands exceed approved proposals");
+      ORDER BY receipt.revision_after,command.command_id`,
+      )
+      .all(row.campaign_id, row.timeline_id, row.actor_id, row.id) as Array<{
+      command_id: string;
+      proposal_id: string;
+    }>;
+    if (commands.length > unlinked.length)
+      throw new AdventureTurnConflictError("source-turn commands exceed approved proposals");
     for (const entry of commands) {
       const proposal = unlinked.find((candidate) => candidate.proposal_id === entry.proposal_id);
       if (!proposal) throw new AdventureTurnConflictError("source-turn command proposal execution binding is invalid");
@@ -314,234 +623,700 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     return commands.length;
   };
   const mechanicsState = (row: any): "confirmed" | "mechanics-committed" => {
-    const approved = approvedProposals(row); const linked = (db.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE campaign_id=? AND turn_id=?")
-      .get(row.campaign_id, row.id) as { count: number }).count;
+    const approved = approvedProposals(row);
+    const linked = (
+      db
+        .prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id) as { count: number }
+    ).count;
     return approved.length > 0 && linked === approved.length ? "mechanics-committed" : "confirmed";
   };
-  const hasDurableMechanics = (row: any): boolean => Boolean(
-    db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND root_turn_id=?").get(row.campaign_id, row.id)
-    || db.prepare("SELECT 1 FROM agent_generalized_receipts_v39 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
-    || db.prepare("SELECT 1 FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
-    || boundAdventureQuestReceipts(db, row.campaign_id, row.id).length
-    || db.prepare("SELECT 1 FROM adventure_check_executions_v54 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
-    || db.prepare("SELECT 1 FROM adventure_inventory_executions_v55 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
-    || db.prepare("SELECT 1 FROM adventure_exact_action_executions_v56 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
-    || db.prepare("SELECT 1 FROM adventure_commerce_executions_v57 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
-    || db.prepare("SELECT 1 FROM world_actor_journey_executions_v1 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
+  const hasDurableMechanics = (row: any): boolean =>
+    Boolean(
+      db
+        .prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND root_turn_id=?")
+        .get(row.campaign_id, row.id) ||
+      db
+        .prepare("SELECT 1 FROM agent_generalized_receipts_v39 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id) ||
+      db
+        .prepare("SELECT 1 FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id) ||
+      boundAdventureQuestReceipts(db, row.campaign_id, row.id).length ||
+      db
+        .prepare("SELECT 1 FROM adventure_check_executions_v54 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id) ||
+      db
+        .prepare("SELECT 1 FROM adventure_inventory_executions_v55 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id) ||
+      db
+        .prepare("SELECT 1 FROM adventure_exact_action_executions_v56 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id) ||
+      db
+        .prepare("SELECT 1 FROM adventure_commerce_executions_v57 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id) ||
+      db
+        .prepare("SELECT 1 FROM world_actor_journey_executions_v1 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id),
+    );
 
   // Self-reference lets the lane-origin rest proposal delegate to the single shared
   // appendToolProposal implementation instead of forking the proposal rules.
   const repository: AdventureTurnWriteRepository = {
-    createAdventureTurn(principalId, raw) { const input = createAdventureTurnInputSchema.parse(raw); return immediate(() => {
-      const synthetic = { campaign_id: input.campaignId, timeline_id: input.timelineId, session_id: input.sessionId, actor_id: input.actorId };
-      authority(principalId, synthetic, input.expectedCampaignRevision, "turn");
-      const existingCommand = db.prepare(`SELECT command.aggregate_id FROM adventure_coordination_commands_v36 command WHERE command.aggregate_kind='turn'
-        AND command.campaign_id=? AND command.idempotency_key=? AND command.mutation_type='turn-create'`).get(input.campaignId, input.idempotencyKey) as any;
-      if (existingCommand) { const row = turn(existingCommand.aggregate_id); const old = replay("turn", row, principalId, "turn-create", input, -1, privateAdventureTurnSchema); if (old) return old; }
-      const mode = input.mode ?? "original", priorId = input.priorTurnId ?? null; let state = "declared", narration = "none";
-      let sheetContext: SheetContextEntry[] | undefined;
-      if (input.sheetReferences?.length) {
-        const sheet = context.getActorGameplaySheet?.(principalId, input.actorId);
-        if (!sheet || sheet.identity.actorId !== input.actorId) throw new AdventureTurnUnavailableError("character sheet is unavailable");
-        const entries = new Map(gameplaySheetEntries(sheet).map((entry) => [sheetReferenceKey(entry.reference), entry]));
-        sheetContext = sheetContextSchema.parse(input.sheetReferences.map((reference) => {
-          const entry = entries.get(sheetReferenceKey(reference));
-          if (!entry) throw new AdventureTurnStaleError("a selected sheet reference is no longer available");
-          return entry;
-        }));
-      }
-      if (mode !== "original") {
-        const prior = turn(priorId!); authority(principalId, prior, input.expectedCampaignRevision, "turn");
-        if (prior.campaign_id !== input.campaignId || prior.timeline_id !== input.timelineId || prior.session_id !== input.sessionId || prior.actor_id !== input.actorId)
-          throw new AdventureTurnConflictError("narration ancestry is out of scope");
-        const priorState = latest("turn", prior.campaign_id, prior.id)?.resulting_state;
-        if (!["completed", "cancelled", "failed"].includes(priorState)) throw new AdventureTurnConflictError("narration retry requires a terminal ancestor");
-        sheetContext = privateTurn(principalId, prior.id).sheetContext;
-        state = "mechanics-committed"; narration = "pending";
-      }
-      const row = { id: id(), campaign_id: input.campaignId, timeline_id: input.timelineId, session_id: input.sessionId, actor_id: input.actorId,
-        revision: 0 } as any;
-      const at = now(), physicalMode = mode === "narration-fallback" ? "narration-retry" : mode;
-      db.prepare(`INSERT INTO adventure_turns(id,campaign_id,timeline_id,session_id,actor_id,principal_id,declaration,mode,prior_turn_id,state,narration_status,
-        revision,campaign_revision,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'declared','none',0,?,?,?,?)`)
-        .run(row.id, input.campaignId, input.timelineId, input.sessionId, input.actorId, principalId, input.declaration, physicalMode, priorId,
-          input.expectedCampaignRevision, input.idempotencyKey, at, at);
-      const limits = input.executionLimits ?? DEFAULT_AGENT_EXECUTION_LIMITS;
-      const deadlineAt = utcIsoTimestampSchema.parse(new Date(new Date(at).getTime() + limits.durationMs).toISOString());
-      db.prepare(`INSERT INTO adventure_agent_executions_v38(campaign_id,turn_id,tool_registry_version,
+    createAdventureTurn(principalId, raw) {
+      const input = createAdventureTurnInputSchema.parse(raw);
+      return immediate(() => {
+        const synthetic = {
+          campaign_id: input.campaignId,
+          timeline_id: input.timelineId,
+          session_id: input.sessionId,
+          actor_id: input.actorId,
+        };
+        authority(principalId, synthetic, input.expectedCampaignRevision, "turn");
+        const existingCommand = db
+          .prepare(
+            `SELECT command.aggregate_id FROM adventure_coordination_commands_v36 command WHERE command.aggregate_kind='turn'
+        AND command.campaign_id=? AND command.idempotency_key=? AND command.mutation_type='turn-create'`,
+          )
+          .get(input.campaignId, input.idempotencyKey) as any;
+        if (existingCommand) {
+          const row = turn(existingCommand.aggregate_id);
+          const old = replay("turn", row, principalId, "turn-create", input, -1, privateAdventureTurnSchema);
+          if (old) return old;
+        }
+        const mode = input.mode ?? "original",
+          priorId = input.priorTurnId ?? null;
+        let state = "declared",
+          narration = "none";
+        let sheetContext: SheetContextEntry[] | undefined;
+        if (input.sheetReferences?.length) {
+          const sheet = context.getActorGameplaySheet?.(principalId, input.actorId);
+          if (!sheet || sheet.identity.actorId !== input.actorId)
+            throw new AdventureTurnUnavailableError("character sheet is unavailable");
+          const entries = new Map(
+            gameplaySheetEntries(sheet).map((entry) => [sheetReferenceKey(entry.reference), entry]),
+          );
+          sheetContext = sheetContextSchema.parse(
+            input.sheetReferences.map((reference) => {
+              const entry = entries.get(sheetReferenceKey(reference));
+              if (!entry) throw new AdventureTurnStaleError("a selected sheet reference is no longer available");
+              return entry;
+            }),
+          );
+        }
+        if (mode !== "original") {
+          const prior = turn(priorId!);
+          authority(principalId, prior, input.expectedCampaignRevision, "turn");
+          if (
+            prior.campaign_id !== input.campaignId ||
+            prior.timeline_id !== input.timelineId ||
+            prior.session_id !== input.sessionId ||
+            prior.actor_id !== input.actorId
+          )
+            throw new AdventureTurnConflictError("narration ancestry is out of scope");
+          const priorState = latest("turn", prior.campaign_id, prior.id)?.resulting_state;
+          if (!["completed", "cancelled", "failed"].includes(priorState))
+            throw new AdventureTurnConflictError("narration retry requires a terminal ancestor");
+          sheetContext = privateTurn(principalId, prior.id).sheetContext;
+          state = "mechanics-committed";
+          narration = "pending";
+        }
+        const row = {
+          id: id(),
+          campaign_id: input.campaignId,
+          timeline_id: input.timelineId,
+          session_id: input.sessionId,
+          actor_id: input.actorId,
+          revision: 0,
+        } as any;
+        const at = now(),
+          physicalMode = mode === "narration-fallback" ? "narration-retry" : mode;
+        db.prepare(
+          `INSERT INTO adventure_turns(id,campaign_id,timeline_id,session_id,actor_id,principal_id,declaration,mode,prior_turn_id,state,narration_status,
+        revision,campaign_revision,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'declared','none',0,?,?,?,?)`,
+        ).run(
+          row.id,
+          input.campaignId,
+          input.timelineId,
+          input.sessionId,
+          input.actorId,
+          principalId,
+          input.declaration,
+          physicalMode,
+          priorId,
+          input.expectedCampaignRevision,
+          input.idempotencyKey,
+          at,
+          at,
+        );
+        const limits = input.executionLimits ?? DEFAULT_AGENT_EXECUTION_LIMITS;
+        const deadlineAt = utcIsoTimestampSchema.parse(
+          new Date(new Date(at).getTime() + limits.durationMs).toISOString(),
+        );
+        db.prepare(
+          `INSERT INTO adventure_agent_executions_v38(campaign_id,turn_id,tool_registry_version,
         max_decision_rounds,max_tool_calls,max_mutation_calls,max_provider_calls,max_duration_ms,started_at,deadline_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(row.campaign_id, row.id, AGENT_TOOL_REGISTRY_VERSION,
-          limits.decisionRounds, limits.toolCalls, limits.mutationCalls, limits.providerCalls, limits.durationMs, at, deadlineAt);
-      return finish("turn", row, principalId, "turn-create", input, -1, state, narration, at, () => privateTurn(principalId, row.id), sheetContext);
-    }); },
-    appendToolProposal(principalId, raw) { const input = appendToolProposalInputSchema.parse(raw); return immediate(() => {
-      const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-      const old = replay("turn", row, principalId, "proposal-append", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
-      const current = stale("turn", row, input.expectedTurnRevision); if (row.mode !== "original" || !["declared", "proposed"].includes(current.resulting_state)) throw new AdventureTurnConflictError("turn cannot accept proposals");
-      const position = (db.prepare("SELECT count(*) count FROM tool_proposals WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id) as { count: number }).count;
-      const at = now(), proposalId = id(), argumentsJson = canonical(input.arguments);
-      const timelineRevision=(db.prepare("SELECT revision FROM campaign_timelines WHERE campaign_id=? AND id=?").get(row.campaign_id,row.timeline_id) as {revision:number}|undefined)?.revision;
-      if(timelineRevision===undefined)throw new AdventureTurnStaleError("timeline is unavailable");
-      const combatRevision=Number.isSafeInteger((input.arguments as any).expectedCombatRevision)?(input.arguments as any).expectedCombatRevision as number:undefined;
-      const autonomousEnemy=input.toolName==="combat_action"&&Boolean(db.prepare(`SELECT 1 FROM encounter JOIN combatant ON combatant.encounter_id=encounter.encounter_id
-        WHERE encounter.encounter_id=? AND encounter.campaign_id=? AND encounter.current_turn_combatant_id=combatant.combatant_id AND combatant.combatant_kind='enemy'`)
-        .get((input.arguments as any).encounterId,row.campaign_id));
-      const policy=deriveConfirmationPolicy({toolName:input.toolName,arguments:input.arguments,campaignRevision:row.campaign_revision,
-        turnRevision:input.expectedTurnRevision,timelineRevision,...(combatRevision===undefined?{}:{combatRevision}),autonomousEnemy,at});
-      // The derived policy is the single source of truth; the caller's flag must already agree, so a
-      // divergent call site fails loudly instead of silently skipping or inventing a confirmation.
-      if(policy.requiresConfirmation!==input.requiresConfirmation)throw new AdventureTurnConflictError("proposal confirmation flag disagrees with the server policy");
-      if(policy.requiresConfirmation&&!input.confirmationExpiresAt)throw new AdventureTurnConflictError("server policy requires a confirmation expiry");
-      db.prepare(`INSERT INTO tool_proposals(proposal_id,campaign_id,turn_id,position,tool_name,arguments_json,requires_confirmation,confirmation_expires_at,idempotency_key,proposed_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(proposalId, row.campaign_id, row.id, position, input.toolName, argumentsJson, policy.requiresConfirmation ? 1 : 0,
-          policy.requiresConfirmation ? input.confirmationExpiresAt : null, input.idempotencyKey, at);
-      db.prepare(`INSERT INTO confirmation_policy_attestations_v40 VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(proposalId,row.campaign_id,row.id,
-        policy.version,policy.category,policy.requiresConfirmation?1:0,policy.requiredAuthorizer,canonicalAgentJson(policy.review as never),
-        policy.proposedCommandDigest,canonicalAgentJson(policy.observedDomains),policy.attestedAt);
-      const executionKey = `mechanics:${createHash("sha256").update(proposalId).digest("hex").slice(0, 48)}`;
-        if(commandType(input.toolName)==="inventory_action"){
-          const args=input.arguments as Record<string,unknown>;
-          const candidate=db.prepare("SELECT action,confirmation_required,candidate_digest FROM adventure_inventory_candidates_v55 WHERE candidate_id=? AND turn_id=?")
-            .get(args.candidateId,row.id) as any;
-          const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=?
+        VALUES(?,?,?,?,?,?,?,?,?,?)`,
+        ).run(
+          row.campaign_id,
+          row.id,
+          AGENT_TOOL_REGISTRY_VERSION,
+          limits.decisionRounds,
+          limits.toolCalls,
+          limits.mutationCalls,
+          limits.providerCalls,
+          limits.durationMs,
+          at,
+          deadlineAt,
+        );
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "turn-create",
+          input,
+          -1,
+          state,
+          narration,
+          at,
+          () => privateTurn(principalId, row.id),
+          sheetContext,
+        );
+      });
+    },
+    appendToolProposal(principalId, raw) {
+      const input = appendToolProposalInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "proposal-append",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (row.mode !== "original" || !["declared", "proposed"].includes(current.resulting_state))
+          throw new AdventureTurnConflictError("turn cannot accept proposals");
+        const position = (
+          db
+            .prepare("SELECT count(*) count FROM tool_proposals WHERE campaign_id=? AND turn_id=?")
+            .get(row.campaign_id, row.id) as { count: number }
+        ).count;
+        const at = now(),
+          proposalId = id(),
+          argumentsJson = canonical(input.arguments);
+        const timelineRevision = (
+          db
+            .prepare("SELECT revision FROM campaign_timelines WHERE campaign_id=? AND id=?")
+            .get(row.campaign_id, row.timeline_id) as { revision: number } | undefined
+        )?.revision;
+        if (timelineRevision === undefined) throw new AdventureTurnStaleError("timeline is unavailable");
+        const combatRevision = Number.isSafeInteger((input.arguments as any).expectedCombatRevision)
+          ? ((input.arguments as any).expectedCombatRevision as number)
+          : undefined;
+        const autonomousEnemy =
+          input.toolName === "combat_action" &&
+          Boolean(
+            db
+              .prepare(
+                `SELECT 1 FROM encounter JOIN combatant ON combatant.encounter_id=encounter.encounter_id
+        WHERE encounter.encounter_id=? AND encounter.campaign_id=? AND encounter.current_turn_combatant_id=combatant.combatant_id AND combatant.combatant_kind='enemy'`,
+              )
+              .get((input.arguments as any).encounterId, row.campaign_id),
+          );
+        const policy = deriveConfirmationPolicy({
+          toolName: input.toolName,
+          arguments: input.arguments,
+          campaignRevision: row.campaign_revision,
+          turnRevision: input.expectedTurnRevision,
+          timelineRevision,
+          ...(combatRevision === undefined ? {} : { combatRevision }),
+          autonomousEnemy,
+          at,
+        });
+        // The derived policy is the single source of truth; the caller's flag must already agree, so a
+        // divergent call site fails loudly instead of silently skipping or inventing a confirmation.
+        if (policy.requiresConfirmation !== input.requiresConfirmation)
+          throw new AdventureTurnConflictError("proposal confirmation flag disagrees with the server policy");
+        if (policy.requiresConfirmation && !input.confirmationExpiresAt)
+          throw new AdventureTurnConflictError("server policy requires a confirmation expiry");
+        db.prepare(
+          `INSERT INTO tool_proposals(proposal_id,campaign_id,turn_id,position,tool_name,arguments_json,requires_confirmation,confirmation_expires_at,idempotency_key,proposed_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`,
+        ).run(
+          proposalId,
+          row.campaign_id,
+          row.id,
+          position,
+          input.toolName,
+          argumentsJson,
+          policy.requiresConfirmation ? 1 : 0,
+          policy.requiresConfirmation ? input.confirmationExpiresAt : null,
+          input.idempotencyKey,
+          at,
+        );
+        db.prepare(`INSERT INTO confirmation_policy_attestations_v40 VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(
+          proposalId,
+          row.campaign_id,
+          row.id,
+          policy.version,
+          policy.category,
+          policy.requiresConfirmation ? 1 : 0,
+          policy.requiredAuthorizer,
+          canonicalAgentJson(policy.review as never),
+          policy.proposedCommandDigest,
+          canonicalAgentJson(policy.observedDomains),
+          policy.attestedAt,
+        );
+        const executionKey = `mechanics:${createHash("sha256").update(proposalId).digest("hex").slice(0, 48)}`;
+        if (commandType(input.toolName) === "inventory_action") {
+          const args = input.arguments as Record<string, unknown>;
+          const candidate = db
+            .prepare(
+              "SELECT action,confirmation_required,candidate_digest FROM adventure_inventory_candidates_v55 WHERE candidate_id=? AND turn_id=?",
+            )
+            .get(args.candidateId, row.id) as any;
+          const response = db
+            .prepare(
+              `SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=?
             AND response.provider_call_id=? AND response.status='succeeded' AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call
               WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')='exact_inventory_action.select'
-                AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`)
-            .get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.candidateId,args.digest);
-          if(!candidate||!response||candidate.candidate_digest!==args.digest||`inventory_item_${candidate.action}`!==input.toolName
-            ||Boolean(candidate.confirmation_required)!==policy.requiresConfirmation)throw new AdventureTurnConflictError("inventory proposal is not bound to an exact provider candidate");
-          db.prepare(`INSERT INTO adventure_inventory_proposal_bindings_v55(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,provider_call_id,
-            provider_tool_call_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,
-              args.providerCallId,args.providerToolCallId,executionKey,at);
-        }else if(commandType(input.toolName)==="commerce_action"){
-          const args=input.arguments as Record<string,unknown>;
-          const candidate=db.prepare("SELECT action,candidate_digest,session_id,batch_id FROM adventure_commerce_candidates_v57 WHERE candidate_id=? AND turn_id=?").get(args.candidateId,row.id)as any;
-          const laneDecisionId=typeof args.systemOneDecisionId==="string"?args.systemOneDecisionId:null;
-          if(laneDecisionId){
+                AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`,
+            )
+            .get(row.campaign_id, row.id, args.providerCallId, args.providerToolCallId, args.candidateId, args.digest);
+          if (
+            !candidate ||
+            !response ||
+            candidate.candidate_digest !== args.digest ||
+            `inventory_item_${candidate.action}` !== input.toolName ||
+            Boolean(candidate.confirmation_required) !== policy.requiresConfirmation
+          )
+            throw new AdventureTurnConflictError("inventory proposal is not bound to an exact provider candidate");
+          db.prepare(
+            `INSERT INTO adventure_inventory_proposal_bindings_v55(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,provider_call_id,
+            provider_tool_call_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?)`,
+          ).run(
+            proposalId,
+            row.campaign_id,
+            row.id,
+            args.candidateId,
+            args.digest,
+            args.providerCallId,
+            args.providerToolCallId,
+            executionKey,
+            at,
+          );
+        } else if (commandType(input.toolName) === "commerce_action") {
+          const args = input.arguments as Record<string, unknown>;
+          const candidate = db
+            .prepare(
+              "SELECT action,candidate_digest,session_id,batch_id FROM adventure_commerce_candidates_v57 WHERE candidate_id=? AND turn_id=?",
+            )
+            .get(args.candidateId, row.id) as any;
+          const laneDecisionId = typeof args.systemOneDecisionId === "string" ? args.systemOneDecisionId : null;
+          if (laneDecisionId) {
             // Lane/server-origin proposal: the decision must already exist and match the turn, the
             // selection must be an advertised commerce candidate whose batch projection verifies,
             // and the derived server policy must still require confirmation. Only the ordinary
             // confirmation API can approve the proposal; nothing commits here.
-            const batch=candidate&&db.prepare("SELECT projection_json,projection_digest FROM adventure_commerce_batches_v57 WHERE batch_id=?").get(candidate.batch_id)as any;
-            let projection:any=null;try{projection=batch&&JSON.parse(batch.projection_json);}catch{projection=null;}
-            const decision=db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(laneDecisionId)as any;
-            if(!candidate||candidate.candidate_digest!==args.digest||!batch
-              ||sha256(batch.projection_json)!==batch.projection_digest||!Array.isArray(projection?.candidates)
-              ||!projection.candidates.some((entry:any)=>entry?.candidateId===args.candidateId&&entry?.digest===args.digest)
-              ||!decision||decision.turn_id!==row.id||`vendor_${candidate.action}`!==input.toolName
-              ||(decision.campaign_id!==null&&decision.campaign_id!==row.campaign_id)
-              ||(decision.session_id!==null&&decision.session_id!==candidate.session_id)
-              ||!policy.requiresConfirmation)
+            const batch =
+              candidate &&
+              (db
+                .prepare(
+                  "SELECT projection_json,projection_digest FROM adventure_commerce_batches_v57 WHERE batch_id=?",
+                )
+                .get(candidate.batch_id) as any);
+            let projection: any = null;
+            try {
+              projection = batch && JSON.parse(batch.projection_json);
+            } catch {
+              projection = null;
+            }
+            const decision = db
+              .prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?")
+              .get(laneDecisionId) as any;
+            if (
+              !candidate ||
+              candidate.candidate_digest !== args.digest ||
+              !batch ||
+              sha256(batch.projection_json) !== batch.projection_digest ||
+              !Array.isArray(projection?.candidates) ||
+              !projection.candidates.some(
+                (entry: any) => entry?.candidateId === args.candidateId && entry?.digest === args.digest,
+              ) ||
+              !decision ||
+              decision.turn_id !== row.id ||
+              `vendor_${candidate.action}` !== input.toolName ||
+              (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id) ||
+              (decision.session_id !== null && decision.session_id !== candidate.session_id) ||
+              !policy.requiresConfirmation
+            )
               throw new AdventureTurnConflictError("commerce proposal is not bound to an advertised lane candidate");
-            db.prepare(`INSERT INTO adventure_commerce_bindings_v57(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,origin,
+            db.prepare(
+              `INSERT INTO adventure_commerce_bindings_v57(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,origin,
               provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at)
-              VALUES(?,?,?,?,?,'lane',NULL,NULL,?,?,?)`).run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,laneDecisionId,executionKey,at);
-          }else{
-            const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=? AND response.provider_call_id=? AND response.status='succeeded'
+              VALUES(?,?,?,?,?,'lane',NULL,NULL,?,?,?)`,
+            ).run(proposalId, row.campaign_id, row.id, args.candidateId, args.digest, laneDecisionId, executionKey, at);
+          } else {
+            const response = db
+              .prepare(
+                `SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=? AND response.provider_call_id=? AND response.status='succeeded'
               AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')='exact_vendor_commerce.select'
-                AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`).get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.candidateId,args.digest);
-            if(!candidate||!response||candidate.candidate_digest!==args.digest||`vendor_${candidate.action}`!==input.toolName||!policy.requiresConfirmation)throw new AdventureTurnConflictError("commerce proposal is not bound to an exact provider candidate");
-            db.prepare(`INSERT INTO adventure_commerce_bindings_v57(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,origin,
+                AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`,
+              )
+              .get(
+                row.campaign_id,
+                row.id,
+                args.providerCallId,
+                args.providerToolCallId,
+                args.candidateId,
+                args.digest,
+              );
+            if (
+              !candidate ||
+              !response ||
+              candidate.candidate_digest !== args.digest ||
+              `vendor_${candidate.action}` !== input.toolName ||
+              !policy.requiresConfirmation
+            )
+              throw new AdventureTurnConflictError("commerce proposal is not bound to an exact provider candidate");
+            db.prepare(
+              `INSERT INTO adventure_commerce_bindings_v57(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,origin,
               provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at)
-              VALUES(?,?,?,?,?,'provider',?,?,NULL,?,?)`).run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,args.providerCallId,args.providerToolCallId,executionKey,at);
+              VALUES(?,?,?,?,?,'provider',?,?,NULL,?,?)`,
+            ).run(
+              proposalId,
+              row.campaign_id,
+              row.id,
+              args.candidateId,
+              args.digest,
+              args.providerCallId,
+              args.providerToolCallId,
+              executionKey,
+              at,
+            );
           }
-        }else if(["power_action","rest_action","combat_consumable_action","combat_power_action","quest_lifecycle_action","progression_action"].includes(commandType(input.toolName))){
-          const args=input.arguments as Record<string,unknown>,kind=commandType(input.toolName)==="power_action"?"power":commandType(input.toolName)==="rest_action"?"rest":commandType(input.toolName)==="combat_consumable_action"?"combat-consumable":commandType(input.toolName)==="combat_power_action"?"combat-power":commandType(input.toolName)==="progression_action"?"progression":input.toolName==="quest_accept"?"quest-accept":input.toolName==="quest_abandon"?"quest-abandon":"quest-reward";
-          const candidate=db.prepare("SELECT candidate_digest,action_kind,public_json,session_id,batch_id FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?")
-            .get(args.candidateId,row.id)as any;
-          const laneKinds=kind==="rest"||kind==="combat-consumable"||kind==="combat-power";
-          const laneDecisionId=laneKinds&&typeof args.systemOneDecisionId==="string"?args.systemOneDecisionId:null;
-          if(laneDecisionId){
+        } else if (
+          [
+            "power_action",
+            "rest_action",
+            "combat_consumable_action",
+            "combat_power_action",
+            "quest_lifecycle_action",
+            "progression_action",
+          ].includes(commandType(input.toolName))
+        ) {
+          const args = input.arguments as Record<string, unknown>,
+            kind =
+              commandType(input.toolName) === "power_action"
+                ? "power"
+                : commandType(input.toolName) === "rest_action"
+                  ? "rest"
+                  : commandType(input.toolName) === "combat_consumable_action"
+                    ? "combat-consumable"
+                    : commandType(input.toolName) === "combat_power_action"
+                      ? "combat-power"
+                      : commandType(input.toolName) === "progression_action"
+                        ? "progression"
+                        : input.toolName === "quest_accept"
+                          ? "quest-accept"
+                          : input.toolName === "quest_abandon"
+                            ? "quest-abandon"
+                            : "quest-reward";
+          const candidate = db
+            .prepare(
+              "SELECT candidate_digest,action_kind,public_json,session_id,batch_id FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?",
+            )
+            .get(args.candidateId, row.id) as any;
+          const laneKinds = kind === "rest" || kind === "combat-consumable" || kind === "combat-power";
+          const laneDecisionId =
+            laneKinds && typeof args.systemOneDecisionId === "string" ? args.systemOneDecisionId : null;
+          if (laneDecisionId) {
             // Lane-origin proposal: the decision must already exist and match the turn, the
             // selection must be an advertised exact-action candidate whose batch projection
             // verifies, and the derived server policy must still require confirmation. Only the
             // ordinary confirmation API can approve the proposal; nothing commits here. Rest
             // derives its tool name from the advertised rest kind; the combat families expose
             // fixed server tool names.
-            const batch=candidate&&db.prepare("SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?").get(candidate.batch_id)as any;
-            let projection:any=null;try{projection=batch&&JSON.parse(batch.projection_json);}catch{projection=null;}
-            const decision=db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(laneDecisionId)as any;
-            let publicValue:any=null;try{publicValue=candidate&&JSON.parse(candidate.public_json);}catch{publicValue=null;}
-            const derivedToolName=kind==="rest"?(publicValue?.restKind==="short"?"rest_short":publicValue?.restKind==="long"?"rest_long":null)
-              :kind==="combat-consumable"?"combat_consumable_use":"combat_power_use";
-            if(!candidate||candidate.action_kind!==kind||candidate.candidate_digest!==args.digest||!batch
-              ||sha256(batch.projection_json)!==batch.projection_digest||!Array.isArray(projection?.candidates)
-              ||!projection.candidates.some((entry:any)=>entry?.candidateId===args.candidateId&&entry?.digest===args.digest)
-              ||!decision||decision.turn_id!==row.id||derivedToolName!==input.toolName
-              ||(decision.campaign_id!==null&&decision.campaign_id!==row.campaign_id)
-              ||(decision.session_id!==null&&decision.session_id!==candidate.session_id))
-              throw new AdventureTurnConflictError(`adventure ${kind} proposal is not bound to an advertised lane candidate`);
-            if(!policy.requiresConfirmation)throw new AdventureTurnConflictError(`adventure ${kind} proposal requires confirmation`);
-            db.prepare(`INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,origin,
-              provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,'lane',NULL,NULL,?,?,?)`)
-              .run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,kind,laneDecisionId,executionKey,at);
-          }else{
-            const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=?
+            const batch =
+              candidate &&
+              (db
+                .prepare(
+                  "SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?",
+                )
+                .get(candidate.batch_id) as any);
+            let projection: any = null;
+            try {
+              projection = batch && JSON.parse(batch.projection_json);
+            } catch {
+              projection = null;
+            }
+            const decision = db
+              .prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?")
+              .get(laneDecisionId) as any;
+            let publicValue: any = null;
+            try {
+              publicValue = candidate && JSON.parse(candidate.public_json);
+            } catch {
+              publicValue = null;
+            }
+            const derivedToolName =
+              kind === "rest"
+                ? publicValue?.restKind === "short"
+                  ? "rest_short"
+                  : publicValue?.restKind === "long"
+                    ? "rest_long"
+                    : null
+                : kind === "combat-consumable"
+                  ? "combat_consumable_use"
+                  : "combat_power_use";
+            if (
+              !candidate ||
+              candidate.action_kind !== kind ||
+              candidate.candidate_digest !== args.digest ||
+              !batch ||
+              sha256(batch.projection_json) !== batch.projection_digest ||
+              !Array.isArray(projection?.candidates) ||
+              !projection.candidates.some(
+                (entry: any) => entry?.candidateId === args.candidateId && entry?.digest === args.digest,
+              ) ||
+              !decision ||
+              decision.turn_id !== row.id ||
+              derivedToolName !== input.toolName ||
+              (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id) ||
+              (decision.session_id !== null && decision.session_id !== candidate.session_id)
+            )
+              throw new AdventureTurnConflictError(
+                `adventure ${kind} proposal is not bound to an advertised lane candidate`,
+              );
+            if (!policy.requiresConfirmation)
+              throw new AdventureTurnConflictError(`adventure ${kind} proposal requires confirmation`);
+            db.prepare(
+              `INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,origin,
+              provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,'lane',NULL,NULL,?,?,?)`,
+            ).run(
+              proposalId,
+              row.campaign_id,
+              row.id,
+              args.candidateId,
+              args.digest,
+              kind,
+              laneDecisionId,
+              executionKey,
+              at,
+            );
+          } else {
+            const response = db
+              .prepare(
+                `SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=?
               AND response.provider_call_id=? AND response.status='succeeded' AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call
                 WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')=?
-                  AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`)
-              .get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,kind==="power"?"exact_power_use.select":kind==="rest"?"exact_rest.select":kind==="combat-consumable"?"exact_combat_consumable.select":kind==="combat-power"?"exact_combat_power.select":kind==="progression"?"exact_progression_apply.select":"exact_quest_lifecycle.select",args.candidateId,args.digest);
-            if(!candidate||!response||candidate.action_kind!==kind||candidate.candidate_digest!==args.digest||!policy.requiresConfirmation)
-              throw new AdventureTurnConflictError("adventure action proposal is not bound to an exact provider candidate");
-            db.prepare(`INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,origin,
-              provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,'provider',?,?,NULL,?,?)`)
-              .run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,kind,args.providerCallId,args.providerToolCallId,executionKey,at);
+                  AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`,
+              )
+              .get(
+                row.campaign_id,
+                row.id,
+                args.providerCallId,
+                args.providerToolCallId,
+                kind === "power"
+                  ? "exact_power_use.select"
+                  : kind === "rest"
+                    ? "exact_rest.select"
+                    : kind === "combat-consumable"
+                      ? "exact_combat_consumable.select"
+                      : kind === "combat-power"
+                        ? "exact_combat_power.select"
+                        : kind === "progression"
+                          ? "exact_progression_apply.select"
+                          : "exact_quest_lifecycle.select",
+                args.candidateId,
+                args.digest,
+              );
+            if (
+              !candidate ||
+              !response ||
+              candidate.action_kind !== kind ||
+              candidate.candidate_digest !== args.digest ||
+              !policy.requiresConfirmation
+            )
+              throw new AdventureTurnConflictError(
+                "adventure action proposal is not bound to an exact provider candidate",
+              );
+            db.prepare(
+              `INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,origin,
+              provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,'provider',?,?,NULL,?,?)`,
+            ).run(
+              proposalId,
+              row.campaign_id,
+              row.id,
+              args.candidateId,
+              args.digest,
+              kind,
+              args.providerCallId,
+              args.providerToolCallId,
+              executionKey,
+              at,
+            );
           }
-        }else if(commandType(input.toolName)==="combat_action"){
-         const args=input.arguments as Record<string,unknown>;
-           db.prepare(`INSERT INTO agent_combat_proposal_bindings_v39(proposal_id,campaign_id,turn_id,provider_call_id,provider_tool_call_id,encounter_id,legal_action_id,command_legal_action_id,legal_action_digest,expected_combat_revision,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
-             .run(proposalId,row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.encounterId,args.legalActionId,args.commandLegalActionId,args.legalActionDigest,args.expectedCombatRevision,executionKey,at);
-           const response=db.prepare(`SELECT context.round_number FROM agent_provider_responses_v39 response JOIN agent_provider_contexts_v39 context
+        } else if (commandType(input.toolName) === "combat_action") {
+          const args = input.arguments as Record<string, unknown>;
+          db.prepare(
+            `INSERT INTO agent_combat_proposal_bindings_v39(proposal_id,campaign_id,turn_id,provider_call_id,provider_tool_call_id,encounter_id,legal_action_id,command_legal_action_id,legal_action_digest,expected_combat_revision,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+          ).run(
+            proposalId,
+            row.campaign_id,
+            row.id,
+            args.providerCallId,
+            args.providerToolCallId,
+            args.encounterId,
+            args.legalActionId,
+            args.commandLegalActionId,
+            args.legalActionDigest,
+            args.expectedCombatRevision,
+            executionKey,
+            at,
+          );
+          const response = db
+            .prepare(
+              `SELECT context.round_number FROM agent_provider_responses_v39 response JOIN agent_provider_contexts_v39 context
              ON context.context_id=response.context_id AND context.campaign_id=response.campaign_id AND context.turn_id=response.turn_id
                AND context.provider_call_id=response.provider_call_id
-             WHERE response.campaign_id=? AND response.provider_call_id=? AND response.turn_id=? AND response.status='succeeded'`)
-             .get(row.campaign_id,args.providerCallId,row.id) as {round_number:number}|undefined;
-          if(!response)throw new AdventureTurnConflictError("combat mutation lacks durable provider response");
-          db.prepare(`INSERT INTO agent_mutation_accounting_v40 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id(),row.campaign_id,row.id,proposalId,
-            args.providerCallId,args.providerToolCallId,response.round_number,"combat_action.execute",createHash("sha256").update(canonicalAgentJson(input.arguments as never)).digest("hex"),at);
-       }else db.prepare(`INSERT INTO tool_proposal_execution_bindings_v37(proposal_id,campaign_id,turn_id,execution_idempotency_key,
-         command_type,source_turn_id,timeline_id,actor_id,bound_at) VALUES(?,?,?,?,?,?,?,?,?)`)
-         .run(proposalId, row.campaign_id, row.id, executionKey, commandType(input.toolName), row.id, row.timeline_id, row.actor_id, at);
-       physicalAdvance(row, row.state==="mechanics-committed"?"mechanics-committed":"proposed", "none", at);
-      return finish("turn", row, principalId, "proposal-append", input, input.expectedTurnRevision, "proposed", "none", at, () => privateTurn(principalId, row.id));
-    }); },
+             WHERE response.campaign_id=? AND response.provider_call_id=? AND response.turn_id=? AND response.status='succeeded'`,
+            )
+            .get(row.campaign_id, args.providerCallId, row.id) as { round_number: number } | undefined;
+          if (!response) throw new AdventureTurnConflictError("combat mutation lacks durable provider response");
+          db.prepare(`INSERT INTO agent_mutation_accounting_v40 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+            id(),
+            row.campaign_id,
+            row.id,
+            proposalId,
+            args.providerCallId,
+            args.providerToolCallId,
+            response.round_number,
+            "combat_action.execute",
+            createHash("sha256")
+              .update(canonicalAgentJson(input.arguments as never))
+              .digest("hex"),
+            at,
+          );
+        } else
+          db.prepare(
+            `INSERT INTO tool_proposal_execution_bindings_v37(proposal_id,campaign_id,turn_id,execution_idempotency_key,
+         command_type,source_turn_id,timeline_id,actor_id,bound_at) VALUES(?,?,?,?,?,?,?,?,?)`,
+          ).run(
+            proposalId,
+            row.campaign_id,
+            row.id,
+            executionKey,
+            commandType(input.toolName),
+            row.id,
+            row.timeline_id,
+            row.actor_id,
+            at,
+          );
+        physicalAdvance(row, row.state === "mechanics-committed" ? "mechanics-committed" : "proposed", "none", at);
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "proposal-append",
+          input,
+          input.expectedTurnRevision,
+          "proposed",
+          "none",
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
     appendAdventureRestProposalFromLane(principalId, raw) {
       const input = laneProposalInputSchema.parse(raw);
       return immediate(() => {
-        const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-        const candidate = db.prepare(`SELECT candidate_id,candidate_digest,action_kind,public_json,session_id,batch_id
-          FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?`).get(input.candidateId, row.id) as any;
-        const batch = candidate && db.prepare("SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?")
-          .get(candidate.batch_id) as any;
-        let projection: any = null; try { projection = batch && JSON.parse(batch.projection_json); } catch { projection = null; }
-        let publicValue: any = null; try { publicValue = candidate && JSON.parse(candidate.public_json); } catch { publicValue = null; }
-        const decision = db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(input.decisionId) as any;
-        if (!candidate || candidate.action_kind !== "rest" || candidate.candidate_digest !== input.digest || !batch
-          || sha256(batch.projection_json) !== batch.projection_digest || !Array.isArray(projection?.candidates)
-          || !projection.candidates.some((entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest)
-          || !decision || decision.turn_id !== row.id
-          || (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id)
-          || (decision.session_id !== null && decision.session_id !== candidate.session_id))
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const candidate = db
+          .prepare(
+            `SELECT candidate_id,candidate_digest,action_kind,public_json,session_id,batch_id
+          FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?`,
+          )
+          .get(input.candidateId, row.id) as any;
+        const batch =
+          candidate &&
+          (db
+            .prepare(
+              "SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?",
+            )
+            .get(candidate.batch_id) as any);
+        let projection: any = null;
+        try {
+          projection = batch && JSON.parse(batch.projection_json);
+        } catch {
+          projection = null;
+        }
+        let publicValue: any = null;
+        try {
+          publicValue = candidate && JSON.parse(candidate.public_json);
+        } catch {
+          publicValue = null;
+        }
+        const decision = db
+          .prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?")
+          .get(input.decisionId) as any;
+        if (
+          !candidate ||
+          candidate.action_kind !== "rest" ||
+          candidate.candidate_digest !== input.digest ||
+          !batch ||
+          sha256(batch.projection_json) !== batch.projection_digest ||
+          !Array.isArray(projection?.candidates) ||
+          !projection.candidates.some(
+            (entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest,
+          ) ||
+          !decision ||
+          decision.turn_id !== row.id ||
+          (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id) ||
+          (decision.session_id !== null && decision.session_id !== candidate.session_id)
+        )
           throw new AdventureTurnConflictError("adventure rest proposal is not bound to an advertised lane candidate");
-        const existing = db.prepare("SELECT binding.* FROM adventure_exact_action_proposal_bindings_v56 binding WHERE binding.campaign_id=? AND binding.turn_id=?")
+        const existing = db
+          .prepare(
+            "SELECT binding.* FROM adventure_exact_action_proposal_bindings_v56 binding WHERE binding.campaign_id=? AND binding.turn_id=?",
+          )
           .get(row.campaign_id, row.id) as any;
         if (existing) {
-          if (existing.origin === "lane" && existing.system_one_decision_id === input.decisionId
-            && existing.candidate_id === input.candidateId && existing.candidate_digest === input.digest)
+          if (
+            existing.origin === "lane" &&
+            existing.system_one_decision_id === input.decisionId &&
+            existing.candidate_id === input.candidateId &&
+            existing.candidate_digest === input.digest
+          )
             return privateTurn(principalId, row.id);
           throw new AdventureTurnConflictError("adventure rest proposal replay changed");
         }
         const restKind = publicValue?.restKind;
-        if (restKind !== "short" && restKind !== "long") throw new AdventureTurnConflictError("adventure rest candidate is unavailable");
+        if (restKind !== "short" && restKind !== "long")
+          throw new AdventureTurnConflictError("adventure rest candidate is unavailable");
         // The single shared proposal implementation derives the confirmation policy, writes the
         // origin='lane' binding through its rest branch, and advances the turn to `proposed`.
         return repository.appendToolProposal(principalId, {
           turnId: input.turnId,
           toolName: restKind === "short" ? "rest_short" : "rest_long",
-          arguments: { candidateId: input.candidateId, digest: input.digest, systemOneDecisionId: input.decisionId,
-            restName: publicValue.restName, recovery: publicValue.recovery },
+          arguments: {
+            candidateId: input.candidateId,
+            digest: input.digest,
+            systemOneDecisionId: input.decisionId,
+            restName: publicValue.restName,
+            recovery: publicValue.recovery,
+          },
           requiresConfirmation: true,
-          confirmationExpiresAt: utcIsoTimestampSchema.parse(new Date(context.clock.now().getTime() + 30 * 60_000).toISOString()),
+          confirmationExpiresAt: utcIsoTimestampSchema.parse(
+            new Date(context.clock.now().getTime() + 30 * 60_000).toISOString(),
+          ),
           expectedTurnRevision: input.expectedTurnRevision,
           expectedCampaignRevision: input.expectedCampaignRevision,
           idempotencyKey: input.idempotencyKey,
@@ -551,29 +1326,74 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     appendAdventureCombatProposalFromLane(principalId, raw) {
       const input = laneProposalInputSchema.parse(raw);
       return immediate(() => {
-        const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-        const candidate = db.prepare(`SELECT candidate_id,candidate_digest,action_kind,public_json,private_json,session_id,batch_id
-          FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?`).get(input.candidateId, row.id) as any;
-        const batch = candidate && db.prepare("SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?")
-          .get(candidate.batch_id) as any;
-        let projection: any = null; try { projection = batch && JSON.parse(batch.projection_json); } catch { projection = null; }
-        let publicValue: any = null; try { publicValue = candidate && JSON.parse(candidate.public_json); } catch { publicValue = null; }
-        let privateValue: any = null; try { privateValue = candidate && JSON.parse(candidate.private_json); } catch { privateValue = null; }
-        const decision = db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(input.decisionId) as any;
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const candidate = db
+          .prepare(
+            `SELECT candidate_id,candidate_digest,action_kind,public_json,private_json,session_id,batch_id
+          FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?`,
+          )
+          .get(input.candidateId, row.id) as any;
+        const batch =
+          candidate &&
+          (db
+            .prepare(
+              "SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?",
+            )
+            .get(candidate.batch_id) as any);
+        let projection: any = null;
+        try {
+          projection = batch && JSON.parse(batch.projection_json);
+        } catch {
+          projection = null;
+        }
+        let publicValue: any = null;
+        try {
+          publicValue = candidate && JSON.parse(candidate.public_json);
+        } catch {
+          publicValue = null;
+        }
+        let privateValue: any = null;
+        try {
+          privateValue = candidate && JSON.parse(candidate.private_json);
+        } catch {
+          privateValue = null;
+        }
+        const decision = db
+          .prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?")
+          .get(input.decisionId) as any;
         const actionKind = candidate?.action_kind;
         const combatKind = actionKind === "combat-consumable" || actionKind === "combat-power";
-        if (!candidate || !combatKind || candidate.candidate_digest !== input.digest || !batch
-          || sha256(batch.projection_json) !== batch.projection_digest || !Array.isArray(projection?.candidates)
-          || !projection.candidates.some((entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest)
-          || !decision || decision.turn_id !== row.id
-          || (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id)
-          || (decision.session_id !== null && decision.session_id !== candidate.session_id))
-          throw new AdventureTurnConflictError("adventure combat proposal is not bound to an advertised lane candidate");
-        const existing = db.prepare("SELECT binding.* FROM adventure_exact_action_proposal_bindings_v56 binding WHERE binding.campaign_id=? AND binding.turn_id=?")
+        if (
+          !candidate ||
+          !combatKind ||
+          candidate.candidate_digest !== input.digest ||
+          !batch ||
+          sha256(batch.projection_json) !== batch.projection_digest ||
+          !Array.isArray(projection?.candidates) ||
+          !projection.candidates.some(
+            (entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest,
+          ) ||
+          !decision ||
+          decision.turn_id !== row.id ||
+          (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id) ||
+          (decision.session_id !== null && decision.session_id !== candidate.session_id)
+        )
+          throw new AdventureTurnConflictError(
+            "adventure combat proposal is not bound to an advertised lane candidate",
+          );
+        const existing = db
+          .prepare(
+            "SELECT binding.* FROM adventure_exact_action_proposal_bindings_v56 binding WHERE binding.campaign_id=? AND binding.turn_id=?",
+          )
           .get(row.campaign_id, row.id) as any;
         if (existing) {
-          if (existing.origin === "lane" && existing.system_one_decision_id === input.decisionId
-            && existing.candidate_id === input.candidateId && existing.candidate_digest === input.digest)
+          if (
+            existing.origin === "lane" &&
+            existing.system_one_decision_id === input.decisionId &&
+            existing.candidate_id === input.candidateId &&
+            existing.candidate_digest === input.digest
+          )
             return privateTurn(principalId, row.id);
           throw new AdventureTurnConflictError("adventure combat proposal replay changed");
         }
@@ -586,23 +1406,40 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
           ? ["1 action", `consume ${publicValue?.quantity} ${publicValue?.itemName}`]
           : ["1 action", ...(Array.isArray(publicValue?.costs) ? publicValue.costs : [])];
         const exactConsequences = Array.isArray(publicValue?.consequences);
-        if (typeof powerName !== "string" || !powerName || typeof publicValue?.target !== "string" || !publicValue.target
-          || !exactConsequences || (consumable && (!Number.isSafeInteger(publicValue?.quantity) || publicValue.quantity < 1))
-          || typeof privateValue?.encounterId !== "string" || !privateValue.encounterId
-          || !Number.isSafeInteger(privateValue?.expectedCombatRevision))
+        if (
+          typeof powerName !== "string" ||
+          !powerName ||
+          typeof publicValue?.target !== "string" ||
+          !publicValue.target ||
+          !exactConsequences ||
+          (consumable && (!Number.isSafeInteger(publicValue?.quantity) || publicValue.quantity < 1)) ||
+          typeof privateValue?.encounterId !== "string" ||
+          !privateValue.encounterId ||
+          !Number.isSafeInteger(privateValue?.expectedCombatRevision)
+        )
           throw new AdventureTurnConflictError("adventure combat candidate is unavailable");
         // The single shared proposal implementation derives the confirmation policy, writes the
         // origin='lane' binding through its exact-action branch, and advances the turn to `proposed`.
         return repository.appendToolProposal(principalId, {
           turnId: input.turnId,
           toolName: consumable ? "combat_consumable_use" : "combat_power_use",
-          arguments: { candidateId: input.candidateId, digest: input.digest, systemOneDecisionId: input.decisionId,
-            powerName, powerTargets: [publicValue.target], powerCosts,
-            ...(consumable ? { combatConsumableConsequences: publicValue.consequences }
+          arguments: {
+            candidateId: input.candidateId,
+            digest: input.digest,
+            systemOneDecisionId: input.decisionId,
+            powerName,
+            powerTargets: [publicValue.target],
+            powerCosts,
+            ...(consumable
+              ? { combatConsumableConsequences: publicValue.consequences }
               : { combatPowerConsequences: publicValue.consequences }),
-            encounterId: privateValue.encounterId, expectedCombatRevision: privateValue.expectedCombatRevision },
+            encounterId: privateValue.encounterId,
+            expectedCombatRevision: privateValue.expectedCombatRevision,
+          },
           requiresConfirmation: true,
-          confirmationExpiresAt: utcIsoTimestampSchema.parse(new Date(context.clock.now().getTime() + 30 * 60_000).toISOString()),
+          confirmationExpiresAt: utcIsoTimestampSchema.parse(
+            new Date(context.clock.now().getTime() + 30 * 60_000).toISOString(),
+          ),
           expectedTurnRevision: input.expectedTurnRevision,
           expectedCampaignRevision: input.expectedCampaignRevision,
           idempotencyKey: input.idempotencyKey,
@@ -612,34 +1449,76 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     appendAdventureCommerceProposalFromLane(principalId, raw) {
       const input = laneProposalInputSchema.parse(raw);
       return immediate(() => {
-        const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-        const candidate = db.prepare(`SELECT candidate_id,candidate_digest,action,public_json,session_id,batch_id
-          FROM adventure_commerce_candidates_v57 WHERE candidate_id=? AND turn_id=?`).get(input.candidateId, row.id) as any;
-        const batch = candidate && db.prepare("SELECT projection_json,projection_digest FROM adventure_commerce_batches_v57 WHERE batch_id=?")
-          .get(candidate.batch_id) as any;
-        let projection: any = null; try { projection = batch && JSON.parse(batch.projection_json); } catch { projection = null; }
-        let publicValue: any = null; try { publicValue = candidate && JSON.parse(candidate.public_json); } catch { publicValue = null; }
-        const decision = db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(input.decisionId) as any;
-        if (!candidate || candidate.candidate_digest !== input.digest || !batch
-          || sha256(batch.projection_json) !== batch.projection_digest || !Array.isArray(projection?.candidates)
-          || !projection.candidates.some((entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest)
-          || !decision || decision.turn_id !== row.id
-          || (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id)
-          || (decision.session_id !== null && decision.session_id !== candidate.session_id))
-          throw new AdventureTurnConflictError("adventure commerce proposal is not bound to an advertised lane candidate");
-        const existing = db.prepare("SELECT binding.* FROM adventure_commerce_bindings_v57 binding WHERE binding.campaign_id=? AND binding.turn_id=?")
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const candidate = db
+          .prepare(
+            `SELECT candidate_id,candidate_digest,action,public_json,session_id,batch_id
+          FROM adventure_commerce_candidates_v57 WHERE candidate_id=? AND turn_id=?`,
+          )
+          .get(input.candidateId, row.id) as any;
+        const batch =
+          candidate &&
+          (db
+            .prepare("SELECT projection_json,projection_digest FROM adventure_commerce_batches_v57 WHERE batch_id=?")
+            .get(candidate.batch_id) as any);
+        let projection: any = null;
+        try {
+          projection = batch && JSON.parse(batch.projection_json);
+        } catch {
+          projection = null;
+        }
+        let publicValue: any = null;
+        try {
+          publicValue = candidate && JSON.parse(candidate.public_json);
+        } catch {
+          publicValue = null;
+        }
+        const decision = db
+          .prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?")
+          .get(input.decisionId) as any;
+        if (
+          !candidate ||
+          candidate.candidate_digest !== input.digest ||
+          !batch ||
+          sha256(batch.projection_json) !== batch.projection_digest ||
+          !Array.isArray(projection?.candidates) ||
+          !projection.candidates.some(
+            (entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest,
+          ) ||
+          !decision ||
+          decision.turn_id !== row.id ||
+          (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id) ||
+          (decision.session_id !== null && decision.session_id !== candidate.session_id)
+        )
+          throw new AdventureTurnConflictError(
+            "adventure commerce proposal is not bound to an advertised lane candidate",
+          );
+        const existing = db
+          .prepare(
+            "SELECT binding.* FROM adventure_commerce_bindings_v57 binding WHERE binding.campaign_id=? AND binding.turn_id=?",
+          )
           .get(row.campaign_id, row.id) as any;
         if (existing) {
-          if (existing.origin === "lane" && existing.system_one_decision_id === input.decisionId
-            && existing.candidate_id === input.candidateId && existing.candidate_digest === input.digest)
+          if (
+            existing.origin === "lane" &&
+            existing.system_one_decision_id === input.decisionId &&
+            existing.candidate_id === input.candidateId &&
+            existing.candidate_digest === input.digest
+          )
             return privateTurn(principalId, row.id);
           throw new AdventureTurnConflictError("adventure commerce proposal replay changed");
         }
         const action = candidate.action;
-        if ((action !== "buy" && action !== "sell" && action !== "give")
-          || typeof publicValue?.vendorLabel !== "string" || !publicValue.vendorLabel
-          || typeof publicValue?.itemLabel !== "string" || !publicValue.itemLabel
-          || !Number.isSafeInteger(publicValue?.quantity) || publicValue.quantity < 1)
+        if (
+          (action !== "buy" && action !== "sell" && action !== "give") ||
+          typeof publicValue?.vendorLabel !== "string" ||
+          !publicValue.vendorLabel ||
+          typeof publicValue?.itemLabel !== "string" ||
+          !publicValue.itemLabel ||
+          !Number.isSafeInteger(publicValue?.quantity) ||
+          publicValue.quantity < 1
+        )
           throw new AdventureTurnConflictError("adventure commerce candidate is unavailable");
         // The advertised candidate owns every mechanical field; the lane proposal mirrors the
         // provider path's exact argument shape minus its provider evidence. The single shared
@@ -648,249 +1527,841 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         return repository.appendToolProposal(principalId, {
           turnId: input.turnId,
           toolName: `vendor_${action}`,
-          arguments: { candidateId: input.candidateId, digest: input.digest, systemOneDecisionId: input.decisionId,
-            vendorLabel: publicValue.vendorLabel, shopLabel: publicValue.shopLabel, itemLabel: publicValue.itemLabel,
-            itemQuantity: publicValue.quantity, itemRecipient: publicValue.vendorLabel, commerceAction: action,
-            currencyLabel: publicValue.currencyLabel, priceMinorUnits: publicValue.priceMinorUnits,
-            commerceConsequence: publicValue.consequence },
+          arguments: {
+            candidateId: input.candidateId,
+            digest: input.digest,
+            systemOneDecisionId: input.decisionId,
+            vendorLabel: publicValue.vendorLabel,
+            shopLabel: publicValue.shopLabel,
+            itemLabel: publicValue.itemLabel,
+            itemQuantity: publicValue.quantity,
+            itemRecipient: publicValue.vendorLabel,
+            commerceAction: action,
+            currencyLabel: publicValue.currencyLabel,
+            priceMinorUnits: publicValue.priceMinorUnits,
+            commerceConsequence: publicValue.consequence,
+          },
           requiresConfirmation: true,
-          confirmationExpiresAt: utcIsoTimestampSchema.parse(new Date(context.clock.now().getTime() + 30 * 60_000).toISOString()),
+          confirmationExpiresAt: utcIsoTimestampSchema.parse(
+            new Date(context.clock.now().getTime() + 30 * 60_000).toISOString(),
+          ),
           expectedTurnRevision: input.expectedTurnRevision,
           expectedCampaignRevision: input.expectedCampaignRevision,
           idempotencyKey: input.idempotencyKey,
         });
       });
     },
-    waitForToolConfirmation(principalId, raw) { const input = turnMutationInputSchema.parse(raw); return immediate(() => {
-      const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-      const old = replay("turn", row, principalId, "confirmation-wait", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
-      const current = stale("turn", row, input.expectedTurnRevision); if (current.resulting_state !== "proposed" || !db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
-        AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`).get(row.campaign_id, row.id))
-        throw new AdventureTurnConflictError("no proposal is waiting for confirmation");
-      const at = now(); physicalAdvance(row, row.state==="mechanics-committed"?"mechanics-committed":"awaiting-confirmation", "none", at);
-      return finish("turn", row, principalId, "confirmation-wait", input, input.expectedTurnRevision, "awaiting-confirmation", "none", at, () => privateTurn(principalId, row.id));
-    }); },
-    decideToolProposal(principalId, raw) { const input = decideToolProposalInputSchema.parse(raw); return immediate(() => {
-      const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-      const old = replay("turn", row, principalId, "confirmation-decision", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
-      const current = stale("turn", row, input.expectedTurnRevision); if (current.resulting_state !== "awaiting-confirmation") throw new AdventureTurnConflictError("turn is not waiting for confirmation");
-        const proposal = db.prepare(`SELECT proposal.*,policy.required_authorizer,policy.policy_version,policy.category,
+    waitForToolConfirmation(principalId, raw) {
+      const input = turnMutationInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "confirmation-wait",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (
+          current.resulting_state !== "proposed" ||
+          !db
+            .prepare(
+              `SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
+        AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`,
+            )
+            .get(row.campaign_id, row.id)
+        )
+          throw new AdventureTurnConflictError("no proposal is waiting for confirmation");
+        const at = now();
+        physicalAdvance(
+          row,
+          row.state === "mechanics-committed" ? "mechanics-committed" : "awaiting-confirmation",
+          "none",
+          at,
+        );
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "confirmation-wait",
+          input,
+          input.expectedTurnRevision,
+          "awaiting-confirmation",
+          "none",
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
+    decideToolProposal(principalId, raw) {
+      const input = decideToolProposalInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "confirmation-decision",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (current.resulting_state !== "awaiting-confirmation")
+          throw new AdventureTurnConflictError("turn is not waiting for confirmation");
+        const proposal = db
+          .prepare(
+            `SELECT proposal.*,policy.required_authorizer,policy.policy_version,policy.category,
           policy.requires_confirmation policy_requires_confirmation,policy.proposed_command_digest,policy.observed_domain_revisions_json FROM tool_proposals proposal
          JOIN confirmation_policy_attestations_v40 policy ON policy.campaign_id=proposal.campaign_id
            AND policy.turn_id=proposal.turn_id AND policy.proposal_id=proposal.proposal_id
-         WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.proposal_id=? AND proposal.requires_confirmation=1`)
-         .get(row.campaign_id, row.id, input.proposalId) as any;
-       if (!proposal || proposal.confirmation_expires_at !== input.expiresAt || proposal.policy_version!=="v1"
-         || !proposal.policy_requires_confirmation) throw new AdventureTurnConflictError("confirmation proposal, policy, or expiry does not match");
-       const at = now(); if (at >= input.expiresAt) throw new AdventureTurnExpiredError("confirmation expired");
-       const decisionRole=(db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
-         .get(row.campaign_id,principalId) as {role:string}).role;
-       if(proposal.required_authorizer==="gm"&&decisionRole!=="owner"&&decisionRole!=="gm")
-         throw new AdventureTurnAuthorizationError("owner or GM confirmation is required");
-      if (db.prepare("SELECT 1 FROM confirmation_decisions WHERE campaign_id=? AND turn_id=? AND proposal_id=?").get(row.campaign_id, row.id, input.proposalId))
-        throw new AdventureTurnConflictError("proposal already has a decision");
-       const decisionId=id();attestConfirmationAuthority(row,proposal,principalId,decisionId,input.decision,at);
-       db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
-         VALUES(?,?,?,?,?,?,?,?,?,?)`).run(decisionId, row.campaign_id, row.id, input.proposalId, principalId, input.decision, row.revision, input.idempotencyKey, input.expiresAt, at);
-      const pending = db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
-        AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`).get(row.campaign_id, row.id);
-      let state = "awaiting-confirmation", physicalState = "awaiting-confirmation";
-      if (!pending) { const approved = approvedProposals(row); state = approved.length > 0 ? "confirmed" : "cancelled";
-        physicalState = approved.length > 0 ? "mechanics-committed" : "cancelled"; }
-      physicalAdvance(row, physicalState, "none", at);
-      return finish("turn", row, principalId, "confirmation-decision", input, input.expectedTurnRevision, state, "none", at, () => privateTurn(principalId, row.id));
-    }); },
+         WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.proposal_id=? AND proposal.requires_confirmation=1`,
+          )
+          .get(row.campaign_id, row.id, input.proposalId) as any;
+        if (
+          !proposal ||
+          proposal.confirmation_expires_at !== input.expiresAt ||
+          proposal.policy_version !== "v1" ||
+          !proposal.policy_requires_confirmation
+        )
+          throw new AdventureTurnConflictError("confirmation proposal, policy, or expiry does not match");
+        const at = now();
+        if (at >= input.expiresAt) throw new AdventureTurnExpiredError("confirmation expired");
+        const decisionRole = (
+          db
+            .prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+            .get(row.campaign_id, principalId) as { role: string }
+        ).role;
+        if (proposal.required_authorizer === "gm" && decisionRole !== "owner" && decisionRole !== "gm")
+          throw new AdventureTurnAuthorizationError("owner or GM confirmation is required");
+        if (
+          db
+            .prepare("SELECT 1 FROM confirmation_decisions WHERE campaign_id=? AND turn_id=? AND proposal_id=?")
+            .get(row.campaign_id, row.id, input.proposalId)
+        )
+          throw new AdventureTurnConflictError("proposal already has a decision");
+        const decisionId = id();
+        attestConfirmationAuthority(row, proposal, principalId, decisionId, input.decision, at);
+        db.prepare(
+          `INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?)`,
+        ).run(
+          decisionId,
+          row.campaign_id,
+          row.id,
+          input.proposalId,
+          principalId,
+          input.decision,
+          row.revision,
+          input.idempotencyKey,
+          input.expiresAt,
+          at,
+        );
+        const pending = db
+          .prepare(
+            `SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
+        AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`,
+          )
+          .get(row.campaign_id, row.id);
+        let state = "awaiting-confirmation",
+          physicalState = "awaiting-confirmation";
+        if (!pending) {
+          const approved = approvedProposals(row);
+          state = approved.length > 0 ? "confirmed" : "cancelled";
+          physicalState = approved.length > 0 ? "mechanics-committed" : "cancelled";
+        }
+        physicalAdvance(row, physicalState, "none", at);
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "confirmation-decision",
+          input,
+          input.expectedTurnRevision,
+          state,
+          "none",
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
     decideToolProposals(principalId, raw) {
       const parsed = decideToolProposalsInputSchema.parse(raw);
       const input = { ...parsed, proposalIds: [...parsed.proposalIds].sort() };
       return immediate(() => {
-        const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-        const old = replay("turn", row, principalId, "confirmation-decisions", input, input.expectedTurnRevision, privateAdventureTurnSchema);
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "confirmation-decisions",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
         if (old) return old;
         const current = stale("turn", row, input.expectedTurnRevision);
-        if (current.resulting_state !== "awaiting-confirmation") throw new AdventureTurnConflictError("turn is not waiting for confirmation");
+        if (current.resulting_state !== "awaiting-confirmation")
+          throw new AdventureTurnConflictError("turn is not waiting for confirmation");
         const at = now();
-        const selected = input.proposalIds.map((proposalId) => db.prepare(`SELECT proposal.*,policy.required_authorizer,policy.policy_version,
+        const selected = input.proposalIds.map(
+          (proposalId) =>
+            db
+              .prepare(
+                `SELECT proposal.*,policy.required_authorizer,policy.policy_version,
           policy.category,policy.requires_confirmation policy_requires_confirmation,policy.proposed_command_digest,policy.observed_domain_revisions_json,
           decision.decision_id FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision
             ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
           JOIN confirmation_policy_attestations_v40 policy ON policy.proposal_id=proposal.proposal_id
-          WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.proposal_id=? AND proposal.requires_confirmation=1`)
-          .get(row.campaign_id, row.id, proposalId) as any);
+          WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.proposal_id=? AND proposal.requires_confirmation=1`,
+              )
+              .get(row.campaign_id, row.id, proposalId) as any,
+        );
         // Validate the complete batch before the first immutable decision row is inserted.
-        if (selected.some((proposal, index) => !proposal || proposal.proposal_id !== input.proposalIds[index]
-            || proposal.decision_id || !proposal.confirmation_expires_at)) {
+        if (
+          selected.some(
+            (proposal, index) =>
+              !proposal ||
+              proposal.proposal_id !== input.proposalIds[index] ||
+              proposal.decision_id ||
+              !proposal.confirmation_expires_at,
+          )
+        ) {
           throw new AdventureTurnConflictError("confirmation proposal set does not match durable pending state");
         }
-        if (selected.some((proposal) => at >= proposal.confirmation_expires_at)) throw new AdventureTurnExpiredError("confirmation expired");
-        const role=(db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(row.campaign_id,principalId) as {role:string}).role;
-        if(selected.some((proposal)=>proposal.required_authorizer==="gm"&&role!=="owner"&&role!=="gm"))
+        if (selected.some((proposal) => at >= proposal.confirmation_expires_at))
+          throw new AdventureTurnExpiredError("confirmation expired");
+        const role = (
+          db
+            .prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+            .get(row.campaign_id, principalId) as { role: string }
+        ).role;
+        if (selected.some((proposal) => proposal.required_authorizer === "gm" && role !== "owner" && role !== "gm"))
           throw new AdventureTurnAuthorizationError("owner or GM confirmation is required");
         for (const proposal of selected) {
           const decisionKey = `batch:${createHash("sha256").update(`${input.idempotencyKey}\0${proposal.proposal_id}`).digest("hex").slice(0, 48)}`;
-          const decisionId=id();attestConfirmationAuthority(row,proposal,principalId,decisionId,input.decision,at);
-          db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
-            VALUES(?,?,?,?,?,?,?,?,?,?)`).run(decisionId, row.campaign_id, row.id, proposal.proposal_id, principalId, input.decision,
-              input.expectedTurnRevision, decisionKey, proposal.confirmation_expires_at, at);
+          const decisionId = id();
+          attestConfirmationAuthority(row, proposal, principalId, decisionId, input.decision, at);
+          db.prepare(
+            `INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?)`,
+          ).run(
+            decisionId,
+            row.campaign_id,
+            row.id,
+            proposal.proposal_id,
+            principalId,
+            input.decision,
+            input.expectedTurnRevision,
+            decisionKey,
+            proposal.confirmation_expires_at,
+            at,
+          );
         }
-        const pending = db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=?
+        const pending = db
+          .prepare(
+            `SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=?
           AND proposal.requires_confirmation=1 AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision
-            WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`)
+            WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`,
+          )
           .get(row.campaign_id, row.id);
-        let state = "awaiting-confirmation", physicalState = "awaiting-confirmation";
+        let state = "awaiting-confirmation",
+          physicalState = "awaiting-confirmation";
         if (!pending) {
-          const approved = approvedProposals(row); state = approved.length > 0 ? "confirmed" : "cancelled";
+          const approved = approvedProposals(row);
+          state = approved.length > 0 ? "confirmed" : "cancelled";
           physicalState = approved.length > 0 ? "mechanics-committed" : "cancelled";
         }
         physicalAdvance(row, physicalState, "none", at);
-        return finish("turn", row, principalId, "confirmation-decisions", input, input.expectedTurnRevision, state, "none", at,
-          () => privateTurn(principalId, row.id));
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "confirmation-decisions",
+          input,
+          input.expectedTurnRevision,
+          state,
+          "none",
+          at,
+          () => privateTurn(principalId, row.id),
+        );
       });
     },
-    expireToolProposals(principalId, raw) { const input=turnMutationInputSchema.parse(raw); return immediate(()=>{
-      const row=turn(input.turnId);authority(principalId,row,input.expectedCampaignRevision,"turn");
-      const old=replay("turn",row,principalId,"confirmation-expiration",input,input.expectedTurnRevision,privateAdventureTurnSchema);if(old)return old;
-      const current=stale("turn",row,input.expectedTurnRevision);if(current.resulting_state!=="awaiting-confirmation")throw new AdventureTurnConflictError("turn is not waiting for confirmation");
-      const at=now();const due=db.prepare(`SELECT proposal.*,policy.required_authorizer,policy.policy_version,policy.category,
+    expireToolProposals(principalId, raw) {
+      const input = turnMutationInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "confirmation-expiration",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (current.resulting_state !== "awaiting-confirmation")
+          throw new AdventureTurnConflictError("turn is not waiting for confirmation");
+        const at = now();
+        const due = db
+          .prepare(
+            `SELECT proposal.*,policy.required_authorizer,policy.policy_version,policy.category,
         policy.requires_confirmation policy_requires_confirmation,policy.proposed_command_digest,policy.observed_domain_revisions_json
         FROM tool_proposals proposal JOIN confirmation_policy_attestations_v40 policy ON policy.campaign_id=proposal.campaign_id
           AND policy.turn_id=proposal.turn_id AND policy.proposal_id=proposal.proposal_id WHERE proposal.campaign_id=? AND proposal.turn_id=?
         AND proposal.requires_confirmation=1 AND proposal.confirmation_expires_at<=? AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision
           WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)
-        ORDER BY proposal.proposal_id`).all(row.campaign_id,row.id,at) as any[];
-      if(!due.length)throw new AdventureTurnConflictError("no confirmation is due for expiration");
-      for(const proposal of due){const decisionId=id();attestConfirmationAuthority(row,proposal,principalId,decisionId,"expired",at);
-        db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,
-          expected_turn_revision,idempotency_key,expires_at,decided_at) VALUES(?,?,?,?,?,'expired',?,?,?,?)`).run(decisionId,row.campaign_id,row.id,proposal.proposal_id,
-            principalId,input.expectedTurnRevision,`expiry:${createHash("sha256").update(`${input.idempotencyKey}\0${proposal.proposal_id}`).digest("hex").slice(0,48)}`,proposal.confirmation_expires_at,at);}
-      const pending=Boolean(db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
-        AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`).get(row.campaign_id,row.id));
-      const approved=approvedProposals(row);const state=pending?"awaiting-confirmation":approved.length?"confirmed":"cancelled";
-      physicalAdvance(row,state==="confirmed"?"mechanics-committed":state,"none",at);
-      db.prepare(`INSERT INTO confirmation_expiration_operations_v40 VALUES(?,?,?,?,?,?,?,?,?)`).run(id(),row.campaign_id,row.id,principalId,input.idempotencyKey,
-        input.expectedTurnRevision,input.expectedTurnRevision+1,canonicalAgentJson(due.map((proposal)=>proposal.proposal_id)),at);
-      return finish("turn",row,principalId,"confirmation-expiration",input,input.expectedTurnRevision,state,"none",at,()=>privateTurn(principalId,row.id));
-    }); },
-    replanAgentProposal(principalId,input){return immediate(()=>{
-      const row=turn(input.turnId);authority(principalId,row,input.expectedCampaignRevision,"turn");
-      const old=replay("turn",row,principalId,"agent-replan",input,input.expectedTurnRevision,privateAdventureTurnSchema);if(old)return old;
-      const current=stale("turn",row,input.expectedTurnRevision);
-      if(["completed","cancelled","failed"].includes(current.resulting_state))throw new AdventureTurnConflictError("terminal turn cannot replan");
-      const requirement=db.prepare("SELECT reason FROM agent_replan_requirements_v40 WHERE campaign_id=? AND turn_id=? AND proposal_id=?")
-        .get(row.campaign_id,row.id,input.proposalId) as {reason:string}|undefined;
-      if(!requirement||requirement.reason!==input.reason)throw new AdventureTurnConflictError("durable replan requirement is unavailable");
-      const at=now();physicalAdvance(row,row.state,"none",at);
-      return finish("turn",row,principalId,"agent-replan",input,input.expectedTurnRevision,"declared","none",at,()=>privateTurn(principalId,row.id));
-    });},
-    recordProviderCallStart(principalId, raw) { const input = providerCallStartInputSchema.parse(raw); return immediate(() => {
-      const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "provider");
-      const old = replay("turn", row, principalId, "provider-start", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
-      const current = stale("turn", row, input.expectedTurnRevision); if (!["declared", "proposed", "awaiting-confirmation", "confirmed", "mechanics-committed", "narrating"].includes(current.resulting_state)) throw new AdventureTurnConflictError("provider start is illegal in this state");
-      const run = db.prepare("SELECT max_provider_calls FROM adventure_agent_executions_v38 WHERE campaign_id=? AND turn_id=?")
-        .get(row.campaign_id, row.id) as { max_provider_calls: number } | undefined;
-      if (!run) throw new AdventureTurnUnavailableError("durable execution is unavailable");
-      const starts = (db.prepare("SELECT count(*) count FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND phase='started'")
-        .get(row.campaign_id, row.id) as { count: number }).count;
-      if (starts >= run.max_provider_calls || db.prepare("SELECT 1 FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=?")
-        .get(row.campaign_id, row.id, input.callId)) throw new AdventureTurnConflictError("provider call identity or bound is invalid");
-      const at = now(); db.prepare(`INSERT INTO provider_call_metadata(record_id,campaign_id,turn_id,call_id,phase,provider,model,attempt,prompt_tokens,completion_tokens,outcome_code,idempotency_key,recorded_at)
-        VALUES(?,?,?,?,'started',?,?,?,NULL,NULL,NULL,?,?)`).run(id(), row.campaign_id, row.id, input.callId, input.provider, input.model, input.attempt, input.idempotencyKey, at);
-      const narrating = current.resulting_state === "mechanics-committed" || current.resulting_state === "narrating";
-      const state = narrating ? "narrating" : current.resulting_state, narration = narrating ? "in-progress" : current.narration_status;
-      physicalAdvance(row, narrating ? "narrating" : row.state, narration, at);
-      return finish("turn", row, principalId, "provider-start", input, input.expectedTurnRevision, state,
-        narration, at, () => privateTurn(principalId, row.id));
-    }); },
-    recordProviderCallOutcome(principalId, raw) { const input = providerCallOutcomeInputSchema.parse(raw); return immediate(() => {
-      const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "provider");
-      const old = replay("turn", row, principalId, "provider-outcome", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
-      const current = stale("turn", row, input.expectedTurnRevision); if (!["declared", "proposed", "awaiting-confirmation", "confirmed", "narrating"].includes(current.resulting_state)) throw new AdventureTurnConflictError("provider outcome is illegal in this state");
-      const start = db.prepare("SELECT * FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=? AND phase='started'").get(row.campaign_id, row.id, input.callId) as any;
-      if (!start || start.provider !== input.provider || start.model !== input.model || start.attempt !== input.attempt || db.prepare("SELECT 1 FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=? AND phase<>'started'").get(row.campaign_id, row.id, input.callId))
-        throw new AdventureTurnConflictError("provider outcome does not match its immutable start");
-      const at = now(); db.prepare(`INSERT INTO provider_call_metadata(record_id,campaign_id,turn_id,call_id,phase,provider,model,attempt,prompt_tokens,completion_tokens,outcome_code,idempotency_key,recorded_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, input.callId, input.outcome, input.provider, input.model, input.attempt,
-          input.promptTokens ?? null, input.completionTokens ?? null, input.outcomeCode, input.idempotencyKey, at);
-      const failedNarration = current.resulting_state === "narrating" && input.outcome !== "succeeded";
-      const narration = failedNarration ? "failed" : current.narration_status;
-      physicalAdvance(row, row.state, narration, at);
-      return finish("turn", row, principalId, "provider-outcome", input, input.expectedTurnRevision, current.resulting_state,
-        narration, at, () => privateTurn(principalId, row.id));
-    }); },
-    linkFinalMechanicsReceipt(principalId, raw) { const input = linkTurnReceiptInputSchema.parse(raw); return immediate(() => {
-      const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-      const old = replay("turn", row, principalId, "mechanics-link", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
-      const current = stale("turn", row, input.expectedTurnRevision); if (row.mode !== "original" || !["proposed", "confirmed", "mechanics-committed"].includes(current.resulting_state)) throw new AdventureTurnConflictError("turn cannot link mechanics");
-      if (!approvedProposals(row).some((proposal) => proposal.proposal_id === input.proposalId)) throw new AdventureTurnConflictError("proposal is not approved");
-      const at = now(); insertMechanicsLink(row, input.proposalId, input.commandId, at);
-      const state = mechanicsState(row); physicalAdvance(row, "mechanics-committed", state === "mechanics-committed" ? "pending" : "none", at);
-      return finish("turn", row, principalId, "mechanics-link", input, input.expectedTurnRevision, state, state === "mechanics-committed" ? "pending" : "none", at, () => privateTurn(principalId, row.id));
-    }); },
-    reconcileAdventureTurnMechanics(principalId, raw) { const input = turnMutationInputSchema.parse(raw); return immediate(() => {
-      const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-      const old = replay("turn", row, principalId, "mechanics-reconcile", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
-      const current = stale("turn", row, input.expectedTurnRevision); if (row.mode !== "original" || !["proposed", "confirmed", "mechanics-committed"].includes(current.resulting_state)) throw new AdventureTurnConflictError("turn cannot reconcile mechanics");
-      const at = now(), linked = reconcile(row, at); if (linked === 0) throw new AdventureTurnConflictError("no unlinked source-turn command receipts exist");
-      const state = mechanicsState(row); physicalAdvance(row, "mechanics-committed", state === "mechanics-committed" ? "pending" : "none", at);
-      return finish("turn", row, principalId, "mechanics-reconcile", input, input.expectedTurnRevision, state, state === "mechanics-committed" ? "pending" : "none", at, () => privateTurn(principalId, row.id));
-    }); },
-    updateAdventureTurnNarration(principalId, raw) { const input = updateTurnNarrationInputSchema.parse(raw); return immediate(() => {
-      const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
-      const old = replay("turn", row, principalId, "narration-update", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
-      const current = stale("turn", row, input.expectedTurnRevision), at = now();
-      if (input.terminalState === "cancelled" && row.mode === "original") reconcile(row, at);
-       const rootRow = root(row); const hasMechanics = hasDurableMechanics(rootRow);
-      const hasProposals = Boolean(db.prepare("SELECT 1 FROM tool_proposals WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
-      const deterministicFallback = row.mode === "original" && !hasProposals;
-      const narrationDerivative = row.mode !== "original";
-      let state = input.terminalState ?? current.resulting_state;
-      if (input.terminalState === "completed" && (current.resulting_state !== "narrating" || (!hasMechanics && !deterministicFallback && !narrationDerivative))) throw new AdventureTurnConflictError("only committed, derivative, or deterministic fallback narration can complete");
-      if (!input.terminalState && input.narrationStatus !== "none") {
-        if (!hasMechanics && !deterministicFallback && !narrationDerivative) throw new AdventureTurnConflictError("narration requires committed mechanics, a derivative, or an empty fallback turn"); state = "narrating";
-      }
-      if (input.terminalState === "cancelled" && !hasMechanics) {
-        const commandExists = db.prepare("SELECT 1 FROM campaign_commands WHERE campaign_id=? AND source_turn_id=?").get(row.campaign_id, rootRow.id);
-        if (commandExists) throw new AdventureTurnConflictError("precommit cancellation cannot leave source-turn commands");
-      }
-      const physicalState = state === "confirmed" ? "mechanics-committed" : state;
-      physicalAdvance(row, physicalState, input.narrationStatus, at);
-      return finish("turn", row, principalId, "narration-update", input, input.expectedTurnRevision, state, input.narrationStatus, at, () => privateTurn(principalId, row.id));
-    }); },
-    createGenerationDraft(principalId, raw) { const input = createGenerationDraftInputSchema.parse(raw); return immediate(() => {
-      const synthetic = { campaign_id: input.campaignId, timeline_id: input.timelineId, session_id: input.sessionId ?? null };
-      authority(principalId, synthetic, input.expectedCampaignRevision, "draft");
-      const existing = db.prepare(`SELECT aggregate_id FROM adventure_coordination_commands_v36 WHERE aggregate_kind='draft' AND campaign_id=?
-        AND idempotency_key=? AND mutation_type='draft-create'`).get(input.campaignId, input.idempotencyKey) as any;
-      if (existing) { const row = draft(existing.aggregate_id); const old = replay("draft", row, principalId, "draft-create", input, -1, privateGenerationDraftSchema); if (old) return old; }
-      const content = stagedGenerationContentSchema.parse(input.stagedContent), validation = generationDraftValidationSchema.parse(input.validation), at = now();
-      const row = { id: id(), campaign_id: input.campaignId, revision: 0 } as any;
-      db.prepare(`INSERT INTO generation_drafts(id,campaign_id,timeline_id,session_id,principal_id,kind,staged_content_json,validation_json,state,revision,campaign_revision,idempotency_key,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,'staged',0,?,?,?,?)`).run(row.id, input.campaignId, input.timelineId, input.sessionId ?? null, principalId,
-          input.kind, canonical(content), canonical(validation), input.expectedCampaignRevision, input.idempotencyKey, at, at);
-      return finish("draft", row, principalId, "draft-create", input, -1, "staged", null, at, () => privateDraft(principalId, row.id));
-    }); },
-    reviewGenerationDraft(principalId, raw) { const input = reviewGenerationDraftInputSchema.parse(raw); return immediate(() => {
-      const row = draft(input.draftId); authority(principalId, row, input.expectedCampaignRevision, "draft");
-      const old = replay("draft", row, principalId, "draft-review", input, input.expectedDraftRevision, privateGenerationDraftSchema); if (old) return old;
-      const current = stale("draft", row, input.expectedDraftRevision); if (current.resulting_state !== "staged") throw new AdventureTurnConflictError("only staged drafts can be reviewed");
-      const at = now();
-      db.prepare(`INSERT INTO review_decisions(decision_id,campaign_id,draft_id,principal_id,decision,notes,expected_draft_revision,idempotency_key,decided_at)
-        VALUES(?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, principalId, input.decision, input.notes ?? null, row.revision, input.idempotencyKey, at);
-      db.prepare("UPDATE generation_drafts SET state=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?").run(input.decision, at, row.id, row.revision); row.revision += 1;
-      return finish("draft", row, principalId, "draft-review", input, input.expectedDraftRevision, input.decision, null, at, () => privateDraft(principalId, row.id));
-    }); },
-    applyGenerationDraft(principalId, raw) { const input = applyGenerationDraftInputSchema.parse(raw); return immediate(() => {
-      const row = draft(input.draftId); authority(principalId, row, input.expectedCampaignRevision, "draft");
-      const old = replay("draft", row, principalId, "draft-apply", input, input.expectedDraftRevision, privateGenerationDraftSchema); if (old) return old;
-      const current = stale("draft", row, input.expectedDraftRevision); if (current.resulting_state !== "approved") throw new AdventureTurnConflictError("only approved drafts can be applied");
-      const review = db.prepare("SELECT * FROM review_decisions WHERE campaign_id=? AND draft_id=? AND decision='approved'").get(row.campaign_id, row.id) as any;
-      if (!review) throw new AdventureTurnConflictError("approved review provenance is missing");
-      const at = now(); db.prepare(`INSERT INTO generation_draft_apply_receipts_v36(receipt_id,campaign_id,draft_id,review_decision_id,principal_id,
-        expected_draft_revision,resulting_draft_revision,result_json,applied_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id,
-          review.decision_id, principalId, input.expectedDraftRevision, input.expectedDraftRevision + 1, canonical(input.result), at);
-      db.prepare("UPDATE generation_drafts SET state='applied',revision=revision+1,updated_at=? WHERE id=? AND revision=?").run(at, row.id, row.revision); row.revision += 1;
-      return finish("draft", row, principalId, "draft-apply", input, input.expectedDraftRevision, "applied", null, at, () => privateDraft(principalId, row.id));
-    }); },
+        ORDER BY proposal.proposal_id`,
+          )
+          .all(row.campaign_id, row.id, at) as any[];
+        if (!due.length) throw new AdventureTurnConflictError("no confirmation is due for expiration");
+        for (const proposal of due) {
+          const decisionId = id();
+          attestConfirmationAuthority(row, proposal, principalId, decisionId, "expired", at);
+          db.prepare(
+            `INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,
+          expected_turn_revision,idempotency_key,expires_at,decided_at) VALUES(?,?,?,?,?,'expired',?,?,?,?)`,
+          ).run(
+            decisionId,
+            row.campaign_id,
+            row.id,
+            proposal.proposal_id,
+            principalId,
+            input.expectedTurnRevision,
+            `expiry:${createHash("sha256").update(`${input.idempotencyKey}\0${proposal.proposal_id}`).digest("hex").slice(0, 48)}`,
+            proposal.confirmation_expires_at,
+            at,
+          );
+        }
+        const pending = Boolean(
+          db
+            .prepare(
+              `SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
+        AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`,
+            )
+            .get(row.campaign_id, row.id),
+        );
+        const approved = approvedProposals(row);
+        const state = pending ? "awaiting-confirmation" : approved.length ? "confirmed" : "cancelled";
+        physicalAdvance(row, state === "confirmed" ? "mechanics-committed" : state, "none", at);
+        db.prepare(`INSERT INTO confirmation_expiration_operations_v40 VALUES(?,?,?,?,?,?,?,?,?)`).run(
+          id(),
+          row.campaign_id,
+          row.id,
+          principalId,
+          input.idempotencyKey,
+          input.expectedTurnRevision,
+          input.expectedTurnRevision + 1,
+          canonicalAgentJson(due.map((proposal) => proposal.proposal_id)),
+          at,
+        );
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "confirmation-expiration",
+          input,
+          input.expectedTurnRevision,
+          state,
+          "none",
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
+    replanAgentProposal(principalId, input) {
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "agent-replan",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (["completed", "cancelled", "failed"].includes(current.resulting_state))
+          throw new AdventureTurnConflictError("terminal turn cannot replan");
+        const requirement = db
+          .prepare(
+            "SELECT reason FROM agent_replan_requirements_v40 WHERE campaign_id=? AND turn_id=? AND proposal_id=?",
+          )
+          .get(row.campaign_id, row.id, input.proposalId) as { reason: string } | undefined;
+        if (!requirement || requirement.reason !== input.reason)
+          throw new AdventureTurnConflictError("durable replan requirement is unavailable");
+        const at = now();
+        physicalAdvance(row, row.state, "none", at);
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "agent-replan",
+          input,
+          input.expectedTurnRevision,
+          "declared",
+          "none",
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
+    recordProviderCallStart(principalId, raw) {
+      const input = providerCallStartInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "provider");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "provider-start",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (
+          !["declared", "proposed", "awaiting-confirmation", "confirmed", "mechanics-committed", "narrating"].includes(
+            current.resulting_state,
+          )
+        )
+          throw new AdventureTurnConflictError("provider start is illegal in this state");
+        const run = db
+          .prepare("SELECT max_provider_calls FROM adventure_agent_executions_v38 WHERE campaign_id=? AND turn_id=?")
+          .get(row.campaign_id, row.id) as { max_provider_calls: number } | undefined;
+        if (!run) throw new AdventureTurnUnavailableError("durable execution is unavailable");
+        const starts = (
+          db
+            .prepare(
+              "SELECT count(*) count FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND phase='started'",
+            )
+            .get(row.campaign_id, row.id) as { count: number }
+        ).count;
+        if (
+          starts >= run.max_provider_calls ||
+          db
+            .prepare("SELECT 1 FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=?")
+            .get(row.campaign_id, row.id, input.callId)
+        )
+          throw new AdventureTurnConflictError("provider call identity or bound is invalid");
+        const at = now();
+        db.prepare(
+          `INSERT INTO provider_call_metadata(record_id,campaign_id,turn_id,call_id,phase,provider,model,attempt,prompt_tokens,completion_tokens,outcome_code,idempotency_key,recorded_at)
+        VALUES(?,?,?,?,'started',?,?,?,NULL,NULL,NULL,?,?)`,
+        ).run(
+          id(),
+          row.campaign_id,
+          row.id,
+          input.callId,
+          input.provider,
+          input.model,
+          input.attempt,
+          input.idempotencyKey,
+          at,
+        );
+        const narrating = current.resulting_state === "mechanics-committed" || current.resulting_state === "narrating";
+        const state = narrating ? "narrating" : current.resulting_state,
+          narration = narrating ? "in-progress" : current.narration_status;
+        physicalAdvance(row, narrating ? "narrating" : row.state, narration, at);
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "provider-start",
+          input,
+          input.expectedTurnRevision,
+          state,
+          narration,
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
+    recordProviderCallOutcome(principalId, raw) {
+      const input = providerCallOutcomeInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "provider");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "provider-outcome",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (
+          !["declared", "proposed", "awaiting-confirmation", "confirmed", "narrating"].includes(current.resulting_state)
+        )
+          throw new AdventureTurnConflictError("provider outcome is illegal in this state");
+        const start = db
+          .prepare(
+            "SELECT * FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=? AND phase='started'",
+          )
+          .get(row.campaign_id, row.id, input.callId) as any;
+        if (
+          !start ||
+          start.provider !== input.provider ||
+          start.model !== input.model ||
+          start.attempt !== input.attempt ||
+          db
+            .prepare(
+              "SELECT 1 FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=? AND phase<>'started'",
+            )
+            .get(row.campaign_id, row.id, input.callId)
+        )
+          throw new AdventureTurnConflictError("provider outcome does not match its immutable start");
+        const at = now();
+        db.prepare(
+          `INSERT INTO provider_call_metadata(record_id,campaign_id,turn_id,call_id,phase,provider,model,attempt,prompt_tokens,completion_tokens,outcome_code,idempotency_key,recorded_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        ).run(
+          id(),
+          row.campaign_id,
+          row.id,
+          input.callId,
+          input.outcome,
+          input.provider,
+          input.model,
+          input.attempt,
+          input.promptTokens ?? null,
+          input.completionTokens ?? null,
+          input.outcomeCode,
+          input.idempotencyKey,
+          at,
+        );
+        const failedNarration = current.resulting_state === "narrating" && input.outcome !== "succeeded";
+        const narration = failedNarration ? "failed" : current.narration_status;
+        physicalAdvance(row, row.state, narration, at);
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "provider-outcome",
+          input,
+          input.expectedTurnRevision,
+          current.resulting_state,
+          narration,
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
+    linkFinalMechanicsReceipt(principalId, raw) {
+      const input = linkTurnReceiptInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "mechanics-link",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (
+          row.mode !== "original" ||
+          !["proposed", "confirmed", "mechanics-committed"].includes(current.resulting_state)
+        )
+          throw new AdventureTurnConflictError("turn cannot link mechanics");
+        if (!approvedProposals(row).some((proposal) => proposal.proposal_id === input.proposalId))
+          throw new AdventureTurnConflictError("proposal is not approved");
+        const at = now();
+        insertMechanicsLink(row, input.proposalId, input.commandId, at);
+        const state = mechanicsState(row);
+        physicalAdvance(row, "mechanics-committed", state === "mechanics-committed" ? "pending" : "none", at);
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "mechanics-link",
+          input,
+          input.expectedTurnRevision,
+          state,
+          state === "mechanics-committed" ? "pending" : "none",
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
+    reconcileAdventureTurnMechanics(principalId, raw) {
+      const input = turnMutationInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "mechanics-reconcile",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (
+          row.mode !== "original" ||
+          !["proposed", "confirmed", "mechanics-committed"].includes(current.resulting_state)
+        )
+          throw new AdventureTurnConflictError("turn cannot reconcile mechanics");
+        const at = now(),
+          linked = reconcile(row, at);
+        if (linked === 0) throw new AdventureTurnConflictError("no unlinked source-turn command receipts exist");
+        const state = mechanicsState(row);
+        physicalAdvance(row, "mechanics-committed", state === "mechanics-committed" ? "pending" : "none", at);
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "mechanics-reconcile",
+          input,
+          input.expectedTurnRevision,
+          state,
+          state === "mechanics-committed" ? "pending" : "none",
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
+    updateAdventureTurnNarration(principalId, raw) {
+      const input = updateTurnNarrationInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId);
+        authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay(
+          "turn",
+          row,
+          principalId,
+          "narration-update",
+          input,
+          input.expectedTurnRevision,
+          privateAdventureTurnSchema,
+        );
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision),
+          at = now();
+        if (input.terminalState === "cancelled" && row.mode === "original") reconcile(row, at);
+        const rootRow = root(row);
+        const hasMechanics = hasDurableMechanics(rootRow);
+        const hasProposals = Boolean(
+          db.prepare("SELECT 1 FROM tool_proposals WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id),
+        );
+        const deterministicFallback = row.mode === "original" && !hasProposals;
+        const narrationDerivative = row.mode !== "original";
+        let state = input.terminalState ?? current.resulting_state;
+        if (
+          input.terminalState === "completed" &&
+          (current.resulting_state !== "narrating" || (!hasMechanics && !deterministicFallback && !narrationDerivative))
+        )
+          throw new AdventureTurnConflictError(
+            "only committed, derivative, or deterministic fallback narration can complete",
+          );
+        if (!input.terminalState && input.narrationStatus !== "none") {
+          if (!hasMechanics && !deterministicFallback && !narrationDerivative)
+            throw new AdventureTurnConflictError(
+              "narration requires committed mechanics, a derivative, or an empty fallback turn",
+            );
+          state = "narrating";
+        }
+        if (input.terminalState === "cancelled" && !hasMechanics) {
+          const commandExists = db
+            .prepare("SELECT 1 FROM campaign_commands WHERE campaign_id=? AND source_turn_id=?")
+            .get(row.campaign_id, rootRow.id);
+          if (commandExists)
+            throw new AdventureTurnConflictError("precommit cancellation cannot leave source-turn commands");
+        }
+        const physicalState = state === "confirmed" ? "mechanics-committed" : state;
+        physicalAdvance(row, physicalState, input.narrationStatus, at);
+        return finish(
+          "turn",
+          row,
+          principalId,
+          "narration-update",
+          input,
+          input.expectedTurnRevision,
+          state,
+          input.narrationStatus,
+          at,
+          () => privateTurn(principalId, row.id),
+        );
+      });
+    },
+    createGenerationDraft(principalId, raw) {
+      const input = createGenerationDraftInputSchema.parse(raw);
+      return immediate(() => {
+        const synthetic = {
+          campaign_id: input.campaignId,
+          timeline_id: input.timelineId,
+          session_id: input.sessionId ?? null,
+        };
+        authority(principalId, synthetic, input.expectedCampaignRevision, "draft");
+        const existing = db
+          .prepare(
+            `SELECT aggregate_id FROM adventure_coordination_commands_v36 WHERE aggregate_kind='draft' AND campaign_id=?
+        AND idempotency_key=? AND mutation_type='draft-create'`,
+          )
+          .get(input.campaignId, input.idempotencyKey) as any;
+        if (existing) {
+          const row = draft(existing.aggregate_id);
+          const old = replay("draft", row, principalId, "draft-create", input, -1, privateGenerationDraftSchema);
+          if (old) return old;
+        }
+        const content = stagedGenerationContentSchema.parse(input.stagedContent),
+          validation = generationDraftValidationSchema.parse(input.validation),
+          at = now();
+        const row = { id: id(), campaign_id: input.campaignId, revision: 0 } as any;
+        db.prepare(
+          `INSERT INTO generation_drafts(id,campaign_id,timeline_id,session_id,principal_id,kind,staged_content_json,validation_json,state,revision,campaign_revision,idempotency_key,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,'staged',0,?,?,?,?)`,
+        ).run(
+          row.id,
+          input.campaignId,
+          input.timelineId,
+          input.sessionId ?? null,
+          principalId,
+          input.kind,
+          canonical(content),
+          canonical(validation),
+          input.expectedCampaignRevision,
+          input.idempotencyKey,
+          at,
+          at,
+        );
+        return finish("draft", row, principalId, "draft-create", input, -1, "staged", null, at, () =>
+          privateDraft(principalId, row.id),
+        );
+      });
+    },
+    reviewGenerationDraft(principalId, raw) {
+      const input = reviewGenerationDraftInputSchema.parse(raw);
+      return immediate(() => {
+        const row = draft(input.draftId);
+        authority(principalId, row, input.expectedCampaignRevision, "draft");
+        const old = replay(
+          "draft",
+          row,
+          principalId,
+          "draft-review",
+          input,
+          input.expectedDraftRevision,
+          privateGenerationDraftSchema,
+        );
+        if (old) return old;
+        const current = stale("draft", row, input.expectedDraftRevision);
+        if (current.resulting_state !== "staged")
+          throw new AdventureTurnConflictError("only staged drafts can be reviewed");
+        const at = now();
+        db.prepare(
+          `INSERT INTO review_decisions(decision_id,campaign_id,draft_id,principal_id,decision,notes,expected_draft_revision,idempotency_key,decided_at)
+        VALUES(?,?,?,?,?,?,?,?,?)`,
+        ).run(
+          id(),
+          row.campaign_id,
+          row.id,
+          principalId,
+          input.decision,
+          input.notes ?? null,
+          row.revision,
+          input.idempotencyKey,
+          at,
+        );
+        db.prepare(
+          "UPDATE generation_drafts SET state=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?",
+        ).run(input.decision, at, row.id, row.revision);
+        row.revision += 1;
+        return finish(
+          "draft",
+          row,
+          principalId,
+          "draft-review",
+          input,
+          input.expectedDraftRevision,
+          input.decision,
+          null,
+          at,
+          () => privateDraft(principalId, row.id),
+        );
+      });
+    },
+    applyGenerationDraft(principalId, raw) {
+      const input = applyGenerationDraftInputSchema.parse(raw);
+      return immediate(() => {
+        const row = draft(input.draftId);
+        authority(principalId, row, input.expectedCampaignRevision, "draft");
+        const old = replay(
+          "draft",
+          row,
+          principalId,
+          "draft-apply",
+          input,
+          input.expectedDraftRevision,
+          privateGenerationDraftSchema,
+        );
+        if (old) return old;
+        const current = stale("draft", row, input.expectedDraftRevision);
+        if (current.resulting_state !== "approved")
+          throw new AdventureTurnConflictError("only approved drafts can be applied");
+        const review = db
+          .prepare("SELECT * FROM review_decisions WHERE campaign_id=? AND draft_id=? AND decision='approved'")
+          .get(row.campaign_id, row.id) as any;
+        if (!review) throw new AdventureTurnConflictError("approved review provenance is missing");
+        const at = now();
+        db.prepare(
+          `INSERT INTO generation_draft_apply_receipts_v36(receipt_id,campaign_id,draft_id,review_decision_id,principal_id,
+        expected_draft_revision,resulting_draft_revision,result_json,applied_at) VALUES(?,?,?,?,?,?,?,?,?)`,
+        ).run(
+          id(),
+          row.campaign_id,
+          row.id,
+          review.decision_id,
+          principalId,
+          input.expectedDraftRevision,
+          input.expectedDraftRevision + 1,
+          canonical(input.result),
+          at,
+        );
+        db.prepare(
+          "UPDATE generation_drafts SET state='applied',revision=revision+1,updated_at=? WHERE id=? AND revision=?",
+        ).run(at, row.id, row.revision);
+        row.revision += 1;
+        return finish(
+          "draft",
+          row,
+          principalId,
+          "draft-apply",
+          input,
+          input.expectedDraftRevision,
+          "applied",
+          null,
+          at,
+          () => privateDraft(principalId, row.id),
+        );
+      });
+    },
     // The encounter command is supplied by orchestration so this coordination
     // aggregate never fabricates domain writes or bypasses encounter authority.
     applyEncounterGenerationDraftAtomically() {

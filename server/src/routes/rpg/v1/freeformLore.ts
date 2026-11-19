@@ -53,61 +53,75 @@ const noneReasonSchema = z.enum([
 
 const boundingText = (max: number) => z.string().min(1).max(max);
 
-const candidateSchema = z.object({
-  candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  sourceNodeKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  clueKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  gmSecretKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  locationKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  title: boundingText(MAX_FREEFORM_LORE_SUBJECT_LENGTH),
-  publicText: boundingText(MAX_NARRATIVE_LENGTH),
-  gmSecret: boundingText(MAX_NARRATIVE_LENGTH),
-  templateId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  visibility: z.literal("public"),
-}).strict();
+const candidateSchema = z
+  .object({
+    candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    sourceNodeKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    clueKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    gmSecretKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    locationKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    title: boundingText(MAX_FREEFORM_LORE_SUBJECT_LENGTH),
+    publicText: boundingText(MAX_NARRATIVE_LENGTH),
+    gmSecret: boundingText(MAX_NARRATIVE_LENGTH),
+    templateId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    visibility: z.literal("public"),
+  })
+  .strict();
 
 const classificationSchema = z.discriminatedUnion("intent", [
-  z.object({
-    intent: z.literal("none"),
-    reason: noneReasonSchema,
-    title: boundingText(MAX_TITLE_LENGTH).optional(),
-  }).strict(),
-  z.object({
-    intent: z.literal("materialize-lore"),
-    subject: boundingText(MAX_FREEFORM_LORE_SUBJECT_LENGTH),
-    candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
-  }).strict(),
+  z
+    .object({
+      intent: z.literal("none"),
+      reason: noneReasonSchema,
+      title: boundingText(MAX_TITLE_LENGTH).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      intent: z.literal("materialize-lore"),
+      subject: boundingText(MAX_FREEFORM_LORE_SUBJECT_LENGTH),
+      candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
+    })
+    .strict(),
 ]);
 
 const materializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: noneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: z.object({
-      candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-      clueKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-      sourceNodeKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-      gmSecretKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-      title: boundingText(MAX_FREEFORM_LORE_SUBJECT_LENGTH),
-      visibility: z.literal("public"),
-    }).strict(),
-    clueId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-    sourceStoryNodeId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-    draftId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-    contentReceiptId: boundingText(MAX_ARTIFACT_KEY_LENGTH).nullable(),
-    gmSecretArtifactKey: boundingText(MAX_ARTIFACT_KEY_LENGTH).nullable(),
-  }).strict(),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: z
+        .object({
+          candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+          clueKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+          sourceNodeKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+          gmSecretKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+          title: boundingText(MAX_FREEFORM_LORE_SUBJECT_LENGTH),
+          visibility: z.literal("public"),
+        })
+        .strict(),
+      clueId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+      sourceStoryNodeId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+      draftId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+      contentReceiptId: boundingText(MAX_ARTIFACT_KEY_LENGTH).nullable(),
+      gmSecretArtifactKey: boundingText(MAX_ARTIFACT_KEY_LENGTH).nullable(),
+    })
+    .strict(),
 ]);
 
-const requestSchema = z.object({
-  text: boundingText(MAX_TEXT_LENGTH),
-  candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH).optional(),
-}).strict();
+const requestSchema = z
+  .object({
+    text: boundingText(MAX_TEXT_LENGTH),
+    candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH).optional(),
+  })
+  .strict();
 
-const responseSchema = z.object({
-  classification: classificationSchema,
-  materialization: materializationSchema.optional(),
-}).strict();
+const responseSchema = z
+  .object({
+    classification: classificationSchema,
+    materialization: materializationSchema.optional(),
+  })
+  .strict();
 
 export interface FreeformLoreHttpOptions {
   repositoryAccessor: () => FreeformLoreRepository;
@@ -130,13 +144,25 @@ function failure(error: unknown, request: FastifyRequest, reply: FastifyReply): 
     return unavailable(request, reply);
   }
   if (error instanceof FreeformLoreConflictError) {
-    return sendApiProblem(request, reply, 409, "RPG_FREEFORM_LORE_CONFLICT",
-      "Freeform lore conflicts with current state; refresh before retrying");
+    return sendApiProblem(
+      request,
+      reply,
+      409,
+      "RPG_FREEFORM_LORE_CONFLICT",
+      "Freeform lore conflicts with current state; refresh before retrying",
+    );
   }
-  request.log.error({ operation: "freeform-lore", method: request.method, route: request.routeOptions.url },
-    "freeform lore command failed");
-  return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR",
-    "Freeform lore outcome may be unknown; reconcile before retrying");
+  request.log.error(
+    { operation: "freeform-lore", method: request.method, route: request.routeOptions.url },
+    "freeform lore command failed",
+  );
+  return sendApiProblem(
+    request,
+    reply,
+    500,
+    "RPG_INTERNAL_ERROR",
+    "Freeform lore outcome may be unknown; reconcile before retrying",
+  );
 }
 
 export const freeformLoreHttpRoutes: FastifyPluginAsync<FreeformLoreHttpOptions> = async (app, options) => {
@@ -150,8 +176,17 @@ export const freeformLoreHttpRoutes: FastifyPluginAsync<FreeformLoreHttpOptions>
           await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
           return;
         }
-        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0) {
-          await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Freeform lore does not accept query parameters");
+        if (
+          (request.raw.url ?? request.url).includes("?") ||
+          Object.keys(request.query as Record<string, unknown>).length > 0
+        ) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Freeform lore does not accept query parameters",
+          );
           return;
         }
         if (Object.values(request.params).some((value) => !resourceIdSchema.safeParse(value).success)) {
@@ -160,7 +195,13 @@ export const freeformLoreHttpRoutes: FastifyPluginAsync<FreeformLoreHttpOptions>
         }
         const contentType = request.headers["content-type"];
         if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Freeform lore requires application/json");
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Freeform lore requires application/json",
+          );
         }
       },
       errorHandler: (_error, request, reply) =>
@@ -174,12 +215,24 @@ export const freeformLoreHttpRoutes: FastifyPluginAsync<FreeformLoreHttpOptions>
       try {
         const repository = options.repositoryAccessor();
         const { campaignId, sessionId, actorId } = request.params;
-        const classification = repository.classifyFreeformLoreIntent(PRINCIPAL, campaignId, sessionId, actorId, body.data.text);
+        const classification = repository.classifyFreeformLoreIntent(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.text,
+        );
         if (classification.intent === "none") {
           return reply.code(200).send(responseSchema.parse({ classification }));
         }
-        const materialization = repository.materializeFreeformLore(PRINCIPAL, campaignId, sessionId, actorId, body.data.text,
-          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {});
+        const materialization = repository.materializeFreeformLore(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.text,
+          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {},
+        );
         return reply.code(200).send(responseSchema.parse({ classification, materialization }));
       } catch (error) {
         return failure(error, request, reply);

@@ -119,7 +119,9 @@ function getCampaignCharacterWorkspaceSyncInternal(
   const targetId = resourceIdSchema.parse(campaignCharacterId);
   let row: CampaignCharacterWorkspaceRow | undefined;
   try {
-    row = db.prepare(`WITH authorized AS (
+    row = db
+      .prepare(
+        `WITH authorized AS (
       SELECT membership.campaign_id, membership.principal_id, membership.role, membership.created_at,
         campaign.owner_principal_id, campaign.owner_role
       FROM campaign_memberships membership
@@ -422,11 +424,13 @@ function getCampaignCharacterWorkspaceSyncInternal(
       ON background_definition.pack_id = sheet.background_pack_id
       AND background_definition.pack_version = sheet.background_pack_version
       AND background_definition.kind = sheet.background_kind
-      AND background_definition.definition_id = sheet.background_definition_id`).get({
-      actorId,
-      campaignId: id,
-      campaignCharacterId: targetId,
-    }) as CampaignCharacterWorkspaceRow | undefined;
+      AND background_definition.definition_id = sheet.background_definition_id`,
+      )
+      .get({
+        actorId,
+        campaignId: id,
+        campaignCharacterId: targetId,
+      }) as CampaignCharacterWorkspaceRow | undefined;
   } catch {
     return malformedCampaignCharacterWorkspace();
   }
@@ -445,51 +449,84 @@ function getCampaignCharacterWorkspaceSyncInternal(
       role: row.owner_membership_role,
       createdAt: row.owner_membership_created_at,
     });
-    if (authorization.campaignId !== id || authorization.principalId !== actorId
-      || row.campaign_owner_role !== "owner" || row.owner_role_count !== 1
-      || row.exact_owner_count !== 1 || row.owner_parent_id !== owner.principalId
-      || owner.campaignId !== id || owner.principalId !== row.campaign_owner_principal_id
-      || owner.role !== "owner") malformedCampaignCharacterWorkspace();
+    if (
+      authorization.campaignId !== id ||
+      authorization.principalId !== actorId ||
+      row.campaign_owner_role !== "owner" ||
+      row.owner_role_count !== 1 ||
+      row.exact_owner_count !== 1 ||
+      row.owner_parent_id !== owner.principalId ||
+      owner.campaignId !== id ||
+      owner.principalId !== row.campaign_owner_principal_id ||
+      owner.role !== "owner"
+    )
+      malformedCampaignCharacterWorkspace();
 
     // Authorization and its exact-owner invariant are validated before target
     // absence, while a missing or other-campaign target remains non-disclosing.
     if (row.campaign_character_id === null) return null;
-    if (row.campaign_character_id !== targetId || row.persona_count !== 1
-      || row.sheet_count !== 1 || row.actor_count !== 1 || row.private_state_count !== 1
-      || row.integrity_error_count !== 0
-      || row.race_pin_count !== 1 || row.background_pin_count !== 1
-      || row.race_definition_count !== 1 || row.background_definition_count !== 1) {
+    if (
+      row.campaign_character_id !== targetId ||
+      row.persona_count !== 1 ||
+      row.sheet_count !== 1 ||
+      row.actor_count !== 1 ||
+      row.private_state_count !== 1 ||
+      row.integrity_error_count !== 0 ||
+      row.race_pin_count !== 1 ||
+      row.background_pin_count !== 1 ||
+      row.race_definition_count !== 1 ||
+      row.background_definition_count !== 1
+    ) {
       return malformedCampaignCharacterWorkspace();
     }
 
     const campaignCharacter = campaignCharacterSchema.parse({
-      id: row.campaign_character_id, campaignId: row.requesting_campaign_id,
-      characterId: row.character_id, createdAt: row.campaign_character_created_at,
+      id: row.campaign_character_id,
+      campaignId: row.requesting_campaign_id,
+      characterId: row.character_id,
+      createdAt: row.campaign_character_created_at,
       updatedAt: row.campaign_character_updated_at,
     });
     const sheetId = resourceIdSchema.parse(row.sheet_id);
     const raceReference = definitionReferenceSchema.parse({
-      packId: row.race_pack_id, packVersion: row.race_pack_version,
-      kind: row.race_kind, definitionId: row.race_definition_id,
+      packId: row.race_pack_id,
+      packVersion: row.race_pack_version,
+      kind: row.race_kind,
+      definitionId: row.race_definition_id,
     });
     const backgroundReference = definitionReferenceSchema.parse({
-      packId: row.background_pack_id, packVersion: row.background_pack_version,
-      kind: row.background_kind, definitionId: row.background_definition_id,
+      packId: row.background_pack_id,
+      packVersion: row.background_pack_version,
+      kind: row.background_kind,
+      definitionId: row.background_definition_id,
     });
     const actorRecord = publicCampaignActorSchema.parse({
-      id: row.actor_id, campaignId: row.actor_campaign_id,
-      campaignCharacterId: row.actor_campaign_character_id, sheetId: row.actor_sheet_id,
-      kind: row.actor_kind, control: row.actor_control,
-      createdAt: row.actor_created_at, updatedAt: row.actor_updated_at,
+      id: row.actor_id,
+      campaignId: row.actor_campaign_id,
+      campaignCharacterId: row.actor_campaign_character_id,
+      sheetId: row.actor_sheet_id,
+      kind: row.actor_kind,
+      control: row.actor_control,
+      createdAt: row.actor_created_at,
+      updatedAt: row.actor_updated_at,
     });
-    if (row.sheet_campaign_id !== id || row.sheet_campaign_character_id !== targetId
-      || actorRecord.campaignId !== id || actorRecord.campaignCharacterId !== targetId
-      || actorRecord.sheetId !== sheetId) malformedCampaignCharacterWorkspace();
+    if (
+      row.sheet_campaign_id !== id ||
+      row.sheet_campaign_character_id !== targetId ||
+      actorRecord.campaignId !== id ||
+      actorRecord.campaignCharacterId !== targetId ||
+      actorRecord.sheetId !== sheetId
+    )
+      malformedCampaignCharacterWorkspace();
     const sheetCreatedAt = utcIsoTimestampSchema.parse(row.sheet_created_at);
     const sheetUpdatedAt = utcIsoTimestampSchema.parse(row.sheet_updated_at);
-    if (raceReference.kind !== "race" || backgroundReference.kind !== "background"
-      || campaignCharacter.updatedAt < campaignCharacter.createdAt
-      || sheetUpdatedAt < sheetCreatedAt || actorRecord.updatedAt < actorRecord.createdAt) {
+    if (
+      raceReference.kind !== "race" ||
+      backgroundReference.kind !== "background" ||
+      campaignCharacter.updatedAt < campaignCharacter.createdAt ||
+      sheetUpdatedAt < sheetCreatedAt ||
+      actorRecord.updatedAt < actorRecord.createdAt
+    ) {
       return malformedCampaignCharacterWorkspace();
     }
 
@@ -498,24 +535,36 @@ function getCampaignCharacterWorkspaceSyncInternal(
     const proficienciesRaw = parseWorkspaceJson(row.proficiencies);
     const choicesRaw = parseWorkspaceJson(row.choices);
     const resourcesRaw = parseWorkspaceJson(row.resources);
-    if (classesRaw.length < 1 || classesRaw.length > MAX_CHARACTER_CLASSES
-      || attributesRaw.length > MAX_CHARACTER_ATTRIBUTES
-      || proficienciesRaw.length > MAX_CHARACTER_PROFICIENCIES
-      || choicesRaw.length > MAX_CHARACTER_CHOICES
-      || resourcesRaw.length > MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES) {
+    if (
+      classesRaw.length < 1 ||
+      classesRaw.length > MAX_CHARACTER_CLASSES ||
+      attributesRaw.length > MAX_CHARACTER_ATTRIBUTES ||
+      proficienciesRaw.length > MAX_CHARACTER_PROFICIENCIES ||
+      choicesRaw.length > MAX_CHARACTER_CHOICES ||
+      resourcesRaw.length > MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES
+    ) {
       return malformedCampaignCharacterWorkspace();
     }
 
-    const positions = (entries: unknown[], maximum: number, project: (entry: Record<string, unknown>, index: number) => unknown) => {
+    const positions = (
+      entries: unknown[],
+      maximum: number,
+      project: (entry: Record<string, unknown>, index: number) => unknown,
+    ) => {
       const seen = new Set<number>();
       return entries.map((unknownEntry, index) => {
         if (unknownEntry === null || typeof unknownEntry !== "object" || Array.isArray(unknownEntry)) {
           return malformedCampaignCharacterWorkspace();
         }
         const entry = unknownEntry as Record<string, unknown>;
-        if (!Number.isSafeInteger(entry.position) || (entry.position as number) < 0
-          || (entry.position as number) >= maximum || seen.has(entry.position as number)
-          || entry.campaignId !== id || entry.sheetId !== sheetId) {
+        if (
+          !Number.isSafeInteger(entry.position) ||
+          (entry.position as number) < 0 ||
+          (entry.position as number) >= maximum ||
+          seen.has(entry.position as number) ||
+          entry.campaignId !== id ||
+          entry.sheetId !== sheetId
+        ) {
           return malformedCampaignCharacterWorkspace();
         }
         seen.add(entry.position as number);
@@ -527,14 +576,22 @@ function getCampaignCharacterWorkspaceSyncInternal(
     const classes = positions(classesRaw, MAX_CHARACTER_CLASSES, (entry) => {
       if (entry.pinCount !== 1 || entry.definitionCount !== 1) return malformedCampaignCharacterWorkspace();
       const value = campaignCharacterClassSchema.parse({
-        class: { packId: entry.packId, packVersion: entry.packVersion,
-          kind: entry.kind, definitionId: entry.definitionId }, level: entry.level,
+        class: {
+          packId: entry.packId,
+          packVersion: entry.packVersion,
+          kind: entry.kind,
+          definitionId: entry.definitionId,
+        },
+        level: entry.level,
       });
       const key = `${value.class.packId}\u0000${value.class.packVersion}\u0000${value.class.definitionId}`;
       if (classReferences.has(key)) return malformedCampaignCharacterWorkspace();
       classReferences.add(key);
-      return { name: campaignCharacterWorkspaceNameSchema.parse(entry.name),
-        description: campaignCharacterWorkspaceDescriptionSchema.parse(entry.description), level: entry.level };
+      return {
+        name: campaignCharacterWorkspaceNameSchema.parse(entry.name),
+        description: campaignCharacterWorkspaceDescriptionSchema.parse(entry.description),
+        level: entry.level,
+      };
     });
     const attributeIds = new Set<string>();
     const attributes = positions(attributesRaw, MAX_CHARACTER_ATTRIBUTES, (entry, index) => {
@@ -545,25 +602,37 @@ function getCampaignCharacterWorkspaceSyncInternal(
     });
     const proficiencyIds = new Set<string>();
     const proficiencies = positions(proficienciesRaw, MAX_CHARACTER_PROFICIENCIES, (entry, index) => {
-      const value = campaignCharacterProficiencySchema.parse({ category: entry.category,
-        proficiencyId: entry.proficiencyId });
+      const value = campaignCharacterProficiencySchema.parse({
+        category: entry.category,
+        proficiencyId: entry.proficiencyId,
+      });
       const key = `${value.category}\u0000${value.proficiencyId}`;
       if (proficiencyIds.has(key)) return malformedCampaignCharacterWorkspace();
       proficiencyIds.add(key);
-      return { category: value.category,
-        label: `${WORKSPACE_PROFICIENCY_PREFIX[value.category]} ${index + 1}` };
+      return { category: value.category, label: `${WORKSPACE_PROFICIENCY_PREFIX[value.category]} ${index + 1}` };
     });
     const choiceIds = new Set<string>();
     const choices = positions(choicesRaw, MAX_CHARACTER_CHOICES, (entry, index) => {
       if (entry.pinCount !== 1 || entry.definitionCount !== 1) return malformedCampaignCharacterWorkspace();
-      const value = resolvedCharacterChoiceSchema.parse({ choiceId: entry.choiceId,
-        selection: { packId: entry.packId, packVersion: entry.packVersion,
-          kind: entry.kind, definitionId: entry.definitionId } });
+      const value = resolvedCharacterChoiceSchema.parse({
+        choiceId: entry.choiceId,
+        selection: {
+          packId: entry.packId,
+          packVersion: entry.packVersion,
+          kind: entry.kind,
+          definitionId: entry.definitionId,
+        },
+      });
       if (choiceIds.has(value.choiceId)) return malformedCampaignCharacterWorkspace();
       choiceIds.add(value.choiceId);
-      return { label: `Choice ${index + 1}`, selection: { kind: value.selection.kind,
-        name: campaignCharacterWorkspaceNameSchema.parse(entry.name),
-        description: campaignCharacterWorkspaceDescriptionSchema.parse(entry.description) } };
+      return {
+        label: `Choice ${index + 1}`,
+        selection: {
+          kind: value.selection.kind,
+          name: campaignCharacterWorkspaceNameSchema.parse(entry.name),
+          description: campaignCharacterWorkspaceDescriptionSchema.parse(entry.description),
+        },
+      };
     });
     const seenResources = new Set<string>();
     const resources = resourcesRaw.map((unknownEntry, index) => {
@@ -571,20 +640,31 @@ function getCampaignCharacterWorkspaceSyncInternal(
         return malformedCampaignCharacterWorkspace();
       }
       const entry = unknownEntry as Record<string, unknown>;
-      const resource = actorResourceSchema.parse({ campaignId: entry.campaignId,
-        actorId: entry.actorId, name: entry.name, current: entry.current, max: entry.max });
-      if (resource.campaignId !== id || resource.actorId !== actorRecord.id
-        || seenResources.has(resource.name)) return malformedCampaignCharacterWorkspace();
+      const resource = actorResourceSchema.parse({
+        campaignId: entry.campaignId,
+        actorId: entry.actorId,
+        name: entry.name,
+        current: entry.current,
+        max: entry.max,
+      });
+      if (resource.campaignId !== id || resource.actorId !== actorRecord.id || seenResources.has(resource.name))
+        return malformedCampaignCharacterWorkspace();
       seenResources.add(resource.name);
       return { label: `Resource ${index + 1}`, current: resource.current, max: resource.max };
     });
 
-    const response = campaignCharacterWorkspaceResponseSchema.parse({ character: {
-      name: campaignCharacterWorkspaceNameSchema.parse(row.character_name),
-      race: { name: row.race_name, description: row.race_description },
-      background: { name: row.background_name, description: row.background_description },
-      classes, attributes, proficiencies, choices, resources,
-    } });
+    const response = campaignCharacterWorkspaceResponseSchema.parse({
+      character: {
+        name: campaignCharacterWorkspaceNameSchema.parse(row.character_name),
+        race: { name: row.race_name, description: row.race_description },
+        background: { name: row.background_name, description: row.background_description },
+        classes,
+        attributes,
+        proficiencies,
+        choices,
+        resources,
+      },
+    });
     if (campaignCharacter.campaignId !== id || campaignCharacter.id !== targetId) {
       return malformedCampaignCharacterWorkspace();
     }
@@ -597,12 +677,7 @@ function getCampaignCharacterWorkspaceSyncInternal(
 
 export function createCampaignCharacterWorkspaceRepository(db: DatabaseDriver.Database) {
   return {
-    getCampaignCharacterWorkspace: (
-      actorPrincipalId: string,
-      campaignId: string,
-      campaignCharacterId: string,
-    ) => getCampaignCharacterWorkspaceSyncInternal(
-      db, actorPrincipalId, campaignId, campaignCharacterId,
-    ),
+    getCampaignCharacterWorkspace: (actorPrincipalId: string, campaignId: string, campaignCharacterId: string) =>
+      getCampaignCharacterWorkspaceSyncInternal(db, actorPrincipalId, campaignId, campaignCharacterId),
   };
 }

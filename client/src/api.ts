@@ -1,21 +1,63 @@
 import { z } from "zod";
 import { actorGameplaySheetResponseSchema } from "@velvet/contracts";
 import { campaignDmSceneBindingRequestSchema, type CampaignDmSceneBindingRequest } from "@velvet/contracts";
-import { campaignDmControlSchema, campaignDmModeRequestSchema, campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmRunSchema, campaignDmPrivateRunSchema, campaignDmHistorySchema, campaignDmReadinessResponseSchema, type CampaignDmModeRequest, type CampaignDmBeatRequest, type CampaignDmDecisionRequest, type CampaignDmReadinessResponse } from "@velvet/contracts";
-import { campaignContextInspectionDispatchReferenceSelectorIdentitySchema, campaignContextInspectionDispatchReferenceSelectorSchema, campaignContextInspectionIdentitySchema, campaignContextInspectionResponseSchema,
-  type CampaignContextInspectionDispatchReferenceSource, type CampaignContextInspectionLane } from "@velvet/contracts";
-import { encounterPlanningRequestSchema, encounterPlanResponseSchema,
-  type EncounterPlanningRequest, type EncounterPlanResponse } from "@velvet/contracts";
-import { attunementCommandSchema, attunementResponseSchema, attunementSnapshotSchema,
-  type AttunementCommand, type AttunementResponse, type AttunementSnapshot } from "@velvet/contracts";
+import {
+  campaignDmControlSchema,
+  campaignDmModeRequestSchema,
+  campaignDmBeatRequestSchema,
+  campaignDmDecisionRequestSchema,
+  campaignDmRunSchema,
+  campaignDmPrivateRunSchema,
+  campaignDmHistorySchema,
+  campaignDmReadinessResponseSchema,
+  type CampaignDmModeRequest,
+  type CampaignDmBeatRequest,
+  type CampaignDmDecisionRequest,
+  type CampaignDmReadinessResponse,
+} from "@velvet/contracts";
+import {
+  campaignContextInspectionDispatchReferenceSelectorIdentitySchema,
+  campaignContextInspectionDispatchReferenceSelectorSchema,
+  campaignContextInspectionIdentitySchema,
+  campaignContextInspectionResponseSchema,
+  type CampaignContextInspectionDispatchReferenceSource,
+  type CampaignContextInspectionLane,
+} from "@velvet/contracts";
+import {
+  encounterPlanningRequestSchema,
+  encounterPlanResponseSchema,
+  type EncounterPlanningRequest,
+  type EncounterPlanResponse,
+} from "@velvet/contracts";
+import {
+  attunementCommandSchema,
+  attunementResponseSchema,
+  attunementSnapshotSchema,
+  type AttunementCommand,
+  type AttunementResponse,
+  type AttunementSnapshot,
+} from "@velvet/contracts";
 
 const dmPath = (campaignId: string, sessionId?: string, runId?: string) => {
   const id = (value: string) => encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(value)));
   return `/rpg/v1/campaigns/${id(campaignId)}${sessionId === undefined ? "/dm" : `/rooms/${id(sessionId)}/dm`}${runId === undefined ? "" : `/runs/${id(runId)}`}`;
 };
-const dmRequest = async (path: string, init?: RequestInit) => (await requestResponse<unknown>(path, { ...init, cache: "no-store" }, { status: 200, message: "DM response status was not confirmed" })).body;
-function bindDmRun<T extends { campaignId: string; sessionId: string; runId: string }>(run: T, campaignId: string, sessionId: string, runId?: string): T {
-  if (run.campaignId !== campaignId || run.sessionId !== sessionId || (runId !== undefined && run.runId !== runId)) throw new Error("DM response did not match this room/run");
+const dmRequest = async (path: string, init?: RequestInit) =>
+  (
+    await requestResponse<unknown>(
+      path,
+      { ...init, cache: "no-store" },
+      { status: 200, message: "DM response status was not confirmed" },
+    )
+  ).body;
+function bindDmRun<T extends { campaignId: string; sessionId: string; runId: string }>(
+  run: T,
+  campaignId: string,
+  sessionId: string,
+  runId?: string,
+): T {
+  if (run.campaignId !== campaignId || run.sessionId !== sessionId || (runId !== undefined && run.runId !== runId))
+    throw new Error("DM response did not match this room/run");
   return run;
 }
 export async function getCampaignDmControl(campaignId: string) {
@@ -25,86 +67,222 @@ export async function getCampaignDmControl(campaignId: string) {
 }
 export async function commandCampaignDmSceneBinding(campaignId: string, input: CampaignDmSceneBindingRequest) {
   const body = parseApiInput(() => campaignDmSceneBindingRequestSchema.parse(input));
-  const accepted = campaignDmSceneBindingRequestSchema.parse(await dmRequest(`${dmPath(campaignId)}/scene-binding-commands`, { method: "POST", body: JSON.stringify(body) }));
-  if (accepted.nodeId !== body.nodeId || accepted.evidence.kind !== body.evidence.kind || accepted.evidence.targetId !== body.evidence.targetId
-    || accepted.expectedStoryRevision !== body.expectedStoryRevision || accepted.idempotencyKey !== body.idempotencyKey) throw new Error("Scene binding response did not match the exact request");
+  const accepted = campaignDmSceneBindingRequestSchema.parse(
+    await dmRequest(`${dmPath(campaignId)}/scene-binding-commands`, { method: "POST", body: JSON.stringify(body) }),
+  );
+  if (
+    accepted.nodeId !== body.nodeId ||
+    accepted.evidence.kind !== body.evidence.kind ||
+    accepted.evidence.targetId !== body.evidence.targetId ||
+    accepted.expectedStoryRevision !== body.expectedStoryRevision ||
+    accepted.idempotencyKey !== body.idempotencyKey
+  )
+    throw new Error("Scene binding response did not match the exact request");
   return accepted;
 }
 export async function commandCampaignDmMode(campaignId: string, input: CampaignDmModeRequest) {
   const body = parseApiInput(() => campaignDmModeRequestSchema.parse(input));
-  const value = campaignDmControlSchema.parse(await dmRequest(`${dmPath(campaignId)}/mode-commands`, { method: "POST", body: JSON.stringify(body) }));
-  if (value.campaignId !== campaignId || value.mode !== body.mode || value.revision !== body.expectedRevision + 1) throw new Error("DM mode response mismatch");
+  const value = campaignDmControlSchema.parse(
+    await dmRequest(`${dmPath(campaignId)}/mode-commands`, { method: "POST", body: JSON.stringify(body) }),
+  );
+  if (value.campaignId !== campaignId || value.mode !== body.mode || value.revision !== body.expectedRevision + 1)
+    throw new Error("DM mode response mismatch");
   return value;
 }
-export async function planCampaignEncounter(campaignId: string, input: EncounterPlanningRequest): Promise<EncounterPlanResponse> {
+export async function planCampaignEncounter(
+  campaignId: string,
+  input: EncounterPlanningRequest,
+): Promise<EncounterPlanResponse> {
   const id = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)));
   const body = parseApiInput(() => encounterPlanningRequestSchema.parse(input));
-  const response = await requestResponse<unknown>(`/rpg/v1/campaigns/${id}/encounter-plans`,
+  const response = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${id}/encounter-plans`,
     { method: "POST", body: JSON.stringify(body), cache: "no-store" },
-    { status: 200, message: "Encounter plan status was not confirmed" });
+    { status: 200, message: "Encounter plan status was not confirmed" },
+  );
   return encounterPlanResponseSchema.parse(response.body);
 }
 export async function getCampaignDmHistory(campaignId: string, sessionId: string) {
   const value = campaignDmHistorySchema.parse(await dmRequest(dmPath(campaignId, sessionId)));
   if (value.control.campaignId !== campaignId) throw new Error("DM history campaign mismatch");
-  value.runs.forEach(run => bindDmRun(run, campaignId, sessionId));
+  value.runs.forEach((run) => bindDmRun(run, campaignId, sessionId));
   return value;
 }
-export async function getCampaignDmPreparationReadiness(campaignId: string, sessionId: string): Promise<CampaignDmReadinessResponse> {
-  const value = campaignDmReadinessResponseSchema.parse(await dmRequest(
-    `${dmPath(campaignId, sessionId)}/preparation-readiness`,
-  ));
+export async function getCampaignDmPreparationReadiness(
+  campaignId: string,
+  sessionId: string,
+): Promise<CampaignDmReadinessResponse> {
+  const value = campaignDmReadinessResponseSchema.parse(
+    await dmRequest(`${dmPath(campaignId, sessionId)}/preparation-readiness`),
+  );
   if (value.identity.campaignId !== campaignId || value.identity.sessionId !== sessionId)
     throw new Error("DM readiness response did not match this campaign/room");
   return value;
 }
 export async function getCampaignDmRun(campaignId: string, sessionId: string, runId: string) {
-  return bindDmRun(campaignDmRunSchema.parse(await dmRequest(dmPath(campaignId, sessionId, runId))), campaignId, sessionId, runId);
+  return bindDmRun(
+    campaignDmRunSchema.parse(await dmRequest(dmPath(campaignId, sessionId, runId))),
+    campaignId,
+    sessionId,
+    runId,
+  );
 }
 export async function getCampaignDmProposal(campaignId: string, sessionId: string, runId: string) {
   const value = campaignDmPrivateRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId, runId)}/proposal`));
-  bindDmRun(value.run, campaignId, sessionId, runId); return value;
+  bindDmRun(value.run, campaignId, sessionId, runId);
+  return value;
 }
 export async function commandCampaignDmBeat(campaignId: string, sessionId: string, input: CampaignDmBeatRequest) {
   const body = parseApiInput(() => campaignDmBeatRequestSchema.parse(input));
-  const run = bindDmRun(campaignDmRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId)}/beat-commands`, { method: "POST", body: JSON.stringify(body) })), campaignId, sessionId);
-  if (run.intent !== body.intent || run.modeRevision !== body.expectedModeRevision) throw new Error("DM beat response mismatch");
+  const run = bindDmRun(
+    campaignDmRunSchema.parse(
+      await dmRequest(`${dmPath(campaignId, sessionId)}/beat-commands`, { method: "POST", body: JSON.stringify(body) }),
+    ),
+    campaignId,
+    sessionId,
+  );
+  if (run.intent !== body.intent || run.modeRevision !== body.expectedModeRevision)
+    throw new Error("DM beat response mismatch");
   return run;
 }
-export async function commandCampaignDmDecision(campaignId: string, sessionId: string, runId: string, input: CampaignDmDecisionRequest) {
+export async function commandCampaignDmDecision(
+  campaignId: string,
+  sessionId: string,
+  runId: string,
+  input: CampaignDmDecisionRequest,
+) {
   const body = parseApiInput(() => campaignDmDecisionRequestSchema.parse(input));
-  const run = bindDmRun(campaignDmRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId, runId)}/decision-commands`, { method: "POST", body: JSON.stringify(body) })), campaignId, sessionId, runId);
-  if (run.revision <= body.expectedRevision || run.state === "awaiting-approval") throw new Error("DM decision was not confirmed");
+  const run = bindDmRun(
+    campaignDmRunSchema.parse(
+      await dmRequest(`${dmPath(campaignId, sessionId, runId)}/decision-commands`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ),
+    campaignId,
+    sessionId,
+    runId,
+  );
+  if (run.revision <= body.expectedRevision || run.state === "awaiting-approval")
+    throw new Error("DM decision was not confirmed");
   return run;
 }
 export async function resumeCampaignDmRun(campaignId: string, sessionId: string, runId: string) {
-  return bindDmRun(campaignDmRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId, runId)}/resume-commands`, { method: "POST", body: "{}" })), campaignId, sessionId, runId);
+  return bindDmRun(
+    campaignDmRunSchema.parse(
+      await dmRequest(`${dmPath(campaignId, sessionId, runId)}/resume-commands`, { method: "POST", body: "{}" }),
+    ),
+    campaignId,
+    sessionId,
+    runId,
+  );
 }
-export async function getCampaignContextInspectionReferences(campaignId: string, sessionId: string, source: CampaignContextInspectionDispatchReferenceSource) {
-  const identity = parseApiInput(() => campaignContextInspectionDispatchReferenceSelectorIdentitySchema.parse({ campaignId, sessionId, source }));
+export async function getCampaignContextInspectionReferences(
+  campaignId: string,
+  sessionId: string,
+  source: CampaignContextInspectionDispatchReferenceSource,
+) {
+  const identity = parseApiInput(() =>
+    campaignContextInspectionDispatchReferenceSelectorIdentitySchema.parse({ campaignId, sessionId, source }),
+  );
   const id = (value: string) => encodeURIComponent(value);
-  const value = campaignContextInspectionDispatchReferenceSelectorSchema.parse(await dmRequest(
-    `/rpg/v1/campaigns/${id(identity.campaignId)}/rooms/${id(identity.sessionId)}/context-inspection/references/${id(identity.source.kind)}/${id(identity.source.sourceId)}`,
-  ));
-  if (value.identity.campaignId !== identity.campaignId || value.identity.sessionId !== identity.sessionId
-    || value.identity.source.kind !== identity.source.kind || value.identity.source.sourceId !== identity.source.sourceId)
+  const value = campaignContextInspectionDispatchReferenceSelectorSchema.parse(
+    await dmRequest(
+      `/rpg/v1/campaigns/${id(identity.campaignId)}/rooms/${id(identity.sessionId)}/context-inspection/references/${id(identity.source.kind)}/${id(identity.source.sourceId)}`,
+    ),
+  );
+  if (
+    value.identity.campaignId !== identity.campaignId ||
+    value.identity.sessionId !== identity.sessionId ||
+    value.identity.source.kind !== identity.source.kind ||
+    value.identity.source.sourceId !== identity.source.sourceId
+  )
     throw new Error("Context inspection references did not match the exact source");
   return value;
 }
-export async function getCampaignContextInspection(campaignId: string, sessionId: string, lane: CampaignContextInspectionLane, dispatchId: string) {
-  const identity = parseApiInput(() => campaignContextInspectionIdentitySchema.parse({ campaignId, sessionId, lane, dispatchId }));
+export async function getCampaignContextInspection(
+  campaignId: string,
+  sessionId: string,
+  lane: CampaignContextInspectionLane,
+  dispatchId: string,
+) {
+  const identity = parseApiInput(() =>
+    campaignContextInspectionIdentitySchema.parse({ campaignId, sessionId, lane, dispatchId }),
+  );
   const id = (value: string) => encodeURIComponent(value);
-  const value = campaignContextInspectionResponseSchema.parse(await dmRequest(
-    `/rpg/v1/campaigns/${id(identity.campaignId)}/rooms/${id(identity.sessionId)}/context-inspection/${id(identity.lane)}/${id(identity.dispatchId)}`,
-  ));
-  if (value.identity.campaignId !== identity.campaignId || value.identity.sessionId !== identity.sessionId
-    || value.identity.lane !== identity.lane || value.identity.dispatchId !== identity.dispatchId)
+  const value = campaignContextInspectionResponseSchema.parse(
+    await dmRequest(
+      `/rpg/v1/campaigns/${id(identity.campaignId)}/rooms/${id(identity.sessionId)}/context-inspection/${id(identity.lane)}/${id(identity.dispatchId)}`,
+    ),
+  );
+  if (
+    value.identity.campaignId !== identity.campaignId ||
+    value.identity.sessionId !== identity.sessionId ||
+    value.identity.lane !== identity.lane ||
+    value.identity.dispatchId !== identity.dispatchId
+  )
     throw new Error("Context inspection response did not match the exact dispatch");
   return value;
 }
 import { createClientId } from "./utils/clientId";
-import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, idempotencyKeySchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
-import type { ApiProblem, CampaignAccess as ContractCampaignAccess, CampaignCharacterCreateRequest, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignCharacterWorkspaceResponse, CampaignCreateRequest, CampaignCreateResponse, CampaignDetail as ContractCampaignDetail, CampaignDetailResponse as ContractCampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollRequest, CampaignDiceRollResponse, CampaignListResponse as ContractCampaignListResponse, CampaignRenameRequest, CampaignRenameResponse, CampaignRoomAttachRequest, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, QuickAdventureCreateRequest, QuickAdventureCreateResponse, RoleplayFeatureFlags, RpgFeatureFlags } from "@velvet/contracts";
+import {
+  apiProblemSchema,
+  campaignCharacterCreateRequestSchema,
+  campaignCharacterCreateResponseSchema,
+  campaignCharacterCreationOptionsResponseSchema,
+  campaignCharacterListResponseSchema,
+  campaignCharacterWorkspaceResponseSchema,
+  campaignCreateRequestSchema,
+  campaignCreateResponseSchema,
+  campaignDetailResponseSchema,
+  campaignDiceHistoryResponseSchema,
+  campaignDiceRollRequestSchema,
+  campaignDiceRollResponseSchema,
+  campaignListResponseSchema,
+  campaignMechanicsStarterSetupRequestSchema,
+  campaignMechanicsStarterSetupResponseSchema,
+  campaignRenameRequestSchema,
+  campaignRenameResponseSchema,
+  campaignRoomAttachRequestSchema,
+  campaignRoomAttachResponseSchema,
+  campaignRoomLinkingResponseSchema,
+  campaignStarterSetupRequestSchema,
+  idempotencyKeySchema,
+  MECHANICS_STARTER_ID,
+  MECHANICS_STARTER_IDENTITY,
+  ORIGINAL_STARTER_ID,
+  ORIGINAL_STARTER_PRESENTATION,
+  resourceIdSchema,
+  roleplayFeatureFlagsSchema,
+  rpgFeatureFlagsSchema,
+  SRD_5_1_STARTER_IDENTITY,
+} from "@velvet/contracts";
+import type {
+  ApiProblem,
+  CampaignAccess as ContractCampaignAccess,
+  CampaignCharacterCreateRequest,
+  CampaignCharacterCreateResponse,
+  CampaignCharacterCreationOptionsResponse,
+  CampaignCharacterListResponse,
+  CampaignCharacterWorkspaceResponse,
+  CampaignCreateRequest,
+  CampaignCreateResponse,
+  CampaignDetail as ContractCampaignDetail,
+  CampaignDetailResponse as ContractCampaignDetailResponse,
+  CampaignDiceHistoryResponse,
+  CampaignDiceRollRequest,
+  CampaignDiceRollResponse,
+  CampaignListResponse as ContractCampaignListResponse,
+  CampaignRenameRequest,
+  CampaignRenameResponse,
+  CampaignRoomAttachRequest,
+  CampaignRoomAttachResponse,
+  CampaignRoomLinkingResponse,
+  QuickAdventureCreateRequest,
+  QuickAdventureCreateResponse,
+  RoleplayFeatureFlags,
+  RpgFeatureFlags,
+} from "@velvet/contracts";
 import { quickAdventureCreateRequestSchema, quickAdventureCreateResponseSchema } from "@velvet/contracts";
 import {
   campaignAdministrationHttpArchiveRequestSchema,
@@ -137,8 +315,24 @@ import {
   campaignTransferHttpDryRunResponseSchema,
   campaignTransferHttpExportDocumentSchema,
 } from "@velvet/contracts";
-import { campaignContentApplyRequestSchema, campaignContentApplyResponseSchema, campaignContentDraftViewSchema, campaignContentGenerationRequestSchema, campaignGeneratedFoundationSchema, campaignGeneratedPlanningSchema, campaignIdSchema, campaignMaterialPublishRequestSchema, campaignMaterialPublishResponseSchema, campaignPublishedMaterialsSchema } from "@velvet/contracts";
-import type { CampaignContentDraftView, CampaignContentGenerationRequest, CampaignGeneratedPlanning, CampaignPublishedMaterials } from "@velvet/contracts";
+import {
+  campaignContentApplyRequestSchema,
+  campaignContentApplyResponseSchema,
+  campaignContentDraftViewSchema,
+  campaignContentGenerationRequestSchema,
+  campaignGeneratedFoundationSchema,
+  campaignGeneratedPlanningSchema,
+  campaignIdSchema,
+  campaignMaterialPublishRequestSchema,
+  campaignMaterialPublishResponseSchema,
+  campaignPublishedMaterialsSchema,
+} from "@velvet/contracts";
+import type {
+  CampaignContentDraftView,
+  CampaignContentGenerationRequest,
+  CampaignGeneratedPlanning,
+  CampaignPublishedMaterials,
+} from "@velvet/contracts";
 import type {
   CampaignAdministrationHttpArchiveRequest,
   CampaignAdministrationHttpArchiveResponse,
@@ -170,11 +364,23 @@ import type {
   CampaignTransferHttpDryRunResponse,
   CampaignTransferHttpExportDocument,
 } from "@velvet/contracts";
-import { administrationIntegrationCommandResponseSchema, campaignAdministrationIntegrationsSchema,
-  rulesetSelectionCommandSchema, safetyActionCommandSchema, sessionZeroSafetyUpdateCommandSchema,
-  shopBuyPolicyCommandSchema, vendorAssociationCommandSchema } from "@velvet/contracts";
-import type { CampaignAdministrationIntegrations, RulesetSelectionCommand, SafetyActionCommand,
-  SessionZeroSafetyUpdateCommand, ShopBuyPolicyCommand, VendorAssociationCommand } from "@velvet/contracts";
+import {
+  administrationIntegrationCommandResponseSchema,
+  campaignAdministrationIntegrationsSchema,
+  rulesetSelectionCommandSchema,
+  safetyActionCommandSchema,
+  sessionZeroSafetyUpdateCommandSchema,
+  shopBuyPolicyCommandSchema,
+  vendorAssociationCommandSchema,
+} from "@velvet/contracts";
+import type {
+  CampaignAdministrationIntegrations,
+  RulesetSelectionCommand,
+  SafetyActionCommand,
+  SessionZeroSafetyUpdateCommand,
+  ShopBuyPolicyCommand,
+  VendorAssociationCommand,
+} from "@velvet/contracts";
 import {
   tacticalMapGenerateRequestSchema,
   tacticalMapGenerateResponseSchema,
@@ -185,17 +391,21 @@ import {
   tacticalMapPreviewResponseSchema,
   tacticalMapSnapshotSchema,
 } from "@velvet/contracts";
-import type { TacticalMapGenerateRequest, TacticalMapMode, TacticalMapMoveRequest, TacticalMapMoveResponse, TacticalMapPreviewRequest, TacticalMapPreviewResponse, TacticalMapSnapshot } from "@velvet/contracts";
+import type {
+  TacticalMapGenerateRequest,
+  TacticalMapMode,
+  TacticalMapMoveRequest,
+  TacticalMapMoveResponse,
+  TacticalMapPreviewRequest,
+  TacticalMapPreviewResponse,
+  TacticalMapSnapshot,
+} from "@velvet/contracts";
 import {
   npcCastHttpSchema,
   npcPresenceMutationHttpRequestSchema,
   npcPresenceMutationHttpResponseSchema,
 } from "@velvet/contracts";
-import type {
-  NpcCastHttp,
-  NpcPresenceMutationHttpRequest,
-  NpcPresenceMutationHttpResponse,
-} from "@velvet/contracts";
+import type { NpcCastHttp, NpcPresenceMutationHttpRequest, NpcPresenceMutationHttpResponse } from "@velvet/contracts";
 import {
   companionAdministrationHttpCommandResponseSchema,
   companionAdministrationHttpCommandSchema,
@@ -243,34 +453,75 @@ import type {
   CampaignPlayBootstrap,
 } from "@velvet/contracts";
 import {
-  actorCheckCommandRequestSchema, actorCheckCommandResponseSchema,
-  actorCampCommandRequestSchema, actorCampCommandResponseSchema,
-  actorPlacementCommandRequestSchema, actorPlacementCommandResponseSchema,
-  actorTravelCommandRequestSchema, actorTravelCommandResponseSchema, gmCampaignQuestsHttpResponseSchema, gmCampaignStoryHttpResponseSchema,
-  campaignWorldHttpResponseSchema, createCampaignFactionHttpRequestSchema, createCampaignFactionHttpResponseSchema,
-  createCampaignNpcHttpRequestSchema, createCampaignNpcHttpResponseSchema, createCampaignQuestHttpRequestSchema,
-  createCampaignQuestHttpResponseSchema, createCampaignStorylineHttpRequestSchema,
-  createCampaignStorylineHttpResponseSchema, factionReputationCommandHttpRequestSchema,
-  factionReputationCommandHttpResponseSchema, npcRelationshipCommandHttpRequestSchema,
-  npcRelationshipCommandHttpResponseSchema, playerCampaignQuestsHttpResponseSchema,
-  playerCampaignStoryHttpResponseSchema, gmCampaignNpcsHttpResponseSchema, playerCampaignNpcsHttpResponseSchema,
-  gmCampaignFactionsHttpResponseSchema, playerCampaignFactionsHttpResponseSchema, questCommandHttpRequestSchema, questCommandHttpResponseSchema,
-  storylineCommandHttpRequestSchema, storylineCommandHttpResponseSchema,
-  factionRelationCommandHttpRequestSchema, factionRelationCommandHttpResponseSchema,
-  actorFactionMembershipCommandHttpRequestSchema, actorFactionMembershipCommandHttpResponseSchema,
-  npcFactionMembershipCommandHttpRequestSchema, npcFactionMembershipCommandHttpResponseSchema,
-  factionReactionCommandHttpRequestSchema, factionReactionCommandHttpResponseSchema,
+  actorCheckCommandRequestSchema,
+  actorCheckCommandResponseSchema,
+  actorCampCommandRequestSchema,
+  actorCampCommandResponseSchema,
+  actorPlacementCommandRequestSchema,
+  actorPlacementCommandResponseSchema,
+  actorTravelCommandRequestSchema,
+  actorTravelCommandResponseSchema,
+  gmCampaignQuestsHttpResponseSchema,
+  gmCampaignStoryHttpResponseSchema,
+  campaignWorldHttpResponseSchema,
+  createCampaignFactionHttpRequestSchema,
+  createCampaignFactionHttpResponseSchema,
+  createCampaignNpcHttpRequestSchema,
+  createCampaignNpcHttpResponseSchema,
+  createCampaignQuestHttpRequestSchema,
+  createCampaignQuestHttpResponseSchema,
+  createCampaignStorylineHttpRequestSchema,
+  createCampaignStorylineHttpResponseSchema,
+  factionReputationCommandHttpRequestSchema,
+  factionReputationCommandHttpResponseSchema,
+  npcRelationshipCommandHttpRequestSchema,
+  npcRelationshipCommandHttpResponseSchema,
+  playerCampaignQuestsHttpResponseSchema,
+  playerCampaignStoryHttpResponseSchema,
+  gmCampaignNpcsHttpResponseSchema,
+  playerCampaignNpcsHttpResponseSchema,
+  gmCampaignFactionsHttpResponseSchema,
+  playerCampaignFactionsHttpResponseSchema,
+  questCommandHttpRequestSchema,
+  questCommandHttpResponseSchema,
+  storylineCommandHttpRequestSchema,
+  storylineCommandHttpResponseSchema,
+  factionRelationCommandHttpRequestSchema,
+  factionRelationCommandHttpResponseSchema,
+  actorFactionMembershipCommandHttpRequestSchema,
+  actorFactionMembershipCommandHttpResponseSchema,
+  npcFactionMembershipCommandHttpRequestSchema,
+  npcFactionMembershipCommandHttpResponseSchema,
+  factionReactionCommandHttpRequestSchema,
+  factionReactionCommandHttpResponseSchema,
 } from "@velvet/contracts";
 import type {
-  ActorCampCommandRequest, ActorCampCommandResponse, ActorCheckCommandRequest, ActorCheckCommandResponse,
-  ActorPlacementCommandRequest, ActorPlacementCommandResponse,
-  ActorTravelCommandRequest, ActorTravelCommandResponse,
-  CampaignQuestsHttpResponse, CampaignStoryHttpResponse,
-  CampaignWorldHttpResponse, CreateCampaignFactionHttpRequest, CreateCampaignNpcHttpRequest,
-  CreateCampaignQuestHttpRequest, CreateCampaignStorylineHttpRequest, FactionReputationCommandHttpRequest,
-  NpcRelationshipCommandHttpRequest, QuestCommandHttpRequest, StorylineCommandHttpRequest,
-  GmCampaignNpcsHttpResponse, PlayerCampaignNpcsHttpResponse, GmCampaignFactionsHttpResponse, PlayerCampaignFactionsHttpResponse,
-  FactionRelationCommandHttpRequest, ActorFactionMembershipCommandHttpRequest, NpcFactionMembershipCommandHttpRequest,
+  ActorCampCommandRequest,
+  ActorCampCommandResponse,
+  ActorCheckCommandRequest,
+  ActorCheckCommandResponse,
+  ActorPlacementCommandRequest,
+  ActorPlacementCommandResponse,
+  ActorTravelCommandRequest,
+  ActorTravelCommandResponse,
+  CampaignQuestsHttpResponse,
+  CampaignStoryHttpResponse,
+  CampaignWorldHttpResponse,
+  CreateCampaignFactionHttpRequest,
+  CreateCampaignNpcHttpRequest,
+  CreateCampaignQuestHttpRequest,
+  CreateCampaignStorylineHttpRequest,
+  FactionReputationCommandHttpRequest,
+  NpcRelationshipCommandHttpRequest,
+  QuestCommandHttpRequest,
+  StorylineCommandHttpRequest,
+  GmCampaignNpcsHttpResponse,
+  PlayerCampaignNpcsHttpResponse,
+  GmCampaignFactionsHttpResponse,
+  PlayerCampaignFactionsHttpResponse,
+  FactionRelationCommandHttpRequest,
+  ActorFactionMembershipCommandHttpRequest,
+  NpcFactionMembershipCommandHttpRequest,
   FactionReactionCommandHttpRequest,
 } from "@velvet/contracts";
 
@@ -584,8 +835,11 @@ export class ApiInputError extends Error {
 }
 
 function parseApiInput<T>(parse: () => T): T {
-  try { return parse(); }
-  catch { throw new ApiInputError(); }
+  try {
+    return parse();
+  } catch {
+    throw new ApiInputError();
+  }
 }
 
 export async function errorFromResponse(res: Response): Promise<ApiError> {
@@ -611,12 +865,7 @@ export async function errorFromResponse(res: Response): Promise<ApiError> {
     ) {
       message = (body as { error: string }).error;
     }
-    if (
-      !problem &&
-      typeof body === "object" &&
-      body !== null &&
-      ("stopReason" in body || "stoppedAt" in body)
-    ) {
+    if (!problem && typeof body === "object" && body !== null && ("stopReason" in body || "stoppedAt" in body)) {
       sessionStopped = true;
     }
     if (
@@ -626,9 +875,7 @@ export async function errorFromResponse(res: Response): Promise<ApiError> {
       "violations" in body &&
       Array.isArray((body as { violations: unknown }).violations)
     ) {
-      violations = (body as { violations: unknown[] }).violations.filter(
-        (v): v is string => typeof v === "string",
-      );
+      violations = (body as { violations: unknown[] }).violations.filter((v): v is string => typeof v === "string");
       if (violations.length > 0) {
         message = `${message}: ${violations.join("; ")}`;
       }
@@ -718,7 +965,9 @@ export function startSession(input: string | StartSessionInput): Promise<Session
   });
 }
 
-export function openSoloSession(characterId: string): Promise<{ session: Session; messages: ChatMessage[]; created: boolean }> {
+export function openSoloSession(
+  characterId: string,
+): Promise<{ session: Session; messages: ChatMessage[]; created: boolean }> {
   return request<{ session: Session; messages: ChatMessage[]; created: boolean }>("/sessions/solo", {
     method: "POST",
     body: JSON.stringify({ characterId }),
@@ -726,7 +975,9 @@ export function openSoloSession(characterId: string): Promise<{ session: Session
 }
 
 export function listSessions(characterId?: string): Promise<{ sessions: Session[] }> {
-  return request<{ sessions: Session[] }>(`/sessions${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ""}`);
+  return request<{ sessions: Session[] }>(
+    `/sessions${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ""}`,
+  );
 }
 
 /** Encode one opaque legacy identifier exactly once for use as a URL segment. */
@@ -742,8 +993,14 @@ export function getSessionContext(sessionId: string): Promise<{ context: Session
   return request<{ context: SessionContextBasket }>(`/sessions/${encodeOpaquePathSegment(sessionId)}/context`);
 }
 
-export function updateSessionContext(sessionId: string, sourceOfTruth: string): Promise<{ source: { sourceOfTruth: string; updatedAt: string } }> {
-  return request(`/sessions/${encodeOpaquePathSegment(sessionId)}/context`, { method: "PUT", body: JSON.stringify({ sourceOfTruth }) });
+export function updateSessionContext(
+  sessionId: string,
+  sourceOfTruth: string,
+): Promise<{ source: { sourceOfTruth: string; updatedAt: string } }> {
+  return request(`/sessions/${encodeOpaquePathSegment(sessionId)}/context`, {
+    method: "PUT",
+    body: JSON.stringify({ sourceOfTruth }),
+  });
 }
 
 export function deleteSession(sessionId: string): Promise<{ ok: true }> {
@@ -824,9 +1081,12 @@ async function streamRoom(path: string, body: Record<string, unknown>, handlers:
     const payload = (data ?? {}) as Record<string, unknown>;
     if (event === "user_message") handlers.onUserMessage?.(payload.message as ChatMessage);
     else if (event === "state") handlers.onState?.(payload.session as Session | undefined, String(payload.state ?? ""));
-    else if (event === "room_reply") handlers.onReply(payload.reply as ChatMessage, Number(payload.index), Number(payload.total));
-    else if (event === "room_done") { completed = true; handlers.onDone(payload as unknown as RoomTurnResult | RoomContinuationResult); }
-    else if (event === "error") {
+    else if (event === "room_reply")
+      handlers.onReply(payload.reply as ChatMessage, Number(payload.index), Number(payload.total));
+    else if (event === "room_done") {
+      completed = true;
+      handlers.onDone(payload as unknown as RoomTurnResult | RoomContinuationResult);
+    } else if (event === "error") {
       const error = String(payload.error ?? "room stream failed");
       handlers.onError?.(error);
       throw new ApiError(0, error);
@@ -840,17 +1100,30 @@ async function streamRoom(path: string, body: Record<string, unknown>, handlers:
       if (done) break;
       push(decoder.decode(value, { stream: true }));
     }
-    if (!completed) throw new ApiError(0, "The room stream ended before the turn completed. Reopen the conversation to check its saved history.");
+    if (!completed)
+      throw new ApiError(
+        0,
+        "The room stream ended before the turn completed. Reopen the conversation to check its saved history.",
+      );
   } finally {
     await reader.cancel().catch(() => undefined);
   }
 }
 
-export function streamRoomMessage(sessionId: string, content: string, handlers: RoomStreamHandlers, maxSpeakers = 3): Promise<void> {
+export function streamRoomMessage(
+  sessionId: string,
+  content: string,
+  handlers: RoomStreamHandlers,
+  maxSpeakers = 3,
+): Promise<void> {
   return streamRoom(`/sessions/${encodeOpaquePathSegment(sessionId)}/room-turn`, { content, maxSpeakers }, handlers);
 }
 
-export function streamRoomContinuation(sessionId: string, handlers: RoomStreamHandlers, maxSpeakers = 2): Promise<void> {
+export function streamRoomContinuation(
+  sessionId: string,
+  handlers: RoomStreamHandlers,
+  maxSpeakers = 2,
+): Promise<void> {
   return streamRoom(`/sessions/${encodeOpaquePathSegment(sessionId)}/room-continue`, { maxSpeakers }, handlers);
 }
 
@@ -871,7 +1144,9 @@ export interface SiblingsResponse {
 }
 
 export function getSiblings(sessionId: string, messageId: string): Promise<SiblingsResponse> {
-  return request<SiblingsResponse>(`/sessions/${encodeOpaquePathSegment(sessionId)}/messages/${encodeOpaquePathSegment(messageId)}/siblings`);
+  return request<SiblingsResponse>(
+    `/sessions/${encodeOpaquePathSegment(sessionId)}/messages/${encodeOpaquePathSegment(messageId)}/siblings`,
+  );
 }
 
 export function activateMessage(
@@ -894,12 +1169,21 @@ export interface SwipeResult {
 }
 
 export function swipeMessage(sessionId: string, messageId: string, speakerCharacterId?: string): Promise<SwipeResult> {
-  return request<SwipeResult>(`/sessions/${encodeOpaquePathSegment(sessionId)}/messages/${encodeOpaquePathSegment(messageId)}/swipe`, {
-    method: "POST", body: JSON.stringify({ speakerCharacterId }),
-  });
+  return request<SwipeResult>(
+    `/sessions/${encodeOpaquePathSegment(sessionId)}/messages/${encodeOpaquePathSegment(messageId)}/swipe`,
+    {
+      method: "POST",
+      body: JSON.stringify({ speakerCharacterId }),
+    },
+  );
 }
 
-export function branchMessage(sessionId: string, messageId: string, content: string, speakerCharacterId?: string): Promise<TurnResult> {
+export function branchMessage(
+  sessionId: string,
+  messageId: string,
+  content: string,
+  speakerCharacterId?: string,
+): Promise<TurnResult> {
   return request<TurnResult>(`/sessions/${encodeOpaquePathSegment(sessionId)}/branch`, {
     method: "POST",
     body: JSON.stringify({ messageId, content, speakerCharacterId }),
@@ -908,15 +1192,19 @@ export function branchMessage(sessionId: string, messageId: string, content: str
 
 export function continueSession(sessionId: string, speakerCharacterId: string): Promise<TurnResult> {
   return request<TurnResult>(`/sessions/${encodeOpaquePathSegment(sessionId)}/continue`, {
-    method: "POST", body: JSON.stringify({ speakerCharacterId }),
+    method: "POST",
+    body: JSON.stringify({ speakerCharacterId }),
   });
 }
 
 export function cancelGeneration(sessionId: string, generationId: string): Promise<{ ok: boolean; aborted: string }> {
-  return request<{ ok: boolean; aborted: string }>(`/sessions/${encodeOpaquePathSegment(sessionId)}/generation/cancel`, {
-    method: "POST",
-    body: JSON.stringify({ generationId }),
-  });
+  return request<{ ok: boolean; aborted: string }>(
+    `/sessions/${encodeOpaquePathSegment(sessionId)}/generation/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ generationId }),
+    },
+  );
 }
 
 export interface StreamDonePayload {
@@ -1071,23 +1359,49 @@ function streamSse(
   };
 }
 
-export function streamMessage(sessionId: string, content: string, speakerCharacterId: string | undefined, handlers: StreamHandlers): StreamHandle {
-  return streamSse(`/sessions/${encodeOpaquePathSegment(sessionId)}/stream`, { content, speakerCharacterId }, handlers, sessionId);
+export function streamMessage(
+  sessionId: string,
+  content: string,
+  speakerCharacterId: string | undefined,
+  handlers: StreamHandlers,
+): StreamHandle {
+  return streamSse(
+    `/sessions/${encodeOpaquePathSegment(sessionId)}/stream`,
+    { content, speakerCharacterId },
+    handlers,
+    sessionId,
+  );
 }
 
-export function streamSwipe(sessionId: string, messageId: string, speakerCharacterId: string | undefined, handlers: StreamHandlers): StreamHandle {
-  return streamSse(`/sessions/${encodeOpaquePathSegment(sessionId)}/messages/${encodeOpaquePathSegment(messageId)}/swipe/stream`, { speakerCharacterId }, handlers, sessionId);
+export function streamSwipe(
+  sessionId: string,
+  messageId: string,
+  speakerCharacterId: string | undefined,
+  handlers: StreamHandlers,
+): StreamHandle {
+  return streamSse(
+    `/sessions/${encodeOpaquePathSegment(sessionId)}/messages/${encodeOpaquePathSegment(messageId)}/swipe/stream`,
+    { speakerCharacterId },
+    handlers,
+    sessionId,
+  );
 }
 
 export function listMemories(characterId: string): Promise<{ memories: MemoryFact[] }> {
   return request<{ memories: MemoryFact[] }>(`/characters/${characterId}/memories`);
 }
 
-export function createMemory(characterId: string, input: { content: string; kind: MemoryKind; userApproved: boolean }): Promise<MemoryFact> {
+export function createMemory(
+  characterId: string,
+  input: { content: string; kind: MemoryKind; userApproved: boolean },
+): Promise<MemoryFact> {
   return request<MemoryFact>(`/characters/${characterId}/memories`, { method: "POST", body: JSON.stringify(input) });
 }
 
-export function updateMemory(id: string, patch: Partial<Pick<MemoryFact, "content" | "kind" | "userApproved">>): Promise<MemoryFact> {
+export function updateMemory(
+  id: string,
+  patch: Partial<Pick<MemoryFact, "content" | "kind" | "userApproved">>,
+): Promise<MemoryFact> {
   return request<MemoryFact>(`/memories/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
 
@@ -1134,10 +1448,26 @@ export interface AdventureTurnClientStreamHandle {
 
 /** Closed initial or server-token continuation input accepted by the client stream method. */
 export type AdventureTurnClientStreamRequest =
-  | { kind: "initial"; campaignId: string; sessionId: string; actorId: string; declaration: string; sheetReferences?: import("@velvet/contracts").SheetReference[]; expectedRevision: number; idempotencyKey: string }
+  | {
+      kind: "initial";
+      campaignId: string;
+      sessionId: string;
+      actorId: string;
+      declaration: string;
+      sheetReferences?: import("@velvet/contracts").SheetReference[];
+      expectedRevision: number;
+      idempotencyKey: string;
+    }
   | { kind: "resume"; resumeToken: string; expected: AdventureTurnClientBinding }
-  | { kind: "narration-retry" | "narration-swipe"; campaignId: string; sessionId: string; actorId: string;
-    priorTurnId: string; expectedRevision: number; idempotencyKey: string };
+  | {
+      kind: "narration-retry" | "narration-swipe";
+      campaignId: string;
+      sessionId: string;
+      actorId: string;
+      priorTurnId: string;
+      expectedRevision: number;
+      idempotencyKey: string;
+    };
 
 /** Exact active play identity required for every durable turn response. */
 export interface AdventureTurnClientBinding {
@@ -1158,72 +1488,117 @@ export interface AdventureTurnSseParser {
  * Parses CRLF or LF SSE framing across arbitrary chunks, validates every event,
  * and requires one final terminal envelope without silently dropping data.
  */
-export function createAdventureTurnSseParser(onEvent: (event: AdventureTurnStreamEvent) => void,
-  streamKind: "initial" | "resume" | "variant" = "resume"): AdventureTurnSseParser {
-  let buffer = ""; let terminal = false; let lastSequence = -1; let count = 0; let confirmationRequired = false;
-  let mechanicsSeen = false; let narrationSeen = false;
+export function createAdventureTurnSseParser(
+  onEvent: (event: AdventureTurnStreamEvent) => void,
+  streamKind: "initial" | "resume" | "variant" = "resume",
+): AdventureTurnSseParser {
+  let buffer = "";
+  let terminal = false;
+  let lastSequence = -1;
+  let count = 0;
+  let confirmationRequired = false;
+  let mechanicsSeen = false;
+  let narrationSeen = false;
   const consume = (final: boolean) => {
     let separator = buffer.match(/\r\n\r\n|\n\n|\r\r/);
     while (separator?.index !== undefined || (final && buffer.length > 0)) {
-      const boundary = separator?.index ?? -1; const separatorLength = separator?.[0].length ?? 0;
+      const boundary = separator?.index ?? -1;
+      const separatorLength = separator?.[0].length ?? 0;
       const block = boundary >= 0 ? buffer.slice(0, boundary) : buffer;
       buffer = boundary >= 0 ? buffer.slice(boundary + separatorLength) : "";
       separator = buffer.match(/\r\n\r\n|\n\n|\r\r/);
       const lines = block.split(/\r\n|\r|\n/);
       if (block.length === 0 || lines.every((line) => line.startsWith(":"))) continue;
-      let eventName: string | null = null; const data: string[] = [];
+      let eventName: string | null = null;
+      const data: string[] = [];
       for (const line of lines) {
         if (line.startsWith(":")) continue;
         if (line.startsWith("event:")) eventName = line.slice(6).trim();
         else if (line.startsWith("data:")) data.push(line.slice(5).replace(/^ /, ""));
-        else if (line.length > 0 && !line.startsWith("id:") && !line.startsWith("retry:")) throw new Error("Adventure turn stream contained malformed SSE fields");
+        else if (line.length > 0 && !line.startsWith("id:") && !line.startsWith("retry:"))
+          throw new Error("Adventure turn stream contained malformed SSE fields");
       }
       if (!eventName || data.length === 0) throw new Error("Adventure turn stream event framing was incomplete");
-      let raw: unknown; try { raw = JSON.parse(data.join("\n")); } catch { throw new Error("Adventure turn stream contained malformed JSON"); }
+      let raw: unknown;
+      try {
+        raw = JSON.parse(data.join("\n"));
+      } catch {
+        throw new Error("Adventure turn stream contained malformed JSON");
+      }
       const event = adventureTurnStreamEventSchema.parse(raw);
       if (event.type !== eventName) throw new Error("Adventure turn stream event name did not match its envelope");
       if (event.sequence !== lastSequence + 1) throw new Error("Adventure turn stream sequence was not contiguous");
       if (terminal) throw new Error("Adventure turn stream emitted data after its terminal event");
       if (count === 0) {
-        if ((streamKind === "initial" || streamKind === "variant") && (event.type !== "turn_started" || event.sequence !== 0)) {
+        if (
+          (streamKind === "initial" || streamKind === "variant") &&
+          (event.type !== "turn_started" || event.sequence !== 0)
+        ) {
           throw new Error("Adventure turn creation stream did not start with turn_started sequence zero");
         }
-        if (streamKind === "resume" && event.type !== "agent_status") throw new Error("Adventure turn resume stream had an illegal first event");
+        if (streamKind === "resume" && event.type !== "agent_status")
+          throw new Error("Adventure turn resume stream had an illegal first event");
       }
-      if (event.type === "turn_started" && (count !== 0 || streamKind === "resume")) throw new Error("Adventure turn stream emitted turn_started illegally");
-      if (event.type === "tool_proposed" && (streamKind !== "initial" || confirmationRequired || mechanicsSeen || narrationSeen)) {
+      if (event.type === "turn_started" && (count !== 0 || streamKind === "resume"))
+        throw new Error("Adventure turn stream emitted turn_started illegally");
+      if (
+        event.type === "tool_proposed" &&
+        (streamKind !== "initial" || confirmationRequired || mechanicsSeen || narrationSeen)
+      ) {
         throw new Error("Adventure turn stream proposed a tool out of order");
       }
-      if (confirmationRequired && event.type !== "terminal") throw new Error("Adventure turn confirmation boundary was not immediately terminal");
+      if (confirmationRequired && event.type !== "terminal")
+        throw new Error("Adventure turn confirmation boundary was not immediately terminal");
       if (event.type === "confirmation_required") {
-        if (streamKind === "variant" || mechanicsSeen || narrationSeen) throw new Error("Adventure turn confirmation boundary was illegal");
+        if (streamKind === "variant" || mechanicsSeen || narrationSeen)
+          throw new Error("Adventure turn confirmation boundary was illegal");
         confirmationRequired = true;
       }
       if (event.type === "mechanics_committed") {
-        if (mechanicsSeen || narrationSeen) throw new Error("Adventure turn mechanics were emitted out of order"); mechanicsSeen = true;
+        if (mechanicsSeen || narrationSeen) throw new Error("Adventure turn mechanics were emitted out of order");
+        mechanicsSeen = true;
       }
       if (event.type === "narration_delta") narrationSeen = true;
       if (event.type === "terminal") {
-        if (event.payload.receipts.length > 0 && !mechanicsSeen) throw new Error("Adventure turn narration omitted its mechanics event");
-        if (confirmationRequired && (event.payload.outcome !== "aborted" || event.payload.turn.state !== "awaiting-confirmation")) {
+        if (event.payload.receipts.length > 0 && !mechanicsSeen)
+          throw new Error("Adventure turn narration omitted its mechanics event");
+        if (
+          confirmationRequired &&
+          (event.payload.outcome !== "aborted" || event.payload.turn.state !== "awaiting-confirmation")
+        ) {
           throw new Error("Adventure turn confirmation terminal was illegal");
         }
-        if (!confirmationRequired && event.payload.turn.state === "awaiting-confirmation") throw new Error("Adventure turn terminal omitted its confirmation boundary");
+        if (!confirmationRequired && event.payload.turn.state === "awaiting-confirmation")
+          throw new Error("Adventure turn terminal omitted its confirmation boundary");
       }
-      lastSequence = event.sequence; count += 1; if (event.type === "terminal") terminal = true; onEvent(event);
+      lastSequence = event.sequence;
+      count += 1;
+      if (event.type === "terminal") terminal = true;
+      onEvent(event);
     }
     if (final && !terminal) throw new Error("Adventure turn stream ended without exactly one terminal event");
   };
-  return { push: (chunk) => { buffer += chunk; consume(false); }, finish: () => consume(true) };
+  return {
+    push: (chunk) => {
+      buffer += chunk;
+      consume(false);
+    },
+    finish: () => consume(true),
+  };
 }
 
 /** Reads one exact campaign-and-room play bootstrap without caching. */
 export async function getCampaignPlayBootstrap(campaignId: string, sessionId: string): Promise<CampaignPlayBootstrap> {
   const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const room = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(campaign)}/rooms/${encodeURIComponent(room)}/play-bootstrap`, { cache: "no-store" });
-  requireStatus(success, 200, "Campaign play bootstrap"); const response = campaignPlayBootstrapSchema.parse(success.body);
-  if (response.campaignId !== campaign || response.sessionId !== room) throw new Error("Campaign play bootstrap did not match the request");
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(campaign)}/rooms/${encodeURIComponent(room)}/play-bootstrap`,
+    { cache: "no-store" },
+  );
+  requireStatus(success, 200, "Campaign play bootstrap");
+  const response = campaignPlayBootstrapSchema.parse(success.body);
+  if (response.campaignId !== campaign || response.sessionId !== room)
+    throw new Error("Campaign play bootstrap did not match the request");
   return response;
 }
 
@@ -1234,108 +1609,261 @@ function tacticalMapPath(campaignId: string, sessionId: string, mode: TacticalMa
   return `/rpg/v1/campaigns/${encodeURIComponent(campaign)}/rooms/${encodeURIComponent(session)}/tactical-maps/${parsedMode}`;
 }
 
-export async function getTacticalMap(campaignId: string, sessionId: string, mode: TacticalMapMode, actorId: string): Promise<TacticalMapSnapshot> {
+export async function getTacticalMap(
+  campaignId: string,
+  sessionId: string,
+  mode: TacticalMapMode,
+  actorId: string,
+): Promise<TacticalMapSnapshot> {
   const actor = parseApiInput(() => resourceIdSchema.parse(actorId));
-  const success = await requestResponse<unknown>(`${tacticalMapPath(campaignId, sessionId, mode)}/actors/${encodeURIComponent(actor)}`, { cache: "no-store" });
-  requireStatus(success, 200, "Tactical map"); const value = tacticalMapSnapshotSchema.parse(success.body);
-  if (value.campaignId !== campaignId || value.sessionId !== sessionId || value.mode !== mode || value.controlledTokenId === null) throw new Error("Tactical map did not match the request");
+  const success = await requestResponse<unknown>(
+    `${tacticalMapPath(campaignId, sessionId, mode)}/actors/${encodeURIComponent(actor)}`,
+    { cache: "no-store" },
+  );
+  requireStatus(success, 200, "Tactical map");
+  const value = tacticalMapSnapshotSchema.parse(success.body);
+  if (
+    value.campaignId !== campaignId ||
+    value.sessionId !== sessionId ||
+    value.mode !== mode ||
+    value.controlledTokenId === null
+  )
+    throw new Error("Tactical map did not match the request");
   return value;
 }
 
-export async function generateTacticalMap(campaignId: string, sessionId: string, input: TacticalMapGenerateRequest): Promise<TacticalMapSnapshot> {
-  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId)); const room = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
+export async function generateTacticalMap(
+  campaignId: string,
+  sessionId: string,
+  input: TacticalMapGenerateRequest,
+): Promise<TacticalMapSnapshot> {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const room = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
   const body = parseApiInput(() => tacticalMapGenerateRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(campaign)}/rooms/${encodeURIComponent(room)}/tactical-maps`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
-  requireStatus(success, 200, "Tactical map generation"); const value = tacticalMapGenerateResponseSchema.parse(success.body);
-  if (value.campaignId !== campaign || value.sessionId !== room || value.mode !== body.mode || value.encounterId !== body.encounterId) throw new Error("Generated tactical map did not match the request");
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(campaign)}/rooms/${encodeURIComponent(room)}/tactical-maps`,
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) },
+  );
+  requireStatus(success, 200, "Tactical map generation");
+  const value = tacticalMapGenerateResponseSchema.parse(success.body);
+  if (
+    value.campaignId !== campaign ||
+    value.sessionId !== room ||
+    value.mode !== body.mode ||
+    value.encounterId !== body.encounterId
+  )
+    throw new Error("Generated tactical map did not match the request");
   return value;
 }
 
-export async function previewTacticalMapMove(campaignId: string, sessionId: string, mode: TacticalMapMode, input: TacticalMapPreviewRequest): Promise<TacticalMapPreviewResponse> {
+export async function previewTacticalMapMove(
+  campaignId: string,
+  sessionId: string,
+  mode: TacticalMapMode,
+  input: TacticalMapPreviewRequest,
+): Promise<TacticalMapPreviewResponse> {
   const body = parseApiInput(() => tacticalMapPreviewRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${tacticalMapPath(campaignId, sessionId, mode)}/previews`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
-  requireStatus(success, 200, "Tactical map preview"); const value = tacticalMapPreviewResponseSchema.parse(success.body);
+  const success = await requestResponse<unknown>(`${tacticalMapPath(campaignId, sessionId, mode)}/previews`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Tactical map preview");
+  const value = tacticalMapPreviewResponseSchema.parse(success.body);
   const end = value.projection.authoritativePath?.at(-1);
-  if (value.campaignId !== campaignId || value.sessionId !== sessionId || value.mode !== mode || end?.x !== body.destination.x || end.y !== body.destination.y) throw new Error("Tactical map preview did not match the request");
+  if (
+    value.campaignId !== campaignId ||
+    value.sessionId !== sessionId ||
+    value.mode !== mode ||
+    end?.x !== body.destination.x ||
+    end.y !== body.destination.y
+  )
+    throw new Error("Tactical map preview did not match the request");
   return value;
 }
 
-export async function moveTacticalMapToken(campaignId: string, sessionId: string, mode: TacticalMapMode, input: TacticalMapMoveRequest): Promise<TacticalMapMoveResponse> {
+export async function moveTacticalMapToken(
+  campaignId: string,
+  sessionId: string,
+  mode: TacticalMapMode,
+  input: TacticalMapMoveRequest,
+): Promise<TacticalMapMoveResponse> {
   const body = parseApiInput(() => tacticalMapMoveRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${tacticalMapPath(campaignId, sessionId, mode)}/move-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
-  requireStatus(success, 200, "Tactical map move"); const value = tacticalMapMoveResponseSchema.parse(success.body);
-  if (value.snapshot.campaignId !== campaignId || value.snapshot.sessionId !== sessionId || value.snapshot.mode !== mode || value.receipt.previewId !== body.previewId || value.receipt.idempotencyKey !== body.idempotencyKey) throw new Error("Tactical map move did not match the request");
+  const success = await requestResponse<unknown>(`${tacticalMapPath(campaignId, sessionId, mode)}/move-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Tactical map move");
+  const value = tacticalMapMoveResponseSchema.parse(success.body);
+  if (
+    value.snapshot.campaignId !== campaignId ||
+    value.snapshot.sessionId !== sessionId ||
+    value.snapshot.mode !== mode ||
+    value.receipt.previewId !== body.previewId ||
+    value.receipt.idempotencyKey !== body.idempotencyKey
+  )
+    throw new Error("Tactical map move did not match the request");
   return value;
 }
 
 /** Opens one initial or token-resume delivery stream; cancellation affects delivery only. */
-export function streamAdventureTurn(requestInput: AdventureTurnClientStreamRequest, onEvent: (event: AdventureTurnStreamEvent) => void): AdventureTurnClientStreamHandle {
-  const request = requestInput.kind === "initial"
-    ? parseApiInput(() => adventureTurnInitialStreamRequestSchema.parse({ campaignId: requestInput.campaignId, sessionId: requestInput.sessionId,
-      actorId: requestInput.actorId, declaration: requestInput.declaration, ...(requestInput.sheetReferences?.length ? { sheetReferences: requestInput.sheetReferences } : {}), expectedRevision: requestInput.expectedRevision, idempotencyKey: requestInput.idempotencyKey }))
-    : requestInput.kind === "resume"
-      ? parseApiInput(() => adventureTurnResumeStreamRequestSchema.parse({ resumeToken: requestInput.resumeToken }))
-      : parseApiInput(() => adventureTurnNarrationVariantStreamRequestSchema.parse({ variant: requestInput.kind,
-        campaignId: requestInput.campaignId, sessionId: requestInput.sessionId, actorId: requestInput.actorId,
-        priorTurnId: requestInput.priorTurnId, expectedRevision: requestInput.expectedRevision, idempotencyKey: requestInput.idempotencyKey }));
-  const controller = new AbortController(); let resolveTurn!: (turnId: string) => void; let rejectTurn!: (error: unknown) => void;
-  const turnId = new Promise<string>((resolve, reject) => { resolveTurn = resolve; rejectTurn = reject; });
+export function streamAdventureTurn(
+  requestInput: AdventureTurnClientStreamRequest,
+  onEvent: (event: AdventureTurnStreamEvent) => void,
+): AdventureTurnClientStreamHandle {
+  const request =
+    requestInput.kind === "initial"
+      ? parseApiInput(() =>
+          adventureTurnInitialStreamRequestSchema.parse({
+            campaignId: requestInput.campaignId,
+            sessionId: requestInput.sessionId,
+            actorId: requestInput.actorId,
+            declaration: requestInput.declaration,
+            ...(requestInput.sheetReferences?.length ? { sheetReferences: requestInput.sheetReferences } : {}),
+            expectedRevision: requestInput.expectedRevision,
+            idempotencyKey: requestInput.idempotencyKey,
+          }),
+        )
+      : requestInput.kind === "resume"
+        ? parseApiInput(() => adventureTurnResumeStreamRequestSchema.parse({ resumeToken: requestInput.resumeToken }))
+        : parseApiInput(() =>
+            adventureTurnNarrationVariantStreamRequestSchema.parse({
+              variant: requestInput.kind,
+              campaignId: requestInput.campaignId,
+              sessionId: requestInput.sessionId,
+              actorId: requestInput.actorId,
+              priorTurnId: requestInput.priorTurnId,
+              expectedRevision: requestInput.expectedRevision,
+              idempotencyKey: requestInput.idempotencyKey,
+            }),
+          );
+  const controller = new AbortController();
+  let resolveTurn!: (turnId: string) => void;
+  let rejectTurn!: (error: unknown) => void;
+  const turnId = new Promise<string>((resolve, reject) => {
+    resolveTurn = resolve;
+    rejectTurn = reject;
+  });
   // Consumers commonly await `done` first; mark the correlated identity
   // rejection handled while preserving rejection semantics for explicit awaits.
   void turnId.catch(() => undefined);
   const done = (async () => {
     try {
-      const response = await fetch("/api/rpg/v1/adventure-turns/stream", { method: "POST", cache: "no-store", signal: controller.signal,
-        headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify(request) });
+      const response = await fetch("/api/rpg/v1/adventure-turns/stream", {
+        method: "POST",
+        cache: "no-store",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+        body: JSON.stringify(request),
+      });
       if (!response.ok) throw await errorFromResponse(response);
       const contentType = response.headers.get("content-type") ?? "";
-      const cache = (response.headers.get("cache-control") ?? "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
-      if (response.status !== 200 || !/^text\/event-stream(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i.test(contentType)
-        || cache.length !== 3 || new Set(cache).size !== 3 || !["private", "no-store", "no-transform"].every((directive) => cache.includes(directive))) {
+      const cache = (response.headers.get("cache-control") ?? "")
+        .split(",")
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean);
+      if (
+        response.status !== 200 ||
+        !/^text\/event-stream(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i.test(
+          contentType,
+        ) ||
+        cache.length !== 3 ||
+        new Set(cache).size !== 3 ||
+        !["private", "no-store", "no-transform"].every((directive) => cache.includes(directive))
+      ) {
         throw new Error("Adventure turn stream response headers were invalid");
       }
       const headerTurnId = resourceIdSchema.parse(response.headers.get("x-adventure-turn-id"));
       if (!response.body) throw new Error("Adventure turn stream response had no body");
-      const expected: AdventureTurnClientBinding = requestInput.kind === "resume" ? requestInput.expected
-        : { campaignId: requestInput.campaignId, sessionId: requestInput.sessionId, actorId: requestInput.actorId,
-          ...(requestInput.kind === "initial" ? { priorTurnId: null } : { priorTurnId: requestInput.priorTurnId }) };
-      if (expected.turnId && expected.turnId !== headerTurnId) throw new Error("Adventure turn stream header did not match the expected turn");
+      const expected: AdventureTurnClientBinding =
+        requestInput.kind === "resume"
+          ? requestInput.expected
+          : {
+              campaignId: requestInput.campaignId,
+              sessionId: requestInput.sessionId,
+              actorId: requestInput.actorId,
+              ...(requestInput.kind === "initial" ? { priorTurnId: null } : { priorTurnId: requestInput.priorTurnId }),
+            };
+      if (expected.turnId && expected.turnId !== headerTurnId)
+        throw new Error("Adventure turn stream header did not match the expected turn");
       resolveTurn(headerTurnId);
-      const parser = createAdventureTurnSseParser((event) => {
-        if ((event.type === "turn_started" || event.type === "terminal") && event.payload.turn.turnId !== headerTurnId) throw new Error("Adventure turn stream was bound to another turn");
-        if (event.type === "turn_started" || event.type === "terminal") {
-          const turn = event.payload.turn;
-          if (turn.campaignId !== expected.campaignId || turn.sessionId !== expected.sessionId || turn.actorId !== expected.actorId
-            || (expected.priorTurnId !== undefined && turn.priorTurnId !== expected.priorTurnId)) throw new Error("Adventure turn stream did not match active play identity");
-          if (requestInput.kind === "initial" && (turn.declaration !== requestInput.declaration || turn.mode !== "original" || turn.priorTurnId !== null)) {
-            throw new Error("Adventure turn stream did not match the initial request");
+      const parser = createAdventureTurnSseParser(
+        (event) => {
+          if (
+            (event.type === "turn_started" || event.type === "terminal") &&
+            event.payload.turn.turnId !== headerTurnId
+          )
+            throw new Error("Adventure turn stream was bound to another turn");
+          if (event.type === "turn_started" || event.type === "terminal") {
+            const turn = event.payload.turn;
+            if (
+              turn.campaignId !== expected.campaignId ||
+              turn.sessionId !== expected.sessionId ||
+              turn.actorId !== expected.actorId ||
+              (expected.priorTurnId !== undefined && turn.priorTurnId !== expected.priorTurnId)
+            )
+              throw new Error("Adventure turn stream did not match active play identity");
+            if (
+              requestInput.kind === "initial" &&
+              (turn.declaration !== requestInput.declaration || turn.mode !== "original" || turn.priorTurnId !== null)
+            ) {
+              throw new Error("Adventure turn stream did not match the initial request");
+            }
+            if (requestInput.kind !== "initial" && requestInput.kind !== "resume" && turn.mode !== requestInput.kind) {
+              throw new Error("Adventure turn stream did not match the narration variant");
+            }
           }
-          if (requestInput.kind !== "initial" && requestInput.kind !== "resume" && turn.mode !== requestInput.kind) {
-            throw new Error("Adventure turn stream did not match the narration variant");
-          }
+          onEvent(event);
+        },
+        requestInput.kind === "initial" ? "initial" : requestInput.kind === "resume" ? "resume" : "variant",
+      );
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      try {
+        while (true) {
+          const next = await reader.read();
+          if (next.done) break;
+          parser.push(decoder.decode(next.value, { stream: true }));
         }
-        onEvent(event);
-      }, requestInput.kind === "initial" ? "initial" : requestInput.kind === "resume" ? "resume" : "variant");
-      const reader = response.body.getReader(); const decoder = new TextDecoder();
-      try { while (true) { const next = await reader.read(); if (next.done) break; parser.push(decoder.decode(next.value, { stream: true })); }
-        parser.push(decoder.decode()); parser.finish(); } finally { void reader.cancel().catch(() => undefined); }
-    } catch (error) { rejectTurn(error); throw error; }
+        parser.push(decoder.decode());
+        parser.finish();
+      } finally {
+        void reader.cancel().catch(() => undefined);
+      }
+    } catch (error) {
+      rejectTurn(error);
+      throw error;
+    }
   })();
   return { turnId, done, cancelDelivery: () => controller.abort() };
 }
 
 /** Reconciles one strict path-bound durable adventure turn. */
-export async function getAdventureTurn(turnId: string, expected: AdventureTurnClientBinding): Promise<AdventureTurnGetResponse> {
+export async function getAdventureTurn(
+  turnId: string,
+  expected: AdventureTurnClientBinding,
+): Promise<AdventureTurnGetResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(turnId));
-  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/${encodeURIComponent(id)}`, { cache: "no-store" }); requireStatus(success, 200, "Adventure turn read");
-  const response = adventureTurnGetResponseSchema.parse(success.body); assertAdventureTurnBinding(response.turn, { ...expected, turnId: id }); return response;
+  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/${encodeURIComponent(id)}`, {
+    cache: "no-store",
+  });
+  requireStatus(success, 200, "Adventure turn read");
+  const response = adventureTurnGetResponseSchema.parse(success.body);
+  assertAdventureTurnBinding(response.turn, { ...expected, turnId: id });
+  return response;
 }
 
 /** Reads the bounded role-safe transcript for one exact campaign room. */
-export async function getAdventureTurnTranscript(campaignId: string, sessionId: string): Promise<AdventureTurnTranscriptResponse> {
+export async function getAdventureTurnTranscript(
+  campaignId: string,
+  sessionId: string,
+): Promise<AdventureTurnTranscriptResponse> {
   const locator = parseApiInput(() => adventureTurnTranscriptRequestSchema.parse({ campaignId, sessionId }));
   const query = new URLSearchParams(locator);
-  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/transcript?${query.toString()}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/transcript?${query.toString()}`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Adventure turn transcript");
   const response = adventureTurnTranscriptResponseSchema.parse(success.body);
   if (response.campaignId !== locator.campaignId || response.sessionId !== locator.sessionId) {
@@ -1344,19 +1872,30 @@ export async function getAdventureTurnTranscript(campaignId: string, sessionId: 
   return response;
 }
 
-function assertAdventureTurnBinding(turn: AdventureTurnGetResponse["turn"], expected: AdventureTurnClientBinding): void {
-  if ((expected.turnId !== undefined && turn.turnId !== expected.turnId) || turn.campaignId !== expected.campaignId
-    || turn.sessionId !== expected.sessionId || turn.actorId !== expected.actorId
-    || (expected.priorTurnId !== undefined && turn.priorTurnId !== expected.priorTurnId)) {
+function assertAdventureTurnBinding(
+  turn: AdventureTurnGetResponse["turn"],
+  expected: AdventureTurnClientBinding,
+): void {
+  if (
+    (expected.turnId !== undefined && turn.turnId !== expected.turnId) ||
+    turn.campaignId !== expected.campaignId ||
+    turn.sessionId !== expected.sessionId ||
+    turn.actorId !== expected.actorId ||
+    (expected.priorTurnId !== undefined && turn.priorTurnId !== expected.priorTurnId)
+  ) {
     throw new Error("Adventure turn response did not match active play identity");
   }
 }
 
 /** Performs one read-only exact initial-key lookup; a null result remains commit-ambiguous. */
-export async function reconcileInitialAdventureTurn(input: AdventureTurnInitialReconcileRequest): Promise<AdventureTurnGetResponse | null> {
+export async function reconcileInitialAdventureTurn(
+  input: AdventureTurnInitialReconcileRequest,
+): Promise<AdventureTurnGetResponse | null> {
   const locator = parseApiInput(() => adventureTurnInitialReconcileRequestSchema.parse(input));
   const query = new URLSearchParams(locator);
-  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/reconcile-initial?${query.toString()}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/reconcile-initial?${query.toString()}`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Initial adventure turn reconciliation");
   const response = adventureTurnInitialReconcileResponseSchema.parse(success.body);
   if (response.result) assertAdventureTurnBinding(response.result.turn, locator);
@@ -1364,13 +1903,23 @@ export async function reconcileInitialAdventureTurn(input: AdventureTurnInitialR
 }
 
 /** Sends one exact confirmation batch without retry and requires turn/revision/token binding. */
-export async function confirmAdventureTurn(turnId: string, input: AdventureTurnConfirmRequest,
-  expected: AdventureTurnClientBinding): Promise<ReturnType<typeof adventureTurnConfirmResponseSchema.parse>> {
-  const id = parseApiInput(() => resourceIdSchema.parse(turnId)); const body = parseApiInput(() => adventureTurnConfirmRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/${encodeURIComponent(id)}/confirm`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
-  requireStatus(success, 200, "Adventure turn confirmation"); const response = adventureTurnConfirmResponseSchema.parse(success.body);
+export async function confirmAdventureTurn(
+  turnId: string,
+  input: AdventureTurnConfirmRequest,
+  expected: AdventureTurnClientBinding,
+): Promise<ReturnType<typeof adventureTurnConfirmResponseSchema.parse>> {
+  const id = parseApiInput(() => resourceIdSchema.parse(turnId));
+  const body = parseApiInput(() => adventureTurnConfirmRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/${encodeURIComponent(id)}/confirm`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Adventure turn confirmation");
+  const response = adventureTurnConfirmResponseSchema.parse(success.body);
   assertAdventureTurnBinding(response.turn, { ...expected, turnId: id });
-  if (response.turn.revision < body.expectedRevision + 1) throw new Error("Adventure turn confirmation response did not match the request");
+  if (response.turn.revision < body.expectedRevision + 1)
+    throw new Error("Adventure turn confirmation response did not match the request");
   return response;
 }
 
@@ -1394,10 +1943,9 @@ export async function createQuickAdventure(input: QuickAdventureCreateRequest): 
 export async function getCampaignDetail(campaignId: string): Promise<CampaignDetailResponse> {
   // Validate before interpolation; IDs are opaque and are never normalized or trimmed.
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const success = await requestResponse<unknown>(
-    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}`,
-    { cache: "no-store" },
-  );
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Campaign detail");
   const response = campaignDetailResponseSchema.parse(success.body);
   if (response.campaign.id !== validCampaignId) throw new Error("Campaign detail response did not match the request");
@@ -1407,10 +1955,9 @@ export async function getCampaignDetail(campaignId: string): Promise<CampaignDet
 /** Reads the bounded safe room projection. Opaque session IDs must not be rendered. */
 export async function listCampaignRooms(campaignId: string): Promise<CampaignRoomLinkingResponse> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const success = await requestResponse<unknown>(
-    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/rooms`,
-    { cache: "no-store" },
-  );
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/rooms`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Campaign room list");
   return campaignRoomLinkingResponseSchema.parse(success.body);
 }
@@ -1422,10 +1969,11 @@ export async function attachCampaignRoom(
 ): Promise<CampaignRoomAttachResponse> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const exactInput = parseApiInput(() => campaignRoomAttachRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(
-    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/rooms`,
-    { method: "PUT", cache: "no-store", body: JSON.stringify(exactInput) },
-  );
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/rooms`, {
+    method: "PUT",
+    cache: "no-store",
+    body: JSON.stringify(exactInput),
+  });
   if (success.status !== 200) throw new Error("Campaign room attachment response did not use the committed status");
   const response = campaignRoomAttachResponseSchema.parse(success.body);
   if (response.attachment.sessionId !== exactInput.sessionId) {
@@ -1452,18 +2000,20 @@ export async function detachCampaignRoom(
   requireStatus(success, 200, "Campaign room detachment");
   const response = campaignAdministrationHttpRoomDetachResponseSchema.parse(success.body);
   const [event] = response.receipt.events;
-  if (response.attachment.sessionId !== validSessionId
-    || response.receipt.campaignId !== validCampaignId
-    || response.receipt.type !== "room_detached"
-    || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1
-    || event.campaignId !== validCampaignId
-    || event.commandId !== response.receipt.commandId
-    || event.type !== "room_detached"
-    || event.revision !== response.receipt.revisionAfter
-    || event.occurredAt !== response.receipt.occurredAt
-    || Object.keys(event.data).join(",") !== "sessionId"
-    || event.data.sessionId !== validSessionId) {
+  if (
+    response.attachment.sessionId !== validSessionId ||
+    response.receipt.campaignId !== validCampaignId ||
+    response.receipt.type !== "room_detached" ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1 ||
+    event.campaignId !== validCampaignId ||
+    event.commandId !== response.receipt.commandId ||
+    event.type !== "room_detached" ||
+    event.revision !== response.receipt.revisionAfter ||
+    event.occurredAt !== response.receipt.occurredAt ||
+    Object.keys(event.data).join(",") !== "sessionId" ||
+    event.data.sessionId !== validSessionId
+  ) {
     throw new Error("Campaign room detachment receipt did not match the request");
   }
   return response;
@@ -1471,7 +2021,13 @@ export async function detachCampaignRoom(
 
 /** Beat terminal states reported by the bounded campaign startup summary. */
 const campaignStartupBeatStateSchema = z.enum([
-  "completed", "blocked", "planning", "awaiting-approval", "cancelled", "unknown", "none",
+  "completed",
+  "blocked",
+  "planning",
+  "awaiting-approval",
+  "cancelled",
+  "unknown",
+  "none",
 ]);
 
 /**
@@ -1479,21 +2035,29 @@ const campaignStartupBeatStateSchema = z.enum([
  * carries no caller-selected command data: the request body is always `{}` and
  * every idempotency key is derived server-side from durable identities.
  */
-export const campaignStartupResponseSchema = z.object({
-  campaignId: resourceIdSchema,
-  sessionId: resourceIdSchema,
-  dmMode: z.enum(["human", "ai"]),
-  dmModeRevision: z.number().int().min(0),
-  published: z.array(z.string().min(1).max(200)).max(64),
-  beat: z.object({ runId: resourceIdSchema.nullable(), state: campaignStartupBeatStateSchema }).strict(),
-  imagesEnqueued: z.array(z.object({
-    locationId: resourceIdSchema,
-    jobId: resourceIdSchema.nullable(),
-    deduped: z.boolean(),
-    skipped: z.string().max(64).nullable(),
-  }).strict()).max(64),
-  blockers: z.array(z.string().max(200)).max(16),
-}).strict();
+export const campaignStartupResponseSchema = z
+  .object({
+    campaignId: resourceIdSchema,
+    sessionId: resourceIdSchema,
+    dmMode: z.enum(["human", "ai"]),
+    dmModeRevision: z.number().int().min(0),
+    published: z.array(z.string().min(1).max(200)).max(64),
+    beat: z.object({ runId: resourceIdSchema.nullable(), state: campaignStartupBeatStateSchema }).strict(),
+    imagesEnqueued: z
+      .array(
+        z
+          .object({
+            locationId: resourceIdSchema,
+            jobId: resourceIdSchema.nullable(),
+            deduped: z.boolean(),
+            skipped: z.string().max(64).nullable(),
+          })
+          .strict(),
+      )
+      .max(64),
+    blockers: z.array(z.string().max(200)).max(16),
+  })
+  .strict();
 
 export type CampaignStartupResponse = z.infer<typeof campaignStartupResponseSchema>;
 
@@ -1554,9 +2118,11 @@ export async function rollCampaignDice(
   // derived success. Any other 2xx is malformed and remains commit-ambiguous.
   if (success.status !== 201) throw new Error("Campaign dice response did not use the committed status");
   const response = campaignDiceRollResponseSchema.parse(success.body);
-  if (response.roll.character.position !== normalized.character.position
-      || response.roll.character.name !== normalized.character.name
-      || response.roll.result.expression !== normalized.expression) {
+  if (
+    response.roll.character.position !== normalized.character.position ||
+    response.roll.character.name !== normalized.character.name ||
+    response.roll.result.expression !== normalized.expression
+  ) {
     throw new Error("Campaign dice response did not match the request");
   }
   return response;
@@ -1589,26 +2155,48 @@ export async function getCampaignCharacterWorkspace(
   return campaignCharacterWorkspaceResponseSchema.parse(success.body);
 }
 
-type CharacterDraftHttpMutation = { draft: CharacterDraftHttpView; receipt: Omit<CharacterDraftMutationReceipt, "commandId" | "draft"> };
+type CharacterDraftHttpMutation = {
+  draft: CharacterDraftHttpView;
+  receipt: Omit<CharacterDraftMutationReceipt, "commandId" | "draft">;
+};
 
-function characterDraftPath(campaignId: string, draftId?: string): { campaignId: string; draftId?: string; path: string } {
+function characterDraftPath(
+  campaignId: string,
+  draftId?: string,
+): { campaignId: string; draftId?: string; path: string } {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const validDraftId = draftId === undefined ? undefined : parseApiInput(() => resourceIdSchema.parse(draftId));
-  return { campaignId: validCampaignId, draftId: validDraftId,
-    path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/character-drafts${validDraftId ? `/${encodeURIComponent(validDraftId)}` : ""}` };
+  return {
+    campaignId: validCampaignId,
+    draftId: validDraftId,
+    path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/character-drafts${validDraftId ? `/${encodeURIComponent(validDraftId)}` : ""}`,
+  };
 }
 
 /** Creates one revision-zero draft. The idempotency key is owned by this exact caller intent. */
-export async function createCharacterDraft(campaignId: string, input: CreateCharacterDraftHttpInput): Promise<CharacterDraftHttpMutation> {
+export async function createCharacterDraft(
+  campaignId: string,
+  input: CreateCharacterDraftHttpInput,
+): Promise<CharacterDraftHttpMutation> {
   const target = characterDraftPath(campaignId);
   const body = parseApiInput(() => createCharacterDraftHttpInputSchema.parse(input));
-  const success = await requestResponse<unknown>(target.path, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(target.path, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 201, "Character draft creation");
   const response = characterDraftHttpMutationResultSchema.parse(success.body);
-  if (response.draft.campaignId !== target.campaignId || response.draft.personaId !== body.personaId
-    || response.draft.revision !== 0 || response.receipt.draftId !== response.draft.id
-    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.type !== "create"
-    || response.receipt.revisionBefore !== 0 || response.receipt.revisionAfter !== 0) {
+  if (
+    response.draft.campaignId !== target.campaignId ||
+    response.draft.personaId !== body.personaId ||
+    response.draft.revision !== 0 ||
+    response.receipt.draftId !== response.draft.id ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.type !== "create" ||
+    response.receipt.revisionBefore !== 0 ||
+    response.receipt.revisionAfter !== 0
+  ) {
     throw new Error("Character draft creation response did not match the request");
   }
   return response;
@@ -1619,61 +2207,111 @@ export async function getCharacterDraft(campaignId: string, draftId: string): Pr
   const success = await requestResponse<unknown>(target.path, { cache: "no-store" });
   requireStatus(success, 200, "Character draft read");
   const response = characterDraftHttpViewSchema.parse(success.body);
-  if (response.campaignId !== target.campaignId || response.id !== target.draftId) throw new Error("Character draft response did not match the request");
+  if (response.campaignId !== target.campaignId || response.id !== target.draftId)
+    throw new Error("Character draft response did not match the request");
   return response;
 }
 
 /** Autosaves one selection intent exactly once; this wrapper never retries a PATCH. */
-export async function updateCharacterDraft(campaignId: string, draftId: string, input: UpdateCharacterDraftHttpInput): Promise<CharacterDraftHttpMutation> {
+export async function updateCharacterDraft(
+  campaignId: string,
+  draftId: string,
+  input: UpdateCharacterDraftHttpInput,
+): Promise<CharacterDraftHttpMutation> {
   const target = characterDraftPath(campaignId, draftId);
   const body = parseApiInput(() => updateCharacterDraftHttpInputSchema.parse(input));
-  const success = await requestResponse<unknown>(target.path, { method: "PATCH", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(target.path, {
+    method: "PATCH",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Character draft update");
   const response = characterDraftHttpMutationResultSchema.parse(success.body);
-  if (response.draft.campaignId !== target.campaignId || response.draft.id !== target.draftId
-    || response.draft.revision !== body.expectedRevision + 1 || response.receipt.draftId !== target.draftId
-    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.type !== "update"
-    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.revisionAfter !== response.draft.revision) {
+  if (
+    response.draft.campaignId !== target.campaignId ||
+    response.draft.id !== target.draftId ||
+    response.draft.revision !== body.expectedRevision + 1 ||
+    response.receipt.draftId !== target.draftId ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.type !== "update" ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== response.draft.revision
+  ) {
     throw new Error("Character draft update response did not match the request");
   }
   return response;
 }
 
 /** Requests one new audited server roll; this wrapper never retries the POST. */
-export async function rerollCharacterDraft(campaignId: string, draftId: string, input: { expectedRevision: number; idempotencyKey: string }): Promise<CharacterDraftHttpMutation> {
+export async function rerollCharacterDraft(
+  campaignId: string,
+  draftId: string,
+  input: { expectedRevision: number; idempotencyKey: string },
+): Promise<CharacterDraftHttpMutation> {
   const target = characterDraftPath(campaignId, draftId);
   const body = parseApiInput(() => rerollCharacterDraftHttpInputSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/reroll`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/reroll`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Character draft reroll");
   const response = characterDraftHttpMutationResultSchema.parse(success.body);
-  if (response.draft.campaignId !== target.campaignId || response.draft.id !== target.draftId || response.draft.allocation.method !== "server-roll"
-    || response.draft.revision !== body.expectedRevision + 1 || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.revisionAfter !== response.draft.revision) throw new Error("Character draft reroll response did not match the request");
+  if (
+    response.draft.campaignId !== target.campaignId ||
+    response.draft.id !== target.draftId ||
+    response.draft.allocation.method !== "server-roll" ||
+    response.draft.revision !== body.expectedRevision + 1 ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== response.draft.revision
+  )
+    throw new Error("Character draft reroll response did not match the request");
   return response;
 }
 
 /** Finalizes once and accepts only the strict public M2.6 receipt projection. */
-export async function finalizeCharacterDraft(campaignId: string, draftId: string, input: { expectedRevision: number; idempotencyKey: string }): Promise<CharacterDraftHttpFinalizationResult> {
+export async function finalizeCharacterDraft(
+  campaignId: string,
+  draftId: string,
+  input: { expectedRevision: number; idempotencyKey: string },
+): Promise<CharacterDraftHttpFinalizationResult> {
   const target = characterDraftPath(campaignId, draftId);
   const body = parseApiInput(() => finalizeCharacterDraftHttpInputSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/finalize`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/finalize`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 201, "Character draft finalization");
   const response = characterDraftHttpFinalizationResultSchema.parse(success.body);
-  if (response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+  if (
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1
+  ) {
     throw new Error("Character draft finalization response did not match the request");
   }
   return response;
 }
 
-function campaignCharacterPath(campaignId: string, campaignCharacterId: string): { campaignId: string; characterId: string; path: string } {
+function campaignCharacterPath(
+  campaignId: string,
+  campaignCharacterId: string,
+): { campaignId: string; characterId: string; path: string } {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const validCharacterId = parseApiInput(() => resourceIdSchema.parse(campaignCharacterId));
-  return { campaignId: validCampaignId, characterId: validCharacterId,
-    path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/characters/${encodeURIComponent(validCharacterId)}` };
+  return {
+    campaignId: validCampaignId,
+    characterId: validCharacterId,
+    path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/characters/${encodeURIComponent(validCharacterId)}`,
+  };
 }
 
-export async function getCharacterSheet(campaignId: string, campaignCharacterId: string): Promise<CharacterSheetHttpResponse> {
+export async function getCharacterSheet(
+  campaignId: string,
+  campaignCharacterId: string,
+): Promise<CharacterSheetHttpResponse> {
   const target = campaignCharacterPath(campaignId, campaignCharacterId);
   const success = await requestResponse<unknown>(`${target.path}/sheet`, { cache: "no-store" });
   requireStatus(success, 200, "Character sheet read");
@@ -1683,8 +2321,11 @@ export async function getCharacterSheet(campaignId: string, campaignCharacterId:
 function actorLanePath(campaignId: string, actorId: string): { campaignId: string; actorId: string; path: string } {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
-  return { campaignId: validCampaignId, actorId: validActorId,
-    path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/actors/${encodeURIComponent(validActorId)}` };
+  return {
+    campaignId: validCampaignId,
+    actorId: validActorId,
+    path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/actors/${encodeURIComponent(validActorId)}`,
+  };
 }
 
 export async function getActorResources(campaignId: string, actorId: string): Promise<ActorResourcesHttpGetResponse> {
@@ -1695,14 +2336,27 @@ export async function getActorResources(campaignId: string, actorId: string): Pr
 }
 
 /** Issues one exact signed adjustment. This function deliberately never retries. */
-export async function changeActorResource(campaignId: string, actorId: string, input: ActorResourcesHttpChangeCommandRequest): Promise<ActorResourcesHttpChangeCommandResponse> {
+export async function changeActorResource(
+  campaignId: string,
+  actorId: string,
+  input: ActorResourcesHttpChangeCommandRequest,
+): Promise<ActorResourcesHttpChangeCommandResponse> {
   const target = actorLanePath(campaignId, actorId);
   const body = parseApiInput(() => actorResourcesHttpChangeCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/resource-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/resource-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor resource command");
   const response = actorResourcesHttpChangeCommandResponseSchema.parse(success.body);
-  if (response.receipt.kind !== body.kind || response.receipt.resourceName !== body.resourceName || response.receipt.amount !== body.amount
-    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision) {
+  if (
+    response.receipt.kind !== body.kind ||
+    response.receipt.resourceName !== body.resourceName ||
+    response.receipt.amount !== body.amount ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision
+  ) {
     throw new Error("Actor resource receipt did not match the request");
   }
   return response;
@@ -1715,25 +2369,57 @@ export async function getActorInventory(campaignId: string, actorId: string): Pr
   return inventoryHttpGetResponseSchema.parse(success.body);
 }
 
-function inventoryReceiptMatches(command: InventoryHttpCommandRequest, receipt: InventoryHttpCommandResponse["receipt"]): boolean {
+function inventoryReceiptMatches(
+  command: InventoryHttpCommandRequest,
+  receipt: InventoryHttpCommandResponse["receipt"],
+): boolean {
   if (command.kind !== receipt.kind) return false;
-  if (command.kind === "equip" && receipt.kind === "equip") return command.slot === receipt.slot && command.entryId === receipt.entryId;
+  if (command.kind === "equip" && receipt.kind === "equip")
+    return command.slot === receipt.slot && command.entryId === receipt.entryId;
   if (command.kind === "unequip" && receipt.kind === "unequip") return command.slot === receipt.slot;
-  if (command.kind === "consume" && receipt.kind === "consume") return command.entryId === receipt.entryId && command.quantity === receipt.quantity && JSON.stringify(command.item) === JSON.stringify(receipt.item);
-  if (command.kind === "drop" && receipt.kind === "drop") return command.entryId === receipt.entryId && command.quantity === receipt.quantity && JSON.stringify(command.item) === JSON.stringify(receipt.item);
-  return command.kind === "gift" && receipt.kind === "gift" && command.recipientActorId === receipt.recipientActorId
-    && command.entryId === receipt.entryId && command.quantity === receipt.quantity && JSON.stringify(command.item) === JSON.stringify(receipt.item);
+  if (command.kind === "consume" && receipt.kind === "consume")
+    return (
+      command.entryId === receipt.entryId &&
+      command.quantity === receipt.quantity &&
+      JSON.stringify(command.item) === JSON.stringify(receipt.item)
+    );
+  if (command.kind === "drop" && receipt.kind === "drop")
+    return (
+      command.entryId === receipt.entryId &&
+      command.quantity === receipt.quantity &&
+      JSON.stringify(command.item) === JSON.stringify(receipt.item)
+    );
+  return (
+    command.kind === "gift" &&
+    receipt.kind === "gift" &&
+    command.recipientActorId === receipt.recipientActorId &&
+    command.entryId === receipt.entryId &&
+    command.quantity === receipt.quantity &&
+    JSON.stringify(command.item) === JSON.stringify(receipt.item)
+  );
 }
 
 /** Submits one legal M2.7 inventory discriminant and requires its exact receipt. */
-export async function commandActorInventory(campaignId: string, actorId: string, input: InventoryHttpCommandRequest): Promise<InventoryHttpCommandResponse> {
+export async function commandActorInventory(
+  campaignId: string,
+  actorId: string,
+  input: InventoryHttpCommandRequest,
+): Promise<InventoryHttpCommandResponse> {
   const target = actorLanePath(campaignId, actorId);
   const body = parseApiInput(() => inventoryHttpCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/inventory-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/inventory-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor inventory command");
   const response = inventoryHttpCommandResponseSchema.parse(success.body);
-  if (!inventoryReceiptMatches(body, response.receipt) || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision || response.inventory.revision !== response.receipt.revisionAfter) {
+  if (
+    !inventoryReceiptMatches(body, response.receipt) ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.inventory.revision !== response.receipt.revisionAfter
+  ) {
     throw new Error("Actor inventory receipt did not match the request");
   }
   return response;
@@ -1749,7 +2435,10 @@ export async function getActorWallet(campaignId: string, actorId: string): Promi
 export async function getCampaignShop(campaignId: string, shopId: string): Promise<EconomyHttpShopGetResponse> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const validShopId = parseApiInput(() => resourceIdSchema.parse(shopId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/shops/${encodeURIComponent(validShopId)}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/shops/${encodeURIComponent(validShopId)}`,
+    { cache: "no-store" },
+  );
   requireStatus(success, 200, "Campaign shop read");
   return economyHttpShopGetResponseSchema.parse(success.body);
 }
@@ -1760,14 +2449,21 @@ export async function getCampaignShop(campaignId: string, shopId: string): Promi
  * this transport maps to `null`; every other failure still throws so callers can
  * never mistake an outage for "no shop yet".
  */
-export async function getCampaignNpcShop(campaignId: string, npcId: string): Promise<EconomyHttpNpcShopAssociationGetResponse["association"] | null> {
+export async function getCampaignNpcShop(
+  campaignId: string,
+  npcId: string,
+): Promise<EconomyHttpNpcShopAssociationGetResponse["association"] | null> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const validNpcId = parseApiInput(() => resourceIdSchema.parse(npcId));
   try {
-    const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/npcs/${encodeURIComponent(validNpcId)}/shop`, { cache: "no-store" });
+    const success = await requestResponse<unknown>(
+      `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/npcs/${encodeURIComponent(validNpcId)}/shop`,
+      { cache: "no-store" },
+    );
     requireStatus(success, 200, "Campaign NPC shop association read");
     const response = economyHttpNpcShopAssociationGetResponseSchema.parse(success.body);
-    if (response.association.npcId !== validNpcId) throw new Error("Campaign NPC shop association did not match the request");
+    if (response.association.npcId !== validNpcId)
+      throw new Error("Campaign NPC shop association did not match the request");
     return response.association;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
@@ -1782,54 +2478,76 @@ export async function getCampaignNpcShop(campaignId: string, npcId: string): Pro
  * `merchantNpcId` (and an optional classified `candidateId`) and validates the
  * exact reply. It never invents an item, a quantity, a price, or a currency.
  */
-export const freeformShopNoneReasonSchema = z.enum(["no-merchant", "merchant-not-public", "shop-already-exists", "no-compatible-item"]);
+export const freeformShopNoneReasonSchema = z.enum([
+  "no-merchant",
+  "merchant-not-public",
+  "shop-already-exists",
+  "no-compatible-item",
+]);
 export type FreeformShopNoneReason = z.infer<typeof freeformShopNoneReasonSchema>;
-const freeformShopItemReferenceSchema = z.object({
-  kind: z.literal("item"),
-  packId: z.string().min(1).max(128),
-  packVersion: z.string().min(1).max(64),
-  definitionId: z.string().min(1).max(256),
-}).strict();
-const freeformShopStockLineSchema = z.object({
-  stockId: z.string().min(1).max(128),
-  item: freeformShopItemReferenceSchema,
-  quantity: z.number().int().min(1).max(20),
-  unitPriceMinor: z.number().int().min(0),
-  currencyCode: z.string().min(1).max(64),
-}).strict();
-const freeformShopCandidateSchema = z.object({
-  candidateId: z.string().min(1).max(128),
-  shopId: z.string().min(1).max(128),
-  shopName: z.string().min(1).max(200),
-  npcId: z.string().min(1).max(128),
-  items: z.array(freeformShopStockLineSchema).min(1).max(8),
-}).strict();
+const freeformShopItemReferenceSchema = z
+  .object({
+    kind: z.literal("item"),
+    packId: z.string().min(1).max(128),
+    packVersion: z.string().min(1).max(64),
+    definitionId: z.string().min(1).max(256),
+  })
+  .strict();
+const freeformShopStockLineSchema = z
+  .object({
+    stockId: z.string().min(1).max(128),
+    item: freeformShopItemReferenceSchema,
+    quantity: z.number().int().min(1).max(20),
+    unitPriceMinor: z.number().int().min(0),
+    currencyCode: z.string().min(1).max(64),
+  })
+  .strict();
+const freeformShopCandidateSchema = z
+  .object({
+    candidateId: z.string().min(1).max(128),
+    shopId: z.string().min(1).max(128),
+    shopName: z.string().min(1).max(200),
+    npcId: z.string().min(1).max(128),
+    items: z.array(freeformShopStockLineSchema).min(1).max(8),
+  })
+  .strict();
 const freeformShopClassificationSchema = z.discriminatedUnion("intent", [
   z.object({ intent: z.literal("none"), reason: freeformShopNoneReasonSchema }).strict(),
-  z.object({ intent: z.literal("materialize-shop"), merchantName: z.string().min(1).max(200),
-    candidates: z.array(freeformShopCandidateSchema).min(1).max(1) }).strict(),
+  z
+    .object({
+      intent: z.literal("materialize-shop"),
+      merchantName: z.string().min(1).max(200),
+      candidates: z.array(freeformShopCandidateSchema).min(1).max(1),
+    })
+    .strict(),
 ]);
 const freeformShopMaterializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: freeformShopNoneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: freeformShopCandidateSchema,
-    shopId: z.string().min(1).max(128),
-    npcId: z.string().min(1).max(128),
-    draftId: z.string().min(1).max(128),
-    contentReceiptId: z.string().min(1).max(128).nullable(),
-    bindingCreated: z.boolean(),
-    stock: z.array(freeformShopStockLineSchema).min(1).max(8),
-  }).strict(),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: freeformShopCandidateSchema,
+      shopId: z.string().min(1).max(128),
+      npcId: z.string().min(1).max(128),
+      draftId: z.string().min(1).max(128),
+      contentReceiptId: z.string().min(1).max(128).nullable(),
+      bindingCreated: z.boolean(),
+      stock: z.array(freeformShopStockLineSchema).min(1).max(8),
+    })
+    .strict(),
 ]);
-export const freeformShopHttpResponseSchema = z.object({
-  classification: freeformShopClassificationSchema,
-  materialization: freeformShopMaterializationSchema.optional(),
-}).strict();
-const freeformShopHttpRequestSchema = z.object({
-  merchantNpcId: z.string().min(1).max(128),
-  candidateId: z.string().min(1).max(128).optional(),
-}).strict();
+export const freeformShopHttpResponseSchema = z
+  .object({
+    classification: freeformShopClassificationSchema,
+    materialization: freeformShopMaterializationSchema.optional(),
+  })
+  .strict();
+const freeformShopHttpRequestSchema = z
+  .object({
+    merchantNpcId: z.string().min(1).max(128),
+    candidateId: z.string().min(1).max(128).optional(),
+  })
+  .strict();
 
 export type FreeformShopHttpRequest = z.infer<typeof freeformShopHttpRequestSchema>;
 export type FreeformShopHttpResponse = z.infer<typeof freeformShopHttpResponseSchema>;
@@ -1839,19 +2557,26 @@ export type FreeformShopHttpResponse = z.infer<typeof freeformShopHttpResponseSc
  * exactly one POST and never retries: a replay is the server's idempotent
  * concern, and an ambiguous outcome must be reconciled explicitly by the caller.
  */
-export async function commandFreeformShop(campaignId: string, sessionId: string, actorId: string,
-  input: FreeformShopHttpRequest): Promise<FreeformShopHttpResponse> {
+export async function commandFreeformShop(
+  campaignId: string,
+  sessionId: string,
+  actorId: string,
+  input: FreeformShopHttpRequest,
+): Promise<FreeformShopHttpResponse> {
   const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const room = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
   const actor = parseApiInput(() => resourceIdSchema.parse(actorId));
   const body = parseApiInput(() => freeformShopHttpRequestSchema.parse(input));
   const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeOpaquePathSegment(campaign)}/rooms/${encodeOpaquePathSegment(room)}/actors/${encodeOpaquePathSegment(actor)}/freeform-shop-commands`,
-    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) },
+  );
   requireStatus(success, 200, "Freeform shop command");
   const response = freeformShopHttpResponseSchema.parse(success.body);
-  if (response.materialization?.status === "materialized"
-    && response.materialization.candidate.npcId !== body.merchantNpcId) {
+  if (
+    response.materialization?.status === "materialized" &&
+    response.materialization.candidate.npcId !== body.merchantNpcId
+  ) {
     throw new Error("Freeform shop materialization did not match the selected merchant");
   }
   return response;
@@ -1869,127 +2594,245 @@ const freeformBoundedText = (max: number) => z.string().min(1).max(max);
  */
 
 export const freeformFactionNoneReasonSchema = z.enum([
-  "no-faction-intent", "empty-name", "name-too-long", "not-a-faction", "known-faction",
+  "no-faction-intent",
+  "empty-name",
+  "name-too-long",
+  "not-a-faction",
+  "known-faction",
 ]);
 export type FreeformFactionNoneReason = z.infer<typeof freeformFactionNoneReasonSchema>;
-const freeformFactionCandidateSchema = z.object({
-  candidateId: freeformBoundedText(128),
-  factionKey: freeformBoundedText(128),
-  gmAgendaKey: freeformBoundedText(128),
-  name: freeformBoundedText(200),
-  archetype: freeformBoundedText(128),
-  description: freeformBoundedText(4_000),
-  gmAgenda: freeformBoundedText(4_000),
-  visibility: z.literal("public"),
-}).strict();
+const freeformFactionCandidateSchema = z
+  .object({
+    candidateId: freeformBoundedText(128),
+    factionKey: freeformBoundedText(128),
+    gmAgendaKey: freeformBoundedText(128),
+    name: freeformBoundedText(200),
+    archetype: freeformBoundedText(128),
+    description: freeformBoundedText(4_000),
+    gmAgenda: freeformBoundedText(4_000),
+    visibility: z.literal("public"),
+  })
+  .strict();
 const freeformFactionClassificationSchema = z.discriminatedUnion("intent", [
-  z.object({ intent: z.literal("none"), reason: freeformFactionNoneReasonSchema, factionName: freeformBoundedText(200).optional() }).strict(),
-  z.object({ intent: z.literal("materialize-faction"), factionName: freeformBoundedText(200),
-    candidates: z.array(freeformFactionCandidateSchema).min(1).max(4) }).strict(),
+  z
+    .object({
+      intent: z.literal("none"),
+      reason: freeformFactionNoneReasonSchema,
+      factionName: freeformBoundedText(200).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      intent: z.literal("materialize-faction"),
+      factionName: freeformBoundedText(200),
+      candidates: z.array(freeformFactionCandidateSchema).min(1).max(4),
+    })
+    .strict(),
 ]);
 const freeformFactionMaterializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: freeformFactionNoneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: z.object({ candidateId: freeformBoundedText(128), factionKey: freeformBoundedText(128),
-      gmAgendaKey: freeformBoundedText(128), name: freeformBoundedText(200), visibility: z.literal("public") }).strict(),
-    factionId: freeformBoundedText(128),
-    draftId: freeformBoundedText(128),
-    contentReceiptId: freeformBoundedText(128).nullable(),
-    gmAgendaArtifactKey: freeformBoundedText(128).nullable(),
-  }).strict(),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: z
+        .object({
+          candidateId: freeformBoundedText(128),
+          factionKey: freeformBoundedText(128),
+          gmAgendaKey: freeformBoundedText(128),
+          name: freeformBoundedText(200),
+          visibility: z.literal("public"),
+        })
+        .strict(),
+      factionId: freeformBoundedText(128),
+      draftId: freeformBoundedText(128),
+      contentReceiptId: freeformBoundedText(128).nullable(),
+      gmAgendaArtifactKey: freeformBoundedText(128).nullable(),
+    })
+    .strict(),
 ]);
-export const freeformFactionHttpResponseSchema = z.object({
-  classification: freeformFactionClassificationSchema,
-  materialization: freeformFactionMaterializationSchema.optional(),
-}).strict();
-const freeformFactionHttpRequestSchema = z.object({
-  text: freeformBoundedText(2_000), candidateId: freeformBoundedText(128).optional(),
-}).strict();
+export const freeformFactionHttpResponseSchema = z
+  .object({
+    classification: freeformFactionClassificationSchema,
+    materialization: freeformFactionMaterializationSchema.optional(),
+  })
+  .strict();
+const freeformFactionHttpRequestSchema = z
+  .object({
+    text: freeformBoundedText(2_000),
+    candidateId: freeformBoundedText(128).optional(),
+  })
+  .strict();
 export type FreeformFactionHttpRequest = z.infer<typeof freeformFactionHttpRequestSchema>;
 export type FreeformFactionHttpResponse = z.infer<typeof freeformFactionHttpResponseSchema>;
 
 export const freeformQuestNoneReasonSchema = z.enum([
-  "no-quest-intent", "empty-lead", "lead-too-long", "known-quest", "no-current-location", "current-location-unmapped",
+  "no-quest-intent",
+  "empty-lead",
+  "lead-too-long",
+  "known-quest",
+  "no-current-location",
+  "current-location-unmapped",
 ]);
 export type FreeformQuestNoneReason = z.infer<typeof freeformQuestNoneReasonSchema>;
-const freeformQuestObjectiveSchema = z.object({
-  key: freeformBoundedText(128), description: freeformBoundedText(2_000),
-  targetProgress: z.number().int().min(1).max(1_000_000),
-  dependencyObjectiveKeys: z.array(freeformBoundedText(128)).max(4), visibility: z.literal("public"),
-}).strict();
-const freeformQuestRewardSchema = z.object({
-  key: freeformBoundedText(128), label: freeformBoundedText(200), kind: z.literal("custom"), amount: z.null(),
-  visibility: z.literal("public"),
-}).strict();
-const freeformQuestCandidateSchema = z.object({
-  candidateId: freeformBoundedText(128), questKey: freeformBoundedText(128), gmTwistKey: freeformBoundedText(128),
-  locationKey: freeformBoundedText(128), title: freeformBoundedText(200), description: freeformBoundedText(2_000),
-  objectives: z.array(freeformQuestObjectiveSchema).min(1).max(3), reward: freeformQuestRewardSchema,
-  gmTwist: freeformBoundedText(2_000), templateId: freeformBoundedText(128), visibility: z.literal("public"),
-}).strict();
+const freeformQuestObjectiveSchema = z
+  .object({
+    key: freeformBoundedText(128),
+    description: freeformBoundedText(2_000),
+    targetProgress: z.number().int().min(1).max(1_000_000),
+    dependencyObjectiveKeys: z.array(freeformBoundedText(128)).max(4),
+    visibility: z.literal("public"),
+  })
+  .strict();
+const freeformQuestRewardSchema = z
+  .object({
+    key: freeformBoundedText(128),
+    label: freeformBoundedText(200),
+    kind: z.literal("custom"),
+    amount: z.null(),
+    visibility: z.literal("public"),
+  })
+  .strict();
+const freeformQuestCandidateSchema = z
+  .object({
+    candidateId: freeformBoundedText(128),
+    questKey: freeformBoundedText(128),
+    gmTwistKey: freeformBoundedText(128),
+    locationKey: freeformBoundedText(128),
+    title: freeformBoundedText(200),
+    description: freeformBoundedText(2_000),
+    objectives: z.array(freeformQuestObjectiveSchema).min(1).max(3),
+    reward: freeformQuestRewardSchema,
+    gmTwist: freeformBoundedText(2_000),
+    templateId: freeformBoundedText(128),
+    visibility: z.literal("public"),
+  })
+  .strict();
 const freeformQuestClassificationSchema = z.discriminatedUnion("intent", [
-  z.object({ intent: z.literal("none"), reason: freeformQuestNoneReasonSchema, title: freeformBoundedText(200).optional() }).strict(),
-  z.object({ intent: z.literal("materialize-quest"), lead: freeformBoundedText(200),
-    candidates: z.array(freeformQuestCandidateSchema).min(1).max(4) }).strict(),
+  z
+    .object({
+      intent: z.literal("none"),
+      reason: freeformQuestNoneReasonSchema,
+      title: freeformBoundedText(200).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      intent: z.literal("materialize-quest"),
+      lead: freeformBoundedText(200),
+      candidates: z.array(freeformQuestCandidateSchema).min(1).max(4),
+    })
+    .strict(),
 ]);
 const freeformQuestMaterializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: freeformQuestNoneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: z.object({ candidateId: freeformBoundedText(128), questKey: freeformBoundedText(128),
-      gmTwistKey: freeformBoundedText(128), title: freeformBoundedText(200), visibility: z.literal("public") }).strict(),
-    questId: freeformBoundedText(128),
-    draftId: freeformBoundedText(128),
-    contentReceiptId: freeformBoundedText(128).nullable(),
-    gmTwistArtifactKey: freeformBoundedText(128).nullable(),
-  }).strict(),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: z
+        .object({
+          candidateId: freeformBoundedText(128),
+          questKey: freeformBoundedText(128),
+          gmTwistKey: freeformBoundedText(128),
+          title: freeformBoundedText(200),
+          visibility: z.literal("public"),
+        })
+        .strict(),
+      questId: freeformBoundedText(128),
+      draftId: freeformBoundedText(128),
+      contentReceiptId: freeformBoundedText(128).nullable(),
+      gmTwistArtifactKey: freeformBoundedText(128).nullable(),
+    })
+    .strict(),
 ]);
-export const freeformQuestHttpResponseSchema = z.object({
-  classification: freeformQuestClassificationSchema,
-  materialization: freeformQuestMaterializationSchema.optional(),
-}).strict();
-const freeformQuestHttpRequestSchema = z.object({
-  text: freeformBoundedText(2_000), candidateId: freeformBoundedText(128).optional(),
-}).strict();
+export const freeformQuestHttpResponseSchema = z
+  .object({
+    classification: freeformQuestClassificationSchema,
+    materialization: freeformQuestMaterializationSchema.optional(),
+  })
+  .strict();
+const freeformQuestHttpRequestSchema = z
+  .object({
+    text: freeformBoundedText(2_000),
+    candidateId: freeformBoundedText(128).optional(),
+  })
+  .strict();
 export type FreeformQuestHttpRequest = z.infer<typeof freeformQuestHttpRequestSchema>;
 export type FreeformQuestHttpResponse = z.infer<typeof freeformQuestHttpResponseSchema>;
 
 export const freeformRumorNoneReasonSchema = z.enum([
-  "no-rumor-intent", "empty-subject", "subject-too-long", "known-rumor", "no-current-location", "current-location-unmapped",
+  "no-rumor-intent",
+  "empty-subject",
+  "subject-too-long",
+  "known-rumor",
+  "no-current-location",
+  "current-location-unmapped",
 ]);
 export type FreeformRumorNoneReason = z.infer<typeof freeformRumorNoneReasonSchema>;
-const freeformRumorCandidateSchema = z.object({
-  candidateId: freeformBoundedText(128), hearsayKey: freeformBoundedText(128), truthKey: freeformBoundedText(128),
-  locationKey: freeformBoundedText(128), subject: freeformBoundedText(160), source: freeformBoundedText(2_000),
-  publicText: freeformBoundedText(2_000), gmTruth: freeformBoundedText(2_000), templateId: freeformBoundedText(128),
-  visibility: z.literal("public"),
-}).strict();
+const freeformRumorCandidateSchema = z
+  .object({
+    candidateId: freeformBoundedText(128),
+    hearsayKey: freeformBoundedText(128),
+    truthKey: freeformBoundedText(128),
+    locationKey: freeformBoundedText(128),
+    subject: freeformBoundedText(160),
+    source: freeformBoundedText(2_000),
+    publicText: freeformBoundedText(2_000),
+    gmTruth: freeformBoundedText(2_000),
+    templateId: freeformBoundedText(128),
+    visibility: z.literal("public"),
+  })
+  .strict();
 const freeformRumorClassificationSchema = z.discriminatedUnion("intent", [
-  z.object({ intent: z.literal("none"), reason: freeformRumorNoneReasonSchema, title: freeformBoundedText(200).optional() }).strict(),
-  z.object({ intent: z.literal("materialize-rumor"), subject: freeformBoundedText(160),
-    candidates: z.array(freeformRumorCandidateSchema).min(1).max(4) }).strict(),
+  z
+    .object({
+      intent: z.literal("none"),
+      reason: freeformRumorNoneReasonSchema,
+      title: freeformBoundedText(200).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      intent: z.literal("materialize-rumor"),
+      subject: freeformBoundedText(160),
+      candidates: z.array(freeformRumorCandidateSchema).min(1).max(4),
+    })
+    .strict(),
 ]);
 const freeformRumorMaterializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: freeformRumorNoneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: z.object({ candidateId: freeformBoundedText(128), hearsayKey: freeformBoundedText(128),
-      truthKey: freeformBoundedText(128), subject: freeformBoundedText(160), source: freeformBoundedText(2_000),
-      publicText: freeformBoundedText(2_000), visibility: z.literal("public") }).strict(),
-    rumorId: freeformBoundedText(128),
-    draftId: freeformBoundedText(128),
-    contentReceiptId: freeformBoundedText(128).nullable(),
-    gmTruthArtifactKey: freeformBoundedText(128).nullable(),
-  }).strict(),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: z
+        .object({
+          candidateId: freeformBoundedText(128),
+          hearsayKey: freeformBoundedText(128),
+          truthKey: freeformBoundedText(128),
+          subject: freeformBoundedText(160),
+          source: freeformBoundedText(2_000),
+          publicText: freeformBoundedText(2_000),
+          visibility: z.literal("public"),
+        })
+        .strict(),
+      rumorId: freeformBoundedText(128),
+      draftId: freeformBoundedText(128),
+      contentReceiptId: freeformBoundedText(128).nullable(),
+      gmTruthArtifactKey: freeformBoundedText(128).nullable(),
+    })
+    .strict(),
 ]);
-export const freeformRumorHttpResponseSchema = z.object({
-  classification: freeformRumorClassificationSchema,
-  materialization: freeformRumorMaterializationSchema.optional(),
-}).strict();
-const freeformRumorHttpRequestSchema = z.object({
-  text: freeformBoundedText(2_000), candidateId: freeformBoundedText(128).optional(),
-}).strict();
+export const freeformRumorHttpResponseSchema = z
+  .object({
+    classification: freeformRumorClassificationSchema,
+    materialization: freeformRumorMaterializationSchema.optional(),
+  })
+  .strict();
+const freeformRumorHttpRequestSchema = z
+  .object({
+    text: freeformBoundedText(2_000),
+    candidateId: freeformBoundedText(128).optional(),
+  })
+  .strict();
 export type FreeformRumorHttpRequest = z.infer<typeof freeformRumorHttpRequestSchema>;
 export type FreeformRumorHttpResponse = z.infer<typeof freeformRumorHttpResponseSchema>;
 
@@ -2001,11 +2844,18 @@ function freeformLanePath(campaignId: string, sessionId: string, actorId: string
 }
 
 /** Materializes one bounded free-form faction/order/guild; one POST, no retry. */
-export async function commandFreeformFaction(campaignId: string, sessionId: string, actorId: string,
-  input: FreeformFactionHttpRequest): Promise<FreeformFactionHttpResponse> {
+export async function commandFreeformFaction(
+  campaignId: string,
+  sessionId: string,
+  actorId: string,
+  input: FreeformFactionHttpRequest,
+): Promise<FreeformFactionHttpResponse> {
   const body = parseApiInput(() => freeformFactionHttpRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "faction"),
-    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "faction"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Freeform faction command");
   const response = freeformFactionHttpResponseSchema.parse(success.body);
   const materialization = response.materialization;
@@ -2014,8 +2864,10 @@ export async function commandFreeformFaction(campaignId: string, sessionId: stri
     if (body.candidateId !== undefined && !candidates.some((candidate) => candidate.candidateId === body.candidateId)) {
       throw new Error("Freeform faction classification did not include the selected candidate");
     }
-    if (materialization?.status === "materialized"
-      && !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)) {
+    if (
+      materialization?.status === "materialized" &&
+      !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)
+    ) {
       throw new Error("Freeform faction materialization did not match the classified candidate");
     }
   }
@@ -2023,11 +2875,18 @@ export async function commandFreeformFaction(campaignId: string, sessionId: stri
 }
 
 /** Materializes one bounded free-form public quest; one POST, no retry. */
-export async function commandFreeformQuest(campaignId: string, sessionId: string, actorId: string,
-  input: FreeformQuestHttpRequest): Promise<FreeformQuestHttpResponse> {
+export async function commandFreeformQuest(
+  campaignId: string,
+  sessionId: string,
+  actorId: string,
+  input: FreeformQuestHttpRequest,
+): Promise<FreeformQuestHttpResponse> {
   const body = parseApiInput(() => freeformQuestHttpRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "quest"),
-    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "quest"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Freeform quest command");
   const response = freeformQuestHttpResponseSchema.parse(success.body);
   const materialization = response.materialization;
@@ -2036,8 +2895,10 @@ export async function commandFreeformQuest(campaignId: string, sessionId: string
     if (body.candidateId !== undefined && !candidates.some((candidate) => candidate.candidateId === body.candidateId)) {
       throw new Error("Freeform quest classification did not include the selected candidate");
     }
-    if (materialization?.status === "materialized"
-      && !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)) {
+    if (
+      materialization?.status === "materialized" &&
+      !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)
+    ) {
       throw new Error("Freeform quest materialization did not match the classified candidate");
     }
   }
@@ -2045,11 +2906,18 @@ export async function commandFreeformQuest(campaignId: string, sessionId: string
 }
 
 /** Materializes one bounded free-form public rumor (hearsay); one POST, no retry. */
-export async function commandFreeformRumor(campaignId: string, sessionId: string, actorId: string,
-  input: FreeformRumorHttpRequest): Promise<FreeformRumorHttpResponse> {
+export async function commandFreeformRumor(
+  campaignId: string,
+  sessionId: string,
+  actorId: string,
+  input: FreeformRumorHttpRequest,
+): Promise<FreeformRumorHttpResponse> {
   const body = parseApiInput(() => freeformRumorHttpRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "rumor"),
-    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(freeformLanePath(campaignId, sessionId, actorId, "rumor"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Freeform rumor command");
   const response = freeformRumorHttpResponseSchema.parse(success.body);
   const materialization = response.materialization;
@@ -2058,8 +2926,10 @@ export async function commandFreeformRumor(campaignId: string, sessionId: string
     if (body.candidateId !== undefined && !candidates.some((candidate) => candidate.candidateId === body.candidateId)) {
       throw new Error("Freeform rumor classification did not include the selected candidate");
     }
-    if (materialization?.status === "materialized"
-      && !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)) {
+    if (
+      materialization?.status === "materialized" &&
+      !candidates.some((candidate) => candidate.candidateId === materialization.candidate.candidateId)
+    ) {
       throw new Error("Freeform rumor materialization did not match the classified candidate");
     }
   }
@@ -2067,48 +2937,88 @@ export async function commandFreeformRumor(campaignId: string, sessionId: string
 }
 
 /** Submits one canonical economy command and binds its discriminated result. */
-export async function commandActorEconomy(campaignId: string, actorId: string, input: EconomyHttpCommandRequest): Promise<EconomyHttpCommandResponse> {
+export async function commandActorEconomy(
+  campaignId: string,
+  actorId: string,
+  input: EconomyHttpCommandRequest,
+): Promise<EconomyHttpCommandResponse> {
   const target = actorLanePath(campaignId, actorId);
   const body = parseApiInput(() => economyHttpCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/economy-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/economy-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor economy command");
   const response = economyHttpCommandResponseSchema.parse(success.body);
-  const resultMatches = body.type === "request_purchase_quote" && response.type === body.type
-    ? response.quote.quantity === body.quantity && JSON.stringify(response.quote.item) === JSON.stringify(body.item)
-    : body.type === "purchase_from_shop" && response.type === body.type
-      ? response.purchase.quoteId === body.quoteId
-      : body.type === "sell_to_shop" && response.type === body.type
-        ? response.sale.quoteId === body.quoteId
-        : (body.type === "propose_bilateral_trade" || body.type === "accept_bilateral_trade" || body.type === "cancel_bilateral_trade")
-          && response.type === body.type && response.trade.tradeId === body.tradeId;
-  if (!resultMatches || response.receipt.type !== body.type || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision) throw new Error("Actor economy receipt did not match the request");
+  const resultMatches =
+    body.type === "request_purchase_quote" && response.type === body.type
+      ? response.quote.quantity === body.quantity && JSON.stringify(response.quote.item) === JSON.stringify(body.item)
+      : body.type === "purchase_from_shop" && response.type === body.type
+        ? response.purchase.quoteId === body.quoteId
+        : body.type === "sell_to_shop" && response.type === body.type
+          ? response.sale.quoteId === body.quoteId
+          : (body.type === "propose_bilateral_trade" ||
+              body.type === "accept_bilateral_trade" ||
+              body.type === "cancel_bilateral_trade") &&
+            response.type === body.type &&
+            response.trade.tradeId === body.tradeId;
+  if (
+    !resultMatches ||
+    response.receipt.type !== body.type ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision
+  )
+    throw new Error("Actor economy receipt did not match the request");
   return response;
 }
 
 /** Requests one exact vendor sale quote bound to the actor's current inventory revision; no automatic retry. */
-export async function requestVendorSaleQuote(campaignId: string, actorId: string, input: VendorSaleQuoteRequest): Promise<VendorSaleQuoteResponse> {
+export async function requestVendorSaleQuote(
+  campaignId: string,
+  actorId: string,
+  input: VendorSaleQuoteRequest,
+): Promise<VendorSaleQuoteResponse> {
   const target = actorLanePath(campaignId, actorId);
   const body = parseApiInput(() => vendorSaleQuoteRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/vendor-sale-quotes`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/vendor-sale-quotes`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Vendor sale quote");
   const response = vendorSaleQuoteResponseSchema.parse(success.body);
-  if (response.quote.entryId !== body.entryId || response.quote.quantity !== body.quantity) throw new Error("Vendor sale quote did not match the request");
+  if (response.quote.entryId !== body.entryId || response.quote.quantity !== body.quantity)
+    throw new Error("Vendor sale quote did not match the request");
   return response;
 }
 
 /** Rest recovery is wholly server-owned and accepted only with a bound receipt/state revision. */
-export async function commandActorRest(campaignId: string, actorId: string, input: RestHttpRequest): Promise<RestHttpResponse> {
+export async function commandActorRest(
+  campaignId: string,
+  actorId: string,
+  input: RestHttpRequest,
+): Promise<RestHttpResponse> {
   const target = actorLanePath(campaignId, actorId);
   const body = parseApiInput(() => restHttpRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/rest-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/rest-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor rest command");
   const response = restHttpResponseSchema.parse(success.body);
   const expectedKind = body.type === "take_short_rest" ? "short" : "long";
   const returnedResources = new Map(response.actorState.resources.map((resource) => [resource.resourceId, resource]));
-  if (response.receipt.kind !== expectedKind || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision || response.actorState.revision !== response.receipt.revisionAfter
-    || response.receipt.recovery.resources.some((delta) => returnedResources.get(delta.resourceId)?.current !== delta.after)) {
+  if (
+    response.receipt.kind !== expectedKind ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.actorState.revision !== response.receipt.revisionAfter ||
+    response.receipt.recovery.resources.some(
+      (delta) => returnedResources.get(delta.resourceId)?.current !== delta.after,
+    )
+  ) {
     throw new Error("Actor rest receipt did not match the request");
   }
   return response;
@@ -2118,60 +3028,85 @@ export async function commandActorRest(campaignId: string, actorId: string, inpu
 export async function getActorAttunements(campaignId: string, actorId: string): Promise<AttunementSnapshot> {
   const campaign = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)));
   const actor = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(actorId)));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${campaign}/actors/${actor}/attunements`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${campaign}/actors/${actor}/attunements`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Actor attunement read");
   const snapshot = attunementSnapshotSchema.parse(success.body);
-  if (snapshot.campaignId !== campaignId || snapshot.actorId !== actorId) throw new Error("Actor attunement response did not match the request");
+  if (snapshot.campaignId !== campaignId || snapshot.actorId !== actorId)
+    throw new Error("Actor attunement response did not match the request");
   return snapshot;
 }
 
 /** Drives one idempotent attune or drop command and returns the engine outcome. */
-export async function commandActorAttunement(campaignId: string, actorId: string, command: AttunementCommand): Promise<AttunementResponse> {
+export async function commandActorAttunement(
+  campaignId: string,
+  actorId: string,
+  command: AttunementCommand,
+): Promise<AttunementResponse> {
   const campaign = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)));
   const actor = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(actorId)));
   const body = parseApiInput(() => attunementCommandSchema.parse(command));
   const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${campaign}/actors/${actor}/attunements`, {
-    method: "POST", cache: "no-store", body: JSON.stringify(body),
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
   });
   requireStatus(success, 200, "Actor attunement command");
   const response = attunementResponseSchema.parse(success.body);
-  if (response.snapshot.campaignId !== campaignId || response.snapshot.actorId !== actorId) throw new Error("Actor attunement response did not match the request");
+  if (response.snapshot.campaignId !== campaignId || response.snapshot.actorId !== actorId)
+    throw new Error("Actor attunement response did not match the request");
   return response;
 }
 
 export async function getActorEffects(actorId: string): Promise<ActorEffectsResponse> {
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
-  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/effects`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/effects`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Actor effects read");
   return actorEffectsResponseSchema.parse(success.body);
 }
 
 /** Reads the complete display-safe gameplay sheet and binds it to the requested actor. */
-export async function getActorGameplaySheet(actorId: string): Promise<import("@velvet/contracts").ActorGameplaySheetResponse> {
+export async function getActorGameplaySheet(
+  actorId: string,
+): Promise<import("@velvet/contracts").ActorGameplaySheetResponse> {
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
-  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/gameplay-sheet`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/gameplay-sheet`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Actor gameplay sheet read");
   const response = actorGameplaySheetResponseSchema.parse(success.body);
-  if (response.identity.actorId !== validActorId) throw new Error("Actor gameplay sheet did not match the requested actor");
+  if (response.identity.actorId !== validActorId)
+    throw new Error("Actor gameplay sheet did not match the requested actor");
   return response;
 }
 
 /** Resolves one server-owned check and binds its discriminant, target, and receipt. */
-export async function commandActorCheck(actorId: string, input: ActorCheckCommandRequest): Promise<ActorCheckCommandResponse> {
+export async function commandActorCheck(
+  actorId: string,
+  input: ActorCheckCommandRequest,
+): Promise<ActorCheckCommandResponse> {
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
   const body = parseApiInput(() => actorCheckCommandRequestSchema.parse(input));
   const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/check-commands`, {
-    method: "POST", cache: "no-store", body: JSON.stringify(body),
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
   });
   requireStatus(success, 200, "Actor check command");
   const response = actorCheckCommandResponseSchema.parse(success.body);
-  const targetMatches = body.kind === "opposed"
-    ? response.check.target.kind === "opposed_total" && response.check.target.actorId === body.targetActorId
-    : response.check.target.kind === "difficulty_class";
-  if (!targetMatches
-    || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+  const targetMatches =
+    body.kind === "opposed"
+      ? response.check.target.kind === "opposed_total" && response.check.target.actorId === body.targetActorId
+      : response.check.target.kind === "difficulty_class";
+  if (
+    !targetMatches ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1
+  ) {
     throw new Error("Actor check response did not match the request");
   }
   return response;
@@ -2179,62 +3114,97 @@ export async function commandActorCheck(actorId: string, input: ActorCheckComman
 
 export async function getActorPowers(actorId: string): Promise<ActorPowersResponse> {
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
-  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/powers`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/powers`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Actor powers read");
   return actorPowersResponseSchema.parse(success.body);
 }
 
 /** Issues one revision-bound power intent. This wrapper never retries a write. */
-export async function commandActorPower(actorId: string, input: ActorPowerCommandRequest): Promise<ActorPowerCommandResponse> {
+export async function commandActorPower(
+  actorId: string,
+  input: ActorPowerCommandRequest,
+): Promise<ActorPowerCommandResponse> {
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
   const body = parseApiInput(() => actorPowerCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/power-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/power-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor power command");
   const response = actorPowerCommandResponseSchema.parse(success.body);
-  const targetsMatch = JSON.stringify(response.resolution.targetIds) === JSON.stringify(body.targetIds)
-    || (body.targetIds.length === 0 && response.resolution.targetIds.length === 1 && response.resolution.targetIds[0] === validActorId);
-  if (response.actorStates[0]?.actorId !== validActorId
-    || JSON.stringify(response.resolution.powerRef) !== JSON.stringify(body.powerRef)
-    || !targetsMatch
-    || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+  const targetsMatch =
+    JSON.stringify(response.resolution.targetIds) === JSON.stringify(body.targetIds) ||
+    (body.targetIds.length === 0 &&
+      response.resolution.targetIds.length === 1 &&
+      response.resolution.targetIds[0] === validActorId);
+  if (
+    response.actorStates[0]?.actorId !== validActorId ||
+    JSON.stringify(response.resolution.powerRef) !== JSON.stringify(body.powerRef) ||
+    !targetsMatch ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1
+  ) {
     throw new Error("Actor power response did not match the request");
   }
   return response;
 }
 
 /** Casts one exact spell through the dedicated lane and binds its receipt; no automatic retry. */
-export async function castActorSpell(actorId: string, input: CastSpellCommandRequest): Promise<CastSpellCommandResponse> {
+export async function castActorSpell(
+  actorId: string,
+  input: CastSpellCommandRequest,
+): Promise<CastSpellCommandResponse> {
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
   const body = parseApiInput(() => castSpellCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/spell-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/spell-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor spell command");
   const response = castSpellCommandResponseSchema.parse(success.body);
-  const targetsMatch = JSON.stringify(response.resolution.targetIds) === JSON.stringify(body.targetIds)
-    || (body.targetIds.length === 0 && response.resolution.targetIds.length === 1 && response.resolution.targetIds[0] === validActorId);
-  if (response.actorStates[0]?.actorId !== validActorId
-    || JSON.stringify(response.resolution.powerRef) !== JSON.stringify(body.powerRef)
-    || !targetsMatch
-    || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+  const targetsMatch =
+    JSON.stringify(response.resolution.targetIds) === JSON.stringify(body.targetIds) ||
+    (body.targetIds.length === 0 &&
+      response.resolution.targetIds.length === 1 &&
+      response.resolution.targetIds[0] === validActorId);
+  if (
+    response.actorStates[0]?.actorId !== validActorId ||
+    JSON.stringify(response.resolution.powerRef) !== JSON.stringify(body.powerRef) ||
+    !targetsMatch ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1
+  ) {
     throw new Error("Actor spell response did not match the request");
   }
   return response;
 }
 
 /** Issues one exact effect mutation and binds its receipt; no automatic retry. */
-export async function commandActorEffect(actorId: string, input: ActorEffectCommandRequest): Promise<ActorEffectCommandResponse> {
+export async function commandActorEffect(
+  actorId: string,
+  input: ActorEffectCommandRequest,
+): Promise<ActorEffectCommandResponse> {
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
   const body = parseApiInput(() => actorEffectCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/effect-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/effect-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor effect command");
   const response = actorEffectCommandResponseSchema.parse(success.body);
-  if (response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1
-    || (body.kind === "remove" && response.effects.some((effect) => effect.effectId === body.effectId))) {
+  if (
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1 ||
+    (body.kind === "remove" && response.effects.some((effect) => effect.effectId === body.effectId))
+  ) {
     throw new Error("Actor effect response did not match the request");
   }
   return response;
@@ -2247,7 +3217,9 @@ function combatPath(combatId: string): { id: string; path: string } {
 
 export async function listCampaignEncounters(campaignId: string): Promise<{ encounters: EncounterPublic[] }> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounters`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounters`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Encounter list");
   return encounterListResponseSchema.parse(success.body);
 }
@@ -2255,58 +3227,94 @@ export async function listCampaignEncounters(campaignId: string): Promise<{ enco
 /** Reads the server-authorized identities available for safe encounter preparation. */
 export async function getEncounterSetupCandidates(campaignId: string): Promise<EncounterSetupCandidatesResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounter-setup-candidates`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(id)}/encounter-setup-candidates`,
+    { cache: "no-store" },
+  );
   requireStatus(success, 200, "Encounter setup candidates");
   return encounterSetupCandidatesResponseSchema.parse(success.body);
 }
 
 /** Creates one encounter intent and requires its route-bound preparing projection. */
-export async function createCampaignEncounter(campaignId: string, input: EncounterCreateRequest): Promise<EncounterPublic> {
+export async function createCampaignEncounter(
+  campaignId: string,
+  input: EncounterCreateRequest,
+): Promise<EncounterPublic> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const body = parseApiInput(() => encounterCreateRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounters`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounters`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 201, "Encounter creation");
   const { encounter } = encounterCreateResponseSchema.parse(success.body);
-  const requestedCombatants = body.combatants.map((entry) => entry.kind === "actor"
-    ? { kind: entry.kind, actorId: entry.actorId, team: entry.team }
-    : { kind: entry.kind, template: entry.template, team: entry.team });
-  const returnedCombatants = encounter.combatants.map((entry) => entry.kind === "actor"
-    ? { kind: entry.kind, actorId: entry.actorId, team: entry.team }
-    : { kind: entry.kind, template: entry.template, team: entry.team });
-  if (encounter.sessionId !== body.sessionId || encounter.name !== body.name || encounter.status !== "preparing"
-    || encounter.combatId !== null || encounter.revision !== 1
-    || JSON.stringify(returnedCombatants) !== JSON.stringify(requestedCombatants)) {
+  const requestedCombatants = body.combatants.map((entry) =>
+    entry.kind === "actor"
+      ? { kind: entry.kind, actorId: entry.actorId, team: entry.team }
+      : { kind: entry.kind, template: entry.template, team: entry.team },
+  );
+  const returnedCombatants = encounter.combatants.map((entry) =>
+    entry.kind === "actor"
+      ? { kind: entry.kind, actorId: entry.actorId, team: entry.team }
+      : { kind: entry.kind, template: entry.template, team: entry.team },
+  );
+  if (
+    encounter.sessionId !== body.sessionId ||
+    encounter.name !== body.name ||
+    encounter.status !== "preparing" ||
+    encounter.combatId !== null ||
+    encounter.revision !== 1 ||
+    JSON.stringify(returnedCombatants) !== JSON.stringify(requestedCombatants)
+  ) {
     throw new Error("Encounter creation response did not match the request");
   }
   return encounter;
 }
 
 /** Requests one typed encounter draft. Writes are never retried automatically. */
-export async function createEncounterGenerationDraft(input: GenerationDraftCreateRequest): Promise<GenerationDraftGetResponse> {
+export async function createEncounterGenerationDraft(
+  input: GenerationDraftCreateRequest,
+): Promise<GenerationDraftGetResponse> {
   const body = parseApiInput(() => generationDraftCreateRequestSchema.parse(input));
-  const success = await requestResponse<unknown>("/rpg/v1/generation-drafts", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>("/rpg/v1/generation-drafts", {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 201, "Encounter generation");
   const response = generationDraftCreateResponseSchema.parse(success.body);
-  if (response.draft.campaignId !== body.campaignId || response.draft.kind !== "encounter") throw new Error("Encounter generation response did not match the request");
+  if (response.draft.campaignId !== body.campaignId || response.draft.kind !== "encounter")
+    throw new Error("Encounter generation response did not match the request");
   return response;
 }
 
 /** Reads only the role-safe typed encounter draft projection. */
 export async function getEncounterGenerationDraft(draftId: string): Promise<GenerationDraftGetResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(draftId));
-  const success = await requestResponse<unknown>(`/rpg/v1/generation-drafts/${encodeURIComponent(id)}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/generation-drafts/${encodeURIComponent(id)}`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Encounter generation draft");
   return generationDraftGetResponseSchema.parse(success.body);
 }
 
 /** Confirms and applies one reviewed encounter draft through the authoritative encounter command service. */
-export async function applyEncounterGenerationDraft(draftId: string, input: GenerationDraftApplyRequest): Promise<GenerationDraftApplyResponse> {
+export async function applyEncounterGenerationDraft(
+  draftId: string,
+  input: GenerationDraftApplyRequest,
+): Promise<GenerationDraftApplyResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(draftId));
   const body = parseApiInput(() => generationDraftApplyRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/generation-drafts/${encodeURIComponent(id)}/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/generation-drafts/${encodeURIComponent(id)}/apply`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Encounter generation apply");
   const response = generationDraftApplyResponseSchema.parse(success.body);
-  if (response.draft.draftId !== id || response.application.encounterId !== response.receipts[0].encounterId) throw new Error("Encounter generation apply response did not match the request");
+  if (response.draft.draftId !== id || response.application.encounterId !== response.receipts[0].encounterId)
+    throw new Error("Encounter generation apply response did not match the request");
   return response;
 }
 
@@ -2323,38 +3331,81 @@ export interface CampaignMaterialPublishInput {
   idempotencyKey: string;
 }
 
-export async function createCampaignContentDraft(input: CampaignContentGenerationRequest): Promise<CampaignContentDraftView> {
+export async function createCampaignContentDraft(
+  input: CampaignContentGenerationRequest,
+): Promise<CampaignContentDraftView> {
   const body = parseApiInput(() => campaignContentGenerationRequestSchema.parse(input));
-  const success = await requestResponse<unknown>("/rpg/v1/campaign-content-drafts", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>("/rpg/v1/campaign-content-drafts", {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 201, "Campaign content generation");
   const response = campaignContentDraftViewSchema.parse(success.body);
-  if (response.draft.campaignId !== body.campaignId) throw new Error("Campaign content generation response did not match the request");
+  if (response.draft.campaignId !== body.campaignId)
+    throw new Error("Campaign content generation response did not match the request");
   return response;
 }
 export async function getCampaignContentDraft(draftId: string): Promise<CampaignContentDraftView> {
   const id = parseApiInput(() => resourceIdSchema.parse(draftId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaign-content-drafts/${encodeURIComponent(id)}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaign-content-drafts/${encodeURIComponent(id)}`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Campaign content draft");
   const response = campaignContentDraftViewSchema.parse(success.body);
   if (response.draft.draftId !== id) throw new Error("Campaign content draft response did not match the request");
   return response;
 }
 export async function getCampaignGeneratedFoundation(campaignId: string) {
-  const id=parseApiInput(()=>campaignIdSchema.parse(campaignId));
-  const success=await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/generated-foundation`,{cache:"no-store"});
-  requireStatus(success,200,"Campaign generated foundation");
+  const id = parseApiInput(() => campaignIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/generated-foundation`, {
+    cache: "no-store",
+  });
+  requireStatus(success, 200, "Campaign generated foundation");
   return campaignGeneratedFoundationSchema.parse(success.body);
 }
 export async function getCampaignGeneratedPlanning(campaignId: string): Promise<CampaignGeneratedPlanning> {
-  const id=parseApiInput(()=>campaignIdSchema.parse(campaignId));
-  const success=await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/generated-planning`,{cache:"no-store"});
-  requireStatus(success,200,"Campaign generated planning");return campaignGeneratedPlanningSchema.parse(success.body);
+  const id = parseApiInput(() => campaignIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/generated-planning`, {
+    cache: "no-store",
+  });
+  requireStatus(success, 200, "Campaign generated planning");
+  return campaignGeneratedPlanningSchema.parse(success.body);
 }
-export async function getCampaignPublishedMaterials(campaignId:string): Promise<CampaignPublishedMaterials>{const id=parseApiInput(()=>campaignIdSchema.parse(campaignId));const success=await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/published-materials`,{cache:"no-store"});requireStatus(success,200,"Campaign published materials");return campaignPublishedMaterialsSchema.parse(success.body);}
-export async function publishCampaignMaterial(campaignId:string,input:CampaignMaterialPublishInput){const id=parseApiInput(()=>campaignIdSchema.parse(campaignId)),body=parseApiInput(()=>campaignMaterialPublishRequestSchema.parse(input));const success=await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/material-publications`,{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Campaign material publication");const response=campaignMaterialPublishResponseSchema.parse(success.body);if(response.material.artifactKey!==body.artifactKey||response.receipt.idempotencyKey!==body.idempotencyKey||response.receipt.revisionBefore!==body.expectedRevision)throw new Error("Campaign material publication response did not match the request");return response;}
+export async function getCampaignPublishedMaterials(campaignId: string): Promise<CampaignPublishedMaterials> {
+  const id = parseApiInput(() => campaignIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/published-materials`, {
+    cache: "no-store",
+  });
+  requireStatus(success, 200, "Campaign published materials");
+  return campaignPublishedMaterialsSchema.parse(success.body);
+}
+export async function publishCampaignMaterial(campaignId: string, input: CampaignMaterialPublishInput) {
+  const id = parseApiInput(() => campaignIdSchema.parse(campaignId)),
+    body = parseApiInput(() => campaignMaterialPublishRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/material-publications`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Campaign material publication");
+  const response = campaignMaterialPublishResponseSchema.parse(success.body);
+  if (
+    response.material.artifactKey !== body.artifactKey ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision
+  )
+    throw new Error("Campaign material publication response did not match the request");
+  return response;
+}
 export async function applyCampaignContentDraft(draftId: string, input: CampaignContentApplyInput) {
-  const id = parseApiInput(() => resourceIdSchema.parse(draftId)), body = parseApiInput(() => campaignContentApplyRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaign-content-drafts/${encodeURIComponent(id)}/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const id = parseApiInput(() => resourceIdSchema.parse(draftId)),
+    body = parseApiInput(() => campaignContentApplyRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaign-content-drafts/${encodeURIComponent(id)}/apply`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Campaign content apply");
   const response = campaignContentApplyResponseSchema.parse(success.body);
   if (response.draft.draftId !== id) throw new Error("Campaign content apply response did not match the request");
@@ -2364,12 +3415,21 @@ export async function applyCampaignContentDraft(draftId: string, input: Campaign
 export async function startEncounter(encounterId: string, input: EncounterStartCommandRequest) {
   const id = parseApiInput(() => resourceIdSchema.parse(encounterId));
   const body = parseApiInput(() => encounterStartCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/encounters/${encodeURIComponent(id)}/start-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/encounters/${encodeURIComponent(id)}/start-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Encounter start");
   const response = encounterStartCommandResponseSchema.parse(success.body);
-  if (response.combat.combatId !== id || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.revisionAfter !== body.expectedRevision + 1
-    || response.combat.revision !== response.receipt.revisionAfter) throw new Error("Encounter start response did not match the request");
+  if (
+    response.combat.combatId !== id ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1 ||
+    response.combat.revision !== response.receipt.revisionAfter
+  )
+    throw new Error("Encounter start response did not match the request");
   return response;
 }
 
@@ -2380,44 +3440,105 @@ export async function getCombatState(combatId: string): Promise<CombatReadRespon
   return combatReadResponseSchema.parse(success.body);
 }
 
-export async function getCombatConsumableActions(combatId:string):Promise<UseConsumableLegalAction[]>{
-  const target=combatPath(combatId);
-  const success=await requestResponse<unknown>(`${target.path}/consumable-actions`,{cache:"no-store"});
-  requireStatus(success,200,"Combat consumable actions");
-  const actions=useConsumableLegalActionSchema.array().parse(success.body);
+export async function getCombatConsumableActions(combatId: string): Promise<UseConsumableLegalAction[]> {
+  const target = combatPath(combatId);
+  const success = await requestResponse<unknown>(`${target.path}/consumable-actions`, { cache: "no-store" });
+  requireStatus(success, 200, "Combat consumable actions");
+  const actions = useConsumableLegalActionSchema.array().parse(success.body);
   return actions;
 }
 
-export async function getDirectCombatPowerActions(combatId:string):Promise<DirectCombatPowerCandidate[]>{const target=combatPath(combatId);const success=await requestResponse<unknown>(`${target.path}/power-actions`,{cache:"no-store"});requireStatus(success,200,"Combat power actions");return directCombatPowerCandidatesResponseSchema.parse(success.body).candidates;}
-export async function commandDirectCombatPower(combatId:string,input:DirectCombatPowerCommandRequest):Promise<DirectCombatPowerCommandResponse>{const target=combatPath(combatId),body=parseApiInput(()=>directCombatPowerCommandRequestSchema.parse(input));const success=await requestResponse<unknown>(`${target.path}/power-actions/commands`,{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Combat power command");const response=directCombatPowerCommandResponseSchema.parse(success.body);if(JSON.stringify(response.request)!==JSON.stringify(body))throw new Error("Combat power result did not match the exact request");return response;}
+export async function getDirectCombatPowerActions(combatId: string): Promise<DirectCombatPowerCandidate[]> {
+  const target = combatPath(combatId);
+  const success = await requestResponse<unknown>(`${target.path}/power-actions`, { cache: "no-store" });
+  requireStatus(success, 200, "Combat power actions");
+  return directCombatPowerCandidatesResponseSchema.parse(success.body).candidates;
+}
+export async function commandDirectCombatPower(
+  combatId: string,
+  input: DirectCombatPowerCommandRequest,
+): Promise<DirectCombatPowerCommandResponse> {
+  const target = combatPath(combatId),
+    body = parseApiInput(() => directCombatPowerCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/power-actions/commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Combat power command");
+  const response = directCombatPowerCommandResponseSchema.parse(success.body);
+  if (JSON.stringify(response.request) !== JSON.stringify(body))
+    throw new Error("Combat power result did not match the exact request");
+  return response;
+}
 /** Reads an immutable power result and never retries its command. */
-export async function getDirectCombatPowerResult(combatId:string,input:DirectCombatPowerCommandRequest):Promise<DirectCombatPowerCommandResponse>{const target=combatPath(combatId),body=parseApiInput(()=>directCombatPowerCommandRequestSchema.parse(input));const success=await requestResponse<unknown>(`${target.path}/power-actions/results/${encodeURIComponent(body.idempotencyKey)}`,{cache:"no-store"});requireStatus(success,200,"Combat power result");const response=directCombatPowerCommandResponseSchema.parse(success.body);if(JSON.stringify(response.request)!==JSON.stringify(body))throw new Error("Combat power result did not match the exact request");return response;}
+export async function getDirectCombatPowerResult(
+  combatId: string,
+  input: DirectCombatPowerCommandRequest,
+): Promise<DirectCombatPowerCommandResponse> {
+  const target = combatPath(combatId),
+    body = parseApiInput(() => directCombatPowerCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(
+    `${target.path}/power-actions/results/${encodeURIComponent(body.idempotencyKey)}`,
+    { cache: "no-store" },
+  );
+  requireStatus(success, 200, "Combat power result");
+  const response = directCombatPowerCommandResponseSchema.parse(success.body);
+  if (JSON.stringify(response.request) !== JSON.stringify(body))
+    throw new Error("Combat power result did not match the exact request");
+  return response;
+}
 
-export async function commandCombatConsumable(combatId:string,input:UseConsumableCommandRequest):Promise<UseConsumableCommandResult>{
-  const target=combatPath(combatId),body=parseApiInput(()=>useConsumableCommandRequestSchema.parse(input));
-  const success=await requestResponse<unknown>(`${target.path}/consumable-actions/commands`,{method:"POST",cache:"no-store",body:JSON.stringify(body)});
-  requireStatus(success,200,"Combat consumable command");
-  const response=useConsumableCommandResultSchema.parse(success.body);
-  await verifyConsumableResult(body,response);
+export async function commandCombatConsumable(
+  combatId: string,
+  input: UseConsumableCommandRequest,
+): Promise<UseConsumableCommandResult> {
+  const target = combatPath(combatId),
+    body = parseApiInput(() => useConsumableCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/consumable-actions/commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Combat consumable command");
+  const response = useConsumableCommandResultSchema.parse(success.body);
+  await verifyConsumableResult(body, response);
   return response;
 }
 
 /** Reads an immutable consumable result and cannot execute or replay the command. */
-export async function getCombatConsumableResult(combatId:string,expectedRequest:UseConsumableCommandRequest):Promise<UseConsumableCommandResult>{
-  const target=combatPath(combatId),expected=parseApiInput(()=>useConsumableCommandRequestSchema.parse(expectedRequest)),key=expected.idempotencyKey;
-  const success=await requestResponse<unknown>(`${target.path}/consumable-actions/results/${encodeURIComponent(key)}`,{cache:"no-store"});
-  requireStatus(success,200,"Combat consumable result");
-  const response=useConsumableCommandResultSchema.parse(success.body);
-  await verifyConsumableResult(expected,response);
+export async function getCombatConsumableResult(
+  combatId: string,
+  expectedRequest: UseConsumableCommandRequest,
+): Promise<UseConsumableCommandResult> {
+  const target = combatPath(combatId),
+    expected = parseApiInput(() => useConsumableCommandRequestSchema.parse(expectedRequest)),
+    key = expected.idempotencyKey;
+  const success = await requestResponse<unknown>(
+    `${target.path}/consumable-actions/results/${encodeURIComponent(key)}`,
+    { cache: "no-store" },
+  );
+  requireStatus(success, 200, "Combat consumable result");
+  const response = useConsumableCommandResultSchema.parse(success.body);
+  await verifyConsumableResult(expected, response);
   return response;
 }
 
-async function verifyConsumableResult(expected:UseConsumableCommandRequest,result:UseConsumableCommandResult):Promise<void>{
-  const frame=new TextEncoder().encode(canonicalUseConsumableRequestFrame(expected));
-  const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",frame)),(byte)=>byte.toString(16).padStart(2,"0")).join("");
-  if(JSON.stringify(result.requestBinding.requestEvidence)!==JSON.stringify(expected)
-    ||result.requestBinding.idempotencyKey!==expected.idempotencyKey||result.receipt.idempotencyKey!==expected.idempotencyKey
-    ||result.requestBinding.canonicalRequestDigest!==digest)throw new Error("Combat consumable result did not match the exact request");
+async function verifyConsumableResult(
+  expected: UseConsumableCommandRequest,
+  result: UseConsumableCommandResult,
+): Promise<void> {
+  const frame = new TextEncoder().encode(canonicalUseConsumableRequestFrame(expected));
+  const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", frame)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  if (
+    JSON.stringify(result.requestBinding.requestEvidence) !== JSON.stringify(expected) ||
+    result.requestBinding.idempotencyKey !== expected.idempotencyKey ||
+    result.receipt.idempotencyKey !== expected.idempotencyKey ||
+    result.requestBinding.canonicalRequestDigest !== digest
+  )
+    throw new Error("Combat consumable result did not match the exact request");
 }
 
 export async function getCombatLog(combatId: string, query: CombatLogQuery): Promise<CombatLogResponse> {
@@ -2427,52 +3548,87 @@ export async function getCombatLog(combatId: string, query: CombatLogQuery): Pro
   const success = await requestResponse<unknown>(`${target.path}/log?${params}`, { cache: "no-store" });
   requireStatus(success, 200, "Combat log read");
   const response = combatLogResponseSchema.parse(success.body);
-  if (response.entries.length > input.limit || response.entries.some((entry) => entry.sequence <= input.afterSequence)) {
+  if (
+    response.entries.length > input.limit ||
+    response.entries.some((entry) => entry.sequence <= input.afterSequence)
+  ) {
     throw new Error("Combat log response did not match the requested page");
   }
   return response;
 }
 
 /** Reads an immutable prior command result. This method cannot execute or replay a command. */
-export async function getCombatCommandResult(campaignId: string, combatId: string, idempotencyKey: string): Promise<CombatCommandResultResponse> {
+export async function getCombatCommandResult(
+  campaignId: string,
+  combatId: string,
+  idempotencyKey: string,
+): Promise<CombatCommandResultResponse> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const target = combatPath(combatId);
   const key = parseApiInput(() => actorPowerCommandRequestSchema.shape.idempotencyKey.parse(idempotencyKey));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/combats/${encodeURIComponent(target.id)}/command-results/${encodeURIComponent(key)}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/combats/${encodeURIComponent(target.id)}/command-results/${encodeURIComponent(key)}`,
+    { cache: "no-store" },
+  );
   requireStatus(success, 200, "Combat command result");
   const response = combatCommandResultResponseSchema.parse(success.body);
-  const bound = response.operation === "action" ? response.result.combat.combatId === target.id && response.result.receipt.idempotencyKey === key
-    : response.result.encounter.encounterId === target.id && response.result.receipt.idempotencyKey === key;
+  const bound =
+    response.operation === "action"
+      ? response.result.combat.combatId === target.id && response.result.receipt.idempotencyKey === key
+      : response.result.encounter.encounterId === target.id && response.result.receipt.idempotencyKey === key;
   if (!bound) throw new Error("Combat command result did not match the request");
   return response;
 }
 
 /** Resolves one server-issued legal action ID exactly once. */
-export async function resolveCombatAction(combatId: string, input: CombatActionCommandRequest): Promise<CombatActionCommandResponse> {
+export async function resolveCombatAction(
+  combatId: string,
+  input: CombatActionCommandRequest,
+): Promise<CombatActionCommandResponse> {
   const target = combatPath(combatId);
   const body = parseApiInput(() => combatActionCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/action-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/action-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Combat action");
   const response = combatActionCommandResponseSchema.parse(success.body);
-  if (response.combat.combatId !== target.id || response.resolution.legalActionId !== body.legalActionId
-    || JSON.stringify(response.resolution.targetIds) !== JSON.stringify(body.targetIds)
-    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1 || response.combat.revision !== response.receipt.revisionAfter) {
+  if (
+    response.combat.combatId !== target.id ||
+    response.resolution.legalActionId !== body.legalActionId ||
+    JSON.stringify(response.resolution.targetIds) !== JSON.stringify(body.targetIds) ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1 ||
+    response.combat.revision !== response.receipt.revisionAfter
+  ) {
     throw new Error("Combat action response did not match the request");
   }
   return response;
 }
 
 /** Resolves the current enemy turn; target and outcome selection remain server-owned. */
-export async function resolveCombatEnemyTurn(combatId: string, input: CombatEnemyTurnCommandRequest): Promise<CombatActionCommandResponse> {
+export async function resolveCombatEnemyTurn(
+  combatId: string,
+  input: CombatEnemyTurnCommandRequest,
+): Promise<CombatActionCommandResponse> {
   const target = combatPath(combatId);
   const body = parseApiInput(() => combatEnemyTurnCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/enemy-turn-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/enemy-turn-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Combat enemy turn");
   const response = combatActionCommandResponseSchema.parse(success.body);
-  if (response.combat.combatId !== target.id || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.revisionAfter !== body.expectedRevision + 1
-    || response.combat.revision !== response.receipt.revisionAfter) {
+  if (
+    response.combat.combatId !== target.id ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1 ||
+    response.combat.revision !== response.receipt.revisionAfter
+  ) {
     throw new Error("Combat enemy turn response did not match the request");
   }
   return response;
@@ -2481,109 +3637,211 @@ export async function resolveCombatEnemyTurn(combatId: string, input: CombatEnem
 export async function endCombat(combatId: string, input: CombatEndCommandRequest): Promise<CombatEndCommandResponse> {
   const target = combatPath(combatId);
   const body = parseApiInput(() => combatEndCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/end-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/end-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Combat end");
   const response = combatEndCommandResponseSchema.parse(success.body);
-  if (response.encounter.encounterId !== target.id || response.encounter.combatId !== target.id
-    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1 || response.encounter.revision !== response.receipt.revisionAfter) {
+  if (
+    response.encounter.encounterId !== target.id ||
+    response.encounter.combatId !== target.id ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1 ||
+    response.encounter.revision !== response.receipt.revisionAfter
+  ) {
     throw new Error("Combat end response did not match the request");
   }
   return response;
 }
 
 /** Reads recipient-visible reward state; `claim.state` is authoritative and survives reload. */
-export async function listCombatRewards(combatId:string):Promise<CombatRewardGrantPublic[]> {
-  const target=combatPath(combatId);const success=await requestResponse<unknown>(`${target.path}/rewards`,{cache:"no-store"});
-  requireStatus(success,200,"Combat rewards");return combatRewardListResponseSchema.parse(success.body).rewards;
+export async function listCombatRewards(combatId: string): Promise<CombatRewardGrantPublic[]> {
+  const target = combatPath(combatId);
+  const success = await requestResponse<unknown>(`${target.path}/rewards`, { cache: "no-store" });
+  requireStatus(success, 200, "Combat rewards");
+  return combatRewardListResponseSchema.parse(success.body).rewards;
 }
 
 /** Explicitly settles one reward bundle exactly once into the recipient's stores. */
-export async function claimCombatReward(combatId:string,rewardBundleId:string,recipientActorId:string,input:CombatRewardClaimRequest):Promise<CombatRewardClaimResponse>{
-  const target=combatPath(combatId),bundle=parseApiInput(()=>resourceIdSchema.parse(rewardBundleId)),recipient=parseApiInput(()=>resourceIdSchema.parse(recipientActorId)),body=parseApiInput(()=>combatRewardClaimRequestSchema.parse(input));
-  const success=await requestResponse<unknown>(`${target.path}/rewards/${encodeURIComponent(bundle)}/claim-commands`,{method:"POST",cache:"no-store",body:JSON.stringify(body)});
-  requireStatus(success,200,"Combat reward claim");const response=combatRewardClaimResponseSchema.parse(success.body);
-  if(response.reward.rewardBundleId!==bundle||response.reward.recipientActorId!==recipient
-    ||response.reward.claim.state!=="claimed"||response.reward.claim.rewardClaimId!==body.rewardClaimId
-    ||response.receipt.idempotencyKey!==body.idempotencyKey||response.receipt.revisionBefore!==body.expectedRevision
-    ||response.receipt.revisionAfter!==body.expectedRevision+1)throw new Error("Combat reward claim did not match the request");
+export async function claimCombatReward(
+  combatId: string,
+  rewardBundleId: string,
+  recipientActorId: string,
+  input: CombatRewardClaimRequest,
+): Promise<CombatRewardClaimResponse> {
+  const target = combatPath(combatId),
+    bundle = parseApiInput(() => resourceIdSchema.parse(rewardBundleId)),
+    recipient = parseApiInput(() => resourceIdSchema.parse(recipientActorId)),
+    body = parseApiInput(() => combatRewardClaimRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(
+    `${target.path}/rewards/${encodeURIComponent(bundle)}/claim-commands`,
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) },
+  );
+  requireStatus(success, 200, "Combat reward claim");
+  const response = combatRewardClaimResponseSchema.parse(success.body);
+  if (
+    response.reward.rewardBundleId !== bundle ||
+    response.reward.recipientActorId !== recipient ||
+    response.reward.claim.state !== "claimed" ||
+    response.reward.claim.rewardClaimId !== body.rewardClaimId ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1
+  )
+    throw new Error("Combat reward claim did not match the request");
   return response;
 }
 
 /** Reads one immutable settled claim; this endpoint never executes or replays the claim command. */
-export async function getCombatRewardClaimResult(campaignId:string,combatId:string,rewardBundleId:string,recipientActorId:string,
-  expectedRequest:CombatRewardClaimRequest):Promise<CombatRewardClaimResultResponse>{
-  const campaign=parseApiInput(()=>resourceIdSchema.parse(campaignId)),combat=parseApiInput(()=>resourceIdSchema.parse(combatId)),
-    bundle=parseApiInput(()=>resourceIdSchema.parse(rewardBundleId)),recipient=parseApiInput(()=>resourceIdSchema.parse(recipientActorId)),
-    expected=parseApiInput(()=>combatRewardClaimRequestSchema.parse(expectedRequest));
-  const path=`/rpg/v1/campaigns/${encodeURIComponent(campaign)}/combats/${encodeURIComponent(combat)}/rewards/${encodeURIComponent(bundle)}/claim-results/${encodeURIComponent(expected.idempotencyKey)}`;
-  const success=await requestResponse<unknown>(path,{cache:"no-store"});requireStatus(success,200,"Combat reward claim result");
-  const result=combatRewardClaimResultResponseSchema.parse(success.body),binding=result.requestBinding;
-  const frame=new TextEncoder().encode(canonicalCombatRewardClaimRequestFrame({campaignId:campaign,combatId:combat,rewardBundleId:bundle,
-    recipientActorId:recipient,claimedAt:binding.claimedAt,request:expected}));
-  const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",frame)),(byte)=>byte.toString(16).padStart(2,"0")).join("");
-  if(binding.campaignId!==campaign||binding.combatId!==combat||binding.rewardBundleId!==bundle||binding.recipientActorId!==recipient
-      ||JSON.stringify(binding.requestEvidence)!==JSON.stringify(expected)||binding.canonicalRequestDigest!==digest
-      ||result.reward.rewardBundleId!==bundle||result.reward.recipientActorId!==recipient)throw new Error("Combat reward claim result did not match the exact request");
+export async function getCombatRewardClaimResult(
+  campaignId: string,
+  combatId: string,
+  rewardBundleId: string,
+  recipientActorId: string,
+  expectedRequest: CombatRewardClaimRequest,
+): Promise<CombatRewardClaimResultResponse> {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId)),
+    combat = parseApiInput(() => resourceIdSchema.parse(combatId)),
+    bundle = parseApiInput(() => resourceIdSchema.parse(rewardBundleId)),
+    recipient = parseApiInput(() => resourceIdSchema.parse(recipientActorId)),
+    expected = parseApiInput(() => combatRewardClaimRequestSchema.parse(expectedRequest));
+  const path = `/rpg/v1/campaigns/${encodeURIComponent(campaign)}/combats/${encodeURIComponent(combat)}/rewards/${encodeURIComponent(bundle)}/claim-results/${encodeURIComponent(expected.idempotencyKey)}`;
+  const success = await requestResponse<unknown>(path, { cache: "no-store" });
+  requireStatus(success, 200, "Combat reward claim result");
+  const result = combatRewardClaimResultResponseSchema.parse(success.body),
+    binding = result.requestBinding;
+  const frame = new TextEncoder().encode(
+    canonicalCombatRewardClaimRequestFrame({
+      campaignId: campaign,
+      combatId: combat,
+      rewardBundleId: bundle,
+      recipientActorId: recipient,
+      claimedAt: binding.claimedAt,
+      request: expected,
+    }),
+  );
+  const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", frame)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  if (
+    binding.campaignId !== campaign ||
+    binding.combatId !== combat ||
+    binding.rewardBundleId !== bundle ||
+    binding.recipientActorId !== recipient ||
+    JSON.stringify(binding.requestEvidence) !== JSON.stringify(expected) ||
+    binding.canonicalRequestDigest !== digest ||
+    result.reward.rewardBundleId !== bundle ||
+    result.reward.recipientActorId !== recipient
+  )
+    throw new Error("Combat reward claim result did not match the exact request");
   return result;
 }
 
-export async function getCharacterProgression(campaignId: string, campaignCharacterId: string): Promise<CharacterProgressionHttpState> {
+export async function getCharacterProgression(
+  campaignId: string,
+  campaignCharacterId: string,
+): Promise<CharacterProgressionHttpState> {
   const target = campaignCharacterPath(campaignId, campaignCharacterId);
   const success = await requestResponse<unknown>(`${target.path}/progression`, { cache: "no-store" });
   requireStatus(success, 200, "Character progression read");
   const { progression } = characterProgressionHttpStateResponseSchema.parse(success.body);
-  if (progression.campaignId !== target.campaignId || progression.campaignCharacterId !== target.characterId) throw new Error("Character progression response did not match the request");
+  if (progression.campaignId !== target.campaignId || progression.campaignCharacterId !== target.characterId)
+    throw new Error("Character progression response did not match the request");
   return progression;
 }
 
-export async function previewCharacterProgression(campaignId: string, campaignCharacterId: string, input: CharacterProgressionHttpPreviewRequest): Promise<CharacterProgressionHttpPreview> {
+export async function previewCharacterProgression(
+  campaignId: string,
+  campaignCharacterId: string,
+  input: CharacterProgressionHttpPreviewRequest,
+): Promise<CharacterProgressionHttpPreview> {
   const target = campaignCharacterPath(campaignId, campaignCharacterId);
   const body = parseApiInput(() => characterProgressionHttpPreviewRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/progression/preview`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/progression/preview`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Character progression preview");
   const { preview } = characterProgressionHttpPreviewResponseSchema.parse(success.body);
-  if (preview.campaignId !== target.campaignId || preview.campaignCharacterId !== target.characterId) throw new Error("Character progression preview did not match the request");
+  if (preview.campaignId !== target.campaignId || preview.campaignCharacterId !== target.characterId)
+    throw new Error("Character progression preview did not match the request");
   return preview;
 }
 
 /** Applies one opaque server preview exactly once; no failed request is replayed. */
-export async function applyCharacterProgression(campaignId: string, campaignCharacterId: string, input: CharacterProgressionHttpApplyRequest, expectedPreview: CharacterProgressionHttpPreview): Promise<CharacterProgressionHttpApplyResponse> {
+export async function applyCharacterProgression(
+  campaignId: string,
+  campaignCharacterId: string,
+  input: CharacterProgressionHttpApplyRequest,
+  expectedPreview: CharacterProgressionHttpPreview,
+): Promise<CharacterProgressionHttpApplyResponse> {
   const target = campaignCharacterPath(campaignId, campaignCharacterId);
   const body = parseApiInput(() => characterProgressionHttpApplyRequestSchema.parse(input));
-  if (expectedPreview.campaignId !== target.campaignId || expectedPreview.campaignCharacterId !== target.characterId
-    || expectedPreview.previewRevision !== body.previewRevision || expectedPreview.previewToken !== body.previewToken) {
+  if (
+    expectedPreview.campaignId !== target.campaignId ||
+    expectedPreview.campaignCharacterId !== target.characterId ||
+    expectedPreview.previewRevision !== body.previewRevision ||
+    expectedPreview.previewToken !== body.previewToken
+  ) {
     throw new ApiInputError("Progression apply preview does not match the request");
   }
-  const success = await requestResponse<unknown>(`${target.path}/progression/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/progression/apply`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Character progression apply");
   const response = characterProgressionHttpApplyResponseSchema.parse(success.body);
-  if (response.progression.campaignId !== target.campaignId || response.progression.campaignCharacterId !== target.characterId
-    || response.receipt.campaignCharacterId !== target.characterId || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.previewRevision || response.receipt.revisionAfter !== response.progression.revision
-    || JSON.stringify(response.receipt.appliedLevels) !== JSON.stringify(expectedPreview.levels)
-    || response.progression.level !== expectedPreview.eligibleLevel) {
+  if (
+    response.progression.campaignId !== target.campaignId ||
+    response.progression.campaignCharacterId !== target.characterId ||
+    response.receipt.campaignCharacterId !== target.characterId ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.previewRevision ||
+    response.receipt.revisionAfter !== response.progression.revision ||
+    JSON.stringify(response.receipt.appliedLevels) !== JSON.stringify(expectedPreview.levels) ||
+    response.progression.level !== expectedPreview.eligibleLevel
+  ) {
     throw new Error("Character progression apply response did not match the request");
   }
   return response;
 }
 
-export async function grantCharacterXp(campaignId: string, campaignCharacterId: string, input: CharacterProgressionHttpGrantXpRequest): Promise<CharacterProgressionHttpGrantXpResponse> {
+export async function grantCharacterXp(
+  campaignId: string,
+  campaignCharacterId: string,
+  input: CharacterProgressionHttpGrantXpRequest,
+): Promise<CharacterProgressionHttpGrantXpResponse> {
   const target = campaignCharacterPath(campaignId, campaignCharacterId);
   const body = parseApiInput(() => characterProgressionHttpGrantXpRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${target.path}/xp-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`${target.path}/xp-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Character XP command");
   const response = characterProgressionHttpGrantXpResponseSchema.parse(success.body);
-  if (response.progression.campaignId !== target.campaignId || response.progression.campaignCharacterId !== target.characterId
-    || response.receipt.campaignCharacterId !== target.characterId || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.revisionAfter !== response.progression.revision) {
+  if (
+    response.progression.campaignId !== target.campaignId ||
+    response.progression.campaignCharacterId !== target.characterId ||
+    response.receipt.campaignCharacterId !== target.characterId ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== response.progression.revision
+  ) {
     throw new Error("Character XP response did not match the request");
   }
   return response;
 }
 
 /** Reads only the strict, path-bound fixed-starter creation projection. */
-export async function getCampaignCharacterCreationOptions(campaignId: string): Promise<CampaignCharacterCreationOptionsResponse> {
+export async function getCampaignCharacterCreationOptions(
+  campaignId: string,
+): Promise<CampaignCharacterCreationOptionsResponse> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/characters/creation-options`,
@@ -2591,7 +3849,8 @@ export async function getCampaignCharacterCreationOptions(campaignId: string): P
   );
   requireStatus(success, 200, "Campaign character creation options");
   const response = campaignCharacterCreationOptionsResponseSchema.parse(success.body);
-  if (response.campaignId !== validCampaignId) throw new Error("Campaign character creation options did not match the request");
+  if (response.campaignId !== validCampaignId)
+    throw new Error("Campaign character creation options did not match the request");
   return response;
 }
 
@@ -2620,28 +3879,33 @@ export async function createOriginalStarterCampaignCharacter(
 export async function createCampaign(input: CampaignCreateRequest): Promise<CampaignCreateResponse> {
   const normalized = parseApiInput(() => campaignCreateRequestSchema.parse(input));
   const success = await requestResponse<unknown>("/rpg/v1/campaigns", {
-    method: "POST", cache: "no-store",
+    method: "POST",
+    cache: "no-store",
     body: JSON.stringify(normalized),
   });
   requireStatus(success, 201, "Campaign creation");
   return campaignCreateResponseSchema.parse(success.body);
 }
 
-export async function renameCampaign(campaignId: string, input: CampaignRenameRequest): Promise<CampaignRenameResponse> {
+export async function renameCampaign(
+  campaignId: string,
+  input: CampaignRenameRequest,
+): Promise<CampaignRenameResponse> {
   // Validate and normalize before interpolation or network I/O. In addition to
   // the strict wire schema, bind the minimal response to this exact operation.
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const normalized = parseApiInput(() => campaignRenameRequestSchema.parse(input));
   const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}`, {
-    method: "PATCH", cache: "no-store",
+    method: "PATCH",
+    cache: "no-store",
     body: JSON.stringify(normalized),
   });
   requireStatus(success, 200, "Campaign rename");
   const response = campaignRenameResponseSchema.parse(success.body);
   if (
-    response.campaign.id !== validCampaignId
-    || response.campaign.name !== normalized.name
-    || response.campaign.updatedAt <= normalized.expectedUpdatedAt
+    response.campaign.id !== validCampaignId ||
+    response.campaign.name !== normalized.name ||
+    response.campaign.updatedAt <= normalized.expectedUpdatedAt
   ) {
     throw new Error("Campaign rename response did not match the request");
   }
@@ -2660,13 +3924,13 @@ export async function setupOriginalStarter(campaignId: string): Promise<Campaign
   const response = campaignDetailResponseSchema.parse(success.body);
   const content = response.campaign.content;
   if (
-    response.campaign.id !== validCampaignId
-    || response.campaign.actorRole !== "owner"
-    || content.status !== "configured"
-    || content.rulesProfileId !== ORIGINAL_STARTER_PRESENTATION.rulesProfile.id
-    || content.contentPacks.length !== 1
-    || content.contentPacks[0]?.packId !== ORIGINAL_STARTER_PRESENTATION.pack.id
-    || content.contentPacks[0]?.packVersion !== ORIGINAL_STARTER_PRESENTATION.pack.version
+    response.campaign.id !== validCampaignId ||
+    response.campaign.actorRole !== "owner" ||
+    content.status !== "configured" ||
+    content.rulesProfileId !== ORIGINAL_STARTER_PRESENTATION.rulesProfile.id ||
+    content.contentPacks.length !== 1 ||
+    content.contentPacks[0]?.packId !== ORIGINAL_STARTER_PRESENTATION.pack.id ||
+    content.contentPacks[0]?.packVersion !== ORIGINAL_STARTER_PRESENTATION.pack.version
   ) {
     throw new Error("Campaign starter setup response did not match the request");
   }
@@ -2676,7 +3940,9 @@ export async function setupOriginalStarter(campaignId: string): Promise<Campaign
 /** Issues exactly one fixed mechanics setup PUT and never retries it. */
 export async function setupMechanicsStarter(campaignId: string): Promise<CampaignDetailResponse> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const body = parseApiInput(() => campaignMechanicsStarterSetupRequestSchema.parse({ starterId: MECHANICS_STARTER_ID }));
+  const body = parseApiInput(() =>
+    campaignMechanicsStarterSetupRequestSchema.parse({ starterId: MECHANICS_STARTER_ID }),
+  );
   const result = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/mechanics-starter-setup`,
     { method: "PUT", cache: "no-store", body: JSON.stringify(body) },
@@ -2686,13 +3952,15 @@ export async function setupMechanicsStarter(campaignId: string): Promise<Campaig
   requireStatus(result, 200, "Campaign mechanics starter setup");
   const response = campaignMechanicsStarterSetupResponseSchema.parse(result.body);
   const content = response.campaign.content;
-  if (response.campaign.id !== validCampaignId
-    || response.campaign.actorRole !== "owner"
-    || content.status !== "configured"
-    || content.rulesProfileId !== MECHANICS_STARTER_IDENTITY.rulesProfileId
-    || content.contentPacks.length !== 1
-    || content.contentPacks[0]?.packId !== MECHANICS_STARTER_IDENTITY.packId
-    || content.contentPacks[0]?.packVersion !== MECHANICS_STARTER_IDENTITY.packVersion) {
+  if (
+    response.campaign.id !== validCampaignId ||
+    response.campaign.actorRole !== "owner" ||
+    content.status !== "configured" ||
+    content.rulesProfileId !== MECHANICS_STARTER_IDENTITY.rulesProfileId ||
+    content.contentPacks.length !== 1 ||
+    content.contentPacks[0]?.packId !== MECHANICS_STARTER_IDENTITY.packId ||
+    content.contentPacks[0]?.packVersion !== MECHANICS_STARTER_IDENTITY.packVersion
+  ) {
     throw new Error("Campaign mechanics starter setup response did not match the request");
   }
   return response;
@@ -2701,7 +3969,9 @@ export async function setupMechanicsStarter(campaignId: string): Promise<Campaig
 /** Issues exactly one fixed SRD 5.1 setup PUT and verifies that exact profile and pack. */
 export async function setupSrd51Starter(campaignId: string): Promise<CampaignDetailResponse> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const body = parseApiInput(() => campaignMechanicsStarterSetupRequestSchema.parse({ starterId: SRD_5_1_STARTER_IDENTITY.starterId }));
+  const body = parseApiInput(() =>
+    campaignMechanicsStarterSetupRequestSchema.parse({ starterId: SRD_5_1_STARTER_IDENTITY.starterId }),
+  );
   const result = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/mechanics-starter-setup`,
     { method: "PUT", cache: "no-store", body: JSON.stringify(body) },
@@ -2710,13 +3980,15 @@ export async function setupSrd51Starter(campaignId: string): Promise<CampaignDet
   requireStatus(result, 200, "Campaign SRD 5.1 starter setup");
   const response = campaignMechanicsStarterSetupResponseSchema.parse(result.body);
   const content = response.campaign.content;
-  if (response.campaign.id !== validCampaignId
-    || response.campaign.actorRole !== "owner"
-    || content.status !== "configured"
-    || content.rulesProfileId !== SRD_5_1_STARTER_IDENTITY.rulesProfileId
-    || content.contentPacks.length !== 1
-    || content.contentPacks[0]?.packId !== SRD_5_1_STARTER_IDENTITY.packId
-    || content.contentPacks[0]?.packVersion !== SRD_5_1_STARTER_IDENTITY.packVersion) {
+  if (
+    response.campaign.id !== validCampaignId ||
+    response.campaign.actorRole !== "owner" ||
+    content.status !== "configured" ||
+    content.rulesProfileId !== SRD_5_1_STARTER_IDENTITY.rulesProfileId ||
+    content.contentPacks.length !== 1 ||
+    content.contentPacks[0]?.packId !== SRD_5_1_STARTER_IDENTITY.packId ||
+    content.contentPacks[0]?.packVersion !== SRD_5_1_STARTER_IDENTITY.packVersion
+  ) {
     throw new Error("Campaign SRD 5.1 starter setup response did not match the request");
   }
   return response;
@@ -2734,10 +4006,17 @@ function assertAdministrationReceipt(
   expectedRevision: number,
 ): void {
   const [event] = receipt.events;
-  if (receipt.campaignId !== campaignId || receipt.type !== type
-    || receipt.revisionBefore !== expectedRevision || receipt.revisionAfter !== expectedRevision + 1
-    || event.campaignId !== campaignId || event.commandId !== receipt.commandId || event.type !== type
-    || event.revision !== receipt.revisionAfter || event.occurredAt !== receipt.occurredAt) {
+  if (
+    receipt.campaignId !== campaignId ||
+    receipt.type !== type ||
+    receipt.revisionBefore !== expectedRevision ||
+    receipt.revisionAfter !== expectedRevision + 1 ||
+    event.campaignId !== campaignId ||
+    event.commandId !== receipt.commandId ||
+    event.type !== type ||
+    event.revision !== receipt.revisionAfter ||
+    event.occurredAt !== receipt.occurredAt
+  ) {
     throw new Error("Campaign administration receipt did not match the request");
   }
 }
@@ -2752,28 +4031,49 @@ export async function getCampaignAdministration(campaignId: string): Promise<Cam
   return response;
 }
 
-const integrationPath = (campaignId: string, command = "") => `/rpg/v1/campaigns/${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)))}/${command || "administration-integrations"}`;
-export async function getCampaignAdministrationIntegrations(campaignId: string): Promise<CampaignAdministrationIntegrations> {
+const integrationPath = (campaignId: string, command = "") =>
+  `/rpg/v1/campaigns/${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)))}/${command || "administration-integrations"}`;
+export async function getCampaignAdministrationIntegrations(
+  campaignId: string,
+): Promise<CampaignAdministrationIntegrations> {
   const success = await requestResponse<unknown>(integrationPath(campaignId), { cache: "no-store" });
   requireStatus(success, 200, "Campaign administration integrations");
   const response = campaignAdministrationIntegrationsSchema.parse(success.body);
   if (response.campaignId !== campaignId) throw new Error("Campaign integration response did not match the request");
   return response;
 }
-async function integrationCommand<T>(campaignId: string, segment: string, schema: { parse(value: unknown): T }, input: T) {
+async function integrationCommand<T>(
+  campaignId: string,
+  segment: string,
+  schema: { parse(value: unknown): T },
+  input: T,
+) {
   const body = parseApiInput(() => schema.parse(input));
-  const success = await requestResponse<unknown>(integrationPath(campaignId, segment), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(integrationPath(campaignId, segment), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Campaign administration command");
   const response = administrationIntegrationCommandResponseSchema.parse(success.body);
-  if (response.receipt.campaignId !== campaignId || response.receipt.idempotencyKey !== (body as any).idempotencyKey
-    || response.receipt.revisionBefore !== (body as any).expectedRevision) throw new Error("Campaign integration receipt did not match the request");
+  if (
+    response.receipt.campaignId !== campaignId ||
+    response.receipt.idempotencyKey !== (body as any).idempotencyKey ||
+    response.receipt.revisionBefore !== (body as any).expectedRevision
+  )
+    throw new Error("Campaign integration receipt did not match the request");
   return response;
 }
-export const associateCampaignVendor = (campaignId: string, input: VendorAssociationCommand) => integrationCommand(campaignId, "vendor-association-commands", vendorAssociationCommandSchema, input);
-export const configureCampaignBuyPolicy = (campaignId: string, input: ShopBuyPolicyCommand) => integrationCommand(campaignId, "buy-policy-commands", shopBuyPolicyCommandSchema, input);
-export const selectCampaignRuleset = (campaignId: string, input: RulesetSelectionCommand) => integrationCommand(campaignId, "ruleset-selection-commands", rulesetSelectionCommandSchema, input);
-export const updateCampaignSessionZeroSafety = (campaignId: string, input: SessionZeroSafetyUpdateCommand) => integrationCommand(campaignId, "session-zero-safety-commands", sessionZeroSafetyUpdateCommandSchema, input);
-export const requestCampaignSafetyAction = (campaignId: string, input: SafetyActionCommand) => integrationCommand(campaignId, "safety-action-commands", safetyActionCommandSchema, input);
+export const associateCampaignVendor = (campaignId: string, input: VendorAssociationCommand) =>
+  integrationCommand(campaignId, "vendor-association-commands", vendorAssociationCommandSchema, input);
+export const configureCampaignBuyPolicy = (campaignId: string, input: ShopBuyPolicyCommand) =>
+  integrationCommand(campaignId, "buy-policy-commands", shopBuyPolicyCommandSchema, input);
+export const selectCampaignRuleset = (campaignId: string, input: RulesetSelectionCommand) =>
+  integrationCommand(campaignId, "ruleset-selection-commands", rulesetSelectionCommandSchema, input);
+export const updateCampaignSessionZeroSafety = (campaignId: string, input: SessionZeroSafetyUpdateCommand) =>
+  integrationCommand(campaignId, "session-zero-safety-commands", sessionZeroSafetyUpdateCommandSchema, input);
+export const requestCampaignSafetyAction = (campaignId: string, input: SafetyActionCommand) =>
+  integrationCommand(campaignId, "safety-action-commands", safetyActionCommandSchema, input);
 
 /** Issues one revision-bound PATCH. Callers must never automatically retry it. */
 export async function updateCampaignAdministration(
@@ -2782,7 +4082,11 @@ export async function updateCampaignAdministration(
 ): Promise<CampaignAdministrationHttpPatchResponse> {
   const { id, path } = campaignAdministrationPath(campaignId);
   const body = parseApiInput(() => campaignAdministrationHttpPatchRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(path, { method: "PATCH", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(path, {
+    method: "PATCH",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   if (success.status !== 200) throw new Error("Campaign administration response did not use the committed status");
   const response = campaignAdministrationHttpPatchResponseSchema.parse(success.body);
   assertAdministrationReceipt(response.receipt, id, "administration_updated", body.expectedRevision);
@@ -2799,12 +4103,19 @@ export async function archiveCampaignAdministration(
 ): Promise<CampaignAdministrationHttpArchiveResponse> {
   const { id, path } = campaignAdministrationPath(campaignId);
   const body = parseApiInput(() => campaignAdministrationHttpArchiveRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(path, { method: "DELETE", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(path, {
+    method: "DELETE",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   if (success.status !== 200) throw new Error("Campaign archive response did not use the committed status");
   const response = campaignAdministrationHttpArchiveResponseSchema.parse(success.body);
   assertAdministrationReceipt(response.receipt, id, "administration_updated", body.expectedRevision);
-  if (response.campaign.id !== id || response.campaign.status !== "archived"
-    || response.receipt.revisionAfter !== response.campaign.revision) {
+  if (
+    response.campaign.id !== id ||
+    response.campaign.status !== "archived" ||
+    response.receipt.revisionAfter !== response.campaign.revision
+  ) {
     throw new Error("Campaign archive receipt did not match the request");
   }
   return response;
@@ -2812,11 +4123,17 @@ export async function archiveCampaignAdministration(
 
 function membershipPath(campaignId: string, principalId?: string): { campaignId: string; path: string } {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const suffix = principalId === undefined ? "" : `/${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(principalId)))}`;
-  return { campaignId: validCampaignId, path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/memberships${suffix}` };
+  const suffix =
+    principalId === undefined ? "" : `/${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(principalId)))}`;
+  return {
+    campaignId: validCampaignId,
+    path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/memberships${suffix}`,
+  };
 }
 
-export async function listCampaignMemberships(campaignId: string): Promise<CampaignAdministrationHttpMembershipListResponse> {
+export async function listCampaignMemberships(
+  campaignId: string,
+): Promise<CampaignAdministrationHttpMembershipListResponse> {
   const { path } = membershipPath(campaignId);
   const success = await requestResponse<unknown>(path, { cache: "no-store" });
   requireStatus(success, 200, "Campaign membership list");
@@ -2837,9 +4154,11 @@ async function membershipMutation(
   const response = campaignAdministrationHttpMembershipMutationResponseSchema.parse(success.body);
   assertAdministrationReceipt(response.receipt, campaignId, operation, expectedRevision);
   const [event] = response.receipt.events;
-  if (response.membership.principalId !== principalId
-    || event.data.principalId !== principalId
-    || (expectedRole !== undefined && (response.membership.role !== expectedRole || event.data.role !== expectedRole))) {
+  if (
+    response.membership.principalId !== principalId ||
+    event.data.principalId !== principalId ||
+    (expectedRole !== undefined && (response.membership.role !== expectedRole || event.data.role !== expectedRole))
+  ) {
     throw new Error("Campaign membership receipt did not match the request");
   }
   return response;
@@ -2851,8 +4170,15 @@ export async function addCampaignAdministrationMembership(
 ): Promise<CampaignAdministrationHttpMembershipMutationResponse> {
   const body = parseApiInput(() => campaignAdministrationHttpMembershipCreateRequestSchema.parse(input));
   const target = membershipPath(campaignId);
-  return membershipMutation(target.campaignId, body.principalId, target.path,
-    { method: "POST", cache: "no-store", body: JSON.stringify(body) }, body.expectedRevision, "membership_added", body.role);
+  return membershipMutation(
+    target.campaignId,
+    body.principalId,
+    target.path,
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) },
+    body.expectedRevision,
+    "membership_added",
+    body.role,
+  );
 }
 
 export async function updateCampaignAdministrationMembership(
@@ -2862,8 +4188,15 @@ export async function updateCampaignAdministrationMembership(
 ): Promise<CampaignAdministrationHttpMembershipMutationResponse> {
   const body = parseApiInput(() => campaignAdministrationHttpMembershipUpdateRequestSchema.parse(input));
   const target = membershipPath(campaignId, principalId);
-  return membershipMutation(target.campaignId, parseApiInput(() => resourceIdSchema.parse(principalId)), target.path,
-    { method: "PATCH", cache: "no-store", body: JSON.stringify(body) }, body.expectedRevision, "membership_role_changed", body.role);
+  return membershipMutation(
+    target.campaignId,
+    parseApiInput(() => resourceIdSchema.parse(principalId)),
+    target.path,
+    { method: "PATCH", cache: "no-store", body: JSON.stringify(body) },
+    body.expectedRevision,
+    "membership_role_changed",
+    body.role,
+  );
 }
 
 export async function removeCampaignAdministrationMembership(
@@ -2873,13 +4206,21 @@ export async function removeCampaignAdministrationMembership(
 ): Promise<CampaignAdministrationHttpMembershipMutationResponse> {
   const body = parseApiInput(() => campaignAdministrationHttpMembershipDeleteRequestSchema.parse(input));
   const target = membershipPath(campaignId, principalId);
-  return membershipMutation(target.campaignId, parseApiInput(() => resourceIdSchema.parse(principalId)), target.path,
-    { method: "DELETE", cache: "no-store", body: JSON.stringify(body) }, body.expectedRevision, "membership_removed");
+  return membershipMutation(
+    target.campaignId,
+    parseApiInput(() => resourceIdSchema.parse(principalId)),
+    target.path,
+    { method: "DELETE", cache: "no-store", body: JSON.stringify(body) },
+    body.expectedRevision,
+    "membership_removed",
+  );
 }
 
 export async function listCampaignTimelines(campaignId: string): Promise<CampaignHistoryHttpTimelinesResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/timelines`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/timelines`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Campaign timeline list");
   const response = campaignHistoryHttpTimelinesResponseSchema.parse(success.body);
   if (!response.timelines.some((timeline) => timeline.id === response.activeTimelineId && timeline.active)) {
@@ -2895,70 +4236,122 @@ export async function listCampaignEvents(
 ): Promise<CampaignHistoryHttpEventsResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const input = parseApiInput(() => campaignHistoryHttpEventsQuerySchema.parse(query));
-  const params = new URLSearchParams({ timelineId: input.timelineId, afterRevision: String(input.afterRevision), limit: String(input.limit) });
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/events?${params}`, { cache: "no-store" });
+  const params = new URLSearchParams({
+    timelineId: input.timelineId,
+    afterRevision: String(input.afterRevision),
+    limit: String(input.limit),
+  });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/events?${params}`, {
+    cache: "no-store",
+  });
   if (success.status !== 200) throw new Error("Campaign event page response did not use the documented status");
   const response = campaignHistoryHttpEventsResponseSchema.parse(success.body);
   let previous = input.afterRevision;
   for (const event of response.events) {
-    if (event.timelineId !== input.timelineId || event.revision <= previous) throw new Error("Campaign event page was not bound to its cursor");
+    if (event.timelineId !== input.timelineId || event.revision <= previous)
+      throw new Error("Campaign event page was not bound to its cursor");
     previous = event.revision;
   }
-  if (response.events.length > input.limit
-    || (response.nextAfterRevision !== null && response.nextAfterRevision !== previous)) {
+  if (
+    response.events.length > input.limit ||
+    (response.nextAfterRevision !== null && response.nextAfterRevision !== previous)
+  ) {
     throw new Error("Campaign event page returned an invalid cursor");
   }
   return response;
 }
 
-export async function getCampaignCommandReceipt(campaignId: string, commandId: string): Promise<CampaignHistoryHttpPublicReceiptResponse> {
+export async function getCampaignCommandReceipt(
+  campaignId: string,
+  commandId: string,
+): Promise<CampaignHistoryHttpPublicReceiptResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const command = parseApiInput(() => resourceIdSchema.parse(commandId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/commands/${encodeURIComponent(command)}/receipt`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(id)}/commands/${encodeURIComponent(command)}/receipt`,
+    { cache: "no-store" },
+  );
   if (success.status !== 200) throw new Error("Campaign receipt response did not use the documented status");
   return campaignHistoryHttpPublicReceiptResponseSchema.parse(success.body);
 }
 
 export async function listCampaignRecaps(campaignId: string): Promise<{ recaps: CampaignHistoryHttpRecap[] }> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/recaps`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/recaps`, {
+    cache: "no-store",
+  });
   if (success.status !== 200) throw new Error("Campaign recap response did not use the documented status");
   const value = success.body;
-  if (typeof value !== "object" || value === null || Array.isArray(value) || Object.keys(value).join(",") !== "recaps") throw new Error("Campaign recap response was malformed");
-  return { recaps: campaignHistoryHttpRecapSchema.array().max(1000).parse((value as { recaps: unknown }).recaps) };
+  if (typeof value !== "object" || value === null || Array.isArray(value) || Object.keys(value).join(",") !== "recaps")
+    throw new Error("Campaign recap response was malformed");
+  return {
+    recaps: campaignHistoryHttpRecapSchema
+      .array()
+      .max(1000)
+      .parse((value as { recaps: unknown }).recaps),
+  };
 }
 
-export async function createCampaignRecap(campaignId: string, input: CampaignHistoryHttpRecapRequest): Promise<CampaignHistoryHttpRecapResponse> {
+export async function createCampaignRecap(
+  campaignId: string,
+  input: CampaignHistoryHttpRecapRequest,
+): Promise<CampaignHistoryHttpRecapResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const body = parseApiInput(() => campaignHistoryHttpRecapRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/recaps`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/recaps`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   if (success.status !== 201) throw new Error("Campaign recap response did not use the committed status");
   const response = campaignHistoryHttpRecapResponseSchema.parse(success.body);
   const event = response.receipt.events[0];
-  if (response.recap.timelineId !== body.timelineId || response.recap.throughRevision !== body.throughRevision
-    || response.recap.visibility !== body.visibility || response.recap.text !== body.text
-    || JSON.stringify(response.recap.selectedSessionIds) !== JSON.stringify(body.selectedSessionIds)
-    || response.recap.createdAt !== response.receipt.occurredAt
-    || response.receipt.type !== "recap_created" || response.receipt.revisionBefore !== body.expectedRevision
-    || event.type !== "recap_created" || event.commandId !== response.receipt.commandId
-    || event.data.timelineId !== body.timelineId || event.data.throughRevision !== body.throughRevision
-    || event.data.visibility !== body.visibility || JSON.stringify(event.data.selectedSessionIds) !== JSON.stringify(body.selectedSessionIds)
-    || "text" in event.data) {
+  if (
+    response.recap.timelineId !== body.timelineId ||
+    response.recap.throughRevision !== body.throughRevision ||
+    response.recap.visibility !== body.visibility ||
+    response.recap.text !== body.text ||
+    JSON.stringify(response.recap.selectedSessionIds) !== JSON.stringify(body.selectedSessionIds) ||
+    response.recap.createdAt !== response.receipt.occurredAt ||
+    response.receipt.type !== "recap_created" ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    event.type !== "recap_created" ||
+    event.commandId !== response.receipt.commandId ||
+    event.data.timelineId !== body.timelineId ||
+    event.data.throughRevision !== body.throughRevision ||
+    event.data.visibility !== body.visibility ||
+    JSON.stringify(event.data.selectedSessionIds) !== JSON.stringify(body.selectedSessionIds) ||
+    "text" in event.data
+  ) {
     throw new Error("Campaign recap receipt did not match the request");
   }
   return response;
 }
 
-export async function listCampaignCheckpoints(campaignId: string): Promise<{ checkpoints: CampaignHistoryHttpCheckpoint[] }> {
+export async function listCampaignCheckpoints(
+  campaignId: string,
+): Promise<{ checkpoints: CampaignHistoryHttpCheckpoint[] }> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Campaign checkpoint list");
   const body = success.body;
-  if (typeof body !== "object" || body === null || Array.isArray(body)
-    || Object.keys(body).length !== 1 || !("checkpoints" in body)) {
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    Array.isArray(body) ||
+    Object.keys(body).length !== 1 ||
+    !("checkpoints" in body)
+  ) {
     throw new Error("Campaign checkpoint response was malformed");
   }
-  return { checkpoints: campaignHistoryHttpCheckpointSchema.array().max(1000).parse((body as { checkpoints: unknown }).checkpoints) };
+  return {
+    checkpoints: campaignHistoryHttpCheckpointSchema
+      .array()
+      .max(1000)
+      .parse((body as { checkpoints: unknown }).checkpoints),
+  };
 }
 
 export async function createCampaignCheckpoint(
@@ -2967,19 +4360,30 @@ export async function createCampaignCheckpoint(
 ): Promise<CampaignHistoryHttpCheckpointResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const body = parseApiInput(() => campaignHistoryHttpCheckpointRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`,
-    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   if (success.status !== 201) throw new Error("Campaign checkpoint response did not use the committed status");
   const response = campaignHistoryHttpCheckpointResponseSchema.parse(success.body);
   const [event] = response.receipt.events;
   const eventKeys = Object.keys(event.data).sort().join(",");
-  if (response.checkpoint.timelineId !== body.timelineId || response.checkpoint.timelineRevision !== body.timelineRevision
-    || response.checkpoint.label !== body.label || response.checkpoint.createdAt !== response.receipt.occurredAt
-    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.type !== "checkpoint_created"
-    || event.type !== "checkpoint_created" || event.occurredAt !== response.receipt.occurredAt
-    || eventKeys !== "label,timelineId,timelineRevision"
-    || event.data.timelineId !== body.timelineId || event.data.timelineRevision !== body.timelineRevision
-    || event.data.label !== body.label) throw new Error("Campaign checkpoint receipt did not match the request");
+  if (
+    response.checkpoint.timelineId !== body.timelineId ||
+    response.checkpoint.timelineRevision !== body.timelineRevision ||
+    response.checkpoint.label !== body.label ||
+    response.checkpoint.createdAt !== response.receipt.occurredAt ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.type !== "checkpoint_created" ||
+    event.type !== "checkpoint_created" ||
+    event.occurredAt !== response.receipt.occurredAt ||
+    eventKeys !== "label,timelineId,timelineRevision" ||
+    event.data.timelineId !== body.timelineId ||
+    event.data.timelineRevision !== body.timelineRevision ||
+    event.data.label !== body.label
+  )
+    throw new Error("Campaign checkpoint receipt did not match the request");
   return response;
 }
 
@@ -2991,63 +4395,102 @@ export async function forkCampaignTimeline(
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const body = parseApiInput(() => campaignHistoryHttpForkRequestSchema.parse(input));
   if (checkpoint.id !== body.checkpointId) throw new ApiInputError("Fork checkpoint identity is invalid");
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/timeline-forks`,
-    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/timeline-forks`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   if (success.status !== 201) throw new Error("Campaign timeline fork response did not use the committed status");
   const response = campaignHistoryHttpForkResponseSchema.parse(success.body);
   const [event] = response.receipt.events;
-  if (!response.timeline.active || response.timeline.parentTimelineId !== checkpoint.timelineId
-    || response.timeline.forkedFromRevision !== checkpoint.timelineRevision
-    || response.timeline.revision !== checkpoint.timelineRevision || response.timeline.createdAt !== response.receipt.occurredAt
-    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.type !== "timeline_forked"
-    || event.type !== "timeline_forked" || event.occurredAt !== response.receipt.occurredAt
-    || Object.keys(event.data).join(",") !== "checkpointId" || event.data.checkpointId !== body.checkpointId) {
+  if (
+    !response.timeline.active ||
+    response.timeline.parentTimelineId !== checkpoint.timelineId ||
+    response.timeline.forkedFromRevision !== checkpoint.timelineRevision ||
+    response.timeline.revision !== checkpoint.timelineRevision ||
+    response.timeline.createdAt !== response.receipt.occurredAt ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.type !== "timeline_forked" ||
+    event.type !== "timeline_forked" ||
+    event.occurredAt !== response.receipt.occurredAt ||
+    Object.keys(event.data).join(",") !== "checkpointId" ||
+    event.data.checkpointId !== body.checkpointId
+  ) {
     throw new Error("Campaign timeline fork receipt did not match the request");
   }
   return response;
 }
 
 /** Runs validation only. This stores a report but does not alter campaign state. */
-export async function dryRunCampaignImport(input: CampaignTransferHttpDryRunRequest): Promise<CampaignTransferHttpDryRunResponse> {
+export async function dryRunCampaignImport(
+  input: CampaignTransferHttpDryRunRequest,
+): Promise<CampaignTransferHttpDryRunResponse> {
   const body = parseApiInput(() => campaignTransferHttpDryRunRequestSchema.parse(input));
-  const success = await requestResponse<unknown>("/rpg/v1/campaign-imports", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>("/rpg/v1/campaign-imports", {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   if (success.status !== 200) throw new Error("Campaign import report response did not use the documented status");
   return campaignTransferHttpDryRunResponseSchema.parse(success.body);
 }
 
 /** Applies exactly one server-stored dry run. Callers must not replay this write. */
-export async function applyCampaignImport(importId: string, input: CampaignTransferHttpApplyRequest): Promise<CampaignTransferHttpApplyResponse> {
+export async function applyCampaignImport(
+  importId: string,
+  input: CampaignTransferHttpApplyRequest,
+): Promise<CampaignTransferHttpApplyResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(importId));
   const body = parseApiInput(() => campaignTransferHttpApplyRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaign-imports/${encodeURIComponent(id)}/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaign-imports/${encodeURIComponent(id)}/apply`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   if (success.status !== 200) throw new Error("Campaign import apply response did not use the committed status");
   const response = campaignTransferHttpApplyResponseSchema.parse(success.body);
   const event = response.receipt.events[0];
-  if (response.campaign.actorRole !== "owner" || response.receipt.type !== "import_applied"
-    || response.receipt.campaignId !== response.campaign.id || event.campaignId !== response.campaign.id
-    || event.type !== "import_applied" || event.commandId !== response.receipt.commandId
-    || event.revision !== response.receipt.revisionAfter || event.occurredAt !== response.receipt.occurredAt
-    || event.data.importId !== id) {
+  if (
+    response.campaign.actorRole !== "owner" ||
+    response.receipt.type !== "import_applied" ||
+    response.receipt.campaignId !== response.campaign.id ||
+    event.campaignId !== response.campaign.id ||
+    event.type !== "import_applied" ||
+    event.commandId !== response.receipt.commandId ||
+    event.revision !== response.receipt.revisionAfter ||
+    event.occurredAt !== response.receipt.occurredAt ||
+    event.data.importId !== id
+  ) {
     throw new Error("Campaign import receipt did not match the imported campaign");
   }
   return response;
 }
 
 /** Fetches and validates the exact portable export document without caching. */
-export async function getCampaignExport(campaignId: string, includeMessages: boolean): Promise<CampaignTransferHttpExportDocument> {
+export async function getCampaignExport(
+  campaignId: string,
+  includeMessages: boolean,
+): Promise<CampaignTransferHttpExportDocument> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/export?includeMessages=${includeMessages ? "true" : "false"}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(id)}/export?includeMessages=${includeMessages ? "true" : "false"}`,
+    { cache: "no-store" },
+  );
   if (success.status !== 200) throw new Error("Campaign export response did not use the documented status");
   const document = campaignTransferHttpExportDocumentSchema.parse(success.body);
-  if (document.messages.included !== includeMessages) throw new Error("Campaign export did not match the message choice");
+  if (document.messages.included !== includeMessages)
+    throw new Error("Campaign export did not match the message choice");
   return document;
 }
 
 function contentPackPath(packId: string, packVersion: string): { packId: string; packVersion: string; path: string } {
   const validPackId = parseApiInput(() => resourceIdSchema.parse(packId));
   const validPackVersion = parseApiInput(() => contentPackVersionSchema.parse(packVersion));
-  return { packId: validPackId, packVersion: validPackVersion,
-    path: `/rpg/v1/content-packs/${encodeURIComponent(validPackId)}/versions/${encodeURIComponent(validPackVersion)}` };
+  return {
+    packId: validPackId,
+    packVersion: validPackVersion,
+    path: `/rpg/v1/content-packs/${encodeURIComponent(validPackId)}/versions/${encodeURIComponent(validPackVersion)}`,
+  };
 }
 
 function requireStatus(success: { status: number }, status: number, operation: string): void {
@@ -3055,15 +4498,20 @@ function requireStatus(success: { status: number }, status: number, operation: s
 }
 
 /** Reads one strict page of sealed publications without caching. */
-export async function listContentPackPublications(query: ContentCatalogHttpPublicationsQuery = {}): Promise<ContentCatalogHttpPublicationsResponse> {
+export async function listContentPackPublications(
+  query: ContentCatalogHttpPublicationsQuery = {},
+): Promise<ContentCatalogHttpPublicationsResponse> {
   const input = parseApiInput(() => contentCatalogHttpPublicationsQuerySchema.parse(query));
   const params = new URLSearchParams();
   if (input.cursor !== undefined) params.set("cursor", input.cursor);
   if (input.limit !== undefined) params.set("limit", String(input.limit));
-  const success = await requestResponse<unknown>(`/rpg/v1/content-packs${params.size ? `?${params}` : ""}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/content-packs${params.size ? `?${params}` : ""}`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Content pack publication list");
   const response = contentCatalogHttpPublicationsResponseSchema.parse(success.body);
-  if (input.limit !== undefined && response.publications.length > input.limit) throw new Error("Content pack publication page exceeded the requested limit");
+  if (input.limit !== undefined && response.publications.length > input.limit)
+    throw new Error("Content pack publication page exceeded the requested limit");
   return response;
 }
 
@@ -3077,31 +4525,47 @@ export async function listAllContentPackPublications(): Promise<ContentCatalogHt
     const response = await listContentPackPublications({ limit: 100, ...(cursor === undefined ? {} : { cursor }) });
     for (const publication of response.publications) {
       const key = `${publication.packId}\0${publication.packVersion}`;
-      if (!exactKeys.has(key)) { exactKeys.add(key); publications.push(publication); }
+      if (!exactKeys.has(key)) {
+        exactKeys.add(key);
+        publications.push(publication);
+      }
     }
     if (response.nextCursor === null) return { publications, nextCursor: null };
     if (cursors.has(response.nextCursor)) throw new Error("Content pack publication pagination repeated a cursor");
-    cursors.add(response.nextCursor); cursor = response.nextCursor;
+    cursors.add(response.nextCursor);
+    cursor = response.nextCursor;
   }
   throw new Error("Content pack publication pagination exceeded the safe page limit");
 }
 
 /** Reads the owner-only complete projection for one exact sealed version. */
-export async function getContentPackPublication(packId: string, packVersion: string): Promise<ContentCatalogHttpOwnerDetailResponse> {
+export async function getContentPackPublication(
+  packId: string,
+  packVersion: string,
+): Promise<ContentCatalogHttpOwnerDetailResponse> {
   const target = contentPackPath(packId, packVersion);
   const success = await requestResponse<unknown>(target.path, { cache: "no-store" });
   requireStatus(success, 200, "Content pack detail");
   const response = contentCatalogHttpOwnerDetailResponseSchema.parse(success.body);
-  if (response.catalog.publication.packId !== target.packId || response.catalog.publication.packVersion !== target.packVersion) {
+  if (
+    response.catalog.publication.packId !== target.packId ||
+    response.catalog.publication.packVersion !== target.packVersion
+  ) {
     throw new Error("Content pack detail response did not match the request");
   }
   return response;
 }
 
 /** Validates only the supplied in-memory draft; this method never publishes. */
-export async function validateContentPackDraft(input: ContentCatalogHttpValidationRequest): Promise<ContentCatalogHttpValidationResponse> {
+export async function validateContentPackDraft(
+  input: ContentCatalogHttpValidationRequest,
+): Promise<ContentCatalogHttpValidationResponse> {
   const body = parseApiInput(() => contentCatalogHttpValidationRequestSchema.parse(input));
-  const success = await requestResponse<unknown>("/rpg/v1/content-packs/validate", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>("/rpg/v1/content-packs/validate", {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Content pack validation");
   return contentCatalogHttpValidationResponseSchema.parse(success.body);
 }
@@ -3109,29 +4573,50 @@ export async function validateContentPackDraft(input: ContentCatalogHttpValidati
 /** Issues one immutable publication POST. Callers must never automatically retry it. */
 function canonicalWireValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalWireValue);
-  if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-    .sort(([left], [right]) => left.localeCompare(right)).map(([key, entry]) => [key, canonicalWireValue(entry)]));
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalWireValue(entry)]),
+    );
   return value;
 }
 
 function canonicalDefinitionSet(definitions: ContentCatalogHttpPublicationRequest["definitions"]): string {
-  return JSON.stringify([...definitions].sort((left, right) => left.reference.kind.localeCompare(right.reference.kind)
-    || left.reference.definitionId.localeCompare(right.reference.definitionId)).map(canonicalWireValue));
+  return JSON.stringify(
+    [...definitions]
+      .sort(
+        (left, right) =>
+          left.reference.kind.localeCompare(right.reference.kind) ||
+          left.reference.definitionId.localeCompare(right.reference.definitionId),
+      )
+      .map(canonicalWireValue),
+  );
 }
 
-export async function publishContentPack(input: ContentCatalogHttpPublicationRequest): Promise<ContentCatalogHttpPublicationResponse> {
+export async function publishContentPack(
+  input: ContentCatalogHttpPublicationRequest,
+): Promise<ContentCatalogHttpPublicationResponse> {
   const body = parseApiInput(() => contentCatalogHttpPublicationRequestSchema.parse(input));
-  const success = await requestResponse<unknown>("/rpg/v1/content-packs", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>("/rpg/v1/content-packs", {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 201, "Content pack publication");
   const response = contentCatalogHttpPublicationResponseSchema.parse(success.body);
   const publication = response.catalog.publication;
-  if (publication.packId !== body.manifest.packId || publication.packVersion !== body.manifest.packVersion
-    || publication.name !== body.manifest.name || publication.description !== body.manifest.description
-    || publication.digest !== body.manifest.digest
-    || JSON.stringify(publication.tags) !== JSON.stringify(body.manifest.tags)
-    || JSON.stringify(publication.compatibility) !== JSON.stringify(body.manifest.compatibility)
-    || JSON.stringify(response.catalog.provenance) !== JSON.stringify(body.manifest.provenance)
-    || canonicalDefinitionSet(response.catalog.definitions) !== canonicalDefinitionSet(body.definitions)) {
+  if (
+    publication.packId !== body.manifest.packId ||
+    publication.packVersion !== body.manifest.packVersion ||
+    publication.name !== body.manifest.name ||
+    publication.description !== body.manifest.description ||
+    publication.digest !== body.manifest.digest ||
+    JSON.stringify(publication.tags) !== JSON.stringify(body.manifest.tags) ||
+    JSON.stringify(publication.compatibility) !== JSON.stringify(body.manifest.compatibility) ||
+    JSON.stringify(response.catalog.provenance) !== JSON.stringify(body.manifest.provenance) ||
+    canonicalDefinitionSet(response.catalog.definitions) !== canonicalDefinitionSet(body.definitions)
+  ) {
     throw new Error("Content pack publication response did not match the request");
   }
   return response;
@@ -3151,30 +4636,53 @@ export async function getCampaignContent(campaignId: string): Promise<ContentCat
 }
 
 /** Issues one revision-bound exact-pin PUT and never retries it. */
-export async function configureCampaignContent(campaignId: string, input: ContentCatalogHttpCampaignContentPutRequest): Promise<ContentCatalogHttpCampaignContentPutResponse> {
+export async function configureCampaignContent(
+  campaignId: string,
+  input: ContentCatalogHttpCampaignContentPutRequest,
+): Promise<ContentCatalogHttpCampaignContentPutResponse> {
   const target = campaignContentPath(campaignId);
   const body = parseApiInput(() => contentCatalogHttpCampaignContentPutRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(target.path, { method: "PUT", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(target.path, {
+    method: "PUT",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Campaign content configuration");
   const response = contentCatalogHttpCampaignContentPutResponseSchema.parse(success.body);
   const expectedPins = JSON.stringify(body.contentPacks);
-  if (response.content.rulesProfileId !== body.rulesProfileId || JSON.stringify(response.content.contentPacks.map(({ packId, packVersion }) => ({ packId, packVersion }))) !== expectedPins
-    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1 || response.receipt.content.rulesProfileId !== body.rulesProfileId
-    || JSON.stringify(response.receipt.content) !== JSON.stringify(response.content)) {
+  if (
+    response.content.rulesProfileId !== body.rulesProfileId ||
+    JSON.stringify(response.content.contentPacks.map(({ packId, packVersion }) => ({ packId, packVersion }))) !==
+      expectedPins ||
+    response.receipt.idempotencyKey !== body.idempotencyKey ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1 ||
+    response.receipt.content.rulesProfileId !== body.rulesProfileId ||
+    JSON.stringify(response.receipt.content) !== JSON.stringify(response.content)
+  ) {
     throw new Error("Campaign content configuration response did not match the request");
   }
   return response;
 }
 
 /** Reads one role-filtered campaign pack projection at an exact version. */
-export async function getCampaignContentPack(campaignId: string, packId: string, packVersion: string): Promise<ContentCatalogHttpCampaignPackDetailResponse> {
+export async function getCampaignContentPack(
+  campaignId: string,
+  packId: string,
+  packVersion: string,
+): Promise<ContentCatalogHttpCampaignPackDetailResponse> {
   const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const target = contentPackPath(packId, packVersion);
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/content-packs/${encodeURIComponent(target.packId)}/versions/${encodeURIComponent(target.packVersion)}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/content-packs/${encodeURIComponent(target.packId)}/versions/${encodeURIComponent(target.packVersion)}`,
+    { cache: "no-store" },
+  );
   requireStatus(success, 200, "Campaign content pack detail");
   const response = contentCatalogHttpCampaignPackDetailResponseSchema.parse(success.body);
-  if (response.catalog.publication.packId !== target.packId || response.catalog.publication.packVersion !== target.packVersion) {
+  if (
+    response.catalog.publication.packId !== target.packId ||
+    response.catalog.publication.packVersion !== target.packVersion
+  ) {
     throw new Error("Campaign content pack detail response did not match the request");
   }
   return response;
@@ -3184,7 +4692,8 @@ type Revisioned<T> = { data: T; revision: number };
 function revisionFrom(headers: Headers, name: "x-world-revision" | "x-quest-revision" | "x-story-revision"): number {
   const raw = headers.get(name);
   const revision = raw === null ? NaN : Number(raw);
-  if (!Number.isSafeInteger(revision) || revision < 0 || String(revision) !== raw) throw new Error(`Response omitted a valid ${name} header`);
+  if (!Number.isSafeInteger(revision) || revision < 0 || String(revision) !== raw)
+    throw new Error(`Response omitted a valid ${name} header`);
   return revision;
 }
 function campaignLane(campaignId: string, suffix: string): string {
@@ -3195,57 +4704,104 @@ function resourceLane(prefix: string, id: string, suffix: string): string {
   const valid = parseApiInput(() => resourceIdSchema.parse(id));
   return `/rpg/v1/${prefix}/${encodeURIComponent(valid)}/${suffix}`;
 }
-function bindReceipt(receipt: { idempotencyKey: string; revisionBefore: number; revisionAfter: number }, body: { idempotencyKey: string; expectedRevision: number }, operation: string): void {
-  if (receipt.idempotencyKey !== body.idempotencyKey || receipt.revisionBefore !== body.expectedRevision || receipt.revisionAfter !== body.expectedRevision + 1) {
+function bindReceipt(
+  receipt: { idempotencyKey: string; revisionBefore: number; revisionAfter: number },
+  body: { idempotencyKey: string; expectedRevision: number },
+  operation: string,
+): void {
+  if (
+    receipt.idempotencyKey !== body.idempotencyKey ||
+    receipt.revisionBefore !== body.expectedRevision ||
+    receipt.revisionAfter !== body.expectedRevision + 1
+  ) {
     throw new Error(`${operation} receipt did not match the request`);
   }
 }
 
 /** M2.10 reads expose the mandatory authoritative revision separately from their strict role projection. */
-export async function getCampaignWorld(campaignId: string, sessionId?: string): Promise<Revisioned<CampaignWorldHttpResponse>> {
-  const suffix = sessionId === undefined ? "world"
-    : `world?sessionId=${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(sessionId)))}`;
+export async function getCampaignWorld(
+  campaignId: string,
+  sessionId?: string,
+): Promise<Revisioned<CampaignWorldHttpResponse>> {
+  const suffix =
+    sessionId === undefined
+      ? "world"
+      : `world?sessionId=${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(sessionId)))}`;
   const success = await requestResponse<unknown>(campaignLane(campaignId, suffix), { cache: "no-store" });
   requireStatus(success, 200, "Campaign world read");
-  return { data: campaignWorldHttpResponseSchema.parse(success.body), revision: revisionFrom(success.headers, "x-world-revision") };
+  return {
+    data: campaignWorldHttpResponseSchema.parse(success.body),
+    revision: revisionFrom(success.headers, "x-world-revision"),
+  };
 }
-export async function travelActor(actorId: string, input: ActorTravelCommandRequest): Promise<ActorTravelCommandResponse> {
+export async function travelActor(
+  actorId: string,
+  input: ActorTravelCommandRequest,
+): Promise<ActorTravelCommandResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(actorId));
   const body = parseApiInput(() => actorTravelCommandRequestSchema.parse(input));
   if (!body.partyActorIds.includes(id)) throw new ApiInputError("Travel party must contain the route actor");
-  const success = await requestResponse<unknown>(resourceLane("actors", id, "travel-commands"), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(resourceLane("actors", id, "travel-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor travel");
-  const response = actorTravelCommandResponseSchema.parse(success.body); bindReceipt(response.receipt, body, "Actor travel");
-  if (JSON.stringify(response.locations.map((item) => item.actorId)) !== JSON.stringify(body.partyActorIds)) throw new Error("Actor travel response did not match the exact party");
+  const response = actorTravelCommandResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Actor travel");
+  if (JSON.stringify(response.locations.map((item) => item.actorId)) !== JSON.stringify(body.partyActorIds))
+    throw new Error("Actor travel response did not match the exact party");
   return response;
 }
 
 /** GM-only bootstrap placement of one previously unplaced actor; never retried automatically. */
-export async function placeActor(actorId: string, input: ActorPlacementCommandRequest): Promise<ActorPlacementCommandResponse> {
+export async function placeActor(
+  actorId: string,
+  input: ActorPlacementCommandRequest,
+): Promise<ActorPlacementCommandResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(actorId));
   const body = parseApiInput(() => actorPlacementCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(resourceLane("actors", id, "placement-commands"), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(resourceLane("actors", id, "placement-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor placement");
   const response = actorPlacementCommandResponseSchema.parse(success.body);
   bindReceipt(response.receipt, body, "Actor placement");
-  if (response.location.actorId !== id || response.location.locationId !== body.locationId) throw new Error("Actor placement response did not match the request");
+  if (response.location.actorId !== id || response.location.locationId !== body.locationId)
+    throw new Error("Actor placement response did not match the request");
   return response;
 }
 
 /** Establishes one camp at the actor's current location; never retried automatically. */
-export async function establishActorCamp(actorId: string, input: ActorCampCommandRequest): Promise<ActorCampCommandResponse> {
+export async function establishActorCamp(
+  actorId: string,
+  input: ActorCampCommandRequest,
+): Promise<ActorCampCommandResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(actorId));
   const body = parseApiInput(() => actorCampCommandRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(resourceLane("actors", id, "camp-commands"), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(resourceLane("actors", id, "camp-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Actor camp");
   const response = actorCampCommandResponseSchema.parse(success.body);
   bindReceipt(response.receipt, body, "Actor camp");
   return response;
 }
 
-export async function listCampaignNpcs(campaignId: string, audience: "gm" | "player"): Promise<Revisioned<CampaignNpcsHttpResponse>> {
-  const success = await requestResponse<unknown>(campaignLane(campaignId, "npcs"), { cache: "no-store" }); requireStatus(success, 200, "Campaign NPC read");
-  const data=audience==="gm"?gmCampaignNpcsHttpResponseSchema.parse(success.body):playerCampaignNpcsHttpResponseSchema.parse(success.body);
+export async function listCampaignNpcs(
+  campaignId: string,
+  audience: "gm" | "player",
+): Promise<Revisioned<CampaignNpcsHttpResponse>> {
+  const success = await requestResponse<unknown>(campaignLane(campaignId, "npcs"), { cache: "no-store" });
+  requireStatus(success, 200, "Campaign NPC read");
+  const data =
+    audience === "gm"
+      ? gmCampaignNpcsHttpResponseSchema.parse(success.body)
+      : playerCampaignNpcsHttpResponseSchema.parse(success.body);
   return { data, revision: revisionFrom(success.headers, "x-world-revision") };
 }
 
@@ -3256,27 +4812,48 @@ function npcPresenceLane(campaignId: string, sessionId: string): string {
 }
 
 /** Reads the authoritative running cast or stopped cast history for one opaque room. */
-export async function getCampaignPresentCast(campaignId: string, sessionId: string, audience: "gm" | "player"): Promise<NpcCastHttp> {
-  const success = await requestResponse<unknown>(`${npcPresenceLane(campaignId, sessionId)}/present-cast`, { cache: "no-store" });
+export async function getCampaignPresentCast(
+  campaignId: string,
+  sessionId: string,
+  audience: "gm" | "player",
+): Promise<NpcCastHttp> {
+  const success = await requestResponse<unknown>(`${npcPresenceLane(campaignId, sessionId)}/present-cast`, {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "NPC present cast read");
   const cast = npcCastHttpSchema.parse(success.body);
   const revision = success.headers.get("x-npc-presence-revision");
   if (cast.audience !== audience) throw new Error("NPC present cast audience did not match the request");
-  if (revision === null || String(cast.sessionRevision) !== revision) throw new Error("NPC present cast revision header did not match the response");
+  if (revision === null || String(cast.sessionRevision) !== revision)
+    throw new Error("NPC present cast revision header did not match the response");
   return cast;
 }
 
 /** Issues one presence write. Ambiguous outcomes are never retried by this transport. */
-export async function commandNpcPresence(campaignId: string, sessionId: string, npcId: string, input: NpcPresenceMutationHttpRequest): Promise<NpcPresenceMutationHttpResponse> {
+export async function commandNpcPresence(
+  campaignId: string,
+  sessionId: string,
+  npcId: string,
+  input: NpcPresenceMutationHttpRequest,
+): Promise<NpcPresenceMutationHttpResponse> {
   const npc = parseApiInput(() => resourceIdSchema.parse(npcId));
   const body = parseApiInput(() => npcPresenceMutationHttpRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`${npcPresenceLane(campaignId, sessionId)}/npcs/${encodeOpaquePathSegment(npc)}/presence-commands`, {
-    method: "POST", cache: "no-store", body: JSON.stringify(body),
-  });
+  const success = await requestResponse<unknown>(
+    `${npcPresenceLane(campaignId, sessionId)}/npcs/${encodeOpaquePathSegment(npc)}/presence-commands`,
+    {
+      method: "POST",
+      cache: "no-store",
+      body: JSON.stringify(body),
+    },
+  );
   requireStatus(success, 200, "NPC presence command");
   const response = npcPresenceMutationHttpResponseSchema.parse(success.body);
-  if (response.receipt.kind !== body.mutation.kind || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1) throw new Error("NPC presence receipt did not match the request");
+  if (
+    response.receipt.kind !== body.mutation.kind ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1
+  )
+    throw new Error("NPC presence receipt did not match the request");
   return response;
 }
 
@@ -3287,7 +4864,10 @@ function companionAdministrationLane(campaignId: string, npcId: string): string 
 }
 
 /** Reads the strict owner/GM management projection for one path-owned companion. */
-export async function getCompanionAdministration(campaignId: string, npcId: string): Promise<CompanionAdministrationHttpGetResponse> {
+export async function getCompanionAdministration(
+  campaignId: string,
+  npcId: string,
+): Promise<CompanionAdministrationHttpGetResponse> {
   const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const npc = parseApiInput(() => resourceIdSchema.parse(npcId));
   const success = await requestResponse<unknown>(companionAdministrationLane(campaign, npc), { cache: "no-store" });
@@ -3300,57 +4880,492 @@ export async function getCompanionAdministration(campaignId: string, npcId: stri
 }
 
 /** Issues one companion administration command without automatic retry. */
-export async function commandCompanionAdministration(campaignId: string, npcId: string,
-  input: CompanionAdministrationHttpCommand): Promise<CompanionAdministrationHttpCommandResponse> {
+export async function commandCompanionAdministration(
+  campaignId: string,
+  npcId: string,
+  input: CompanionAdministrationHttpCommand,
+): Promise<CompanionAdministrationHttpCommandResponse> {
   const body = parseApiInput(() => companionAdministrationHttpCommandSchema.parse(input));
   const success = await requestResponse<unknown>(`${companionAdministrationLane(campaignId, npcId)}/commands`, {
-    method: "POST", cache: "no-store", body: JSON.stringify(body),
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
   });
   requireStatus(success, 200, "Companion administration command");
   const response = companionAdministrationHttpCommandResponseSchema.parse(success.body);
-  if (response.receipt.kind !== body.kind || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+  if (
+    response.receipt.kind !== body.kind ||
+    response.receipt.revisionBefore !== body.expectedRevision ||
+    response.receipt.revisionAfter !== body.expectedRevision + 1
+  ) {
     throw new Error("Companion administration receipt did not match the request");
   }
   return response;
 }
-export async function createCampaignNpc(campaignId: string, input: CreateCampaignNpcHttpRequest): Promise<ReturnType<typeof createCampaignNpcHttpResponseSchema.parse>> {
-  const body=parseApiInput(()=>createCampaignNpcHttpRequestSchema.parse(input)); const success=await requestResponse<unknown>(campaignLane(campaignId,"npcs"),{method:"POST",cache:"no-store",body:JSON.stringify(body)}); requireStatus(success,201,"NPC creation");
-  const response=createCampaignNpcHttpResponseSchema.parse(success.body); bindReceipt(response.receipt,body,"NPC creation");
-  if(response.npc.personaId!==body.personaId||JSON.stringify(canonicalWireValue(response.npc.publicState))!==JSON.stringify(canonicalWireValue(body.publicState))||JSON.stringify(canonicalWireValue(response.npc.privateState))!==JSON.stringify(canonicalWireValue(body.privateState)))throw new Error("NPC creation response did not match the request"); return response;
+export async function createCampaignNpc(
+  campaignId: string,
+  input: CreateCampaignNpcHttpRequest,
+): Promise<ReturnType<typeof createCampaignNpcHttpResponseSchema.parse>> {
+  const body = parseApiInput(() => createCampaignNpcHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(campaignLane(campaignId, "npcs"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 201, "NPC creation");
+  const response = createCampaignNpcHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "NPC creation");
+  if (
+    response.npc.personaId !== body.personaId ||
+    JSON.stringify(canonicalWireValue(response.npc.publicState)) !==
+      JSON.stringify(canonicalWireValue(body.publicState)) ||
+    JSON.stringify(canonicalWireValue(response.npc.privateState)) !==
+      JSON.stringify(canonicalWireValue(body.privateState))
+  )
+    throw new Error("NPC creation response did not match the request");
+  return response;
 }
-export async function commandNpcRelationship(npcId:string,input:NpcRelationshipCommandHttpRequest):Promise<ReturnType<typeof npcRelationshipCommandHttpResponseSchema.parse>>{
-  const id=parseApiInput(()=>resourceIdSchema.parse(npcId));const body=parseApiInput(()=>npcRelationshipCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("npcs",id,"relationship-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"NPC relationship command");const response=npcRelationshipCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"NPC relationship command");if(response.relationship.npcId!==id||response.relationship.subjectActorId!==body.subjectActorId)throw new Error("NPC relationship response did not match the request");return response;
+export async function commandNpcRelationship(
+  npcId: string,
+  input: NpcRelationshipCommandHttpRequest,
+): Promise<ReturnType<typeof npcRelationshipCommandHttpResponseSchema.parse>> {
+  const id = parseApiInput(() => resourceIdSchema.parse(npcId));
+  const body = parseApiInput(() => npcRelationshipCommandHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("npcs", id, "relationship-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "NPC relationship command");
+  const response = npcRelationshipCommandHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "NPC relationship command");
+  if (response.relationship.npcId !== id || response.relationship.subjectActorId !== body.subjectActorId)
+    throw new Error("NPC relationship response did not match the request");
+  return response;
 }
 
-export async function listCampaignFactions(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignFactionsHttpResponse>>{const success=await requestResponse<unknown>(campaignLane(campaignId,"factions"),{cache:"no-store"});requireStatus(success,200,"Campaign faction read");const data=audience==="gm"?gmCampaignFactionsHttpResponseSchema.parse(success.body):playerCampaignFactionsHttpResponseSchema.parse(success.body);return{data,revision:revisionFrom(success.headers,"x-world-revision")};}
-export async function createCampaignFaction(campaignId:string,input:CreateCampaignFactionHttpRequest):Promise<ReturnType<typeof createCampaignFactionHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignFactionHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"factions"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Faction creation");const response=createCampaignFactionHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction creation");if(response.faction.name!==body.name||JSON.stringify(canonicalWireValue(response.faction.publicState))!==JSON.stringify(canonicalWireValue(body.publicState))||JSON.stringify(canonicalWireValue(response.faction.privateState))!==JSON.stringify(canonicalWireValue(body.privateState)))throw new Error("Faction creation response did not match the request");return response;}
-export async function commandFactionReputation(factionId:string,input:FactionReputationCommandHttpRequest):Promise<ReturnType<typeof factionReputationCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(factionId));const body=parseApiInput(()=>factionReputationCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("factions",id,"reputation-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Faction reputation command");const response=factionReputationCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction reputation command");if(response.standing.factionId!==id||response.standing.subjectActorId!==body.subjectActorId)throw new Error("Faction reputation response did not match the request");return response;}
-export async function commandFactionRelation(factionId:string,input:FactionRelationCommandHttpRequest):Promise<ReturnType<typeof factionRelationCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(factionId));const body=parseApiInput(()=>factionRelationCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("factions",id,"relation-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Faction relation command");const response=factionRelationCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction relation command");if(response.relation.fromFactionId!==id||response.relation.toFactionId!==body.toFactionId||response.relation.disposition!==body.disposition)throw new Error("Faction relation response did not match the request");return response;}
-export async function commandActorFactionMembership(factionId:string,input:ActorFactionMembershipCommandHttpRequest):Promise<ReturnType<typeof actorFactionMembershipCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(factionId));const body=parseApiInput(()=>actorFactionMembershipCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("factions",id,"actor-membership-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Faction actor membership command");const response=actorFactionMembershipCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction actor membership command");if(response.membership.factionId!==id||response.membership.actorId!==body.actorId||response.membership.role!==body.role)throw new Error("Faction actor membership response did not match the request");return response;}
-export async function commandNpcFactionMembership(factionId:string,input:NpcFactionMembershipCommandHttpRequest):Promise<ReturnType<typeof npcFactionMembershipCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(factionId));const body=parseApiInput(()=>npcFactionMembershipCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("factions",id,"npc-membership-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Faction NPC membership command");const response=npcFactionMembershipCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction NPC membership command");if(response.membership.factionId!==id||response.membership.npcId!==body.npcId||response.membership.role!==body.role)throw new Error("Faction NPC membership response did not match the request");return response;}
-export async function commandFactionReaction(factionId:string,input:FactionReactionCommandHttpRequest):Promise<ReturnType<typeof factionReactionCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(factionId));const body=parseApiInput(()=>factionReactionCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("factions",id,"reaction-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Faction reaction command");const response=factionReactionCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction reaction command");if(response.standing.factionId!==id||response.standing.subjectActorId!==body.subjectActorId)throw new Error("Faction reaction response did not match the request");return response;}
+export async function listCampaignFactions(
+  campaignId: string,
+  audience: "gm" | "player",
+): Promise<Revisioned<CampaignFactionsHttpResponse>> {
+  const success = await requestResponse<unknown>(campaignLane(campaignId, "factions"), { cache: "no-store" });
+  requireStatus(success, 200, "Campaign faction read");
+  const data =
+    audience === "gm"
+      ? gmCampaignFactionsHttpResponseSchema.parse(success.body)
+      : playerCampaignFactionsHttpResponseSchema.parse(success.body);
+  return { data, revision: revisionFrom(success.headers, "x-world-revision") };
+}
+export async function createCampaignFaction(
+  campaignId: string,
+  input: CreateCampaignFactionHttpRequest,
+): Promise<ReturnType<typeof createCampaignFactionHttpResponseSchema.parse>> {
+  const body = parseApiInput(() => createCampaignFactionHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(campaignLane(campaignId, "factions"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 201, "Faction creation");
+  const response = createCampaignFactionHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Faction creation");
+  if (
+    response.faction.name !== body.name ||
+    JSON.stringify(canonicalWireValue(response.faction.publicState)) !==
+      JSON.stringify(canonicalWireValue(body.publicState)) ||
+    JSON.stringify(canonicalWireValue(response.faction.privateState)) !==
+      JSON.stringify(canonicalWireValue(body.privateState))
+  )
+    throw new Error("Faction creation response did not match the request");
+  return response;
+}
+export async function commandFactionReputation(
+  factionId: string,
+  input: FactionReputationCommandHttpRequest,
+): Promise<ReturnType<typeof factionReputationCommandHttpResponseSchema.parse>> {
+  const id = parseApiInput(() => resourceIdSchema.parse(factionId));
+  const body = parseApiInput(() => factionReputationCommandHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("factions", id, "reputation-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Faction reputation command");
+  const response = factionReputationCommandHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Faction reputation command");
+  if (response.standing.factionId !== id || response.standing.subjectActorId !== body.subjectActorId)
+    throw new Error("Faction reputation response did not match the request");
+  return response;
+}
+export async function commandFactionRelation(
+  factionId: string,
+  input: FactionRelationCommandHttpRequest,
+): Promise<ReturnType<typeof factionRelationCommandHttpResponseSchema.parse>> {
+  const id = parseApiInput(() => resourceIdSchema.parse(factionId));
+  const body = parseApiInput(() => factionRelationCommandHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("factions", id, "relation-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Faction relation command");
+  const response = factionRelationCommandHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Faction relation command");
+  if (
+    response.relation.fromFactionId !== id ||
+    response.relation.toFactionId !== body.toFactionId ||
+    response.relation.disposition !== body.disposition
+  )
+    throw new Error("Faction relation response did not match the request");
+  return response;
+}
+export async function commandActorFactionMembership(
+  factionId: string,
+  input: ActorFactionMembershipCommandHttpRequest,
+): Promise<ReturnType<typeof actorFactionMembershipCommandHttpResponseSchema.parse>> {
+  const id = parseApiInput(() => resourceIdSchema.parse(factionId));
+  const body = parseApiInput(() => actorFactionMembershipCommandHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("factions", id, "actor-membership-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Faction actor membership command");
+  const response = actorFactionMembershipCommandHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Faction actor membership command");
+  if (
+    response.membership.factionId !== id ||
+    response.membership.actorId !== body.actorId ||
+    response.membership.role !== body.role
+  )
+    throw new Error("Faction actor membership response did not match the request");
+  return response;
+}
+export async function commandNpcFactionMembership(
+  factionId: string,
+  input: NpcFactionMembershipCommandHttpRequest,
+): Promise<ReturnType<typeof npcFactionMembershipCommandHttpResponseSchema.parse>> {
+  const id = parseApiInput(() => resourceIdSchema.parse(factionId));
+  const body = parseApiInput(() => npcFactionMembershipCommandHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("factions", id, "npc-membership-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Faction NPC membership command");
+  const response = npcFactionMembershipCommandHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Faction NPC membership command");
+  if (
+    response.membership.factionId !== id ||
+    response.membership.npcId !== body.npcId ||
+    response.membership.role !== body.role
+  )
+    throw new Error("Faction NPC membership response did not match the request");
+  return response;
+}
+export async function commandFactionReaction(
+  factionId: string,
+  input: FactionReactionCommandHttpRequest,
+): Promise<ReturnType<typeof factionReactionCommandHttpResponseSchema.parse>> {
+  const id = parseApiInput(() => resourceIdSchema.parse(factionId));
+  const body = parseApiInput(() => factionReactionCommandHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("factions", id, "reaction-commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Faction reaction command");
+  const response = factionReactionCommandHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Faction reaction command");
+  if (response.standing.factionId !== id || response.standing.subjectActorId !== body.subjectActorId)
+    throw new Error("Faction reaction response did not match the request");
+  return response;
+}
 
-export async function listCampaignQuests(campaignId:string,audience:"gm"):Promise<Revisioned<GmCampaignQuestsHttpResponse>>;
-export async function listCampaignQuests(campaignId:string,audience:"player"):Promise<Revisioned<PlayerCampaignQuestsHttpResponse>>;
-export async function listCampaignQuests(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignQuestsHttpResponse>>;
-export async function listCampaignQuests(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignQuestsHttpResponse>>{const validCampaignId=parseApiInput(()=>resourceIdSchema.parse(campaignId));const success=await requestResponse<unknown>(campaignLane(validCampaignId,"quests"),{cache:"no-store"});requireStatus(success,200,"Campaign quest read");const data=audience==="gm"?gmCampaignQuestsHttpResponseSchema.parse(success.body):playerCampaignQuestsHttpResponseSchema.parse(success.body);if(data.quests.some((quest)=>quest.campaignId!==validCampaignId))throw new Error("Campaign quest response did not match the request");return{data,revision:revisionFrom(success.headers,"x-quest-revision")};}
-export async function createCampaignQuest(campaignId:string,input:CreateCampaignQuestHttpRequest):Promise<ReturnType<typeof createCampaignQuestHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignQuestHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"quests"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Quest creation");const response=createCampaignQuestHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Quest creation");const createdObjectives=response.projection.objectives.filter((item)=>item.questId===body.quest.questId).map(({objectiveId,description,targetProgress,dependencyObjectiveIds})=>({objectiveId,description,targetProgress,dependencyObjectiveIds}));const expectedObjectives=body.quest.objectives.map(({objectiveId,description,targetProgress,dependencyObjectiveIds})=>({objectiveId,description,targetProgress,dependencyObjectiveIds}));const createdRewards=response.quest.rewards.map(({rewardId,kind,amount,label})=>({rewardId,kind,amount,label}));const expectedRewards=body.quest.rewards.map(({rewardId,kind,amount,label})=>({rewardId,kind,amount,label}));const journal=response.projection.journal.filter((item)=>item.questId===body.quest.questId);if(JSON.stringify(canonicalWireValue(response.definition))!==JSON.stringify(canonicalWireValue(body.quest))||response.quest.campaignId!==parseApiInput(()=>resourceIdSchema.parse(campaignId))||response.quest.questId!==body.quest.questId||response.quest.storylineId!==body.quest.storylineId||response.quest.title!==body.quest.title||response.quest.description!==body.quest.description||JSON.stringify(canonicalWireValue(createdObjectives))!==JSON.stringify(canonicalWireValue(expectedObjectives))||JSON.stringify(canonicalWireValue(createdRewards))!==JSON.stringify(canonicalWireValue(expectedRewards))||journal.length!==1||journal[0]?.text!==body.quest.journalText)throw new Error("Quest creation response did not match the complete submitted definition");return response;}
+export async function listCampaignQuests(
+  campaignId: string,
+  audience: "gm",
+): Promise<Revisioned<GmCampaignQuestsHttpResponse>>;
+export async function listCampaignQuests(
+  campaignId: string,
+  audience: "player",
+): Promise<Revisioned<PlayerCampaignQuestsHttpResponse>>;
+export async function listCampaignQuests(
+  campaignId: string,
+  audience: "gm" | "player",
+): Promise<Revisioned<CampaignQuestsHttpResponse>>;
+export async function listCampaignQuests(
+  campaignId: string,
+  audience: "gm" | "player",
+): Promise<Revisioned<CampaignQuestsHttpResponse>> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(campaignLane(validCampaignId, "quests"), { cache: "no-store" });
+  requireStatus(success, 200, "Campaign quest read");
+  const data =
+    audience === "gm"
+      ? gmCampaignQuestsHttpResponseSchema.parse(success.body)
+      : playerCampaignQuestsHttpResponseSchema.parse(success.body);
+  if (data.quests.some((quest) => quest.campaignId !== validCampaignId))
+    throw new Error("Campaign quest response did not match the request");
+  return { data, revision: revisionFrom(success.headers, "x-quest-revision") };
+}
+export async function createCampaignQuest(
+  campaignId: string,
+  input: CreateCampaignQuestHttpRequest,
+): Promise<ReturnType<typeof createCampaignQuestHttpResponseSchema.parse>> {
+  const body = parseApiInput(() => createCampaignQuestHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(campaignLane(campaignId, "quests"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 201, "Quest creation");
+  const response = createCampaignQuestHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Quest creation");
+  const createdObjectives = response.projection.objectives
+    .filter((item) => item.questId === body.quest.questId)
+    .map(({ objectiveId, description, targetProgress, dependencyObjectiveIds }) => ({
+      objectiveId,
+      description,
+      targetProgress,
+      dependencyObjectiveIds,
+    }));
+  const expectedObjectives = body.quest.objectives.map(
+    ({ objectiveId, description, targetProgress, dependencyObjectiveIds }) => ({
+      objectiveId,
+      description,
+      targetProgress,
+      dependencyObjectiveIds,
+    }),
+  );
+  const createdRewards = response.quest.rewards.map(({ rewardId, kind, amount, label }) => ({
+    rewardId,
+    kind,
+    amount,
+    label,
+  }));
+  const expectedRewards = body.quest.rewards.map(({ rewardId, kind, amount, label }) => ({
+    rewardId,
+    kind,
+    amount,
+    label,
+  }));
+  const journal = response.projection.journal.filter((item) => item.questId === body.quest.questId);
+  if (
+    JSON.stringify(canonicalWireValue(response.definition)) !== JSON.stringify(canonicalWireValue(body.quest)) ||
+    response.quest.campaignId !== parseApiInput(() => resourceIdSchema.parse(campaignId)) ||
+    response.quest.questId !== body.quest.questId ||
+    response.quest.storylineId !== body.quest.storylineId ||
+    response.quest.title !== body.quest.title ||
+    response.quest.description !== body.quest.description ||
+    JSON.stringify(canonicalWireValue(createdObjectives)) !== JSON.stringify(canonicalWireValue(expectedObjectives)) ||
+    JSON.stringify(canonicalWireValue(createdRewards)) !== JSON.stringify(canonicalWireValue(expectedRewards)) ||
+    journal.length !== 1 ||
+    journal[0]?.text !== body.quest.journalText
+  )
+    throw new Error("Quest creation response did not match the complete submitted definition");
+  return response;
+}
 /** Advance-objective responses expose no objective outcome; callers must retain the receipt and require an authoritative quest-list refresh. */
-export async function commandQuest(questId:string,input:QuestCommandHttpRequest):Promise<ReturnType<typeof questCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(questId));const body=parseApiInput(()=>questCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("quests",id,"commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Quest command");const response=questCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Quest command");if(response.quest.questId!==id||(body.kind==="accept"&&response.quest.status!=="active")||(body.kind==="abandon"&&response.quest.status!=="abandoned")||(body.kind==="claim-reward"&&!response.quest.rewards.some((reward)=>reward.rewardId===body.rewardId&&reward.claimedByActorId===body.actorId)))throw new Error("Quest command response did not match the request");return response;}
+export async function commandQuest(
+  questId: string,
+  input: QuestCommandHttpRequest,
+): Promise<ReturnType<typeof questCommandHttpResponseSchema.parse>> {
+  const id = parseApiInput(() => resourceIdSchema.parse(questId));
+  const body = parseApiInput(() => questCommandHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("quests", id, "commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Quest command");
+  const response = questCommandHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Quest command");
+  if (
+    response.quest.questId !== id ||
+    (body.kind === "accept" && response.quest.status !== "active") ||
+    (body.kind === "abandon" && response.quest.status !== "abandoned") ||
+    (body.kind === "claim-reward" &&
+      !response.quest.rewards.some(
+        (reward) => reward.rewardId === body.rewardId && reward.claimedByActorId === body.actorId,
+      ))
+  )
+    throw new Error("Quest command response did not match the request");
+  return response;
+}
 
-export async function getCampaignStory(campaignId:string,audience:"gm"):Promise<Revisioned<GmCampaignStoryHttpResponse>>;
-export async function getCampaignStory(campaignId:string,audience:"player"):Promise<Revisioned<PlayerCampaignStoryHttpResponse>>;
-export async function getCampaignStory(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignStoryHttpResponse>>;
-export async function getCampaignStory(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignStoryHttpResponse>>{const validCampaignId=parseApiInput(()=>resourceIdSchema.parse(campaignId));const success=await requestResponse<unknown>(campaignLane(validCampaignId,"story"),{cache:"no-store"});requireStatus(success,200,"Campaign story read");const data=audience==="gm"?gmCampaignStoryHttpResponseSchema.parse(success.body):playerCampaignStoryHttpResponseSchema.parse(success.body);if("storylines"in data&&data.storylines.some((storyline)=>storyline.campaignId!==validCampaignId))throw new Error("Campaign story response did not match the request");return{data,revision:revisionFrom(success.headers,"x-story-revision")};}
-export async function createCampaignStoryline(campaignId:string,input:CreateCampaignStorylineHttpRequest):Promise<ReturnType<typeof createCampaignStorylineHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignStorylineHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"storylines"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Storyline creation");const response=createCampaignStorylineHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Storyline creation");const storylineId=body.storyline.storylineId;const nodes=response.story.nodes.filter((item)=>item.storylineId===storylineId).map(({storylineId:_,status,createdAt,updatedAt,...item})=>item);const edges=response.story.edges.filter((item)=>item.storylineId===storylineId).map(({storylineId:_,...item})=>item);const plotPoints=response.story.plotPoints.filter((item)=>item.storylineId===storylineId).map(({storylineId:_,answered,playerAnswer,answeredAt,...item})=>item);const clues=response.story.clues.filter((item)=>item.storylineId===storylineId).map(({storylineId:_,revealed,revealedAt,...item})=>item);if(response.storyline.campaignId!==parseApiInput(()=>resourceIdSchema.parse(campaignId))||response.storyline.storylineId!==storylineId||response.storyline.title!==body.storyline.title||response.storyline.summary!==body.storyline.summary||JSON.stringify(canonicalWireValue(nodes))!==JSON.stringify(canonicalWireValue(body.storyline.nodes))||JSON.stringify(canonicalWireValue(edges))!==JSON.stringify(canonicalWireValue(body.storyline.edges))||JSON.stringify(canonicalWireValue(plotPoints))!==JSON.stringify(canonicalWireValue(body.storyline.plotPoints))||JSON.stringify(canonicalWireValue(clues))!==JSON.stringify(canonicalWireValue(body.storyline.clues)))throw new Error("Storyline creation response did not match the complete submitted graph");return response;}
-export async function commandStoryline(storylineId:string,input:StorylineCommandHttpRequest):Promise<{story:GmCampaignStoryHttpResponse;receipt:ReturnType<typeof storylineCommandHttpResponseSchema.parse>["receipt"]}>{const id=parseApiInput(()=>resourceIdSchema.parse(storylineId));const body=parseApiInput(()=>storylineCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("storylines",id,"commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Storyline command");const envelope=storylineCommandHttpResponseSchema.parse(success.body);const response={...envelope,story:gmCampaignStoryHttpResponseSchema.parse(envelope.story)};bindReceipt(response.receipt,body,"Storyline command");const story=response.story;const targetMatches=body.kind==="reveal-node"?story.nodes.some((node)=>node.storylineId===id&&node.nodeId===body.targetId&&node.status==="revealed"):body.kind==="resolve-node"?story.nodes.some((node)=>node.storylineId===id&&node.nodeId===body.targetId&&node.status==="resolved"):body.kind==="reveal-clue"?story.clues.some((clue)=>clue.storylineId===id&&clue.clueId===body.targetId&&clue.revealed):story.plotPoints.some((point)=>point.storylineId===id&&point.plotPointId===body.targetId&&point.answered&&point.playerAnswer===body.data.answer);if(!targetMatches)throw new Error("Storyline command response did not match the exact target");return response;}
+export async function getCampaignStory(
+  campaignId: string,
+  audience: "gm",
+): Promise<Revisioned<GmCampaignStoryHttpResponse>>;
+export async function getCampaignStory(
+  campaignId: string,
+  audience: "player",
+): Promise<Revisioned<PlayerCampaignStoryHttpResponse>>;
+export async function getCampaignStory(
+  campaignId: string,
+  audience: "gm" | "player",
+): Promise<Revisioned<CampaignStoryHttpResponse>>;
+export async function getCampaignStory(
+  campaignId: string,
+  audience: "gm" | "player",
+): Promise<Revisioned<CampaignStoryHttpResponse>> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(campaignLane(validCampaignId, "story"), { cache: "no-store" });
+  requireStatus(success, 200, "Campaign story read");
+  const data =
+    audience === "gm"
+      ? gmCampaignStoryHttpResponseSchema.parse(success.body)
+      : playerCampaignStoryHttpResponseSchema.parse(success.body);
+  if ("storylines" in data && data.storylines.some((storyline) => storyline.campaignId !== validCampaignId))
+    throw new Error("Campaign story response did not match the request");
+  return { data, revision: revisionFrom(success.headers, "x-story-revision") };
+}
+export async function createCampaignStoryline(
+  campaignId: string,
+  input: CreateCampaignStorylineHttpRequest,
+): Promise<ReturnType<typeof createCampaignStorylineHttpResponseSchema.parse>> {
+  const body = parseApiInput(() => createCampaignStorylineHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(campaignLane(campaignId, "storylines"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 201, "Storyline creation");
+  const response = createCampaignStorylineHttpResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Storyline creation");
+  const storylineId = body.storyline.storylineId;
+  const nodes = response.story.nodes
+    .filter((item) => item.storylineId === storylineId)
+    .map(({ storylineId: _, status, createdAt, updatedAt, ...item }) => item);
+  const edges = response.story.edges
+    .filter((item) => item.storylineId === storylineId)
+    .map(({ storylineId: _, ...item }) => item);
+  const plotPoints = response.story.plotPoints
+    .filter((item) => item.storylineId === storylineId)
+    .map(({ storylineId: _, answered, playerAnswer, answeredAt, ...item }) => item);
+  const clues = response.story.clues
+    .filter((item) => item.storylineId === storylineId)
+    .map(({ storylineId: _, revealed, revealedAt, ...item }) => item);
+  if (
+    response.storyline.campaignId !== parseApiInput(() => resourceIdSchema.parse(campaignId)) ||
+    response.storyline.storylineId !== storylineId ||
+    response.storyline.title !== body.storyline.title ||
+    response.storyline.summary !== body.storyline.summary ||
+    JSON.stringify(canonicalWireValue(nodes)) !== JSON.stringify(canonicalWireValue(body.storyline.nodes)) ||
+    JSON.stringify(canonicalWireValue(edges)) !== JSON.stringify(canonicalWireValue(body.storyline.edges)) ||
+    JSON.stringify(canonicalWireValue(plotPoints)) !== JSON.stringify(canonicalWireValue(body.storyline.plotPoints)) ||
+    JSON.stringify(canonicalWireValue(clues)) !== JSON.stringify(canonicalWireValue(body.storyline.clues))
+  )
+    throw new Error("Storyline creation response did not match the complete submitted graph");
+  return response;
+}
+export async function commandStoryline(
+  storylineId: string,
+  input: StorylineCommandHttpRequest,
+): Promise<{
+  story: GmCampaignStoryHttpResponse;
+  receipt: ReturnType<typeof storylineCommandHttpResponseSchema.parse>["receipt"];
+}> {
+  const id = parseApiInput(() => resourceIdSchema.parse(storylineId));
+  const body = parseApiInput(() => storylineCommandHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("storylines", id, "commands"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Storyline command");
+  const envelope = storylineCommandHttpResponseSchema.parse(success.body);
+  const response = { ...envelope, story: gmCampaignStoryHttpResponseSchema.parse(envelope.story) };
+  bindReceipt(response.receipt, body, "Storyline command");
+  const story = response.story;
+  const targetMatches =
+    body.kind === "reveal-node"
+      ? story.nodes.some(
+          (node) => node.storylineId === id && node.nodeId === body.targetId && node.status === "revealed",
+        )
+      : body.kind === "resolve-node"
+        ? story.nodes.some(
+            (node) => node.storylineId === id && node.nodeId === body.targetId && node.status === "resolved",
+          )
+        : body.kind === "reveal-clue"
+          ? story.clues.some((clue) => clue.storylineId === id && clue.clueId === body.targetId && clue.revealed)
+          : story.plotPoints.some(
+              (point) =>
+                point.storylineId === id &&
+                point.plotPointId === body.targetId &&
+                point.answered &&
+                point.playerAnswer === body.data.answer,
+            );
+  if (!targetMatches) throw new Error("Storyline command response did not match the exact target");
+  return response;
+}
 
 /** Explicit GM-to-player previews pass through the public schemas and return newly allocated, secret-free structures. */
-export function projectNpcsForPlayers(value:GmCampaignNpcsHttpResponse):PlayerCampaignNpcsHttpResponse{return playerCampaignNpcsHttpResponseSchema.parse({npcs:value.npcs.map(({npcId,publicState,createdAt})=>({npcId,publicState,createdAt})),relationships:value.relationships});}
-export function projectFactionsForPlayers(value:GmCampaignFactionsHttpResponse):PlayerCampaignFactionsHttpResponse{const factions=value.factions.filter((item)=>item.privateState.visibility!=="gm");const visible=new Set(factions.map((item)=>item.factionId));return playerCampaignFactionsHttpResponseSchema.parse({factions:factions.map(({factionId,name,publicState,createdAt})=>({factionId,name,publicState,createdAt})),standings:value.standings.filter((standing)=>visible.has(standing.factionId)),relations:value.relations.filter((relation)=>visible.has(relation.fromFactionId)&&visible.has(relation.toFactionId)),memberships:value.memberships.filter((membership)=>visible.has(membership.factionId)&&!("actorId" in membership))});}
-export function projectQuestsForPlayers(value:CampaignQuestsHttpResponse):ReturnType<typeof playerCampaignQuestsHttpResponseSchema.parse>{return playerCampaignQuestsHttpResponseSchema.parse({quests:value.quests.map((quest)=>{if("storylineId" in quest){const{storylineId:_,...playerQuest}=quest;return playerQuest;}return quest;}),objectives:value.objectives,journal:value.journal});}
-export function projectStoryForPlayers(value:CampaignStoryHttpResponse):ReturnType<typeof playerCampaignStoryHttpResponseSchema.parse>{if("visibleNodes" in value)return playerCampaignStoryHttpResponseSchema.parse(value);return playerCampaignStoryHttpResponseSchema.parse({visibleNodes:value.nodes.filter((node)=>node.status!=="hidden").map((node)=>({nodeId:node.nodeId,title:node.title,description:node.description,status:node.status,updatedAt:node.updatedAt})),discoveredClues:value.clues.filter((clue)=>clue.revealed&&clue.revealedAt!==null).map((clue)=>({clueId:clue.clueId,title:clue.title,content:clue.content,discoveredAt:clue.revealedAt!}))});}
+export function projectNpcsForPlayers(value: GmCampaignNpcsHttpResponse): PlayerCampaignNpcsHttpResponse {
+  return playerCampaignNpcsHttpResponseSchema.parse({
+    npcs: value.npcs.map(({ npcId, publicState, createdAt }) => ({ npcId, publicState, createdAt })),
+    relationships: value.relationships,
+  });
+}
+export function projectFactionsForPlayers(value: GmCampaignFactionsHttpResponse): PlayerCampaignFactionsHttpResponse {
+  const factions = value.factions.filter((item) => item.privateState.visibility !== "gm");
+  const visible = new Set(factions.map((item) => item.factionId));
+  return playerCampaignFactionsHttpResponseSchema.parse({
+    factions: factions.map(({ factionId, name, publicState, createdAt }) => ({
+      factionId,
+      name,
+      publicState,
+      createdAt,
+    })),
+    standings: value.standings.filter((standing) => visible.has(standing.factionId)),
+    relations: value.relations.filter(
+      (relation) => visible.has(relation.fromFactionId) && visible.has(relation.toFactionId),
+    ),
+    memberships: value.memberships.filter(
+      (membership) => visible.has(membership.factionId) && !("actorId" in membership),
+    ),
+  });
+}
+export function projectQuestsForPlayers(
+  value: CampaignQuestsHttpResponse,
+): ReturnType<typeof playerCampaignQuestsHttpResponseSchema.parse> {
+  return playerCampaignQuestsHttpResponseSchema.parse({
+    quests: value.quests.map((quest) => {
+      if ("storylineId" in quest) {
+        const { storylineId: _, ...playerQuest } = quest;
+        return playerQuest;
+      }
+      return quest;
+    }),
+    objectives: value.objectives,
+    journal: value.journal,
+  });
+}
+export function projectStoryForPlayers(
+  value: CampaignStoryHttpResponse,
+): ReturnType<typeof playerCampaignStoryHttpResponseSchema.parse> {
+  if ("visibleNodes" in value) return playerCampaignStoryHttpResponseSchema.parse(value);
+  return playerCampaignStoryHttpResponseSchema.parse({
+    visibleNodes: value.nodes
+      .filter((node) => node.status !== "hidden")
+      .map((node) => ({
+        nodeId: node.nodeId,
+        title: node.title,
+        description: node.description,
+        status: node.status,
+        updatedAt: node.updatedAt,
+      })),
+    discoveredClues: value.clues
+      .filter((clue) => clue.revealed && clue.revealedAt !== null)
+      .map((clue) => ({
+        clueId: clue.clueId,
+        title: clue.title,
+        content: clue.content,
+        discoveredAt: clue.revealedAt!,
+      })),
+  });
+}
 
 export interface HarnessSettings {
   id: "harness";
@@ -3392,7 +5407,10 @@ export function listPromptTemplates(): Promise<{ templates: PromptTemplateDefini
   return request<{ templates: PromptTemplateDefinition[] }>("/prompt-templates");
 }
 
-export function updatePromptTemplate(id: string, template: string | null): Promise<{ templates: PromptTemplateDefinition[] }> {
+export function updatePromptTemplate(
+  id: string,
+  template: string | null,
+): Promise<{ templates: PromptTemplateDefinition[] }> {
   return request<{ templates: PromptTemplateDefinition[] }>(`/prompt-templates/${encodeURIComponent(id)}`, {
     method: "PUT",
     body: JSON.stringify({ template }),
@@ -3451,7 +5469,12 @@ export interface ProviderCapabilityPreflightResult {
     /** strict-function-tools is retained for responses from older servers or saved fixtures. */
     capability: "function-tools" | "strict-function-tools" | "strict-json-schema";
     status: "supported" | "unsupported" | "unavailable";
-    failure?: { permanence: "permanent" | "transient"; code: string; httpStatus: number | null; retryAfterMs?: number | null };
+    failure?: {
+      permanence: "permanent" | "transient";
+      code: string;
+      httpStatus: number | null;
+      retryAfterMs?: number | null;
+    };
   }>;
 }
 
@@ -3541,7 +5564,12 @@ export interface SystemOneSettings {
   hasApiKey: boolean;
   requestTimeoutSeconds: number;
   pricing: { promptPerMillion: number | null; completionPerMillion: number | null };
-  budget: { maxTotalTokens: number; maxEstimatedCostUsd: number | null; maxRequestsPerWindow: number; rateWindowMs: number };
+  budget: {
+    maxTotalTokens: number;
+    maxEstimatedCostUsd: number | null;
+    maxRequestsPerWindow: number;
+    rateWindowMs: number;
+  };
   confidencePolicy: Record<SystemOneLane, SystemOneConfidenceThresholds>;
   confidenceCalibration: Record<SystemOneLane, SystemOneCalibration>;
   updatedAt: string;
@@ -3810,7 +5838,8 @@ function sceneImageSettingsPayload(value: unknown): SceneImageSettings {
 function sceneImageRevisionPayload(value: unknown, label: string): number {
   const raw = sceneImageObjectBody(value, label);
   const revision = raw.revision;
-  if (typeof revision !== "number" || !Number.isInteger(revision) || revision < 0) throw new Error(`${label} revision was malformed`);
+  if (typeof revision !== "number" || !Number.isInteger(revision) || revision < 0)
+    throw new Error(`${label} revision was malformed`);
   return revision;
 }
 
@@ -3821,7 +5850,8 @@ function sceneImageReceiptPayload(value: unknown, label: string): SceneImageRece
 function sceneImageJobPayload(value: unknown): SceneImageJob {
   const raw = sceneImageObjectBody(value, "Scene-image job payload");
   if (typeof raw.jobId !== "string" || raw.jobId.length === 0) throw new Error("Scene-image job payload was malformed");
-  if (typeof raw.status !== "string" || raw.status.length === 0) throw new Error("Scene-image job payload was malformed");
+  if (typeof raw.status !== "string" || raw.status.length === 0)
+    throw new Error("Scene-image job payload was malformed");
   const optionalString = (key: string): string | undefined => {
     const field = raw[key];
     if (field === undefined || field === null) return undefined;
@@ -3835,15 +5865,24 @@ function sceneImageJobPayload(value: unknown): SceneImageJob {
     return field;
   };
   const job: SceneImageJob = { jobId: raw.jobId, status: raw.status as SceneImageStatus };
-  const sessionId = optionalString("sessionId"); if (sessionId !== undefined) job.sessionId = sessionId;
-  const sceneKey = optionalString("sceneKey"); if (sceneKey !== undefined) job.sceneKey = sceneKey;
-  const assetId = optionalString("assetId"); if (assetId !== undefined) job.assetId = assetId;
-  const prompt = optionalString("prompt"); if (prompt !== undefined) job.prompt = prompt;
-  const createdAt = optionalString("createdAt"); if (createdAt !== undefined) job.createdAt = createdAt;
-  const seed = optionalNumber("seed"); if (seed !== undefined) job.seed = seed;
-  const steps = optionalNumber("steps"); if (steps !== undefined) job.steps = steps;
-  const guidance = optionalNumber("guidance"); if (guidance !== undefined) job.guidance = guidance;
-  const seconds = optionalNumber("seconds"); if (seconds !== undefined) job.seconds = seconds;
+  const sessionId = optionalString("sessionId");
+  if (sessionId !== undefined) job.sessionId = sessionId;
+  const sceneKey = optionalString("sceneKey");
+  if (sceneKey !== undefined) job.sceneKey = sceneKey;
+  const assetId = optionalString("assetId");
+  if (assetId !== undefined) job.assetId = assetId;
+  const prompt = optionalString("prompt");
+  if (prompt !== undefined) job.prompt = prompt;
+  const createdAt = optionalString("createdAt");
+  if (createdAt !== undefined) job.createdAt = createdAt;
+  const seed = optionalNumber("seed");
+  if (seed !== undefined) job.seed = seed;
+  const steps = optionalNumber("steps");
+  if (steps !== undefined) job.steps = steps;
+  const guidance = optionalNumber("guidance");
+  if (guidance !== undefined) job.guidance = guidance;
+  const seconds = optionalNumber("seconds");
+  if (seconds !== undefined) job.seconds = seconds;
   if ("assetId" in raw && raw.assetId === null) job.assetId = null;
   if ("seconds" in raw && raw.seconds === null) job.seconds = null;
   return job;
@@ -3866,23 +5905,46 @@ function sceneImageGenerateBody(input: SceneImageGenerateRequest): SceneImageGen
   }
   if (raw.seed !== undefined) {
     const seed = raw.seed;
-    if (typeof seed !== "number" || !Number.isInteger(seed) || seed < SCENE_IMAGE_MIN_SEED || seed > SCENE_IMAGE_MAX_SEED) throw new ApiInputError();
+    if (
+      typeof seed !== "number" ||
+      !Number.isInteger(seed) ||
+      seed < SCENE_IMAGE_MIN_SEED ||
+      seed > SCENE_IMAGE_MAX_SEED
+    )
+      throw new ApiInputError();
     body.seed = seed;
   }
   if (raw.steps !== undefined) {
     const steps = raw.steps;
-    if (typeof steps !== "number" || !Number.isInteger(steps) || steps < SCENE_IMAGE_STEPS_MIN || steps > SCENE_IMAGE_STEPS_MAX) throw new ApiInputError();
+    if (
+      typeof steps !== "number" ||
+      !Number.isInteger(steps) ||
+      steps < SCENE_IMAGE_STEPS_MIN ||
+      steps > SCENE_IMAGE_STEPS_MAX
+    )
+      throw new ApiInputError();
     body.steps = steps;
   }
   if (raw.guidance !== undefined) {
     const guidance = raw.guidance;
-    if (typeof guidance !== "number" || !Number.isFinite(guidance)
-      || guidance < SCENE_IMAGE_GUIDANCE_MIN || guidance > SCENE_IMAGE_GUIDANCE_MAX) throw new ApiInputError();
+    if (
+      typeof guidance !== "number" ||
+      !Number.isFinite(guidance) ||
+      guidance < SCENE_IMAGE_GUIDANCE_MIN ||
+      guidance > SCENE_IMAGE_GUIDANCE_MAX
+    )
+      throw new ApiInputError();
     body.guidance = guidance;
   }
   if (raw.count !== undefined) {
     const count = raw.count;
-    if (typeof count !== "number" || !Number.isInteger(count) || count < SCENE_IMAGE_VARIATION_MIN || count > SCENE_IMAGE_VARIATION_MAX) throw new ApiInputError();
+    if (
+      typeof count !== "number" ||
+      !Number.isInteger(count) ||
+      count < SCENE_IMAGE_VARIATION_MIN ||
+      count > SCENE_IMAGE_VARIATION_MAX
+    )
+      throw new ApiInputError();
     body.count = count;
   }
   if (raw.auto !== undefined) body.auto = Boolean(raw.auto);
@@ -3898,12 +5960,17 @@ function sceneImagePath(campaignId: string, suffix = ""): string {
 export async function getSceneImageSettings(campaignId: string): Promise<SceneImageSettingsResponse> {
   const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/settings"), { cache: "no-store" });
   requireStatus(success, 200, "Scene-image settings read");
-  return { settings: sceneImageSettingsPayload(sceneImageObjectBody(success.body, "Scene-image settings response").settings),
-    revision: sceneImageRevisionPayload(success.body, "Scene-image settings response") };
+  return {
+    settings: sceneImageSettingsPayload(sceneImageObjectBody(success.body, "Scene-image settings response").settings),
+    revision: sceneImageRevisionPayload(success.body, "Scene-image settings response"),
+  };
 }
 
 /** Writes scene-image settings with one optimistic revision and idempotency key. */
-export async function putSceneImageSettings(campaignId: string, input: SceneImageSettingsPutRequest): Promise<SceneImageSettingsPutResponse> {
+export async function putSceneImageSettings(
+  campaignId: string,
+  input: SceneImageSettingsPutRequest,
+): Promise<SceneImageSettingsPutResponse> {
   const raw = sceneImageObjectBody(input, "Scene-image settings write");
   const expectedRevision = raw.expectedRevision;
   if (!Number.isInteger(expectedRevision) || (expectedRevision as number) < 0) throw new ApiInputError();
@@ -3912,50 +5979,89 @@ export async function putSceneImageSettings(campaignId: string, input: SceneImag
     idempotencyKey: parseApiInput(() => idempotencyKeySchema.parse(raw.idempotencyKey)),
     settings: sceneImageSettingsPayload(raw.settings),
   };
-  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/settings"), { method: "PUT", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/settings"), {
+    method: "PUT",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Scene-image settings write");
   const response = sceneImageObjectBody(success.body, "Scene-image settings write response");
   const revision = sceneImageRevisionPayload(success.body, "Scene-image settings write response");
   if (revision <= body.expectedRevision) throw new Error("Scene-image settings revision did not advance");
   const settings = sceneImageSettingsPayload(response.settings);
-  if (JSON.stringify(settings) !== JSON.stringify(body.settings)) throw new Error("Scene-image settings write response did not match the request");
-  return { settings, revision, receipt: sceneImageReceiptPayload(response.receipt, "Scene-image settings write receipt") };
+  if (JSON.stringify(settings) !== JSON.stringify(body.settings))
+    throw new Error("Scene-image settings write response did not match the request");
+  return {
+    settings,
+    revision,
+    receipt: sceneImageReceiptPayload(response.receipt, "Scene-image settings write receipt"),
+  };
 }
 
 /** Starts one bounded generation. The documented success status is 202. */
-export async function generateSceneImage(campaignId: string, input: SceneImageGenerateRequest): Promise<SceneImageGenerateResponse> {
+export async function generateSceneImage(
+  campaignId: string,
+  input: SceneImageGenerateRequest,
+): Promise<SceneImageGenerateResponse> {
   const body = sceneImageGenerateBody(input);
-  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/generate"),
+  const success = await requestResponse<unknown>(
+    sceneImagePath(campaignId, "/generate"),
     { method: "POST", cache: "no-store", body: JSON.stringify(body) },
-    { status: 202, message: "Scene-image generation status was not confirmed" });
+    { status: 202, message: "Scene-image generation status was not confirmed" },
+  );
   const response = sceneImageObjectBody(success.body, "Scene-image generation response");
   if (typeof response.deduped !== "boolean") throw new Error("Scene-image generation response was malformed");
   const job = sceneImageJobPayload(response.job);
-  if (job.sessionId !== undefined && job.sessionId !== body.sessionId) throw new Error("Scene-image job did not match the requested room");
-  if (job.sceneKey !== undefined && job.sceneKey !== body.sceneKey) throw new Error("Scene-image job did not match the requested scene");
+  if (job.sessionId !== undefined && job.sessionId !== body.sessionId)
+    throw new Error("Scene-image job did not match the requested room");
+  if (job.sceneKey !== undefined && job.sceneKey !== body.sceneKey)
+    throw new Error("Scene-image job did not match the requested scene");
   return { job, deduped: response.deduped };
 }
 
 /** Reads the session gallery exactly, without caching. */
 export async function getSceneImageGallery(campaignId: string, sessionId: string): Promise<SceneImageGalleryResponse> {
   const room = parseApiInput(() => resourceIdSchema.parse(sessionId));
-  const success = await requestResponse<unknown>(`${sceneImagePath(campaignId, "/gallery")}?sessionId=${encodeURIComponent(room)}`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(
+    `${sceneImagePath(campaignId, "/gallery")}?sessionId=${encodeURIComponent(room)}`,
+    { cache: "no-store" },
+  );
   requireStatus(success, 200, "Scene-image gallery read");
   const raw = sceneImageObjectBody(success.body, "Scene-image gallery response");
   if (!Array.isArray(raw.images)) throw new Error("Scene-image gallery response was malformed");
   const images = raw.images.map((entry) => {
     const item = sceneImageObjectBody(entry, "Scene-image gallery row");
-    const string = (key: string) => { const field = item[key]; if (typeof field !== "string") throw new Error(`Scene-image gallery ${key} was malformed`); return field; };
-    const number = (key: string) => { const field = item[key]; if (typeof field !== "number" || !Number.isFinite(field)) throw new Error(`Scene-image gallery ${key} was malformed`); return field; };
+    const string = (key: string) => {
+      const field = item[key];
+      if (typeof field !== "string") throw new Error(`Scene-image gallery ${key} was malformed`);
+      return field;
+    };
+    const number = (key: string) => {
+      const field = item[key];
+      if (typeof field !== "number" || !Number.isFinite(field))
+        throw new Error(`Scene-image gallery ${key} was malformed`);
+      return field;
+    };
     if (typeof item.selected !== "boolean") throw new Error("Scene-image gallery selected was malformed");
-    if (item.seconds !== undefined && item.seconds !== null && (typeof item.seconds !== "number" || !Number.isFinite(item.seconds))) {
+    if (
+      item.seconds !== undefined &&
+      item.seconds !== null &&
+      (typeof item.seconds !== "number" || !Number.isFinite(item.seconds))
+    ) {
       throw new Error("Scene-image gallery seconds was malformed");
     }
-    if (item.sceneKey !== undefined && typeof item.sceneKey !== "string") throw new Error("Scene-image gallery sceneKey was malformed");
+    if (item.sceneKey !== undefined && typeof item.sceneKey !== "string")
+      throw new Error("Scene-image gallery sceneKey was malformed");
     const row: SceneImageGalleryItem = {
-      assetId: string("assetId"), jobId: string("jobId"), prompt: string("prompt"),
-      seed: number("seed"), steps: number("steps"), guidance: number("guidance"),
-      status: string("status"), createdAt: string("createdAt"), selected: item.selected,
+      assetId: string("assetId"),
+      jobId: string("jobId"),
+      prompt: string("prompt"),
+      seed: number("seed"),
+      steps: number("steps"),
+      guidance: number("guidance"),
+      status: string("status"),
+      createdAt: string("createdAt"),
+      selected: item.selected,
     };
     if (item.seconds !== undefined) row.seconds = item.seconds as number | null;
     if (item.sceneKey !== undefined) row.sceneKey = item.sceneKey;
@@ -3965,7 +6071,10 @@ export async function getSceneImageGallery(campaignId: string, sessionId: string
 }
 
 /** Selects one asset for one scene with an optimistic revision. */
-export async function selectSceneImage(campaignId: string, input: SceneImageSelectRequest): Promise<SceneImageSelectResponse> {
+export async function selectSceneImage(
+  campaignId: string,
+  input: SceneImageSelectRequest,
+): Promise<SceneImageSelectResponse> {
   const raw = sceneImageObjectBody(input, "Scene-image selection request");
   const expectedRevision = raw.expectedRevision;
   if (!Number.isInteger(expectedRevision) || (expectedRevision as number) < 0) throw new ApiInputError();
@@ -3978,19 +6087,30 @@ export async function selectSceneImage(campaignId: string, input: SceneImageSele
     expectedRevision: expectedRevision as number,
     idempotencyKey: parseApiInput(() => idempotencyKeySchema.parse(raw.idempotencyKey)),
   };
-  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/select"), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(sceneImagePath(campaignId, "/select"), {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
   requireStatus(success, 200, "Scene-image selection");
   const response = sceneImageObjectBody(success.body, "Scene-image selection response");
   const selection = sceneImageObjectBody(response.selection, "Scene-image selection");
-  if (selection.sceneKey !== undefined && selection.sceneKey !== body.sceneKey) throw new Error("Scene-image selection did not match the requested scene");
-  if (selection.assetId !== undefined && selection.assetId !== body.assetId) throw new Error("Scene-image selection did not match the requested asset");
-  return { selection: selection as SceneImageSelection, receipt: sceneImageReceiptPayload(response.receipt, "Scene-image selection receipt") };
+  if (selection.sceneKey !== undefined && selection.sceneKey !== body.sceneKey)
+    throw new Error("Scene-image selection did not match the requested scene");
+  if (selection.assetId !== undefined && selection.assetId !== body.assetId)
+    throw new Error("Scene-image selection did not match the requested asset");
+  return {
+    selection: selection as SceneImageSelection,
+    receipt: sceneImageReceiptPayload(response.receipt, "Scene-image selection receipt"),
+  };
 }
 
 /** Reads one exact job without caching. */
 export async function getSceneImageJob(campaignId: string, jobId: string): Promise<SceneImageJobResponse> {
   const job = parseApiInput(() => resourceIdSchema.parse(jobId));
-  const success = await requestResponse<unknown>(sceneImagePath(campaignId, `/jobs/${encodeURIComponent(job)}`), { cache: "no-store" });
+  const success = await requestResponse<unknown>(sceneImagePath(campaignId, `/jobs/${encodeURIComponent(job)}`), {
+    cache: "no-store",
+  });
   requireStatus(success, 200, "Scene-image job read");
   const response = sceneImageObjectBody(success.body, "Scene-image job response");
   const value = sceneImageJobPayload(response.job);

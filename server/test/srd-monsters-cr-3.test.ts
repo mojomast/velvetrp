@@ -20,7 +20,16 @@ describe("SRD 5.1 monsters, challenge rating 3", () => {
   it("covers the CR-3 roster with at least ten enemy templates", () => {
     expect(enemies.length).toBeGreaterThanOrEqual(10);
     const names = enemies.map((enemy) => enemy.name);
-    for (const expected of ["Basilisk", "Bearded Devil", "Mummy", "Minotaur", "Owlbear", "Werewolf", "Wight", "Winter Wolf"]) {
+    for (const expected of [
+      "Basilisk",
+      "Bearded Devil",
+      "Mummy",
+      "Minotaur",
+      "Owlbear",
+      "Werewolf",
+      "Wight",
+      "Winter Wolf",
+    ]) {
       expect(names).toContain(expected);
     }
   });

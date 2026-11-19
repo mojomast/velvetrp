@@ -45,7 +45,12 @@ export type PlanDerivedValuesInput = Readonly<{
 }>;
 
 const ABILITY_IDS: readonly MagicAbilityId[] = Object.freeze([
-  "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",
+  "strength",
+  "dexterity",
+  "constitution",
+  "intelligence",
+  "wisdom",
+  "charisma",
 ]);
 
 function flatAmount(modifier: MagicPassiveModifier): number | null {
@@ -54,12 +59,16 @@ function flatAmount(modifier: MagicPassiveModifier): number | null {
   return null;
 }
 
-function addToFlatTarget(target: MagicFlatTarget, amount: number, totals: {
-  armorClass: number;
-  savingThrows: Record<MagicAbilityId, number>;
-  attackRoll: number;
-  damageRoll: number;
-}): void {
+function addToFlatTarget(
+  target: MagicFlatTarget,
+  amount: number,
+  totals: {
+    armorClass: number;
+    savingThrows: Record<MagicAbilityId, number>;
+    attackRoll: number;
+    damageRoll: number;
+  },
+): void {
   if (target.kind === "armor-class") totals.armorClass += amount;
   else if (target.kind === "attack-roll") totals.attackRoll += amount;
   else if (target.kind === "damage-roll") totals.damageRoll += amount;
@@ -69,17 +78,27 @@ function addToFlatTarget(target: MagicFlatTarget, amount: number, totals: {
 function sortedUnique<T>(values: readonly T[]): readonly T[] {
   const seen = new Map<string, T>();
   for (const value of values) seen.set(stableKey(value), value);
-  return Object.freeze([...seen.entries()].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)).map(([, value]) => value));
+  return Object.freeze(
+    [...seen.entries()].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)).map(([, value]) => value),
+  );
 }
 
 /** True when an item's passive modifiers are active: equipped, and attuned when required. */
-export function passiveModifierActive(item: MagicEquippedItem, entry: { requireAttunement: boolean }, attunement: MagicAttunementState): boolean {
+export function passiveModifierActive(
+  item: MagicEquippedItem,
+  entry: { requireAttunement: boolean },
+  attunement: MagicAttunementState,
+): boolean {
   return item.equipped && (!entry.requireAttunement || isAttuned(attunement, item.key));
 }
 
 export function planDerivedValues(input: PlanDerivedValuesInput): MagicDerivedValuesPlan {
-  const totals = { armorClass: 0, attackRoll: 0, damageRoll: 0,
-    savingThrows: Object.fromEntries(ABILITY_IDS.map((id) => [id, 0])) as Record<MagicAbilityId, number> };
+  const totals = {
+    armorClass: 0,
+    attackRoll: 0,
+    damageRoll: 0,
+    savingThrows: Object.fromEntries(ABILITY_IDS.map((id) => [id, 0])) as Record<MagicAbilityId, number>,
+  };
   const advantages: MagicCheckTarget[] = [];
   const resistances: MagicDamageScope[] = [];
   const vulnerabilities: MagicDamageScope[] = [];
@@ -91,7 +110,8 @@ export function planDerivedValues(input: PlanDerivedValuesInput): MagicDerivedVa
       const modifier = entry.modifier;
       contributions.push(Object.freeze({ sourceItemKey: item.key, modifier: Object.freeze({ ...modifier }) }));
       const flat = flatAmount(modifier);
-      if (flat !== null && (modifier.kind === "flat" || modifier.kind === "proficiency")) addToFlatTarget(modifier.target, flat, totals);
+      if (flat !== null && (modifier.kind === "flat" || modifier.kind === "proficiency"))
+        addToFlatTarget(modifier.target, flat, totals);
       else if (modifier.kind === "advantage") advantages.push(Object.freeze({ ...modifier.target }));
       else if (modifier.kind === "resistance") resistances.push(modifier.damageType);
       else if (modifier.kind === "vulnerability") vulnerabilities.push(modifier.damageType);

@@ -124,7 +124,9 @@ describe("deriveNpcTier", () => {
   });
 
   it("does not promote an NPC from verb forms of ambiguous title keywords", () => {
-    expect(deriveNpcTier("Margery Fenn\nA wool factor who counts on her fingers and watches the road.").tier).toBe("commoner");
+    expect(deriveNpcTier("Margery Fenn\nA wool factor who counts on her fingers and watches the road.").tier).toBe(
+      "commoner",
+    );
     expect(deriveNpcTier("She watches the road.").tier).toBe("commoner");
     expect(deriveNpcTier("He counts the takings.").tier).toBe("commoner");
   });
@@ -165,7 +167,14 @@ describe("deriveNpcTier", () => {
 describe("TIER_TEMPLATES", () => {
   it("is ordered and verifies every definition id against the published starter pack", () => {
     expect(TIER_TEMPLATES.map((entry) => entry.tier)).toEqual([
-      "commoner", "guard", "scout", "soldier", "adventurer", "mage", "priest", "leader",
+      "commoner",
+      "guard",
+      "scout",
+      "soldier",
+      "adventurer",
+      "mage",
+      "priest",
+      "leader",
     ]);
     const ids = new Set<string>();
     for (const entry of TIER_TEMPLATES) {
@@ -228,7 +237,11 @@ function fixture() {
     if (options.description !== undefined) publicState.description = options.description;
     if (options.archetype !== undefined) publicState.archetype = options.archetype;
     const persona = repo.createCharacter({
-      name, age: 40, archetype: options.archetype ?? "Commoner", boundaries: "", fictionalConfirmed: true,
+      name,
+      age: 40,
+      archetype: options.archetype ?? "Commoner",
+      boundaries: "",
+      fictionalConfirmed: true,
     });
     const npc = repo.createCampaignNpc(OWNER, campaign.id, {
       personaId: persona.id,
@@ -239,8 +252,9 @@ function fixture() {
     }).npc;
     revision += 1;
     if (options.baseline) {
-      db.prepare("INSERT INTO campaign_npc_baseline_stats_v41 VALUES(?,?,?,?,?,'generated-deterministic-baseline')")
-        .run(campaign.id, npc.npcId, options.baseline.body, options.baseline.mind, options.baseline.presence);
+      db.prepare(
+        "INSERT INTO campaign_npc_baseline_stats_v41 VALUES(?,?,?,?,?,'generated-deterministic-baseline')",
+      ).run(campaign.id, npc.npcId, options.baseline.body, options.baseline.mind, options.baseline.presence);
     }
     return npc;
   };
@@ -283,14 +297,19 @@ describe("resolveNpcCombatProfile", () => {
 
   it("combines name, public role text, and baseline stats", () => {
     const f: Fixture = fixture();
-    const npc = f.createNpc(
-      "Sergeant Bram",
-      { description: "A grizzled veteran of the northern campaigns.", baseline: { body: 15, mind: 10, presence: 12 } },
-    );
+    const npc = f.createNpc("Sergeant Bram", {
+      description: "A grizzled veteran of the northern campaigns.",
+      baseline: { body: 15, mind: 10, presence: 12 },
+    });
     const profile = resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, npc.npcId);
     expect(profile.tier).toBe("adventurer");
     expect(profile.template.definitionId).toBe("srd-5.1:enemy-template:veteran");
-    expect(profile.baselineStats).toEqual({ body: 15, mind: 10, presence: 12, source: "generated-deterministic-baseline" });
+    expect(profile.baselineStats).toEqual({
+      body: 15,
+      mind: 10,
+      presence: 12,
+      source: "generated-deterministic-baseline",
+    });
     expect(profile.rationale).toContain("veteran");
     f.db.close();
   });
@@ -300,10 +319,12 @@ describe("resolveNpcCombatProfile", () => {
     const mage = f.createNpc("Ilyra", { archetype: "Court Wizard" });
     const priest = f.createNpc("Brother Oren", { description: "An acolyte of the dawn." });
     const leader = f.createNpc("Vex", { description: "A bandit captain who leads the outlaws of the pass." });
-    expect(resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, mage.npcId).template.definitionId)
-      .toBe("srd-5.1:enemy-template:mage");
-    expect(resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, priest.npcId).template.definitionId)
-      .toBe("srd-5.1:enemy-template:priest");
+    expect(resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, mage.npcId).template.definitionId).toBe(
+      "srd-5.1:enemy-template:mage",
+    );
+    expect(resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, priest.npcId).template.definitionId).toBe(
+      "srd-5.1:enemy-template:priest",
+    );
     const leaderProfile = resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, leader.npcId);
     expect(leaderProfile.tier).toBe("leader");
     expect(leaderProfile.template.definitionId).toBe("srd-5.1:enemy-template:gladiator");
@@ -312,7 +333,10 @@ describe("resolveNpcCombatProfile", () => {
 
   it("rejects an unknown NPC", () => {
     const f: Fixture = fixture();
-    expectFailure(() => resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, "npc-profile-missing"), "NPC_PROFILE_NPC_NOT_FOUND");
+    expectFailure(
+      () => resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, "npc-profile-missing"),
+      "NPC_PROFILE_NPC_NOT_FOUND",
+    );
     f.db.close();
   });
 
@@ -327,9 +351,15 @@ describe("resolveNpcCombatProfile", () => {
     const f: Fixture = fixture();
     const npc = f.createNpc("Old Mara", { description: "ferryman" });
     f.db.exec("DROP TRIGGER rpg_catalog_visibility_immutable_update");
-    f.db.prepare("UPDATE rpg_catalog_definition_visibility SET publicly_reachable=0 WHERE kind='enemy-template' AND definition_id=?")
+    f.db
+      .prepare(
+        "UPDATE rpg_catalog_definition_visibility SET publicly_reachable=0 WHERE kind='enemy-template' AND definition_id=?",
+      )
       .run("srd-5.1:enemy-template:cultist");
-    expectFailure(() => resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, npc.npcId), "NPC_PROFILE_TEMPLATE_UNAVAILABLE");
+    expectFailure(
+      () => resolveNpcCombatProfile(f.db, OWNER, f.campaign.id, npc.npcId),
+      "NPC_PROFILE_TEMPLATE_UNAVAILABLE",
+    );
     f.db.close();
   });
 
@@ -337,7 +367,11 @@ describe("resolveNpcCombatProfile", () => {
     const f: Fixture = fixture();
     const unpinned = f.repo.createCampaign(OWNER, { name: "No pinned packs" });
     const persona = f.repo.createCharacter({
-      name: "Old Mara", age: 40, archetype: "Ferryman", boundaries: "", fictionalConfirmed: true,
+      name: "Old Mara",
+      age: 40,
+      archetype: "Ferryman",
+      boundaries: "",
+      fictionalConfirmed: true,
     });
     const npc = f.repo.createCampaignNpc(OWNER, unpinned.id, {
       personaId: persona.id,
@@ -346,7 +380,10 @@ describe("resolveNpcCombatProfile", () => {
       expectedRevision: 0,
       idempotencyKey: "unpinned-npc",
     }).npc;
-    expectFailure(() => resolveNpcCombatProfile(f.db, OWNER, unpinned.id, npc.npcId), "NPC_PROFILE_TEMPLATE_UNAVAILABLE");
+    expectFailure(
+      () => resolveNpcCombatProfile(f.db, OWNER, unpinned.id, npc.npcId),
+      "NPC_PROFILE_TEMPLATE_UNAVAILABLE",
+    );
     f.db.close();
   });
 });

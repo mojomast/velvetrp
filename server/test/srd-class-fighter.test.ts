@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { fighterDefinition, fighterLevels, fighterSubclasses } from "../src/content/srdStarter/classes/fighter.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -35,10 +39,19 @@ describe("SRD 5.1 Fighter class", () => {
 
   it("grants the d10 hit die at level 1 and preserves the level 1-2 ability refs", () => {
     const levelOne = classLevelCatalogDefinitionSchema.parse(levels.find((level) => level.mechanics.level === 1)!);
-    expect(levelOne.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d10", maxIncrease: 1, currentIncrease: 1 });
-    expect(levelOne.mechanics.abilityRefs.map((ref) => ref.definitionId)).toEqual(["srd-5.1:ability:longsword-attack", "srd-5.1:ability:fighter-second-wind"]);
+    expect(levelOne.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d10",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
+    expect(levelOne.mechanics.abilityRefs.map((ref) => ref.definitionId)).toEqual([
+      "srd-5.1:ability:longsword-attack",
+      "srd-5.1:ability:fighter-second-wind",
+    ]);
     const levelTwo = classLevelCatalogDefinitionSchema.parse(levels.find((level) => level.mechanics.level === 2)!);
-    expect(levelTwo.mechanics.abilityRefs.map((ref) => ref.definitionId)).toEqual(["srd-5.1:ability:fighter-action-surge"]);
+    expect(levelTwo.mechanics.abilityRefs.map((ref) => ref.definitionId)).toEqual([
+      "srd-5.1:ability:fighter-action-surge",
+    ]);
   });
 
   it("offers the Champion subclass choice at level 3", () => {

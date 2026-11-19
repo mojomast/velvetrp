@@ -66,9 +66,15 @@ export function clericDefinition(refs: StarterReferences) {
   return {
     reference: classRef(refs, CLERIC_SLUG),
     name: "Cleric",
-    description: "Bounded SRD 5.1 Cleric progression covers levels 1-20 as metadata. Channel Divinity, Destroy Undead, and Divine Intervention are tracked as bounded resource grants; spell execution and domain features remain unsupported at runtime.",
+    description:
+      "Bounded SRD 5.1 Cleric progression covers levels 1-20 as metadata. Channel Divinity, Destroy Undead, and Divine Intervention are tracked as bounded resource grants; spell execution and domain features remain unsupported at runtime.",
     tags: ["srd-5.1", "cleric", UNSUPPORTED_TAG],
-    mechanics: { hitDie: CLERIC_HIT_DIE, primaryAttribute: "wisdom", savingAttributes: ["wisdom", "charisma"], levelRefs: CLERIC_LEVEL_NUMBERS.map((level) => levelReference(refs, level)) },
+    mechanics: {
+      hitDie: CLERIC_HIT_DIE,
+      primaryAttribute: "wisdom",
+      savingAttributes: ["wisdom", "charisma"],
+      levelRefs: CLERIC_LEVEL_NUMBERS.map((level) => levelReference(refs, level)),
+    },
   };
 }
 
@@ -76,7 +82,23 @@ export function clericLevels(refs: StarterReferences) {
   const { cleric, clericOne, bless, cureWounds, healingWord } = refs;
   const subclass = subclassReference(refs);
   return [
-    { reference: clericOne, name: "Cleric Level 1", description: "Level-one Cleric hit points use the d8 maximum. Bless, Cure Wounds, and Healing Word are exact prepared-spell selections; the supported healing spells enforce their target and range contracts.", tags: ["srd-5.1", "cleric-1", "prepared-spells"], mechanics: { classRef: cleric, level: 1, proficiencyBonus: proficiencyBonusFor(1), hpGain: CLERIC_HIT_DIE, abilityRefs: [], spellRefs: [], preparedSpellRefs: [bless, cureWounds, healingWord], resourceGrants: [hitDieGrant()] } },
+    {
+      reference: clericOne,
+      name: "Cleric Level 1",
+      description:
+        "Level-one Cleric hit points use the d8 maximum. Bless, Cure Wounds, and Healing Word are exact prepared-spell selections; the supported healing spells enforce their target and range contracts.",
+      tags: ["srd-5.1", "cleric-1", "prepared-spells"],
+      mechanics: {
+        classRef: cleric,
+        level: 1,
+        proficiencyBonus: proficiencyBonusFor(1),
+        hpGain: CLERIC_HIT_DIE,
+        abilityRefs: [],
+        spellRefs: [],
+        preparedSpellRefs: [bless, cureWounds, healingWord],
+        resourceGrants: [hitDieGrant()],
+      },
+    },
     ...CLERIC_LEVEL_NUMBERS.slice(1).map((level) => {
       const base = buildUnsupportedClassLevel(cleric, levelReference(refs, level), "Cleric", level, CLERIC_HIT_DIE);
       return {
@@ -88,7 +110,19 @@ export function clericLevels(refs: StarterReferences) {
           proficiencyBonus: proficiencyBonusFor(level),
           hpGain: CLERIC_HP_GAIN,
           resourceGrants: [hitDieGrant(), ...channelDivinityGrants(level), ...divineInterventionGrants(level)],
-          ...(level === 3 ? { progressionChoices: [{ choiceId: "cleric-subclass", required: true as const, count: 1 as const, kind: "subclass" as const, options: [subclass] }] } : {}),
+          ...(level === 3
+            ? {
+                progressionChoices: [
+                  {
+                    choiceId: "cleric-subclass",
+                    required: true as const,
+                    count: 1 as const,
+                    kind: "subclass" as const,
+                    options: [subclass],
+                  },
+                ],
+              }
+            : {}),
         },
       };
     }),
@@ -96,11 +130,14 @@ export function clericLevels(refs: StarterReferences) {
 }
 
 export function clericSubclasses(refs: StarterReferences) {
-  return [{
-    reference: subclassReference(refs),
-    name: "Life Domain",
-    description: "Bounded SRD 5.1 Life Domain subclass metadata bound to the Cleric class at level 3; its domain spells and features remain unsupported at runtime.",
-    tags: ["srd-5.1", "subclass", "cleric"],
-    mechanics: { classRef: refs.cleric, level: 3, abilityRefs: [] as string[] },
-  }];
+  return [
+    {
+      reference: subclassReference(refs),
+      name: "Life Domain",
+      description:
+        "Bounded SRD 5.1 Life Domain subclass metadata bound to the Cleric class at level 3; its domain spells and features remain unsupported at runtime.",
+      tags: ["srd-5.1", "subclass", "cleric"],
+      mechanics: { classRef: refs.cleric, level: 3, abilityRefs: [] as string[] },
+    },
+  ];
 }

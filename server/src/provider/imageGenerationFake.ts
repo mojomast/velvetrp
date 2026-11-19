@@ -56,7 +56,10 @@ export function createFakeImageGenerationClient(options: FakeImageGenerationOpti
       calls.push(parsed);
       if (options.failWith) throw options.failWith;
       return {
-        images: Array.from({ length: parsed.count }, () => ({ format: "png", base64: FAKE_IMAGE_GENERATION_PNG_BASE64 })),
+        images: Array.from({ length: parsed.count }, () => ({
+          format: "png",
+          base64: FAKE_IMAGE_GENERATION_PNG_BASE64,
+        })),
         seed: parsed.seed,
         seconds: options.seconds ?? 0,
       };

@@ -1,14 +1,35 @@
 import { resourceIdSchema } from "@velvet/contracts";
 import type {
-  ActorCheckCommandRequest, ActorCheckCommandResponse, ActorEffectCommandRequest, ActorEffectCommandResponse,
-  ActorEffectsResponse, ActorPowerCommandRequest, ActorPowerCommandResponse, ActorPowersResponse,
-  ActorResourcesHttpChangeCommandRequest, ActorResourcesHttpChangeCommandResponse, ActorResourcesHttpGetResponse, CharacterSheetHttpResponse,
-  CastSpellCommandRequest, CastSpellCommandResponse,
-  ContentCatalogHttpCampaignContentGetResponse, ContentCatalogHttpCampaignPackDetailResponse,
-  VendorSaleQuoteRequest, VendorSaleQuoteResponse,
-  EconomyHttpCommandRequest, EconomyHttpCommandResponse, EconomyHttpShopGetResponse, EconomyHttpWalletGetResponse,
-  InventoryHttpCommandRequest, InventoryHttpCommandResponse, InventoryHttpGetResponse, RestHttpRequest, RestHttpResponse,
-  AttunementCommand, AttunementResponse, AttunementSnapshot,
+  ActorCheckCommandRequest,
+  ActorCheckCommandResponse,
+  ActorEffectCommandRequest,
+  ActorEffectCommandResponse,
+  ActorEffectsResponse,
+  ActorPowerCommandRequest,
+  ActorPowerCommandResponse,
+  ActorPowersResponse,
+  ActorResourcesHttpChangeCommandRequest,
+  ActorResourcesHttpChangeCommandResponse,
+  ActorResourcesHttpGetResponse,
+  CharacterSheetHttpResponse,
+  CastSpellCommandRequest,
+  CastSpellCommandResponse,
+  ContentCatalogHttpCampaignContentGetResponse,
+  ContentCatalogHttpCampaignPackDetailResponse,
+  VendorSaleQuoteRequest,
+  VendorSaleQuoteResponse,
+  EconomyHttpCommandRequest,
+  EconomyHttpCommandResponse,
+  EconomyHttpShopGetResponse,
+  EconomyHttpWalletGetResponse,
+  InventoryHttpCommandRequest,
+  InventoryHttpCommandResponse,
+  InventoryHttpGetResponse,
+  RestHttpRequest,
+  RestHttpResponse,
+  AttunementCommand,
+  AttunementResponse,
+  AttunementSnapshot,
 } from "@velvet/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActorChecksPanel } from "./ActorChecksPanel";
@@ -34,19 +55,43 @@ export interface RpgCharacterSheetApi {
   getEffects: (actorId: string) => Promise<ActorEffectsResponse>;
   getPowers: (actorId: string) => Promise<ActorPowersResponse>;
   getShop: (campaignId: string, shopId: string) => Promise<EconomyHttpShopGetResponse>;
-  inventoryCommand: (campaignId: string, actorId: string, command: InventoryHttpCommandRequest) => Promise<InventoryHttpCommandResponse>;
-  economyCommand: (campaignId: string, actorId: string, command: EconomyHttpCommandRequest) => Promise<EconomyHttpCommandResponse>;
+  inventoryCommand: (
+    campaignId: string,
+    actorId: string,
+    command: InventoryHttpCommandRequest,
+  ) => Promise<InventoryHttpCommandResponse>;
+  economyCommand: (
+    campaignId: string,
+    actorId: string,
+    command: EconomyHttpCommandRequest,
+  ) => Promise<EconomyHttpCommandResponse>;
   rest: (campaignId: string, actorId: string, command: RestHttpRequest) => Promise<RestHttpResponse>;
   checkCommand: (actorId: string, command: ActorCheckCommandRequest) => Promise<ActorCheckCommandResponse>;
   powerCommand: (actorId: string, command: ActorPowerCommandRequest) => Promise<ActorPowerCommandResponse>;
   spellCommand: (actorId: string, command: CastSpellCommandRequest) => Promise<CastSpellCommandResponse>;
   effectCommand: (actorId: string, command: ActorEffectCommandRequest) => Promise<ActorEffectCommandResponse>;
-  resourceCommand: (campaignId: string, actorId: string, command: ActorResourcesHttpChangeCommandRequest) => Promise<ActorResourcesHttpChangeCommandResponse>;
-  vendorSaleQuote: (campaignId: string, actorId: string, command: VendorSaleQuoteRequest) => Promise<VendorSaleQuoteResponse>;
+  resourceCommand: (
+    campaignId: string,
+    actorId: string,
+    command: ActorResourcesHttpChangeCommandRequest,
+  ) => Promise<ActorResourcesHttpChangeCommandResponse>;
+  vendorSaleQuote: (
+    campaignId: string,
+    actorId: string,
+    command: VendorSaleQuoteRequest,
+  ) => Promise<VendorSaleQuoteResponse>;
   getCampaignContent: (campaignId: string) => Promise<ContentCatalogHttpCampaignContentGetResponse>;
-  getCampaignPack: (campaignId: string, packId: string, packVersion: string) => Promise<ContentCatalogHttpCampaignPackDetailResponse>;
+  getCampaignPack: (
+    campaignId: string,
+    packId: string,
+    packVersion: string,
+  ) => Promise<ContentCatalogHttpCampaignPackDetailResponse>;
   getActorAttunements?: (campaignId: string, actorId: string) => Promise<AttunementSnapshot>;
-  commandActorAttunement?: (campaignId: string, actorId: string, command: AttunementCommand) => Promise<AttunementResponse>;
+  commandActorAttunement?: (
+    campaignId: string,
+    actorId: string,
+    command: AttunementCommand,
+  ) => Promise<AttunementResponse>;
 }
 
 export interface RpgCharacterSheetPageProps {
@@ -77,53 +122,330 @@ type ConfirmedResult =
   | { kind: "spell"; value: CastSpellCommandResponse }
   | { kind: "effect"; value: ActorEffectCommandResponse }
   | { kind: "resource"; value: ActorResourcesHttpChangeCommandResponse };
-type Marker = { campaignId: string; actorId: string; phase: "ambiguous" | "confirmed"; operation: string; command: unknown; startedAt: string; receipt?: string; result?: ConfirmedResult };
-const markerKey = (campaignId: string, characterId: string) => `velvet.actor-command.v1:${campaignId.length}:${campaignId}${characterId}`;
-const actorKey = (campaignId: string, characterId: string) => `velvet.actor-id.v1:${campaignId.length}:${campaignId}${characterId}`;
+type Marker = {
+  campaignId: string;
+  actorId: string;
+  phase: "ambiguous" | "confirmed";
+  operation: string;
+  command: unknown;
+  startedAt: string;
+  receipt?: string;
+  result?: ConfirmedResult;
+};
+const markerKey = (campaignId: string, characterId: string) =>
+  `velvet.actor-command.v1:${campaignId.length}:${campaignId}${characterId}`;
+const actorKey = (campaignId: string, characterId: string) =>
+  `velvet.actor-id.v1:${campaignId.length}:${campaignId}${characterId}`;
 const commandKey = (kind: string) => `ui-${kind}-${createClientId()}`;
-const isNotFound = (error: unknown) => typeof error === "object" && error !== null && "status" in error && (error as { status?: unknown }).status === 404;
+const isNotFound = (error: unknown) =>
+  typeof error === "object" && error !== null && "status" in error && (error as { status?: unknown }).status === 404;
 
 function readMarker(key: string, campaignId: string): Marker | null {
   try {
     const value = JSON.parse(localStorage.getItem(key) ?? "null") as unknown;
     if (typeof value !== "object" || value === null) return null;
     const item = value as Partial<Marker>;
-    return item.campaignId === campaignId && resourceIdSchema.safeParse(item.actorId).success && (item.phase === "ambiguous" || item.phase === "confirmed")
-      && typeof item.operation === "string" && typeof item.startedAt === "string" ? item as Marker : null;
-  } catch { return null; }
+    return item.campaignId === campaignId &&
+      resourceIdSchema.safeParse(item.actorId).success &&
+      (item.phase === "ambiguous" || item.phase === "confirmed") &&
+      typeof item.operation === "string" &&
+      typeof item.startedAt === "string"
+      ? (item as Marker)
+      : null;
+  } catch {
+    return null;
+  }
 }
 function readActorId(key: string): string {
-  try { const value = localStorage.getItem(key) ?? ""; return resourceIdSchema.safeParse(value).success ? value : ""; }
-  catch { return ""; }
+  try {
+    const value = localStorage.getItem(key) ?? "";
+    return resourceIdSchema.safeParse(value).success ? value : "";
+  } catch {
+    return "";
+  }
 }
-function writeMarker(key: string, value: Marker | null) { try { if (value) localStorage.setItem(key, JSON.stringify(value)); else localStorage.removeItem(key); } catch { /* best-effort ambiguity durability */ } }
-function receiptText(receipt: { revisionBefore: number; revisionAfter: number; idempotencyKey: string }) { return `Receipt ${receipt.idempotencyKey}: revision ${receipt.revisionBefore} → ${receipt.revisionAfter}`; }
+function writeMarker(key: string, value: Marker | null) {
+  try {
+    if (value) localStorage.setItem(key, JSON.stringify(value));
+    else localStorage.removeItem(key);
+  } catch {
+    /* best-effort ambiguity durability */
+  }
+}
+function receiptText(receipt: { revisionBefore: number; revisionAfter: number; idempotencyKey: string }) {
+  return `Receipt ${receipt.idempotencyKey}: revision ${receipt.revisionBefore} → ${receipt.revisionAfter}`;
+}
 
 function ReceiptDetails({ result, currencies }: { result: ConfirmedResult; currencies: CurrencyPresentations }) {
   if (result.kind === "inventory") {
     const { receipt, inventory } = result.value;
-    return <section className="receipt-details"><h3>Inventory receipt and returned state</h3><dl className="command-detail-list"><div><dt>Command</dt><dd>{receipt.kind}</dd></div><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div><div><dt>Occurred</dt><dd>{receipt.occurredAt}</dd></div>{"entryId" in receipt && <div><dt>Entry</dt><dd>{receipt.entryId}</dd></div>}{"item" in receipt && <div><dt>Item</dt><dd>{catalogReferenceKey(receipt.item)}</dd></div>}{"quantity" in receipt && <div><dt>Quantity</dt><dd>{receipt.quantity}</dd></div>}{"slot" in receipt && <div><dt>Slot</dt><dd>{receipt.slot}</dd></div>}{receipt.kind === "gift" && <div><dt>Recipient</dt><dd>{receipt.recipientActorId}</dd></div>}<div><dt>Returned inventory</dt><dd>Revision {inventory.revision} · {inventory.entries.length} entries · capacity {inventory.capacity} · {inventory.equipment.length} equipped</dd></div></dl><details><summary>Complete strict server response</summary><pre>{JSON.stringify(result.value, null, 2)}</pre></details></section>;
+    return (
+      <section className="receipt-details">
+        <h3>Inventory receipt and returned state</h3>
+        <dl className="command-detail-list">
+          <div>
+            <dt>Command</dt>
+            <dd>{receipt.kind}</dd>
+          </div>
+          <div>
+            <dt>Revision</dt>
+            <dd>
+              {receipt.revisionBefore} → {receipt.revisionAfter}
+            </dd>
+          </div>
+          <div>
+            <dt>Occurred</dt>
+            <dd>{receipt.occurredAt}</dd>
+          </div>
+          {"entryId" in receipt && (
+            <div>
+              <dt>Entry</dt>
+              <dd>{receipt.entryId}</dd>
+            </div>
+          )}
+          {"item" in receipt && (
+            <div>
+              <dt>Item</dt>
+              <dd>{catalogReferenceKey(receipt.item)}</dd>
+            </div>
+          )}
+          {"quantity" in receipt && (
+            <div>
+              <dt>Quantity</dt>
+              <dd>{receipt.quantity}</dd>
+            </div>
+          )}
+          {"slot" in receipt && (
+            <div>
+              <dt>Slot</dt>
+              <dd>{receipt.slot}</dd>
+            </div>
+          )}
+          {receipt.kind === "gift" && (
+            <div>
+              <dt>Recipient</dt>
+              <dd>{receipt.recipientActorId}</dd>
+            </div>
+          )}
+          <div>
+            <dt>Returned inventory</dt>
+            <dd>
+              Revision {inventory.revision} · {inventory.entries.length} entries · capacity {inventory.capacity} ·{" "}
+              {inventory.equipment.length} equipped
+            </dd>
+          </div>
+        </dl>
+        <details>
+          <summary>Complete strict server response</summary>
+          <pre>{JSON.stringify(result.value, null, 2)}</pre>
+        </details>
+      </section>
+    );
   }
   if (result.kind === "rest") {
     const { receipt, actorState } = result.value;
-    return <section className="receipt-details"><h3>Rest receipt and returned resource state</h3><dl className="command-detail-list"><div><dt>Rest</dt><dd>{receipt.kind}</dd></div><div><dt>Recovered at</dt><dd>{receipt.recoveredAt}</dd></div><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div>{receipt.recovery.resources.map((delta) => <div key={delta.resourceId}><dt>{delta.resourceId}</dt><dd>{delta.before} → {delta.after}</dd></div>)}<div><dt>Returned actor state</dt><dd>Revision {actorState.revision} · {actorState.resources.length} resources</dd></div></dl><details><summary>Complete strict server response</summary><pre>{JSON.stringify(result.value, null, 2)}</pre></details></section>;
+    return (
+      <section className="receipt-details">
+        <h3>Rest receipt and returned resource state</h3>
+        <dl className="command-detail-list">
+          <div>
+            <dt>Rest</dt>
+            <dd>{receipt.kind}</dd>
+          </div>
+          <div>
+            <dt>Recovered at</dt>
+            <dd>{receipt.recoveredAt}</dd>
+          </div>
+          <div>
+            <dt>Revision</dt>
+            <dd>
+              {receipt.revisionBefore} → {receipt.revisionAfter}
+            </dd>
+          </div>
+          {receipt.recovery.resources.map((delta) => (
+            <div key={delta.resourceId}>
+              <dt>{delta.resourceId}</dt>
+              <dd>
+                {delta.before} → {delta.after}
+              </dd>
+            </div>
+          ))}
+          <div>
+            <dt>Returned actor state</dt>
+            <dd>
+              Revision {actorState.revision} · {actorState.resources.length} resources
+            </dd>
+          </div>
+        </dl>
+        <details>
+          <summary>Complete strict server response</summary>
+          <pre>{JSON.stringify(result.value, null, 2)}</pre>
+        </details>
+      </section>
+    );
   }
-  if (result.kind === "check" || result.kind === "power" || result.kind === "spell" || result.kind === "effect" || result.kind === "resource") {
+  if (
+    result.kind === "check" ||
+    result.kind === "power" ||
+    result.kind === "spell" ||
+    result.kind === "effect" ||
+    result.kind === "resource"
+  ) {
     const receipt = result.value.receipt;
-    return <section className="receipt-details"><h3>{result.kind} receipt and server result</h3><dl className="command-detail-list"><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div><div><dt>Occurred</dt><dd>{receipt.occurredAt}</dd></div></dl><details><summary>Complete strict server response</summary><pre>{JSON.stringify(result.value, null, 2)}</pre></details></section>;
+    return (
+      <section className="receipt-details">
+        <h3>{result.kind} receipt and server result</h3>
+        <dl className="command-detail-list">
+          <div>
+            <dt>Revision</dt>
+            <dd>
+              {receipt.revisionBefore} → {receipt.revisionAfter}
+            </dd>
+          </div>
+          <div>
+            <dt>Occurred</dt>
+            <dd>{receipt.occurredAt}</dd>
+          </div>
+        </dl>
+        <details>
+          <summary>Complete strict server response</summary>
+          <pre>{JSON.stringify(result.value, null, 2)}</pre>
+        </details>
+      </section>
+    );
   }
   const response = result.value;
   const receipt = response.receipt;
-  return <section className="receipt-details"><h3>Economy receipt and server result</h3><dl className="command-detail-list"><div><dt>Command</dt><dd>{receipt.type}</dd></div><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div><div><dt>Occurred</dt><dd>{receipt.occurredAt}</dd></div>{response.type === "request_purchase_quote" && <><div><dt>Quote</dt><dd>{response.quote.quoteId} · expires {response.quote.expiresAt}</dd></div><div><dt>Exact total</dt><dd>{formatMinorUnits(response.quote.total.minorUnits, response.quote.total.currency, currencies.get(catalogReferenceKey(response.quote.total.currency)))}</dd></div></>}{response.type === "purchase_from_shop" && <><div><dt>Purchase</dt><dd>{response.purchase.purchaseId} · quote {response.purchase.quoteId} · {response.purchase.quantity} items</dd></div><div><dt>Exact paid total</dt><dd>{formatMinorUnits(response.purchase.total.minorUnits, response.purchase.total.currency, currencies.get(catalogReferenceKey(response.purchase.total.currency)))}</dd></div><div><dt>Purchased at</dt><dd>{response.purchase.purchasedAt}</dd></div></>}{response.type === "sell_to_shop" && <><div><dt>Sale</dt><dd>{response.sale.saleId} · {response.sale.disposition} · {response.sale.quantity} items</dd></div><div><dt>Exact received total</dt><dd>{formatMinorUnits(response.sale.total.minorUnits, response.sale.total.currency, currencies.get(catalogReferenceKey(response.sale.total.currency)))}</dd></div><div><dt>Sold at</dt><dd>{response.sale.soldAt}</dd></div></>}{(response.type === "propose_bilateral_trade" || response.type === "accept_bilateral_trade" || response.type === "cancel_bilateral_trade") && <div><dt>Trade</dt><dd>{response.trade.tradeId} · {response.trade.status}</dd></div>}</dl><details><summary>Complete strict server response</summary><pre>{JSON.stringify(response, null, 2)}</pre></details></section>;
+  return (
+    <section className="receipt-details">
+      <h3>Economy receipt and server result</h3>
+      <dl className="command-detail-list">
+        <div>
+          <dt>Command</dt>
+          <dd>{receipt.type}</dd>
+        </div>
+        <div>
+          <dt>Revision</dt>
+          <dd>
+            {receipt.revisionBefore} → {receipt.revisionAfter}
+          </dd>
+        </div>
+        <div>
+          <dt>Occurred</dt>
+          <dd>{receipt.occurredAt}</dd>
+        </div>
+        {response.type === "request_purchase_quote" && (
+          <>
+            <div>
+              <dt>Quote</dt>
+              <dd>
+                {response.quote.quoteId} · expires {response.quote.expiresAt}
+              </dd>
+            </div>
+            <div>
+              <dt>Exact total</dt>
+              <dd>
+                {formatMinorUnits(
+                  response.quote.total.minorUnits,
+                  response.quote.total.currency,
+                  currencies.get(catalogReferenceKey(response.quote.total.currency)),
+                )}
+              </dd>
+            </div>
+          </>
+        )}
+        {response.type === "purchase_from_shop" && (
+          <>
+            <div>
+              <dt>Purchase</dt>
+              <dd>
+                {response.purchase.purchaseId} · quote {response.purchase.quoteId} · {response.purchase.quantity} items
+              </dd>
+            </div>
+            <div>
+              <dt>Exact paid total</dt>
+              <dd>
+                {formatMinorUnits(
+                  response.purchase.total.minorUnits,
+                  response.purchase.total.currency,
+                  currencies.get(catalogReferenceKey(response.purchase.total.currency)),
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Purchased at</dt>
+              <dd>{response.purchase.purchasedAt}</dd>
+            </div>
+          </>
+        )}
+        {response.type === "sell_to_shop" && (
+          <>
+            <div>
+              <dt>Sale</dt>
+              <dd>
+                {response.sale.saleId} · {response.sale.disposition} · {response.sale.quantity} items
+              </dd>
+            </div>
+            <div>
+              <dt>Exact received total</dt>
+              <dd>
+                {formatMinorUnits(
+                  response.sale.total.minorUnits,
+                  response.sale.total.currency,
+                  currencies.get(catalogReferenceKey(response.sale.total.currency)),
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Sold at</dt>
+              <dd>{response.sale.soldAt}</dd>
+            </div>
+          </>
+        )}
+        {(response.type === "propose_bilateral_trade" ||
+          response.type === "accept_bilateral_trade" ||
+          response.type === "cancel_bilateral_trade") && (
+          <div>
+            <dt>Trade</dt>
+            <dd>
+              {response.trade.tradeId} · {response.trade.status}
+            </dd>
+          </div>
+        )}
+      </dl>
+      <details>
+        <summary>Complete strict server response</summary>
+        <pre>{JSON.stringify(response, null, 2)}</pre>
+      </details>
+    </section>
+  );
 }
 
-export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", api, onBack, onUnavailable, focusHeadingRequest, onOpenCombat, focusCombatRequest, onCombatFocused,
-  embedded = false, controlledActorId, blocked = false, canMutate = true, reauthorize, onLockChange, onStateChange }: RpgCharacterSheetPageProps) {
+export function RpgCharacterSheetPage({
+  campaignId,
+  campaignCharacterId = "",
+  api,
+  onBack,
+  onUnavailable,
+  focusHeadingRequest,
+  onOpenCombat,
+  focusCombatRequest,
+  onCombatFocused,
+  embedded = false,
+  controlledActorId,
+  blocked = false,
+  canMutate = true,
+  reauthorize,
+  onLockChange,
+  onStateChange,
+}: RpgCharacterSheetPageProps) {
   const [sheet, setSheet] = useState<CharacterSheetHttpResponse | null>(null);
   const storageKey = markerKey(campaignId, campaignCharacterId || `actor:${controlledActorId ?? ""}`);
   const restoredMarker = useMemo(() => readMarker(storageKey, campaignId), [campaignId, storageKey]);
   const actorStorageKey = actorKey(campaignId, campaignCharacterId);
-  const [actorId, setActorId] = useState(() => controlledActorId ?? restoredMarker?.actorId ?? readActorId(actorStorageKey));
+  const [actorId, setActorId] = useState(
+    () => controlledActorId ?? restoredMarker?.actorId ?? readActorId(actorStorageKey),
+  );
   const [actorIdDraft, setActorIdDraft] = useState(actorId);
   const [resources, setResources] = useState<ActorResourcesHttpGetResponse | null>(null);
   const [inventory, setInventory] = useState<InventoryHttpGetResponse | null>(null);
@@ -132,12 +454,18 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
   const [powers, setPowers] = useState<ActorPowersResponse | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "failed">("loading");
   const [optionalWarning, setOptionalWarning] = useState("");
-  const [itemNames, setItemNames] = useState(new Map<string, { name: string; category?: string; slot?: string | null }>());
-  const [magicItems, setMagicItems] = useState(new Map<string, { definitionId: string; name: string; prerequisite: "short-rest" | "long-rest" | null }>());
+  const [itemNames, setItemNames] = useState(
+    new Map<string, { name: string; category?: string; slot?: string | null }>(),
+  );
+  const [magicItems, setMagicItems] = useState(
+    new Map<string, { definitionId: string; name: string; prerequisite: "short-rest" | "long-rest" | null }>(),
+  );
   const [currencies, setCurrencies] = useState<CurrencyPresentations>(new Map());
   const [shop, setShop] = useState<EconomyHttpShopGetResponse | null>(null);
   const [shopId, setShopId] = useState("");
-  const [quote, setQuote] = useState<Extract<EconomyHttpCommandResponse, { type: "request_purchase_quote" }>["quote"] | null>(null);
+  const [quote, setQuote] = useState<
+    Extract<EconomyHttpCommandResponse, { type: "request_purchase_quote" }>["quote"] | null
+  >(null);
   const [tradeOpen, setTradeOpen] = useState(false);
   const [restOpen, setRestOpen] = useState(false);
   const [marker, setMarker] = useState<Marker | null>(restoredMarker);
@@ -153,173 +481,362 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
   const actorCorrectionRef = useRef<HTMLButtonElement>(null);
   const actorInputRef = useRef<HTMLInputElement>(null);
   const combatButtonRef = useRef<HTMLButtonElement>(null);
-  const [checking, setChecking] = useState(false), [inventoryReview, setInventoryReview] = useState(false);
+  const [checking, setChecking] = useState(false),
+    [inventoryReview, setInventoryReview] = useState(false);
   const busyRef = useRef(false);
-  const authorityRef = useRef({ blocked, canMutate, reauthorize }); authorityRef.current = { blocked, canMutate, reauthorize };
-  const unavailableRef = useRef(onUnavailable); unavailableRef.current = onUnavailable;
-  const changedRef = useRef(onStateChange); changedRef.current = onStateChange;
+  const authorityRef = useRef({ blocked, canMutate, reauthorize });
+  authorityRef.current = { blocked, canMutate, reauthorize };
+  const unavailableRef = useRef(onUnavailable);
+  unavailableRef.current = onUnavailable;
+  const changedRef = useRef(onStateChange);
+  changedRef.current = onStateChange;
   const commandDisabled = blocked || !canMutate || checking || Boolean(marker);
-  useEffect(() => { onLockChange?.(canMutate && Boolean(marker || checking || inventoryReview || tradeOpen || restOpen)); }, [canMutate, marker, checking, inventoryReview, tradeOpen, restOpen, onLockChange]);
+  useEffect(() => {
+    onLockChange?.(canMutate && Boolean(marker || checking || inventoryReview || tradeOpen || restOpen));
+  }, [canMutate, marker, checking, inventoryReview, tradeOpen, restOpen, onLockChange]);
   useEffect(() => () => onLockChange?.(false), [onLockChange]);
   const actorIdRef = useRef(actorId);
   actorIdRef.current = actorId;
   const activeRef = useRef({ campaignId, campaignCharacterId });
   activeRef.current = { campaignId, campaignCharacterId };
-  const current = useCallback((generation: number) => mountedRef.current && generation === generationRef.current
-    && activeRef.current.campaignId === campaignId && activeRef.current.campaignCharacterId === campaignCharacterId, [campaignCharacterId, campaignId]);
+  const current = useCallback(
+    (generation: number) =>
+      mountedRef.current &&
+      generation === generationRef.current &&
+      activeRef.current.campaignId === campaignId &&
+      activeRef.current.campaignCharacterId === campaignCharacterId,
+    [campaignCharacterId, campaignId],
+  );
 
-  const loadCatalog = useCallback(async (generation: number) => {
-    try {
-      const content = await api.getCampaignContent(campaignId);
-      const packs = await Promise.all(content.content.contentPacks.map((pin) => api.getCampaignPack(campaignId, pin.packId, pin.packVersion)));
-      if (!current(generation)) return;
-      const nextItems = new Map<string, { name: string; category?: string; slot?: string | null }>();
-      const nextMagic = new Map<string, { definitionId: string; name: string; prerequisite: "short-rest" | "long-rest" | null }>();
-      const nextCurrencies: CurrencyPresentations = new Map();
-      for (const pack of packs) for (const definition of pack.catalog.definitions) {
-        const key = catalogReferenceKey(definition.reference);
-        if (definition.reference.kind === "item" && "mechanics" in definition) {
-          const mechanics = definition.mechanics as { category: string; slot: string | null; magic?: { attunement: { prerequisite: "short-rest" | "long-rest" } | null } };
-          nextItems.set(key, { name: definition.name, category: mechanics.category, slot: mechanics.slot });
-          if (mechanics.magic) nextMagic.set(key, { definitionId: definition.reference.definitionId, name: definition.name, prerequisite: mechanics.magic.attunement?.prerequisite ?? null });
-        }
-        if (definition.reference.kind === "currency" && "mechanics" in definition) {
-          const mechanics = definition.mechanics as { symbol: string; minorPerMajor: number };
-          nextCurrencies.set(key, { name: definition.name, symbol: mechanics.symbol, minorPerMajor: mechanics.minorPerMajor });
+  const loadCatalog = useCallback(
+    async (generation: number) => {
+      try {
+        const content = await api.getCampaignContent(campaignId);
+        const packs = await Promise.all(
+          content.content.contentPacks.map((pin) => api.getCampaignPack(campaignId, pin.packId, pin.packVersion)),
+        );
+        if (!current(generation)) return;
+        const nextItems = new Map<string, { name: string; category?: string; slot?: string | null }>();
+        const nextMagic = new Map<
+          string,
+          { definitionId: string; name: string; prerequisite: "short-rest" | "long-rest" | null }
+        >();
+        const nextCurrencies: CurrencyPresentations = new Map();
+        for (const pack of packs)
+          for (const definition of pack.catalog.definitions) {
+            const key = catalogReferenceKey(definition.reference);
+            if (definition.reference.kind === "item" && "mechanics" in definition) {
+              const mechanics = definition.mechanics as {
+                category: string;
+                slot: string | null;
+                magic?: { attunement: { prerequisite: "short-rest" | "long-rest" } | null };
+              };
+              nextItems.set(key, { name: definition.name, category: mechanics.category, slot: mechanics.slot });
+              if (mechanics.magic)
+                nextMagic.set(key, {
+                  definitionId: definition.reference.definitionId,
+                  name: definition.name,
+                  prerequisite: mechanics.magic.attunement?.prerequisite ?? null,
+                });
+            }
+            if (definition.reference.kind === "currency" && "mechanics" in definition) {
+              const mechanics = definition.mechanics as { symbol: string; minorPerMajor: number };
+              nextCurrencies.set(key, {
+                name: definition.name,
+                symbol: mechanics.symbol,
+                minorPerMajor: mechanics.minorPerMajor,
+              });
+            }
+          }
+        setItemNames(nextItems);
+        setMagicItems(nextMagic);
+        setCurrencies(nextCurrencies);
+      } catch {
+        if (current(generation)) {
+          setItemNames(new Map());
+          setMagicItems(new Map());
+          setCurrencies(new Map());
         }
       }
-      setItemNames(nextItems); setMagicItems(nextMagic); setCurrencies(nextCurrencies);
-    } catch { if (current(generation)) { setItemNames(new Map()); setMagicItems(new Map()); setCurrencies(new Map()); } }
-  }, [api, campaignId, current]);
+    },
+    [api, campaignId, current],
+  );
 
-  const loadActor = useCallback(async (generation: number, exactActorId: string): Promise<number> => {
-    const reads = await Promise.allSettled([api.getResources(campaignId, exactActorId), api.getInventory(campaignId, exactActorId), api.getWallet(campaignId, exactActorId), api.getEffects(exactActorId), api.getPowers(exactActorId)] as const);
-    if (!current(generation)) return 0;
-    const setters = [setResources, setInventory, setWallet, setEffects, setPowers] as const;
-    let warnings = 0;
-    let available = 0;
-    reads.forEach((result, index) => {
-      if (result.status === "fulfilled") { available += 1; (setters[index] as (value: never) => void)(result.value as never); }
-      else { if (isNotFound(result.reason)) (setters[index] as (value: null) => void)(null); else warnings += 1; }
-    });
-    setOptionalWarning(available === 0 ? `No actor state is available for that exact actor ID. Check or change the binding.${warnings ? ` ${warnings} lane read${warnings === 1 ? "" : "s"} failed.` : ""}`
-      : warnings ? `${warnings} actor section${warnings === 1 ? "" : "s"} could not be refreshed.` : "");
-    setCorrectionFocusPending(available === 0);
-    return available;
-  }, [api, campaignId, current]);
+  const loadActor = useCallback(
+    async (generation: number, exactActorId: string): Promise<number> => {
+      const reads = await Promise.allSettled([
+        api.getResources(campaignId, exactActorId),
+        api.getInventory(campaignId, exactActorId),
+        api.getWallet(campaignId, exactActorId),
+        api.getEffects(exactActorId),
+        api.getPowers(exactActorId),
+      ] as const);
+      if (!current(generation)) return 0;
+      const setters = [setResources, setInventory, setWallet, setEffects, setPowers] as const;
+      let warnings = 0;
+      let available = 0;
+      reads.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          available += 1;
+          (setters[index] as (value: never) => void)(result.value as never);
+        } else {
+          if (isNotFound(result.reason)) (setters[index] as (value: null) => void)(null);
+          else warnings += 1;
+        }
+      });
+      setOptionalWarning(
+        available === 0
+          ? `No actor state is available for that exact actor ID. Check or change the binding.${warnings ? ` ${warnings} lane read${warnings === 1 ? "" : "s"} failed.` : ""}`
+          : warnings
+            ? `${warnings} actor section${warnings === 1 ? "" : "s"} could not be refreshed.`
+            : "",
+      );
+      setCorrectionFocusPending(available === 0);
+      return available;
+    },
+    [api, campaignId, current],
+  );
 
-  const load = useCallback(async (focusFailure = false) => {
-    const generation = ++generationRef.current;
-    setPhase("loading"); setOptionalWarning(""); setSheet(null);
-    try {
-      const nextSheet = embedded && !campaignCharacterId ? null : await api.getSheet(campaignId, campaignCharacterId);
-      if (!current(generation)) return;
-      setSheet(nextSheet);
-      const actorAvailability = actorId ? await loadActor(generation, actorId) : null;
-      setPhase("ready");
-      void loadCatalog(generation);
-      if (focusHeadingRequest !== undefined && actorAvailability !== 0) queueMicrotask(() => { if (current(generation)) headingRef.current?.focus(); });
-    } catch (error) {
-      if (!current(generation)) return;
+  const load = useCallback(
+    async (focusFailure = false) => {
+      const generation = ++generationRef.current;
+      setPhase("loading");
+      setOptionalWarning("");
       setSheet(null);
-      if (isNotFound(error)) { unavailableRef.current(); return; }
-      setPhase("failed");
-      if (focusFailure) queueMicrotask(() => retryRef.current?.focus());
-    }
-  }, [actorId, api, campaignCharacterId, campaignId, current, embedded, focusHeadingRequest, loadActor, loadCatalog]);
+      try {
+        const nextSheet = embedded && !campaignCharacterId ? null : await api.getSheet(campaignId, campaignCharacterId);
+        if (!current(generation)) return;
+        setSheet(nextSheet);
+        const actorAvailability = actorId ? await loadActor(generation, actorId) : null;
+        setPhase("ready");
+        void loadCatalog(generation);
+        if (focusHeadingRequest !== undefined && actorAvailability !== 0)
+          queueMicrotask(() => {
+            if (current(generation)) headingRef.current?.focus();
+          });
+      } catch (error) {
+        if (!current(generation)) return;
+        setSheet(null);
+        if (isNotFound(error)) {
+          unavailableRef.current();
+          return;
+        }
+        setPhase("failed");
+        if (focusFailure) queueMicrotask(() => retryRef.current?.focus());
+      }
+    },
+    [actorId, api, campaignCharacterId, campaignId, current, embedded, focusHeadingRequest, loadActor, loadCatalog],
+  );
 
   useEffect(() => {
     mountedRef.current = true;
     const restored = readMarker(storageKey, campaignId);
     const restoredActor = controlledActorId ?? restored?.actorId ?? readActorId(actorStorageKey);
-    actorIdRef.current = restoredActor; setActorId(restoredActor); setActorIdDraft(restoredActor);
-    setResources(null); setInventory(null); setWallet(null); setEffects(null); setPowers(null); setShop(null); setQuote(null);
-    setMarker(restored); setConfirmedResult(restored?.result ?? null);
-    if (!restoredActor) { try { localStorage.removeItem(actorStorageKey); } catch { /* optional restoration */ } }
+    actorIdRef.current = restoredActor;
+    setActorId(restoredActor);
+    setActorIdDraft(restoredActor);
+    setResources(null);
+    setInventory(null);
+    setWallet(null);
+    setEffects(null);
+    setPowers(null);
+    setShop(null);
+    setQuote(null);
+    setMarker(restored);
+    setConfirmedResult(restored?.result ?? null);
+    if (!restoredActor) {
+      try {
+        localStorage.removeItem(actorStorageKey);
+      } catch {
+        /* optional restoration */
+      }
+    }
     void load();
-    return () => { mountedRef.current = false; generationRef.current += 1; shopRequestRef.current += 1; };
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      shopRequestRef.current += 1;
+    };
   }, [actorStorageKey, campaignId, controlledActorId, load, storageKey]);
 
   useEffect(() => {
     if (!correctionFocusPending || phase !== "ready") return;
-    actorCorrectionRef.current?.focus(); setCorrectionFocusPending(false);
+    actorCorrectionRef.current?.focus();
+    setCorrectionFocusPending(false);
   }, [correctionFocusPending, phase]);
 
   useEffect(() => {
     if (phase !== "ready" || focusCombatRequest === undefined || !onOpenCombat) return;
-    queueMicrotask(() => { if (mountedRef.current) { combatButtonRef.current?.focus(); onCombatFocused?.(focusCombatRequest); } });
+    queueMicrotask(() => {
+      if (mountedRef.current) {
+        combatButtonRef.current?.focus();
+        onCombatFocused?.(focusCombatRequest);
+      }
+    });
   }, [focusCombatRequest, onCombatFocused, onOpenCombat, phase]);
 
-  const setDurableMarker = (next: Marker | null) => { writeMarker(storageKey, next); if (mountedRef.current) setMarker(next); };
+  const setDurableMarker = (next: Marker | null) => {
+    writeMarker(storageKey, next);
+    if (mountedRef.current) setMarker(next);
+  };
   async function connectActor() {
     if (embedded) return;
     if (!resourceIdSchema.safeParse(actorIdDraft).success) return;
     const generation = generationRef.current;
-    actorIdRef.current = actorIdDraft; setActorId(actorIdDraft);
-    setResources(null); setInventory(null); setWallet(null); setEffects(null); setPowers(null); setOptionalWarning("Loading exact actor state…");
-    try { localStorage.setItem(actorStorageKey, actorIdDraft); } catch { /* optional restoration */ }
+    actorIdRef.current = actorIdDraft;
+    setActorId(actorIdDraft);
+    setResources(null);
+    setInventory(null);
+    setWallet(null);
+    setEffects(null);
+    setPowers(null);
+    setOptionalWarning("Loading exact actor state…");
+    try {
+      localStorage.setItem(actorStorageKey, actorIdDraft);
+    } catch {
+      /* optional restoration */
+    }
     await loadActor(generation, actorIdDraft);
   }
   function disconnectActor() {
-    actorIdRef.current = ""; setActorId(""); setActorIdDraft(""); setResources(null); setInventory(null); setWallet(null); setEffects(null); setPowers(null); setShop(null); setQuote(null); setOptionalWarning("");
-    try { localStorage.removeItem(actorStorageKey); } catch { /* optional restoration */ }
+    actorIdRef.current = "";
+    setActorId("");
+    setActorIdDraft("");
+    setResources(null);
+    setInventory(null);
+    setWallet(null);
+    setEffects(null);
+    setPowers(null);
+    setShop(null);
+    setQuote(null);
+    setOptionalWarning("");
+    try {
+      localStorage.removeItem(actorStorageKey);
+    } catch {
+      /* optional restoration */
+    }
     queueMicrotask(() => actorInputRef.current?.focus());
   }
-  async function runCommand<T>(operation: string, command: unknown, invoke: () => Promise<T>, wrap: (value: T) => ConfirmedResult, refresh: () => Promise<void>, consume?: (value: T) => void) {
-    if (marker || busyRef.current || authorityRef.current.blocked || !authorityRef.current.canMutate || !actorId || (embedded && actorId !== controlledActorId)) return;
-    busyRef.current = true; setChecking(true);
+  async function runCommand<T>(
+    operation: string,
+    command: unknown,
+    invoke: () => Promise<T>,
+    wrap: (value: T) => ConfirmedResult,
+    refresh: () => Promise<void>,
+    consume?: (value: T) => void,
+  ) {
+    if (
+      marker ||
+      busyRef.current ||
+      authorityRef.current.blocked ||
+      !authorityRef.current.canMutate ||
+      !actorId ||
+      (embedded && actorId !== controlledActorId)
+    )
+      return;
+    busyRef.current = true;
+    setChecking(true);
     try {
-    if (authorityRef.current.reauthorize && !await authorityRef.current.reauthorize()) return;
-    if (!mountedRef.current || authorityRef.current.blocked || !authorityRef.current.canMutate) return;
-    const pending: Marker = { campaignId, actorId, phase: "ambiguous", operation, command, startedAt: new Date().toISOString() };
-    setDurableMarker(pending); setCommandMessage(""); setReceipt(""); setConfirmedResult(null);
-    try {
-      const result = await invoke();
-      const wrapped = wrap(result);
-      const proof = receiptText(wrapped.value.receipt);
-      const confirmed: Marker = { ...pending, phase: "confirmed", receipt: proof, result: wrapped };
-      writeMarker(storageKey, confirmed);
-      if (mountedRef.current) { setMarker(confirmed); setReceipt(proof); setConfirmedResult(wrapped); consume?.(result); }
+      if (authorityRef.current.reauthorize && !(await authorityRef.current.reauthorize())) return;
+      if (!mountedRef.current || authorityRef.current.blocked || !authorityRef.current.canMutate) return;
+      const pending: Marker = {
+        campaignId,
+        actorId,
+        phase: "ambiguous",
+        operation,
+        command,
+        startedAt: new Date().toISOString(),
+      };
+      setDurableMarker(pending);
+      setCommandMessage("");
+      setReceipt("");
+      setConfirmedResult(null);
       try {
-        await refresh();
-        writeMarker(storageKey, null);
-        if (mountedRef.current) { setMarker(null); setCommandMessage("Command confirmed and authoritative state refreshed."); changedRef.current?.(); }
+        const result = await invoke();
+        const wrapped = wrap(result);
+        const proof = receiptText(wrapped.value.receipt);
+        const confirmed: Marker = { ...pending, phase: "confirmed", receipt: proof, result: wrapped };
+        writeMarker(storageKey, confirmed);
+        if (mountedRef.current) {
+          setMarker(confirmed);
+          setReceipt(proof);
+          setConfirmedResult(wrapped);
+          consume?.(result);
+        }
+        try {
+          await refresh();
+          writeMarker(storageKey, null);
+          if (mountedRef.current) {
+            setMarker(null);
+            setCommandMessage("Command confirmed and authoritative state refreshed.");
+            changedRef.current?.();
+          }
+        } catch {
+          if (mountedRef.current)
+            setCommandMessage(
+              "Command was confirmed and its returned state was applied, but one or more authoritative GET refreshes failed. The complete receipt is preserved; displayed lanes may be partial until refresh succeeds.",
+            );
+        }
       } catch {
-        if (mountedRef.current) setCommandMessage("Command was confirmed and its returned state was applied, but one or more authoritative GET refreshes failed. The complete receipt is preserved; displayed lanes may be partial until refresh succeeds.");
+        if (mountedRef.current)
+          setCommandMessage(
+            "The command outcome is uncertain. It will not be replayed. Refresh authoritative state before another command.",
+          );
       }
     } catch {
-      if (mountedRef.current) setCommandMessage("The command outcome is uncertain. It will not be replayed. Refresh authoritative state before another command.");
+      if (mountedRef.current) setCommandMessage("Authorization could not be refreshed. No command was sent.");
+    } finally {
+      busyRef.current = false;
+      if (mountedRef.current) setChecking(false);
     }
-    } catch { if (mountedRef.current) setCommandMessage("Authorization could not be refreshed. No command was sent."); }
-    finally { busyRef.current = false; if (mountedRef.current) setChecking(false); }
   }
 
   const refreshAllLanes = async (exactActorId = actorId) => {
     const generation = generationRef.current;
-    const reads = await Promise.allSettled([embedded && !campaignCharacterId ? Promise.resolve(null) : api.getSheet(campaignId, campaignCharacterId), api.getResources(campaignId, exactActorId), api.getInventory(campaignId, exactActorId), api.getWallet(campaignId, exactActorId), api.getEffects(exactActorId), api.getPowers(exactActorId)] as const);
+    const reads = await Promise.allSettled([
+      embedded && !campaignCharacterId ? Promise.resolve(null) : api.getSheet(campaignId, campaignCharacterId),
+      api.getResources(campaignId, exactActorId),
+      api.getInventory(campaignId, exactActorId),
+      api.getWallet(campaignId, exactActorId),
+      api.getEffects(exactActorId),
+      api.getPowers(exactActorId),
+    ] as const);
     if (!current(generation)) throw new Error("stale refresh");
     const activeActor = actorIdRef.current === exactActorId;
     const [sheetRead, resourcesRead, inventoryRead, walletRead, effectsRead, powersRead] = reads;
-    if (sheetRead.status === "fulfilled") setSheet(sheetRead.value); else if (isNotFound(sheetRead.reason)) setSheet(null);
+    if (sheetRead.status === "fulfilled") setSheet(sheetRead.value);
+    else if (isNotFound(sheetRead.reason)) setSheet(null);
     const actorReads = [resourcesRead, inventoryRead, walletRead, effectsRead, powersRead] as const;
     const setters = [setResources, setInventory, setWallet, setEffects, setPowers] as const;
-    if (activeActor) actorReads.forEach((read, index) => {
-      if (read.status === "fulfilled") (setters[index] as (value: never) => void)(read.value as never);
-      else if (isNotFound(read.reason)) (setters[index] as (value: null) => void)(null);
-    });
+    if (activeActor)
+      actorReads.forEach((read, index) => {
+        if (read.status === "fulfilled") (setters[index] as (value: never) => void)(read.value as never);
+        else if (isNotFound(read.reason)) (setters[index] as (value: null) => void)(null);
+      });
     if (reads.some((read) => read.status === "rejected")) throw new Error("partial authoritative refresh");
   };
   const reconcile = async () => {
     const reconcileActorId = marker?.actorId ?? actorId;
     if (!reconcileActorId) return;
     setCommandMessage("Refreshing authoritative state…");
-    try { await refreshAllLanes(reconcileActorId);
-      if (embedded && marker?.phase === "ambiguous") { setCommandMessage("Authoritative lanes refreshed, but generic reads cannot prove this uncertain command. The lock remains; no command was replayed."); return; }
-      setDurableMarker(null); setCommandMessage("All authoritative lanes refreshed. No command was replayed."); changedRef.current?.(); }
-    catch { setCommandMessage("Authoritative refresh failed. The write lock remains in place."); }
+    try {
+      await refreshAllLanes(reconcileActorId);
+      if (embedded && marker?.phase === "ambiguous") {
+        setCommandMessage(
+          "Authoritative lanes refreshed, but generic reads cannot prove this uncertain command. The lock remains; no command was replayed.",
+        );
+        return;
+      }
+      setDurableMarker(null);
+      setCommandMessage("All authoritative lanes refreshed. No command was replayed.");
+      changedRef.current?.();
+    } catch {
+      setCommandMessage("Authoritative refresh failed. The write lock remains in place.");
+    }
   };
 
-  const describeItem = (item: InventoryHttpGetResponse["entries"][number]["item"]) => itemNames.get(catalogReferenceKey(item)) ?? { name: item.definitionId };
+  const describeItem = (item: InventoryHttpGetResponse["entries"][number]["item"]) =>
+    itemNames.get(catalogReferenceKey(item)) ?? { name: item.definitionId };
   const attunementCandidates = useMemo((): AttunementCandidate[] => {
     if (!inventory) return [];
     const seen = new Set<string>();
@@ -328,107 +845,549 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
       const magicItem = magicItems.get(catalogReferenceKey(entry.item));
       if (!magicItem || magicItem.prerequisite === null || seen.has(magicItem.definitionId)) continue;
       seen.add(magicItem.definitionId);
-      candidates.push({ definitionId: magicItem.definitionId, name: magicItem.name, prerequisite: magicItem.prerequisite });
+      candidates.push({
+        definitionId: magicItem.definitionId,
+        name: magicItem.name,
+        prerequisite: magicItem.prerequisite,
+      });
     }
     return candidates;
   }, [inventory, magicItems]);
   function submitInventory(intent: InventoryIntent) {
     if (!inventory) return;
-    const command = { ...intent, expectedRevision: inventory.revision, idempotencyKey: commandKey(`inventory-${intent.kind}`) } as InventoryHttpCommandRequest;
-    void runCommand(intent.kind, command, () => api.inventoryCommand(campaignId, actorId, command), (value) => ({ kind: "inventory", value }), () => refreshAllLanes(actorId), (value) => setInventory(value.inventory));
+    const command = {
+      ...intent,
+      expectedRevision: inventory.revision,
+      idempotencyKey: commandKey(`inventory-${intent.kind}`),
+    } as InventoryHttpCommandRequest;
+    void runCommand(
+      intent.kind,
+      command,
+      () => api.inventoryCommand(campaignId, actorId, command),
+      (value) => ({ kind: "inventory", value }),
+      () => refreshAllLanes(actorId),
+      (value) => setInventory(value.inventory),
+    );
   }
-  type EconomyIntent = EconomyHttpCommandRequest extends infer Command ? Command extends EconomyHttpCommandRequest ? Omit<Command, "expectedRevision" | "idempotencyKey"> : never : never;
-  function submitEconomy(intent: EconomyIntent, operation: string, consume?: (value: EconomyHttpCommandResponse) => void) {
+  type EconomyIntent = EconomyHttpCommandRequest extends infer Command
+    ? Command extends EconomyHttpCommandRequest
+      ? Omit<Command, "expectedRevision" | "idempotencyKey">
+      : never
+    : never;
+  function submitEconomy(
+    intent: EconomyIntent,
+    operation: string,
+    consume?: (value: EconomyHttpCommandResponse) => void,
+  ) {
     if (!wallet) return;
-    const command = { ...intent, expectedRevision: wallet.revision, idempotencyKey: commandKey(`economy-${operation}`) } as EconomyHttpCommandRequest;
-    void runCommand(operation, command, () => api.economyCommand(campaignId, actorId, command), (value) => ({ kind: "economy", value }), () => refreshAllLanes(actorId), consume);
+    const command = {
+      ...intent,
+      expectedRevision: wallet.revision,
+      idempotencyKey: commandKey(`economy-${operation}`),
+    } as EconomyHttpCommandRequest;
+    void runCommand(
+      operation,
+      command,
+      () => api.economyCommand(campaignId, actorId, command),
+      (value) => ({ kind: "economy", value }),
+      () => refreshAllLanes(actorId),
+      consume,
+    );
   }
-  function submitTrade(intent: TradeIntent) { setTradeOpen(false); submitEconomy(intent, "trade"); }
+  function submitTrade(intent: TradeIntent) {
+    setTradeOpen(false);
+    submitEconomy(intent, "trade");
+  }
   function submitRest(intent: RestIntent) {
     if (!resources) return;
-    const command = { ...intent, expectedRevision: resources.revision, idempotencyKey: commandKey("rest") } as RestHttpRequest;
+    const command = {
+      ...intent,
+      expectedRevision: resources.revision,
+      idempotencyKey: commandKey("rest"),
+    } as RestHttpRequest;
     setRestOpen(false);
-    void runCommand("rest", command, () => api.rest(campaignId, actorId, command), (value) => ({ kind: "rest", value }), () => refreshAllLanes(actorId), (value) => setResources({ resources: value.actorState.resources.map((resource) => ({ name: resource.resourceId, current: resource.current, max: resource.capacity })), revision: value.actorState.revision }));
+    void runCommand(
+      "rest",
+      command,
+      () => api.rest(campaignId, actorId, command),
+      (value) => ({ kind: "rest", value }),
+      () => refreshAllLanes(actorId),
+      (value) =>
+        setResources({
+          resources: value.actorState.resources.map((resource) => ({
+            name: resource.resourceId,
+            current: resource.current,
+            max: resource.capacity,
+          })),
+          revision: value.actorState.revision,
+        }),
+    );
   }
   const m16Revision = powers?.revision ?? effects?.revision ?? 0;
-  function submitCheck(intent: ActorCheckCommandRequest extends infer C ? C extends ActorCheckCommandRequest ? Omit<C, "expectedRevision" | "idempotencyKey"> : never : never) {
+  function submitCheck(
+    intent: ActorCheckCommandRequest extends infer C
+      ? C extends ActorCheckCommandRequest
+        ? Omit<C, "expectedRevision" | "idempotencyKey">
+        : never
+      : never,
+  ) {
     if (!actorId) return;
-    const command = { ...intent, expectedRevision: m16Revision, idempotencyKey: commandKey("check") } as ActorCheckCommandRequest;
-    void runCommand("check", command, () => api.checkCommand(actorId, command), (value) => ({ kind: "check", value }), () => refreshAllLanes(actorId));
+    const command = {
+      ...intent,
+      expectedRevision: m16Revision,
+      idempotencyKey: commandKey("check"),
+    } as ActorCheckCommandRequest;
+    void runCommand(
+      "check",
+      command,
+      () => api.checkCommand(actorId, command),
+      (value) => ({ kind: "check", value }),
+      () => refreshAllLanes(actorId),
+    );
   }
   function submitPower(command: ActorPowersResponse["legalCommands"][number], targetIds: string[]) {
     if (!actorId) return;
-    const request = { powerRef: command.powerRef, targetIds, choices: [], expectedRevision: m16Revision, idempotencyKey: commandKey("power") } as ActorPowerCommandRequest;
-    void runCommand("power", request, () => api.powerCommand(actorId, request), (value) => ({ kind: "power", value }), () => refreshAllLanes(actorId));
+    const request = {
+      powerRef: command.powerRef,
+      targetIds,
+      choices: [],
+      expectedRevision: m16Revision,
+      idempotencyKey: commandKey("power"),
+    } as ActorPowerCommandRequest;
+    void runCommand(
+      "power",
+      request,
+      () => api.powerCommand(actorId, request),
+      (value) => ({ kind: "power", value }),
+      () => refreshAllLanes(actorId),
+    );
   }
   function submitSpell(intent: Omit<CastSpellCommandRequest, "expectedRevision" | "idempotencyKey">) {
     if (!actorId) return;
-    const command = { ...intent, expectedRevision: m16Revision, idempotencyKey: commandKey("spell") } as CastSpellCommandRequest;
-    void runCommand("spell", command, () => api.spellCommand(actorId, command), (value) => ({ kind: "spell", value }), () => refreshAllLanes(actorId));
+    const command = {
+      ...intent,
+      expectedRevision: m16Revision,
+      idempotencyKey: commandKey("spell"),
+    } as CastSpellCommandRequest;
+    void runCommand(
+      "spell",
+      command,
+      () => api.spellCommand(actorId, command),
+      (value) => ({ kind: "spell", value }),
+      () => refreshAllLanes(actorId),
+    );
   }
-  function submitEffect(intent: ActorEffectCommandRequest extends infer C ? C extends ActorEffectCommandRequest ? Omit<C, "expectedRevision" | "idempotencyKey"> : never : never) {
+  function submitEffect(
+    intent: ActorEffectCommandRequest extends infer C
+      ? C extends ActorEffectCommandRequest
+        ? Omit<C, "expectedRevision" | "idempotencyKey">
+        : never
+      : never,
+  ) {
     if (!actorId) return;
-    const command = { ...intent, expectedRevision: m16Revision, idempotencyKey: commandKey(`effect-${intent.kind}`) } as ActorEffectCommandRequest;
-    void runCommand(`effect-${intent.kind}`, command, () => api.effectCommand(actorId, command), (value) => ({ kind: "effect", value }), () => refreshAllLanes(actorId));
+    const command = {
+      ...intent,
+      expectedRevision: m16Revision,
+      idempotencyKey: commandKey(`effect-${intent.kind}`),
+    } as ActorEffectCommandRequest;
+    void runCommand(
+      `effect-${intent.kind}`,
+      command,
+      () => api.effectCommand(actorId, command),
+      (value) => ({ kind: "effect", value }),
+      () => refreshAllLanes(actorId),
+    );
   }
   function submitResource(intent: Omit<ActorResourcesHttpChangeCommandRequest, "expectedRevision" | "idempotencyKey">) {
     if (!actorId || !resources) return;
-    const command = { ...intent, expectedRevision: resources.revision, idempotencyKey: commandKey("resource") } as ActorResourcesHttpChangeCommandRequest;
-    void runCommand("resource", command, () => api.resourceCommand(campaignId, actorId, command), (value) => ({ kind: "resource", value }), () => refreshAllLanes(actorId));
+    const command = {
+      ...intent,
+      expectedRevision: resources.revision,
+      idempotencyKey: commandKey("resource"),
+    } as ActorResourcesHttpChangeCommandRequest;
+    void runCommand(
+      "resource",
+      command,
+      () => api.resourceCommand(campaignId, actorId, command),
+      (value) => ({ kind: "resource", value }),
+      () => refreshAllLanes(actorId),
+    );
   }
 
   async function requestSaleQuote(entryId: string, quantity: number): Promise<VendorSaleQuoteResponse | null> {
     if (!actorId) return null;
-    try { return await api.vendorSaleQuote(campaignId, actorId, { entryId, quantity, idempotencyKey: commandKey("vendor-sale-quote") }); }
-    catch { if (mountedRef.current) setCommandMessage("A vendor sale quote is unavailable for that item, quantity, or location. Confirm a vendor is present with a buy policy."); return null; }
+    try {
+      return await api.vendorSaleQuote(campaignId, actorId, {
+        entryId,
+        quantity,
+        idempotencyKey: commandKey("vendor-sale-quote"),
+      });
+    } catch {
+      if (mountedRef.current)
+        setCommandMessage(
+          "A vendor sale quote is unavailable for that item, quantity, or location. Confirm a vendor is present with a buy policy.",
+        );
+      return null;
+    }
   }
 
   async function openShop(id: string) {
-    const request = ++shopRequestRef.current; setShop(null); setShopId(id); setQuote(null);
-    try { const value = await api.getShop(campaignId, id); if (mountedRef.current && request === shopRequestRef.current) setShop(value); }
-    catch { if (mountedRef.current && request === shopRequestRef.current) setCommandMessage("Known shop could not be loaded."); }
+    const request = ++shopRequestRef.current;
+    setShop(null);
+    setShopId(id);
+    setQuote(null);
+    try {
+      const value = await api.getShop(campaignId, id);
+      if (mountedRef.current && request === shopRequestRef.current) setShop(value);
+    } catch {
+      if (mountedRef.current && request === shopRequestRef.current)
+        setCommandMessage("Known shop could not be loaded.");
+    }
   }
 
-  const derivedStats = useMemo((): Array<readonly [string, number | undefined]> => { if (!sheet) return [];
-    const defenses: Array<readonly [string, number | undefined]> = sheet.rulesetId === "dnd-5e" ? [["Armor Class", sheet.derived.armorClass]] : [["Guard", sheet.derived.defenses.guard], ["Evasion", sheet.derived.defenses.evasion], ["Will", sheet.derived.defenses.will]];
-    return [["Maximum HP", sheet.derived.maxHp], ...defenses, ["Initiative", sheet.derived.initiative], ["Speed", sheet.derived.speed], ["Carrying limit", sheet.derived.carryingLimit], ["Spell attack", sheet.derived.spellAttack], ["Save DC", sheet.derived.saveDc]];
+  const derivedStats = useMemo((): Array<readonly [string, number | undefined]> => {
+    if (!sheet) return [];
+    const defenses: Array<readonly [string, number | undefined]> =
+      sheet.rulesetId === "dnd-5e"
+        ? [["Armor Class", sheet.derived.armorClass]]
+        : [
+            ["Guard", sheet.derived.defenses.guard],
+            ["Evasion", sheet.derived.defenses.evasion],
+            ["Will", sheet.derived.defenses.will],
+          ];
+    return [
+      ["Maximum HP", sheet.derived.maxHp],
+      ...defenses,
+      ["Initiative", sheet.derived.initiative],
+      ["Speed", sheet.derived.speed],
+      ["Carrying limit", sheet.derived.carryingLimit],
+      ["Spell attack", sheet.derived.spellAttack],
+      ["Save DC", sheet.derived.saveDc],
+    ];
   }, [sheet]);
 
-  const Container = embedded ? "section" : "main", Heading = embedded ? "h3" : "h1";
-  return <Container className={embedded ? "atlas-actor-tools" : "page library-page campaign-page actor-sheet-page"}><section className={embedded ? "atlas-actor-body" : "actor-sheet-shell"} aria-labelledby="actor-sheet-heading">
-    <header className={embedded ? "atlas-domain-heading" : "library-header"}><div>{!embedded && <button className="back-link" type="button" onClick={onBack}>← Character workspace</button>}<p className="eyebrow">{embedded ? "SERVER-BOUND POSSESSIONS" : `CHARACTER SHEET // ${sheet ? `${sheet.rulesetId} @ ${sheet.rulesetVersion}` : "SERVER STATE"}`}</p><Heading ref={headingRef} tabIndex={-1} className={embedded ? undefined : "title"} id="actor-sheet-heading"><bdi dir="auto">{embedded ? "Inventory & equipment" : sheet?.sheet.name ?? "Character sheet"}</bdi></Heading></div>{phase === "ready" && <div className="button-row">{onOpenCombat && <button ref={combatButtonRef} className="primary" type="button" onClick={onOpenCombat}>Open combat tracker</button>}<button className="ghost" type="button" onClick={() => void load()} disabled={Boolean(marker || checking)}>Refresh sheet</button></div>}</header>
-    {embedded && commandDisabled && <p role="status">{!canMutate ? "Your current role cannot change this actor." : blocked ? "Finish the other room operation before changing possessions." : "Review or reconcile the pending character command before another write."}</p>}
-    {phase === "loading" && <section className="library-panel actor-loading" role="status">Loading authoritative character state…</section>}
-    {phase === "failed" && <section className="library-panel actor-loading" role="alert"><p>Character sheet could not be loaded.</p><button ref={retryRef} className="ghost" type="button" onClick={() => void load(true)}>Retry</button></section>}
-    {phase === "ready" && (sheet || embedded) && <div className={embedded ? "atlas-actor-sections" : "actor-sheet-layout"}>
-      {(marker || commandMessage || receipt) && <section className={`actor-command-status ${marker?.phase === "ambiguous" ? "is-warning" : ""}`} aria-live="assertive">
-        {marker && <p><strong>{marker.phase === "confirmed" ? "Confirmed write awaiting refresh" : "Write outcome uncertain"}:</strong> {marker.operation}. No duplicate or automatic replay is allowed.</p>}
-        {receipt && <p>{receipt}</p>}{commandMessage && <p>{commandMessage}</p>}
-        {marker && <button className="ghost" type="button" onClick={() => void reconcile()}>Refresh authoritative state</button>}
-      </section>}
-      {confirmedResult && <ReceiptDetails result={confirmedResult} currencies={currencies} />}
-      {optionalWarning && <p className="actor-warning" role="status">{optionalWarning}</p>}
-      {!embedded && <form className="actor-section known-actor-form" onSubmit={(event) => { event.preventDefault(); void connectActor(); }}><div className="actor-section-heading"><h2>Actor binding</h2>{actorId && <span className="status-pill">Connected</span>}</div>{actorId && <p>Current campaign-provided actor: <bdi dir="auto">{actorId}</bdi></p>}<label className="field">Campaign-provided actor ID<input ref={actorInputRef} value={actorIdDraft} onChange={(event) => setActorIdDraft(event.target.value)} autoComplete="off" /></label><div className="button-row"><button ref={actorCorrectionRef} className="ghost" type="submit" disabled={!resourceIdSchema.safeParse(actorIdDraft).success}>{actorId ? "Change actor" : "Load actor resources"}</button>{actorId && <button className="ghost" type="button" onClick={disconnectActor}>Disconnect actor</button>}</div><p className="actor-help">The character-sheet route does not expose its actor binding. Enter an exact actor ID supplied by the campaign; this client never guesses one.</p></form>}
-      {sheet && <><section className="actor-section actor-overview" aria-labelledby="overview-heading"><div className="actor-section-heading"><h2 id="overview-heading">Statistics & defenses</h2><span className="status-pill">Level {sheet.progression.level}</span></div><dl className="actor-stat-grid">{derivedStats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>
-      <section className="actor-section" aria-labelledby="skills-heading"><div className="actor-section-heading"><h2 id="skills-heading">Skills, saves & proficiencies</h2></div>{sheet.sheet.proficiencies.length ? <ul className="compact-server-list">{sheet.sheet.proficiencies.map((item, index) => <li key={`${item.category}-${index}`}><span>{item.category}</span><strong>{item.label}</strong></li>)}</ul> : <p className="actor-empty">No proficiencies returned.</p>}</section></>}
-      {sheet && <KnownOptionsPanel options={sheet.sheet.choices.map((choice) => ({
-        id: choice.label, label: choice.label, selectionLabel: choice.selection.name, kind: choice.selection.kind,
-      }))} />}
-      {actorId && api.getActorAttunements && api.commandActorAttunement && <MagicItemAttunementPanel campaignId={campaignId} actorId={actorId}
-        disabled={commandDisabled} candidates={attunementCandidates}
-        api={{ getActorAttunements: api.getActorAttunements, commandActorAttunement: api.commandActorAttunement }} />}
-      {resources && <ResourceTrackers resources={resources.resources} disabled={commandDisabled} onAdjust={submitResource} />}
-      {actorId && <ActorChecksPanel disabled={commandDisabled} result={confirmedResult?.kind === "check" ? confirmedResult.value : null} onSubmit={submitCheck} />}
-      {actorId && <PowerLibraryPanel powers={powers} disabled={commandDisabled} onRefresh={() => void load()} onUse={submitPower} result={confirmedResult?.kind === "power" ? confirmedResult.value : null} />}
-      {actorId && <SpellcastingPanel powers={powers} disabled={commandDisabled} result={confirmedResult?.kind === "spell" ? confirmedResult.value : null} onCast={submitSpell} />}
-      {effects && <ActorEffectsPanel effects={effects} disabled={commandDisabled} result={confirmedResult?.kind === "effect" ? confirmedResult.value : null} onApply={submitEffect} onRemove={(effectId) => submitEffect({ kind: "remove", effectId })} onAdvance={(effectId, rounds) => submitEffect({ kind: "advance-duration", effectId, rounds })} />}
-      {inventory && <InventoryPanel inventory={inventory} disabled={commandDisabled} onReviewChange={setInventoryReview} describeItem={describeItem} onCommand={submitInventory} />}
-      {inventory && <VendorSellPanel inventory={inventory} disabled={commandDisabled} describeItem={describeItem} onRequestQuote={requestSaleQuote} onSell={(quoteId) => submitEconomy({ type: "sell_to_shop", quoteId }, "sell")} />}
-      {wallet && <TradeInboxPanel disabled={commandDisabled} onAccept={(tradeId) => submitEconomy({ type: "accept_bilateral_trade", tradeId }, "accept-trade")} onCancel={(tradeId) => submitEconomy({ type: "cancel_bilateral_trade", tradeId }, "cancel-trade")} />}
-      {wallet && <ShopBrowser wallet={wallet} shop={shop} shopId={shopId} quote={quote} currencies={currencies} disabled={commandDisabled} itemLabel={(item) => describeItem(item).name} onLoadShop={(id) => void openShop(id)} onQuote={(id, item, quantity) => submitEconomy({ type: "request_purchase_quote", shopId: id, item, quantity }, "purchase quote", (value) => { if (value.type === "request_purchase_quote") setQuote(value.quote); })} onPurchase={(quoteId) => submitEconomy({ type: "purchase_from_shop", quoteId }, "purchase", () => setQuote(null))} />}
-      <section className="actor-section actor-actions" aria-labelledby="actor-actions-heading"><div className="actor-section-heading"><h2 id="actor-actions-heading">Recovery & exchange</h2></div><div className="button-row">{resources && <button className="ghost" type="button" disabled={commandDisabled} onClick={() => setRestOpen(true)}>Review rest</button>}{inventory && wallet && <button className="ghost" type="button" disabled={commandDisabled} onClick={() => setTradeOpen(true)}>Review trade</button>}</div></section>
-    </div>}
-    {inventory && wallet && <TradeReviewDialog open={tradeOpen} inventory={inventory} wallet={wallet} currencies={currencies} disabled={commandDisabled} itemLabel={(item) => describeItem(item).name} onClose={() => setTradeOpen(false)} onSubmit={submitTrade} />}
-    {resources && <RestDialog open={restOpen} disabled={commandDisabled} resources={resources} onClose={() => setRestOpen(false)} onSubmit={submitRest} />}
-  </section></Container>;
+  const Container = embedded ? "section" : "main",
+    Heading = embedded ? "h3" : "h1";
+  return (
+    <Container className={embedded ? "atlas-actor-tools" : "page library-page campaign-page actor-sheet-page"}>
+      <section className={embedded ? "atlas-actor-body" : "actor-sheet-shell"} aria-labelledby="actor-sheet-heading">
+        <header className={embedded ? "atlas-domain-heading" : "library-header"}>
+          <div>
+            {!embedded && (
+              <button className="back-link" type="button" onClick={onBack}>
+                ← Character workspace
+              </button>
+            )}
+            <p className="eyebrow">
+              {embedded
+                ? "SERVER-BOUND POSSESSIONS"
+                : `CHARACTER SHEET // ${sheet ? `${sheet.rulesetId} @ ${sheet.rulesetVersion}` : "SERVER STATE"}`}
+            </p>
+            <Heading ref={headingRef} tabIndex={-1} className={embedded ? undefined : "title"} id="actor-sheet-heading">
+              <bdi dir="auto">{embedded ? "Inventory & equipment" : (sheet?.sheet.name ?? "Character sheet")}</bdi>
+            </Heading>
+          </div>
+          {phase === "ready" && (
+            <div className="button-row">
+              {onOpenCombat && (
+                <button ref={combatButtonRef} className="primary" type="button" onClick={onOpenCombat}>
+                  Open combat tracker
+                </button>
+              )}
+              <button
+                className="ghost"
+                type="button"
+                onClick={() => void load()}
+                disabled={Boolean(marker || checking)}
+              >
+                Refresh sheet
+              </button>
+            </div>
+          )}
+        </header>
+        {embedded && commandDisabled && (
+          <p role="status">
+            {!canMutate
+              ? "Your current role cannot change this actor."
+              : blocked
+                ? "Finish the other room operation before changing possessions."
+                : "Review or reconcile the pending character command before another write."}
+          </p>
+        )}
+        {phase === "loading" && (
+          <section className="library-panel actor-loading" role="status">
+            Loading authoritative character state…
+          </section>
+        )}
+        {phase === "failed" && (
+          <section className="library-panel actor-loading" role="alert">
+            <p>Character sheet could not be loaded.</p>
+            <button ref={retryRef} className="ghost" type="button" onClick={() => void load(true)}>
+              Retry
+            </button>
+          </section>
+        )}
+        {phase === "ready" && (sheet || embedded) && (
+          <div className={embedded ? "atlas-actor-sections" : "actor-sheet-layout"}>
+            {(marker || commandMessage || receipt) && (
+              <section
+                className={`actor-command-status ${marker?.phase === "ambiguous" ? "is-warning" : ""}`}
+                aria-live="assertive"
+              >
+                {marker && (
+                  <p>
+                    <strong>
+                      {marker.phase === "confirmed" ? "Confirmed write awaiting refresh" : "Write outcome uncertain"}:
+                    </strong>{" "}
+                    {marker.operation}. No duplicate or automatic replay is allowed.
+                  </p>
+                )}
+                {receipt && <p>{receipt}</p>}
+                {commandMessage && <p>{commandMessage}</p>}
+                {marker && (
+                  <button className="ghost" type="button" onClick={() => void reconcile()}>
+                    Refresh authoritative state
+                  </button>
+                )}
+              </section>
+            )}
+            {confirmedResult && <ReceiptDetails result={confirmedResult} currencies={currencies} />}
+            {optionalWarning && (
+              <p className="actor-warning" role="status">
+                {optionalWarning}
+              </p>
+            )}
+            {!embedded && (
+              <form
+                className="actor-section known-actor-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void connectActor();
+                }}
+              >
+                <div className="actor-section-heading">
+                  <h2>Actor binding</h2>
+                  {actorId && <span className="status-pill">Connected</span>}
+                </div>
+                {actorId && (
+                  <p>
+                    Current campaign-provided actor: <bdi dir="auto">{actorId}</bdi>
+                  </p>
+                )}
+                <label className="field">
+                  Campaign-provided actor ID
+                  <input
+                    ref={actorInputRef}
+                    value={actorIdDraft}
+                    onChange={(event) => setActorIdDraft(event.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+                <div className="button-row">
+                  <button
+                    ref={actorCorrectionRef}
+                    className="ghost"
+                    type="submit"
+                    disabled={!resourceIdSchema.safeParse(actorIdDraft).success}
+                  >
+                    {actorId ? "Change actor" : "Load actor resources"}
+                  </button>
+                  {actorId && (
+                    <button className="ghost" type="button" onClick={disconnectActor}>
+                      Disconnect actor
+                    </button>
+                  )}
+                </div>
+                <p className="actor-help">
+                  The character-sheet route does not expose its actor binding. Enter an exact actor ID supplied by the
+                  campaign; this client never guesses one.
+                </p>
+              </form>
+            )}
+            {sheet && (
+              <>
+                <section className="actor-section actor-overview" aria-labelledby="overview-heading">
+                  <div className="actor-section-heading">
+                    <h2 id="overview-heading">Statistics & defenses</h2>
+                    <span className="status-pill">Level {sheet.progression.level}</span>
+                  </div>
+                  <dl className="actor-stat-grid">
+                    {derivedStats.map(([label, value]) => (
+                      <div key={label}>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+                <section className="actor-section" aria-labelledby="skills-heading">
+                  <div className="actor-section-heading">
+                    <h2 id="skills-heading">Skills, saves & proficiencies</h2>
+                  </div>
+                  {sheet.sheet.proficiencies.length ? (
+                    <ul className="compact-server-list">
+                      {sheet.sheet.proficiencies.map((item, index) => (
+                        <li key={`${item.category}-${index}`}>
+                          <span>{item.category}</span>
+                          <strong>{item.label}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="actor-empty">No proficiencies returned.</p>
+                  )}
+                </section>
+              </>
+            )}
+            {sheet && (
+              <KnownOptionsPanel
+                options={sheet.sheet.choices.map((choice) => ({
+                  id: choice.label,
+                  label: choice.label,
+                  selectionLabel: choice.selection.name,
+                  kind: choice.selection.kind,
+                }))}
+              />
+            )}
+            {actorId && api.getActorAttunements && api.commandActorAttunement && (
+              <MagicItemAttunementPanel
+                campaignId={campaignId}
+                actorId={actorId}
+                disabled={commandDisabled}
+                candidates={attunementCandidates}
+                api={{
+                  getActorAttunements: api.getActorAttunements,
+                  commandActorAttunement: api.commandActorAttunement,
+                }}
+              />
+            )}
+            {resources && (
+              <ResourceTrackers resources={resources.resources} disabled={commandDisabled} onAdjust={submitResource} />
+            )}
+            {actorId && (
+              <ActorChecksPanel
+                disabled={commandDisabled}
+                result={confirmedResult?.kind === "check" ? confirmedResult.value : null}
+                onSubmit={submitCheck}
+              />
+            )}
+            {actorId && (
+              <PowerLibraryPanel
+                powers={powers}
+                disabled={commandDisabled}
+                onRefresh={() => void load()}
+                onUse={submitPower}
+                result={confirmedResult?.kind === "power" ? confirmedResult.value : null}
+              />
+            )}
+            {actorId && (
+              <SpellcastingPanel
+                powers={powers}
+                disabled={commandDisabled}
+                result={confirmedResult?.kind === "spell" ? confirmedResult.value : null}
+                onCast={submitSpell}
+              />
+            )}
+            {effects && (
+              <ActorEffectsPanel
+                effects={effects}
+                disabled={commandDisabled}
+                result={confirmedResult?.kind === "effect" ? confirmedResult.value : null}
+                onApply={submitEffect}
+                onRemove={(effectId) => submitEffect({ kind: "remove", effectId })}
+                onAdvance={(effectId, rounds) => submitEffect({ kind: "advance-duration", effectId, rounds })}
+              />
+            )}
+            {inventory && (
+              <InventoryPanel
+                inventory={inventory}
+                disabled={commandDisabled}
+                onReviewChange={setInventoryReview}
+                describeItem={describeItem}
+                onCommand={submitInventory}
+              />
+            )}
+            {inventory && (
+              <VendorSellPanel
+                inventory={inventory}
+                disabled={commandDisabled}
+                describeItem={describeItem}
+                onRequestQuote={requestSaleQuote}
+                onSell={(quoteId) => submitEconomy({ type: "sell_to_shop", quoteId }, "sell")}
+              />
+            )}
+            {wallet && (
+              <TradeInboxPanel
+                disabled={commandDisabled}
+                onAccept={(tradeId) => submitEconomy({ type: "accept_bilateral_trade", tradeId }, "accept-trade")}
+                onCancel={(tradeId) => submitEconomy({ type: "cancel_bilateral_trade", tradeId }, "cancel-trade")}
+              />
+            )}
+            {wallet && (
+              <ShopBrowser
+                wallet={wallet}
+                shop={shop}
+                shopId={shopId}
+                quote={quote}
+                currencies={currencies}
+                disabled={commandDisabled}
+                itemLabel={(item) => describeItem(item).name}
+                onLoadShop={(id) => void openShop(id)}
+                onQuote={(id, item, quantity) =>
+                  submitEconomy(
+                    { type: "request_purchase_quote", shopId: id, item, quantity },
+                    "purchase quote",
+                    (value) => {
+                      if (value.type === "request_purchase_quote") setQuote(value.quote);
+                    },
+                  )
+                }
+                onPurchase={(quoteId) =>
+                  submitEconomy({ type: "purchase_from_shop", quoteId }, "purchase", () => setQuote(null))
+                }
+              />
+            )}
+            <section className="actor-section actor-actions" aria-labelledby="actor-actions-heading">
+              <div className="actor-section-heading">
+                <h2 id="actor-actions-heading">Recovery & exchange</h2>
+              </div>
+              <div className="button-row">
+                {resources && (
+                  <button className="ghost" type="button" disabled={commandDisabled} onClick={() => setRestOpen(true)}>
+                    Review rest
+                  </button>
+                )}
+                {inventory && wallet && (
+                  <button className="ghost" type="button" disabled={commandDisabled} onClick={() => setTradeOpen(true)}>
+                    Review trade
+                  </button>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+        {inventory && wallet && (
+          <TradeReviewDialog
+            open={tradeOpen}
+            inventory={inventory}
+            wallet={wallet}
+            currencies={currencies}
+            disabled={commandDisabled}
+            itemLabel={(item) => describeItem(item).name}
+            onClose={() => setTradeOpen(false)}
+            onSubmit={submitTrade}
+          />
+        )}
+        {resources && (
+          <RestDialog
+            open={restOpen}
+            disabled={commandDisabled}
+            resources={resources}
+            onClose={() => setRestOpen(false)}
+            onSubmit={submitRest}
+          />
+        )}
+      </section>
+    </Container>
+  );
 }

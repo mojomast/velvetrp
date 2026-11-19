@@ -496,9 +496,31 @@ export interface UsageSummary {
   estimatedTokens: number;
   estimatedCostUsd: number | null;
   pricing: ProviderPricing;
-  byKind: Array<{ kind: string; calls: number; promptTokens: number; completionTokens: number; totalTokens: number; estimatedCostUsd: number | null }>;
-  byModel: Array<{ model: string; calls: number; promptTokens: number; completionTokens: number; totalTokens: number; estimatedCostUsd: number | null }>;
-  bySession: Array<{ sessionId: string; title: string; calls: number; promptTokens: number; completionTokens: number; totalTokens: number; estimatedCostUsd: number | null }>;
+  byKind: Array<{
+    kind: string;
+    calls: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    estimatedCostUsd: number | null;
+  }>;
+  byModel: Array<{
+    model: string;
+    calls: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    estimatedCostUsd: number | null;
+  }>;
+  bySession: Array<{
+    sessionId: string;
+    title: string;
+    calls: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    estimatedCostUsd: number | null;
+  }>;
 }
 
 export interface PolicyResult {

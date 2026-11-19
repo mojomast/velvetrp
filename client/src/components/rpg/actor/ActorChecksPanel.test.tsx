@@ -28,8 +28,20 @@ describe("ActorChecksPanel", () => {
   });
 
   it("renders the authoritative outcome and revision", () => {
-    render(<ActorChecksPanel result={{ check: { terms: [], modifier: 2, total: 14, target: { kind: "difficulty_class", value: 12 }, outcome: "success" },
-      receipt: { idempotencyKey: "k", revisionBefore: 3, revisionAfter: 4, occurredAt: "2030-01-01T00:00:00.000Z" } }} />);
+    render(
+      <ActorChecksPanel
+        result={{
+          check: {
+            terms: [],
+            modifier: 2,
+            total: 14,
+            target: { kind: "difficulty_class", value: 12 },
+            outcome: "success",
+          },
+          receipt: { idempotencyKey: "k", revisionBefore: 3, revisionAfter: 4, occurredAt: "2030-01-01T00:00:00.000Z" },
+        }}
+      />,
+    );
     expect(screen.getByText("success")).toBeTruthy();
     expect(screen.getByText("14")).toBeTruthy();
     expect(screen.getByText("3 → 4")).toBeTruthy();

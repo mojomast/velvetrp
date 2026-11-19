@@ -57,7 +57,8 @@ describe("CopySqlAssets", () => {
     const referenced = [...schema.matchAll(/["'`]\.\/([A-Za-z0-9_-]+\.sql)["'`]/g)].map((m) => m[1]);
     assert.ok(referenced.length >= 11, `expected schema.ts to reference the SQL files, found ${referenced.length}`);
     const present = new Set(readdirSync(path.join(SERVER, "src", "repo", "db")).filter((f) => f.endsWith(".sql")));
-    for (const name of referenced) assert.ok(present.has(name), `${name} must live in src/repo/db so the glob copies it`);
+    for (const name of referenced)
+      assert.ok(present.has(name), `${name} must live in src/repo/db so the glob copies it`);
   });
 
   it("test_build_script_has_no_hand_kept_sql_list", () => {
@@ -91,7 +92,10 @@ function smoke(source, extraEnv = {}, timeoutMs = 8000) {
   writeFileSync(entry, source);
   const started = Date.now();
   const result = spawnSync(process.execPath, [SMOKE, "--entry", entry, "--timeout-ms", String(timeoutMs)], {
-    cwd: SERVER, env: { ...process.env, ...extraEnv }, encoding: "utf8", timeout: 60000,
+    cwd: SERVER,
+    env: { ...process.env, ...extraEnv },
+    encoding: "utf8",
+    timeout: 60000,
   });
   rmSync(dir, { recursive: true, force: true });
   return { ...result, elapsed: Date.now() - started };
@@ -117,7 +121,10 @@ describe("SmokeDist", () => {
   it("test_fails_fast_when_the_server_crashes_on_start", () => {
     const result = smoke(FAKE_CRASH, {}, 20000);
     assert.notEqual(result.status, 0);
-    assert.ok(result.elapsed < 15000, `should fail when the child exits, not wait for the timeout (took ${result.elapsed}ms)`);
+    assert.ok(
+      result.elapsed < 15000,
+      `should fail when the child exits, not wait for the timeout (took ${result.elapsed}ms)`,
+    );
   });
 
   it("test_fails_when_health_never_answers_ok", () => {

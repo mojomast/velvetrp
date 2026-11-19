@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { clericDefinition, clericLevels, clericSubclasses } from "../src/content/srdStarter/classes/cleric.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -36,7 +40,11 @@ describe("SRD 5.1 Cleric class", () => {
 
   it("grants the d8 hit die and the prepared spells at level 1", () => {
     const parsed = classLevelCatalogDefinitionSchema.parse(levels[0]);
-    expect(parsed.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 });
+    expect(parsed.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d8",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
     expect(parsed.mechanics.preparedSpellRefs?.map((spell) => spell.definitionId)).toEqual([
       "srd-5.1:spell:bless",
       "srd-5.1:spell:cure-wounds",
@@ -49,7 +57,9 @@ describe("SRD 5.1 Cleric class", () => {
     const choice = parsed.mechanics.progressionChoices?.find((candidate) => candidate.kind === "subclass");
     expect(choice).toBeDefined();
     expect(choice?.kind === "subclass" ? choice.choiceId : undefined).toBe("cleric-subclass");
-    expect(choice?.kind === "subclass" ? choice.options[0]?.definitionId : undefined).toBe("srd-5.1:subclass:life-domain");
+    expect(choice?.kind === "subclass" ? choice.options[0]?.definitionId : undefined).toBe(
+      "srd-5.1:subclass:life-domain",
+    );
   });
 
   it("parses the Life Domain subclass bound to the Cleric class", () => {

@@ -1,8 +1,15 @@
 import type { AbilityId } from "../../../rulesets/types.js";
 import {
-  resolveMonsterAttack, resolveMonsterSave, rollMonsterRecharge,
-  type MonsterActionPlan, type MonsterAttackStep, type MonsterRechargePlan, type MonsterRechargeResolution,
-  type MonsterRng, type MonsterSavePlan, type MonsterSaveRider,
+  resolveMonsterAttack,
+  resolveMonsterSave,
+  rollMonsterRecharge,
+  type MonsterActionPlan,
+  type MonsterAttackStep,
+  type MonsterRechargePlan,
+  type MonsterRechargeResolution,
+  type MonsterRng,
+  type MonsterSavePlan,
+  type MonsterSaveRider,
 } from "../../../rulesets/dnd5e/monsters.js";
 
 /**
@@ -51,10 +58,11 @@ export type MonsterAttackOutcome = Readonly<{
   rider?: MonsterSaveOutcome;
 }>;
 
-export type MonsterSaveActionOutcome = MonsterSaveOutcome & Readonly<{
-  kind: "save";
-  targetId: string;
-}>;
+export type MonsterSaveActionOutcome = MonsterSaveOutcome &
+  Readonly<{
+    kind: "save";
+    targetId: string;
+  }>;
 
 export type MonsterActionReceipt = Readonly<{
   encounterId: string;
@@ -76,27 +84,35 @@ export type MonsterRechargeTurn = Readonly<{
 }>;
 
 function rollDamageDie(count: number, sides: number, rng: MonsterRng): readonly number[] {
-  return Object.freeze(Array.from({ length: count }, () => {
-    const roll = rng.integer(1, sides + 1);
-    if (!Number.isInteger(roll) || roll < 1 || roll > sides) throw new Error("monster rider RNG returned an out-of-range die");
-    return roll;
-  }));
+  return Object.freeze(
+    Array.from({ length: count }, () => {
+      const roll = rng.integer(1, sides + 1);
+      if (!Number.isInteger(roll) || roll < 1 || roll > sides)
+        throw new Error("monster rider RNG returned an out-of-range die");
+      return roll;
+    }),
+  );
 }
 
 /** Applies the save riders selected by a save resolution, rolling damage dice via RNG. */
-export function applyMonsterRiders(riders: readonly MonsterSaveRider[], rng: MonsterRng): readonly MonsterRiderApplication[] {
-  return Object.freeze(riders.map((rider): MonsterRiderApplication => {
-    if (rider.kind === "condition") {
-      return Object.freeze({
-        kind: "condition",
-        condition: rider.condition,
-        ...(rider.durationRounds !== undefined ? { durationRounds: rider.durationRounds } : {}),
-      });
-    }
-    const damageRolls = rollDamageDie(rider.damageDie.count, rider.damageDie.sides, rng);
-    const damage = damageRolls.reduce((sum, roll) => sum + roll, 0) + rider.damageModifier;
-    return Object.freeze({ kind: "damage", damageType: rider.damageType, damageRolls, damage: Math.max(0, damage) });
-  }));
+export function applyMonsterRiders(
+  riders: readonly MonsterSaveRider[],
+  rng: MonsterRng,
+): readonly MonsterRiderApplication[] {
+  return Object.freeze(
+    riders.map((rider): MonsterRiderApplication => {
+      if (rider.kind === "condition") {
+        return Object.freeze({
+          kind: "condition",
+          condition: rider.condition,
+          ...(rider.durationRounds !== undefined ? { durationRounds: rider.durationRounds } : {}),
+        });
+      }
+      const damageRolls = rollDamageDie(rider.damageDie.count, rider.damageDie.sides, rng);
+      const damage = damageRolls.reduce((sum, roll) => sum + roll, 0) + rider.damageModifier;
+      return Object.freeze({ kind: "damage", damageType: rider.damageType, damageRolls, damage: Math.max(0, damage) });
+    }),
+  );
 }
 
 /**
@@ -104,11 +120,13 @@ export function applyMonsterRiders(riders: readonly MonsterSaveRider[], rng: Mon
  * unspent ability stays ready without consuming a roll; a spent ability is
  * only restored when its roll lands inside the range.
  */
-export function beginMonsterTurn(input: Readonly<{
-  plans: readonly MonsterRechargePlan[];
-  spent: readonly string[];
-  rng: MonsterRng;
-}>): MonsterRechargeTurn {
+export function beginMonsterTurn(
+  input: Readonly<{
+    plans: readonly MonsterRechargePlan[];
+    spent: readonly string[];
+    rng: MonsterRng;
+  }>,
+): MonsterRechargeTurn {
   const spentSet = new Set(input.spent);
   const recharges: MonsterRechargeResolution[] = [];
   for (const plan of input.plans) {
@@ -129,9 +147,15 @@ export function spendMonsterAbility(spent: readonly string[], abilityId: string)
   return Object.freeze([...new Set([...spent, abilityId])]);
 }
 
-function resolveSavePlan(plan: MonsterSavePlan, target: MonsterTargetState, rng: MonsterRng, targetId: string): MonsterSaveActionOutcome {
+function resolveSavePlan(
+  plan: MonsterSavePlan,
+  target: MonsterTargetState,
+  rng: MonsterRng,
+  targetId: string,
+): MonsterSaveActionOutcome {
   const roll = rng.integer(1, 21);
-  if (!Number.isInteger(roll) || roll < 1 || roll > 20) throw new Error("monster save RNG returned an out-of-range d20");
+  if (!Number.isInteger(roll) || roll < 1 || roll > 20)
+    throw new Error("monster save RNG returned an out-of-range d20");
   const resolution = resolveMonsterSave(plan, { rolls: [roll], saveBonus: target.saveBonus });
   return Object.freeze({
     kind: "save" as const,
@@ -147,7 +171,12 @@ function resolveSavePlan(plan: MonsterSavePlan, target: MonsterTargetState, rng:
   });
 }
 
-function attackOutcome(stepIndex: number, step: MonsterAttackStep, target: MonsterTargetState, rng: MonsterRng): MonsterAttackOutcome {
+function attackOutcome(
+  stepIndex: number,
+  step: MonsterAttackStep,
+  target: MonsterTargetState,
+  rng: MonsterRng,
+): MonsterAttackOutcome {
   const resolution = resolveMonsterAttack(step, { armorClass: target.armorClass, rng });
   return Object.freeze({
     kind: "attack" as const,
@@ -172,17 +201,19 @@ function attackOutcome(stepIndex: number, step: MonsterAttackStep, target: Monst
  * on-hit save rider; a save action forces a saving throw and applies its
  * failure/partial riders.
  */
-export function executeMonsterAction(input: Readonly<{
-  encounterId: string;
-  combatantId: string;
-  round: number;
-  actionId: string;
-  legalActionId: string;
-  plan: MonsterActionPlan;
-  target: MonsterTargetState;
-  rng: MonsterRng;
-  recharge?: readonly MonsterRechargeResolution[];
-}>): MonsterActionReceipt {
+export function executeMonsterAction(
+  input: Readonly<{
+    encounterId: string;
+    combatantId: string;
+    round: number;
+    actionId: string;
+    legalActionId: string;
+    plan: MonsterActionPlan;
+    target: MonsterTargetState;
+    rng: MonsterRng;
+    recharge?: readonly MonsterRechargeResolution[];
+  }>,
+): MonsterActionReceipt {
   const { plan, target, rng } = input;
   let outcomes: readonly (MonsterAttackOutcome | MonsterSaveActionOutcome)[];
   if (plan.kind === "multiattack") {

@@ -3,24 +3,49 @@ import { canonicalAgentJson } from "@velvet/contracts";
 import { getRepositoryDatabase } from "./repoContext.js";
 
 export interface RecordSystemOneDecisionInput {
-  decisionId: string; lane: string;
-  campaignId?: string | null; sessionId?: string | null; turnId?: string | null;
-  provider: string; model: string; confidencePolicyVersion: string;
-  state: unknown; questions: unknown; answers: unknown; selection: unknown;
+  decisionId: string;
+  lane: string;
+  campaignId?: string | null;
+  sessionId?: string | null;
+  turnId?: string | null;
+  provider: string;
+  model: string;
+  confidencePolicyVersion: string;
+  state: unknown;
+  questions: unknown;
+  answers: unknown;
+  selection: unknown;
   confidenceBand: "act" | "confirm" | "fallback";
-  fallbackUsed: boolean; shadow: boolean;
-  usage: unknown | null; latencyMs: number; createdAt: string;
+  fallbackUsed: boolean;
+  shadow: boolean;
+  usage: unknown | null;
+  latencyMs: number;
+  createdAt: string;
 }
 
 export interface SystemOneDecisionRecord {
-  decisionId: string; lane: string;
-  campaignId: string | null; sessionId: string | null; turnId: string | null;
-  provider: string; model: string; confidencePolicyVersion: string;
-  requestDigest: string; questionsDigest: string; stateDigest: string;
-  request: unknown; questions: unknown; state: unknown; answers: unknown; selection: unknown;
+  decisionId: string;
+  lane: string;
+  campaignId: string | null;
+  sessionId: string | null;
+  turnId: string | null;
+  provider: string;
+  model: string;
+  confidencePolicyVersion: string;
+  requestDigest: string;
+  questionsDigest: string;
+  stateDigest: string;
+  request: unknown;
+  questions: unknown;
+  state: unknown;
+  answers: unknown;
+  selection: unknown;
   confidenceBand: "act" | "confirm" | "fallback";
-  fallbackUsed: boolean; shadow: boolean; usage: unknown | null;
-  latencyMs: number; createdAt: string;
+  fallbackUsed: boolean;
+  shadow: boolean;
+  usage: unknown | null;
+  latencyMs: number;
+  createdAt: string;
   /**
    * True when an `adventure_check_executions_v54` row with `origin='lane'` links this decision as
    * `system_one_decision_id`. Only joined reads (`listRecentSystemOneDecisionsWithLaneCommits`,
@@ -32,14 +57,28 @@ export interface SystemOneDecisionRecord {
 }
 
 interface SystemOneDecisionRow {
-  decision_id: string; lane: string;
-  campaign_id: string | null; session_id: string | null; turn_id: string | null;
-  provider: string; model: string; confidence_policy_version: string;
-  request_digest: string; questions_digest: string; state_digest: string;
-  request_json: string; questions_json: string; state_json: string; answers_json: string; selection_json: string;
+  decision_id: string;
+  lane: string;
+  campaign_id: string | null;
+  session_id: string | null;
+  turn_id: string | null;
+  provider: string;
+  model: string;
+  confidence_policy_version: string;
+  request_digest: string;
+  questions_digest: string;
+  state_digest: string;
+  request_json: string;
+  questions_json: string;
+  state_json: string;
+  answers_json: string;
+  selection_json: string;
   confidence_band: "act" | "confirm" | "fallback";
-  fallback_used: number; shadow: number; usage_json: string | null;
-  latency_ms: number; created_at: string;
+  fallback_used: number;
+  shadow: number;
+  usage_json: string | null;
+  latency_ms: number;
+  created_at: string;
 }
 
 export interface SystemOneDecisionSummary {
@@ -59,7 +98,10 @@ export interface SystemOneDecisionSummary {
 
 const CONFIDENCE_BANDS: ReadonlyArray<SystemOneDecisionRecord["confidenceBand"]> = ["act", "confirm", "fallback"];
 
-const sha = (value: unknown): string => createHash("sha256").update(canonicalAgentJson(value as never)).digest("hex");
+const sha = (value: unknown): string =>
+  createHash("sha256")
+    .update(canonicalAgentJson(value as never))
+    .digest("hex");
 const parseJson = (value: string): unknown => JSON.parse(value) as unknown;
 const clampLimit = (limit: number): number => Math.max(1, Math.min(1_000, Math.trunc(limit)));
 
@@ -73,16 +115,28 @@ function usageTokens(usage: unknown): { input: number; output: number } {
 
 function toRecord(row: SystemOneDecisionRow): SystemOneDecisionRecord {
   return {
-    decisionId: row.decision_id, lane: row.lane,
-    campaignId: row.campaign_id, sessionId: row.session_id, turnId: row.turn_id,
-    provider: row.provider, model: row.model, confidencePolicyVersion: row.confidence_policy_version,
-    requestDigest: row.request_digest, questionsDigest: row.questions_digest, stateDigest: row.state_digest,
-    request: parseJson(row.request_json), questions: parseJson(row.questions_json), state: parseJson(row.state_json),
-    answers: parseJson(row.answers_json), selection: parseJson(row.selection_json),
+    decisionId: row.decision_id,
+    lane: row.lane,
+    campaignId: row.campaign_id,
+    sessionId: row.session_id,
+    turnId: row.turn_id,
+    provider: row.provider,
+    model: row.model,
+    confidencePolicyVersion: row.confidence_policy_version,
+    requestDigest: row.request_digest,
+    questionsDigest: row.questions_digest,
+    stateDigest: row.state_digest,
+    request: parseJson(row.request_json),
+    questions: parseJson(row.questions_json),
+    state: parseJson(row.state_json),
+    answers: parseJson(row.answers_json),
+    selection: parseJson(row.selection_json),
     confidenceBand: row.confidence_band,
-    fallbackUsed: row.fallback_used === 1, shadow: row.shadow === 1,
+    fallbackUsed: row.fallback_used === 1,
+    shadow: row.shadow === 1,
     usage: row.usage_json === null ? null : parseJson(row.usage_json),
-    latencyMs: row.latency_ms, createdAt: row.created_at,
+    latencyMs: row.latency_ms,
+    createdAt: row.created_at,
   };
 }
 
@@ -91,19 +145,38 @@ export function recordSystemOneDecision(input: RecordSystemOneDecisionInput): vo
   const stateDigest = sha(input.state);
   const questionsDigest = sha(input.questions);
   const requestDigest = sha({ state: input.state, model: input.model, questions: input.questions });
-  getRepositoryDatabase().prepare(`INSERT INTO system_one_decisions_v1
+  getRepositoryDatabase()
+    .prepare(
+      `INSERT INTO system_one_decisions_v1
     (decision_id,lane,campaign_id,session_id,turn_id,provider,model,confidence_policy_version,
       request_digest,questions_digest,state_digest,request_json,questions_json,state_json,answers_json,
       selection_json,confidence_band,fallback_used,shadow,usage_json,latency_ms,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-    input.decisionId, input.lane, input.campaignId ?? null, input.sessionId ?? null, input.turnId ?? null,
-    input.provider, input.model, input.confidencePolicyVersion,
-    requestDigest, questionsDigest, stateDigest,
-    JSON.stringify({ state: input.state, model: input.model, questions: input.questions }),
-    JSON.stringify(input.questions), JSON.stringify(input.state), JSON.stringify(input.answers), JSON.stringify(input.selection),
-    input.confidenceBand, input.fallbackUsed ? 1 : 0, input.shadow ? 1 : 0,
-    input.usage === null ? null : JSON.stringify(input.usage), input.latencyMs, input.createdAt,
-  );
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    .run(
+      input.decisionId,
+      input.lane,
+      input.campaignId ?? null,
+      input.sessionId ?? null,
+      input.turnId ?? null,
+      input.provider,
+      input.model,
+      input.confidencePolicyVersion,
+      requestDigest,
+      questionsDigest,
+      stateDigest,
+      JSON.stringify({ state: input.state, model: input.model, questions: input.questions }),
+      JSON.stringify(input.questions),
+      JSON.stringify(input.state),
+      JSON.stringify(input.answers),
+      JSON.stringify(input.selection),
+      input.confidenceBand,
+      input.fallbackUsed ? 1 : 0,
+      input.shadow ? 1 : 0,
+      input.usage === null ? null : JSON.stringify(input.usage),
+      input.latencyMs,
+      input.createdAt,
+    );
 }
 
 export function getSystemOneDecision(decisionId: string): SystemOneDecisionRecord | null {
@@ -163,9 +236,12 @@ export function listLaneCommittedSystemOneDecisionIds(decisionIds: readonly stri
     let foundTable = false;
     for (const table of laneTables) {
       try {
-        const rows = db.prepare(`SELECT DISTINCT system_one_decision_id AS decision_id
+        const rows = db
+          .prepare(
+            `SELECT DISTINCT system_one_decision_id AS decision_id
           FROM ${table}
-          WHERE origin='lane' AND system_one_decision_id IN (${placeholders})`)
+          WHERE origin='lane' AND system_one_decision_id IN (${placeholders})`,
+          )
           .all(...batch) as Array<{ decision_id: string }>;
         foundTable = true;
         for (const row of rows) committed.add(row.decision_id);
@@ -207,9 +283,11 @@ function proposalCandidateIds(proposalJson: string | null): string[] | null {
     const parsed = JSON.parse(proposalJson) as unknown;
     if (parsed === null || parsed === undefined) return null;
     const composition = Array.isArray(parsed) ? parsed : [parsed];
-    return composition.flatMap((item) => item && typeof item === "object" && typeof (item as { candidateId?: unknown }).candidateId === "string"
-      ? [(item as { candidateId: string }).candidateId]
-      : []);
+    return composition.flatMap((item) =>
+      item && typeof item === "object" && typeof (item as { candidateId?: unknown }).candidateId === "string"
+        ? [(item as { candidateId: string }).candidateId]
+        : [],
+    );
   } catch {
     return null;
   }
@@ -226,7 +304,9 @@ export function listDirectorDecisionsWithAuthority(limit: number): DirectorDecis
   let rows: SystemOneDecisionRow[];
   try {
     rows = getRepositoryDatabase()
-      .prepare("SELECT * FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC,decision_id DESC LIMIT ?")
+      .prepare(
+        "SELECT * FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC,decision_id DESC LIMIT ?",
+      )
       .all(bounded) as SystemOneDecisionRow[];
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -241,7 +321,11 @@ export function listDirectorDecisionsWithAuthority(limit: number): DirectorDecis
         .prepare("SELECT proposal_json FROM dm_runs WHERE run_id=?")
         .get(decision.turnId) as { proposal_json: string | null } | undefined;
       if (!run) return { decision, authoritativeCandidateIds: null, authoritativeMissing: true };
-      return { decision, authoritativeCandidateIds: proposalCandidateIds(run.proposal_json), authoritativeMissing: false };
+      return {
+        decision,
+        authoritativeCandidateIds: proposalCandidateIds(run.proposal_json),
+        authoritativeMissing: false,
+      };
     } catch {
       return { decision, authoritativeCandidateIds: null, authoritativeMissing: true };
     }
@@ -297,10 +381,13 @@ export function summarizeSystemOneDecisions(limit = 1_000): SystemOneDecisionSum
 export function assertSystemOneDecisionIntegrity(decisionId: string): void {
   const record = getSystemOneDecision(decisionId);
   if (!record) throw new Error("system one decision is missing");
-  if (sha(record.state) !== record.stateDigest
-    || sha(record.questions) !== record.questionsDigest
-    || sha({ state: record.state, model: record.model, questions: record.questions }) !== record.requestDigest) {
+  if (
+    sha(record.state) !== record.stateDigest ||
+    sha(record.questions) !== record.questionsDigest ||
+    sha({ state: record.state, model: record.model, questions: record.questions }) !== record.requestDigest
+  ) {
     throw new Error("system one decision digest mismatch");
   }
-  if (!CONFIDENCE_BANDS.includes(record.confidenceBand)) throw new Error("system one decision confidence band is invalid");
+  if (!CONFIDENCE_BANDS.includes(record.confidenceBand))
+    throw new Error("system one decision confidence band is invalid");
 }

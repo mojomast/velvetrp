@@ -17,7 +17,8 @@ export function createCampaignEventProjectionRepo(eventReadRepository: CampaignE
       if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PUBLIC_CAMPAIGN_EVENT_PAGE_SIZE) {
         throw new RangeError(`campaign event limit must be between 1 and ${MAX_PUBLIC_CAMPAIGN_EVENT_PAGE_SIZE}`);
       }
-      const visible = eventReadRepository.listCampaignEvents(actorPrincipalId, campaignId, timelineId)
+      const visible = eventReadRepository
+        .listCampaignEvents(actorPrincipalId, campaignId, timelineId)
         .filter((event) => event.revision > cursor);
       const events = visible.slice(0, limit);
       return { events, nextAfterRevision: visible.length > events.length ? events.at(-1)!.revision : null };

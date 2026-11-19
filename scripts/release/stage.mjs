@@ -10,7 +10,17 @@
 // so the output can be moved, zipped and unzipped anywhere.
 // Run after `npm ci && npm run build` from the repository root.
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  rmdirSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -35,11 +45,17 @@ export function stage(outDir, { from = root, install = true } = {}) {
     copy(path.join(workspace, "package.json"));
     copy(path.join(workspace, "dist"));
   }
-  writeFileSync(path.join(out, "start.sh"), "#!/bin/sh\ncd \"$(dirname \"$0\")\" && exec node server/dist/index.js \"$@\"\n", { mode: 0o755 });
-  writeFileSync(path.join(out, "start.cmd"), "@echo off\r\ncd /d \"%~dp0\"\r\nnode server\\dist\\index.js %*\r\n");
+  writeFileSync(
+    path.join(out, "start.sh"),
+    '#!/bin/sh\ncd "$(dirname "$0")" && exec node server/dist/index.js "$@"\n',
+    { mode: 0o755 },
+  );
+  writeFileSync(path.join(out, "start.cmd"), '@echo off\r\ncd /d "%~dp0"\r\nnode server\\dist\\index.js %*\r\n');
   if (install) {
     const result = spawnSync("npm", ["ci", "--omit=dev", "--no-audit", "--no-fund"], {
-      cwd: out, stdio: "inherit", shell: process.platform === "win32",
+      cwd: out,
+      stdio: "inherit",
+      shell: process.platform === "win32",
     });
     if (result.status !== 0) throw new Error(`npm ci --omit=dev failed in ${out}`);
     materializeWorkspaceLinks(out);
@@ -52,7 +68,13 @@ export function materializeWorkspaceLinks(out) {
   const modules = path.join(out, "node_modules");
   const isLink = (target) => lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink() ?? false;
   // A Windows junction is removed with rmdir; a POSIX symlink with unlink. Neither touches the target.
-  const removeLink = (target) => { try { unlinkSync(target); } catch { rmdirSync(target); } };
+  const removeLink = (target) => {
+    try {
+      unlinkSync(target);
+    } catch {
+      rmdirSync(target);
+    }
+  };
   for (const name of ["velvet-mvp-server", "velvet-mvp-client"]) {
     const link = path.join(modules, name);
     if (isLink(link)) removeLink(link);
@@ -65,9 +87,13 @@ export function materializeWorkspaceLinks(out) {
       if (existsSync(source)) cpSync(source, path.join(contracts, entry), { recursive: true });
     }
   }
-  const remaining = readdirSync(modules, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isSymbolicLink() && !entry.parentPath.includes(`${path.sep}.bin`));
-  if (remaining.length) throw new Error(`unexpected links in staged node_modules: ${remaining.map((e) => path.join(e.parentPath, e.name)).join(", ")}`);
+  const remaining = readdirSync(modules, { recursive: true, withFileTypes: true }).filter(
+    (entry) => entry.isSymbolicLink() && !entry.parentPath.includes(`${path.sep}.bin`),
+  );
+  if (remaining.length)
+    throw new Error(
+      `unexpected links in staged node_modules: ${remaining.map((e) => path.join(e.parentPath, e.name)).join(", ")}`,
+    );
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

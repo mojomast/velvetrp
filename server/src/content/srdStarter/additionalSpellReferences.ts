@@ -11,7 +11,8 @@ export function buildAdditionalSpellReferences(refs: StarterReferences) {
       // 30 daily castings) has no contract duration value; do not approximate it.
       reference: refs.ref("spell", "srd-5.1:spell:forbiddance"),
       name: "Forbiddance",
-      description: "A ritual ward blocks teleportation, portals, and planar travel into an area and damages selected creature types. Casting takes 10 minutes, its range is touch, and its duration is 1 day without concentration. Casting it daily for 30 days in the same location makes it last until dispelled and consumes the material components on the final casting. This is an inert spell reference; warding, damage, passwords, repeated casting, and component consumption are not executable in this bounded pack.",
+      description:
+        "A ritual ward blocks teleportation, portals, and planar travel into an area and damages selected creature types. Casting takes 10 minutes, its range is touch, and its duration is 1 day without concentration. Casting it daily for 30 days in the same location makes it last until dispelled and consumes the material components on the final casting. This is an inert spell reference; warding, damage, passwords, repeated casting, and component consumption are not executable in this bounded pack.",
       tags: ["srd-5.1", "level-6", "metadata-only", "unsupported-runtime", "cleric"],
       mechanics: {
         level: 6,
@@ -40,7 +41,8 @@ export function buildAdditionalSpellReferences(refs: StarterReferences) {
       // retain the exact ten-minute upper limit descriptively, without runtime effects.
       reference: refs.ref("spell", "srd-5.1:spell:wall-of-thorns"),
       name: "Wall of Thorns",
-      description: "You create a wall of thorn-covered brush on a solid surface within 120 feet. The wall blocks line of sight, slows movement through it, and deals damage with Dexterity saving throws when it appears and when creatures first enter it on a turn or end their turns there. Its duration is concentration, up to 10 minutes. This is an inert spell reference; wall geometry, movement, damage, saving throws, and higher-level scaling are not executable in this bounded pack.",
+      description:
+        "You create a wall of thorn-covered brush on a solid surface within 120 feet. The wall blocks line of sight, slows movement through it, and deals damage with Dexterity saving throws when it appears and when creatures first enter it on a turn or end their turns there. Its duration is concentration, up to 10 minutes. This is an inert spell reference; wall geometry, movement, damage, saving throws, and higher-level scaling are not executable in this bounded pack.",
       tags: ["srd-5.1", "level-6", "metadata-only", "unsupported-runtime", "druid"],
       mechanics: {
         level: 6,

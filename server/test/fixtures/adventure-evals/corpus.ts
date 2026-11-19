@@ -21,13 +21,7 @@ export const ADVENTURE_EVAL_CORPUS_VERSION = "adventure-evals-v1" as const;
 
 /** The distinct failure modes the L2 lane must separate, plus live-derived harvested cases. */
 export type AdventureEvalCategory =
-  | "direct-match"
-  | "ambiguous"
-  | "multi-family"
-  | "unsupported"
-  | "unadvertised"
-  | "small-talk"
-  | "harvested";
+  "direct-match" | "ambiguous" | "multi-family" | "unsupported" | "unadvertised" | "small-talk" | "harvested";
 
 /** One hand-labeled declaration projected against the candidates a turn advertised. */
 export interface AdventureEvalCase {
@@ -134,9 +128,7 @@ export const ADVENTURE_EVAL_CASES: readonly AdventureEvalCase[] = [
     category: "direct-match",
     holdout: false,
     declaration: "The training is done; I advance to level 3.",
-    candidates: [
-      candidate("level:advance-11", "d011", PROGRESSION, "Advance to level 3"),
-    ],
+    candidates: [candidate("level:advance-11", "d011", PROGRESSION, "Advance to level 3")],
     expected: { preferred: "level:advance-11", acceptable: ["level:advance-11"] },
   },
 
@@ -231,7 +223,12 @@ export const ADVENTURE_EVAL_CASES: readonly AdventureEvalCase[] = [
     declaration: "I put my shoulder to the mill gate and force it open.",
     candidates: [
       candidate("travel:mill-27", "d027", TRAVEL, "Travel to the mill"),
-      candidate("check:force-gate-28", "d028", CHECK, "Strength (Athletics), Easy difficulty, normal — force the mill gate"),
+      candidate(
+        "check:force-gate-28",
+        "d028",
+        CHECK,
+        "Strength (Athletics), Easy difficulty, normal — force the mill gate",
+      ),
     ],
     // Travel to the mill is the plausible confident wrong pick; forcing the gate is the check.
     expected: { preferred: "check:force-gate-28", acceptable: ["check:force-gate-28"] },

@@ -72,72 +72,109 @@ interface CommandRetryRow extends CampaignCommandRow {
 }
 
 function commandRowMatchesEnvelope(row: CampaignCommandRow, envelope: CommandEnvelope): boolean {
-  return envelope.command.type === "set_actor_attribute"
-    && row.campaign_id === envelope.campaignId
-    && row.command_id === envelope.commandId
-    && row.idempotency_key === envelope.idempotencyKey
-    && row.timeline_id === envelope.timelineId
-    && row.actor_id === envelope.actorId
-    && row.expected_revision === envelope.expectedRevision
-    && row.source_turn_id === envelope.sourceTurnId
-    && row.type === envelope.command.type
-    && row.attribute_id === envelope.command.payload.attributeId
-    && row.value === envelope.command.payload.value
-    && row.resource_name === null
-    && row.resource_current === null
-    && row.resource_max === null
-    && row.dice_expression === null && row.dice_count === null && row.dice_sides === null
-    && row.dice_selection_type === null && row.dice_selection_count === null && row.dice_modifier === null;
+  return (
+    envelope.command.type === "set_actor_attribute" &&
+    row.campaign_id === envelope.campaignId &&
+    row.command_id === envelope.commandId &&
+    row.idempotency_key === envelope.idempotencyKey &&
+    row.timeline_id === envelope.timelineId &&
+    row.actor_id === envelope.actorId &&
+    row.expected_revision === envelope.expectedRevision &&
+    row.source_turn_id === envelope.sourceTurnId &&
+    row.type === envelope.command.type &&
+    row.attribute_id === envelope.command.payload.attributeId &&
+    row.value === envelope.command.payload.value &&
+    row.resource_name === null &&
+    row.resource_current === null &&
+    row.resource_max === null &&
+    row.dice_expression === null &&
+    row.dice_count === null &&
+    row.dice_sides === null &&
+    row.dice_selection_type === null &&
+    row.dice_selection_count === null &&
+    row.dice_modifier === null
+  );
 }
 
 function commandRowMatchesResourceEnvelope(row: CampaignCommandRow, envelope: CommandEnvelope): boolean {
-  return envelope.command.type === "initialize_actor_resource"
-    && row.campaign_id === envelope.campaignId
-    && row.command_id === envelope.commandId
-    && row.idempotency_key === envelope.idempotencyKey
-    && row.timeline_id === envelope.timelineId
-    && row.actor_id === envelope.actorId
-    && row.expected_revision === envelope.expectedRevision
-    && row.source_turn_id === envelope.sourceTurnId
-    && row.type === envelope.command.type
-    && row.attribute_id === null
-    && row.value === null
-    && row.resource_name === envelope.command.payload.name
-    && row.resource_current === envelope.command.payload.current
-    && row.resource_max === envelope.command.payload.max
-    && row.dice_expression === null && row.dice_count === null && row.dice_sides === null
-    && row.dice_selection_type === null && row.dice_selection_count === null && row.dice_modifier === null;
+  return (
+    envelope.command.type === "initialize_actor_resource" &&
+    row.campaign_id === envelope.campaignId &&
+    row.command_id === envelope.commandId &&
+    row.idempotency_key === envelope.idempotencyKey &&
+    row.timeline_id === envelope.timelineId &&
+    row.actor_id === envelope.actorId &&
+    row.expected_revision === envelope.expectedRevision &&
+    row.source_turn_id === envelope.sourceTurnId &&
+    row.type === envelope.command.type &&
+    row.attribute_id === null &&
+    row.value === null &&
+    row.resource_name === envelope.command.payload.name &&
+    row.resource_current === envelope.command.payload.current &&
+    row.resource_max === envelope.command.payload.max &&
+    row.dice_expression === null &&
+    row.dice_count === null &&
+    row.dice_sides === null &&
+    row.dice_selection_type === null &&
+    row.dice_selection_count === null &&
+    row.dice_modifier === null
+  );
 }
 
 function commandRowMatchesDiceEnvelope(row: CampaignCommandRow, envelope: CommandEnvelope): boolean {
   if (envelope.command.type !== "roll_actor_dice") return false;
   const normalized = parseDiceExpression(envelope.command.payload.expression);
-  const selectionCount = normalized.selection.type === "keep_highest"
-    || normalized.selection.type === "keep_lowest" ? normalized.selection.count : null;
-  return row.campaign_id === envelope.campaignId && row.command_id === envelope.commandId
-    && row.idempotency_key === envelope.idempotencyKey && row.timeline_id === envelope.timelineId
-    && row.actor_id === envelope.actorId && row.expected_revision === envelope.expectedRevision
-    && row.source_turn_id === envelope.sourceTurnId && row.type === "roll_actor_dice"
-    && row.attribute_id === null && row.value === null && row.resource_name === null
-    && row.resource_current === null && row.resource_max === null
-    && row.dice_expression === envelope.command.payload.expression
-    && row.dice_count === normalized.count && row.dice_sides === normalized.sides
-    && row.dice_selection_type === normalized.selection.type
-    && row.dice_selection_count === selectionCount && row.dice_modifier === normalized.modifier;
+  const selectionCount =
+    normalized.selection.type === "keep_highest" || normalized.selection.type === "keep_lowest"
+      ? normalized.selection.count
+      : null;
+  return (
+    row.campaign_id === envelope.campaignId &&
+    row.command_id === envelope.commandId &&
+    row.idempotency_key === envelope.idempotencyKey &&
+    row.timeline_id === envelope.timelineId &&
+    row.actor_id === envelope.actorId &&
+    row.expected_revision === envelope.expectedRevision &&
+    row.source_turn_id === envelope.sourceTurnId &&
+    row.type === "roll_actor_dice" &&
+    row.attribute_id === null &&
+    row.value === null &&
+    row.resource_name === null &&
+    row.resource_current === null &&
+    row.resource_max === null &&
+    row.dice_expression === envelope.command.payload.expression &&
+    row.dice_count === normalized.count &&
+    row.dice_sides === normalized.sides &&
+    row.dice_selection_type === normalized.selection.type &&
+    row.dice_selection_count === selectionCount &&
+    row.dice_modifier === normalized.modifier
+  );
 }
 
 /** Rebuild an immutable prior result rather than re-running any command logic. */
 function receiptFromRetryRow(row: CommandRetryRow, envelope: CommandEnvelope): CommandReceipt {
   if (
-    row.retry_timeline_presence === null || row.retry_timeline_revision === null
-    || row.retry_actor_presence === null
-    || row.revision_before === null || row.revision_after === null || row.receipt_event_id === null
-    || row.event_id === null || row.event_campaign_id === null || row.event_command_id === null
-    || row.event_timeline_id === null || row.event_actor_id === null || row.event_type === null
-    || row.event_revision === null || row.occurred_at === null || row.event_attribute_id === null
-    || row.value_before === null || row.value_after === null
-    || row.event_resource_name !== null || row.event_resource_current !== null || row.event_resource_max !== null
-    || row.dice_roll_presence !== null
+    row.retry_timeline_presence === null ||
+    row.retry_timeline_revision === null ||
+    row.retry_actor_presence === null ||
+    row.revision_before === null ||
+    row.revision_after === null ||
+    row.receipt_event_id === null ||
+    row.event_id === null ||
+    row.event_campaign_id === null ||
+    row.event_command_id === null ||
+    row.event_timeline_id === null ||
+    row.event_actor_id === null ||
+    row.event_type === null ||
+    row.event_revision === null ||
+    row.occurred_at === null ||
+    row.event_attribute_id === null ||
+    row.value_before === null ||
+    row.value_after === null ||
+    row.event_resource_name !== null ||
+    row.event_resource_current !== null ||
+    row.event_resource_max !== null ||
+    row.dice_roll_presence !== null
   ) {
     throw new Error("set actor attribute command retry is incomplete");
   }
@@ -175,13 +212,14 @@ function receiptFromRetryRow(row: CommandRetryRow, envelope: CommandEnvelope): C
   // The receipt schema intentionally has only receipt/event invariants. A retry
   // additionally requires the stored event to be the exact result of this row.
   if (
-    event.timelineId !== envelope.timelineId || event.actorId !== envelope.actorId
-    || event.sourceTurnId !== envelope.sourceTurnId
-    || event.data.attributeId !== envelope.command.payload.attributeId
-    || event.data.valueAfter !== envelope.command.payload.value
-    || receipt.revisionBefore !== envelope.expectedRevision
-    || retryTimelineRevision < event.revision
-    || retryTimelineEventCount !== retryTimelineRevision
+    event.timelineId !== envelope.timelineId ||
+    event.actorId !== envelope.actorId ||
+    event.sourceTurnId !== envelope.sourceTurnId ||
+    event.data.attributeId !== envelope.command.payload.attributeId ||
+    event.data.valueAfter !== envelope.command.payload.value ||
+    receipt.revisionBefore !== envelope.expectedRevision ||
+    retryTimelineRevision < event.revision ||
+    retryTimelineEventCount !== retryTimelineRevision
   ) {
     throw new Error("set actor attribute command retry is invalid");
   }
@@ -203,29 +241,38 @@ function executeSetActorAttributeSync(
   const run = db.transaction(() => {
     // Authorization deliberately precedes all command identity lookups so an
     // unauthorized caller cannot discover whether a command has been used.
-    const authorized = db.prepare(`SELECT 1
+    const authorized = db
+      .prepare(
+        `SELECT 1
       FROM campaign_memberships membership
       JOIN principals principal ON principal.id = membership.principal_id
       JOIN campaigns campaign ON campaign.id = membership.campaign_id
       WHERE membership.campaign_id = ? AND membership.principal_id = ?
         AND (membership.role = 'gm' OR (
           membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id
-        ))`)
+        ))`,
+      )
       .get(envelope.campaignId, principalId);
     if (!authorized) throw new Error("set actor attribute command unavailable");
 
-    const collisions = db.prepare(`SELECT campaign_id, command_id, idempotency_key, timeline_id,
+    const collisions = db
+      .prepare(
+        `SELECT campaign_id, command_id, idempotency_key, timeline_id,
         actor_id, expected_revision, source_turn_id, type, attribute_id, value,
         resource_name, resource_current, resource_max, dice_expression, dice_count, dice_sides,
         dice_selection_type, dice_selection_count, dice_modifier
       FROM campaign_commands
       WHERE campaign_id = ? AND (command_id = ? OR idempotency_key = ?)
-      ORDER BY rowid`).all(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CampaignCommandRow[];
+      ORDER BY rowid`,
+      )
+      .all(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CampaignCommandRow[];
     if (collisions.length > 0) {
       if (collisions.length !== 1 || !commandRowMatchesEnvelope(collisions[0]!, envelope)) {
         throw new Error("set actor attribute command identity collision");
       }
-      const retry = db.prepare(`SELECT command.*,
+      const retry = db
+        .prepare(
+          `SELECT command.*,
           retry_timeline.id AS retry_timeline_presence,
           retry_timeline.revision AS retry_timeline_revision,
           ((SELECT COUNT(*) FROM campaign_timeline_events timeline_event
@@ -252,24 +299,30 @@ function executeSetActorAttributeSync(
           ON retry_timeline.campaign_id = event.campaign_id AND retry_timeline.id = event.timeline_id
         LEFT JOIN campaign_actors retry_actor
           ON retry_actor.campaign_id = event.campaign_id AND retry_actor.id = event.actor_id
-        WHERE command.campaign_id = ? AND command.command_id = ? AND command.idempotency_key = ?`)
+        WHERE command.campaign_id = ? AND command.command_id = ? AND command.idempotency_key = ?`,
+        )
         .get(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CommandRetryRow | undefined;
       if (!retry) throw new Error("set actor attribute command retry is incomplete");
       return receiptFromRetryRow(retry, envelope);
     }
 
-    const timeline = db.prepare(`SELECT timeline.revision
+    const timeline = db
+      .prepare(
+        `SELECT timeline.revision
       FROM campaigns campaign
       JOIN campaign_timelines timeline
         ON timeline.campaign_id = campaign.id AND timeline.id = campaign.active_timeline_id
-      WHERE campaign.id = ? AND campaign.active_timeline_id = ?`)
+      WHERE campaign.id = ? AND campaign.active_timeline_id = ?`,
+      )
       .get(envelope.campaignId, envelope.timelineId) as { revision: unknown } | undefined;
     if (!timeline) throw new Error("set actor attribute command timeline is inactive");
     const timelineRevision = revisionSchema.parse(timeline.revision);
     if (timelineRevision !== envelope.expectedRevision) {
       throw new Error("set actor attribute command revision does not match");
     }
-    const target = db.prepare(`SELECT actor.sheet_id, sheet.updated_at,
+    const target = db
+      .prepare(
+        `SELECT actor.sheet_id, sheet.updated_at,
         attribute.attribute_id, attribute.value
       FROM campaign_actors actor
       JOIN campaign_characters campaign_character
@@ -281,10 +334,10 @@ function executeSetActorAttributeSync(
       JOIN rpg_character_attributes attribute
         ON attribute.campaign_id = sheet.campaign_id AND attribute.sheet_id = sheet.id
           AND attribute.attribute_id = ?
-      WHERE actor.campaign_id = ? AND actor.id = ?`)
+      WHERE actor.campaign_id = ? AND actor.id = ?`,
+      )
       .get(command.payload.attributeId, envelope.campaignId, envelope.actorId) as
-      | { sheet_id: string; updated_at: string; attribute_id: string; value: number }
-      | undefined;
+      { sheet_id: string; updated_at: string; attribute_id: string; value: number } | undefined;
     if (!target) throw new Error("set actor attribute command target unavailable");
     // Treat persisted state as untrusted. These shared contract schemas keep a
     // damaged row from reaching dependency consumption or command writes.
@@ -333,42 +386,83 @@ function executeSetActorAttributeSync(
 
     // This order is part of the persistence contract and satisfies the v12
     // audit triggers without temporarily weakening any foreign key.
-    db.prepare(`INSERT INTO campaign_commands
+    db.prepare(
+      `INSERT INTO campaign_commands
       (campaign_id, command_id, idempotency_key, timeline_id, actor_id, expected_revision,
-       source_turn_id, type, attribute_id, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(envelope.campaignId, envelope.commandId, envelope.idempotencyKey, envelope.timelineId,
-        envelope.actorId, envelope.expectedRevision, envelope.sourceTurnId, command.type,
-        command.payload.attributeId, command.payload.value);
-    const attributeWrite = db.prepare(`UPDATE rpg_character_attributes SET value = ?
-      WHERE campaign_id = ? AND sheet_id = ? AND attribute_id = ? AND value = ?`)
-      .run(command.payload.value, envelope.campaignId, targetSheetId,
-        command.payload.attributeId, targetAttribute.value);
+       source_turn_id, type, attribute_id, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      envelope.campaignId,
+      envelope.commandId,
+      envelope.idempotencyKey,
+      envelope.timelineId,
+      envelope.actorId,
+      envelope.expectedRevision,
+      envelope.sourceTurnId,
+      command.type,
+      command.payload.attributeId,
+      command.payload.value,
+    );
+    const attributeWrite = db
+      .prepare(
+        `UPDATE rpg_character_attributes SET value = ?
+      WHERE campaign_id = ? AND sheet_id = ? AND attribute_id = ? AND value = ?`,
+      )
+      .run(
+        command.payload.value,
+        envelope.campaignId,
+        targetSheetId,
+        command.payload.attributeId,
+        targetAttribute.value,
+      );
     if (attributeWrite.changes !== 1) throw new Error("set actor attribute command target changed");
-    const sheetWrite = db.prepare(`UPDATE rpg_campaign_sheets SET updated_at = ?
-      WHERE campaign_id = ? AND id = ? AND updated_at = ?`)
+    const sheetWrite = db
+      .prepare(
+        `UPDATE rpg_campaign_sheets SET updated_at = ?
+      WHERE campaign_id = ? AND id = ? AND updated_at = ?`,
+      )
       .run(occurredAt, envelope.campaignId, targetSheetId, targetUpdatedAt);
     if (sheetWrite.changes !== 1) throw new Error("set actor attribute command target changed");
-    const timelineWrite = db.prepare(`UPDATE campaign_timelines SET revision = ?
-      WHERE campaign_id = ? AND id = ? AND revision = ?`)
+    const timelineWrite = db
+      .prepare(
+        `UPDATE campaign_timelines SET revision = ?
+      WHERE campaign_id = ? AND id = ? AND revision = ?`,
+      )
       .run(revisionAfter, envelope.campaignId, envelope.timelineId, envelope.expectedRevision);
     if (timelineWrite.changes !== 1) throw new Error("set actor attribute command revision changed");
-    db.prepare(`INSERT INTO campaign_events
+    db.prepare(
+      `INSERT INTO campaign_events
       (event_id, campaign_id, command_id, timeline_id, actor_id, source_turn_id, type,
        revision, occurred_at, attribute_id, value_before, value_after)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(event.eventId, event.campaignId, event.commandId, event.timelineId, event.actorId,
-        event.sourceTurnId, event.type, event.revision, event.occurredAt, event.data.attributeId,
-        event.data.valueBefore, event.data.valueAfter);
-    db.prepare(`INSERT INTO command_receipts
-      (campaign_id, command_id, revision_before, revision_after, event_id) VALUES (?, ?, ?, ?, ?)`)
-      .run(receipt.campaignId, receipt.commandId, receipt.revisionBefore, receipt.revisionAfter, event.eventId);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      event.eventId,
+      event.campaignId,
+      event.commandId,
+      event.timelineId,
+      event.actorId,
+      event.sourceTurnId,
+      event.type,
+      event.revision,
+      event.occurredAt,
+      event.data.attributeId,
+      event.data.valueBefore,
+      event.data.valueAfter,
+    );
+    db.prepare(
+      `INSERT INTO command_receipts
+      (campaign_id, command_id, revision_before, revision_after, event_id) VALUES (?, ?, ?, ?, ?)`,
+    ).run(receipt.campaignId, receipt.commandId, receipt.revisionBefore, receipt.revisionAfter, event.eventId);
     return receipt;
   });
   return run.immediate();
 }
 
-function executeRollActorDiceSync(db: DatabaseDriver.Database, dependencies: RepositoryDependencies,
-  actorPrincipalId: string, input: CommandEnvelope): CommandReceipt {
+function executeRollActorDiceSync(
+  db: DatabaseDriver.Database,
+  dependencies: RepositoryDependencies,
+  actorPrincipalId: string,
+  input: CommandEnvelope,
+): CommandReceipt {
   return executeRollActorDiceAtomic(db, dependencies, actorPrincipalId, input);
 }
 
@@ -395,20 +489,27 @@ function executeRollActorDiceForVisibleCharacterSync(
   const name = publicCampaignCharacterSummarySchema.shape.name.parse(inputBinding.name);
   const campaignCharacterId = resourceIdSchema.parse(inputBinding.campaignCharacterId);
 
-  return executeRollActorDiceAtomic(db, dependencies, actorPrincipalId, input, (envelope, principalId) => {
-    // BEGIN IMMEDIATE is already held. Roster drift cannot occur between this
-    // validation and the generic executor's RNG, identities, clock, or writes.
-    const roster = createCampaignCharacterRosterOperations(
-      db,
-      projectLegacyPersonaDisplayName,
-    ).getCampaignCharacterRoster(principalId, envelope.campaignId);
-    if (roster === null) throw new Error("roll actor dice command unavailable");
-    const current = roster.characters[position - 1];
-    if (current === undefined || current.id !== campaignCharacterId || current.name !== name) {
-      throw new CampaignDiceCharacterConflict();
-    }
+  return executeRollActorDiceAtomic(
+    db,
+    dependencies,
+    actorPrincipalId,
+    input,
+    (envelope, principalId) => {
+      // BEGIN IMMEDIATE is already held. Roster drift cannot occur between this
+      // validation and the generic executor's RNG, identities, clock, or writes.
+      const roster = createCampaignCharacterRosterOperations(
+        db,
+        projectLegacyPersonaDisplayName,
+      ).getCampaignCharacterRoster(principalId, envelope.campaignId);
+      if (roster === null) throw new Error("roll actor dice command unavailable");
+      const current = roster.characters[position - 1];
+      if (current === undefined || current.id !== campaignCharacterId || current.name !== name) {
+        throw new CampaignDiceCharacterConflict();
+      }
 
-    const ancestry = db.prepare(`SELECT actor.id AS actor_id,
+      const ancestry = db
+        .prepare(
+          `SELECT actor.id AS actor_id,
         actor.campaign_character_id, actor.campaign_id AS actor_campaign_id,
         sheet.id AS sheet_id, sheet.campaign_character_id AS sheet_campaign_character_id,
         sheet.campaign_id AS sheet_campaign_id
@@ -417,33 +518,50 @@ function executeRollActorDiceForVisibleCharacterSync(
         AND sheet.campaign_character_id=cc.id
       JOIN campaign_actors actor ON actor.campaign_id=cc.campaign_id
         AND actor.campaign_character_id=cc.id AND actor.sheet_id=sheet.id
-      WHERE cc.campaign_id=? AND cc.id=?`).all(envelope.campaignId, campaignCharacterId) as
-      LockedDiceCharacterAncestryRow[];
-    if (ancestry.length !== 1) throw new Error("campaign dice character ancestry is malformed");
-    const row = ancestry[0]!;
-    const actorId = resourceIdSchema.parse(row.actor_id);
-    resourceIdSchema.parse(row.sheet_id);
-    if (resourceIdSchema.parse(row.campaign_character_id) !== campaignCharacterId
-      || resourceIdSchema.parse(row.actor_campaign_id) !== envelope.campaignId
-      || resourceIdSchema.parse(row.sheet_campaign_character_id) !== campaignCharacterId
-      || resourceIdSchema.parse(row.sheet_campaign_id) !== envelope.campaignId) {
-      throw new Error("campaign dice character ancestry is malformed");
-    }
-    if (actorId !== envelope.actorId) throw new CampaignDiceCharacterConflict();
-  }, true);
+      WHERE cc.campaign_id=? AND cc.id=?`,
+        )
+        .all(envelope.campaignId, campaignCharacterId) as LockedDiceCharacterAncestryRow[];
+      if (ancestry.length !== 1) throw new Error("campaign dice character ancestry is malformed");
+      const row = ancestry[0]!;
+      const actorId = resourceIdSchema.parse(row.actor_id);
+      resourceIdSchema.parse(row.sheet_id);
+      if (
+        resourceIdSchema.parse(row.campaign_character_id) !== campaignCharacterId ||
+        resourceIdSchema.parse(row.actor_campaign_id) !== envelope.campaignId ||
+        resourceIdSchema.parse(row.sheet_campaign_character_id) !== campaignCharacterId ||
+        resourceIdSchema.parse(row.sheet_campaign_id) !== envelope.campaignId
+      ) {
+        throw new Error("campaign dice character ancestry is malformed");
+      }
+      if (actorId !== envelope.actorId) throw new CampaignDiceCharacterConflict();
+    },
+    true,
+  );
 }
 
 function resourceReceiptFromRetryRow(row: CommandRetryRow, envelope: CommandEnvelope): CommandReceipt {
   if (
-    row.retry_timeline_presence === null || row.retry_timeline_revision === null
-    || row.retry_actor_presence === null
-    || row.revision_before === null || row.revision_after === null || row.receipt_event_id === null
-    || row.event_id === null || row.event_campaign_id === null || row.event_command_id === null
-    || row.event_timeline_id === null || row.event_actor_id === null || row.event_type === null
-    || row.event_revision === null || row.occurred_at === null
-    || row.event_attribute_id !== null || row.value_before !== null || row.value_after !== null
-    || row.event_resource_name === null || row.event_resource_current === null || row.event_resource_max === null
-    || row.dice_roll_presence !== null
+    row.retry_timeline_presence === null ||
+    row.retry_timeline_revision === null ||
+    row.retry_actor_presence === null ||
+    row.revision_before === null ||
+    row.revision_after === null ||
+    row.receipt_event_id === null ||
+    row.event_id === null ||
+    row.event_campaign_id === null ||
+    row.event_command_id === null ||
+    row.event_timeline_id === null ||
+    row.event_actor_id === null ||
+    row.event_type === null ||
+    row.event_revision === null ||
+    row.occurred_at === null ||
+    row.event_attribute_id !== null ||
+    row.value_before !== null ||
+    row.value_after !== null ||
+    row.event_resource_name === null ||
+    row.event_resource_current === null ||
+    row.event_resource_max === null ||
+    row.dice_roll_presence !== null
   ) {
     throw new Error("initialize actor resource command retry is incomplete");
   }
@@ -479,14 +597,15 @@ function resourceReceiptFromRetryRow(row: CommandRetryRow, envelope: CommandEnve
     throw new Error("initialize actor resource command retry is invalid");
   }
   if (
-    event.timelineId !== envelope.timelineId || event.actorId !== envelope.actorId
-    || event.sourceTurnId !== envelope.sourceTurnId
-    || event.data.name !== envelope.command.payload.name
-    || event.data.current !== envelope.command.payload.current
-    || event.data.max !== envelope.command.payload.max
-    || receipt.revisionBefore !== envelope.expectedRevision
-    || retryTimelineRevision < event.revision
-    || retryTimelineEventCount !== retryTimelineRevision
+    event.timelineId !== envelope.timelineId ||
+    event.actorId !== envelope.actorId ||
+    event.sourceTurnId !== envelope.sourceTurnId ||
+    event.data.name !== envelope.command.payload.name ||
+    event.data.current !== envelope.command.payload.current ||
+    event.data.max !== envelope.command.payload.max ||
+    receipt.revisionBefore !== envelope.expectedRevision ||
+    retryTimelineRevision < event.revision ||
+    retryTimelineEventCount !== retryTimelineRevision
   ) {
     throw new Error("initialize actor resource command retry is invalid");
   }
@@ -506,29 +625,38 @@ function executeInitializeActorResourceSync(
   }
   const command = envelope.command;
   const run = db.transaction(() => {
-    const authorized = db.prepare(`SELECT 1
+    const authorized = db
+      .prepare(
+        `SELECT 1
       FROM campaign_memberships membership
       JOIN principals principal ON principal.id = membership.principal_id
       JOIN campaigns campaign ON campaign.id = membership.campaign_id
       WHERE membership.campaign_id = ? AND membership.principal_id = ?
         AND (membership.role = 'gm' OR (
           membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id
-        ))`)
+        ))`,
+      )
       .get(envelope.campaignId, principalId);
     if (!authorized) throw new Error("initialize actor resource command unavailable");
 
-    const collisions = db.prepare(`SELECT campaign_id, command_id, idempotency_key, timeline_id,
+    const collisions = db
+      .prepare(
+        `SELECT campaign_id, command_id, idempotency_key, timeline_id,
         actor_id, expected_revision, source_turn_id, type, attribute_id, value,
         resource_name, resource_current, resource_max, dice_expression, dice_count, dice_sides,
         dice_selection_type, dice_selection_count, dice_modifier
       FROM campaign_commands
       WHERE campaign_id = ? AND (command_id = ? OR idempotency_key = ?)
-      ORDER BY rowid`).all(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CampaignCommandRow[];
+      ORDER BY rowid`,
+      )
+      .all(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CampaignCommandRow[];
     if (collisions.length > 0) {
       if (collisions.length !== 1 || !commandRowMatchesResourceEnvelope(collisions[0]!, envelope)) {
         throw new Error("initialize actor resource command identity collision");
       }
-      const retry = db.prepare(`SELECT command.*,
+      const retry = db
+        .prepare(
+          `SELECT command.*,
           retry_timeline.id AS retry_timeline_presence,
           retry_timeline.revision AS retry_timeline_revision,
           ((SELECT COUNT(*) FROM campaign_timeline_events timeline_event
@@ -555,22 +683,25 @@ function executeInitializeActorResourceSync(
           ON retry_timeline.campaign_id = event.campaign_id AND retry_timeline.id = event.timeline_id
         LEFT JOIN campaign_actors retry_actor
           ON retry_actor.campaign_id = event.campaign_id AND retry_actor.id = event.actor_id
-        WHERE command.campaign_id = ? AND command.command_id = ? AND command.idempotency_key = ?`)
+        WHERE command.campaign_id = ? AND command.command_id = ? AND command.idempotency_key = ?`,
+        )
         .get(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CommandRetryRow | undefined;
       if (!retry) throw new Error("initialize actor resource command retry is incomplete");
       return resourceReceiptFromRetryRow(retry, envelope);
     }
 
-    if (command.payload.name === "health"
-        && actorHasActiveEncounter(db, envelope.campaignId, envelope.actorId)) {
+    if (command.payload.name === "health" && actorHasActiveEncounter(db, envelope.campaignId, envelope.actorId)) {
       throw new Error("active encounter health is authoritative");
     }
 
-    const timeline = db.prepare(`SELECT timeline.revision
+    const timeline = db
+      .prepare(
+        `SELECT timeline.revision
       FROM campaigns campaign
       JOIN campaign_timelines timeline
         ON timeline.campaign_id = campaign.id AND timeline.id = campaign.active_timeline_id
-      WHERE campaign.id = ? AND campaign.active_timeline_id = ?`)
+      WHERE campaign.id = ? AND campaign.active_timeline_id = ?`,
+      )
       .get(envelope.campaignId, envelope.timelineId) as { revision: unknown } | undefined;
     if (!timeline) throw new Error("initialize actor resource command timeline is inactive");
     const timelineRevision = revisionSchema.parse(timeline.revision);
@@ -578,7 +709,9 @@ function executeInitializeActorResourceSync(
       throw new Error("initialize actor resource command revision does not match");
     }
 
-    const target = db.prepare(`SELECT actor.id
+    const target = db
+      .prepare(
+        `SELECT actor.id
       FROM campaign_actors actor
       JOIN campaign_characters campaign_character
         ON campaign_character.campaign_id = actor.campaign_id
@@ -586,14 +719,17 @@ function executeInitializeActorResourceSync(
       JOIN rpg_campaign_sheets sheet
         ON sheet.campaign_id = actor.campaign_id AND sheet.id = actor.sheet_id
           AND sheet.campaign_character_id = campaign_character.id
-      WHERE actor.campaign_id = ? AND actor.id = ?`)
+      WHERE actor.campaign_id = ? AND actor.id = ?`,
+      )
       .get(envelope.campaignId, envelope.actorId) as { id: string } | undefined;
     if (!target) throw new Error("initialize actor resource command target unavailable");
     resourceIdSchema.parse(target.id);
-    const existingResource = db.prepare(`SELECT campaign_id FROM rpg_actor_resources
-      WHERE actor_id = ? AND name = ?`).get(envelope.actorId, command.payload.name) as
-      | { campaign_id: unknown }
-      | undefined;
+    const existingResource = db
+      .prepare(
+        `SELECT campaign_id FROM rpg_actor_resources
+      WHERE actor_id = ? AND name = ?`,
+      )
+      .get(envelope.actorId, command.payload.name) as { campaign_id: unknown } | undefined;
     if (existingResource) {
       if (resourceIdSchema.parse(existingResource.campaign_id) !== envelope.campaignId) {
         throw new Error("initialize actor resource command resource is invalid");
@@ -627,115 +763,219 @@ function executeInitializeActorResourceSync(
       events: [event],
     });
 
-    db.prepare(`INSERT INTO campaign_commands
+    db.prepare(
+      `INSERT INTO campaign_commands
       (campaign_id, command_id, idempotency_key, timeline_id, actor_id, expected_revision,
        source_turn_id, type, resource_name, resource_current, resource_max)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(envelope.campaignId, envelope.commandId, envelope.idempotencyKey, envelope.timelineId,
-        envelope.actorId, envelope.expectedRevision, envelope.sourceTurnId, command.type,
-        command.payload.name, command.payload.current, command.payload.max);
-    db.prepare(`INSERT INTO rpg_actor_resources (campaign_id, actor_id, name, current, max)
-      VALUES (?, ?, ?, ?, ?)`)
-      .run(envelope.campaignId, envelope.actorId, command.payload.name,
-        command.payload.current, command.payload.max);
-    const timelineWrite = db.prepare(`UPDATE campaign_timelines SET revision = ?
-      WHERE campaign_id = ? AND id = ? AND revision = ?`)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      envelope.campaignId,
+      envelope.commandId,
+      envelope.idempotencyKey,
+      envelope.timelineId,
+      envelope.actorId,
+      envelope.expectedRevision,
+      envelope.sourceTurnId,
+      command.type,
+      command.payload.name,
+      command.payload.current,
+      command.payload.max,
+    );
+    db.prepare(
+      `INSERT INTO rpg_actor_resources (campaign_id, actor_id, name, current, max)
+      VALUES (?, ?, ?, ?, ?)`,
+    ).run(envelope.campaignId, envelope.actorId, command.payload.name, command.payload.current, command.payload.max);
+    const timelineWrite = db
+      .prepare(
+        `UPDATE campaign_timelines SET revision = ?
+      WHERE campaign_id = ? AND id = ? AND revision = ?`,
+      )
       .run(revisionAfter, envelope.campaignId, envelope.timelineId, envelope.expectedRevision);
     if (timelineWrite.changes !== 1) throw new Error("initialize actor resource command revision changed");
-    db.prepare(`INSERT INTO campaign_events
+    db.prepare(
+      `INSERT INTO campaign_events
       (event_id, campaign_id, command_id, timeline_id, actor_id, source_turn_id, type,
        revision, occurred_at, resource_name, resource_current, resource_max)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(event.eventId, event.campaignId, event.commandId, event.timelineId, event.actorId,
-        event.sourceTurnId, event.type, event.revision, event.occurredAt,
-        event.data.name, event.data.current, event.data.max);
-    db.prepare(`INSERT INTO command_receipts
-      (campaign_id, command_id, revision_before, revision_after, event_id) VALUES (?, ?, ?, ?, ?)`)
-      .run(receipt.campaignId, receipt.commandId, receipt.revisionBefore, receipt.revisionAfter, event.eventId);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      event.eventId,
+      event.campaignId,
+      event.commandId,
+      event.timelineId,
+      event.actorId,
+      event.sourceTurnId,
+      event.type,
+      event.revision,
+      event.occurredAt,
+      event.data.name,
+      event.data.current,
+      event.data.max,
+    );
+    db.prepare(
+      `INSERT INTO command_receipts
+      (campaign_id, command_id, revision_before, revision_after, event_id) VALUES (?, ?, ?, ?, ?)`,
+    ).run(receipt.campaignId, receipt.commandId, receipt.revisionBefore, receipt.revisionAfter, event.eventId);
     return receipt;
   });
   return run.immediate();
 }
 
 interface DiceRetryRow extends CommandRetryRow {
-  retry_timeline_min_revision: unknown; retry_timeline_max_revision: unknown;
+  retry_timeline_min_revision: unknown;
+  retry_timeline_max_revision: unknown;
   retry_timeline_invalid_event_count: unknown;
-  retry_campaign_character_presence: string | null; retry_character_presence: string | null;
+  retry_campaign_character_presence: string | null;
+  retry_character_presence: string | null;
   retry_sheet_presence: string | null;
-  roll_event_id: string | null; roll_campaign_id: string | null; roll_command_id: string | null;
-  roll_expression: string | null; roll_dice_count: number | null; roll_dice_sides: number | null;
-  roll_selection_type: string | null; roll_selection_count: number | null;
-  roll_modifier: number | null; roll_total: number | null;
+  roll_event_id: string | null;
+  roll_campaign_id: string | null;
+  roll_command_id: string | null;
+  roll_expression: string | null;
+  roll_dice_count: number | null;
+  roll_dice_sides: number | null;
+  roll_selection_type: string | null;
+  roll_selection_count: number | null;
+  roll_modifier: number | null;
+  roll_total: number | null;
 }
 
-function diceReceiptFromRetryRow(db: DatabaseDriver.Database, row: DiceRetryRow, envelope: CommandEnvelope): CommandReceipt {
-  if (envelope.command.type !== "roll_actor_dice" || row.retry_timeline_presence === null
-      || row.retry_timeline_revision === null || row.retry_actor_presence === null
-      || row.retry_campaign_character_presence === null || row.retry_character_presence === null
-      || row.retry_sheet_presence === null
-      || row.revision_before === null || row.revision_after === null || row.receipt_event_id === null
-      || row.event_id === null || row.event_campaign_id === null || row.event_command_id === null
-      || row.event_timeline_id === null || row.event_actor_id === null || row.event_type === null
-      || row.event_revision === null || row.occurred_at === null || row.event_attribute_id !== null
-      || row.value_before !== null || row.value_after !== null || row.event_resource_name !== null
-      || row.event_resource_current !== null || row.event_resource_max !== null || row.roll_event_id === null
-      || row.roll_campaign_id === null || row.roll_command_id === null || row.roll_expression === null
-      || row.roll_dice_count === null || row.roll_dice_sides === null || row.roll_selection_type === null
-      || row.roll_modifier === null || row.roll_total === null) {
+function diceReceiptFromRetryRow(
+  db: DatabaseDriver.Database,
+  row: DiceRetryRow,
+  envelope: CommandEnvelope,
+): CommandReceipt {
+  if (
+    envelope.command.type !== "roll_actor_dice" ||
+    row.retry_timeline_presence === null ||
+    row.retry_timeline_revision === null ||
+    row.retry_actor_presence === null ||
+    row.retry_campaign_character_presence === null ||
+    row.retry_character_presence === null ||
+    row.retry_sheet_presence === null ||
+    row.revision_before === null ||
+    row.revision_after === null ||
+    row.receipt_event_id === null ||
+    row.event_id === null ||
+    row.event_campaign_id === null ||
+    row.event_command_id === null ||
+    row.event_timeline_id === null ||
+    row.event_actor_id === null ||
+    row.event_type === null ||
+    row.event_revision === null ||
+    row.occurred_at === null ||
+    row.event_attribute_id !== null ||
+    row.value_before !== null ||
+    row.value_after !== null ||
+    row.event_resource_name !== null ||
+    row.event_resource_current !== null ||
+    row.event_resource_max !== null ||
+    row.roll_event_id === null ||
+    row.roll_campaign_id === null ||
+    row.roll_command_id === null ||
+    row.roll_expression === null ||
+    row.roll_dice_count === null ||
+    row.roll_dice_sides === null ||
+    row.roll_selection_type === null ||
+    row.roll_modifier === null ||
+    row.roll_total === null
+  ) {
     throw new Error("roll actor dice command retry is incomplete");
   }
   if (row.receipt_event_id !== row.event_id || row.roll_event_id !== row.event_id) {
     throw new Error("roll actor dice command retry is invalid");
   }
-  const terms = db.prepare("SELECT position, value, kept FROM rpg_dice_terms WHERE event_id = ? ORDER BY position")
+  const terms = db
+    .prepare("SELECT position, value, kept FROM rpg_dice_terms WHERE event_id = ? ORDER BY position")
     .all(row.event_id) as Array<{ position: unknown; value: unknown; kept: unknown }>;
   const normalized = parseDiceExpression(row.roll_expression);
-  const physicalCount = normalized.selection.type === "advantage" || normalized.selection.type === "disadvantage"
-    ? 2 : normalized.count;
+  const physicalCount =
+    normalized.selection.type === "advantage" || normalized.selection.type === "disadvantage" ? 2 : normalized.count;
   if (terms.length !== physicalCount || terms.some((term, index) => term.position !== index)) {
     throw new Error("roll actor dice command retry is incomplete");
   }
   // Do not coerce corrupt SQLite values into booleans.  A database opened with
   // checks disabled can contain text, fractions, or arbitrary integers here;
   // every such row must make historical reconstruction fail closed.
-  if (terms.some((term) => typeof term.kept !== "number" || !Number.isInteger(term.kept)
-      || (term.kept !== 0 && term.kept !== 1))) {
+  if (
+    terms.some(
+      (term) => typeof term.kept !== "number" || !Number.isInteger(term.kept) || (term.kept !== 0 && term.kept !== 1),
+    )
+  ) {
     throw new Error("roll actor dice command retry is invalid");
   }
   const termData = terms.map((term) => ({ value: term.value, kept: term.kept === 1 }));
-  const selectionCount = normalized.selection.type === "keep_highest" || normalized.selection.type === "keep_lowest"
-    ? normalized.selection.count : null;
-  if (row.roll_campaign_id !== row.campaign_id || row.roll_command_id !== row.command_id
-      || row.roll_dice_count !== normalized.count || row.roll_dice_sides !== normalized.sides
-      || row.roll_selection_type !== normalized.selection.type || row.roll_selection_count !== selectionCount
-      || row.roll_modifier !== normalized.modifier) throw new Error("roll actor dice command retry is invalid");
+  const selectionCount =
+    normalized.selection.type === "keep_highest" || normalized.selection.type === "keep_lowest"
+      ? normalized.selection.count
+      : null;
+  if (
+    row.roll_campaign_id !== row.campaign_id ||
+    row.roll_command_id !== row.command_id ||
+    row.roll_dice_count !== normalized.count ||
+    row.roll_dice_sides !== normalized.sides ||
+    row.roll_selection_type !== normalized.selection.type ||
+    row.roll_selection_count !== selectionCount ||
+    row.roll_modifier !== normalized.modifier
+  )
+    throw new Error("roll actor dice command retry is invalid");
   const keepCount = selectionCount ?? (normalized.selection.type === "all" ? normalized.count : 1);
   const keepHigh = normalized.selection.type === "keep_highest" || normalized.selection.type === "advantage";
-  const expectedKept = new Set(termData.map((_, index) => index).sort((left, right) => {
-    if (normalized.selection.type === "all") return left - right;
-    const difference = keepHigh ? Number(termData[right]!.value) - Number(termData[left]!.value)
-      : Number(termData[left]!.value) - Number(termData[right]!.value);
-    return difference === 0 ? left - right : difference;
-  }).slice(0, keepCount));
+  const expectedKept = new Set(
+    termData
+      .map((_, index) => index)
+      .sort((left, right) => {
+        if (normalized.selection.type === "all") return left - right;
+        const difference = keepHigh
+          ? Number(termData[right]!.value) - Number(termData[left]!.value)
+          : Number(termData[left]!.value) - Number(termData[right]!.value);
+        return difference === 0 ? left - right : difference;
+      })
+      .slice(0, keepCount),
+  );
   if (termData.some((term, index) => term.kept !== expectedKept.has(index))) {
     throw new Error("roll actor dice command retry is invalid");
   }
-  const event = rpgEventSchema.parse({ eventId: row.event_id, commandId: row.event_command_id,
-    campaignId: row.event_campaign_id, timelineId: row.event_timeline_id, actorId: row.event_actor_id,
-    sourceTurnId: row.event_source_turn_id, type: row.event_type, revision: row.event_revision,
-    occurredAt: row.occurred_at, data: { expression: row.roll_expression, normalized, terms: termData,
-      modifier: row.roll_modifier, total: row.roll_total } });
-  const receipt = commandReceiptSchema.parse({ commandId: row.command_id, campaignId: row.campaign_id,
-    revisionBefore: row.revision_before, revisionAfter: row.revision_after, events: [event] });
+  const event = rpgEventSchema.parse({
+    eventId: row.event_id,
+    commandId: row.event_command_id,
+    campaignId: row.event_campaign_id,
+    timelineId: row.event_timeline_id,
+    actorId: row.event_actor_id,
+    sourceTurnId: row.event_source_turn_id,
+    type: row.event_type,
+    revision: row.event_revision,
+    occurredAt: row.occurred_at,
+    data: {
+      expression: row.roll_expression,
+      normalized,
+      terms: termData,
+      modifier: row.roll_modifier,
+      total: row.roll_total,
+    },
+  });
+  const receipt = commandReceiptSchema.parse({
+    commandId: row.command_id,
+    campaignId: row.campaign_id,
+    revisionBefore: row.revision_before,
+    revisionAfter: row.revision_after,
+    events: [event],
+  });
   const timelineRevision = revisionSchema.parse(row.retry_timeline_revision);
   const eventCount = revisionSchema.parse(row.retry_timeline_event_count);
   const invalidEventCount = revisionSchema.parse(row.retry_timeline_invalid_event_count);
-  if (event.type !== "actor_dice_rolled" || event.timelineId !== envelope.timelineId
-      || event.actorId !== envelope.actorId || event.sourceTurnId !== envelope.sourceTurnId
-      || event.data.expression !== envelope.command.payload.expression
-      || receipt.revisionBefore !== envelope.expectedRevision || timelineRevision < event.revision
-      || eventCount !== timelineRevision || invalidEventCount !== 0 || (timelineRevision > 0
-        && (row.retry_timeline_min_revision !== 1 || row.retry_timeline_max_revision !== timelineRevision))) {
+  if (
+    event.type !== "actor_dice_rolled" ||
+    event.timelineId !== envelope.timelineId ||
+    event.actorId !== envelope.actorId ||
+    event.sourceTurnId !== envelope.sourceTurnId ||
+    event.data.expression !== envelope.command.payload.expression ||
+    receipt.revisionBefore !== envelope.expectedRevision ||
+    timelineRevision < event.revision ||
+    eventCount !== timelineRevision ||
+    invalidEventCount !== 0 ||
+    (timelineRevision > 0 &&
+      (row.retry_timeline_min_revision !== 1 || row.retry_timeline_max_revision !== timelineRevision))
+  ) {
     throw new Error("roll actor dice command retry is invalid");
   }
   return receipt;
@@ -897,10 +1137,14 @@ const DICE_RETRY_INVALID_HISTORY_COUNT = `(SELECT COUNT(*) FROM campaign_events 
         )
     ))`;
 
-function executeRollActorDiceAtomic(db: DatabaseDriver.Database, dependencies: RepositoryDependencies,
-  actorPrincipalId: string, input: CommandEnvelope,
+function executeRollActorDiceAtomic(
+  db: DatabaseDriver.Database,
+  dependencies: RepositoryDependencies,
+  actorPrincipalId: string,
+  input: CommandEnvelope,
   validateLockedTarget?: (envelope: CommandEnvelope, principalId: string) => void,
-  allowControlledPlayer = false): CommandReceipt {
+  allowControlledPlayer = false,
+): CommandReceipt {
   const principalId = resourceIdSchema.parse(actorPrincipalId);
   const envelope = commandEnvelopeSchema.parse(input);
   if (envelope.command.type !== "roll_actor_dice") {
@@ -908,37 +1152,50 @@ function executeRollActorDiceAtomic(db: DatabaseDriver.Database, dependencies: R
   }
   const command = envelope.command;
   const run = db.transaction(() => {
-    const authority = db.prepare(`SELECT membership.role, campaign.owner_principal_id, campaign.settings,
+    const authority = db
+      .prepare(
+        `SELECT membership.role, campaign.owner_principal_id, campaign.settings,
         private_state.controller_principal_id
       FROM campaign_memberships membership
       JOIN principals principal ON principal.id = membership.principal_id
       JOIN campaigns campaign ON campaign.id = membership.campaign_id
       LEFT JOIN campaign_actor_private_state private_state ON private_state.campaign_id=campaign.id
         AND private_state.actor_id=?
-      WHERE membership.campaign_id = ? AND membership.principal_id = ?`)
-      .get(envelope.actorId, envelope.campaignId, principalId) as {
-        role: string;
-        owner_principal_id: string;
-        settings: string;
-        controller_principal_id: string | null;
-      } | undefined;
-    const authorized = authority?.role === "gm"
-      || (authority?.role === "owner" && authority.owner_principal_id === principalId)
-      || (allowControlledPlayer && authority?.role === "player"
-        && authority.controller_principal_id === principalId
-        && campaignSettingsSchema.parse(JSON.parse(authority.settings)).allowPlayerDice);
+      WHERE membership.campaign_id = ? AND membership.principal_id = ?`,
+      )
+      .get(envelope.actorId, envelope.campaignId, principalId) as
+      | {
+          role: string;
+          owner_principal_id: string;
+          settings: string;
+          controller_principal_id: string | null;
+        }
+      | undefined;
+    const authorized =
+      authority?.role === "gm" ||
+      (authority?.role === "owner" && authority.owner_principal_id === principalId) ||
+      (allowControlledPlayer &&
+        authority?.role === "player" &&
+        authority.controller_principal_id === principalId &&
+        campaignSettingsSchema.parse(JSON.parse(authority.settings)).allowPlayerDice);
     if (!authorized) throw new Error("roll actor dice command unavailable");
     validateLockedTarget?.(envelope, principalId);
-    const collisions = db.prepare(`SELECT campaign_id, command_id, idempotency_key, timeline_id, actor_id,
+    const collisions = db
+      .prepare(
+        `SELECT campaign_id, command_id, idempotency_key, timeline_id, actor_id,
       expected_revision, source_turn_id, type, attribute_id, value, resource_name, resource_current,
       resource_max, dice_expression, dice_count, dice_sides, dice_selection_type, dice_selection_count,
       dice_modifier FROM campaign_commands WHERE campaign_id = ? AND (command_id = ? OR idempotency_key = ?)
-      ORDER BY rowid`).all(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CampaignCommandRow[];
+      ORDER BY rowid`,
+      )
+      .all(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CampaignCommandRow[];
     if (collisions.length > 0) {
       if (collisions.length !== 1 || !commandRowMatchesDiceEnvelope(collisions[0]!, envelope)) {
         throw new Error("roll actor dice command identity collision");
       }
-      const retry = db.prepare(`SELECT command.*,
+      const retry = db
+        .prepare(
+          `SELECT command.*,
         timeline.id retry_timeline_presence, timeline.revision retry_timeline_revision,
         ((SELECT COUNT(*) FROM campaign_timeline_events h WHERE h.campaign_id=command.campaign_id AND h.timeline_id=command.timeline_id)
           + (SELECT COUNT(*) FROM campaign_imported_timeline_events imported
@@ -982,24 +1239,31 @@ function executeRollActorDiceAtomic(db: DatabaseDriver.Database, dependencies: R
         LEFT JOIN rpg_campaign_sheets sheet ON sheet.campaign_id=actor.campaign_id
           AND sheet.id=actor.sheet_id AND sheet.campaign_character_id=campaign_character.id
         LEFT JOIN rpg_dice_rolls roll ON roll.event_id=event.event_id
-        WHERE command.campaign_id=? AND command.command_id=? AND command.idempotency_key=?`)
+        WHERE command.campaign_id=? AND command.command_id=? AND command.idempotency_key=?`,
+        )
         .get(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as DiceRetryRow | undefined;
       if (!retry) throw new Error("roll actor dice command retry is incomplete");
       return diceReceiptFromRetryRow(db, retry, envelope);
     }
-    const timeline = db.prepare(`SELECT timeline.revision FROM campaigns campaign JOIN campaign_timelines timeline
+    const timeline = db
+      .prepare(
+        `SELECT timeline.revision FROM campaigns campaign JOIN campaign_timelines timeline
       ON timeline.campaign_id=campaign.id AND timeline.id=campaign.active_timeline_id
-      WHERE campaign.id=? AND campaign.active_timeline_id=?`).get(envelope.campaignId, envelope.timelineId) as
-      { revision: unknown } | undefined;
+      WHERE campaign.id=? AND campaign.active_timeline_id=?`,
+      )
+      .get(envelope.campaignId, envelope.timelineId) as { revision: unknown } | undefined;
     if (!timeline) throw new Error("roll actor dice command timeline is inactive");
     if (revisionSchema.parse(timeline.revision) !== envelope.expectedRevision) {
       throw new Error("roll actor dice command revision does not match");
     }
-    const target = db.prepare(`SELECT actor.id FROM campaign_actors actor
+    const target = db
+      .prepare(
+        `SELECT actor.id FROM campaign_actors actor
       JOIN campaign_characters cc ON cc.campaign_id=actor.campaign_id AND cc.id=actor.campaign_character_id
       JOIN characters character ON character.id=cc.character_id
       JOIN rpg_campaign_sheets sheet ON sheet.campaign_id=actor.campaign_id AND sheet.id=actor.sheet_id
-        AND sheet.campaign_character_id=cc.id WHERE actor.campaign_id=? AND actor.id=?`)
+        AND sheet.campaign_character_id=cc.id WHERE actor.campaign_id=? AND actor.id=?`,
+      )
       .get(envelope.campaignId, envelope.actorId) as { id: unknown } | undefined;
     if (!target) throw new Error("roll actor dice command target unavailable");
     resourceIdSchema.parse(target.id);
@@ -1007,34 +1271,90 @@ function executeRollActorDiceAtomic(db: DatabaseDriver.Database, dependencies: R
     const eventId = resourceIdSchema.parse(dependencies.ids.nextId());
     const occurredAt = utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString());
     const revisionAfter = envelope.expectedRevision + 1;
-    const event = rpgEventSchema.parse({ eventId, commandId: envelope.commandId, campaignId: envelope.campaignId,
-      timelineId: envelope.timelineId, actorId: envelope.actorId, sourceTurnId: envelope.sourceTurnId,
-      type: "actor_dice_rolled", revision: revisionAfter, occurredAt, data: result });
+    const event = rpgEventSchema.parse({
+      eventId,
+      commandId: envelope.commandId,
+      campaignId: envelope.campaignId,
+      timelineId: envelope.timelineId,
+      actorId: envelope.actorId,
+      sourceTurnId: envelope.sourceTurnId,
+      type: "actor_dice_rolled",
+      revision: revisionAfter,
+      occurredAt,
+      data: result,
+    });
     if (event.type !== "actor_dice_rolled") throw new Error("roll actor dice command produced an invalid event");
-    const receipt = commandReceiptSchema.parse({ commandId: envelope.commandId, campaignId: envelope.campaignId,
-      revisionBefore: envelope.expectedRevision, revisionAfter, events: [event] });
-    const selectionCount = result.normalized.selection.type === "keep_highest"
-      || result.normalized.selection.type === "keep_lowest" ? result.normalized.selection.count : null;
-    db.prepare(`INSERT INTO campaign_commands (campaign_id,command_id,idempotency_key,timeline_id,actor_id,
+    const receipt = commandReceiptSchema.parse({
+      commandId: envelope.commandId,
+      campaignId: envelope.campaignId,
+      revisionBefore: envelope.expectedRevision,
+      revisionAfter,
+      events: [event],
+    });
+    const selectionCount =
+      result.normalized.selection.type === "keep_highest" || result.normalized.selection.type === "keep_lowest"
+        ? result.normalized.selection.count
+        : null;
+    db.prepare(
+      `INSERT INTO campaign_commands (campaign_id,command_id,idempotency_key,timeline_id,actor_id,
       expected_revision,source_turn_id,type,dice_expression,dice_count,dice_sides,dice_selection_type,
-      dice_selection_count,dice_modifier) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(envelope.campaignId,
-      envelope.commandId,envelope.idempotencyKey,envelope.timelineId,envelope.actorId,envelope.expectedRevision,
-      envelope.sourceTurnId,command.type,result.expression,result.normalized.count,result.normalized.sides,
-      result.normalized.selection.type,selectionCount,result.modifier);
-    const timelineWrite = db.prepare("UPDATE campaign_timelines SET revision=? WHERE campaign_id=? AND id=? AND revision=?")
-      .run(revisionAfter,envelope.campaignId,envelope.timelineId,envelope.expectedRevision);
+      dice_selection_count,dice_modifier) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      envelope.campaignId,
+      envelope.commandId,
+      envelope.idempotencyKey,
+      envelope.timelineId,
+      envelope.actorId,
+      envelope.expectedRevision,
+      envelope.sourceTurnId,
+      command.type,
+      result.expression,
+      result.normalized.count,
+      result.normalized.sides,
+      result.normalized.selection.type,
+      selectionCount,
+      result.modifier,
+    );
+    const timelineWrite = db
+      .prepare("UPDATE campaign_timelines SET revision=? WHERE campaign_id=? AND id=? AND revision=?")
+      .run(revisionAfter, envelope.campaignId, envelope.timelineId, envelope.expectedRevision);
     if (timelineWrite.changes !== 1) throw new Error("roll actor dice command revision changed");
-    db.prepare(`INSERT INTO rpg_dice_rolls (event_id,campaign_id,command_id,expression,dice_count,dice_sides,
-      selection_type,selection_count,modifier,total) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(event.eventId,event.campaignId,
-      event.commandId,result.expression,result.normalized.count,result.normalized.sides,result.normalized.selection.type,
-      selectionCount,result.modifier,result.total);
+    db.prepare(
+      `INSERT INTO rpg_dice_rolls (event_id,campaign_id,command_id,expression,dice_count,dice_sides,
+      selection_type,selection_count,modifier,total) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      event.eventId,
+      event.campaignId,
+      event.commandId,
+      result.expression,
+      result.normalized.count,
+      result.normalized.sides,
+      result.normalized.selection.type,
+      selectionCount,
+      result.modifier,
+      result.total,
+    );
     const insertTerm = db.prepare("INSERT INTO rpg_dice_terms (event_id,position,value,kept) VALUES (?,?,?,?)");
-    result.terms.forEach((term, position) => insertTerm.run(event.eventId,position,term.value,term.kept ? 1 : 0));
-    db.prepare(`INSERT INTO campaign_events (event_id,campaign_id,command_id,timeline_id,actor_id,source_turn_id,
-      type,revision,occurred_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(event.eventId,event.campaignId,event.commandId,
-      event.timelineId,event.actorId,event.sourceTurnId,event.type,event.revision,event.occurredAt);
-    const receiptWrite = db.prepare("INSERT INTO command_receipts (campaign_id,command_id,revision_before,revision_after,event_id) VALUES (?,?,?,?,?)")
-      .run(receipt.campaignId,receipt.commandId,receipt.revisionBefore,receipt.revisionAfter,event.eventId);
+    result.terms.forEach((term, position) => insertTerm.run(event.eventId, position, term.value, term.kept ? 1 : 0));
+    db.prepare(
+      `INSERT INTO campaign_events (event_id,campaign_id,command_id,timeline_id,actor_id,source_turn_id,
+      type,revision,occurred_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      event.eventId,
+      event.campaignId,
+      event.commandId,
+      event.timelineId,
+      event.actorId,
+      event.sourceTurnId,
+      event.type,
+      event.revision,
+      event.occurredAt,
+    );
+    const receiptWrite = db
+      .prepare(
+        "INSERT INTO command_receipts (campaign_id,command_id,revision_before,revision_after,event_id) VALUES (?,?,?,?,?)",
+      )
+      .run(receipt.campaignId, receipt.commandId, receipt.revisionBefore, receipt.revisionAfter, event.eventId);
     if (receiptWrite.changes !== 1) throw new Error("roll actor dice command receipt was not persisted");
     return receipt;
   });

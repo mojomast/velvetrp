@@ -59,7 +59,8 @@ function seed(options: { configure?: boolean; personas?: Array<[string, string, 
     ["persona-z", "Zulu", "2035-01-02T00:00:00.000Z"],
     ["persona-A", "Alpha", "2035-01-01T00:00:00.000Z"],
     ["persona-a", "Lower", "2035-01-01T00:00:00.000Z"],
-  ]) insertPersona.run(...persona);
+  ])
+    insertPersona.run(...persona);
   db.close();
 }
 
@@ -84,9 +85,10 @@ function corruptionRead(actor = "local-owner", campaign = "campaign-one") {
 function addLink(campaignId: string, id: string, characterId: string): void {
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys = ON");
-  db.prepare(`INSERT INTO campaign_characters
-    (id, campaign_id, character_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-    .run(id, campaignId, characterId, AT, AT);
+  db.prepare(
+    `INSERT INTO campaign_characters
+    (id, campaign_id, character_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+  ).run(id, campaignId, characterId, AT, AT);
   db.close();
 }
 
@@ -122,11 +124,13 @@ describe("getCampaignCharacterCreationOptions", () => {
     const ascii = "a".repeat(201);
     const pairAtBoundary = `${"b".repeat(199)}😀tail`;
     const astral = "😀".repeat(101);
-    seed({ personas: [
-      ["ascii", ascii, "2035-01-01T00:00:00.000Z"],
-      ["boundary", pairAtBoundary, "2035-01-02T00:00:00.000Z"],
-      ["astral", astral, "2035-01-03T00:00:00.000Z"],
-    ] });
+    seed({
+      personas: [
+        ["ascii", ascii, "2035-01-01T00:00:00.000Z"],
+        ["boundary", pairAtBoundary, "2035-01-02T00:00:00.000Z"],
+        ["astral", astral, "2035-01-03T00:00:00.000Z"],
+      ],
+    });
 
     const result = read()!;
     expect(result.personas).toEqual([
@@ -135,17 +139,22 @@ describe("getCampaignCharacterCreationOptions", () => {
       { characterId: "astral", name: "😀".repeat(100), alreadyUsed: false },
     ]);
     expect(campaignCharacterCreationOptionsResponseSchema.parse(result)).toEqual(result);
-    expect(result.personas.every((persona) => Array.from(persona.name).every((symbol) =>
-      symbol.length === 2 || !/[\uD800-\uDFFF]/.test(symbol)))).toBe(true);
+    expect(
+      result.personas.every((persona) =>
+        Array.from(persona.name).every((symbol) => symbol.length === 2 || !/[\uD800-\uDFFF]/.test(symbol)),
+      ),
+    ).toBe(true);
   });
 
   it("projects a visible bounded name when the first prefix is only whitespace", () => {
     const leadingWhitespace = " ".repeat(201);
-    seed({ personas: [
-      ["visible", `${leadingWhitespace}Visible`, "2035-01-01T00:00:00.000Z"],
-      ["boundary", `${leadingWhitespace}${"x".repeat(199)}😀tail`, "2035-01-02T00:00:00.000Z"],
-      ["ordinary", "  Ordinary  ", "2035-01-03T00:00:00.000Z"],
-    ] });
+    seed({
+      personas: [
+        ["visible", `${leadingWhitespace}Visible`, "2035-01-01T00:00:00.000Z"],
+        ["boundary", `${leadingWhitespace}${"x".repeat(199)}😀tail`, "2035-01-02T00:00:00.000Z"],
+        ["ordinary", "  Ordinary  ", "2035-01-03T00:00:00.000Z"],
+      ],
+    });
 
     const result = read()!;
     expect(result.personas).toEqual([
@@ -228,11 +237,13 @@ describe("getCampaignCharacterCreationOptions", () => {
       expired = unit;
       expect(unit.getCampaignCharacterCreationOptions("gm", "campaign-one")).toEqual(expected);
     });
-    expect(() => expired!.getCampaignCharacterCreationOptions("bad actor", "bad campaign"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.getCampaignCharacterCreationOptions("bad actor", "bad campaign")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
-    expect(() => repository.getCampaignCharacterCreationOptions("bad actor", "bad campaign"))
-      .toThrow("repository is closed");
+    expect(() => repository.getCampaignCharacterCreationOptions("bad actor", "bad campaign")).toThrow(
+      "repository is closed",
+    );
   });
 
   it("keeps active-UoW reads on one snapshot across a concurrent WAL commit", () => {
@@ -241,9 +252,12 @@ describe("getCampaignCharacterCreationOptions", () => {
     repository.transaction((unit) => {
       expect(unit.getCampaignCharacterCreationOptions("gm", "campaign-one")!.personas).toHaveLength(3);
       const writer = new DatabaseDriver(dbPath());
-      writer.prepare(`INSERT INTO characters
+      writer
+        .prepare(
+          `INSERT INTO characters
         (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
-        VALUES ('concurrent', 'Concurrent', 30, 'hero', 'fictional', 1, 0, ?)`)
+        VALUES ('concurrent', 'Concurrent', 30, 'hero', 'fictional', 1, 0, ?)`,
+        )
         .run(AT);
       writer.close();
       expect(unit.getCampaignCharacterCreationOptions("gm", "campaign-one")!.personas).toHaveLength(3);
@@ -371,22 +385,40 @@ describe("getCampaignCharacterCreationOptions", () => {
   });
 
   it.each([
-    ["missing race", `DROP TRIGGER rpg_definitions_prevent_delete;
-      DELETE FROM rpg_definitions WHERE kind = 'race'`],
-    ["unsealed pack", `DROP TRIGGER rpg_content_packs_prevent_update;
-      UPDATE rpg_content_packs SET sealed = 0 WHERE pack_id = '${ORIGINAL_STARTER_PACK.packId}'`],
-    ["malformed profile metadata", `DROP TRIGGER rpg_rules_profiles_tags_update;
+    [
+      "missing race",
+      `DROP TRIGGER rpg_definitions_prevent_delete;
+      DELETE FROM rpg_definitions WHERE kind = 'race'`,
+    ],
+    [
+      "unsealed pack",
+      `DROP TRIGGER rpg_content_packs_prevent_update;
+      UPDATE rpg_content_packs SET sealed = 0 WHERE pack_id = '${ORIGINAL_STARTER_PACK.packId}'`,
+    ],
+    [
+      "malformed profile metadata",
+      `DROP TRIGGER rpg_rules_profiles_tags_update;
       DROP TRIGGER rpg_rules_profiles_prevent_referenced_update;
-      UPDATE rpg_rules_profiles SET tags = '[1]' WHERE rules_profile_id = '${ORIGINAL_STARTER_RULES_PROFILE.rulesProfileId}'`],
-    ["changed class metadata", `DROP TRIGGER rpg_definitions_prevent_update;
-      UPDATE rpg_definitions SET name = 'Captured' WHERE kind = 'class'`],
-    ["extra starter-pack definition", `DROP TRIGGER rpg_definitions_prevent_sealed_insert;
+      UPDATE rpg_rules_profiles SET tags = '[1]' WHERE rules_profile_id = '${ORIGINAL_STARTER_RULES_PROFILE.rulesProfileId}'`,
+    ],
+    [
+      "changed class metadata",
+      `DROP TRIGGER rpg_definitions_prevent_update;
+      UPDATE rpg_definitions SET name = 'Captured' WHERE kind = 'class'`,
+    ],
+    [
+      "extra starter-pack definition",
+      `DROP TRIGGER rpg_definitions_prevent_sealed_insert;
       INSERT INTO rpg_definitions (pack_id, pack_version, kind, definition_id, name, description, tags)
       VALUES ('${ORIGINAL_STARTER_PACK.packId}', '${ORIGINAL_STARTER_PACK.packVersion}',
-        'item', 'velvet:unexpected', 'Unexpected', 'Unexpected', '[]')`],
-    ["reserved definition captured by another pack", `DROP TRIGGER rpg_definitions_prevent_update;
+        'item', 'velvet:unexpected', 'Unexpected', 'Unexpected', '[]')`,
+    ],
+    [
+      "reserved definition captured by another pack",
+      `DROP TRIGGER rpg_definitions_prevent_update;
       PRAGMA foreign_keys = OFF;
-      UPDATE rpg_definitions SET pack_id = 'capturing-pack' WHERE kind = 'race'`],
+      UPDATE rpg_definitions SET pack_id = 'capturing-pack' WHERE kind = 'race'`,
+    ],
   ])("loudly rejects authorized %s corruption but masks it from denied actors", (_label, sql) => {
     seed();
     corrupt(sql);

@@ -1,11 +1,18 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
-  checkCommandSchema, checkResolutionSchema, checkTargetSchema, checkTermSchema,
-  type CheckCommand, type CheckKind,
+  checkCommandSchema,
+  checkResolutionSchema,
+  checkTargetSchema,
+  checkTermSchema,
+  type CheckCommand,
+  type CheckKind,
 } from "../src/checks.js";
 
 const resolution = {
-  terms: [{ kind: "flat", sourceId: null, value: 12 }, { kind: "proficiency", sourceId: "prof", value: 2 }],
+  terms: [
+    { kind: "flat", sourceId: null, value: 12 },
+    { kind: "proficiency", sourceId: "prof", value: 2 },
+  ],
   total: 14,
   target: { kind: "difficulty_class", value: 13 },
   outcome: "success",
@@ -24,7 +31,9 @@ describe("M1.6 check contracts", () => {
     ] as const;
     commands.forEach((command) => expect(checkCommandSchema.parse(command)).toEqual(command));
     expect(checkCommandSchema.safeParse({ ...base, kind: "spell", abilityId: "int" }).success).toBe(false);
-    expect(checkCommandSchema.safeParse({ ...base, kind: "ability", abilityId: "int", unknown: true }).success).toBe(false);
+    expect(checkCommandSchema.safeParse({ ...base, kind: "ability", abilityId: "int", unknown: true }).success).toBe(
+      false,
+    );
   });
 
   it("requires bounded structured terms, total, target, and outcome", () => {
@@ -36,17 +45,28 @@ describe("M1.6 check contracts", () => {
       { ...resolution, outcome: "maybe" },
       { ...resolution, terms: [] },
       { ...resolution, target: { kind: "difficulty_class", value: 13, script: "x" } },
-    ]) expect(checkResolutionSchema.safeParse(invalid).success).toBe(false);
+    ])
+      expect(checkResolutionSchema.safeParse(invalid).success).toBe(false);
   });
 
   it("rejects caller-provided resolutions and enforces concurrency keys", () => {
-    expect(checkCommandSchema.safeParse({ ...base, kind: "ability", abilityId: "int", expectedRevision: -1 }).success).toBe(false);
-    expect(checkCommandSchema.safeParse({ ...base, kind: "ability", abilityId: "int", idempotencyKey: "" }).success).toBe(false);
+    expect(
+      checkCommandSchema.safeParse({ ...base, kind: "ability", abilityId: "int", expectedRevision: -1 }).success,
+    ).toBe(false);
+    expect(
+      checkCommandSchema.safeParse({ ...base, kind: "ability", abilityId: "int", idempotencyKey: "" }).success,
+    ).toBe(false);
     for (const callerResult of [
-      { resolution }, { terms: resolution.terms }, { total: resolution.total }, { target: resolution.target },
-      { outcome: resolution.outcome }, { resolvedAt: "2026-08-05T12:00:00.000Z" },
+      { resolution },
+      { terms: resolution.terms },
+      { total: resolution.total },
+      { target: resolution.target },
+      { outcome: resolution.outcome },
+      { resolvedAt: "2026-08-05T12:00:00.000Z" },
     ]) {
-      expect(checkCommandSchema.safeParse({ ...base, kind: "ability", abilityId: "int", ...callerResult }).success).toBe(false);
+      expect(
+        checkCommandSchema.safeParse({ ...base, kind: "ability", abilityId: "int", ...callerResult }).success,
+      ).toBe(false);
     }
   });
 

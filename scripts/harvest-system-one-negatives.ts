@@ -23,11 +23,7 @@ import {
   confirmedHarvestProposals,
   summarizeHarvest,
 } from "../server/src/agent/systemOneHarvest.js";
-import type {
-  HarvestAnnotation,
-  HarvestProposal,
-  HarvestSummary,
-} from "../server/src/agent/systemOneHarvest.js";
+import type { HarvestAnnotation, HarvestProposal, HarvestSummary } from "../server/src/agent/systemOneHarvest.js";
 import {
   closeRepo,
   listDirectorDecisionsWithAuthority,
@@ -52,16 +48,16 @@ const FIXTURE_DIRECTORY = path.join("server", "test", "fixtures", "system-one-ha
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), "..", "..");
 
 export const USAGE =
-  "usage: harvest-system-one-negatives.ts [--lane <lane>] [--limit 1..1000]"
-  + " [--annotations <path.json>] [--disagreements] [--status confirmed|proposed|all]"
-  + " [--out <path>] [--write-fixture] [--merge-fixture] [--summary]\n"
-  + "\n"
-  + `harvestable lanes: ${HARVEST_LANES.join(", ")} (with --lane omitted, every lane is read)\n`
-  + "--disagreements also reads Director authority rows (director-selection only)\n"
-  + "--status defaults to all; --write-fixture forces confirmed and writes"
-  + ` ${FIXTURE_DIRECTORY.replace(/\\/g, "/")}/<lane>.json (requires --lane)\n`
-  + "--merge-fixture (requires --write-fixture) merges into an existing lane fixture instead of replacing it\n"
-  + "the proposals JSON goes to --out, or to stdout when neither --out, --write-fixture nor --summary is set\n";
+  "usage: harvest-system-one-negatives.ts [--lane <lane>] [--limit 1..1000]" +
+  " [--annotations <path.json>] [--disagreements] [--status confirmed|proposed|all]" +
+  " [--out <path>] [--write-fixture] [--merge-fixture] [--summary]\n" +
+  "\n" +
+  `harvestable lanes: ${HARVEST_LANES.join(", ")} (with --lane omitted, every lane is read)\n` +
+  "--disagreements also reads Director authority rows (director-selection only)\n" +
+  "--status defaults to all; --write-fixture forces confirmed and writes" +
+  ` ${FIXTURE_DIRECTORY.replace(/\\/g, "/")}/<lane>.json (requires --lane)\n` +
+  "--merge-fixture (requires --write-fixture) merges into an existing lane fixture instead of replacing it\n" +
+  "the proposals JSON goes to --out, or to stdout when neither --out, --write-fixture nor --summary is set\n";
 
 export interface HarvestCliOptions {
   lane: HarvestLane | null;
@@ -101,32 +97,32 @@ export function parseHarvestArgs(argv: readonly string[]): HarvestCliOptions {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]!;
     if (arg === "--lane" || arg.startsWith("--lane=")) {
-      const raw = arg === "--lane" ? argv[index += 1] : arg.slice("--lane=".length);
+      const raw = arg === "--lane" ? argv[(index += 1)] : arg.slice("--lane=".length);
       if (raw === undefined || raw.trim() === "") throw new Error("--lane requires a lane id");
       if (!isHarvestLane(raw)) {
         throw new Error(`unknown lane: ${raw} (harvestable lanes: ${HARVEST_LANES.join(", ")})`);
       }
       lane = raw;
     } else if (arg === "--limit" || arg.startsWith("--limit=")) {
-      const raw = arg === "--limit" ? argv[index += 1] : arg.slice("--limit=".length);
+      const raw = arg === "--limit" ? argv[(index += 1)] : arg.slice("--limit=".length);
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) throw new Error(`--limit requires a number, received ${raw ?? "nothing"}`);
       limit = Math.max(MIN_LIMIT, Math.min(MAX_LIMIT, Math.trunc(parsed)));
     } else if (arg === "--annotations" || arg.startsWith("--annotations=")) {
-      const value = arg === "--annotations" ? argv[index += 1] : arg.slice("--annotations=".length);
+      const value = arg === "--annotations" ? argv[(index += 1)] : arg.slice("--annotations=".length);
       if (!value || value.trim() === "") throw new Error("--annotations requires a path");
       annotations = value;
     } else if (arg === "--disagreements") {
       disagreements = true;
     } else if (arg === "--status" || arg.startsWith("--status=")) {
-      const raw = arg === "--status" ? argv[index += 1] : arg.slice("--status=".length);
+      const raw = arg === "--status" ? argv[(index += 1)] : arg.slice("--status=".length);
       if (raw === undefined || !isHarvestStatusFilter(raw)) {
         throw new Error(`--status requires confirmed, proposed, or all, received ${raw ?? "nothing"}`);
       }
       status = raw;
       statusProvided = true;
     } else if (arg === "--out" || arg.startsWith("--out=")) {
-      const value = arg === "--out" ? argv[index += 1] : arg.slice("--out=".length);
+      const value = arg === "--out" ? argv[(index += 1)] : arg.slice("--out=".length);
       if (!value || value.trim() === "") throw new Error("--out requires a path");
       out = path.resolve(value);
     } else if (arg === "--write-fixture") {
@@ -380,10 +376,14 @@ export function renderHarvestSummary(input: HarvestSummaryReportInput): string {
   const proposedWidth = Math.max("Proposed".length, ...entries.map((entry) => String(entry.proposed).length));
   const totalWidth = Math.max("Total".length, ...totals.map((total) => String(total).length));
   const row = (lane: string, confirmed: number, proposed: number, total: number): string =>
-    `${lane.padEnd(laneWidth)}  ${String(confirmed).padStart(confirmedWidth)}`
-    + `  ${String(proposed).padStart(proposedWidth)}  ${String(total).padStart(totalWidth)}`;
-  lines.push(`${"Lane".padEnd(laneWidth)}  ${"Confirmed".padStart(confirmedWidth)}  ${"Proposed".padStart(proposedWidth)}  ${"Total".padStart(totalWidth)}`);
-  lines.push(`${"-".repeat(laneWidth)}  ${"-".repeat(confirmedWidth)}  ${"-".repeat(proposedWidth)}  ${"-".repeat(totalWidth)}`);
+    `${lane.padEnd(laneWidth)}  ${String(confirmed).padStart(confirmedWidth)}` +
+    `  ${String(proposed).padStart(proposedWidth)}  ${String(total).padStart(totalWidth)}`;
+  lines.push(
+    `${"Lane".padEnd(laneWidth)}  ${"Confirmed".padStart(confirmedWidth)}  ${"Proposed".padStart(proposedWidth)}  ${"Total".padStart(totalWidth)}`,
+  );
+  lines.push(
+    `${"-".repeat(laneWidth)}  ${"-".repeat(confirmedWidth)}  ${"-".repeat(proposedWidth)}  ${"-".repeat(totalWidth)}`,
+  );
   for (const entry of entries) {
     lines.push(row(entry.lane, entry.confirmed, entry.proposed, entry.confirmed + entry.proposed));
   }
@@ -391,20 +391,26 @@ export function renderHarvestSummary(input: HarvestSummaryReportInput): string {
   lines.push("");
 
   if (input.summary.byProvenance.length > 0) {
-    lines.push(`By provenance: ${input.summary.byProvenance.map((entry) => `${entry.provenance} ${entry.count}`).join(", ")}`);
+    lines.push(
+      `By provenance: ${input.summary.byProvenance.map((entry) => `${entry.provenance} ${entry.count}`).join(", ")}`,
+    );
     lines.push("");
   }
 
   const annotationCounts = input.annotationCounts ?? null;
-  lines.push(annotationCounts === null
-    ? "Annotations: none"
-    : `Annotations: applied ${annotationCounts.applied}, skipped ${annotationCounts.skipped}`
-      + (input.annotationsSource ? ` (${input.annotationsSource})` : ""));
+  lines.push(
+    annotationCounts === null
+      ? "Annotations: none"
+      : `Annotations: applied ${annotationCounts.applied}, skipped ${annotationCounts.skipped}` +
+          (input.annotationsSource ? ` (${input.annotationsSource})` : ""),
+  );
   const authority = input.authority ?? null;
-  lines.push(authority === null
-    ? "Authority: not read"
-    : `Authority: read ${authority.rowsRead} Director decision${authority.rowsRead === 1 ? "" : "s"}`
-      + ` (${authority.disagreements} disagreement${authority.disagreements === 1 ? "" : "s"})`);
+  lines.push(
+    authority === null
+      ? "Authority: not read"
+      : `Authority: read ${authority.rowsRead} Director decision${authority.rowsRead === 1 ? "" : "s"}` +
+          ` (${authority.disagreements} disagreement${authority.disagreements === 1 ? "" : "s"})`,
+  );
 
   if (input.notices && input.notices.length > 0) {
     lines.push("");
@@ -491,9 +497,8 @@ async function main(): Promise<void> {
     const builtFixture = buildFixtureDocument(lane, built, generatedAt);
     const filePath = fixtureFilePath(lane);
     const existingFixture = options.mergeFixture && existsSync(filePath) ? readFixtureDocument(filePath) : null;
-    const fixture = existingFixture === null
-      ? builtFixture
-      : mergeFixtureDocuments(existingFixture, builtFixture, generatedAt);
+    const fixture =
+      existingFixture === null ? builtFixture : mergeFixtureDocuments(existingFixture, builtFixture, generatedAt);
     // Do not let a valid-but-wrong data directory replace a reviewed corpus with an empty one.
     if (fixture.proposals.length === 0 && existsSync(filePath)) {
       let existing = 0;
@@ -505,8 +510,8 @@ async function main(): Promise<void> {
       }
       if (existing > 0) {
         throw new Error(
-          `refusing to replace ${filePath} (${existing} confirmed proposal(s)) with an empty fixture;`
-          + " remove the file deliberately, fix the data directory, or use --merge-fixture",
+          `refusing to replace ${filePath} (${existing} confirmed proposal(s)) with an empty fixture;` +
+            " remove the file deliberately, fix the data directory, or use --merge-fixture",
         );
       }
     }
@@ -519,8 +524,8 @@ async function main(): Promise<void> {
     } else {
       const excluded = built.length - fixture.proposals.length;
       process.stdout.write(
-        `wrote ${filePath} (${fixture.proposals.length} confirmed proposals`
-        + `${excluded > 0 ? `, ${excluded} not confirmed` : ""})\n`,
+        `wrote ${filePath} (${fixture.proposals.length} confirmed proposals` +
+          `${excluded > 0 ? `, ${excluded} not confirmed` : ""})\n`,
       );
     }
   }
@@ -533,18 +538,21 @@ async function main(): Promise<void> {
   }
 
   if (options.summary) {
-    process.stdout.write(renderHarvestSummary({
-      summary: summarizeHarvest(proposals),
-      generatedAt,
-      source: databasePath,
-      lanes,
-      annotationCounts: options.annotations === null
-        ? null
-        : { applied: parsedAnnotations.applied, skipped: parsedAnnotations.skipped },
-      annotationsSource: options.annotations,
-      authority: authorityStats,
-      notices,
-    }));
+    process.stdout.write(
+      renderHarvestSummary({
+        summary: summarizeHarvest(proposals),
+        generatedAt,
+        source: databasePath,
+        lanes,
+        annotationCounts:
+          options.annotations === null
+            ? null
+            : { applied: parsedAnnotations.applied, skipped: parsedAnnotations.skipped },
+        annotationsSource: options.annotations,
+        authority: authorityStats,
+        notices,
+      }),
+    );
   } else {
     for (const notice of notices) process.stderr.write(`note: ${notice}\n`);
   }

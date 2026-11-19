@@ -28,10 +28,8 @@ export async function registerClientApp(
     index: false,
   });
 
-  const sendIndex = (reply: FastifyReply) => reply
-    .header("cache-control", "no-cache")
-    .type("text/html")
-    .send(indexHtml);
+  const sendIndex = (reply: FastifyReply) =>
+    reply.header("cache-control", "no-cache").type("text/html").send(indexHtml);
 
   app.get("/", (_request, reply) => sendIndex(reply));
 

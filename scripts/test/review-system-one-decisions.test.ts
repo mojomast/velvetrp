@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
-import {
-  applyReviewAnnotations,
-  renderReviewSheet,
-  reviewCandidates,
-} from "../../server/src/agent/systemOneReview.js";
+import { applyReviewAnnotations, renderReviewSheet, reviewCandidates } from "../../server/src/agent/systemOneReview.js";
 import type { SystemOneDecisionRecord } from "../../server/src/repo/index.js";
 import { parseReviewArgs } from "../review-system-one-decisions.js";
 
@@ -119,7 +115,10 @@ test("renders a review sheet with annotated verdicts", () => {
   ];
 
   const candidates = reviewCandidates(records, { limit: 20 });
-  assert.deepEqual(candidates.map((candidate) => candidate.decisionId), ["decision-uncertain", "decision-act"]);
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.decisionId),
+    ["decision-uncertain", "decision-act"],
+  );
 
   const annotated = applyReviewAnnotations(candidates, { "decision-uncertain": "incorrect" });
   assert.equal(annotated[0]!.verdict, "incorrect");
@@ -133,10 +132,13 @@ test("renders a review sheet with annotated verdicts", () => {
   assert.match(rendered, /decision-act/);
   assert.match(rendered, /incorrect/);
   assert.doesNotMatch(rendered, /decision-fallback/);
-  assert.equal(rendered, renderReviewSheet(annotated, {
-    generatedAt: "2026-09-17T00:00:00.000Z",
-    source: "/tmp/velvet.sqlite",
-  }));
+  assert.equal(
+    rendered,
+    renderReviewSheet(annotated, {
+      generatedAt: "2026-09-17T00:00:00.000Z",
+      source: "/tmp/velvet.sqlite",
+    }),
+  );
 });
 
 test("includes flagged fallbacks and honors maxSignal when asked", () => {
@@ -147,6 +149,9 @@ test("includes flagged fallbacks and honors maxSignal when asked", () => {
   ];
 
   const flagged = reviewCandidates(records, { includeFlaggedFallbacks: true, maxSignal: 0.5 });
-  assert.deepEqual(flagged.map((candidate) => candidate.decisionId), ["decision-fallback"]);
+  assert.deepEqual(
+    flagged.map((candidate) => candidate.decisionId),
+    ["decision-fallback"],
+  );
   assert.equal(flagged[0]!.topSignal, 0.1);
 });

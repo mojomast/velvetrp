@@ -43,33 +43,54 @@ describe("system one lane budget", () => {
   it("denies when the token budget would be exceeded", () => {
     const budgets = new SystemOneLaneBudgetManager();
     const tight: SystemOneBudgetPolicy = { ...policy, maxTotalTokens: 100 };
-    expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 60, maxOutputTokens: 50 })))
-      .toEqual({ allowed: false, reason: "token-budget" });
+    expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 60, maxOutputTokens: 50 }))).toEqual({
+      allowed: false,
+      reason: "token-budget",
+    });
   });
 
   it("counts settled and reserved tokens when checking the token budget", () => {
     const budgets = new SystemOneLaneBudgetManager();
     const tight: SystemOneBudgetPolicy = { ...policy, maxTotalTokens: 200 };
-    expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 60, maxOutputTokens: 50 }))).toEqual({ allowed: true, reservationId: expect.any(Number) });
+    expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 60, maxOutputTokens: 50 }))).toEqual({
+      allowed: true,
+      reservationId: expect.any(Number),
+    });
     budgets.settle("jev", { inputTokens: 110, outputTokens: 50 });
-    expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 30, maxOutputTokens: 20 })))
-      .toEqual({ allowed: false, reason: "token-budget" });
+    expect(budgets.reserve("jev", tight, request({ estimatedInputTokens: 30, maxOutputTokens: 20 }))).toEqual({
+      allowed: false,
+      reason: "token-budget",
+    });
   });
 
   it("denies when the dollar budget would be exceeded", () => {
     const budgets = new SystemOneLaneBudgetManager();
     const expensive: SystemOneBudgetPolicy = { ...policy, maxEstimatedCostUsd: 100 };
     const expensivePricing: SystemOneBudgetPricing = { inputPerMillionUsd: 1_000_000, outputPerMillionUsd: 1_000_000 };
-    expect(budgets.reserve("jev", expensive, request({ pricing: expensivePricing, estimatedInputTokens: 100, maxOutputTokens: 50 })))
-      .toEqual({ allowed: false, reason: "dollar-budget" });
+    expect(
+      budgets.reserve(
+        "jev",
+        expensive,
+        request({ pricing: expensivePricing, estimatedInputTokens: 100, maxOutputTokens: 50 }),
+      ),
+    ).toEqual({ allowed: false, reason: "dollar-budget" });
   });
 
   it("rate-limits within the window and allows again once the window passes", () => {
     const budgets = new SystemOneLaneBudgetManager();
-    expect(budgets.reserve("jev", policy, request({ nowMs: 0 }))).toEqual({ allowed: true, reservationId: expect.any(Number) });
-    expect(budgets.reserve("jev", policy, request({ nowMs: 100 }))).toEqual({ allowed: true, reservationId: expect.any(Number) });
+    expect(budgets.reserve("jev", policy, request({ nowMs: 0 }))).toEqual({
+      allowed: true,
+      reservationId: expect.any(Number),
+    });
+    expect(budgets.reserve("jev", policy, request({ nowMs: 100 }))).toEqual({
+      allowed: true,
+      reservationId: expect.any(Number),
+    });
     expect(budgets.reserve("jev", policy, request({ nowMs: 200 }))).toEqual({ allowed: false, reason: "rate-limit" });
-    expect(budgets.reserve("jev", policy, request({ nowMs: 1101 }))).toEqual({ allowed: true, reservationId: expect.any(Number) });
+    expect(budgets.reserve("jev", policy, request({ nowMs: 1101 }))).toEqual({
+      allowed: true,
+      reservationId: expect.any(Number),
+    });
   });
 
   it("release removes the reservation without settling", () => {
@@ -92,8 +113,7 @@ describe("system one lane budget", () => {
   it("does not mutate state on a denied reservation", () => {
     const budgets = new SystemOneLaneBudgetManager();
     const tight: SystemOneBudgetPolicy = { ...policy, maxEstimatedCostUsd: 0 };
-    expect(budgets.reserve("jev", tight, request()))
-      .toEqual({ allowed: false, reason: "dollar-budget" });
+    expect(budgets.reserve("jev", tight, request())).toEqual({ allowed: false, reason: "dollar-budget" });
     expect(budgets.snapshot("jev")).toMatchObject({
       reservedInputTokens: 0,
       reservedOutputTokens: 0,
@@ -135,7 +155,9 @@ describe("system one lane budget", () => {
     expect(() => budgets.reserve("jev", { ...policy, maxEstimatedCostUsd: -1 }, request())).toThrow(RangeError);
     expect(() => budgets.reserve("jev", policy, request({ estimatedInputTokens: -1 }))).toThrow(RangeError);
     expect(() => budgets.reserve("jev", policy, request({ maxOutputTokens: 1.5 }))).toThrow(RangeError);
-    expect(() => budgets.reserve("jev", policy, request({ pricing: { inputPerMillionUsd: -1, outputPerMillionUsd: 2 } }))).toThrow(RangeError);
+    expect(() =>
+      budgets.reserve("jev", policy, request({ pricing: { inputPerMillionUsd: -1, outputPerMillionUsd: 2 } })),
+    ).toThrow(RangeError);
     expect(() => budgets.reserve("jev", policy, request({ nowMs: Number.NaN }))).toThrow(RangeError);
   });
 

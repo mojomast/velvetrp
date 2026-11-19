@@ -27,20 +27,30 @@ function seed(): void {
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys = ON");
   db.transaction(() => {
-    db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)")
-      .run(applicationOwnerId, "Application owner");
-    db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)")
-      .run(otherCampaignOnlyId, "Other campaign only");
+    db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(
+      applicationOwnerId,
+      "Application owner",
+    );
+    db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(
+      otherCampaignOnlyId,
+      "Other campaign only",
+    );
     for (const member of members) {
       db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(member, member);
     }
     db.prepare("UPDATE application_owner SET principal_id = ? WHERE singleton = 1").run(applicationOwnerId);
-    db.prepare(`INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
-      VALUES ('profile-read', 'Read profile', 'Strict selected profile', '["tag","tag"]')`).run();
+    db.prepare(
+      `INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
+      VALUES ('profile-read', 'Read profile', 'Strict selected profile', '["tag","tag"]')`,
+    ).run();
     const insertPack = db.prepare(`INSERT INTO rpg_content_packs
       (pack_id, pack_version, rules_profile_id, name, description, tags, sealed)
       VALUES (?, ?, 'profile-read', ?, 'Strict exact pack', '[]', 1)`);
-    for (const [packId, packVersion] of [["pack-z", "2"], ["pack-A", "10"], ["pack-Aa", "1"]] as const) {
+    for (const [packId, packVersion] of [
+      ["pack-z", "2"],
+      ["pack-A", "10"],
+      ["pack-Aa", "1"],
+    ] as const) {
       insertPack.run(packId, packVersion, `${packId} ${packVersion}`);
     }
 
@@ -54,16 +64,22 @@ function seed(): void {
       insertTimeline.run(`timeline-${id}`, id, at);
       for (const [index, member] of members.entries()) {
         const role = ["owner", "gm", "player", "observer"][index];
-        db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-          VALUES (?, ?, ?, ?)`).run(id, member, role, at);
+        db.prepare(
+          `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+          VALUES (?, ?, ?, ?)`,
+        ).run(id, member, role, at);
       }
     }
     for (const id of [campaignId, emptyCampaignId]) {
-      db.prepare(`INSERT INTO campaign_rules_profiles (campaign_id, rules_profile_id)
-        VALUES (?, 'profile-read')`).run(id);
+      db.prepare(
+        `INSERT INTO campaign_rules_profiles (campaign_id, rules_profile_id)
+        VALUES (?, 'profile-read')`,
+      ).run(id);
     }
-    db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-      VALUES (?, ?, 'observer', ?)`).run(unconfiguredCampaignId, otherCampaignOnlyId, at);
+    db.prepare(
+      `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+      VALUES (?, ?, 'observer', ?)`,
+    ).run(unconfiguredCampaignId, otherCampaignOnlyId, at);
     // Insert opposite to the required binary/code-unit projection order.
     const insertPin = db.prepare(`INSERT INTO campaign_content_packs
       (campaign_id, pack_id, pack_version, rules_profile_id)
@@ -198,11 +214,13 @@ describe("getCampaignContentConfiguration", () => {
       expired = unitOfWork;
       expect(unitOfWork.getCampaignContentConfiguration("read-gm", campaignId)).toEqual(factory);
     });
-    expect(() => expired!.getCampaignContentConfiguration("bad actor", "bad campaign"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.getCampaignContentConfiguration("bad actor", "bad campaign")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
-    expect(() => repository.getCampaignContentConfiguration("bad actor", "bad campaign"))
-      .toThrow("repository is closed");
+    expect(() => repository.getCampaignContentConfiguration("bad actor", "bad campaign")).toThrow(
+      "repository is closed",
+    );
   });
 
   it("strictly validates inputs before querying an open repository", () => {
@@ -240,22 +258,37 @@ describe("getCampaignContentConfiguration", () => {
 
   it.each([
     ["missing selected profile", `DELETE FROM rpg_rules_profiles WHERE rules_profile_id = 'profile-read';`],
-    ["malformed selected profile", `DROP TRIGGER rpg_rules_profiles_tags_update;
+    [
+      "malformed selected profile",
+      `DROP TRIGGER rpg_rules_profiles_tags_update;
       DROP TRIGGER rpg_rules_profiles_prevent_referenced_update;
-      UPDATE rpg_rules_profiles SET tags = '[1]' WHERE rules_profile_id = 'profile-read';`],
-    ["missing exact pack", `DROP TRIGGER rpg_content_packs_prevent_delete;
-      DELETE FROM rpg_content_packs WHERE pack_id = 'pack-A';`],
-    ["unsealed exact pack", `DROP TRIGGER rpg_content_packs_prevent_update;
-      UPDATE rpg_content_packs SET sealed = 0 WHERE pack_id = 'pack-A';`],
-    ["profile-incompatible pin", `DROP TRIGGER campaign_content_packs_require_sealed_update;
+      UPDATE rpg_rules_profiles SET tags = '[1]' WHERE rules_profile_id = 'profile-read';`,
+    ],
+    [
+      "missing exact pack",
+      `DROP TRIGGER rpg_content_packs_prevent_delete;
+      DELETE FROM rpg_content_packs WHERE pack_id = 'pack-A';`,
+    ],
+    [
+      "unsealed exact pack",
+      `DROP TRIGGER rpg_content_packs_prevent_update;
+      UPDATE rpg_content_packs SET sealed = 0 WHERE pack_id = 'pack-A';`,
+    ],
+    [
+      "profile-incompatible pin",
+      `DROP TRIGGER campaign_content_packs_require_sealed_update;
       UPDATE campaign_content_packs SET rules_profile_id = 'other-profile'
-      WHERE campaign_id = '${campaignId}' AND pack_id = 'pack-A';`],
-    ["malformed exact identifiers", `DROP TRIGGER rpg_content_packs_prevent_update;
+      WHERE campaign_id = '${campaignId}' AND pack_id = 'pack-A';`,
+    ],
+    [
+      "malformed exact identifiers",
+      `DROP TRIGGER rpg_content_packs_prevent_update;
       DROP TRIGGER campaign_content_packs_require_sealed_update;
       UPDATE rpg_content_packs SET pack_id = 'bad pack', pack_version = ' bad'
       WHERE pack_id = 'pack-A';
       UPDATE campaign_content_packs SET pack_id = 'bad pack', pack_version = ' bad'
-      WHERE campaign_id = '${campaignId}' AND pack_id = 'pack-A';`],
+      WHERE campaign_id = '${campaignId}' AND pack_id = 'pack-A';`,
+    ],
   ])("fails loudly for authorized %s corruption while masking it from outsiders", (_name, mutation) => {
     seed();
     if (mutation.includes("other-profile")) {
@@ -270,26 +303,41 @@ describe("getCampaignContentConfiguration", () => {
   });
 
   it.each([
-    ["pins without a selected profile", `DELETE FROM campaign_rules_profiles
-      WHERE campaign_id = '${campaignId}'`],
-    ["a partial-null pin", `ALTER TABLE campaign_content_packs RENAME TO campaign_content_packs_strict;
+    [
+      "pins without a selected profile",
+      `DELETE FROM campaign_rules_profiles
+      WHERE campaign_id = '${campaignId}'`,
+    ],
+    [
+      "a partial-null pin",
+      `ALTER TABLE campaign_content_packs RENAME TO campaign_content_packs_strict;
       CREATE TABLE campaign_content_packs (
         campaign_id TEXT, pack_id TEXT, pack_version TEXT, rules_profile_id TEXT
       );
       INSERT INTO campaign_content_packs SELECT * FROM campaign_content_packs_strict;
       UPDATE campaign_content_packs SET pack_version = NULL
-        WHERE campaign_id = '${campaignId}' AND pack_id = 'pack-A'`],
-    ["duplicate selected-profile rows", `ALTER TABLE campaign_rules_profiles RENAME TO campaign_rules_profiles_strict;
+        WHERE campaign_id = '${campaignId}' AND pack_id = 'pack-A'`,
+    ],
+    [
+      "duplicate selected-profile rows",
+      `ALTER TABLE campaign_rules_profiles RENAME TO campaign_rules_profiles_strict;
       CREATE TABLE campaign_rules_profiles (campaign_id TEXT, rules_profile_id TEXT);
       INSERT INTO campaign_rules_profiles SELECT * FROM campaign_rules_profiles_strict;
-      INSERT INTO campaign_rules_profiles VALUES ('${campaignId}', 'profile-read')`],
-    ["malformed pack metadata", `DROP TRIGGER rpg_content_packs_tags_update;
+      INSERT INTO campaign_rules_profiles VALUES ('${campaignId}', 'profile-read')`,
+    ],
+    [
+      "malformed pack metadata",
+      `DROP TRIGGER rpg_content_packs_tags_update;
       DROP TRIGGER rpg_content_packs_prevent_update;
-      UPDATE rpg_content_packs SET tags = '[1]' WHERE pack_id = 'pack-A'`],
-    ["a pack whose own profile mismatches its pin", `INSERT INTO rpg_rules_profiles
+      UPDATE rpg_content_packs SET tags = '[1]' WHERE pack_id = 'pack-A'`,
+    ],
+    [
+      "a pack whose own profile mismatches its pin",
+      `INSERT INTO rpg_rules_profiles
         VALUES ('other-profile', 'Other', 'Other', '[]');
       DROP TRIGGER rpg_content_packs_prevent_update;
-      UPDATE rpg_content_packs SET rules_profile_id = 'other-profile' WHERE pack_id = 'pack-A'`],
+      UPDATE rpg_content_packs SET rules_profile_id = 'other-profile' WHERE pack_id = 'pack-A'`,
+    ],
   ])("rejects independently corrupted content configuration with %s", (_name, mutation) => {
     seed();
     corrupt(mutation);

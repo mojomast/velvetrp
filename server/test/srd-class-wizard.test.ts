@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { wizardDefinition, wizardLevels, wizardSubclasses } from "../src/content/srdStarter/classes/wizard.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -38,10 +42,23 @@ describe("SRD 5.1 Wizard class", () => {
 
   it("keeps the level-1 spellbook, cantrips, prepared spells, and d6 hit-die grant", () => {
     const parsed = classLevelCatalogDefinitionSchema.parse(levels[0]!);
-    expect(parsed.mechanics.abilityRefs.map((reference) => reference.definitionId)).toEqual(["srd-5.1:ability:wizard-spellbook"]);
-    expect(parsed.mechanics.spellRefs.map((reference) => reference.definitionId)).toEqual(["srd-5.1:spell:fire-bolt", "srd-5.1:spell:ray-of-frost"]);
-    expect(parsed.mechanics.preparedSpellRefs?.map((reference) => reference.definitionId)).toEqual(["srd-5.1:spell:magic-missile", "srd-5.1:spell:false-life", "srd-5.1:spell:shield"]);
-    expect(parsed.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d6", maxIncrease: 1, currentIncrease: 1 });
+    expect(parsed.mechanics.abilityRefs.map((reference) => reference.definitionId)).toEqual([
+      "srd-5.1:ability:wizard-spellbook",
+    ]);
+    expect(parsed.mechanics.spellRefs.map((reference) => reference.definitionId)).toEqual([
+      "srd-5.1:spell:fire-bolt",
+      "srd-5.1:spell:ray-of-frost",
+    ]);
+    expect(parsed.mechanics.preparedSpellRefs?.map((reference) => reference.definitionId)).toEqual([
+      "srd-5.1:spell:magic-missile",
+      "srd-5.1:spell:false-life",
+      "srd-5.1:spell:shield",
+    ]);
+    expect(parsed.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d6",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
   });
 
   it("points the level-3 subclass choice at the School of Evocation", () => {

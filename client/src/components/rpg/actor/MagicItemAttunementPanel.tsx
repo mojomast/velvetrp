@@ -10,7 +10,11 @@ export interface AttunementCandidate {
 
 export interface AttunementPanelApi {
   getActorAttunements: (campaignId: string, actorId: string) => Promise<AttunementSnapshot>;
-  commandActorAttunement: (campaignId: string, actorId: string, command: AttunementCommand) => Promise<AttunementResponse>;
+  commandActorAttunement: (
+    campaignId: string,
+    actorId: string,
+    command: AttunementCommand,
+  ) => Promise<AttunementResponse>;
 }
 
 export interface MagicItemAttunementPanelProps {
@@ -32,7 +36,13 @@ type CompletedRest = (typeof REST_OPTIONS)[number]["value"];
 const DEFAULT_API: AttunementPanelApi = { getActorAttunements, commandActorAttunement };
 
 /** Reads and edits the SRD-attunable magic items of one actor (maximum of three). */
-export function MagicItemAttunementPanel({ campaignId, actorId, disabled = false, candidates = [], api = DEFAULT_API }: MagicItemAttunementPanelProps) {
+export function MagicItemAttunementPanel({
+  campaignId,
+  actorId,
+  disabled = false,
+  candidates = [],
+  api = DEFAULT_API,
+}: MagicItemAttunementPanelProps) {
   const [snapshot, setSnapshot] = useState<AttunementSnapshot | null>(null);
   const [completedRest, setCompletedRest] = useState<CompletedRest>("none");
   const [message, setMessage] = useState("");
@@ -41,25 +51,38 @@ export function MagicItemAttunementPanel({ campaignId, actorId, disabled = false
   useEffect(() => {
     let active = true;
     setMessage("");
-    api.getActorAttunements(campaignId, actorId)
-      .then((value) => { if (active) setSnapshot(value); })
-      .catch(() => { if (active) { setSnapshot(null); setMessage("Attunements could not be loaded."); } });
-    return () => { active = false; };
+    api
+      .getActorAttunements(campaignId, actorId)
+      .then((value) => {
+        if (active) setSnapshot(value);
+      })
+      .catch(() => {
+        if (active) {
+          setSnapshot(null);
+          setMessage("Attunements could not be loaded.");
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [api, campaignId, actorId]);
 
-  const apply = useCallback(async (command: AttunementCommand) => {
-    setPending(true);
-    setMessage("");
-    try {
-      const response = await api.commandActorAttunement(campaignId, actorId, command);
-      setSnapshot(response.snapshot);
-      if (!response.ok) setMessage(`Attunement rejected: ${response.code ?? "unknown"}.`);
-    } catch {
-      setMessage("The attunement command could not be completed.");
-    } finally {
-      setPending(false);
-    }
-  }, [api, campaignId, actorId]);
+  const apply = useCallback(
+    async (command: AttunementCommand) => {
+      setPending(true);
+      setMessage("");
+      try {
+        const response = await api.commandActorAttunement(campaignId, actorId, command);
+        setSnapshot(response.snapshot);
+        if (!response.ok) setMessage(`Attunement rejected: ${response.code ?? "unknown"}.`);
+      } catch {
+        setMessage("The attunement command could not be completed.");
+      } finally {
+        setPending(false);
+      }
+    },
+    [api, campaignId, actorId],
+  );
 
   const attuned = new Set((snapshot?.attunements ?? []).map((entry) => entry.definition.definitionId));
   const busy = disabled || pending;
@@ -78,26 +101,59 @@ export function MagicItemAttunementPanel({ campaignId, actorId, disabled = false
             {snapshot.attunements.map((entry) => (
               <li key={entry.key}>
                 <span>{entry.definition.definitionId}</span>
-                <button className="ghost" type="button" disabled={busy} onClick={() => void apply({ command: "drop", key: entry.key })}>
+                <button
+                  className="ghost"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void apply({ command: "drop", key: entry.key })}
+                >
                   Drop attunement
                 </button>
               </li>
             ))}
           </ul>
-        ) : <p className="actor-empty">No items are attuned.</p>
-      ) : <p className="actor-empty" role="status">Loading attunements…</p>}
+        ) : (
+          <p className="actor-empty">No items are attuned.</p>
+        )
+      ) : (
+        <p className="actor-empty" role="status">
+          Loading attunements…
+        </p>
+      )}
       {candidates.length ? (
         <div className="attunement-candidates">
           <label htmlFor="attunement-rest">Completed rest</label>
-          <select id="attunement-rest" value={completedRest} disabled={busy} onChange={(event) => setCompletedRest(event.target.value as CompletedRest)}>
-            {REST_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          <select
+            id="attunement-rest"
+            value={completedRest}
+            disabled={busy}
+            onChange={(event) => setCompletedRest(event.target.value as CompletedRest)}
+          >
+            {REST_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
           <ul className="compact-server-list">
             {candidates.map((candidate) => (
               <li key={candidate.definitionId}>
-                <span>{candidate.name} <span className="status-pill">{candidate.prerequisite}</span></span>
-                <button className="ghost" type="button" disabled={busy || attuned.has(candidate.definitionId)}
-                  onClick={() => void apply({ command: "attune", key: candidate.definitionId, definitionId: candidate.definitionId, satisfiedRest })}>
+                <span>
+                  {candidate.name} <span className="status-pill">{candidate.prerequisite}</span>
+                </span>
+                <button
+                  className="ghost"
+                  type="button"
+                  disabled={busy || attuned.has(candidate.definitionId)}
+                  onClick={() =>
+                    void apply({
+                      command: "attune",
+                      key: candidate.definitionId,
+                      definitionId: candidate.definitionId,
+                      satisfiedRest,
+                    })
+                  }
+                >
                   {attuned.has(candidate.definitionId) ? "Attuned" : "Attune"}
                 </button>
               </li>

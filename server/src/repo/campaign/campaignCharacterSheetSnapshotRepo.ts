@@ -2,10 +2,7 @@
 import DatabaseDriver from "better-sqlite3";
 import { resourceIdSchema } from "@velvet/contracts";
 import type { CharacterProgressionRepository } from "../characterProgressionRepo.js";
-import type {
-  CampaignCharacterSheetSnapshot,
-  CampaignCharacterWorkspaceSnapshot,
-} from "./campaignTypes.js";
+import type { CampaignCharacterSheetSnapshot, CampaignCharacterWorkspaceSnapshot } from "./campaignTypes.js";
 
 interface CampaignCharacterWorkspaceRepository {
   getCampaignCharacterWorkspace(
@@ -36,8 +33,12 @@ function getCampaignCharacterSheetSnapshotSyncInternal(
 
   const progression = progressionRepository.getCharacterProgression(actorId, targetId);
   if (progression === null) return null;
-  if (workspace.campaignId !== id || workspace.campaignCharacterId !== targetId
-    || progression.campaignId !== id || progression.campaignCharacterId !== targetId) {
+  if (
+    workspace.campaignId !== id ||
+    workspace.campaignCharacterId !== targetId ||
+    progression.campaignId !== id ||
+    progression.campaignCharacterId !== targetId
+  ) {
     throw new Error("campaign character sheet snapshot is malformed");
   }
   return { campaignId: id, campaignCharacterId: targetId, sheet: workspace.character, progression };
@@ -49,17 +50,14 @@ export function createCampaignCharacterSheetSnapshotRepository(
   workspaceRepository: CampaignCharacterWorkspaceRepository,
 ) {
   return {
-    getCampaignCharacterSheetSnapshot: (
-      actorPrincipalId: string,
-      campaignId: string,
-      campaignCharacterId: string,
-    ) => getCampaignCharacterSheetSnapshotSyncInternal(
-      db,
-      progressionRepository,
-      workspaceRepository,
-      actorPrincipalId,
-      campaignId,
-      campaignCharacterId,
-    ),
+    getCampaignCharacterSheetSnapshot: (actorPrincipalId: string, campaignId: string, campaignCharacterId: string) =>
+      getCampaignCharacterSheetSnapshotSyncInternal(
+        db,
+        progressionRepository,
+        workspaceRepository,
+        actorPrincipalId,
+        campaignId,
+        campaignCharacterId,
+      ),
   };
 }

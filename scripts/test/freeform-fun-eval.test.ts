@@ -27,15 +27,36 @@ import {
 } from "../freeform-fun-eval.js";
 
 function event(overrides: Partial<NarrationEvent> & Pick<NarrationEvent, "source" | "text">): NarrationEvent {
-  return { phase: "initial", ...overrides, class: overrides.class ?? classifyNarration(overrides.text, overrides.source) };
+  return {
+    phase: "initial",
+    ...overrides,
+    class: overrides.class ?? classifyNarration(overrides.text, overrides.source),
+  };
 }
 
 function turn(overrides: Partial<TurnRecord>): TurnRecord {
   return {
-    index: 0, id: "t", category: "read", declaration: "I look around.", probe: null, status: 200,
-    finalState: "completed", outcome: "done", narration: "", narrationSource: "none", narrationClass: "none",
-    narrationEvents: [], committed: false, receiptKinds: [], receiptCommandIds: [], proposalToolNames: [],
-    confirmed: false, dmBeatIndex: null, providerCalls: 0, latencyMs: 0, coherence: [],
+    index: 0,
+    id: "t",
+    category: "read",
+    declaration: "I look around.",
+    probe: null,
+    status: 200,
+    finalState: "completed",
+    outcome: "done",
+    narration: "",
+    narrationSource: "none",
+    narrationClass: "none",
+    narrationEvents: [],
+    committed: false,
+    receiptKinds: [],
+    receiptCommandIds: [],
+    proposalToolNames: [],
+    confirmed: false,
+    dmBeatIndex: null,
+    providerCalls: 0,
+    latencyMs: 0,
+    coherence: [],
     ...overrides,
   };
 }
@@ -47,12 +68,33 @@ test("classifyNarration: provider source is provider, regardless of text", () =>
 
 test("classifyNarration: deterministic hold lines split from narration failure", () => {
   // A deliberate hold always carries the bounded reason plus a suggested next step.
-  assert.equal(classifyNarration("The captain is already there. Suggested next step: Travel to Docks. Nothing is resolved; no movement or other campaign change is established.", "deterministic-fallback"), "deliberate-hold");
+  assert.equal(
+    classifyNarration(
+      "The captain is already there. Suggested next step: Travel to Docks. Nothing is resolved; no movement or other campaign change is established.",
+      "deterministic-fallback",
+    ),
+    "deliberate-hold",
+  );
   // The "nothing is resolved" close alone is also a hold marker.
-  assert.equal(classifyNarration("The scene holds. Nothing is resolved; no movement or other campaign change is established.", "deterministic-fallback"), "deliberate-hold");
+  assert.equal(
+    classifyNarration(
+      "The scene holds. Nothing is resolved; no movement or other campaign change is established.",
+      "deterministic-fallback",
+    ),
+    "deliberate-hold",
+  );
   // Generic receipt-free hold prose and receipt-bound composition stay failures.
-  assert.equal(classifyNarration("The scene holds. Your intended action remains pending; no movement or other campaign change is established.", "deterministic-fallback"), "narration-failure");
-  assert.equal(classifyNarration("The authoritative result is clear. You buy 1 Longsword from Mara.", "deterministic-fallback"), "narration-failure");
+  assert.equal(
+    classifyNarration(
+      "The scene holds. Your intended action remains pending; no movement or other campaign change is established.",
+      "deterministic-fallback",
+    ),
+    "narration-failure",
+  );
+  assert.equal(
+    classifyNarration("The authoritative result is clear. You buy 1 Longsword from Mara.", "deterministic-fallback"),
+    "narration-failure",
+  );
   assert.equal(classifyNarration("", "deterministic-fallback"), "narration-failure");
 });
 
@@ -60,7 +102,10 @@ test("narrationClassificationDescriptor: documents the split and the probes", ()
   const descriptor = narrationClassificationDescriptor();
   assert.deepEqual(descriptor.classes, ["provider", "deliberate-hold", "narration-failure"]);
   assert.match(descriptor.fallbackDistinctnessScope, /narration-failure/);
-  assert.deepEqual(descriptor.probes.map((probe) => probe.kind), ["declared-purchase", "unknown-npc", "cheating-commerce"]);
+  assert.deepEqual(
+    descriptor.probes.map((probe) => probe.kind),
+    ["declared-purchase", "unknown-npc", "cheating-commerce"],
+  );
 });
 
 test("fallbackDistinctness: collapses identical strings and ignores blanks", () => {
@@ -94,45 +139,86 @@ test("latencyStats: avg and percentiles over a sorted sample", () => {
 });
 
 test("detectCoherenceViolations: a declared destination resolved elsewhere is a mismatch", () => {
-  const known = [{ id: "market", name: "Market" }, { id: "docks", name: "Docks" }, { id: "chapel", name: "Chapel" }];
+  const known = [
+    { id: "market", name: "Market" },
+    { id: "docks", name: "Docks" },
+    { id: "chapel", name: "Chapel" },
+  ];
   const mismatch = detectCoherenceViolations({
-    index: 0, turnId: "turn-1", declaration: "I set out for the Docks.",
-    actorBeforeId: "market", actorAfterId: "market",
-    travelDestinations: [{ id: "chapel", name: "Chapel" }], actionLocations: [], knownLocations: known,
+    index: 0,
+    turnId: "turn-1",
+    declaration: "I set out for the Docks.",
+    actorBeforeId: "market",
+    actorAfterId: "market",
+    travelDestinations: [{ id: "chapel", name: "Chapel" }],
+    actionLocations: [],
+    knownLocations: known,
   });
-  assert.ok(mismatch.some((value) => value.startsWith("travel-target-mismatch")), mismatch.join(","));
-  assert.ok(mismatch.some((value) => value.startsWith("travel-destination-not-reached")), mismatch.join(","));
+  assert.ok(
+    mismatch.some((value) => value.startsWith("travel-target-mismatch")),
+    mismatch.join(","),
+  );
+  assert.ok(
+    mismatch.some((value) => value.startsWith("travel-destination-not-reached")),
+    mismatch.join(","),
+  );
 });
 
 test("detectCoherenceViolations: a coherent travel and unmapped travel do not fire", () => {
-  const known = [{ id: "market", name: "Market" }, { id: "docks", name: "Docks" }];
+  const known = [
+    { id: "market", name: "Market" },
+    { id: "docks", name: "Docks" },
+  ];
   const coherent = detectCoherenceViolations({
-    index: 0, turnId: "turn-1", declaration: "I set out for the Docks.",
-    actorBeforeId: "market", actorAfterId: "docks",
-    travelDestinations: [{ id: "docks", name: "Docks" }], actionLocations: [], knownLocations: known,
+    index: 0,
+    turnId: "turn-1",
+    declaration: "I set out for the Docks.",
+    actorBeforeId: "market",
+    actorAfterId: "docks",
+    travelDestinations: [{ id: "docks", name: "Docks" }],
+    actionLocations: [],
+    knownLocations: known,
   });
   assert.deepEqual(coherent, []);
   const unmapped = detectCoherenceViolations({
-    index: 1, turnId: "turn-2", declaration: "I follow the smugglers' path to the Sunken Cathedral.",
-    actorBeforeId: "docks", actorAfterId: "sunken-cathedral",
-    travelDestinations: [{ id: null, name: "Sunken Cathedral" }], actionLocations: [], knownLocations: known,
+    index: 1,
+    turnId: "turn-2",
+    declaration: "I follow the smugglers' path to the Sunken Cathedral.",
+    actorBeforeId: "docks",
+    actorAfterId: "sunken-cathedral",
+    travelDestinations: [{ id: null, name: "Sunken Cathedral" }],
+    actionLocations: [],
+    knownLocations: known,
   });
   assert.deepEqual(unmapped, []);
 });
 
 test("detectCoherenceViolations: a location-bound action away from the actor fires", () => {
-  const known = [{ id: "market", name: "Market" }, { id: "docks", name: "Docks" }];
+  const known = [
+    { id: "market", name: "Market" },
+    { id: "docks", name: "Docks" },
+  ];
   const violation = detectCoherenceViolations({
-    index: 7, turnId: "turn-8", declaration: "I buy a longsword from the stall.",
-    actorBeforeId: "docks", actorAfterId: "docks",
-    travelDestinations: [], actionLocations: [{ id: "market", name: "Mara's Goods" }], knownLocations: known,
+    index: 7,
+    turnId: "turn-8",
+    declaration: "I buy a longsword from the stall.",
+    actorBeforeId: "docks",
+    actorAfterId: "docks",
+    travelDestinations: [],
+    actionLocations: [{ id: "market", name: "Mara's Goods" }],
+    knownLocations: known,
   });
   assert.equal(violation.length, 1);
   assert.ok(violation[0]!.startsWith("action-location-mismatch"), violation[0]);
   const fine = detectCoherenceViolations({
-    index: 8, turnId: "turn-9", declaration: "I buy a longsword from the stall.",
-    actorBeforeId: "market", actorAfterId: "market",
-    travelDestinations: [], actionLocations: [{ id: "market", name: "Mara's Goods" }], knownLocations: known,
+    index: 8,
+    turnId: "turn-9",
+    declaration: "I buy a longsword from the stall.",
+    actorBeforeId: "market",
+    actorAfterId: "market",
+    travelDestinations: [],
+    actionLocations: [{ id: "market", name: "Mara's Goods" }],
+    knownLocations: known,
   });
   assert.deepEqual(fine, []);
 });
@@ -141,35 +227,136 @@ test("turnExercisesCommerce: receipts and vendor proposals both count", () => {
   assert.equal(turnExercisesCommerce({ receiptKinds: ["commerce"], proposalToolNames: [] }), true);
   assert.equal(turnExercisesCommerce({ receiptKinds: [], proposalToolNames: ["vendor_buy"] }), true);
   assert.equal(turnExercisesCommerce({ receiptKinds: [], proposalToolNames: ["vendor_give"] }), true);
-  assert.equal(turnExercisesCommerce({ receiptKinds: ["check"], proposalToolNames: ["exact_srd_check.select"] }), false);
+  assert.equal(
+    turnExercisesCommerce({ receiptKinds: ["check"], proposalToolNames: ["exact_srd_check.select"] }),
+    false,
+  );
 });
 
 test("computeMetrics: separates deliberate holds from narration-failure fallbacks", () => {
   const calls: ProviderCallRecord[] = [
-    { seq: 1, lane: "adventure-narration-v1", ok: true, finishReason: "tool", detail: "", tools: [], promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0, latencyMs: 100, dmCandidates: null },
-    { seq: 2, lane: "adventure-narration-v1", ok: false, finishReason: "Error", detail: "boom", tools: [], promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, latencyMs: 50, dmCandidates: null },
+    {
+      seq: 1,
+      lane: "adventure-narration-v1",
+      ok: true,
+      finishReason: "tool",
+      detail: "",
+      tools: [],
+      promptTokens: 1,
+      completionTokens: 1,
+      totalTokens: 2,
+      costUsd: 0,
+      latencyMs: 100,
+      dmCandidates: null,
+    },
+    {
+      seq: 2,
+      lane: "adventure-narration-v1",
+      ok: false,
+      finishReason: "Error",
+      detail: "boom",
+      tools: [],
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      costUsd: 0,
+      latencyMs: 50,
+      dmCandidates: null,
+    },
   ];
   const turns = [
-    turn({ index: 0, narrationSource: "provider-assisted", narrationClass: "provider",
-      narrationEvents: [event({ source: "provider-assisted", text: "A" })], committed: true, latencyMs: 1000 }),
-    turn({ index: 1, narrationSource: "deterministic-fallback", narrationClass: "deliberate-hold",
-      narrationEvents: [event({ source: "deterministic-fallback", text: "Suggested next step: Travel to Docks. Nothing is resolved; no movement or other campaign change is established." })],
-      committed: false, latencyMs: 3000 }),
-    turn({ index: 2, narrationSource: "deterministic-fallback", narrationClass: "narration-failure",
-      narrationEvents: [event({ source: "deterministic-fallback", text: "hold" })], committed: true, latencyMs: 2000 }),
-    turn({ index: 3, narrationSource: "deterministic-fallback", narrationClass: "narration-failure",
-      narrationEvents: [event({ source: "deterministic-fallback", text: "hold" })], committed: false, latencyMs: 4000 }),
-    turn({ index: 4, probe: "declared-purchase", narrationClass: "provider", committed: true,
-      receiptKinds: ["commerce"], receiptCommandIds: ["cmd-1"], proposalToolNames: ["vendor_buy"] }),
-    turn({ index: 5, probe: "unknown-npc", narrationClass: "deliberate-hold", committed: false,
-      narrationEvents: [event({ source: "deterministic-fallback", text: "Suggested next step: Talk to them. Nothing is resolved; no movement or other campaign change is established." })] }),
-    turn({ index: 6, probe: "cheating-commerce", narrationClass: "narration-failure", committed: false,
-      receiptKinds: [], receiptCommandIds: [], proposalToolNames: [],
-      narrationEvents: [event({ source: "deterministic-fallback", text: "That action cannot be established." })] }),
+    turn({
+      index: 0,
+      narrationSource: "provider-assisted",
+      narrationClass: "provider",
+      narrationEvents: [event({ source: "provider-assisted", text: "A" })],
+      committed: true,
+      latencyMs: 1000,
+    }),
+    turn({
+      index: 1,
+      narrationSource: "deterministic-fallback",
+      narrationClass: "deliberate-hold",
+      narrationEvents: [
+        event({
+          source: "deterministic-fallback",
+          text: "Suggested next step: Travel to Docks. Nothing is resolved; no movement or other campaign change is established.",
+        }),
+      ],
+      committed: false,
+      latencyMs: 3000,
+    }),
+    turn({
+      index: 2,
+      narrationSource: "deterministic-fallback",
+      narrationClass: "narration-failure",
+      narrationEvents: [event({ source: "deterministic-fallback", text: "hold" })],
+      committed: true,
+      latencyMs: 2000,
+    }),
+    turn({
+      index: 3,
+      narrationSource: "deterministic-fallback",
+      narrationClass: "narration-failure",
+      narrationEvents: [event({ source: "deterministic-fallback", text: "hold" })],
+      committed: false,
+      latencyMs: 4000,
+    }),
+    turn({
+      index: 4,
+      probe: "declared-purchase",
+      narrationClass: "provider",
+      committed: true,
+      receiptKinds: ["commerce"],
+      receiptCommandIds: ["cmd-1"],
+      proposalToolNames: ["vendor_buy"],
+    }),
+    turn({
+      index: 5,
+      probe: "unknown-npc",
+      narrationClass: "deliberate-hold",
+      committed: false,
+      narrationEvents: [
+        event({
+          source: "deterministic-fallback",
+          text: "Suggested next step: Talk to them. Nothing is resolved; no movement or other campaign change is established.",
+        }),
+      ],
+    }),
+    turn({
+      index: 6,
+      probe: "cheating-commerce",
+      narrationClass: "narration-failure",
+      committed: false,
+      receiptKinds: [],
+      receiptCommandIds: [],
+      proposalToolNames: [],
+      narrationEvents: [event({ source: "deterministic-fallback", text: "That action cannot be established." })],
+    }),
   ];
   const beats: DmBeatRecord[] = [
-    { index: 0, intent: "open", state: "completed", receipts: ["advance-time"], candidatesOffered: ["x"], narration: "n", blockers: [], latencyMs: 10, success: true },
-    { index: 1, intent: "continue", state: "blocked", receipts: [], candidatesOffered: [], narration: "", blockers: ["no-candidate"], latencyMs: 20, success: false },
+    {
+      index: 0,
+      intent: "open",
+      state: "completed",
+      receipts: ["advance-time"],
+      candidatesOffered: ["x"],
+      narration: "n",
+      blockers: [],
+      latencyMs: 10,
+      success: true,
+    },
+    {
+      index: 1,
+      intent: "continue",
+      state: "blocked",
+      receipts: [],
+      candidatesOffered: [],
+      narration: "",
+      blockers: ["no-candidate"],
+      latencyMs: 20,
+      success: false,
+    },
   ];
   const metrics = computeMetrics(turns, beats, calls);
   assert.equal(metrics.providerSuccessRate, 0.5);
@@ -200,14 +387,22 @@ test("computeMetrics: separates deliberate holds from narration-failure fallback
 });
 
 test("probeOutcomes: declared purchase passes only with a committed commerce receipt", () => {
-  const exercisedOnly = probeOutcomes([turn({ probe: "declared-purchase", committed: false,
-    proposalToolNames: ["vendor_buy"], receiptKinds: [] })]);
+  const exercisedOnly = probeOutcomes([
+    turn({ probe: "declared-purchase", committed: false, proposalToolNames: ["vendor_buy"], receiptKinds: [] }),
+  ]);
   const purchase = exercisedOnly.find((probe) => probe.kind === "declared-purchase")!;
   assert.equal(purchase.passed, false);
   assert.match(purchase.observed, /commerce proposal surfaced/);
 
-  const committed = probeOutcomes([turn({ probe: "declared-purchase", committed: true,
-    proposalToolNames: ["vendor_buy"], receiptKinds: ["commerce"], receiptCommandIds: ["cmd-1"] })]);
+  const committed = probeOutcomes([
+    turn({
+      probe: "declared-purchase",
+      committed: true,
+      proposalToolNames: ["vendor_buy"],
+      receiptKinds: ["commerce"],
+      receiptCommandIds: ["cmd-1"],
+    }),
+  ]);
   assert.equal(committed.find((probe) => probe.kind === "declared-purchase")!.passed, true);
 });
 
@@ -215,22 +410,28 @@ test("probeOutcomes: unknown NPC fails loudly when it resolves as a check", () =
   const held = probeOutcomes([turn({ probe: "unknown-npc", committed: false, receiptKinds: [] })]);
   assert.equal(held.find((probe) => probe.kind === "unknown-npc")!.passed, true);
 
-  const checked = probeOutcomes([turn({ probe: "unknown-npc", committed: true, receiptKinds: ["check"], receiptCommandIds: ["cmd-1"] })]);
+  const checked = probeOutcomes([
+    turn({ probe: "unknown-npc", committed: true, receiptKinds: ["check"], receiptCommandIds: ["cmd-1"] }),
+  ]);
   const probe = checked.find((value) => value.kind === "unknown-npc")!;
   assert.equal(probe.passed, false);
   assert.match(probe.observed, /resolved as a skill check/);
 });
 
 test("probeOutcomes: cheating commerce catches the give misfire", () => {
-  const held = probeOutcomes([turn({ probe: "cheating-commerce", committed: false, receiptKinds: [], receiptCommandIds: [] })]);
+  const held = probeOutcomes([
+    turn({ probe: "cheating-commerce", committed: false, receiptKinds: [], receiptCommandIds: [] }),
+  ]);
   assert.equal(held.find((probe) => probe.kind === "cheating-commerce")!.passed, true);
 
-  const receiptMisfire = probeOutcomes([turn({ probe: "cheating-commerce", committed: true,
-    receiptKinds: ["inventory"], receiptCommandIds: ["cmd-1"] })]);
+  const receiptMisfire = probeOutcomes([
+    turn({ probe: "cheating-commerce", committed: true, receiptKinds: ["inventory"], receiptCommandIds: ["cmd-1"] }),
+  ]);
   assert.equal(receiptMisfire.find((probe) => probe.kind === "cheating-commerce")!.passed, false);
 
-  const proposalMisfire = probeOutcomes([turn({ probe: "cheating-commerce", committed: false,
-    receiptKinds: [], proposalToolNames: ["vendor_give"] })]);
+  const proposalMisfire = probeOutcomes([
+    turn({ probe: "cheating-commerce", committed: false, receiptKinds: [], proposalToolNames: ["vendor_give"] }),
+  ]);
   const probe = proposalMisfire.find((value) => value.kind === "cheating-commerce")!;
   assert.equal(probe.passed, false);
   assert.match(probe.observed, /give misfire/);
@@ -256,17 +457,38 @@ test("negative probes do not treat failed HTTP requests or incomplete turns as s
 });
 
 test("run verdict fails total provider outages even when fallback turns complete", () => {
-  const result = evaluateRun({ mode: "in-process", declarations: 1, dmBeats: [], providerCalls: [],
-    turns: [turn({ narration: "The scene holds.", narrationClass: "narration-failure" })] });
+  const result = evaluateRun({
+    mode: "in-process",
+    declarations: 1,
+    dmBeats: [],
+    providerCalls: [],
+    turns: [turn({ narration: "The scene holds.", narrationClass: "narration-failure" })],
+  });
   assert.equal(result.passed, false);
   assert.deepEqual(result.failures, ["no live provider call succeeded"]);
   assert.equal(result.skipped.length, 3);
 });
 
 test("run verdict catches missing narration, HTTP failures, incomplete DM beats, and coherence failures", () => {
-  const result = evaluateRun({ mode: "base-url", declarations: 1, providerCalls: [],
+  const result = evaluateRun({
+    mode: "base-url",
+    declarations: 1,
+    providerCalls: [],
     turns: [turn({ status: 409, finalState: null, coherence: ["travel-destination-not-reached"] })],
-    dmBeats: [{ index: 1, intent: "open", state: "unknown", receipts: [], candidatesOffered: [], narration: "", blockers: [], latencyMs: 0, success: false }] });
+    dmBeats: [
+      {
+        index: 1,
+        intent: "open",
+        state: "unknown",
+        receipts: [],
+        candidatesOffered: [],
+        narration: "",
+        blockers: [],
+        latencyMs: 0,
+        success: false,
+      },
+    ],
+  });
   assert.equal(result.passed, false);
   assert.ok(result.failures.some((value) => value.includes("HTTP 409")));
   assert.ok(result.failures.some((value) => value.includes("missing terminal")));
@@ -276,16 +498,46 @@ test("run verdict catches missing narration, HTTP failures, incomplete DM beats,
 });
 
 test("a shortened run skips probes outside its turn range but fails requested probes", () => {
-  const providerCall: ProviderCallRecord = { seq: 1, lane: "adventure-narration-v1", ok: true, finishReason: "stop", detail: "", tools: [],
-    promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0, latencyMs: 1, dmCandidates: null };
+  const providerCall: ProviderCallRecord = {
+    seq: 1,
+    lane: "adventure-narration-v1",
+    ok: true,
+    finishReason: "stop",
+    detail: "",
+    tools: [],
+    promptTokens: 1,
+    completionTokens: 1,
+    totalTokens: 2,
+    costUsd: 0,
+    latencyMs: 1,
+    dmCandidates: null,
+  };
   const first = turn({ id: "look-around", narration: "The market is quiet." });
-  assert.equal(evaluateRun({ mode: "in-process", declarations: 1, turns: [first], dmBeats: [], providerCalls: [providerCall] }).passed, true);
-  const unnecessaryRoll = evaluateRun({ mode: "in-process", declarations: 1, turns: [{ ...first, committed: true, receiptKinds: ["check"] }], dmBeats: [], providerCalls: [providerCall] });
+  assert.equal(
+    evaluateRun({ mode: "in-process", declarations: 1, turns: [first], dmBeats: [], providerCalls: [providerCall] })
+      .passed,
+    true,
+  );
+  const unnecessaryRoll = evaluateRun({
+    mode: "in-process",
+    declarations: 1,
+    turns: [{ ...first, committed: true, receiptKinds: ["check"] }],
+    dmBeats: [],
+    providerCalls: [providerCall],
+  });
   assert.equal(unnecessaryRoll.passed, false);
   assert.deepEqual(unnecessaryRoll.failures, ["routine observation: looking around committed an unnecessary check"]);
-  const result = evaluateRun({ mode: "in-process", declarations: 3,
-    turns: [first, turn({ index: 1, narration: "Maren greets you." }), turn({ index: 2, probe: "declared-purchase", narration: "The stall is closed." })],
-    dmBeats: [], providerCalls: [providerCall] });
+  const result = evaluateRun({
+    mode: "in-process",
+    declarations: 3,
+    turns: [
+      first,
+      turn({ index: 1, narration: "Maren greets you." }),
+      turn({ index: 2, probe: "declared-purchase", narration: "The stall is closed." }),
+    ],
+    dmBeats: [],
+    providerCalls: [providerCall],
+  });
   assert.equal(result.passed, false);
   assert.ok(result.failures.some((value) => value.startsWith("declared-purchase:")));
   assert.equal(result.skipped.length, 2);
@@ -304,19 +556,31 @@ test("repeat evaluations dispatch fresh commands and open their first Director b
   const server = createServer((req, res) => {
     let body = "";
     req.setEncoding("utf8");
-    req.on("data", (chunk) => { body += chunk; });
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
     req.on("end", () => {
       const input = body ? JSON.parse(body) : {};
       if (input.idempotencyKey) keys.push(input.idempotencyKey);
       if (req.url?.endsWith("/adventure-turns/stream")) {
         res.writeHead(200, { "content-type": "text/event-stream", "x-adventure-turn-id": "turn-1" });
-        res.end(`event: narration_delta\ndata: {"payload":{"text":"The market stirs."}}\n\nevent: terminal\ndata: {"payload":{"turn":{"turnId":"turn-1","state":"completed"},"outcome":"completed","narrationStatus":{"source":"provider-assisted"}}}\n\n`);
+        res.end(
+          `event: narration_delta\ndata: {"payload":{"text":"The market stirs."}}\n\nevent: terminal\ndata: {"payload":{"turn":{"turnId":"turn-1","state":"completed"},"outcome":"completed","narrationStatus":{"source":"provider-assisted"}}}\n\n`,
+        );
         return;
       }
       res.setHeader("content-type", "application/json");
       if (req.url?.endsWith("/beat-commands")) {
         intents.push(input.intent);
-        res.end(JSON.stringify({ runId: "run-1", intent: input.intent, state: "completed", narration: "A bell rings.", receipts: [] }));
+        res.end(
+          JSON.stringify({
+            runId: "run-1",
+            intent: input.intent,
+            state: "completed",
+            narration: "A bell rings.",
+            receipts: [],
+          }),
+        );
       } else if (req.url?.endsWith("/dm")) res.end(JSON.stringify({ mode: "ai", revision: 0 }));
       else if (req.url?.endsWith("/play-bootstrap")) res.end(JSON.stringify({ expectedRevision: 0 }));
       else res.end(JSON.stringify({ receipts: [] }));
@@ -325,23 +589,36 @@ test("repeat evaluations dispatch fresh commands and open their first Director b
   try {
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     for (let run = 0; run < 2; run += 1) {
-      const artifact = await runAgainstBaseUrl({ baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
-        campaignId: "campaign", sessionId: "session", actorId: "actor", turns: 2,
-        out: path.join(directory, `run-${run}.json`), baseline: null, quiet: true });
+      const artifact = await runAgainstBaseUrl({
+        baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+        campaignId: "campaign",
+        sessionId: "session",
+        actorId: "actor",
+        turns: 2,
+        out: path.join(directory, `run-${run}.json`),
+        baseline: null,
+        quiet: true,
+      });
       assert.equal(artifact.verdict.passed, true);
     }
     assert.equal(keys.length, 6);
-    assert.equal(new Set(keys).size, keys.length, "new evaluations must not replay an older run's paid generation or actions");
+    assert.equal(
+      new Set(keys).size,
+      keys.length,
+      "new evaluations must not replay an older run's paid generation or actions",
+    );
     assert.deepEqual(intents, ["open", "open"]);
   } finally {
-    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     await rm(directory, { recursive: true, force: true });
   }
 });
 
 test("diagnostic call and receipt counts do not mislabel fewer unnecessary actions as worse", () => {
-  const diffs = diffMetrics({ providerCalls: 55, materializedTurns: 5, fallbackDistinct: 1, narrationFailureTurns: 1 },
-    { providerCalls: 57, materializedTurns: 7, fallbackDistinct: 3, narrationFailureTurns: 3 });
+  const diffs = diffMetrics(
+    { providerCalls: 55, materializedTurns: 5, fallbackDistinct: 1, narrationFailureTurns: 1 },
+    { providerCalls: 57, materializedTurns: 7, fallbackDistinct: 3, narrationFailureTurns: 3 },
+  );
   assert.deepEqual(diffs.map(diffVerdict), ["changed (-2)", "changed (-2)", "changed (-2)", "better (-2)"]);
 });
 
@@ -352,8 +629,20 @@ test("diffMetrics: computes per-key deltas and direction", () => {
   );
   const byKey = new Map(diffs.map((diff) => [diff.key, diff]));
   assert.equal(byKey.size, 3);
-  assert.deepEqual(byKey.get("narrationsProvider"), { key: "narrationsProvider", baseline: 7, current: 9, delta: 2, lowerIsBetter: false });
-  assert.deepEqual(byKey.get("providerFailed"), { key: "providerFailed", baseline: 4, current: 1, delta: -3, lowerIsBetter: true });
+  assert.deepEqual(byKey.get("narrationsProvider"), {
+    key: "narrationsProvider",
+    baseline: 7,
+    current: 9,
+    delta: 2,
+    lowerIsBetter: false,
+  });
+  assert.deepEqual(byKey.get("providerFailed"), {
+    key: "providerFailed",
+    baseline: 4,
+    current: 1,
+    delta: -3,
+    lowerIsBetter: true,
+  });
   assert.equal(byKey.get("latencyAvgMs")!.lowerIsBetter, true);
   assert.equal(byKey.has("missing"), false);
   assert.equal(byKey.has("ignored"), false);

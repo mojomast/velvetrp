@@ -64,7 +64,12 @@ const gradingCase = (
   expected,
   candidates: [
     { candidateId: "a", digest: "a".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
-    { candidateId: "b", digest: "b".repeat(64), kind: "exact_srd_check.select", label: "Strength (Athletics), Easy difficulty, normal" },
+    {
+      candidateId: "b",
+      digest: "b".repeat(64),
+      kind: "exact_srd_check.select",
+      label: "Strength (Athletics), Easy difficulty, normal",
+    },
   ],
 });
 
@@ -112,7 +117,12 @@ const harvestProposal = (overrides: Record<string, unknown> = {}): Record<string
   state: {
     declaration: "I walk to the mill.",
     candidates: [
-      { candidateId: "harvest:travel", digest: "c".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
+      {
+        candidateId: "harvest:travel",
+        digest: "c".repeat(64),
+        kind: "exact_actor_travel.select",
+        label: "Travel to the mill",
+      },
     ],
   },
   expected: { candidateId: "harvest:travel" },
@@ -132,8 +142,18 @@ const mergedHarvestCase = (provenance: string, seed = "a"): MergedAdventureCase 
       state: {
         declaration: "I walk to the mill or the harbor.",
         candidates: [
-          { candidateId: "harvest:travel", digest: "c".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
-          { candidateId: "harvest:harbor", digest: "d".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the harbor" },
+          {
+            candidateId: "harvest:travel",
+            digest: "c".repeat(64),
+            kind: "exact_actor_travel.select",
+            label: "Travel to the mill",
+          },
+          {
+            candidateId: "harvest:harbor",
+            digest: "d".repeat(64),
+            kind: "exact_actor_travel.select",
+            label: "Travel to the harbor",
+          },
         ],
       },
       expected: { candidateId: "harvest:harbor" },
@@ -143,7 +163,10 @@ const mergedHarvestCase = (provenance: string, seed = "a"): MergedAdventureCase 
 };
 
 /** A composition of one of the merged case's candidates, committed at the given signal. */
-const harvestedComposition = (candidateId: "harvest:travel" | "harvest:harbor", topSignal = 0.9): AdventureSelectionComposition =>
+const harvestedComposition = (
+  candidateId: "harvest:travel" | "harvest:harbor",
+  topSignal = 0.9,
+): AdventureSelectionComposition =>
   composition({
     selection: { candidateId, digest: candidateId === "harvest:travel" ? "c".repeat(64) : "d".repeat(64) },
     topSignal,
@@ -155,7 +178,14 @@ test("the frozen corpus covers every category and tool family with unique ids an
   assert.ok(ADVENTURE_EVAL_CASES.length >= 24 && ADVENTURE_EVAL_CASES.length <= 32, "expected roughly 24-32 cases");
 
   const categories = new Set(ADVENTURE_EVAL_CASES.map((testCase) => testCase.category));
-  for (const category of ["direct-match", "ambiguous", "multi-family", "unsupported", "unadvertised", "small-talk"] as const) {
+  for (const category of [
+    "direct-match",
+    "ambiguous",
+    "multi-family",
+    "unsupported",
+    "unadvertised",
+    "small-talk",
+  ] as const) {
     assert.ok(categories.has(category), `missing category ${category}`);
   }
 
@@ -173,7 +203,10 @@ test("the frozen corpus covers every category and tool family with unique ids an
       assert.match(entry.digest, /^[0-9a-f]{64}$/, `bad digest in ${testCase.id}`);
       assert.ok(!digests.has(entry.digest), `duplicate digest in ${testCase.id}`);
       digests.add(entry.digest);
-      assert.ok(entry.kind.trim().length > 0 && entry.label.trim().length > 0, `incomplete candidate in ${testCase.id}`);
+      assert.ok(
+        entry.kind.trim().length > 0 && entry.label.trim().length > 0,
+        `incomplete candidate in ${testCase.id}`,
+      );
     }
   }
 
@@ -193,39 +226,49 @@ test("the frozen corpus covers every category and tool family with unique ids an
     assert.ok(kinds.has(kind), `missing tool family ${kind}`);
   }
 
-  assert.ok(ADVENTURE_EVAL_CASES.some((testCase) => testCase.candidates.length === 0), "expected an empty candidate list case");
+  assert.ok(
+    ADVENTURE_EVAL_CASES.some((testCase) => testCase.candidates.length === 0),
+    "expected an empty candidate list case",
+  );
 });
 
 test("the corpus validator rejects malformed cases", () => {
   assert.throws(() => validateAdventureEvalCases([evalCase()]), /holdout/);
   assert.throws(() => validateAdventureEvalCases([evalCase({ id: "x" }), evalCase({ id: "x", holdout: true })]), /id/);
-  assert.throws(() => validateAdventureEvalCases([evalCase({ declaration: "   " }), evalCase({ id: "h", holdout: true })]), /declaration/);
   assert.throws(
-    () => validateAdventureEvalCases([
-      evalCase({ candidates: [{ candidateId: "a", digest: "nope", kind: "kind", label: "label" }] }),
-      evalCase({ id: "h", holdout: true }),
-    ]),
+    () => validateAdventureEvalCases([evalCase({ declaration: "   " }), evalCase({ id: "h", holdout: true })]),
+    /declaration/,
+  );
+  assert.throws(
+    () =>
+      validateAdventureEvalCases([
+        evalCase({ candidates: [{ candidateId: "a", digest: "nope", kind: "kind", label: "label" }] }),
+        evalCase({ id: "h", holdout: true }),
+      ]),
     /digest/,
   );
   assert.throws(
-    () => validateAdventureEvalCases([
-      evalCase({ expected: { preferred: "missing", acceptable: ["missing"] } }),
-      evalCase({ id: "h", holdout: true }),
-    ]),
+    () =>
+      validateAdventureEvalCases([
+        evalCase({ expected: { preferred: "missing", acceptable: ["missing"] } }),
+        evalCase({ id: "h", holdout: true }),
+      ]),
     /not advertised/,
   );
   assert.throws(
-    () => validateAdventureEvalCases([
-      evalCase({ expected: { preferred: null, acceptable: [] } }),
-      evalCase({ id: "h", holdout: true }),
-    ]),
+    () =>
+      validateAdventureEvalCases([
+        evalCase({ expected: { preferred: null, acceptable: [] } }),
+        evalCase({ id: "h", holdout: true }),
+      ]),
     /acceptable/,
   );
   assert.throws(
-    () => validateAdventureEvalCases([
-      evalCase({ expected: { preferred: null, acceptable: ["a"] } }),
-      evalCase({ id: "h", holdout: true }),
-    ]),
+    () =>
+      validateAdventureEvalCases([
+        evalCase({ expected: { preferred: null, acceptable: ["a"] } }),
+        evalCase({ id: "h", holdout: true }),
+      ]),
     /null/,
   );
 });
@@ -233,7 +276,14 @@ test("the corpus validator rejects malformed cases", () => {
 test("grades exhaustively: exact picks, acceptable alternatives, wrong picks, and deferrals", () => {
   const exact = gradeAdventureCase(gradingCase({ preferred: "a", acceptable: ["a"] }), composition());
   assert.deepEqual(
-    { band: exact.band, selected: exact.selected, candidateId: exact.candidateId, selectedCorrect: exact.selectedCorrect, deferred: exact.deferred, correct: exact.correct },
+    {
+      band: exact.band,
+      selected: exact.selected,
+      candidateId: exact.candidateId,
+      selectedCorrect: exact.selectedCorrect,
+      deferred: exact.deferred,
+      correct: exact.correct,
+    },
     { band: "act", selected: "a", candidateId: "a", selectedCorrect: true, deferred: false, correct: true },
   );
 
@@ -258,7 +308,13 @@ test("grades exhaustively: exact picks, acceptable alternatives, wrong picks, an
     composition({ band: "fallback", method: "defer", selection: null, topSignal: 0.2 }),
   );
   assert.deepEqual(
-    { selected: deferred.selected, candidateId: deferred.candidateId, selectedCorrect: deferred.selectedCorrect, deferred: deferred.deferred, correct: deferred.correct },
+    {
+      selected: deferred.selected,
+      candidateId: deferred.candidateId,
+      selectedCorrect: deferred.selectedCorrect,
+      deferred: deferred.deferred,
+      correct: deferred.correct,
+    },
     { selected: null, candidateId: null, selectedCorrect: true, deferred: true, correct: true },
   );
 
@@ -268,7 +324,12 @@ test("grades exhaustively: exact picks, acceptable alternatives, wrong picks, an
 
   const confirmed = gradeAdventureCase(
     gradingCase({ preferred: null, acceptable: [null] }),
-    composition({ band: "confirm", method: "choice", selection: { candidateId: "a", digest: "a".repeat(64) }, topSignal: 0.6 }),
+    composition({
+      band: "confirm",
+      method: "choice",
+      selection: { candidateId: "a", digest: "a".repeat(64) },
+      topSignal: 0.6,
+    }),
   );
   assert.equal(confirmed.deferred, true, "confirm is a deferral");
   assert.equal(confirmed.selected, null, "confirm commits nothing");
@@ -326,13 +387,19 @@ test("promotes, proposes a record, and selects the default when composed decisio
   assert.equal(evaluation.gate.promoted, true);
   assert.deepEqual(evaluation.gate.reasons, []);
   assert.ok(evaluation.calibration.allCalibrated.brier <= 0.1, `brier ${evaluation.calibration.allCalibrated.brier}`);
-  assert.ok(evaluation.calibration.allCalibrated.expectedCalibrationError <= 0.1, `ece ${evaluation.calibration.allCalibrated.expectedCalibrationError}`);
+  assert.ok(
+    evaluation.calibration.allCalibrated.expectedCalibrationError <= 0.1,
+    `ece ${evaluation.calibration.allCalibrated.expectedCalibrationError}`,
+  );
   assert.ok(evaluation.proposedRecord);
   assert.equal(evaluation.proposedRecord.metrics.samples, 40);
   assert.equal(evaluation.proposedRecord.metrics.accuracy, 1);
   assert.equal(evaluation.proposedRecord.promotedAt, "2026-09-17");
   assert.equal(evaluation.proposedRecord.evidence, "docs/system-one-adventure-benchmark.md");
-  assert.ok(Number.isFinite(evaluation.proposedRecord.calibration?.a) && Number.isFinite(evaluation.proposedRecord.calibration?.b));
+  assert.ok(
+    Number.isFinite(evaluation.proposedRecord.calibration?.a) &&
+      Number.isFinite(evaluation.proposedRecord.calibration?.b),
+  );
 
   assert.equal(evaluation.sweep.defaultVerdict.threshold, ADVENTURE_DEFAULT_ACTION_THRESHOLD);
   assert.equal(evaluation.sweep.defaultVerdict.gate.promoted, true);
@@ -343,18 +410,19 @@ test("promotes, proposes a record, and selects the default when composed decisio
 });
 
 test("recommends a lower threshold when the default bar leaves the raw picks below it", () => {
-  const underconfident = (id: string, holdout: boolean) => readout({
-    id,
-    holdout,
-    band: "confirm",
-    method: "choice",
-    selected: null,
-    candidateId: "a",
-    selectedCorrect: false,
-    deferred: true,
-    correct: false,
-    topSignal: 0.68,
-  });
+  const underconfident = (id: string, holdout: boolean) =>
+    readout({
+      id,
+      holdout,
+      band: "confirm",
+      method: "choice",
+      selected: null,
+      candidateId: "a",
+      selectedCorrect: false,
+      deferred: true,
+      correct: false,
+      topSignal: 0.68,
+    });
   const evaluation = evaluateAdventureReadouts(
     [
       ...Array.from({ length: 30 }, (_, index) => underconfident(`dev-${index}`, false)),
@@ -392,19 +460,20 @@ test("recommends a lower threshold when the default bar leaves the raw picks bel
 });
 
 test("reports no recommended threshold when every grid point fails an acted floor", () => {
-  const wrong = (id: string, holdout: boolean) => readout({
-    id,
-    holdout,
-    band: "confirm",
-    method: "choice",
-    selected: null,
-    candidateId: "wrong",
-    acceptable: ["a"],
-    selectedCorrect: false,
-    deferred: true,
-    correct: false,
-    topSignal: 0.68,
-  });
+  const wrong = (id: string, holdout: boolean) =>
+    readout({
+      id,
+      holdout,
+      band: "confirm",
+      method: "choice",
+      selected: null,
+      candidateId: "wrong",
+      acceptable: ["a"],
+      selectedCorrect: false,
+      deferred: true,
+      correct: false,
+      topSignal: 0.68,
+    });
   const evaluation = evaluateAdventureReadouts(
     [
       ...Array.from({ length: 30 }, (_, index) => wrong(`dev-${index}`, false)),
@@ -487,8 +556,28 @@ test("excludes deferrals and unusable signals from the acted calibration points"
   const evaluation = evaluateAdventureReadouts(
     [
       readout({ id: "act", topSignal: 0.8 }),
-      readout({ id: "confirm", band: "confirm", method: "choice", selected: null, candidateId: "a", selectedCorrect: false, deferred: true, correct: false, topSignal: 0.6 }),
-      readout({ id: "fallback", band: "fallback", method: "defer", selected: null, candidateId: "a", selectedCorrect: true, deferred: true, correct: true, topSignal: 0.2 }),
+      readout({
+        id: "confirm",
+        band: "confirm",
+        method: "choice",
+        selected: null,
+        candidateId: "a",
+        selectedCorrect: false,
+        deferred: true,
+        correct: false,
+        topSignal: 0.6,
+      }),
+      readout({
+        id: "fallback",
+        band: "fallback",
+        method: "defer",
+        selected: null,
+        candidateId: "a",
+        selectedCorrect: true,
+        deferred: true,
+        correct: true,
+        topSignal: 0.2,
+      }),
       readout({ id: "null-signal", topSignal: null }),
     ],
     "2026-09-17",
@@ -516,12 +605,24 @@ test("rolls up per-case counts, bands, outcomes, and failures", () => {
         correct: false,
         topSignal: 0.3,
       }),
-      readout({ id: holdoutCase.id, category: holdoutCase.category, holdout: true, selected: "wrong", candidateId: "wrong", selectedCorrect: false, correct: false, topSignal: 0.8 }),
+      readout({
+        id: holdoutCase.id,
+        category: holdoutCase.category,
+        holdout: true,
+        selected: "wrong",
+        candidateId: "wrong",
+        selectedCorrect: false,
+        correct: false,
+        topSignal: 0.8,
+      }),
     ],
     [{ id: holdoutCase.id }],
   );
   assert.equal(summaries.length, ADVENTURE_EVAL_CASES.length, "every corpus case gets a row");
-  assert.deepEqual(summaries.map((summary) => summary.id), ADVENTURE_EVAL_CASES.map((testCase) => testCase.id));
+  assert.deepEqual(
+    summaries.map((summary) => summary.id),
+    ADVENTURE_EVAL_CASES.map((testCase) => testCase.id),
+  );
 
   const firstSummary = summaries.find((summary) => summary.id === first.id)!;
   assert.equal(firstSummary.calls, 2);
@@ -540,7 +641,10 @@ test("rolls up per-case counts, bands, outcomes, and failures", () => {
 
 test("parses repeat and out flags with safe defaults", () => {
   assert.deepEqual(parseAdventureArgs([]), { repeats: 3, out: "docs/system-one-adventure-benchmark.md" });
-  assert.deepEqual(parseAdventureArgs(["--repeat", "5", "--out", "docs/custom.md"]), { repeats: 5, out: "docs/custom.md" });
+  assert.deepEqual(parseAdventureArgs(["--repeat", "5", "--out", "docs/custom.md"]), {
+    repeats: 5,
+    out: "docs/custom.md",
+  });
   assert.deepEqual(parseAdventureArgs(["--repeat=2"]), { repeats: 2, out: "docs/system-one-adventure-benchmark.md" });
   assert.equal(parseAdventureArgs(["--repeat", "0"]).repeats, 1);
   assert.equal(parseAdventureArgs(["--repeat", "999"]).repeats, 25);
@@ -552,7 +656,12 @@ test("sends the production-shaped request state with no uid decorrelator", () =>
   const testCase = evalCase({
     candidates: [
       { candidateId: "a", digest: "a".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
-      { candidateId: "b", digest: "b".repeat(64), kind: "exact_srd_check.select", label: "Strength (Athletics), Easy difficulty, normal" },
+      {
+        candidateId: "b",
+        digest: "b".repeat(64),
+        kind: "exact_srd_check.select",
+        label: "Strength (Athletics), Easy difficulty, normal",
+      },
     ],
   });
   const state = adventureRequestState(testCase);
@@ -572,7 +681,10 @@ test("sends the production-shaped request state with no uid decorrelator", () =>
 test("renders the benchmark report with the sweep, honesty, and reproduce sections", () => {
   const first = ADVENTURE_EVAL_CASES[0]!;
   const readouts = [
-    gradeAdventureCase(first, composition({ selection: { candidateId: first.expected.preferred!, digest: "a".repeat(64) } })),
+    gradeAdventureCase(
+      first,
+      composition({ selection: { candidateId: first.expected.preferred!, digest: "a".repeat(64) } }),
+    ),
     gradeAdventureCase(first, composition({ band: "fallback", method: "defer", selection: null, topSignal: 0.2 })),
   ];
   const evaluation = evaluateAdventureReadouts(readouts, "2026-09-17");
@@ -596,9 +708,15 @@ test("renders the benchmark report with the sweep, honesty, and reproduce sectio
   assert.ok(!report.includes("unwired"), "the wiring-status prose must not claim the lane is unwired");
   assert.ok(report.includes("## Corpus and per-case results"));
   assert.ok(report.includes("## Decision stability"));
-  assert.ok(report.includes("production-shaped request (no `uid`)"), "the stability prose explains the same-state production draw");
+  assert.ok(
+    report.includes("production-shaped request (no `uid`)"),
+    "the stability prose explains the same-state production draw",
+  );
   assert.ok(report.includes("reserved for dedicated stability probes"));
-  assert.ok(!report.includes("carries a deterministic throwaway `uid`"), "the report must not claim a uid decorrelator");
+  assert.ok(
+    !report.includes("carries a deterministic throwaway `uid`"),
+    "the report must not claim a uid decorrelator",
+  );
   assert.ok(report.includes("## Threshold sweep"));
   assert.ok(report.includes("No threshold qualified"));
   assert.ok(report.includes("Server default"));
@@ -610,7 +728,10 @@ test("renders the benchmark report with the sweep, honesty, and reproduce sectio
   assert.ok(report.includes("repeatability, not accuracy"));
   assert.ok(report.includes("set -a; . /tmp/opencode/jev/jev.env; set +a"));
   assert.ok(report.includes("docs/system-one-adventure-benchmark.json"));
-  assert.ok(!report.includes("### Proposed `adventure-selection` promotion record"), "no record when no threshold qualifies");
+  assert.ok(
+    !report.includes("### Proposed `adventure-selection` promotion record"),
+    "no record when no threshold qualifies",
+  );
 
   const promoted = evaluateAdventureReadouts(
     [
@@ -640,7 +761,10 @@ test("renders the benchmark report with the sweep, honesty, and reproduce sectio
 test("no candidate list defers by construction", () => {
   const emptyCase = ADVENTURE_EVAL_CASES.find((testCase) => testCase.candidates.length === 0);
   assert.ok(emptyCase, "expected an empty candidate list case");
-  const graded = gradeAdventureCase(emptyCase, composition({ band: "fallback", method: "defer", selection: null, topSignal: null }));
+  const graded = gradeAdventureCase(
+    emptyCase,
+    composition({ band: "fallback", method: "defer", selection: null, topSignal: null }),
+  );
   assert.equal(graded.deferred, true);
   assert.equal(graded.selected, null);
   assert.equal(graded.candidateId, null);
@@ -653,8 +777,24 @@ test("rolls up decision stability over synthetic readouts", () => {
     readout({ id: "stable", candidateId: "a", topSignal: 0.6 }),
     readout({ id: "conflicted", candidateId: "a", topSignal: 0.8 }),
     readout({ id: "conflicted", candidateId: "b", topSignal: 0.7 }),
-    readout({ id: "deferred", candidateId: null, topSignal: null, selected: null, selectedCorrect: true, deferred: true, correct: true }),
-    readout({ id: "deferred", candidateId: null, topSignal: null, selected: null, selectedCorrect: true, deferred: true, correct: true }),
+    readout({
+      id: "deferred",
+      candidateId: null,
+      topSignal: null,
+      selected: null,
+      selectedCorrect: true,
+      deferred: true,
+      correct: true,
+    }),
+    readout({
+      id: "deferred",
+      candidateId: null,
+      topSignal: null,
+      selected: null,
+      selectedCorrect: true,
+      deferred: true,
+      correct: true,
+    }),
   ]);
 
   assert.equal(summary.cases.length, 3);
@@ -694,7 +834,11 @@ test("merges confirmed harvested proposals and skips unusable labels", () => {
     harvestProposal({ proposalId: "3".repeat(64), expected: null }),
     harvestProposal({ proposalId: "4".repeat(64), expected: { candidateId: 42 } }),
     harvestProposal({ proposalId: "5".repeat(64), expected: { candidateId: "not-advertised" } }),
-    harvestProposal({ proposalId: "6".repeat(64), expected: { candidateId: null }, state: { declaration: "I look around.", candidates: [] } }),
+    harvestProposal({
+      proposalId: "6".repeat(64),
+      expected: { candidateId: null },
+      state: { declaration: "I look around.", candidates: [] },
+    }),
     harvestProposal({ proposalId: "7".repeat(64), lane: "director-selection" }),
     harvestProposal({ proposalId: "8".repeat(64), status: "proposed" }),
     harvestProposal({ proposalId: "9".repeat(64), state: "not-an-object" }),
@@ -722,7 +866,9 @@ test("merges confirmed harvested proposals and skips unusable labels", () => {
 });
 
 test("treats an absent or malformed harvest fixture as zero cases without failing", async () => {
-  const missing = await loadHarvestedAdventureCases(path.join(tmpdir(), `velvet-adventure-harvest-missing-${process.pid}.json`));
+  const missing = await loadHarvestedAdventureCases(
+    path.join(tmpdir(), `velvet-adventure-harvest-missing-${process.pid}.json`),
+  );
   assert.deepEqual(
     { cases: missing.cases.length, present: missing.present, warning: missing.warning },
     { cases: 0, present: false, warning: null },
@@ -733,19 +879,30 @@ test("treats an absent or malformed harvest fixture as zero cases without failin
   assert.equal(notJson.present, true);
   assert.ok(notJson.warning?.includes("not valid JSON"));
 
-  const noProposals = parseHarvestedAdventureCases(JSON.stringify({ version: 1, lane: "adventure-selection", generatedAt: "2026-09-17T00:00:00.000Z" }));
+  const noProposals = parseHarvestedAdventureCases(
+    JSON.stringify({ version: 1, lane: "adventure-selection", generatedAt: "2026-09-17T00:00:00.000Z" }),
+  );
   assert.equal(noProposals.cases.length, 0);
   assert.ok(noProposals.warning?.includes("proposals"));
 
-  const wrongVersion = parseHarvestedAdventureCases(JSON.stringify({ version: 2, lane: "adventure-selection", generatedAt: "x", proposals: [] }));
+  const wrongVersion = parseHarvestedAdventureCases(
+    JSON.stringify({ version: 2, lane: "adventure-selection", generatedAt: "x", proposals: [] }),
+  );
   assert.equal(wrongVersion.cases.length, 0);
   assert.ok(wrongVersion.warning?.includes("version"));
 
-  const wrongLane = parseHarvestedAdventureCases(JSON.stringify({ version: 1, lane: "guardrails", generatedAt: "x", proposals: [harvestProposal()] }));
+  const wrongLane = parseHarvestedAdventureCases(
+    JSON.stringify({ version: 1, lane: "guardrails", generatedAt: "x", proposals: [harvestProposal()] }),
+  );
   assert.equal(wrongLane.cases.length, 0);
   assert.ok(wrongLane.warning?.includes("guardrails"));
 
-  const fixture = { version: 1, lane: "adventure-selection", generatedAt: "2026-09-17T00:00:00.000Z", proposals: [harvestProposal()] };
+  const fixture = {
+    version: 1,
+    lane: "adventure-selection",
+    generatedAt: "2026-09-17T00:00:00.000Z",
+    proposals: [harvestProposal()],
+  };
   const parsed = parseHarvestedAdventureCases(JSON.stringify(fixture));
   assert.equal(parsed.warning, null);
   assert.equal(parsed.cases.length, 1);
@@ -795,7 +952,11 @@ test("renders harvested provenance and counts harvested cases separately", () =>
   assert.ok(report.includes("| dev | harvested (human) | harvest:travel |"), "the corpus table marks the human bucket");
   assert.ok(report.includes("Harvested cases"));
   assert.ok(report.includes("| Harvested cases | 1 merged (1 human-confirmed + 0 agent-reviewed), 0 skipped"));
-  assert.ok(report.includes("| Gate scope | frozen corpus + 1 human-confirmed harvested case(s); 0 agent-reviewed harvested case(s) are scored but not gated |"));
+  assert.ok(
+    report.includes(
+      "| Gate scope | frozen corpus + 1 human-confirmed harvested case(s); 0 agent-reviewed harvested case(s) are scored but not gated |",
+    ),
+  );
   assert.ok(report.includes("confirmed live-derived labels"));
   assert.ok(!report.includes("Agent-reviewed harvested cases"), "a human-only harvest renders no agent section");
   assert.ok(!report.includes("Harvest warning"), "a clean fixture produces no warning");
@@ -804,7 +965,11 @@ test("renders harvested provenance and counts harvested cases separately", () =>
 test("maps proposal provenance into gate-eligible human and non-gated agent buckets", () => {
   assert.equal(harvestBucketForProvenance("review-annotated"), "human");
   assert.equal(harvestBucketForProvenance("agent-review"), "agent");
-  assert.equal(harvestBucketForProvenance("provider-disagreement"), "agent", "other provenances are not human-confirmed");
+  assert.equal(
+    harvestBucketForProvenance("provider-disagreement"),
+    "agent",
+    "other provenances are not human-confirmed",
+  );
   assert.equal(harvestBucketForProvenance(undefined), "agent", "an unrecognized provenance is not human-confirmed");
 
   const merged = mergeHarvestedAdventureCases([
@@ -932,18 +1097,32 @@ test("renders the human/agent split, the agent section, and the not-gated reason
     },
   });
 
-  assert.ok(report.includes("| Harvested cases | 2 merged (1 human-confirmed + 1 agent-reviewed), 0 skipped"), "Setup rows split the buckets");
   assert.ok(
-    report.includes("| Gate scope | frozen corpus + 1 human-confirmed harvested case(s); 1 agent-reviewed harvested case(s) are scored but not gated |"),
+    report.includes("| Harvested cases | 2 merged (1 human-confirmed + 1 agent-reviewed), 0 skipped"),
+    "Setup rows split the buckets",
+  );
+  assert.ok(
+    report.includes(
+      "| Gate scope | frozen corpus + 1 human-confirmed harvested case(s); 1 agent-reviewed harvested case(s) are scored but not gated |",
+    ),
     "Setup rows state the gate scope",
   );
   assert.ok(report.includes("The review split is 1"));
   assert.ok(report.includes("human-confirmed (`review-annotated`, gate-eligible) versus 1 agent-reviewed"));
-  assert.ok(report.includes("| dev | harvested (human) | harvest:harbor |"), "the human row is marked in the per-case table");
-  assert.ok(report.includes("| dev | harvested (agent) | harvest:harbor |"), "the agent row is still scored in the per-case table");
+  assert.ok(
+    report.includes("| dev | harvested (human) | harvest:harbor |"),
+    "the human row is marked in the per-case table",
+  );
+  assert.ok(
+    report.includes("| dev | harvested (agent) | harvest:harbor |"),
+    "the agent row is still scored in the per-case table",
+  );
   assert.ok(report.includes("### Agent-reviewed harvested cases (not gated)"));
   assert.ok(report.includes("not promotion evidence"));
-  assert.ok(report.includes("promotion records re-derive only from human-confirmed labels"), "the section states the reason");
+  assert.ok(
+    report.includes("promotion records re-derive only from human-confirmed labels"),
+    "the section states the reason",
+  );
   assert.ok(report.includes("Gate scope: frozen corpus plus human-confirmed harvested cases only"));
   assert.ok(report.includes("| Cases | 1 |"));
   assert.ok(report.includes("| Acted calls | 1 |"));

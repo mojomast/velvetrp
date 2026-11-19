@@ -1,36 +1,132 @@
 /* Command Center: the one-screen table. The right pane is the scene rail
    (illustration + character quick panel); tool content overlays as drawers. */
-.campaign-play-page { --panel-gap: 12px; --panel-padding: 14px; --campaign-context-width: 320px; --campaign-quick-width: 340px; }
-.campaign-play-page [hidden] { display: none !important; }
-.campaign-play-page .campaign-play-title { display: grid; gap: 2px; min-width: 0; flex: 0 0 auto; }
-.campaign-play-page .campaign-play-header h1 { white-space: nowrap; }
-.campaign-play-page .campaign-play-status { display: flex; align-items: center; gap: 12px; }
-.campaign-play-page .campaign-play-status .atlas-actor { display: grid; gap: 4px; max-width: 22rem; }
-.campaign-play-page .atlas-actor-readonly { display: grid; gap: 1px; min-width: 0; max-width: 20rem; text-align: right; color: var(--muted); font-size: 11px; line-height: 1.3; }
-.campaign-play-page .atlas-actor-readonly strong { color: var(--text); font-size: 13px; overflow-wrap: anywhere; }
-.campaign-play-page .atlas-actor-readonly .atlas-actor-hint { font-size: 10px; }
-.campaign-play-page .campaign-context-drawer { position: sticky; top: 14px; z-index: 20; width: 100%; max-height: calc(100dvh - 110px); overflow: auto; }
-.campaign-play-page .campaign-quick-tools { min-width: 0; min-height: 0; max-height: 100%; overflow: auto; overscroll-behavior: contain; outline: none; position: relative; z-index: 20; }
-.campaign-play-page .campaign-quick-tools > .campaign-quick-panel { position: static; max-height: none; overflow: visible; }
-.campaign-play-page .campaign-quick-tools > .campaign-quick-panel > header { position: static; }
-.campaign-play-page .campaign-quick-tools > .scene-illustration { margin-bottom: var(--panel-gap); }
-.campaign-play-page .campaign-quick-tools > .dm-chronicle { margin-bottom: var(--panel-gap); }
-.campaign-play-page .campaign-quick-tools .scene-illustration-figure img { width: 100%; }
+.campaign-play-page {
+  --panel-gap: 12px;
+  --panel-padding: 14px;
+  --campaign-context-width: 320px;
+  --campaign-quick-width: 340px;
+}
+.campaign-play-page [hidden] {
+  display: none !important;
+}
+.campaign-play-page .campaign-play-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.campaign-play-page .campaign-play-header h1 {
+  white-space: nowrap;
+}
+.campaign-play-page .campaign-play-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.campaign-play-page .campaign-play-status .atlas-actor {
+  display: grid;
+  gap: 4px;
+  max-width: 22rem;
+}
+.campaign-play-page .atlas-actor-readonly {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  max-width: 20rem;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+.campaign-play-page .atlas-actor-readonly strong {
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.campaign-play-page .atlas-actor-readonly .atlas-actor-hint {
+  font-size: 10px;
+}
+.campaign-play-page .campaign-context-drawer {
+  position: sticky;
+  top: 14px;
+  z-index: 20;
+  width: 100%;
+  max-height: calc(100dvh - 110px);
+  overflow: auto;
+}
+.campaign-play-page .campaign-quick-tools {
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  outline: none;
+  position: relative;
+  z-index: 20;
+}
+.campaign-play-page .campaign-quick-tools > .campaign-quick-panel {
+  position: static;
+  max-height: none;
+  overflow: visible;
+}
+.campaign-play-page .campaign-quick-tools > .campaign-quick-panel > header {
+  position: static;
+}
+.campaign-play-page .campaign-quick-tools > .scene-illustration {
+  margin-bottom: var(--panel-gap);
+}
+.campaign-play-page .campaign-quick-tools > .dm-chronicle {
+  margin-bottom: var(--panel-gap);
+}
+.campaign-play-page .campaign-quick-tools .scene-illustration-figure img {
+  width: 100%;
+}
 /* Density: notices, toolbar, and transcript keep more content above the fold.
    Text sizes stay at or above 11px so the tightened rhythm stays readable. */
-.campaign-play-page .room-top > :is(.atlas-notice, .atlas-reconcile) { margin: 0; }
-.campaign-play-page .room-top > .atlas-notice { padding: 8px 10px; }
-.campaign-play-page .room-toolbar .atlas-turn-tools { padding: 0; }
-.campaign-play-page .campaign-conversation > header { padding: 10px 12px; }
-.campaign-play-page .campaign-conversation-log { gap: 12px; padding: 12px; }
-.campaign-play-page .conversation-turn { gap: 6px; }
-.campaign-play-page .conversation-exchange { padding: 9px 11px; line-height: 1.5; }
-.campaign-play-page .conversation-exchange p { margin-top: 4px; }
-.campaign-play-page .conversation-exchange time { margin-top: 5px; }
-.campaign-play-page .back-link, .campaign-play-page .campaign-context-drawer h3 { color: var(--eyebrow); }
-.campaign-play-page .route-map-canvas, .campaign-play-page .route-map-location.is-current { color: var(--eyebrow); }
-.campaign-play-page .route-map-location.is-reachable, .campaign-play-page .route-map-connection.is-reachable { color: light-dark(#23613d, #80c99c); }
-.campaign-play-page .route-map-canvas text { fill: var(--text); }
+.campaign-play-page .room-top > :is(.atlas-notice, .atlas-reconcile) {
+  margin: 0;
+}
+.campaign-play-page .room-top > .atlas-notice {
+  padding: 8px 10px;
+}
+.campaign-play-page .room-toolbar .atlas-turn-tools {
+  padding: 0;
+}
+.campaign-play-page .campaign-conversation > header {
+  padding: 10px 12px;
+}
+.campaign-play-page .campaign-conversation-log {
+  gap: 12px;
+  padding: 12px;
+}
+.campaign-play-page .conversation-turn {
+  gap: 6px;
+}
+.campaign-play-page .conversation-exchange {
+  padding: 9px 11px;
+  line-height: 1.5;
+}
+.campaign-play-page .conversation-exchange p {
+  margin-top: 4px;
+}
+.campaign-play-page .conversation-exchange time {
+  margin-top: 5px;
+}
+.campaign-play-page .back-link,
+.campaign-play-page .campaign-context-drawer h3 {
+  color: var(--eyebrow);
+}
+.campaign-play-page .route-map-canvas,
+.campaign-play-page .route-map-location.is-current {
+  color: var(--eyebrow);
+}
+.campaign-play-page .route-map-location.is-reachable,
+.campaign-play-page .route-map-connection.is-reachable {
+  color: light-dark(#23613d, #80c99c);
+}
+.campaign-play-page .route-map-canvas text {
+  fill: var(--text);
+}
 /* Tool drawers overlay the table from a fixed edge slot; the open drawer sits above
    its scrim, and each tool can attach to the top, bottom, left, or right edge.
    Top and bottom drawers keep to the centre lane: CampaignPlayPage publishes the
@@ -46,76 +142,275 @@
   --atlas-muted: var(--muted);
   --drawer-inset-left: 0px;
   --drawer-inset-right: 0px;
-  position: fixed; inset: 0; pointer-events: none; z-index: 60;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
 }
-.campaign-drawers-overlay .campaign-drawers-scrim { position: fixed; inset: 0; pointer-events: auto; margin: 0; padding: 0; min-height: 0; border: 0; border-radius: 0; background: color-mix(in srgb, #000 45%, transparent); backdrop-filter: blur(1px); cursor: pointer; }
-.campaign-drawers-overlay .campaign-drawers-scrim:hover { background: color-mix(in srgb, #000 52%, transparent); }
-.campaign-drawers-overlay .atlas-drawer-slot { position: absolute; pointer-events: auto; z-index: 1; }
-.campaign-drawers-overlay .atlas-drawer-slot[data-side="right"] { inset: 0 0 0 auto; width: min(680px, 75vw); box-shadow: -16px 0 45px #0005; }
-.campaign-drawers-overlay .atlas-drawer-slot[data-side="left"] { inset: 0 auto 0 0; width: min(680px, 75vw); box-shadow: 16px 0 45px #0005; }
-.campaign-drawers-overlay .atlas-drawer-slot[data-side="top"] { inset: 0 var(--drawer-inset-right) auto var(--drawer-inset-left); width: auto; height: min(60vh, 540px); box-shadow: 0 16px 45px #0005; }
-.campaign-drawers-overlay .atlas-drawer-slot[data-side="bottom"] { inset: auto var(--drawer-inset-right) 0 var(--drawer-inset-left); width: auto; height: min(60vh, 540px); box-shadow: 0 -16px 45px #0005; }
-.campaign-drawers-overlay .atlas-drawer-slot[hidden] { display: none; }
+.campaign-drawers-overlay .campaign-drawers-scrim {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, #000 45%, transparent);
+  backdrop-filter: blur(1px);
+  cursor: pointer;
+}
+.campaign-drawers-overlay .campaign-drawers-scrim:hover {
+  background: color-mix(in srgb, #000 52%, transparent);
+}
+.campaign-drawers-overlay .atlas-drawer-slot {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 1;
+}
+.campaign-drawers-overlay .atlas-drawer-slot[data-side="right"] {
+  inset: 0 0 0 auto;
+  width: min(680px, 75vw);
+  box-shadow: -16px 0 45px #0005;
+}
+.campaign-drawers-overlay .atlas-drawer-slot[data-side="left"] {
+  inset: 0 auto 0 0;
+  width: min(680px, 75vw);
+  box-shadow: 16px 0 45px #0005;
+}
+.campaign-drawers-overlay .atlas-drawer-slot[data-side="top"] {
+  inset: 0 var(--drawer-inset-right) auto var(--drawer-inset-left);
+  width: auto;
+  height: min(60vh, 540px);
+  box-shadow: 0 16px 45px #0005;
+}
+.campaign-drawers-overlay .atlas-drawer-slot[data-side="bottom"] {
+  inset: auto var(--drawer-inset-right) 0 var(--drawer-inset-left);
+  width: auto;
+  height: min(60vh, 540px);
+  box-shadow: 0 -16px 45px #0005;
+}
+.campaign-drawers-overlay .atlas-drawer-slot[hidden] {
+  display: none;
+}
 /* Explicit opaque surfaces: the mapped atlas variables cover the shared styles, and
    these rules keep the drawer opaque even if a legacy override loses the variables. */
-.campaign-drawers-overlay .atlas-drawer { background: var(--surface); color: var(--text); }
-.campaign-drawers-overlay .atlas-drawer-heading { background: var(--surface-2); }
-.campaign-drawers-overlay .atlas-drawer-content { flex: 1 1 auto; max-height: none; background: var(--surface); }
-.campaign-drawers-overlay .atlas-drawer-controls button { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
-.campaign-drawers-overlay .atlas-drawer-controls button:hover:not(:disabled) { border-color: var(--accent); }
-.campaign-drawers-overlay .atlas-drawer-controls button[aria-pressed="true"] { border-color: var(--focus); color: var(--eyebrow); }
-.campaign-drawers-overlay :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.campaign-drawers-overlay .atlas-drawer {
+  background: var(--surface);
+  color: var(--text);
+}
+.campaign-drawers-overlay .atlas-drawer-heading {
+  background: var(--surface-2);
+}
+.campaign-drawers-overlay .atlas-drawer-content {
+  flex: 1 1 auto;
+  max-height: none;
+  background: var(--surface);
+}
+.campaign-drawers-overlay .atlas-drawer-controls button {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.campaign-drawers-overlay .atlas-drawer-controls button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.campaign-drawers-overlay .atlas-drawer-controls button[aria-pressed="true"] {
+  border-color: var(--focus);
+  color: var(--eyebrow);
+}
+.campaign-drawers-overlay :focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
 /* The character reference slot wraps the gameplay sheet directly. Pin the sheet to the
    slot so the reference follows the chosen edge and scrolls inside the drawer. */
 .campaign-drawers-overlay .atlas-character-reference > .gameplay-sheet-drawer {
-  position: static; inset: auto; width: 100%; height: auto; max-height: none; flex: 1 1 auto; min-height: 0;
-  margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  position: static;
+  inset: auto;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 /* Top and bottom drawers get a wide, short canvas: content reflows into auto-fit
    columns instead of the single-file column used by side drawers. */
-.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-heading h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-content :is(.session-control-grid, .scene-image-dm, .combat-layout, .combat-actor-lanes, .workbench-preference-grid, .table-dice-form, .encounter-setup, .combat-binding, .atlas-actor-sections, .atlas-world-locations) {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-heading h2 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-content .atlas-domain-heading { flex-wrap: nowrap; }
-.campaign-drawers-overlay .atlas-drawer-slot[data-orientation="horizontal"] .atlas-drawer-content > .gameplay-sheet-drawer { max-height: none; }
-.workbench-dialog .drawer-side-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
-.workbench-dialog .drawer-side-grid label { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-.workbench-dialog .drawer-side-grid span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workbench-dialog .drawer-side-grid select { flex: 0 0 auto; }
-.campaign-play-page .atlas-drawer-content .campaign-context-drawer { position: static; max-height: none; }
-.campaign-play-page .gameplay-sheet-drawer { position: static; width: 100%; height: auto; max-height: none; }
-.campaign-play-page .atlas-character-actions { border-radius: 10px 10px 0 0; }
-.campaign-play-page .admin-security-panels { display: grid; gap: var(--panel-gap); }
-.campaign-play-page .campaign-character-creator { display: grid; gap: var(--panel-gap); }
-.campaign-play-page .campaign-nav-group { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.campaign-play-page .campaign-nav-group-setup { margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border); }
-.campaign-play-page .campaign-nav-group-label { color: var(--muted); font: 700 10px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing: .1em; text-transform: uppercase; }
-.campaign-play-page .campaign-nav-select { display: inline-flex; align-items: center; }
-.campaign-play-page .campaign-nav-select select { min-height: 36px; padding: 7px 11px; white-space: nowrap; }
+.campaign-drawers-overlay
+  .atlas-drawer-slot[data-orientation="horizontal"]
+  .atlas-drawer-content
+  :is(
+    .session-control-grid,
+    .scene-image-dm,
+    .combat-layout,
+    .combat-actor-lanes,
+    .workbench-preference-grid,
+    .table-dice-form,
+    .encounter-setup,
+    .combat-binding,
+    .atlas-actor-sections,
+    .atlas-world-locations
+  ) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+.campaign-drawers-overlay
+  .atlas-drawer-slot[data-orientation="horizontal"]
+  .atlas-drawer-content
+  .atlas-domain-heading {
+  flex-wrap: nowrap;
+}
+.campaign-drawers-overlay
+  .atlas-drawer-slot[data-orientation="horizontal"]
+  .atlas-drawer-content
+  > .gameplay-sheet-drawer {
+  max-height: none;
+}
+.workbench-dialog .drawer-side-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+}
+.workbench-dialog .drawer-side-grid label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.workbench-dialog .drawer-side-grid span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workbench-dialog .drawer-side-grid select {
+  flex: 0 0 auto;
+}
+.campaign-play-page .atlas-drawer-content .campaign-context-drawer {
+  position: static;
+  max-height: none;
+}
+.campaign-play-page .gameplay-sheet-drawer {
+  position: static;
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+.campaign-play-page .atlas-character-actions {
+  border-radius: 10px 10px 0 0;
+}
+.campaign-play-page .admin-security-panels {
+  display: grid;
+  gap: var(--panel-gap);
+}
+.campaign-play-page .campaign-character-creator {
+  display: grid;
+  gap: var(--panel-gap);
+}
+.campaign-play-page .campaign-nav-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.campaign-play-page .campaign-nav-group-setup {
+  margin-left: auto;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+.campaign-play-page .campaign-nav-group-label {
+  color: var(--muted);
+  font:
+    700 10px/1.2 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.campaign-play-page .campaign-nav-select {
+  display: inline-flex;
+  align-items: center;
+}
+.campaign-play-page .campaign-nav-select select {
+  min-height: 36px;
+  padding: 7px 11px;
+  white-space: nowrap;
+}
 @media (max-width: 1280px) {
-  .campaign-play-page .campaign-play-status { gap: 2px 8px; }
-  .campaign-play-page .atlas-actor-readonly { max-width: 15rem; }
-  .campaign-play-page .atlas-actor-readonly .atlas-actor-hint { display: none; }
+  .campaign-play-page .campaign-play-status {
+    gap: 2px 8px;
+  }
+  .campaign-play-page .atlas-actor-readonly {
+    max-width: 15rem;
+  }
+  .campaign-play-page .atlas-actor-readonly .atlas-actor-hint {
+    display: none;
+  }
 }
 @media (max-width: 600px) {
-  .campaign-play-page .campaign-play-header h1 { font-size: 24px; }
-  .workbench-dialog .drawer-side-grid { grid-template-columns: minmax(0, 1fr); }
+  .campaign-play-page .campaign-play-header h1 {
+    font-size: 24px;
+  }
+  .workbench-dialog .drawer-side-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 @media (max-width: 1100px) {
-  .campaign-play-page .campaign-play-grid.has-context.has-quick-tools { grid-template-columns: minmax(220px, var(--campaign-context-width)) 8px minmax(420px, 1fr); }
-  .campaign-play-page .campaign-nav-group-setup { margin-left: 0; }
+  .campaign-play-page .campaign-play-grid.has-context.has-quick-tools {
+    grid-template-columns: minmax(220px, var(--campaign-context-width)) 8px minmax(420px, 1fr);
+  }
+  .campaign-play-page .campaign-nav-group-setup {
+    margin-left: 0;
+  }
   /* The tools column becomes a full-width row, so top/bottom drawers may use the right edge. */
-  .campaign-drawers-overlay { --drawer-inset-right: 0px !important; }
+  .campaign-drawers-overlay {
+    --drawer-inset-right: 0px !important;
+  }
 }
 @media (max-width: 900px) {
   /* Two scrolling tool rows leave the small-screen draft unobscured. */
-  .campaign-play-page .campaign-play-nav { position: static; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
-  .campaign-play-page .campaign-nav-group { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding: 3px; scrollbar-width: thin; }
-  .campaign-play-page .campaign-nav-group > * { flex: none; }
-  .campaign-play-page .campaign-nav-group-setup { border-left: 0; }
-  .campaign-play-page .campaign-play-title, .campaign-play-page .campaign-play-status { max-width: 100%; }
+  .campaign-play-page .campaign-play-nav {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .campaign-play-page .campaign-nav-group {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    padding: 3px;
+    scrollbar-width: thin;
+  }
+  .campaign-play-page .campaign-nav-group > * {
+    flex: none;
+  }
+  .campaign-play-page .campaign-nav-group-setup {
+    border-left: 0;
+  }
+  .campaign-play-page .campaign-play-title,
+  .campaign-play-page .campaign-play-status {
+    max-width: 100%;
+  }
   /* The workbench stacks into one column; the centre lane is the whole viewport. */
-  .campaign-drawers-overlay { --drawer-inset-left: 0px !important; --drawer-inset-right: 0px !important; }
-  .campaign-drawers-overlay .atlas-drawer-slot[data-side="right"], .campaign-drawers-overlay .atlas-drawer-slot[data-side="left"] { width: min(680px, 100vw); }
+  .campaign-drawers-overlay {
+    --drawer-inset-left: 0px !important;
+    --drawer-inset-right: 0px !important;
+  }
+  .campaign-drawers-overlay .atlas-drawer-slot[data-side="right"],
+  .campaign-drawers-overlay .atlas-drawer-slot[data-side="left"] {
+    width: min(680px, 100vw);
+  }
 }

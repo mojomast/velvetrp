@@ -1,5 +1,15 @@
 import assert from "node:assert/strict";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -27,8 +37,18 @@ test("stage copies only the runtime layout and writes start scripts", () => {
   const out = path.join(mkdtempSync(path.join(tmpdir(), "velvet-stage-out-")), "velvetrp");
   try {
     stage(out, { from, install: false });
-    for (const relative of ["package.json", "package-lock.json", "NOTICE.md", ".env.example", "packages/contracts/dist/index.js",
-      "server/dist/index.js", "client/dist/index.js", "server/package.json", "start.sh", "start.cmd"]) {
+    for (const relative of [
+      "package.json",
+      "package-lock.json",
+      "NOTICE.md",
+      ".env.example",
+      "packages/contracts/dist/index.js",
+      "server/dist/index.js",
+      "client/dist/index.js",
+      "server/package.json",
+      "start.sh",
+      "start.cmd",
+    ]) {
       assert.ok(existsSync(path.join(out, relative)), relative);
     }
     for (const relative of [".env", "server/data", "server/src", "client/src", "packages/contracts/src"]) {

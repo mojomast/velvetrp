@@ -17,36 +17,112 @@ let activationStatus = 200;
 let expectedRevision = 3;
 let readinessReads = 0;
 let readResponse: (() => Response | Promise<Response>) | undefined;
-const readiness = () => ({ campaignId: "campaign-one", sessionId: "session-one", expectedRevision, active, ready, blockers, actorIds: ["actor-one"] });
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+const readiness = () => ({
+  campaignId: "campaign-one",
+  sessionId: "session-one",
+  expectedRevision,
+  active,
+  ready,
+  blockers,
+  actorIds: ["actor-one"],
+});
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>(done => { resolve = done; });
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
   return { promise, resolve };
 }
-const props = { campaignId: "campaign-one", destination: "overview" as const, mechanics: true, onAdvanced: vi.fn(), onBuilder: vi.fn(), onCharacter: vi.fn(), onRoom: vi.fn() };
+const props = {
+  campaignId: "campaign-one",
+  destination: "overview" as const,
+  mechanics: true,
+  onAdvanced: vi.fn(),
+  onBuilder: vi.fn(),
+  onCharacter: vi.fn(),
+  onRoom: vi.fn(),
+};
 beforeEach(() => {
-  localStorage.clear(); role = "owner"; active = false; ready = true; stopped = false; hasParty = true; hasRooms = true; blockers = []; posts = []; uncertain = false; activationStatus = 200; expectedRevision = 3; readinessReads = 0; readResponse = undefined; vi.clearAllMocks();
-  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.endsWith("/activation-readiness")) {
-      readinessReads += 1;
-      return readResponse ? readResponse() : json(readiness());
-    }
-    if (url.endsWith("/activation-commands")) {
-      posts.push(String(init?.body));
-      if (activationStatus !== 200) return json({ error: "rejected" }, activationStatus);
-      active = true;
-      if (uncertain && posts.length === 1) throw new TypeError("response lost");
-      const body = JSON.parse(String(init?.body));
-      return json({ readiness: { ...readiness(), expectedRevision: body.expectedRevision }, receipt: { commandId: "command-one", idempotencyKey: body.idempotencyKey, occurredAt: stamp, activated: true, placedActorIds: ["actor-one"], reconciledNpcCount: 0 } });
-    }
-    if (url.endsWith("/characters")) return json({ characters: hasParty ? [{ id: "campaign-character-one", characterId: "persona-one", name: "Rowan" }] : [] });
-    if (url.endsWith("/rooms")) return json({ attached: hasRooms ? [{ sessionId: "session-one", title: "The crossing", participantNames: ["Rowan"], createdAt: stamp, attachedAt: stamp, stopped }] : [], eligible: [] });
-    return json({ campaign: { id: "campaign-one", name: "Salt Road", actorRole: role, content: { status: "unconfigured" }, createdAt: stamp, updatedAt: stamp } });
-  }));
+  localStorage.clear();
+  role = "owner";
+  active = false;
+  ready = true;
+  stopped = false;
+  hasParty = true;
+  hasRooms = true;
+  blockers = [];
+  posts = [];
+  uncertain = false;
+  activationStatus = 200;
+  expectedRevision = 3;
+  readinessReads = 0;
+  readResponse = undefined;
+  vi.clearAllMocks();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/activation-readiness")) {
+        readinessReads += 1;
+        return readResponse ? readResponse() : json(readiness());
+      }
+      if (url.endsWith("/activation-commands")) {
+        posts.push(String(init?.body));
+        if (activationStatus !== 200) return json({ error: "rejected" }, activationStatus);
+        active = true;
+        if (uncertain && posts.length === 1) throw new TypeError("response lost");
+        const body = JSON.parse(String(init?.body));
+        return json({
+          readiness: { ...readiness(), expectedRevision: body.expectedRevision },
+          receipt: {
+            commandId: "command-one",
+            idempotencyKey: body.idempotencyKey,
+            occurredAt: stamp,
+            activated: true,
+            placedActorIds: ["actor-one"],
+            reconciledNpcCount: 0,
+          },
+        });
+      }
+      if (url.endsWith("/characters"))
+        return json({
+          characters: hasParty ? [{ id: "campaign-character-one", characterId: "persona-one", name: "Rowan" }] : [],
+        });
+      if (url.endsWith("/rooms"))
+        return json({
+          attached: hasRooms
+            ? [
+                {
+                  sessionId: "session-one",
+                  title: "The crossing",
+                  participantNames: ["Rowan"],
+                  createdAt: stamp,
+                  attachedAt: stamp,
+                  stopped,
+                },
+              ]
+            : [],
+          eligible: [],
+        });
+      return json({
+        campaign: {
+          id: "campaign-one",
+          name: "Salt Road",
+          actorRole: role,
+          content: { status: "unconfigured" },
+          createdAt: stamp,
+          updatedAt: stamp,
+        },
+      });
+    }),
+  );
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 describe("task-focused campaign entry", () => {
   it("leads an existing party and room toward Sessions and keeps setup secondary", async () => {
     render(<CampaignOverviewPage {...props} />);
@@ -64,7 +140,8 @@ describe("task-focused campaign entry", () => {
     expect(posts).toHaveLength(0);
   });
   it("keeps initial preparation available for a campaign without a party or room", async () => {
-    hasParty = false; hasRooms = false;
+    hasParty = false;
+    hasRooms = false;
     render(<CampaignOverviewPage {...props} />);
     await screen.findByText("Choose your campaign rules");
     expect(screen.queryByRole("button", { name: "Go to Sessions" })).toBeNull();
@@ -95,7 +172,8 @@ describe("task-focused campaign entry", () => {
     expect(screen.queryByRole("button", { name: "Enter adventure" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Retry exact room start" }));
     const enter = await screen.findByRole("button", { name: "Enter adventure" });
-    expect(posts).toHaveLength(2); expect(posts[0]).toBe(posts[1]);
+    expect(posts).toHaveLength(2);
+    expect(posts[0]).toBe(posts[1]);
     expect(JSON.parse(posts[1]!)).toMatchObject({ expectedRevision: 3 });
     expect(readinessReads).toBe(4);
     expect(localStorage.getItem(pendingKey)).toBeNull();
@@ -105,7 +183,9 @@ describe("task-focused campaign entry", () => {
   it("retains a saved pending command after a later rejected retry and a manual readiness read", async () => {
     const saved = JSON.stringify({ expectedRevision: 2, idempotencyKey: "saved-room-start" });
     localStorage.setItem(pendingKey, saved);
-    active = true; expectedRevision = 9; activationStatus = 409;
+    active = true;
+    expectedRevision = 9;
+    activationStatus = 409;
     render(<CampaignOverviewPage {...props} destination="rooms" />);
     await screen.findByText(/Active room requires command recovery/);
     expect(posts).toHaveLength(0);
@@ -136,7 +216,8 @@ describe("task-focused campaign entry", () => {
   it("does not grant observers activation controls and refreshes the actual role", async () => {
     const page = render(<CampaignOverviewPage {...props} destination="rooms" />);
     await screen.findByRole("button", { name: "Start room" });
-    role = "observer"; fireEvent(window, new Event("focus"));
+    role = "observer";
+    fireEvent(window, new Event("focus"));
     await screen.findByRole("button", { name: "Open room" });
     expect(screen.queryByRole("button", { name: "Check room readiness" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Build a character" })).toBeNull();
@@ -151,7 +232,9 @@ describe("task-focused campaign entry", () => {
     expect(screen.queryByRole("button", { name: "Enter adventure" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start room" })).toBeNull();
     expect(posts).toHaveLength(0);
-    await act(async () => { initialRead.resolve(json(readiness())); });
+    await act(async () => {
+      initialRead.resolve(json(readiness()));
+    });
     fireEvent.click(await screen.findByRole("button", { name: "Enter adventure" }));
     expect(props.onRoom).toHaveBeenCalledWith("session-one");
     expect(screen.queryByRole("button", { name: "Start room" })).toBeNull();
@@ -169,11 +252,14 @@ describe("task-focused campaign entry", () => {
 
     const focusRead = deferred<Response>();
     readResponse = () => focusRead.promise;
-    ready = false; blockers = ["safety-paused"];
+    ready = false;
+    blockers = ["safety-paused"];
     fireEvent(window, new Event("focus"));
     await screen.findByText("Checking room readiness...");
     expect(screen.queryByRole("button", { name: "Enter adventure" })).toBeNull();
-    await act(async () => { focusRead.resolve(json(readiness())); });
+    await act(async () => {
+      focusRead.resolve(json(readiness()));
+    });
     await screen.findByText(/Preparation required/);
     expect(screen.queryByRole("button", { name: "Enter adventure" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start room" })).toBeNull();
@@ -191,7 +277,9 @@ describe("task-focused campaign entry", () => {
     expect(localStorage.getItem(pendingKey)).toBeNull();
     expect(screen.queryByRole("button", { name: "Enter adventure" })).toBeNull();
     expect((screen.getByRole("button", { name: "Check room readiness" }) as HTMLButtonElement).disabled).toBe(true);
-    await act(async () => { afterActivation.resolve(json(readiness())); });
+    await act(async () => {
+      afterActivation.resolve(json(readiness()));
+    });
     await screen.findByRole("button", { name: "Enter adventure" });
     expect(screen.queryByRole("button", { name: "Start room" })).toBeNull();
     expect(props.onRoom).not.toHaveBeenCalled();
@@ -200,7 +288,9 @@ describe("task-focused campaign entry", () => {
   it("keeps a confirmed receipt cleared if the follow-up read fails and offers explicit read recovery", async () => {
     render(<CampaignOverviewPage {...props} destination="rooms" />);
     await screen.findByRole("button", { name: "Start room" });
-    readResponse = () => { throw new TypeError("read unavailable"); };
+    readResponse = () => {
+      throw new TypeError("read unavailable");
+    };
     fireEvent.click(screen.getByRole("button", { name: "Start room" }));
     await screen.findByText(/Activation receipt confirmed. Readiness unavailable/);
     expect(localStorage.getItem(pendingKey)).toBeNull();
@@ -213,7 +303,9 @@ describe("task-focused campaign entry", () => {
   });
   it("does not infer readiness from an attached, non-stopped room when its initial read fails", async () => {
     active = true;
-    readResponse = () => { throw new TypeError("read unavailable"); };
+    readResponse = () => {
+      throw new TypeError("read unavailable");
+    };
     render(<CampaignOverviewPage {...props} destination="rooms" />);
     await screen.findByText(/Readiness unavailable/);
     expect(screen.queryByRole("button", { name: "Enter adventure" })).toBeNull();
@@ -233,7 +325,8 @@ describe("task-focused campaign entry", () => {
     expect(posts).toHaveLength(0);
   });
   it("links readiness blockers to campaign preparation", async () => {
-    ready = false; blockers = ["campaign-not-published"];
+    ready = false;
+    blockers = ["campaign-not-published"];
     render(<CampaignOverviewPage {...props} destination="rooms" />);
     await screen.findByText(/Preparation required/);
     expect(screen.queryByRole("button", { name: "Start room" })).toBeNull();

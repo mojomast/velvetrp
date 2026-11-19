@@ -16,7 +16,7 @@ const ORIGIN = `http://127.0.0.1:${PORT}`;
 const FAKE_PROVIDER = "http://127.0.0.1:18788";
 
 async function narrationCalls(): Promise<number> {
-  const stats = await (await fetch(`${FAKE_PROVIDER}/stats`)).json() as { narrationResponses: number };
+  const stats = (await (await fetch(`${FAKE_PROVIDER}/stats`)).json()) as { narrationResponses: number };
   return stats.narrationResponses;
 }
 
@@ -43,12 +43,20 @@ test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async () => {
   for (const built of ["server/dist/index.js", "client/dist/index.html"]) {
-    if (!existsSync(path.join(ROOT, built))) throw new Error(`the first-run e2e needs the production build (${built}); run \`npm run build\` first`);
+    if (!existsSync(path.join(ROOT, built)))
+      throw new Error(`the first-run e2e needs the production build (${built}); run \`npm run build\` first`);
   }
   dataDir = mkdtempSync(path.join(tmpdir(), "velvet-first-run-"));
   // A clean first-run environment: nothing from a developer's .env, saved flags or real provider keys.
-  const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) =>
-    !name.startsWith("OPENROUTER_") && !name.startsWith("OPENAI_") && !name.startsWith("FEATURE_RPG_") && !name.startsWith("VELVET_")));
+  const inherited = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([name]) =>
+        !name.startsWith("OPENROUTER_") &&
+        !name.startsWith("OPENAI_") &&
+        !name.startsWith("FEATURE_RPG_") &&
+        !name.startsWith("VELVET_"),
+    ),
+  );
   server = spawn(process.execPath, ["server/dist/index.js"], {
     cwd: ROOT,
     env: {
@@ -64,8 +72,12 @@ test.beforeAll(async () => {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  server.stdout?.on("data", (chunk) => { output += chunk.toString("utf8"); });
-  server.stderr?.on("data", (chunk) => { output += chunk.toString("utf8"); });
+  server.stdout?.on("data", (chunk) => {
+    output += chunk.toString("utf8");
+  });
+  server.stderr?.on("data", (chunk) => {
+    output += chunk.toString("utf8");
+  });
   await waitForHealth();
 });
 
@@ -80,7 +92,11 @@ test.afterAll(async () => {
 
 test("a new user starts a Quick adventure and resolves a first turn", async ({ page }) => {
   test.setTimeout(120_000);
-  expect(readdirSync(dataDir).filter((name) => name !== "no-such.env").every((name) => name.startsWith("velvet.sqlite"))).toBe(true);
+  expect(
+    readdirSync(dataDir)
+      .filter((name) => name !== "no-such.env")
+      .every((name) => name.startsWith("velvet.sqlite")),
+  ).toBe(true);
   const empty = await page.request.get(`${ORIGIN}/api/rpg/v1/campaigns`);
   expect(empty.status()).toBe(200);
   expect((await empty.json()).campaigns).toEqual([]);
@@ -88,8 +104,10 @@ test("a new user starts a Quick adventure and resolves a first turn", async ({ p
   await page.goto(`${ORIGIN}/`);
   await expect(page.getByRole("heading", { name: "Campaigns & worlds", exact: true })).toBeVisible();
 
-  const created = page.waitForResponse((response) => response.request().method() === "POST"
-    && new URL(response.url()).pathname === "/api/rpg/v1/quick-adventures");
+  const created = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" && new URL(response.url()).pathname === "/api/rpg/v1/quick-adventures",
+  );
   const started = Date.now();
   await page.getByRole("button", { name: "Start a quick adventure", exact: true }).click();
   const response = await created;
@@ -99,13 +117,20 @@ test("a new user starts a Quick adventure and resolves a first turn", async ({ p
 
   // The library opens the new campaign straight into play.
   await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
-  await expect(page.locator("[data-adventure-table]").getByRole("heading", { name: adventure.campaignName, level: 1, exact: true })).toBeVisible();
+  await expect(
+    page
+      .locator("[data-adventure-table]")
+      .getByRole("heading", { name: adventure.campaignName, level: 1, exact: true }),
+  ).toBeVisible();
 
   const declaration = "I look around the square and ask who tends the commons fire.";
   const callsBefore = await narrationCalls();
-  const streamed = page.waitForResponse((candidate) => candidate.request().method() === "POST"
-    && new URL(candidate.url()).pathname === "/api/rpg/v1/adventure-turns/stream"
-    && (candidate.request().postDataJSON() as { declaration?: unknown } | null)?.declaration === declaration);
+  const streamed = page.waitForResponse(
+    (candidate) =>
+      candidate.request().method() === "POST" &&
+      new URL(candidate.url()).pathname === "/api/rpg/v1/adventure-turns/stream" &&
+      (candidate.request().postDataJSON() as { declaration?: unknown } | null)?.declaration === declaration,
+  );
   await page.getByRole("textbox", { name: "What do you do?", exact: true }).fill(declaration);
   await page.getByRole("button", { name: "Send action", exact: true }).click();
   const stream = await streamed;
@@ -117,21 +142,30 @@ test("a new user starts a Quick adventure and resolves a first turn", async ({ p
   expect(turnId).toBeTruthy();
   const saved = await page.request.get(`${ORIGIN}/api/rpg/v1/adventure-turns/${turnId}`);
   expect(saved.status()).toBe(200);
-  const turn = await saved.json() as {
+  const turn = (await saved.json()) as {
     turn: { campaignId: string; sessionId: string; declaration: string; state: string };
     narrationStatus: { status: string; text: string };
   };
-  expect(turn.turn).toMatchObject({ campaignId: adventure.campaignId, sessionId: adventure.sessionId, declaration, state: "completed" });
+  expect(turn.turn).toMatchObject({
+    campaignId: adventure.campaignId,
+    sessionId: adventure.sessionId,
+    declaration,
+    state: "completed",
+  });
   expect(turn.narrationStatus.status).toBe("completed");
   expect(turn.narrationStatus.text.length).toBeGreaterThan(0);
   expect(await narrationCalls()).toBeGreaterThan(callsBefore);
 
   // The room transcript the page renders agrees with the turn's settled narration.
-  await expect.poll(async () => {
-    const transcript = await page.request.get(`${ORIGIN}/api/rpg/v1/adventure-turns/transcript?campaignId=${adventure.campaignId}&sessionId=${adventure.sessionId}`);
-    const entries = (await transcript.json() as { turns: Array<{ turnId: string; narration: string }> }).turns;
-    return entries.find((entry) => entry.turnId === turnId)?.narration ?? null;
-  }).toBe(turn.narrationStatus.text);
+  await expect
+    .poll(async () => {
+      const transcript = await page.request.get(
+        `${ORIGIN}/api/rpg/v1/adventure-turns/transcript?campaignId=${adventure.campaignId}&sessionId=${adventure.sessionId}`,
+      );
+      const entries = ((await transcript.json()) as { turns: Array<{ turnId: string; narration: string }> }).turns;
+      return entries.find((entry) => entry.turnId === turnId)?.narration ?? null;
+    })
+    .toBe(turn.narrationStatus.text);
 
   // The player sees their action and the settled narration in the adventure history.
   const history = page.getByRole("log", { name: "Adventure history" });

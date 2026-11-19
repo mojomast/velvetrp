@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
 import { compareDirectorAuthority } from "../../server/src/agent/systemOneDisagreement.js";
-import {
-  buildHarvestProposals,
-  summarizeHarvest,
-} from "../../server/src/agent/systemOneHarvest.js";
+import { buildHarvestProposals, summarizeHarvest } from "../../server/src/agent/systemOneHarvest.js";
 import type { HarvestProposal } from "../../server/src/agent/systemOneHarvest.js";
 import type { DirectorDecisionAuthority, SystemOneDecisionRecord } from "../../server/src/repo/index.js";
 import {
@@ -299,7 +296,10 @@ test("buildFixtureDocument keeps confirmed proposals only and sorts by proposalI
   assert.equal(document.proposals.length, 2);
   assert.ok(document.proposals.every((proposal) => proposal.status === "confirmed"));
   const ids = document.proposals.map((proposal) => proposal.proposalId);
-  assert.deepEqual(ids, [...ids].sort((left, right) => left.localeCompare(right)));
+  assert.deepEqual(
+    ids,
+    [...ids].sort((left, right) => left.localeCompare(right)),
+  );
 });
 
 test("buildFixtureDocument is order-independent and idempotent for the same inputs", () => {
@@ -313,12 +313,14 @@ test("buildFixtureDocument is order-independent and idempotent for the same inpu
 
 test("buildFixtureDocument never carries another lane's proposals", () => {
   const director = buildHarvestProposals({
-    records: [makeRecord({
-      decisionId: "director-1",
-      lane: "director-selection",
-      stateDigest: "director-state",
-      selection: { selections: [{ candidateId: "beat-a" }] },
-    })],
+    records: [
+      makeRecord({
+        decisionId: "director-1",
+        lane: "director-selection",
+        stateDigest: "director-state",
+        selection: { selections: [{ candidateId: "beat-a" }] },
+      }),
+    ],
     annotations: { "director-1": { verdict: "correct" } },
   });
   assert.equal(director.length, 1);
@@ -332,10 +334,11 @@ test("mergeFixtureDocuments adds new proposals and keeps the existing ones", () 
     makeProposal({ proposalId: "b", note: "existing b" }),
     makeProposal({ proposalId: "a", note: "existing a" }),
   ]);
-  const incoming = makeFixtureDocument("guardrails", [
-    makeProposal({ proposalId: "d", note: "incoming d" }),
-    makeProposal({ proposalId: "c", note: "incoming c" }),
-  ], "2026-09-17T01:00:00.000Z");
+  const incoming = makeFixtureDocument(
+    "guardrails",
+    [makeProposal({ proposalId: "d", note: "incoming d" }), makeProposal({ proposalId: "c", note: "incoming c" })],
+    "2026-09-17T01:00:00.000Z",
+  );
   const merged = mergeFixtureDocuments(existing, incoming, "2026-09-18T00:00:00.000Z");
   assert.equal(merged.version, 1);
   assert.equal(merged.lane, "guardrails");
@@ -368,13 +371,18 @@ test("mergeFixtureDocuments sorts the merged proposals by proposalId", () => {
   const merged = mergeFixtureDocuments(existing, incoming, NOW);
   const ids = merged.proposals.map((proposal) => proposal.proposalId);
   assert.deepEqual(ids, ["a", "b", "m", "z"]);
-  assert.deepEqual(ids, [...ids].sort((left, right) => left.localeCompare(right)));
+  assert.deepEqual(
+    ids,
+    [...ids].sort((left, right) => left.localeCompare(right)),
+  );
   assert.equal(serializeFixture(mergeFixtureDocuments(existing, incoming, NOW)), serializeFixture(merged));
 });
 
 test("mergeFixtureDocuments throws when the lanes differ", () => {
   const existing = makeFixtureDocument("guardrails", [makeProposal({ proposalId: "a" })]);
-  const incoming = makeFixtureDocument("adventure-selection", [makeProposal({ proposalId: "b", lane: "adventure-selection" })]);
+  const incoming = makeFixtureDocument("adventure-selection", [
+    makeProposal({ proposalId: "b", lane: "adventure-selection" }),
+  ]);
   assert.throws(
     () => mergeFixtureDocuments(existing, incoming, NOW),
     /cannot merge fixtures from different lanes: guardrails and adventure-selection/,
@@ -398,7 +406,10 @@ test("fixtureFilePath anchors to the repo root", () => {
     fixtureFilePath("guardrails", path.join("/repo", "root")),
     path.join("/repo", "root", "server", "test", "fixtures", "system-one-harvested", "guardrails.json"),
   );
-  assert.match(fixtureFilePath("director-selection"), /server[/\\]test[/\\]fixtures[/\\]system-one-harvested[/\\]director-selection\.json$/);
+  assert.match(
+    fixtureFilePath("director-selection"),
+    /server[/\\]test[/\\]fixtures[/\\]system-one-harvested[/\\]director-selection\.json$/,
+  );
 });
 
 test("serializeFixture round-trips and ends with a newline", () => {

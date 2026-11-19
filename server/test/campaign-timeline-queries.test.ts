@@ -23,13 +23,20 @@ function seed(): void {
       ('outsider','Outsider',0),('app-owner','App owner',0),('other-owner','Other owner',0);
     UPDATE application_owner SET principal_id='app-owner' WHERE singleton=1;
   `);
-  db.prepare(`INSERT INTO campaigns (id,name,active_timeline_id,owner_principal_id,created_at,updated_at)
+  db.prepare(
+    `INSERT INTO campaigns (id,name,active_timeline_id,owner_principal_id,created_at,updated_at)
     VALUES ('campaign','Campaign','timeline-z-history','local-owner',?,?),
-      ('other-campaign','Other','other-timeline','other-owner',?,?)`).run(BEFORE, BEFORE, BEFORE, BEFORE);
-  db.prepare(`INSERT INTO campaign_timelines (id,campaign_id,created_at) VALUES
-    ('timeline-z-history','campaign',?),('other-timeline','other-campaign',?)`).run(BEFORE, BEFORE);
+      ('other-campaign','Other','other-timeline','other-owner',?,?)`,
+  ).run(BEFORE, BEFORE, BEFORE, BEFORE);
+  db.prepare(
+    `INSERT INTO campaign_timelines (id,campaign_id,created_at) VALUES
+    ('timeline-z-history','campaign',?),('other-timeline','other-campaign',?)`,
+  ).run(BEFORE, BEFORE);
   for (const [principal, role] of [
-    ["local-owner", "owner"], ["gm", "gm"], ["player", "player"], ["observer", "observer"],
+    ["local-owner", "owner"],
+    ["gm", "gm"],
+    ["player", "player"],
+    ["observer", "observer"],
   ] as const) {
     db.prepare("INSERT INTO campaign_memberships VALUES ('campaign',?,?,?)").run(principal, role, BEFORE);
   }
@@ -45,8 +52,10 @@ function seed(): void {
     INSERT INTO campaign_content_packs VALUES ('campaign','core','1','profile');
   `);
   db.prepare("INSERT INTO campaign_characters VALUES ('cc','campaign','persona',?,?)").run(BEFORE, BEFORE);
-  db.prepare(`INSERT INTO rpg_campaign_sheets VALUES
-    ('sheet','campaign','cc','core','1','race','human','core','1','background','sage',?,?)`).run(BEFORE, BEFORE);
+  db.prepare(
+    `INSERT INTO rpg_campaign_sheets VALUES
+    ('sheet','campaign','cc','core','1','race','human','core','1','background','sage',?,?)`,
+  ).run(BEFORE, BEFORE);
   db.exec(`
     INSERT INTO rpg_character_attributes VALUES ('campaign','sheet',0,'strength',10);
     INSERT INTO campaign_actors VALUES
@@ -63,8 +72,13 @@ function seed(): void {
     rng: { integer: () => 4 },
   });
   const common = (commandId: string, expectedRevision: number): Omit<CommandEnvelope, "command"> => ({
-    commandId, idempotencyKey: `key-${commandId}`, campaignId: "campaign",
-    timelineId: "timeline-z-history", actorId: "actor", expectedRevision, sourceTurnId: null,
+    commandId,
+    idempotencyKey: `key-${commandId}`,
+    campaignId: "campaign",
+    timelineId: "timeline-z-history",
+    actorId: "actor",
+    expectedRevision,
+    sourceTurnId: null,
   });
   repository.executeSetActorAttribute("local-owner", {
     ...common("command-attribute", 0),
@@ -82,8 +96,12 @@ function seed(): void {
 
   const finish = new DatabaseDriver(dbPath());
   finish.pragma("foreign_keys = ON");
-  finish.prepare(`INSERT INTO campaign_timelines (id,campaign_id,created_at) VALUES
-    ('timeline-a-empty','campaign',?),('timeline-A-active','campaign',?)`).run(LATER, LATER);
+  finish
+    .prepare(
+      `INSERT INTO campaign_timelines (id,campaign_id,created_at) VALUES
+    ('timeline-a-empty','campaign',?),('timeline-A-active','campaign',?)`,
+    )
+    .run(LATER, LATER);
   finish.prepare("UPDATE campaigns SET active_timeline_id='timeline-A-active' WHERE id='campaign'").run();
   finish.close();
 }
@@ -161,7 +179,10 @@ describe("campaign timeline queries", () => {
     expect(repository.getCampaignTimeline("local-owner", "campaign", "other-timeline")).toBeNull();
     expect(repository.getCampaignTimeline("local-owner", "other-campaign", "other-timeline")).toBeNull();
     expect(repository.getCampaignTimeline("other-owner", "other-campaign", "other-timeline")).toEqual({
-      id: "other-timeline", campaignId: "other-campaign", revision: 0, createdAt: BEFORE,
+      id: "other-timeline",
+      campaignId: "other-campaign",
+      revision: 0,
+      createdAt: BEFORE,
     });
     repository.close();
     corrupt("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign';");
@@ -174,34 +195,81 @@ describe("campaign timeline queries", () => {
   });
 
   it.each([
-    ["active pointer parent", "UPDATE campaigns SET active_timeline_id='missing' WHERE id='campaign'", "timeline-z-history"],
-    ["timeline projection", "UPDATE campaign_timelines SET created_at='invalid' WHERE id='timeline-a-empty'", "timeline-a-empty"],
-    ["non-contiguous history", "UPDATE campaign_events SET revision=5 WHERE command_id='command-resource'", "timeline-z-history"],
-    ["history after revision reset", "UPDATE campaign_timelines SET revision=0 WHERE id='timeline-z-history'", "timeline-z-history"],
-    ["command timeline parent", "UPDATE campaign_commands SET timeline_id='missing' WHERE command_id='command-attribute'", "timeline-z-history"],
-    ["event actor parent", "UPDATE campaign_events SET actor_id='missing' WHERE command_id='command-resource'", "timeline-z-history"],
-    ["receipt identity", "UPDATE command_receipts SET event_id='missing' WHERE command_id='command-dice'", "timeline-z-history"],
-    ["attribute aggregate", "UPDATE campaign_events SET value_before=value_after WHERE command_id='command-attribute'", "timeline-z-history"],
-    ["resource aggregate", "UPDATE campaign_commands SET resource_current=6 WHERE command_id='command-resource'", "timeline-z-history"],
+    [
+      "active pointer parent",
+      "UPDATE campaigns SET active_timeline_id='missing' WHERE id='campaign'",
+      "timeline-z-history",
+    ],
+    [
+      "timeline projection",
+      "UPDATE campaign_timelines SET created_at='invalid' WHERE id='timeline-a-empty'",
+      "timeline-a-empty",
+    ],
+    [
+      "non-contiguous history",
+      "UPDATE campaign_events SET revision=5 WHERE command_id='command-resource'",
+      "timeline-z-history",
+    ],
+    [
+      "history after revision reset",
+      "UPDATE campaign_timelines SET revision=0 WHERE id='timeline-z-history'",
+      "timeline-z-history",
+    ],
+    [
+      "command timeline parent",
+      "UPDATE campaign_commands SET timeline_id='missing' WHERE command_id='command-attribute'",
+      "timeline-z-history",
+    ],
+    [
+      "event actor parent",
+      "UPDATE campaign_events SET actor_id='missing' WHERE command_id='command-resource'",
+      "timeline-z-history",
+    ],
+    [
+      "receipt identity",
+      "UPDATE command_receipts SET event_id='missing' WHERE command_id='command-dice'",
+      "timeline-z-history",
+    ],
+    [
+      "attribute aggregate",
+      "UPDATE campaign_events SET value_before=value_after WHERE command_id='command-attribute'",
+      "timeline-z-history",
+    ],
+    [
+      "resource aggregate",
+      "UPDATE campaign_commands SET resource_current=6 WHERE command_id='command-resource'",
+      "timeline-z-history",
+    ],
     ["dice normalization", "UPDATE rpg_dice_rolls SET expression='2d6kh1+02'", "timeline-z-history"],
     ["dice stable tie", "UPDATE rpg_dice_terms SET kept=CASE position WHEN 0 THEN 0 ELSE 1 END", "timeline-z-history"],
     ["dice total", "UPDATE rpg_dice_rolls SET total=99", "timeline-z-history"],
     ["orphan command", "DELETE FROM campaign_events WHERE command_id='command-attribute'", "timeline-z-history"],
     ["orphan event", "DELETE FROM campaign_commands WHERE command_id='command-attribute'", "timeline-z-history"],
-    ["orphan receipt", "DELETE FROM campaign_commands WHERE command_id='command-resource'; DELETE FROM campaign_events WHERE command_id='command-resource'; UPDATE campaign_timelines SET revision=2 WHERE id='timeline-z-history'", "timeline-z-history"],
-    ["orphan roll", "DELETE FROM campaign_commands WHERE command_id='command-dice'; DELETE FROM campaign_events WHERE command_id='command-dice'; DELETE FROM command_receipts WHERE command_id='command-dice'; UPDATE campaign_timelines SET revision=2 WHERE id='timeline-z-history'", "timeline-z-history"],
+    [
+      "orphan receipt",
+      "DELETE FROM campaign_commands WHERE command_id='command-resource'; DELETE FROM campaign_events WHERE command_id='command-resource'; UPDATE campaign_timelines SET revision=2 WHERE id='timeline-z-history'",
+      "timeline-z-history",
+    ],
+    [
+      "orphan roll",
+      "DELETE FROM campaign_commands WHERE command_id='command-dice'; DELETE FROM campaign_events WHERE command_id='command-dice'; DELETE FROM command_receipts WHERE command_id='command-dice'; UPDATE campaign_timelines SET revision=2 WHERE id='timeline-z-history'",
+      "timeline-z-history",
+    ],
     ["attributable orphan terms", "DELETE FROM rpg_dice_rolls", "timeline-z-history"],
   ])("fails loudly for authorized %s corruption while masking outsiders", (_label, sql, timelineId) => {
     seed();
     corrupt(sql);
     const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
-    expect(() => repository.listCampaignTimelines("observer", "campaign"))
-      .toThrow("campaign timeline aggregate is malformed");
-    expect(() => repository.getCampaignTimeline("observer", "campaign", timelineId))
-      .toThrow("campaign timeline aggregate is malformed");
+    expect(() => repository.listCampaignTimelines("observer", "campaign")).toThrow(
+      "campaign timeline aggregate is malformed",
+    );
+    expect(() => repository.getCampaignTimeline("observer", "campaign", timelineId)).toThrow(
+      "campaign timeline aggregate is malformed",
+    );
     if (_label === "orphan command") {
-      expect(() => repository.getCampaignTimeline("observer", "campaign", "missing-timeline"))
-        .toThrow("campaign timeline aggregate is malformed");
+      expect(() => repository.getCampaignTimeline("observer", "campaign", "missing-timeline")).toThrow(
+        "campaign timeline aggregate is malformed",
+      );
     }
     expect(repository.listCampaignTimelines("outsider", "campaign")).toEqual([]);
     expect(repository.getCampaignTimeline("outsider", "campaign", timelineId)).toBeNull();
@@ -223,10 +291,12 @@ describe("campaign timeline queries", () => {
     const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.listCampaignTimelines("observer", "campaign")).toHaveLength(3);
     expect(repository.getCampaignTimeline("observer", "campaign", "timeline-z-history")).not.toBeNull();
-    expect(() => repository.listCampaignTimelines("other-owner", "other-campaign"))
-      .toThrow("campaign timeline aggregate is malformed");
-    expect(() => repository.getCampaignTimeline("other-owner", "other-campaign", "other-timeline"))
-      .toThrow("campaign timeline aggregate is malformed");
+    expect(() => repository.listCampaignTimelines("other-owner", "other-campaign")).toThrow(
+      "campaign timeline aggregate is malformed",
+    );
+    expect(() => repository.getCampaignTimeline("other-owner", "other-campaign", "other-timeline")).toThrow(
+      "campaign timeline aggregate is malformed",
+    );
     expect(repository.listCampaignTimelines("outsider", "other-campaign")).toEqual([]);
     expect(repository.getCampaignTimeline("outsider", "other-campaign", "other-timeline")).toBeNull();
     repository.close();
@@ -246,12 +316,13 @@ describe("campaign timeline queries", () => {
       INSERT INTO rpg_dice_terms VALUES ('event-attribute',0,4,1)`);
     const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.listCampaignTimelines("observer", "campaign")).toHaveLength(3);
-    expect(repository.getCampaignTimeline("observer", "campaign", "timeline-z-history"))
-      .toMatchObject({ revision: 3 });
-    expect(() => repository.listCampaignTimelines("other-owner", "other-campaign"))
-      .toThrow("campaign timeline aggregate is malformed");
-    expect(() => repository.getCampaignTimeline("other-owner", "other-campaign", "other-timeline"))
-      .toThrow("campaign timeline aggregate is malformed");
+    expect(repository.getCampaignTimeline("observer", "campaign", "timeline-z-history")).toMatchObject({ revision: 3 });
+    expect(() => repository.listCampaignTimelines("other-owner", "other-campaign")).toThrow(
+      "campaign timeline aggregate is malformed",
+    );
+    expect(() => repository.getCampaignTimeline("other-owner", "other-campaign", "other-timeline")).toThrow(
+      "campaign timeline aggregate is malformed",
+    );
     expect(repository.listCampaignTimelines("outsider", "other-campaign")).toEqual([]);
     expect(repository.getCampaignTimeline("outsider", "other-campaign", "other-timeline")).toBeNull();
     repository.close();
@@ -262,10 +333,12 @@ describe("campaign timeline queries", () => {
     corrupt("DELETE FROM rpg_dice_rolls WHERE campaign_id='campaign' AND event_id='event-dice'");
     const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     for (const principal of ["local-owner", "gm", "player", "observer"]) {
-      expect(() => repository.listCampaignTimelines(principal, "campaign"))
-        .toThrow("campaign timeline aggregate is malformed");
-      expect(() => repository.getCampaignTimeline(principal, "campaign", "timeline-z-history"))
-        .toThrow("campaign timeline aggregate is malformed");
+      expect(() => repository.listCampaignTimelines(principal, "campaign")).toThrow(
+        "campaign timeline aggregate is malformed",
+      );
+      expect(() => repository.getCampaignTimeline(principal, "campaign", "timeline-z-history")).toThrow(
+        "campaign timeline aggregate is malformed",
+      );
     }
     expect(repository.listCampaignTimelines("outsider", "campaign")).toEqual([]);
     expect(repository.getCampaignTimeline("outsider", "campaign", "timeline-z-history")).toBeNull();
@@ -277,8 +350,12 @@ describe("campaign timeline queries", () => {
     const now = vi.fn(() => new Date());
     const nextId = vi.fn(() => "unused");
     const integer = vi.fn(() => 1);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
-      clock: { now }, ids: { nextId }, rng: { integer } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      clock: { now },
+      ids: { nextId },
+      rng: { integer },
+    });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
     try {
@@ -306,13 +383,19 @@ describe("campaign timeline queries", () => {
     const now = vi.fn(() => new Date());
     const nextId = vi.fn(() => "unused");
     const integer = vi.fn(() => 1);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
-      clock: { now }, ids: { nextId }, rng: { integer } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      clock: { now },
+      ids: { nextId },
+      rng: { integer },
+    });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
     try {
-      expect(repository.getCampaignTimeline("player", "campaign", "timeline-z-history"))
-        .toMatchObject({ id: "timeline-z-history", revision: 3 });
+      expect(repository.getCampaignTimeline("player", "campaign", "timeline-z-history")).toMatchObject({
+        id: "timeline-z-history",
+        revision: 3,
+      });
       expect(prepare).toHaveBeenCalledOnce();
       const sql = prepare.mock.calls[0]![0] as string;
       expect(sql).toMatch(/^SELECT\s/i);
@@ -344,17 +427,21 @@ describe("campaign timeline queries", () => {
     repository.transaction((unit) => {
       expired = unit;
       expect(unit.listCampaignTimelines("observer", "campaign")).toHaveLength(3);
-      expect(unit.getCampaignTimeline("observer", "campaign", "timeline-A-active"))
-        .toMatchObject({ id: "timeline-A-active", revision: 0 });
+      expect(unit.getCampaignTimeline("observer", "campaign", "timeline-A-active")).toMatchObject({
+        id: "timeline-A-active",
+        revision: 0,
+      });
     });
-    expect(() => expired!.listCampaignTimelines("bad actor", "bad campaign"))
-      .toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getCampaignTimeline("bad actor", "bad campaign", "bad timeline"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.listCampaignTimelines("bad actor", "bad campaign")).toThrow(
+      "transaction unit of work is no longer active",
+    );
+    expect(() => expired!.getCampaignTimeline("bad actor", "bad campaign", "bad timeline")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
-    expect(() => repository.listCampaignTimelines("bad actor", "bad campaign"))
-      .toThrow("repository is closed");
-    expect(() => repository.getCampaignTimeline("bad actor", "bad campaign", "bad timeline"))
-      .toThrow("repository is closed");
+    expect(() => repository.listCampaignTimelines("bad actor", "bad campaign")).toThrow("repository is closed");
+    expect(() => repository.getCampaignTimeline("bad actor", "bad campaign", "bad timeline")).toThrow(
+      "repository is closed",
+    );
   });
 });

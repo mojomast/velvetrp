@@ -5,9 +5,24 @@ export const VELVET_LEGACY_RULESET_DESCRIPTOR: RulesetDescriptor = Object.freeze
   version: "1.0.0",
   name: "Velvet Starter Legacy Adapter",
   scope: "Behavior-preserving adapter for existing Velvet starter campaigns.",
-  source: Object.freeze({ title: "Velvet Starter Rules", publisher: "Velvet", edition: "starter-v1", url: "https://github.com/" }),
-  license: Object.freeze({ name: "Original project material", identifier: "Proprietary-original", url: "https://github.com/", attribution: "Original Velvet project mechanics." }),
-  supportedMechanics: Object.freeze(["legacy character builder", "legacy checks", "legacy progression", "legacy combat"]),
+  source: Object.freeze({
+    title: "Velvet Starter Rules",
+    publisher: "Velvet",
+    edition: "starter-v1",
+    url: "https://github.com/",
+  }),
+  license: Object.freeze({
+    name: "Original project material",
+    identifier: "Proprietary-original",
+    url: "https://github.com/",
+    attribution: "Original Velvet project mechanics.",
+  }),
+  supportedMechanics: Object.freeze([
+    "legacy character builder",
+    "legacy checks",
+    "legacy progression",
+    "legacy combat",
+  ]),
   capabilities: Object.freeze([
     Object.freeze({ id: "character-builder", version: "1.0.0", status: "supported" as const }),
     Object.freeze({ id: "checks", version: "1.0.0", status: "supported" as const }),
@@ -36,10 +51,18 @@ const abilityModifier = (score: number): number => {
 };
 
 const resolveCheck = (input: CheckInput): CheckResolution => {
-  if (!Number.isInteger(input.d20) || input.d20 < 1 || input.d20 > 20) throw new RangeError("d20 must be between 1 and 20");
+  if (!Number.isInteger(input.d20) || input.d20 < 1 || input.d20 > 20)
+    throw new RangeError("d20 must be between 1 and 20");
   const modifier = abilityModifier(input.abilityScore);
   const total = input.d20 + modifier + input.proficiencyBonus;
-  return Object.freeze({ d20: input.d20, abilityModifier: modifier, proficiencyBonus: input.proficiencyBonus, total, dc: input.dc, success: total >= input.dc });
+  return Object.freeze({
+    d20: input.d20,
+    abilityModifier: modifier,
+    proficiencyBonus: input.proficiencyBonus,
+    total,
+    dc: input.dc,
+    success: total >= input.dc,
+  });
 };
 
 export const VELVET_LEGACY_RULESET: RulesetModule = Object.freeze({

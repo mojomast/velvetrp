@@ -15,7 +15,10 @@ export function selectLoreEntries(
   const matched = entries
     .filter((entry) => entry.enabled)
     .filter((entry) => entry.characterIds.length === 0 || entry.characterIds.some((id) => characterIds.has(id)))
-    .filter((entry) => entry.keys.length === 0 || entry.keys.some((key) => key.trim() !== "" && haystack.includes(key.toLowerCase())))
+    .filter(
+      (entry) =>
+        entry.keys.length === 0 || entry.keys.some((key) => key.trim() !== "" && haystack.includes(key.toLowerCase())),
+    )
     .sort((a, b) => a.insertionOrder - b.insertionOrder);
   const selected: LoreEntry[] = [];
   let remaining = Math.max(0, maxChars);

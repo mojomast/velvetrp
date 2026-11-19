@@ -72,11 +72,7 @@ export function commitmentFrame(binding: VerifiableRollBinding, serverSecret: Ui
 export const computeCommitment = (binding: VerifiableRollBinding, serverSecret: Uint8Array): Uint8Array =>
   hash(commitmentFrame(binding, serverSecret));
 
-export function hkdfSaltFrame(
-  commitment: Uint8Array,
-  clientEntropy: Uint8Array,
-  clientNonce: Uint8Array,
-): Uint8Array {
+export function hkdfSaltFrame(commitment: Uint8Array, clientEntropy: Uint8Array, clientNonce: Uint8Array): Uint8Array {
   assertBytes("commitment", commitment, DIGEST_BYTES);
   assertBytes("client entropy", clientEntropy, CLIENT_ENTROPY_BYTES);
   assertBytes("client nonce", clientNonce, CLIENT_NONCE_BYTES);
@@ -163,15 +159,16 @@ const normalizeExpression = (expression: string): NormalizedDiceExpression => {
   validateRollBinding({ rollId: "validation", commandId: "validation", candidateId: null, expression });
   const match = EXPRESSION.exec(expression);
   if (match === null) throw new VerifiableDiceProtocolError("invalid canonical dice expression");
-  const selection: NormalizedDiceExpression["selection"] = match[3] === "kh"
-    ? { type: "keep_highest", count: Number(match[4]) }
-    : match[3] === "kl"
-      ? { type: "keep_lowest", count: Number(match[4]) }
-      : match[5] === "adv"
-        ? { type: "advantage" }
-        : match[5] === "dis"
-          ? { type: "disadvantage" }
-          : { type: "all" };
+  const selection: NormalizedDiceExpression["selection"] =
+    match[3] === "kh"
+      ? { type: "keep_highest", count: Number(match[4]) }
+      : match[3] === "kl"
+        ? { type: "keep_lowest", count: Number(match[4]) }
+        : match[5] === "adv"
+          ? { type: "advantage" }
+          : match[5] === "dis"
+            ? { type: "disadvantage" }
+            : { type: "all" };
   return normalizedDiceExpressionSchema.parse({
     count: Number(match[1]),
     sides: Number(match[2]),
@@ -184,23 +181,25 @@ export function evaluateVerifiableDice(binding: VerifiableRollBinding, rollKey: 
   validateRollBinding(binding);
   assertBytes("roll key", rollKey, DIGEST_BYTES);
   const normalized = normalizeExpression(binding.expression);
-  const physicalCount = normalized.selection.type === "advantage" || normalized.selection.type === "disadvantage"
-    ? 2
-    : normalized.count;
+  const physicalCount =
+    normalized.selection.type === "advantage" || normalized.selection.type === "disadvantage" ? 2 : normalized.count;
   const words = hmacWords(rollKey, binding);
   const values = Array.from({ length: physicalCount }, () => sampleUnbiasedBounded(words, normalized.sides));
   const selection = normalized.selection;
-  const keepCount = selection.type === "keep_highest" || selection.type === "keep_lowest"
-    ? selection.count
-    : selection.type === "all" ? physicalCount : 1;
+  const keepCount =
+    selection.type === "keep_highest" || selection.type === "keep_lowest"
+      ? selection.count
+      : selection.type === "all"
+        ? physicalCount
+        : 1;
   const keepHighest = selection.type === "keep_highest" || selection.type === "advantage";
-  const ordered = values.map((_, index) => index).sort((left, right) => {
-    const difference = keepHighest ? values[right]! - values[left]! : values[left]! - values[right]!;
-    return difference === 0 ? left - right : difference;
-  });
-  const kept = selection.type === "all"
-    ? new Set(ordered)
-    : new Set(ordered.slice(0, keepCount));
+  const ordered = values
+    .map((_, index) => index)
+    .sort((left, right) => {
+      const difference = keepHighest ? values[right]! - values[left]! : values[left]! - values[right]!;
+      return difference === 0 ? left - right : difference;
+    });
+  const kept = selection.type === "all" ? new Set(ordered) : new Set(ordered.slice(0, keepCount));
   const terms = values.map((value, index) => ({ value, kept: kept.has(index) }));
   return diceRollResultSchema.parse({
     expression: binding.expression,
@@ -272,43 +271,43 @@ export const computeClientContributionDigest = (...args: Parameters<typeof clien
 
 export type ProtocolTransitionOperation =
   | Readonly<{
-    kind: "create";
-    rollId: string;
-    commitment: Uint8Array;
-    source: "lifecycle" | "observation";
-  }>
+      kind: "create";
+      rollId: string;
+      commitment: Uint8Array;
+      source: "lifecycle" | "observation";
+    }>
   | Readonly<{
-    kind: "contribute";
-    rollId: string;
-    commitment: Uint8Array;
-    nonce: Uint8Array;
-    contributionDigest: Uint8Array;
-    expectedCapability: string;
-  }>
+      kind: "contribute";
+      rollId: string;
+      commitment: Uint8Array;
+      nonce: Uint8Array;
+      contributionDigest: Uint8Array;
+      expectedCapability: string;
+    }>
   | Readonly<{
-    kind: "settle";
-    rollId: string;
-    commitment: Uint8Array;
-    contributionDigest: Uint8Array;
-    transcriptDigest: Uint8Array;
-    expectedCapability: string;
-  }>
+      kind: "settle";
+      rollId: string;
+      commitment: Uint8Array;
+      contributionDigest: Uint8Array;
+      transcriptDigest: Uint8Array;
+      expectedCapability: string;
+    }>
   | Readonly<{
-    kind: "abandon";
-    rollId: string;
-    commitment: Uint8Array;
-    reason: "cancelled" | "timeout" | "withheld";
-    expectedCapability: string;
-  }>
+      kind: "abandon";
+      rollId: string;
+      commitment: Uint8Array;
+      reason: "cancelled" | "timeout" | "withheld";
+      expectedCapability: string;
+    }>
   | Readonly<{
-    kind: "proof";
-    rollId: string;
-    commitment: Uint8Array;
-    nonce: Uint8Array;
-    contributionDigest: Uint8Array;
-    transcriptDigest: Uint8Array;
-    expectedCapability: string;
-  }>;
+      kind: "proof";
+      rollId: string;
+      commitment: Uint8Array;
+      nonce: Uint8Array;
+      contributionDigest: Uint8Array;
+      transcriptDigest: Uint8Array;
+      expectedCapability: string;
+    }>;
 
 export type ProtocolTransitionConflict =
   | "roll_reused"
@@ -320,7 +319,8 @@ export type ProtocolTransitionConflict =
   | "contribution_mismatch"
   | "roll_terminal";
 
-export type ProtocolTransitionResult = Readonly<{ accepted: true; capability: string | null }>
+export type ProtocolTransitionResult =
+  | Readonly<{ accepted: true; capability: string | null }>
   | Readonly<{ accepted: false; conflict: ProtocolTransitionConflict }>;
 
 /**
@@ -337,18 +337,18 @@ const keyOf = (value: Uint8Array): string => Buffer.from(value).toString("hex");
 
 type RegistryRollState =
   | Readonly<{
-    state: "pending";
-    commitment: string;
-    capability: string;
-    source: "lifecycle" | "observation";
-  }>
+      state: "pending";
+      commitment: string;
+      capability: string;
+      source: "lifecycle" | "observation";
+    }>
   | Readonly<{
-    state: "contributed";
-    commitment: string;
-    nonce: string;
-    contributionDigest: string;
-    capability: string;
-  }>
+      state: "contributed";
+      commitment: string;
+      nonce: string;
+      contributionDigest: string;
+      capability: string;
+    }>
   | Readonly<{ state: "settled" | "cancelled" | "timeout" | "withheld"; commitment: string }>;
 
 /** Reference atomic state machine for tests and single-process callers. */
@@ -373,7 +373,10 @@ export class InMemoryProtocolTransitionRegistry implements ProtocolTransitionReg
       if (existingRoll !== undefined) return { accepted: false, conflict: "commitment_reused" };
       const capability = this.#nextCapability();
       this.#rolls.set(operation.rollId, {
-        state: "pending", commitment, capability, source: operation.source,
+        state: "pending",
+        commitment,
+        capability,
+        source: operation.source,
       });
       this.#commitmentRolls.set(commitment, operation.rollId);
       return { accepted: true, capability };
@@ -389,14 +392,17 @@ export class InMemoryProtocolTransitionRegistry implements ProtocolTransitionReg
         return { accepted: false, conflict: "stale_capability" };
       }
       if (roll.commitment !== commitment) return { accepted: false, conflict: "contribution_mismatch" };
-      if (roll.commitment !== commitment
-          || roll.nonce !== keyOf(operation.nonce)
-          || roll.contributionDigest !== keyOf(operation.contributionDigest)) {
+      if (
+        roll.commitment !== commitment ||
+        roll.nonce !== keyOf(operation.nonce) ||
+        roll.contributionDigest !== keyOf(operation.contributionDigest)
+      ) {
         return { accepted: false, conflict: "contribution_mismatch" };
       }
       const nonce = keyOf(operation.nonce);
       const nonceRoll = this.#nonceRolls.get(nonce);
-      if (nonceRoll !== undefined && nonceRoll !== operation.rollId) return { accepted: false, conflict: "nonce_reused" };
+      if (nonceRoll !== undefined && nonceRoll !== operation.rollId)
+        return { accepted: false, conflict: "nonce_reused" };
       this.#rolls.set(operation.rollId, { state: "settled", commitment });
       this.#commitmentRolls.set(commitment, operation.rollId);
       this.#nonceRolls.set(nonce, operation.rollId);
@@ -439,19 +445,16 @@ export class InMemoryProtocolTransitionRegistry implements ProtocolTransitionReg
       return { accepted: true, capability: null };
     }
 
-    const validAbandonment = (roll.state === "pending"
-      && (operation.reason === "cancelled" || operation.reason === "timeout"))
-      || (roll.state === "contributed" && operation.reason === "withheld");
+    const validAbandonment =
+      (roll.state === "pending" && (operation.reason === "cancelled" || operation.reason === "timeout")) ||
+      (roll.state === "contributed" && operation.reason === "withheld");
     if (!validAbandonment) return { accepted: false, conflict: "invalid_transition" };
     this.#rolls.set(operation.rollId, { state: operation.reason, commitment });
     return { accepted: true, capability: null };
   }
 }
 
-const transition = (
-  registry: ProtocolTransitionRegistry,
-  operation: ProtocolTransitionOperation,
-): string | null => {
+const transition = (registry: ProtocolTransitionRegistry, operation: ProtocolTransitionOperation): string | null => {
   const result = registry.transition(operation);
   if (!result.accepted) throw new VerifiableDiceProtocolError(`protocol transition rejected: ${result.conflict}`);
   return result.capability;
@@ -502,9 +505,7 @@ export interface ContributedVerifiableDiceProofHandle {
 const observedCommitments = new WeakMap<ObservedVerifiableDiceCommitmentHandle, ObservedCommitmentInternal>();
 const contributedProofs = new WeakMap<ContributedVerifiableDiceProofHandle, ContributedVerificationInternal>();
 
-const contributedProofHandle = (
-  internal: ContributedVerificationInternal,
-): ContributedVerifiableDiceProofHandle => {
+const contributedProofHandle = (internal: ContributedVerificationInternal): ContributedVerifiableDiceProofHandle => {
   const handle: ContributedVerifiableDiceProofHandle = Object.freeze({
     kind: "verifiable-dice-contributed-proof-handle",
   });
@@ -525,7 +526,10 @@ export function observeVerifiableDiceCommitment(
   validateRollBinding(binding);
   assertBytes("observed commitment", commitment, DIGEST_BYTES);
   const capability = transition(registry, {
-    kind: "create", rollId: binding.rollId, commitment, source: "observation",
+    kind: "create",
+    rollId: binding.rollId,
+    commitment,
+    source: "observation",
   });
   if (capability === null) throw new VerifiableDiceProtocolError("commitment observation did not return a capability");
   const handle: ObservedVerifiableDiceCommitmentHandle = Object.freeze({
@@ -545,9 +549,7 @@ export function contributeToObservedVerifiableDiceCommitment(
   if (observed === undefined) throw new VerifiableDiceProtocolError("invalid observed commitment handle");
   assertBytes("client entropy", entropy, CLIENT_ENTROPY_BYTES);
   assertBytes("client nonce", nonce, CLIENT_NONCE_BYTES);
-  const contributionDigest = computeClientContributionDigest(
-    observed.binding, observed.commitment, entropy, nonce,
-  );
+  const contributionDigest = computeClientContributionDigest(observed.binding, observed.commitment, entropy, nonce);
   const capability = transition(registry, {
     kind: "contribute",
     rollId: observed.binding.rollId,
@@ -591,11 +593,14 @@ export function projectPendingVerifiableRoll(handle: PendingVerifiableRollHandle
     commitment: copy(pending.commitment),
     committedAtMs: pending.committedAtMs,
     expiresAtMs: pending.expiresAtMs,
-    client: pending.client === null ? null : {
-      entropy: copy(pending.client.entropy),
-      nonce: copy(pending.client.nonce),
-      submittedAtMs: pending.client.submittedAtMs,
-    },
+    client:
+      pending.client === null
+        ? null
+        : {
+            entropy: copy(pending.client.entropy),
+            nonce: copy(pending.client.nonce),
+            submittedAtMs: pending.client.submittedAtMs,
+          },
   };
 }
 
@@ -618,7 +623,10 @@ export function beginVerifiableRoll(
   const serverSecret = copy(secret);
   const commitment = computeCommitment(binding, serverSecret);
   const capability = transition(registry, {
-    kind: "create", rollId: binding.rollId, commitment, source: "lifecycle",
+    kind: "create",
+    rollId: binding.rollId,
+    commitment,
+    source: "lifecycle",
   });
   if (capability === null) throw new VerifiableDiceProtocolError("create transition did not return a capability");
   return pendingHandle({
@@ -643,12 +651,11 @@ export function submitClientEntropy(
   const pending = pendingInternal(handle);
   if (pending.client !== null) fail("client entropy or nonce reuse for this roll");
   assertTimestamp("submittedAtMs", submittedAtMs);
-  if (submittedAtMs < pending.committedAtMs || submittedAtMs >= pending.expiresAtMs) fail("client entropy submitted outside pending window");
+  if (submittedAtMs < pending.committedAtMs || submittedAtMs >= pending.expiresAtMs)
+    fail("client entropy submitted outside pending window");
   assertBytes("client entropy", entropy, CLIENT_ENTROPY_BYTES);
   assertBytes("client nonce", nonce, CLIENT_NONCE_BYTES);
-  const contributionDigest = computeClientContributionDigest(
-    pending.binding, pending.commitment, entropy, nonce,
-  );
+  const contributionDigest = computeClientContributionDigest(pending.binding, pending.commitment, entropy, nonce);
   const capability = transition(registry, {
     kind: "contribute",
     rollId: pending.binding.rollId,
@@ -671,12 +678,18 @@ export function settleVerifiableRoll(
   if (pending.client === null) throw new VerifiableDiceProtocolError("client entropy has not been submitted");
   const client = pending.client;
   assertTimestamp("settledAtMs", settledAtMs);
-  if (settledAtMs < client.submittedAtMs || settledAtMs >= pending.expiresAtMs) fail("roll cannot settle at or after expiry");
+  if (settledAtMs < client.submittedAtMs || settledAtMs >= pending.expiresAtMs)
+    fail("roll cannot settle at or after expiry");
   const { entropy, nonce } = client;
   const rollKey = deriveRollKey(pending.binding, pending.commitment, pending.serverSecret, entropy, nonce);
   const result = evaluateVerifiableDice(pending.binding, rollKey);
   const transcriptDigest = computeTranscriptDigest(
-    pending.binding, pending.commitment, entropy, nonce, pending.serverSecret, result,
+    pending.binding,
+    pending.commitment,
+    entropy,
+    nonce,
+    pending.serverSecret,
+    result,
   );
   transition(registry, {
     kind: "settle",
@@ -714,11 +727,15 @@ export function abandonVerifiableRoll(
   if (pending.client !== null && !expired) fail("a contributed roll cannot be cancelled before expiry");
   if (!expired && !cancellationRequested) fail("unexpired roll requires explicit cancellation");
   const reason = expired ? (pending.client === null ? "timeout" : "withheld") : "cancelled";
-  const clientContributionEvidenceDigest = pending.client === null
-    ? null
-    : computeClientContributionDigest(
-      pending.binding, pending.commitment, pending.client.entropy, pending.client.nonce,
-    );
+  const clientContributionEvidenceDigest =
+    pending.client === null
+      ? null
+      : computeClientContributionDigest(
+          pending.binding,
+          pending.commitment,
+          pending.client.entropy,
+          pending.client.nonce,
+        );
   transition(registry, {
     kind: "abandon",
     rollId: pending.binding.rollId,
@@ -768,10 +785,13 @@ export function verifyVerifiableDiceProof(
   if (proof.version !== VERIFIABLE_DICE_VERSION) fail("unsupported proof version");
   validateRollBinding(proof.binding);
   validateRollBinding(expectedBinding);
-  if (proof.binding.rollId !== expectedBinding.rollId
-      || proof.binding.commandId !== expectedBinding.commandId
-      || proof.binding.candidateId !== expectedBinding.candidateId
-      || proof.binding.expression !== expectedBinding.expression) fail("proof binding mismatch");
+  if (
+    proof.binding.rollId !== expectedBinding.rollId ||
+    proof.binding.commandId !== expectedBinding.commandId ||
+    proof.binding.candidateId !== expectedBinding.candidateId ||
+    proof.binding.expression !== expectedBinding.expression
+  )
+    fail("proof binding mismatch");
   assertBytes("commitment", proof.commitment, DIGEST_BYTES);
   assertBytes("client entropy", proof.clientEntropy, CLIENT_ENTROPY_BYTES);
   assertBytes("client nonce", proof.clientNonce, CLIENT_NONCE_BYTES);
@@ -781,18 +801,28 @@ export function verifyVerifiableDiceProof(
   assertBytes("observed commitment", trustedInput.commitment, DIGEST_BYTES);
   assertBytes("expected client entropy", trustedInput.entropy, CLIENT_ENTROPY_BYTES);
   assertBytes("expected client nonce", trustedInput.nonce, CLIENT_NONCE_BYTES);
-  if (!bytesEqual(proof.commitment, trustedInput.commitment)) fail("proof commitment does not match observed precommitment");
-  if (!bytesEqual(proof.clientEntropy, trustedInput.entropy)
-      || !bytesEqual(proof.clientNonce, trustedInput.nonce)) fail("proof contribution mismatch");
+  if (!bytesEqual(proof.commitment, trustedInput.commitment))
+    fail("proof commitment does not match observed precommitment");
+  if (!bytesEqual(proof.clientEntropy, trustedInput.entropy) || !bytesEqual(proof.clientNonce, trustedInput.nonce))
+    fail("proof contribution mismatch");
   diceRollResultSchema.parse(proof.result);
   if (!bytesEqual(proof.commitment, computeCommitment(proof.binding, proof.serverReveal))) fail("commitment mismatch");
   const key = deriveRollKey(
-    proof.binding, proof.commitment, proof.serverReveal, proof.clientEntropy, proof.clientNonce,
+    proof.binding,
+    proof.commitment,
+    proof.serverReveal,
+    proof.clientEntropy,
+    proof.clientNonce,
   );
   const expectedResult = evaluateVerifiableDice(proof.binding, key);
   if (!bytesEqual(canonicalDiceResult(proof.result), canonicalDiceResult(expectedResult))) fail("result mismatch");
   const transcript = computeTranscriptDigest(
-    proof.binding, proof.commitment, proof.clientEntropy, proof.clientNonce, proof.serverReveal, proof.result,
+    proof.binding,
+    proof.commitment,
+    proof.clientEntropy,
+    proof.clientNonce,
+    proof.serverReveal,
+    proof.result,
   );
   if (!bytesEqual(proof.transcriptDigest, transcript)) fail("transcript mismatch");
   if (!bytesEqual(proof.proofMac, computeProofMac(key, proof.binding, transcript))) fail("proof MAC mismatch");
@@ -802,7 +832,10 @@ export function verifyVerifiableDiceProof(
     commitment: proof.commitment,
     nonce: proof.clientNonce,
     contributionDigest: computeClientContributionDigest(
-      proof.binding, proof.commitment, proof.clientEntropy, proof.clientNonce,
+      proof.binding,
+      proof.commitment,
+      proof.clientEntropy,
+      proof.clientNonce,
     ),
     transcriptDigest: proof.transcriptDigest,
     expectedCapability: trustedInput.capability,

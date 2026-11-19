@@ -29,7 +29,8 @@ process.env.NODE_ENV = "test";
 useTmpDataDir();
 
 const route = "/api/rpg/v1/campaigns/campaign-one/characters";
-const UNKNOWN_CREATE_DETAIL = "Campaign character creation status is unknown; reconciliation with authoritative character list and creation options GETs is required; never retry automatically";
+const UNKNOWN_CREATE_DETAIL =
+  "Campaign character creation status is unknown; reconciliation with authoritative character list and creation options GETs is required; never retry automatically";
 const AT = "2036-01-02T03:04:05.006Z";
 
 const options: CampaignCharacterCreationOptionsResponse = {
@@ -46,19 +47,36 @@ const options: CampaignCharacterCreationOptionsResponse = {
 
 const projection: PrivilegedCampaignCharacterProjection = {
   campaignCharacter: {
-    id: "campaign-character", campaignId: "campaign-one", characterId: "persona-opaque",
-    createdAt: AT, updatedAt: AT,
+    id: "campaign-character",
+    campaignId: "campaign-one",
+    characterId: "persona-opaque",
+    createdAt: AT,
+    updatedAt: AT,
   },
   sheet: {
-    id: "sheet", campaignId: "campaign-one", campaignCharacterId: "campaign-character",
-    race: ORIGINAL_STARTER_RACE.reference, background: ORIGINAL_STARTER_BACKGROUND.reference,
+    id: "sheet",
+    campaignId: "campaign-one",
+    campaignCharacterId: "campaign-character",
+    race: ORIGINAL_STARTER_RACE.reference,
+    background: ORIGINAL_STARTER_BACKGROUND.reference,
     classes: [{ class: ORIGINAL_STARTER_CLASS.reference, level: 1 }],
-    attributes: [], proficiencies: [], choices: [], createdAt: AT, updatedAt: AT,
+    attributes: [],
+    proficiencies: [],
+    choices: [],
+    createdAt: AT,
+    updatedAt: AT,
   },
   actor: {
-    id: "actor", campaignId: "campaign-one", campaignCharacterId: "campaign-character", sheetId: "sheet",
-    kind: "player-character", control: "principal", controllerPrincipalId: "local-owner", privateNotes: null,
-    createdAt: AT, updatedAt: AT,
+    id: "actor",
+    campaignId: "campaign-one",
+    campaignCharacterId: "campaign-character",
+    sheetId: "sheet",
+    kind: "player-character",
+    control: "principal",
+    controllerPrincipalId: "local-owner",
+    privateNotes: null,
+    createdAt: AT,
+    updatedAt: AT,
   },
 };
 
@@ -66,13 +84,18 @@ function repository(optionResult: CampaignCharacterCreationOptionsResponse | nul
   return {
     listCampaigns: vi.fn((): CampaignAccess[] => []),
     getCampaignDetail: vi.fn((): CampaignDetail | null => null),
-    createCampaign: vi.fn((): Campaign => { throw new Error("unused"); }),
-    renameCampaignIfUnchanged: vi.fn((): Campaign => { throw new Error("unused"); }),
+    createCampaign: vi.fn((): Campaign => {
+      throw new Error("unused");
+    }),
+    renameCampaignIfUnchanged: vi.fn((): Campaign => {
+      throw new Error("unused");
+    }),
     getCampaignCharacterCreationOptions: vi.fn(() => optionResult),
     getCampaignCharacterRoster: vi.fn(() => null),
     getCampaignCharacterWorkspace: vi.fn(() => null),
     createOriginalStarterCampaignCharacter: vi.fn((_actor: string, _input: CreateCampaignCharacterInput) => ({
-      projection, personaDisplayName: "Persona",
+      projection,
+      personaDisplayName: "Persona",
     })),
     close: vi.fn(),
   };
@@ -95,7 +118,10 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
       `/api/rpg/v1/campaigns/${"x".repeat(129)}/characters`,
     ]) {
       const response = await app.inject({
-        method: "POST", url, payload: "{", headers: { "content-type": "text/plain", "x-request-id": "create-disabled" },
+        method: "POST",
+        url,
+        payload: "{",
+        headers: { "content-type": "text/plain", "x-request-id": "create-disabled" },
       });
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND", requestId: "create-disabled" });
@@ -109,7 +135,8 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const opaquePersonaId = "persona:/opaque?body-only=#value";
     const repo = repository({
-      ...options, personas: [{ characterId: opaquePersonaId, name: "Opaque Persona", alreadyUsed: false }],
+      ...options,
+      personas: [{ characterId: opaquePersonaId, name: "Opaque Persona", alreadyUsed: false }],
     });
     repo.createOriginalStarterCampaignCharacter.mockImplementation((_actor, input) => ({
       projection: {
@@ -120,10 +147,15 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     }));
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "POST", url: route, payload: { characterId: opaquePersonaId },
+      method: "POST",
+      url: route,
+      payload: { characterId: opaquePersonaId },
       headers: {
-        "content-type": "application/json; charset=utf-8", "x-request-id": "create-ok",
-        authorization: "Bearer attacker", "x-principal-id": "attacker", "x-user-id": "attacker",
+        "content-type": "application/json; charset=utf-8",
+        "x-request-id": "create-ok",
+        authorization: "Bearer attacker",
+        "x-principal-id": "attacker",
+        "x-user-id": "attacker",
       },
     });
     expect(response.statusCode).toBe(201);
@@ -138,10 +170,15 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     expect(repo.createOriginalStarterCampaignCharacter).toHaveBeenCalledWith(
       "local-owner",
       expect.objectContaining({
-        campaignId: "campaign-one", characterId: opaquePersonaId, controllerPrincipalId: "local-owner",
-        race: ORIGINAL_STARTER_RACE.reference, background: ORIGINAL_STARTER_BACKGROUND.reference,
+        campaignId: "campaign-one",
+        characterId: opaquePersonaId,
+        controllerPrincipalId: "local-owner",
+        race: ORIGINAL_STARTER_RACE.reference,
+        background: ORIGINAL_STARTER_BACKGROUND.reference,
         classes: [{ class: ORIGINAL_STARTER_CLASS.reference, level: 1 }],
-        attributes: [], proficiencies: [], choices: [],
+        attributes: [],
+        proficiencies: [],
+        choices: [],
       }),
     );
     expect(response.body).not.toMatch(/controllerPrincipalId|privateNotes|sheet|actor|campaignId|rulesProfile/i);
@@ -153,13 +190,21 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     const factory = vi.fn(() => repository());
     const app = buildApp({ campaignRepositoryFactory: factory });
     for (const url of [
-      `${route}?x=1`, `${route}?unused=`, `${route}?x=1&x=2`,
+      `${route}?x=1`,
+      `${route}?unused=`,
+      `${route}?x=1&x=2`,
       "/api/rpg/v1/campaigns/%zz/characters?private=query",
     ]) {
-      const response = await app.inject({ method: "POST", url, payload: "{", headers: { "content-type": "text/plain" } });
+      const response = await app.inject({
+        method: "POST",
+        url,
+        payload: "{",
+        headers: { "content-type": "text/plain" },
+      });
       expect(response.statusCode).toBe(400);
       expect(response.json()).toMatchObject({
-        code: "RPG_INVALID_REQUEST", error: "Campaign character creation does not accept query parameters",
+        code: "RPG_INVALID_REQUEST",
+        error: "Campaign character creation does not accept query parameters",
       });
       expect(response.body).not.toContain("private=query");
     }
@@ -175,15 +220,23 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     const address = app.server.address();
     if (!address || typeof address === "string") throw new Error("no server address");
     const response = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      const request = httpRequest({
-        host: "127.0.0.1", port: address.port, method: "POST", path: `${route}?`,
-        headers: { "content-type": "application/json", "x-request-id": `create-bare-${enabled}` },
-      }, (incoming) => {
-        let body = "";
-        incoming.setEncoding("utf8");
-        incoming.on("data", (chunk: string) => { body += chunk; });
-        incoming.on("end", () => resolve({ status: incoming.statusCode ?? 0, body }));
-      });
+      const request = httpRequest(
+        {
+          host: "127.0.0.1",
+          port: address.port,
+          method: "POST",
+          path: `${route}?`,
+          headers: { "content-type": "application/json", "x-request-id": `create-bare-${enabled}` },
+        },
+        (incoming) => {
+          let body = "";
+          incoming.setEncoding("utf8");
+          incoming.on("data", (chunk: string) => {
+            body += chunk;
+          });
+          incoming.on("end", () => resolve({ status: incoming.statusCode ?? 0, body }));
+        },
+      );
       request.on("error", reject);
       request.end(JSON.stringify({ characterId: "persona-opaque" }));
     });
@@ -206,7 +259,12 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
       "/api/rpg/v1/campaigns/%zz/characters",
       `/api/rpg/v1/campaigns/${"x".repeat(129)}/characters`,
     ]) {
-      const response = await app.inject({ method: "POST", url, payload: "{", headers: { "content-type": "text/plain" } });
+      const response = await app.inject({
+        method: "POST",
+        url,
+        payload: "{",
+        headers: { "content-type": "text/plain" },
+      });
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: "RPG_CAMPAIGN_NOT_FOUND" });
     }
@@ -233,7 +291,7 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     ["application/json", 201],
     ["Application/JSON", 201],
     ["application/json;charset=utf-8", 201],
-    ["application/json ; charset = \"UTF-8\"", 201],
+    ['application/json ; charset = "UTF-8"', 201],
     [undefined, 415],
     ["text/json", 415],
     ["application/problem+json", 415],
@@ -245,7 +303,9 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     const repo = repository();
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "POST", url: route, payload: JSON.stringify({ characterId: "persona-opaque" }),
+      method: "POST",
+      url: route,
+      payload: JSON.stringify({ characterId: "persona-opaque" }),
       headers: contentType ? { "content-type": contentType } : {},
     });
     expect(response.statusCode).toBe(status);
@@ -254,17 +314,26 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
   });
 
   it.each([
-    ["empty", ""], ["malformed", "{"], ["null", "null"], ["missing", "{}"],
+    ["empty", ""],
+    ["malformed", "{"],
+    ["null", "null"],
+    ["missing", "{}"],
     ["blank", JSON.stringify({ characterId: "" })],
     ["extra", JSON.stringify({ characterId: "persona-opaque", campaignId: "caller-owned" })],
   ])("returns the same generic 400 for %s bodies without repository access", async (_label, payload) => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const factory = vi.fn(() => repository());
     const app = buildApp({ campaignRepositoryFactory: factory });
-    const response = await app.inject({ method: "POST", url: route, payload, headers: { "content-type": "application/json" } });
+    const response = await app.inject({
+      method: "POST",
+      url: route,
+      payload,
+      headers: { "content-type": "application/json" },
+    });
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({
-      code: "RPG_INVALID_REQUEST", error: "Campaign character creation request is invalid",
+      code: "RPG_INVALID_REQUEST",
+      error: "Campaign character creation request is invalid",
     });
     expect(response.json()).not.toHaveProperty("issues");
     expect(factory).not.toHaveBeenCalled();
@@ -278,7 +347,9 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
   ])("maps only the typed %s service failure", async (_label, failure, status, code) => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const repo = repository();
-    repo.createOriginalStarterCampaignCharacter.mockImplementation(() => { throw failure; });
+    repo.createOriginalStarterCampaignCharacter.mockImplementation(() => {
+      throw failure;
+    });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({ method: "POST", url: route, payload: { characterId: "persona-opaque" } });
     expect(response.statusCode).toBe(status);
@@ -294,18 +365,25 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
       process.env.FEATURE_RPG_CAMPAIGN = "true";
       const secret = `private-${kind}-id-header-body-output`;
       const repo = repository();
-      const failure = kind === "lookalike"
-        ? Object.assign(new Error(secret), { code: "ORIGINAL_STARTER_CHARACTER_CREATION_CONFLICT" })
-        : new Error(secret);
-      repo.createOriginalStarterCampaignCharacter.mockImplementation(() => { throw failure; });
+      const failure =
+        kind === "lookalike"
+          ? Object.assign(new Error(secret), { code: "ORIGINAL_STARTER_CHARACTER_CREATION_CONFLICT" })
+          : new Error(secret);
+      repo.createOriginalStarterCampaignCharacter.mockImplementation(() => {
+        throw failure;
+      });
       const app = buildApp({ campaignRepositoryFactory: () => repo });
       const response = await app.inject({
-        method: "POST", url: route, payload: { characterId: "persona-opaque" },
+        method: "POST",
+        url: route,
+        payload: { characterId: "persona-opaque" },
         headers: { "x-request-id": "create-failure", "x-private": secret },
       });
       expect(response.statusCode).toBe(500);
       expect(response.json()).toMatchObject({
-        code: "RPG_INTERNAL_ERROR", requestId: "create-failure", detail: UNKNOWN_CREATE_DETAIL,
+        code: "RPG_INTERNAL_ERROR",
+        requestId: "create-failure",
+        detail: UNKNOWN_CREATE_DETAIL,
         error: UNKNOWN_CREATE_DETAIL,
       });
       expect(response.body).not.toContain(secret);
@@ -320,7 +398,13 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     const repo = repository();
     repo.createOriginalStarterCampaignCharacter.mockReturnValue(
       (value === "mismatch"
-        ? { projection: { ...projection, campaignCharacter: { ...projection.campaignCharacter, characterId: "other-persona" } }, personaDisplayName: "Persona" }
+        ? {
+            projection: {
+              ...projection,
+              campaignCharacter: { ...projection.campaignCharacter, characterId: "other-persona" },
+            },
+            personaDisplayName: "Persona",
+          }
         : value) as never,
     );
     const app = buildApp({ campaignRepositoryFactory: () => repo });
@@ -337,21 +421,27 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     const marker = "slice85-surrogate-persona-marker";
     const repo = repository();
     repo.createOriginalStarterCampaignCharacter.mockReturnValue({
-      projection, personaDisplayName: `${marker}\ud800`,
+      projection,
+      personaDisplayName: `${marker}\ud800`,
     });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const malformed = await app.inject({
-      method: "POST", url: route, payload: { characterId: "persona-opaque" },
+      method: "POST",
+      url: route,
+      payload: { characterId: "persona-opaque" },
     });
     expect(malformed.statusCode).toBe(500);
     expect(malformed.json()).toMatchObject({ code: "RPG_INTERNAL_ERROR", detail: UNKNOWN_CREATE_DETAIL });
     expect(malformed.body).not.toContain(marker);
 
     repo.createOriginalStarterCampaignCharacter.mockReturnValue({
-      projection, personaDisplayName: "Astral \u{1F9D9} Persona",
+      projection,
+      personaDisplayName: "Astral \u{1F9D9} Persona",
     });
     const valid = await app.inject({
-      method: "POST", url: route, payload: { characterId: "persona-opaque" },
+      method: "POST",
+      url: route,
+      payload: { characterId: "persona-opaque" },
     });
     expect(valid.statusCode).toBe(201);
     expect(valid.json().character.name).toBe("Astral \u{1F9D9} Persona");
@@ -363,17 +453,24 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     const repo = repository();
     const factory = vi.fn(() => repo);
     const app = buildApp({ campaignRepositoryFactory: factory });
-    expect((await app.inject({ method: "POST", url: route, payload: { characterId: "persona-opaque" } })).statusCode).toBe(201);
+    expect(
+      (await app.inject({ method: "POST", url: route, payload: { characterId: "persona-opaque" } })).statusCode,
+    ).toBe(201);
     expect((await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns" })).statusCode).toBe(200);
     expect(factory).toHaveBeenCalledOnce();
     await app.close();
     expect(repo.close).toHaveBeenCalledOnce();
 
-    const failedFactory = vi.fn(() => { throw new Error("private database path"); });
+    const failedFactory = vi.fn(() => {
+      throw new Error("private database path");
+    });
     const failedApp = buildApp({ campaignRepositoryFactory: failedFactory });
     for (const requestId of ["open-one", "open-two"]) {
       const response = await failedApp.inject({
-        method: "POST", url: route, payload: { characterId: "persona-opaque" }, headers: { "x-request-id": requestId },
+        method: "POST",
+        url: route,
+        payload: { characterId: "persona-opaque" },
+        headers: { "x-request-id": requestId },
       });
       expect(response.statusCode).toBe(500);
       expect(response.json()).toMatchObject({ code: "RPG_INTERNAL_ERROR", requestId });
@@ -387,22 +484,32 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     process.env.NODE_ENV = "production";
     const markers = [
-      "slice85-exception-secret", "slice85-body-persona", "slice85-header-secret",
-      "slice85-query-secret", "slice85-output-secret", "slice85-request-id-secret",
+      "slice85-exception-secret",
+      "slice85-body-persona",
+      "slice85-header-secret",
+      "slice85-query-secret",
+      "slice85-output-secret",
+      "slice85-request-id-secret",
     ];
     let logged = "";
     const loggerStream = new Writable({
-      write(chunk, _encoding, callback) { logged += chunk.toString(); callback(); },
+      write(chunk, _encoding, callback) {
+        logged += chunk.toString();
+        callback();
+      },
     });
     const repo = repository({
-      ...options, personas: [{ characterId: markers[1]!, name: "Persona", alreadyUsed: false }],
+      ...options,
+      personas: [{ characterId: markers[1]!, name: "Persona", alreadyUsed: false }],
     });
     repo.createOriginalStarterCampaignCharacter.mockImplementation(() => {
       throw Object.assign(new Error(markers[0]), { output: markers[4] });
     });
     const app = buildApp({ campaignRepositoryFactory: () => repo, loggerStream });
     const response = await app.inject({
-      method: "POST", url: route, payload: { characterId: markers[1] },
+      method: "POST",
+      url: route,
+      payload: { characterId: markers[1] },
       headers: { "x-private": markers[2], "x-request-id": markers[5] },
     });
     await app.inject({ method: "POST", url: `${route}?token=${markers[3]}`, payload: { characterId: markers[1] } });
@@ -427,9 +534,11 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     real.installOriginalStarterContent("local-owner", "campaign-one");
     real.configureOriginalStarterContent("local-owner", "campaign-one");
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
-    db.prepare(`INSERT INTO characters
+    db.prepare(
+      `INSERT INTO characters
       (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona-opaque','Persona',30,'hero','fictional',1,0,?)`).run(AT);
+      VALUES ('persona-opaque','Persona',30,'hero','fictional',1,0,?)`,
+    ).run(AT);
     db.close();
     const committedCreate = vi.fn((actor: string, input: CreateCampaignCharacterInput) => {
       const committed = real.createOriginalStarterCampaignCharacter(actor, input);
@@ -445,11 +554,16 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     const app = buildApp({ campaignRepositoryFactory: () => routeRepository });
 
     const first = await app.inject({
-      method: "POST", url: route, payload: { characterId: "persona-opaque" }, headers: { "x-request-id": "ambiguous" },
+      method: "POST",
+      url: route,
+      payload: { characterId: "persona-opaque" },
+      headers: { "x-request-id": "ambiguous" },
     });
     expect(first.statusCode).toBe(500);
     expect(first.json()).toMatchObject({
-      code: "RPG_INTERNAL_ERROR", requestId: "ambiguous", detail: UNKNOWN_CREATE_DETAIL,
+      code: "RPG_INTERNAL_ERROR",
+      requestId: "ambiguous",
+      detail: UNKNOWN_CREATE_DETAIL,
     });
     expect(committedCreate).toHaveBeenCalledOnce();
 
@@ -464,11 +578,17 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
       { characterId: "persona-opaque", name: "Persona", alreadyUsed: true },
     ]);
 
-    const deliberateSecond = await app.inject({ method: "POST", url: route, payload: { characterId: "persona-opaque" } });
+    const deliberateSecond = await app.inject({
+      method: "POST",
+      url: route,
+      payload: { characterId: "persona-opaque" },
+    });
     expect(deliberateSecond.statusCode).toBe(409);
     expect(deliberateSecond.json()).toMatchObject({ code: "RPG_CAMPAIGN_CHARACTER_CREATE_CONFLICT" });
     expect(committedCreate).toHaveBeenCalledOnce();
-    const verify = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"), { readonly: true });
+    const verify = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"), {
+      readonly: true,
+    });
     expect((verify.prepare("SELECT COUNT(*) count FROM campaign_characters").get() as { count: number }).count).toBe(1);
     verify.close();
     await app.close();

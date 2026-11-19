@@ -12,16 +12,13 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSystemOneShadowReport } from "../server/src/agent/systemOneReport.js";
+import { evaluatePromotionGate, isLanePromoted, promotionRecord } from "../server/src/agent/systemOnePromotion.js";
+import type { SystemOnePromotionRecord, SystemOnePromotionResult } from "../server/src/agent/systemOnePromotion.js";
 import {
-  evaluatePromotionGate,
-  isLanePromoted,
-  promotionRecord,
-} from "../server/src/agent/systemOnePromotion.js";
-import type {
-  SystemOnePromotionRecord,
-  SystemOnePromotionResult,
-} from "../server/src/agent/systemOnePromotion.js";
-import { closeRepo, listRecentSystemOneDecisionsWithLaneCommits, summarizeSystemOneDecisions } from "../server/src/repo/index.js";
+  closeRepo,
+  listRecentSystemOneDecisionsWithLaneCommits,
+  summarizeSystemOneDecisions,
+} from "../server/src/repo/index.js";
 import type { SystemOneDecisionRecord, SystemOneDecisionSummary } from "../server/src/repo/index.js";
 import { resolveDataDir } from "../server/src/repo/db/connection.js";
 import { SYSTEM_ONE_LANES } from "../server/src/types.js";
@@ -43,12 +40,12 @@ export function parseReportArgs(argv: readonly string[]): ReportCliOptions {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]!;
     if (arg === "--limit" || arg.startsWith("--limit=")) {
-      const raw = arg === "--limit" ? argv[index += 1] : arg.slice("--limit=".length);
+      const raw = arg === "--limit" ? argv[(index += 1)] : arg.slice("--limit=".length);
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) throw new Error(`--limit requires a number, received ${raw ?? "nothing"}`);
       limit = Math.max(MIN_LIMIT, Math.min(MAX_LIMIT, Math.trunc(parsed)));
     } else if (arg === "--out" || arg.startsWith("--out=")) {
-      const value = arg === "--out" ? argv[index += 1] : arg.slice("--out=".length);
+      const value = arg === "--out" ? argv[(index += 1)] : arg.slice("--out=".length);
       if (!value || value.trim() === "") throw new Error("--out requires a path");
       out = path.resolve(value);
     } else if (arg === "--help" || arg === "-h") {
@@ -107,7 +104,7 @@ function formatCalibration(record: SystemOnePromotionRecord): string {
 /** Renders a recorded-but-unbound lane as explicitly inactive rather than a bare "no". */
 function promotionLabel(status: LanePromotionStatus): string {
   if (status.promoted) return "yes";
-  return status.record && !(status.record.evaluatedBindings?.length) ? "no (unbound)" : "no";
+  return status.record && !status.record.evaluatedBindings?.length ? "no (unbound)" : "no";
 }
 
 /**
@@ -122,10 +119,10 @@ export function buildPromotionSection(statuses: readonly LanePromotionStatus[]):
   lines.push("| --- | --- | --- | --- | --- |");
   for (const status of statuses) {
     lines.push(
-      `| ${status.lane} | ${promotionLabel(status)}`
-      + ` | ${status.record?.promotedAt ?? NONE}`
-      + ` | ${status.record?.evidence ?? NOT_RECORDED}`
-      + ` | ${status.record ? (status.gate?.promoted ? "pass" : "fail") : NOT_RECORDED} |`,
+      `| ${status.lane} | ${promotionLabel(status)}` +
+        ` | ${status.record?.promotedAt ?? NONE}` +
+        ` | ${status.record?.evidence ?? NOT_RECORDED}` +
+        ` | ${status.record ? (status.gate?.promoted ? "pass" : "fail") : NOT_RECORDED} |`,
     );
   }
   lines.push("");
@@ -133,7 +130,7 @@ export function buildPromotionSection(statuses: readonly LanePromotionStatus[]):
     lines.push(`### ${status.lane}`);
     lines.push("");
     lines.push(`- Promoted: ${promotionLabel(status)}`);
-    if (status.record && !(status.record.evaluatedBindings?.length)) {
+    if (status.record && !status.record.evaluatedBindings?.length) {
       lines.push("- Active binding: missing (historical record cannot authorize active decisions)");
     }
     if (!status.record) {
@@ -147,8 +144,8 @@ export function buildPromotionSection(statuses: readonly LanePromotionStatus[]):
       lines.push(`- Promoted at: ${status.record.promotedAt}`);
       lines.push(`- Evidence: ${status.record.evidence}`);
       lines.push(
-        `- Metrics: samples=${metrics.samples}, accuracy=${formatRate(metrics.accuracy)}`
-        + `, brier=${formatRate(metrics.brier)}, ece=${formatRate(metrics.expectedCalibrationError)}`,
+        `- Metrics: samples=${metrics.samples}, accuracy=${formatRate(metrics.accuracy)}` +
+          `, brier=${formatRate(metrics.brier)}, ece=${formatRate(metrics.expectedCalibrationError)}`,
       );
       lines.push(`- Calibration: ${formatCalibration(status.record)}`);
       lines.push(`- Gate: ${status.gate?.promoted ? "pass" : "fail"}`);
@@ -191,7 +188,9 @@ async function main(): Promise<void> {
   const dataDir = resolveDataDir();
   const databasePath = path.join(dataDir, SQLITE_FILENAME);
   if (!existsSync(databasePath)) {
-    throw new Error(`no Velvet database found at ${databasePath}; set VELVET_DATA_DIR or run the server once to create it`);
+    throw new Error(
+      `no Velvet database found at ${databasePath}; set VELVET_DATA_DIR or run the server once to create it`,
+    );
   }
   try {
     const { summary, recent } = readDecisions(options.limit, databasePath);

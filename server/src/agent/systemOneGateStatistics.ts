@@ -63,8 +63,7 @@ export function wilsonLowerBound(successes: number, samples: number, z = WILSON_
   const denominator = 1 + (z * z) / samples;
   const center = (proportion + (z * z) / (2 * samples)) / denominator;
   const halfWidth =
-    (z * Math.sqrt((proportion * (1 - proportion)) / samples + (z * z) / (4 * samples * samples))) /
-    denominator;
+    (z * Math.sqrt((proportion * (1 - proportion)) / samples + (z * z) / (4 * samples * samples))) / denominator;
   return Math.min(1, Math.max(0, center - halfWidth));
 }
 

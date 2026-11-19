@@ -5,7 +5,11 @@ import type { CampaignEventReadRepository } from "./campaignEventReadRepo.js";
 
 export interface CampaignCommandRepository {
   executeRollActorDice(actorPrincipalId: string, input: CommandEnvelope): CommandReceipt;
-  executeRollActorDiceForVisibleCharacter(actorPrincipalId: string, input: CommandEnvelope, inputBinding: CampaignDiceVisibleCharacterBinding): CommandReceipt;
+  executeRollActorDiceForVisibleCharacter(
+    actorPrincipalId: string,
+    input: CommandEnvelope,
+    inputBinding: CampaignDiceVisibleCharacterBinding,
+  ): CommandReceipt;
   listRecentCampaignDiceEvents(actorPrincipalId: string, campaignId: string, timelineId: string): CampaignDiceEvent[];
   getCommandReceipt(actorPrincipalId: string, campaignId: string, commandId: string): CommandReceipt | null;
 }

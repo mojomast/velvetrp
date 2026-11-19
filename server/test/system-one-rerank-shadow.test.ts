@@ -40,7 +40,16 @@ afterEach(() => {
 });
 
 function lane(caller: SystemOneCaller, overrides: Partial<SystemOneSettings> = {}): SystemOneRerankDependency {
-  return { settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key", ...overrides }, caller };
+  return {
+    settings: {
+      ...defaultSystemOneSettings(),
+      enabled: true,
+      laneModes: defaultSystemOneLaneModes(),
+      apiKey: "test-key",
+      ...overrides,
+    },
+    caller,
+  };
 }
 
 /** Deterministic answers that lift the second-ranked candidate above the first, an advisory reorder. */
@@ -48,7 +57,11 @@ function scriptedRerankAnswers(candidates: readonly RerankCandidate[]): Record<s
   const answers: Record<string, SystemOneAnswer> = {};
   for (const [index, candidate] of candidates.entries()) {
     answers[`${RERANK_RELEVANCE_PREFIX}${candidate.candidateId}`] = {
-      type: "score", score: index === 0 ? 0 : 3, confidence: 1, legend: {}, probabilities: {},
+      type: "score",
+      score: index === 0 ? 0 : 3,
+      confidence: 1,
+      legend: {},
+      probabilities: {},
     };
     answers[`${RERANK_ANSWERS_PREFIX}${candidate.candidateId}`] = { type: "noul", noul: 0.9 };
   }
@@ -57,7 +70,11 @@ function scriptedRerankAnswers(candidates: readonly RerankCandidate[]): Record<s
 
 const DECLARATION = "I complete the gate quest.";
 /** Three prior declarations the current turn's recall query ("complete gate quest") retrieves. */
-const PRIOR_DECLARATIONS = ["The gate quest remains open", "I inspect the gate stones", "The quest log mentions the gate"];
+const PRIOR_DECLARATIONS = [
+  "The gate quest remains open",
+  "I inspect the gate stones",
+  "The quest log mentions the gate",
+];
 
 /**
  * A settled campaign with one accepted public quest, three prior recall-able declarations, and
@@ -68,24 +85,64 @@ async function rerankTurn() {
   const f = await dmFixture();
   f.graph();
   f.repo.createCampaignQuest(OWNER, f.campaign.id, {
-    quest: { questId: "gate-quest", storylineId: "story", title: "gate-quest", description: null, visibility: "public", journalText: "Offered",
-      objectives: [{ objectiveId: "gate-quest-objective", description: "Complete gate-quest", targetProgress: 1, dependencyObjectiveIds: [], visibility: "public" }], rewards: [] },
-    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "create-gate-quest",
+    quest: {
+      questId: "gate-quest",
+      storylineId: "story",
+      title: "gate-quest",
+      description: null,
+      visibility: "public",
+      journalText: "Offered",
+      objectives: [
+        {
+          objectiveId: "gate-quest-objective",
+          description: "Complete gate-quest",
+          targetProgress: 1,
+          dependencyObjectiveIds: [],
+          visibility: "public",
+        },
+      ],
+      rewards: [],
+    },
+    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision,
+    idempotencyKey: "create-gate-quest",
   });
-  f.repo.executeQuestCommand(OWNER, "gate-quest", { kind: "accept",
-    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "accept-gate-quest" });
+  f.repo.executeQuestCommand(OWNER, "gate-quest", {
+    kind: "accept",
+    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision,
+    idempotencyKey: "accept-gate-quest",
+  });
   for (const [index, declaration] of PRIOR_DECLARATIONS.entries()) {
-    f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
-      sessionId: f.session.id, actorId: f.actorId, declaration,
-      expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: `recall-${index}` });
+    f.repo.createAdventureTurn(OWNER, {
+      campaignId: f.campaign.id,
+      timelineId: f.campaign.activeTimelineId,
+      sessionId: f.session.id,
+      actorId: f.actorId,
+      declaration,
+      expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
+      idempotencyKey: `recall-${index}`,
+    });
   }
-  const created = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
-    sessionId: f.session.id, actorId: f.actorId, declaration: DECLARATION,
-    expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: "shadow-turn" });
-  const candidate = f.repo.listAdventureQuestObjectiveCandidates(OWNER, created.turnId).find((value) => value.objectiveId === "gate-quest-objective");
+  const created = f.repo.createAdventureTurn(OWNER, {
+    campaignId: f.campaign.id,
+    timelineId: f.campaign.activeTimelineId,
+    sessionId: f.session.id,
+    actorId: f.actorId,
+    declaration: DECLARATION,
+    expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
+    idempotencyKey: "shadow-turn",
+  });
+  const candidate = f.repo
+    .listAdventureQuestObjectiveCandidates(OWNER, created.turnId)
+    .find((value) => value.objectiveId === "gate-quest-objective");
   if (!candidate) throw new Error("gate quest objective candidate is unavailable");
-  const recall = f.repo.getCampaignRecall(OWNER, { campaignId: f.campaign.id, sessionId: f.session.id,
-    audience: { kind: "player", actorId: f.actorId }, query: DECLARATION, purpose: "adventure-planning", excludeRootTurnId: created.turnId });
+  const recall = f.repo.getCampaignRecall(OWNER, {
+    campaignId: f.campaign.id,
+    sessionId: f.session.id,
+    audience: { kind: "player", actorId: f.actorId },
+    query: DECLARATION,
+    purpose: "adventure-planning",
+    excludeRootTurnId: created.turnId,
+  });
   if (!recall) throw new Error("adventure planning recall is unavailable");
   const candidates = rerankShadowCandidates(recall.hits);
   if (candidates.length < PRIOR_DECLARATIONS.length) throw new Error("the rerank fixture lost a recall candidate");
@@ -96,7 +153,9 @@ async function rerankTurn() {
  * Runs one fresh-planning turn that commits the exact quest objective candidate. The optional
  * lane factory is the only difference between the shadow and baseline runs.
  */
-async function runTurn(options: { lane?: (caller: SystemOneCaller) => SystemOneRerankDependency; onTurnComplete?: () => void } = {}) {
+async function runTurn(
+  options: { lane?: (caller: SystemOneCaller) => SystemOneRerankDependency; onTurnComplete?: () => void } = {},
+) {
   const { f, created, candidate, recall, candidates } = await rerankTurn();
   let providerCalls = 0;
   let laneResolutions = 0;
@@ -108,10 +167,21 @@ async function runTurn(options: { lane?: (caller: SystemOneCaller) => SystemOneR
       providerCalls += 1;
       advertisedTools = (input.tools ?? []).map((tool) => tool.name);
       messageCount = input.messages.length;
-      return { message: { role: "assistant" as const, content: null,
-        toolCalls: [{ id: "objective-call", name: "exact_quest_objective.select",
-          arguments: JSON.stringify({ candidateId: candidate.candidateId, digest: candidate.digest }) }] },
-        usage: null, model: { requestedModel: "fake", responseModel: "fake" } };
+      return {
+        message: {
+          role: "assistant" as const,
+          content: null,
+          toolCalls: [
+            {
+              id: "objective-call",
+              name: "exact_quest_objective.select",
+              arguments: JSON.stringify({ candidateId: candidate.candidateId, digest: candidate.digest }),
+            },
+          ],
+        },
+        usage: null,
+        model: { requestedModel: "fake", responseModel: "fake" },
+      };
     },
     getProvider: async () => ({ ...defaultProviderSettings(), model: "fake-dm" }),
     getHarness: async () => defaultHarnessSettings(),
@@ -119,14 +189,28 @@ async function runTurn(options: { lane?: (caller: SystemOneCaller) => SystemOneR
   };
   const resolved = options.lane?.(caller);
   if (resolved) {
-    dependencies.getSystemOneRerank = async () => { laneResolutions += 1; return resolved; };
+    dependencies.getSystemOneRerank = async () => {
+      laneResolutions += 1;
+      return resolved;
+    };
   }
   const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
   options.onTurnComplete?.();
   await systemOneShadowQueue.drain();
   const decisions = listSystemOneDecisionsByLane("memory-reranking", 10);
   f.repo.close();
-  return { result, decisions, providerCalls, laneResolutions, advertisedTools, messageCount, caller, query: recall.query, candidates, candidate };
+  return {
+    result,
+    decisions,
+    providerCalls,
+    laneResolutions,
+    advertisedTools,
+    messageCount,
+    caller,
+    query: recall.query,
+    candidates,
+    candidate,
+  };
 }
 
 /** The turn's own public decision surface with run-local identifiers removed. */
@@ -137,8 +221,11 @@ function turnProjection(result: AdventureAgentResult) {
     declaration: result.turn.declaration,
     narrationStatus: result.turn.narrationStatus,
     mode: result.turn.mode,
-    toolCalls: result.turn.toolCalls.map((call) => ({ toolName: call.proposal.toolName, status: call.status,
-      confirmation: call.proposal.confirmation.state })),
+    toolCalls: result.turn.toolCalls.map((call) => ({
+      toolName: call.proposal.toolName,
+      status: call.status,
+      confirmation: call.proposal.confirmation.state,
+    })),
     receiptCount: result.turn.receiptLinks.length,
     limitations: [...result.limitations],
   };
@@ -147,20 +234,34 @@ function turnProjection(result: AdventureAgentResult) {
 describe("System One memory-reranking shadow lane", () => {
   it("completes the turn while shadow inference is still blocked", async () => {
     let release!: () => void;
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     let finished = false;
     let completedBeforeShadow = false;
     // Safety cleanup only; the assertion fails if completion needed this timer.
     const timer = setTimeout(release, 3000);
     try {
       const result = await runTurn({
-        lane: (caller) => lane(async (input) => { await gate; const result = await caller(input); finished = true; return result; }),
-        onTurnComplete: () => { completedBeforeShadow = !finished; release(); },
+        lane: (caller) =>
+          lane(async (input) => {
+            await gate;
+            const result = await caller(input);
+            finished = true;
+            return result;
+          }),
+        onTurnComplete: () => {
+          completedBeforeShadow = !finished;
+          release();
+        },
       });
       expect(completedBeforeShadow).toBe(true);
       expect(result.result.outcome).toBe("mechanics-committed");
       expect(result.decisions).toHaveLength(1);
-    } finally { clearTimeout(timer); release(); }
+    } finally {
+      clearTimeout(timer);
+      release();
+    }
   });
   it("records one advisory decision while the committed turn and provider calls stay identical", async () => {
     const shadow = await runTurn({ lane: (caller) => lane(caller) });
@@ -178,18 +279,31 @@ describe("System One memory-reranking shadow lane", () => {
 
     expect(shadow.decisions).toHaveLength(1);
     const decision = shadow.decisions[0]!;
-    expect(decision).toMatchObject({ lane: "memory-reranking", shadow: true, fallbackUsed: true, provider: "typesafe",
-      confidencePolicyVersion: "system-one-confidence-v1", confidenceBand: "act", turnId: shadow.result.turn.turnId,
-      campaignId: shadow.result.turn.campaignId, sessionId: shadow.result.turn.sessionId });
+    expect(decision).toMatchObject({
+      lane: "memory-reranking",
+      shadow: true,
+      fallbackUsed: true,
+      provider: "typesafe",
+      confidencePolicyVersion: "system-one-confidence-v1",
+      confidenceBand: "act",
+      turnId: shadow.result.turn.turnId,
+      campaignId: shadow.result.turn.campaignId,
+      sessionId: shadow.result.turn.sessionId,
+    });
     // The model reasoned over exactly the persisted structured state.
     expect(shadow.caller.calls[0]!.state).toEqual(decision.state);
     const state = decision.state as { query: string; purpose: string; candidates: RerankCandidate[] };
     expect(state.query).toBe(shadow.query);
     expect(state.purpose).toBe("adventure-planning");
-    expect(state.candidates.map((candidate) => candidate.candidateId)).toEqual(shadow.candidates.map((candidate) => candidate.candidateId));
+    expect(state.candidates.map((candidate) => candidate.candidateId)).toEqual(
+      shadow.candidates.map((candidate) => candidate.candidateId),
+    );
     // The selection carries the composed advisory order, not the deterministic recall order.
-    const expected = composeRerankOrder({ query: shadow.query, candidates: shadow.candidates },
-      scriptedRerankAnswers(shadow.candidates), RERANK_THRESHOLDS);
+    const expected = composeRerankOrder(
+      { query: shadow.query, candidates: shadow.candidates },
+      scriptedRerankAnswers(shadow.candidates),
+      RERANK_THRESHOLDS,
+    );
     const selection = decision.selection as { order: string[]; band: string; topSignal: number };
     expect(selection.order).toEqual(expected.order);
     expect(selection.order).not.toEqual(shadow.candidates.map((candidate) => candidate.candidateId));
@@ -212,7 +326,9 @@ describe("System One memory-reranking shadow lane", () => {
     expect(baseline.decisions).toHaveLength(0);
 
     makeTmpDataDir();
-    const shadow = await runTurn({ lane: () => lane(createFakeSystemOneCaller({ failWith: new Error("rerank shadow endpoint down") })) });
+    const shadow = await runTurn({
+      lane: () => lane(createFakeSystemOneCaller({ failWith: new Error("rerank shadow endpoint down") })),
+    });
     expect(shadow.result.outcome).toBe("mechanics-committed");
     expect(shadow.result.turn.receiptLinks).toHaveLength(1);
     expect(shadow.providerCalls).toBe(1);
@@ -223,8 +339,12 @@ describe("System One memory-reranking shadow lane", () => {
   });
 
   it("records nothing and never calls the model when the lane mode is off", async () => {
-    const run = await runTurn({ lane: (caller) => lane(caller, {
-      laneModes: { ...defaultSystemOneLaneModes(), "memory-reranking": "off" } }) });
+    const run = await runTurn({
+      lane: (caller) =>
+        lane(caller, {
+          laneModes: { ...defaultSystemOneLaneModes(), "memory-reranking": "off" },
+        }),
+    });
 
     expect(run.result.outcome).toBe("mechanics-committed");
     expect(run.laneResolutions).toBe(1);
@@ -247,7 +367,11 @@ describe("System One memory-reranking shadow lane", () => {
     const state = decision.state as { query: string; candidates: RerankCandidate[] };
     expect(state.query).toBe("gate quest");
     expect(state.candidates).toEqual(candidates);
-    const expected = composeRerankOrder({ query: "gate quest", candidates }, scriptedRerankAnswers(candidates), RERANK_THRESHOLDS);
+    const expected = composeRerankOrder(
+      { query: "gate quest", candidates },
+      scriptedRerankAnswers(candidates),
+      RERANK_THRESHOLDS,
+    );
     expect(decision.selection).toMatchObject({ order: expected.order, band: expected.band });
     expect(decision.confidenceBand).toBe(expected.band);
     f.repo.close();
@@ -269,14 +393,29 @@ describe("System One memory-reranking shadow lane", () => {
 });
 
 describe("memory-reranking shortlist projection", () => {
-  const hit = (sourceId: string, text: string, sourceKind: CampaignRecallHit["sourceKind"] = "declaration"): CampaignRecallHit => ({
-    sourceKind, authority: "intent", sourceId, digest: sourceId.padEnd(64, "0"), sessionId: "session", timelineId: "timeline",
-    rootTurnId: sourceId, actorId: "actor", text,
+  const hit = (
+    sourceId: string,
+    text: string,
+    sourceKind: CampaignRecallHit["sourceKind"] = "declaration",
+  ): CampaignRecallHit => ({
+    sourceKind,
+    authority: "intent",
+    sourceId,
+    digest: sourceId.padEnd(64, "0"),
+    sessionId: "session",
+    timelineId: "timeline",
+    rootTurnId: sourceId,
+    actorId: "actor",
+    text,
   });
 
   it("deduplicates by source id, keeps the recall order, and labels from the source kind", () => {
-    const hits = [hit("alpha", "first"), hit("alpha", "duplicate", "presentation"),
-      hit("bravo", "second", "presentation"), hit("charlie", "third", "recap")];
+    const hits = [
+      hit("alpha", "first"),
+      hit("alpha", "duplicate", "presentation"),
+      hit("bravo", "second", "presentation"),
+      hit("charlie", "third", "recap"),
+    ];
 
     expect(rerankShadowCandidates(hits)).toEqual([
       { candidateId: "alpha", label: "declaration", text: "first", rank: 0 },
@@ -286,7 +425,9 @@ describe("memory-reranking shortlist projection", () => {
   });
 
   it("bounds the shortlist at the shadow candidate cap", () => {
-    const hits = Array.from({ length: RERANK_SHADOW_CANDIDATE_CAP + 4 }, (_value, index) => hit(`hit-${index}`, `text ${index}`));
+    const hits = Array.from({ length: RERANK_SHADOW_CANDIDATE_CAP + 4 }, (_value, index) =>
+      hit(`hit-${index}`, `text ${index}`),
+    );
 
     expect(rerankShadowCandidates(hits)).toHaveLength(RERANK_SHADOW_CANDIDATE_CAP);
     expect(rerankShadowCandidates([])).toEqual([]);

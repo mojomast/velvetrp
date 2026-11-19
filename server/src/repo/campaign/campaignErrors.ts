@@ -54,9 +54,12 @@ export class CampaignSessionAttachmentSessionMissingError extends Error {
 
 export class CampaignSessionAttachmentConflictError extends Error {
   readonly code = "CAMPAIGN_SESSION_ATTACHMENT_CONFLICT";
-  constructor(message: "session is already attached to a different campaign"
-    | "stopped sessions cannot be attached to campaigns"
-    | "running sessions with present NPCs cannot be detached") {
+  constructor(
+    message:
+      | "session is already attached to a different campaign"
+      | "stopped sessions cannot be attached to campaigns"
+      | "running sessions with present NPCs cannot be detached",
+  ) {
     super(message);
     this.name = "CampaignSessionAttachmentConflictError";
   }

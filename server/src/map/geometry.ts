@@ -28,7 +28,10 @@ export function supercoverLine(from: MapPoint, to: MapPoint): MapPoint[] {
   let crossedY = 0;
   const add = (point: MapPoint) => {
     const key = pointKey(point);
-    if (!seen.has(key)) { seen.add(key); result.push(point); }
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(point);
+    }
   };
   while (x !== to.x || y !== to.y) {
     const compare = (1 + 2 * crossedX) * absY - (1 + 2 * crossedY) * absX;
@@ -55,8 +58,10 @@ export function supercoverLine(from: MapPoint, to: MapPoint): MapPoint[] {
 
 export function hasLineOfSight(from: MapPoint, to: MapPoint, tiles: ReadonlyMap<string, MapTile>): boolean {
   const line = supercoverLine(from, to);
-  return line.every((point) => tiles.has(pointKey(point)))
-    && line.slice(1, -1).every((point) => !tiles.get(pointKey(point))?.blocksSight);
+  return (
+    line.every((point) => tiles.has(pointKey(point))) &&
+    line.slice(1, -1).every((point) => !tiles.get(pointKey(point))?.blocksSight)
+  );
 }
 
 export type Cover = "none" | "half" | "three-quarters" | "full";
@@ -69,15 +74,26 @@ export type LineOfEffectEvidence = {
 };
 
 /** Resolves the bounded 2D tactical ray. Missing cells are unsupported, never clear. */
-export function lineOfEffectBetween(from: MapPoint, to: MapPoint, tiles: ReadonlyMap<string, MapTile>): LineOfEffectEvidence {
+export function lineOfEffectBetween(
+  from: MapPoint,
+  to: MapPoint,
+  tiles: ReadonlyMap<string, MapTile>,
+): LineOfEffectEvidence {
   const line = supercoverLine(from, to);
   if (!line.every((point) => tiles.has(pointKey(point)))) {
     return { supported: false, lineOfEffect: "blocked", cover: "full", blockedBy: [] };
   }
   const intervening = line.slice(1, -1);
-  const blockedBy = intervening.filter((point) => tiles.get(pointKey(point))!.blocksSight).map((point) => ({ ...point }));
+  const blockedBy = intervening
+    .filter((point) => tiles.get(pointKey(point))!.blocksSight)
+    .map((point) => ({ ...point }));
   if (blockedBy.length === 0) return { supported: true, lineOfEffect: "clear", cover: "none", blockedBy };
-  const cover = blockedBy.length === intervening.length ? "full" : blockedBy.length * 2 >= intervening.length ? "three-quarters" : "half";
+  const cover =
+    blockedBy.length === intervening.length
+      ? "full"
+      : blockedBy.length * 2 >= intervening.length
+        ? "three-quarters"
+        : "half";
   return { supported: true, lineOfEffect: "blocked", cover, blockedBy };
 }
 

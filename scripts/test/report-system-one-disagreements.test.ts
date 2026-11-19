@@ -5,10 +5,7 @@ import {
   compareDirectorAuthority,
   renderDirectorDisagreementReport,
 } from "../../server/src/agent/systemOneDisagreement.js";
-import type {
-  DirectorDecisionAuthority,
-  SystemOneDecisionRecord,
-} from "../../server/src/repo/index.js";
+import type { DirectorDecisionAuthority, SystemOneDecisionRecord } from "../../server/src/repo/index.js";
 import { parseDisagreementArgs } from "../report-system-one-disagreements.js";
 
 function makeRecord(decisionId: string, createdAt: string, selection: unknown): SystemOneDecisionRecord {
@@ -46,11 +43,9 @@ function makeAuthority(
   authoritativeMissing = false,
 ): DirectorDecisionAuthority {
   return {
-    decision: makeRecord(
-      decisionId,
-      createdAt,
-      { selections: directorCandidateIds.map((candidateId) => ({ candidateId })) },
-    ),
+    decision: makeRecord(decisionId, createdAt, {
+      selections: directorCandidateIds.map((candidateId) => ({ candidateId })),
+    }),
     authoritativeCandidateIds,
     authoritativeMissing,
   };
@@ -109,12 +104,7 @@ test("parseDisagreementArgs rejects missing out paths", () => {
 });
 
 test("renders a review queue that omits agreeing decisions by default", () => {
-  const agreeing = makeAuthority(
-    "director-agree-alpha",
-    "2026-09-17T00:00:00.000Z",
-    ["candidate-a"],
-    ["candidate-a"],
-  );
+  const agreeing = makeAuthority("director-agree-alpha", "2026-09-17T00:00:00.000Z", ["candidate-a"], ["candidate-a"]);
   const disagreeing = makeAuthority(
     "director-disagree-beta",
     "2026-09-17T00:01:00.000Z",
@@ -123,7 +113,10 @@ test("renders a review queue that omits agreeing decisions by default", () => {
   );
 
   const compared = compareDirectorAuthority([agreeing, disagreeing]);
-  assert.deepEqual(compared.map((row) => row.agreement), ["agree", "disagree"]);
+  assert.deepEqual(
+    compared.map((row) => row.agreement),
+    ["agree", "disagree"],
+  );
 
   const rendered = renderDirectorDisagreementReport(compared, {
     generatedAt: "2026-09-17T00:02:00.000Z",

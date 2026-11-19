@@ -29,9 +29,19 @@ describe("System One confidence policy", () => {
     const noul: SystemOneQuestion = { type: "noul", instructions: "yes?" };
     expect(systemOneSignal(noul, { type: "noul", noul: 0.33 })).toBe(0.33);
     const choice: SystemOneQuestion = { type: "choice", instructions: "pick", criteria: { a: null } };
-    expect(systemOneSignal(choice, { type: "choice", choice: "a", confidence: 0.61, probabilities: { a: 1 } })).toBe(0.61);
+    expect(systemOneSignal(choice, { type: "choice", choice: "a", confidence: 0.61, probabilities: { a: 1 } })).toBe(
+      0.61,
+    );
     const score: SystemOneQuestion = { type: "score", instructions: "rate", criteria: ["low", "high"] };
-    expect(systemOneSignal(score, { type: "score", score: 1, confidence: 0.8, legend: {}, probabilities: { 0: 0.2, 1: 0.8 } })).toBe(0.8);
+    expect(
+      systemOneSignal(score, {
+        type: "score",
+        score: 1,
+        confidence: 0.8,
+        legend: {},
+        probabilities: { 0: 0.2, 1: 0.8 },
+      }),
+    ).toBe(0.8);
     expect(() => systemOneSignal(choice, { type: "noul", noul: 0.5 } as SystemOneAnswer)).toThrow(RangeError);
   });
 

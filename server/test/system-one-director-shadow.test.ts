@@ -12,15 +12,27 @@ useTmpDataDir();
 const database = () => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
 
 const director = (caller: SystemOneDirectorDependency["caller"]): SystemOneDirectorDependency => ({
-  settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key" },
+  settings: {
+    ...defaultSystemOneSettings(),
+    enabled: true,
+    laneModes: defaultSystemOneLaneModes(),
+    apiKey: "test-key",
+  },
   caller,
 });
 
 async function openForShadow() {
   const fixture = await dmFixture();
-  fixture.repo.setDmControl("local-owner", fixture.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "shadow-ai" });
-  const run = fixture.repo.openDmBeat("local-owner", fixture.campaign.id, fixture.session.id,
-    { intent: "open", expectedModeRevision: 1, idempotencyKey: "shadow-open" });
+  fixture.repo.setDmControl("local-owner", fixture.campaign.id, {
+    mode: "ai",
+    expectedRevision: 0,
+    idempotencyKey: "shadow-ai",
+  });
+  const run = fixture.repo.openDmBeat("local-owner", fixture.campaign.id, fixture.session.id, {
+    intent: "open",
+    expectedModeRevision: 1,
+    idempotencyKey: "shadow-open",
+  });
   return { fixture, run };
 }
 
@@ -29,13 +41,18 @@ describe("System One Director shadow lane", () => {
     const { fixture, run } = await openForShadow();
     const caller = createFakeSystemOneCaller();
     await orchestrateCampaignDmBeat(fixture.repo, "local-owner", run.runId, {
-      ...dmDependencies(), getSystemOneDirector: async () => director(caller),
+      ...dmDependencies(),
+      getSystemOneDirector: async () => director(caller),
     });
 
     // The same resolved lane also drives the L3 narration shadow, so scope to the Director lane.
     expect(caller.calls.length).toBeGreaterThanOrEqual(1);
     const db = database();
-    const row = db.prepare("SELECT lane,shadow,fallback_used,confidence_band,provider FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC LIMIT 1").get();
+    const row = db
+      .prepare(
+        "SELECT lane,shadow,fallback_used,confidence_band,provider FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC LIMIT 1",
+      )
+      .get();
     db.close();
     expect(row).toMatchObject({ lane: "director-selection", shadow: 1, fallback_used: 1, provider: "typesafe" });
     expect(row).toHaveProperty("confidence_band");
@@ -49,18 +66,26 @@ describe("System One Director shadow lane", () => {
     const { fixture, run } = await openForShadow();
     const caller = createFakeSystemOneCaller();
     const settings = {
-      ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key",
+      ...defaultSystemOneSettings(),
+      enabled: true,
+      laneModes: defaultSystemOneLaneModes(),
+      apiKey: "test-key",
       confidenceCalibration: {
         ...defaultSystemOneSettings().confidenceCalibration,
         "director-selection": { a: 2.5, b: 3.3 },
       },
     };
     await orchestrateCampaignDmBeat(fixture.repo, "local-owner", run.runId, {
-      ...dmDependencies(), getSystemOneDirector: async () => ({ settings, caller }),
+      ...dmDependencies(),
+      getSystemOneDirector: async () => ({ settings, caller }),
     });
 
     const db = database();
-    const row = db.prepare("SELECT selection_json FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC LIMIT 1").get() as { selection_json: string };
+    const row = db
+      .prepare(
+        "SELECT selection_json FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC LIMIT 1",
+      )
+      .get() as { selection_json: string };
     db.close();
     // The fake battery grounds every candidate at a raw 0.9; the map raises it toward 1.
     const selection = JSON.parse(row.selection_json) as { topSignal: number | null };
@@ -70,7 +95,10 @@ describe("System One Director shadow lane", () => {
   it("ignores a failing shadow hook and still settles planning", async () => {
     const { fixture, run } = await openForShadow();
     await orchestrateCampaignDmBeat(fixture.repo, "local-owner", run.runId, {
-      ...dmDependencies(), getSystemOneDirector: async () => { throw new Error("shadow endpoint down"); },
+      ...dmDependencies(),
+      getSystemOneDirector: async () => {
+        throw new Error("shadow endpoint down");
+      },
     });
     const db = database();
     const count = db.prepare("SELECT count(*) count FROM system_one_decisions_v1").get();

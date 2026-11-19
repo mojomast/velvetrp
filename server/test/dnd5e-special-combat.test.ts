@@ -13,27 +13,76 @@ import { planDnd5eAttackConditions } from "../src/rulesets/dnd5e/attack.js";
 
 describe("SRD 5.1 mounting", () => {
   it("requires a willing, larger, suitably shaped mount and costs half your speed", () => {
-    expect(planDnd5eMount({ riderSize: "medium", mountSize: "large", willing: true, trained: true, suitableAnatomy: true, speed: 30 }))
-      .toMatchObject({ legal: true, costFeet: 15, controlled: true, reasons: [] });
-    const tooSmall = planDnd5eMount({ riderSize: "medium", mountSize: "medium", willing: true, trained: true, suitableAnatomy: true, speed: 30 });
+    expect(
+      planDnd5eMount({
+        riderSize: "medium",
+        mountSize: "large",
+        willing: true,
+        trained: true,
+        suitableAnatomy: true,
+        speed: 30,
+      }),
+    ).toMatchObject({ legal: true, costFeet: 15, controlled: true, reasons: [] });
+    const tooSmall = planDnd5eMount({
+      riderSize: "medium",
+      mountSize: "medium",
+      willing: true,
+      trained: true,
+      suitableAnatomy: true,
+      speed: 30,
+    });
     expect(tooSmall.legal).toBe(false);
     expect(tooSmall.reasons).toContain("a mount must be at least one size larger than the rider");
-    expect(planDnd5eMount({ riderSize: "medium", mountSize: "large", willing: false, trained: true, suitableAnatomy: true, speed: 30 }).legal).toBe(false);
-    expect(planDnd5eMount({ riderSize: "medium", mountSize: "large", willing: true, trained: true, suitableAnatomy: false, speed: 30 }).legal).toBe(false);
+    expect(
+      planDnd5eMount({
+        riderSize: "medium",
+        mountSize: "large",
+        willing: false,
+        trained: true,
+        suitableAnatomy: true,
+        speed: 30,
+      }).legal,
+    ).toBe(false);
+    expect(
+      planDnd5eMount({
+        riderSize: "medium",
+        mountSize: "large",
+        willing: true,
+        trained: true,
+        suitableAnatomy: false,
+        speed: 30,
+      }).legal,
+    ).toBe(false);
   });
 
   it("marks an untrained mount as independent", () => {
-    expect(planDnd5eMount({ riderSize: "small", mountSize: "large", willing: true, trained: false, suitableAnatomy: true, speed: 40 }))
-      .toMatchObject({ legal: true, costFeet: 20, controlled: false });
+    expect(
+      planDnd5eMount({
+        riderSize: "small",
+        mountSize: "large",
+        willing: true,
+        trained: false,
+        suitableAnatomy: true,
+        speed: 40,
+      }),
+    ).toMatchObject({ legal: true, costFeet: 20, controlled: false });
   });
 });
 
 describe("SRD 5.1 mounted melee advantage", () => {
   it("only applies against an unmounted creature smaller than the mount", () => {
-    expect(mountedMeleeAdvantage({ attackerMounted: true, targetMounted: false, targetSize: "medium", mountSize: "large" })).toBe(true);
-    expect(mountedMeleeAdvantage({ attackerMounted: true, targetMounted: true, targetSize: "medium", mountSize: "large" })).toBe(false);
-    expect(mountedMeleeAdvantage({ attackerMounted: true, targetMounted: false, targetSize: "large", mountSize: "large" })).toBe(false);
-    expect(mountedMeleeAdvantage({ attackerMounted: false, targetMounted: false, targetSize: "small", mountSize: "large" })).toBe(false);
+    expect(
+      mountedMeleeAdvantage({ attackerMounted: true, targetMounted: false, targetSize: "medium", mountSize: "large" }),
+    ).toBe(true);
+    expect(
+      mountedMeleeAdvantage({ attackerMounted: true, targetMounted: true, targetSize: "medium", mountSize: "large" }),
+    ).toBe(false);
+    expect(
+      mountedMeleeAdvantage({ attackerMounted: true, targetMounted: false, targetSize: "large", mountSize: "large" }),
+    ).toBe(false);
+    expect(
+      mountedMeleeAdvantage({ attackerMounted: false, targetMounted: false, targetSize: "small", mountSize: "large" }),
+    ).toBe(false);
   });
 });
 
@@ -47,30 +96,52 @@ describe("SRD 5.1 forced dismount", () => {
   });
 
   it("lets a rider land on its feet when it spends its reaction as the mount falls", () => {
-    expect(resolveDnd5eMountKnockdown({ reactionAvailable: true })).toEqual({ usedReaction: true, mounted: false, landedProne: false });
-    expect(resolveDnd5eMountKnockdown({ reactionAvailable: false })).toEqual({ usedReaction: false, mounted: false, landedProne: true });
+    expect(resolveDnd5eMountKnockdown({ reactionAvailable: true })).toEqual({
+      usedReaction: true,
+      mounted: false,
+      landedProne: false,
+    });
+    expect(resolveDnd5eMountKnockdown({ reactionAvailable: false })).toEqual({
+      usedReaction: false,
+      mounted: false,
+      landedProne: true,
+    });
   });
 });
 
 describe("SRD 5.1 underwater combat", () => {
   it("exempts a swim speed from every underwater penalty", () => {
-    expect(planDnd5eUnderwaterAttack({ kind: "melee", hasSwimSpeed: true, weapon: "longsword" })).toMatchObject({ disadvantage: false, automaticMiss: false });
-    expect(planDnd5eUnderwaterAttack({ kind: "ranged", hasSwimSpeed: true, weapon: "longbow", beyondNormalRange: true })).toMatchObject({ disadvantage: false, automaticMiss: false });
+    expect(planDnd5eUnderwaterAttack({ kind: "melee", hasSwimSpeed: true, weapon: "longsword" })).toMatchObject({
+      disadvantage: false,
+      automaticMiss: false,
+    });
+    expect(
+      planDnd5eUnderwaterAttack({ kind: "ranged", hasSwimSpeed: true, weapon: "longbow", beyondNormalRange: true }),
+    ).toMatchObject({ disadvantage: false, automaticMiss: false });
   });
 
   it("applies melee disadvantage without a swim speed unless the weapon is exempt", () => {
-    expect(planDnd5eUnderwaterAttack({ kind: "melee", hasSwimSpeed: false, weapon: "longsword" }).disadvantage).toBe(true);
+    expect(planDnd5eUnderwaterAttack({ kind: "melee", hasSwimSpeed: false, weapon: "longsword" }).disadvantage).toBe(
+      true,
+    );
     for (const weapon of DND_5E_UNDERWATER_MELEE_EXCEPTIONS) {
-      expect(planDnd5eUnderwaterAttack({ kind: "melee", hasSwimSpeed: false, weapon }).disadvantage, weapon).toBe(false);
+      expect(planDnd5eUnderwaterAttack({ kind: "melee", hasSwimSpeed: false, weapon }).disadvantage, weapon).toBe(
+        false,
+      );
     }
   });
 
   it("auto-misses a ranged attack beyond normal range and otherwise penalizes non-exempt weapons", () => {
-    expect(planDnd5eUnderwaterAttack({ kind: "ranged", hasSwimSpeed: false, weapon: "longbow", beyondNormalRange: true }))
-      .toMatchObject({ automaticMiss: true, disadvantage: false });
-    expect(planDnd5eUnderwaterAttack({ kind: "ranged", hasSwimSpeed: false, weapon: "longbow" }).disadvantage).toBe(true);
+    expect(
+      planDnd5eUnderwaterAttack({ kind: "ranged", hasSwimSpeed: false, weapon: "longbow", beyondNormalRange: true }),
+    ).toMatchObject({ automaticMiss: true, disadvantage: false });
+    expect(planDnd5eUnderwaterAttack({ kind: "ranged", hasSwimSpeed: false, weapon: "longbow" }).disadvantage).toBe(
+      true,
+    );
     for (const weapon of DND_5E_UNDERWATER_RANGED_EXCEPTIONS) {
-      expect(planDnd5eUnderwaterAttack({ kind: "ranged", hasSwimSpeed: false, weapon }).disadvantage, weapon).toBe(false);
+      expect(planDnd5eUnderwaterAttack({ kind: "ranged", hasSwimSpeed: false, weapon }).disadvantage, weapon).toBe(
+        false,
+      );
     }
   });
 
@@ -86,6 +157,8 @@ describe("SRD 5.1 special combat folds into attack conditions", () => {
   it("applies underwater disadvantage and mounted advantage", () => {
     expect(planDnd5eAttackConditions({ ...base, underwaterDisadvantage: true }).mode).toBe("disadvantage");
     expect(planDnd5eAttackConditions({ ...base, mountedAdvantage: true }).mode).toBe("advantage");
-    expect(planDnd5eAttackConditions({ ...base, mountedAdvantage: true, underwaterDisadvantage: true }).mode).toBe("normal");
+    expect(planDnd5eAttackConditions({ ...base, mountedAdvantage: true, underwaterDisadvantage: true }).mode).toBe(
+      "normal",
+    );
   });
 });

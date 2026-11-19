@@ -61,17 +61,22 @@ import { appendSentences, pickVariation, type VariationPool } from "./freeformVa
 /** Maximum length of the player-supplied person/role phrase. */
 export const MAX_FREEFORM_NPC_NAME_LENGTH = 200;
 
-const canonical = (value: unknown): string => JSON.stringify(value, (_key, item) =>
-  item && typeof item === "object" && !Array.isArray(item)
-    ? Object.fromEntries(Object.entries(item as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)))
-    : item);
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, item) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)),
+        )
+      : item,
+  );
 const sha256 = (value: string): string => createHash("sha256").update(value).digest("hex");
 
 /**
  * A declaration addresses a new person after one of these contact verbs, with an
  * optional preposition. The declared person/role is the bounded capture.
  */
-const NPC_CONTACT_PATTERN = /\b(?:ask|asks|asking|tell|tells|telling|talk|talks|talking|speak|speaks|speaking|greet|greets|greeting|address|addresses|addressing|call|calls|calling|question|questions|questioning|approach|approaches|approaching|meet|meets|meeting|hail|hails|hailing|confront|confronts|confronting|find|finds|finding|visit|visits|visiting)\s+(?:(?:to|with|at)\s+)?(.+)$/i;
+const NPC_CONTACT_PATTERN =
+  /\b(?:ask|asks|asking|tell|tells|telling|talk|talks|talking|speak|speaks|speaking|greet|greets|greeting|address|addresses|addressing|call|calls|calling|question|questions|questioning|approach|approaches|approaching|meet|meets|meeting|hail|hails|hailing|confront|confronts|confronting|find|finds|finding|visit|visits|visiting)\s+(?:(?:to|with|at)\s+)?(.+)$/i;
 const LEADING_ARTICLE = /^(?:the|a|an|my|our|your)\s+/i;
 /** Clause openers that mean the declaration has no person object ("I ask about the road"). */
 const CLAUSE_PREFIX = /^(?:about|for|after|into|whether|if|that|why|how|when|where)\b/i;
@@ -97,97 +102,242 @@ export interface FreeformNpcArchetypeTemplate {
 
 export const FREEFORM_NPC_ARCHETYPES: readonly FreeformNpcArchetypeTemplate[] = Object.freeze([
   Object.freeze({
-    id: "artisan", label: "Artisan",
-    keywords: ["glassblower", "smith", "blacksmith", "goldsmith", "silversmith", "artisan", "craftsman", "craftsperson", "weaver", "potter", "carpenter", "tinker", "baker", "mason", "cooper", "fletcher", "joiner"],
+    id: "artisan",
+    label: "Artisan",
+    keywords: [
+      "glassblower",
+      "smith",
+      "blacksmith",
+      "goldsmith",
+      "silversmith",
+      "artisan",
+      "craftsman",
+      "craftsperson",
+      "weaver",
+      "potter",
+      "carpenter",
+      "tinker",
+      "baker",
+      "mason",
+      "cooper",
+      "fletcher",
+      "joiner",
+    ],
     description: "A public artisan of {location}, known locally for careful hands and a guarded workbench.",
     gmGoals: "Assess whether the party respects the workshop; trade honest craft knowledge only once trust is earned.",
   }),
   Object.freeze({
-    id: "merchant", label: "Merchant",
+    id: "merchant",
+    label: "Merchant",
     keywords: ["merchant", "shopkeeper", "trader", "vendor", "peddler", "hawker", "factor", "salesman"],
     description: "A public merchant of {location}, minding a stall and the price of every word.",
     gmGoals: "Protect the stall's margin; offer fair but not generous terms and remember who haggled.",
   }),
   Object.freeze({
-    id: "host", label: "Innkeeper",
+    id: "host",
+    label: "Innkeeper",
     keywords: ["innkeeper", "barkeep", "bartender", "tavernkeeper", "host", "publican", "landlord"],
     description: "A public host of {location}, keeping the common room calm and the cups filled.",
     gmGoals: "Notice who pays, who listens, and who asks about the road; report nothing without cause.",
   }),
   Object.freeze({
-    id: "guard", label: "Guard",
+    id: "guard",
+    label: "Guard",
     keywords: ["guard", "watchman", "sentry", "watch", "soldier", "constable", "patrol", "deputy", "marshal"],
     description: "A public guard of {location}, carrying the local watch's authority and its suspicions.",
     gmGoals: "Enforce the watch's rules; record strangers' names and report anything unusual up the chain.",
   }),
   Object.freeze({
-    id: "healer", label: "Healer",
+    id: "healer",
+    label: "Healer",
     keywords: ["healer", "apothecary", "physician", "herbalist", "midwife", "medic", "doctor"],
     description: "A public healer of {location}, tending the visibly hurt before the merely worried.",
     gmGoals: "Withhold rare remedies unless the party earns trust; remember who was desperate and why.",
   }),
   Object.freeze({
-    id: "scholar", label: "Scholar",
+    id: "scholar",
+    label: "Scholar",
     keywords: ["scholar", "scribe", "sage", "librarian", "teacher", "priest", "cleric", "acolyte", "monk"],
     description: "A public scholar of {location}, weighing what is worth writing down.",
     gmGoals: "Guard local knowledge; share only what the party can be trusted to use well.",
   }),
   Object.freeze({
-    id: "laborer", label: "Laborer",
-    keywords: ["laborer", "labourer", "porter", "dockhand", "ferryman", "stablehand", "servant", "cook", "fisher", "farmer", "groom", "miner", "longshoreman", "stevedore", "handyman"],
-    description: "A public laborer of {location}, getting through the day's work with a wary eye on strangers and a long memory for who pays on time.",
+    id: "laborer",
+    label: "Laborer",
+    keywords: [
+      "laborer",
+      "labourer",
+      "porter",
+      "dockhand",
+      "ferryman",
+      "stablehand",
+      "servant",
+      "cook",
+      "fisher",
+      "farmer",
+      "groom",
+      "miner",
+      "longshoreman",
+      "stevedore",
+      "handyman",
+    ],
+    description:
+      "A public laborer of {location}, getting through the day's work with a wary eye on strangers and a long memory for who pays on time.",
     gmGoals: "Trade gossip about the immediate district only for a small kindness or an honest answer.",
   }),
   Object.freeze({
-    id: "sailor", label: "Sailor",
-    keywords: ["sailor", "sailors", "mariner", "mariners", "deckhand", "boatman", "captain", "navigator", "dockmaster", "whaler", "rigger", "bosun"],
+    id: "sailor",
+    label: "Sailor",
+    keywords: [
+      "sailor",
+      "sailors",
+      "mariner",
+      "mariners",
+      "deckhand",
+      "boatman",
+      "captain",
+      "navigator",
+      "dockmaster",
+      "whaler",
+      "rigger",
+      "bosun",
+    ],
     description: "A public sailor of {location}, reading the weather and the company with the same practised squint.",
-    gmGoals: "Talk freely of tides and cargo, but keep the crew's business close; test whether the party understands how the water works.",
+    gmGoals:
+      "Talk freely of tides and cargo, but keep the crew's business close; test whether the party understands how the water works.",
   }),
   Object.freeze({
-    id: "hunter", label: "Hunter",
-    keywords: ["hunter", "hunters", "trapper", "tracker", "ranger", "falconer", "guide", "scout", "woodsman", "beastmaster"],
+    id: "hunter",
+    label: "Hunter",
+    keywords: [
+      "hunter",
+      "hunters",
+      "trapper",
+      "tracker",
+      "ranger",
+      "falconer",
+      "guide",
+      "scout",
+      "woodsman",
+      "beastmaster",
+    ],
     description: "A public hunter of {location}, patient with animals and considerably less so with people.",
-    gmGoals: "Weigh whether the party respects the land; share a trail or a warning only after they prove they will not waste it.",
+    gmGoals:
+      "Weigh whether the party respects the land; share a trail or a warning only after they prove they will not waste it.",
   }),
   Object.freeze({
-    id: "performer", label: "Performer",
-    keywords: ["performer", "bard", "minstrel", "actor", "dancer", "acrobat", "juggler", "musician", "singer", "storyteller", "player", "tumbler"],
+    id: "performer",
+    label: "Performer",
+    keywords: [
+      "performer",
+      "bard",
+      "minstrel",
+      "actor",
+      "dancer",
+      "acrobat",
+      "juggler",
+      "musician",
+      "singer",
+      "storyteller",
+      "player",
+      "tumbler",
+    ],
     description: "A public performer of {location}, always half a step from the next laugh or the next exit.",
-    gmGoals: "Collect the room's secrets as readily as its applause; trade a flattering public story for a private truth.",
+    gmGoals:
+      "Collect the room's secrets as readily as its applause; trade a flattering public story for a private truth.",
   }),
   Object.freeze({
-    id: "noble", label: "Noble",
-    keywords: ["noble", "nobles", "lord", "lady", "aristocrat", "magistrate", "envoy", "diplomat", "baron", "baroness", "count", "countess", "duke", "duchess", "heir", "steward"],
+    id: "noble",
+    label: "Noble",
+    keywords: [
+      "noble",
+      "nobles",
+      "lord",
+      "lady",
+      "aristocrat",
+      "magistrate",
+      "envoy",
+      "diplomat",
+      "baron",
+      "baroness",
+      "count",
+      "countess",
+      "duke",
+      "duchess",
+      "heir",
+      "steward",
+    ],
     description: "A public noble of {location}, courteous in exactly the measure required and not a degree more.",
-    gmGoals: "Measure the party's usefulness and breeding; promise nothing in writing and remember every slight, real or imagined.",
+    gmGoals:
+      "Measure the party's usefulness and breeding; promise nothing in writing and remember every slight, real or imagined.",
   }),
   Object.freeze({
-    id: "beggar", label: "Beggar",
-    keywords: ["beggar", "beggars", "vagrant", "drifter", "urchin", "panhandler", "outcast", "leper", "mendicant", "tramp"],
+    id: "beggar",
+    label: "Beggar",
+    keywords: [
+      "beggar",
+      "beggars",
+      "vagrant",
+      "drifter",
+      "urchin",
+      "panhandler",
+      "outcast",
+      "leper",
+      "mendicant",
+      "tramp",
+    ],
     description: "A public beggar of {location}, seeing far more of the street than anyone gives them credit for.",
-    gmGoals: "Trade street truth for a little food or a moment of respect; keep track of who is kind and who pretends not to look.",
+    gmGoals:
+      "Trade street truth for a little food or a moment of respect; keep track of who is kind and who pretends not to look.",
   }),
   Object.freeze({
-    id: "outlaw", label: "Outlaw",
-    keywords: ["outlaw", "bandit", "cutpurse", "rogue", "smuggler", "brigand", "poacher", "raider", "highwayman", "fence"],
+    id: "outlaw",
+    label: "Outlaw",
+    keywords: [
+      "outlaw",
+      "bandit",
+      "cutpurse",
+      "rogue",
+      "smuggler",
+      "brigand",
+      "poacher",
+      "raider",
+      "highwayman",
+      "fence",
+    ],
     description: "A public outlaw of {location}, moving like someone who has learned which alleys have exits.",
-    gmGoals: "Probe whether the party can be bought, used or avoided; never name a partner or a route without a reason.",
+    gmGoals:
+      "Probe whether the party can be bought, used or avoided; never name a partner or a route without a reason.",
   }),
   Object.freeze({
-    id: "courier", label: "Courier",
+    id: "courier",
+    label: "Courier",
     keywords: ["courier", "messenger", "herald", "runner", "postman", "crier", "dispatch"],
     description: "A public courier of {location}, carrying more than letters and saying less than either.",
     gmGoals: "Guard the contents and the route; decide whether the party is a safer hand than the last one.",
   }),
   Object.freeze({
-    id: "mercenary", label: "Mercenary",
-    keywords: ["mercenary", "mercenaries", "sellsword", "sellswords", "adventurer", "adventurers", "bravo", "freebooter", "blade", "fighter"],
+    id: "mercenary",
+    label: "Mercenary",
+    keywords: [
+      "mercenary",
+      "mercenaries",
+      "sellsword",
+      "sellswords",
+      "adventurer",
+      "adventurers",
+      "bravo",
+      "freebooter",
+      "blade",
+      "fighter",
+    ],
     description: "A public mercenary of {location}, weighing every stranger as a contract or a complication.",
-    gmGoals: "Price the party's courage and discipline; commit only for coin or a cause worth the risk, and keep a line of retreat.",
+    gmGoals:
+      "Price the party's courage and discipline; commit only for coin or a cause worth the risk, and keep a line of retreat.",
   }),
   Object.freeze({
-    id: "bystander", label: "Bystander",
+    id: "bystander",
+    label: "Bystander",
     keywords: [],
     description: "A public bystander of {location}, caught between curiosity and the wish to stay out of trouble.",
     gmGoals: "Avoid trouble; answer only what is asked and remember who was polite.",
@@ -237,12 +387,7 @@ export const FREEFORM_NPC_PRIVATE_ANGLES: VariationPool<string> = Object.freeze(
 
 /** Fail-closed reasons a declaration does not produce a materialization candidate. */
 export type FreeformNpcNoneReason =
-  | "no-npc-intent"
-  | "empty-name"
-  | "name-too-long"
-  | "known-npc"
-  | "no-current-location"
-  | "current-location-unmapped";
+  "no-npc-intent" | "empty-name" | "name-too-long" | "known-npc" | "no-current-location" | "current-location-unmapped";
 
 /** One server-authored materialization candidate. */
 export interface FreeformNpcCandidate {
@@ -294,43 +439,60 @@ export interface FreeformNpcMaterializedCandidate {
 export type FreeformNpcMaterialization =
   | { status: "declined"; reason: FreeformNpcNoneReason }
   | {
-    status: "materialized";
-    candidate: FreeformNpcMaterializedCandidate;
-    npcId: string;
-    draftId: string;
-    /** Durable `campaign_content_receipts_v42` receipt for the persona materialization. */
-    contentReceiptId: string | null;
-    /** Accepted artifact key of the separate GM-only goals artifact, when written. */
-    gmGoalsArtifactKey: string | null;
-  };
+      status: "materialized";
+      candidate: FreeformNpcMaterializedCandidate;
+      npcId: string;
+      draftId: string;
+      /** Durable `campaign_content_receipts_v42` receipt for the persona materialization. */
+      contentReceiptId: string | null;
+      /** Accepted artifact key of the separate GM-only goals artifact, when written. */
+      gmGoalsArtifactKey: string | null;
+    };
 
 export class FreeformNpcAuthorizationError extends Error {}
 export class FreeformNpcConflictError extends Error {}
 export class FreeformNpcUnavailableError extends Error {}
 
 /** Parses the bounded person/role phrase out of a free-form declaration. */
-export function parseFreeformNpcAddress(text: string):
+export function parseFreeformNpcAddress(
+  text: string,
+):
   | { ok: true; name: string; normalized: string }
   | { ok: false; reason: Extract<FreeformNpcNoneReason, "no-npc-intent" | "empty-name" | "name-too-long"> } {
   const match = NPC_CONTACT_PATTERN.exec(text.trim());
   if (!match) return { ok: false, reason: "no-npc-intent" };
   const firstSentence = (match[1] ?? "").split(/[.!?;]/, 1)[0] ?? "";
   const clause = firstSentence.split(CLAUSE_SPLIT, 1)[0] ?? "";
-  const cleaned = clause.replace(/^["'`]+|["'`]+$/g, "").replace(/\s+/g, " ").trim();
+  const cleaned = clause
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (CLAUSE_PREFIX.test(cleaned)) return { ok: false, reason: "no-npc-intent" };
-  const name = cleaned.replace(LEADING_ARTICLE, "").replace(/[.,;:!?]+$/g, "").trim();
+  const name = cleaned
+    .replace(LEADING_ARTICLE, "")
+    .replace(/[.,;:!?]+$/g, "")
+    .trim();
   if (!name) return { ok: false, reason: "empty-name" };
   if (name.length > MAX_FREEFORM_NPC_NAME_LENGTH) return { ok: false, reason: "name-too-long" };
   return { ok: true, name, normalized: normalizeNpcName(name) };
 }
 
 function normalizeNpcName(value: string): string {
-  return value.toLowerCase().replace(LEADING_ARTICLE, "").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(LEADING_ARTICLE, "")
+    .replace(/[^a-z0-9' ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Selects the first server-authored archetype whose keyword matches a name token. */
 export function selectFreeformNpcArchetype(name: string): FreeformNpcArchetypeTemplate {
-  const tokens = new Set(normalizeNpcName(name).split(/[^a-z0-9]+/).filter(Boolean));
+  const tokens = new Set(
+    normalizeNpcName(name)
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean),
+  );
   for (const template of FREEFORM_NPC_ARCHETYPES) {
     if (template.keywords.some((keyword) => tokens.has(keyword))) return template;
   }
@@ -388,15 +550,30 @@ export interface FreeformNpcPorts {
   createDraft(principalId: string, input: CreateGenerationDraftInput): PrivateGenerationDraft;
   getContentRevision(principalId: string, campaignId: string): number | null;
   recordCandidate(draftId: string, content: GeneratedCampaignContentProvider): void;
-  applyDraft(principalId: string, input: DraftMutationInput & { selectedArtifactKeys: string[] }): PrivateGenerationDraft;
+  applyDraft(
+    principalId: string,
+    input: DraftMutationInput & { selectedArtifactKeys: string[] },
+  ): PrivateGenerationDraft;
 }
 
 export interface FreeformNpcRepository {
   /** Classifies one declaration; throws only for unauthorized principals. */
-  classifyFreeformNpcIntent(principalId: string, campaignId: string, sessionId: string, actorId: string, text: string): FreeformNpcClassification;
+  classifyFreeformNpcIntent(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+  ): FreeformNpcClassification;
   /** Applies the exact server-authored candidate atomically. */
-  materializeFreeformNpc(principalId: string, campaignId: string, sessionId: string, actorId: string, text: string,
-    options?: { candidateId?: string }): FreeformNpcMaterialization;
+  materializeFreeformNpc(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformNpcMaterialization;
 }
 
 type PlacementRow = { location_id: string; public_name: string; visibility: "public" | "discovered" | "gm" };
@@ -410,55 +587,113 @@ export function createFreeformNpcRepository(
   const now = (): string => deps.clock.now().toISOString();
 
   function authorize(principalId: string, campaignId: string, actorId: string): void {
-    const member = db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+    const member = db
+      .prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
       .get(campaignId, principalId) as { role: string } | undefined;
-    if (!member || member.role === "observer") throw new FreeformNpcAuthorizationError("campaign membership is required");
+    if (!member || member.role === "observer")
+      throw new FreeformNpcAuthorizationError("campaign membership is required");
     if (member.role === "owner" || member.role === "gm") return;
-    if (!db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?")
-      .get(campaignId, actorId, principalId)) throw new FreeformNpcAuthorizationError("principal cannot act for the actor");
+    if (
+      !db
+        .prepare(
+          "SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?",
+        )
+        .get(campaignId, actorId, principalId)
+    )
+      throw new FreeformNpcAuthorizationError("principal cannot act for the actor");
   }
 
   /** Resolves GM materialization authority exactly as `initiateCombat` does. */
   function gmAuthorityPrincipal(principalId: string, campaignId: string): string | null {
-    if (db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')")
-      .get(campaignId, principalId)) return principalId;
-    const row = db.prepare(`SELECT membership.principal_id principal_id FROM campaign_memberships membership
+    if (
+      db
+        .prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')")
+        .get(campaignId, principalId)
+    )
+      return principalId;
+    const row = db
+      .prepare(
+        `SELECT membership.principal_id principal_id FROM campaign_memberships membership
       JOIN campaigns campaign ON campaign.id=membership.campaign_id
       WHERE membership.campaign_id=? AND membership.role IN ('owner','gm')
       ORDER BY CASE WHEN membership.principal_id=campaign.owner_principal_id THEN 0 ELSE 1 END,membership.principal_id
-      LIMIT 1`).get(campaignId) as { principal_id: string } | undefined;
+      LIMIT 1`,
+      )
+      .get(campaignId) as { principal_id: string } | undefined;
     return row?.principal_id ?? null;
   }
 
-  function readCurrentLocation(campaignId: string, sessionId: string, actorId: string): FreeformNpcLocationContext | null {
-    const row = db.prepare(`SELECT placement.location_id,location.public_name,location.visibility
+  function readCurrentLocation(
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+  ): FreeformNpcLocationContext | null {
+    const row = db
+      .prepare(
+        `SELECT placement.location_id,location.public_name,location.visibility
       FROM campaign_actor_locations_v28 placement
       JOIN campaign_locations_v28 location ON location.campaign_id=placement.campaign_id AND location.location_id=placement.location_id
-      WHERE placement.campaign_id=? AND placement.actor_id=? AND placement.session_id=?`)
+      WHERE placement.campaign_id=? AND placement.actor_id=? AND placement.session_id=?`,
+      )
       .get(campaignId, actorId, sessionId) as PlacementRow | undefined;
     if (!row) return null;
-    const artifact = db.prepare(`SELECT artifact_key,canonical_json FROM campaign_generation_accepted_artifacts_v52
-      WHERE campaign_id=? AND server_resource_id=? AND artifact_kind='location' AND visibility='public' LIMIT 1`)
+    const artifact = db
+      .prepare(
+        `SELECT artifact_key,canonical_json FROM campaign_generation_accepted_artifacts_v52
+      WHERE campaign_id=? AND server_resource_id=? AND artifact_kind='location' AND visibility='public' LIMIT 1`,
+      )
       .get(campaignId, row.location_id) as { artifact_key: string; canonical_json: string } | undefined;
-    if (!artifact) return { locationId: row.location_id, name: row.public_name, visibility: row.visibility, artifactKey: null, factionKeys: [] };
+    if (!artifact)
+      return {
+        locationId: row.location_id,
+        name: row.public_name,
+        visibility: row.visibility,
+        artifactKey: null,
+        factionKeys: [],
+      };
     // Only accepted public factions referenced by the location may become NPC context.
     const referenced = (JSON.parse(artifact.canonical_json) as { factionKeys?: unknown }).factionKeys;
     const factionKeys = Array.isArray(referenced)
-      ? referenced.filter((value): value is string => typeof value === "string").filter((key) =>
-        Boolean(db.prepare(`SELECT 1 FROM campaign_generation_accepted_artifacts_v52
-          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='faction' AND visibility='public'`).get(campaignId, key)))
+      ? referenced
+          .filter((value): value is string => typeof value === "string")
+          .filter((key) =>
+            Boolean(
+              db
+                .prepare(
+                  `SELECT 1 FROM campaign_generation_accepted_artifacts_v52
+          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='faction' AND visibility='public'`,
+                )
+                .get(campaignId, key),
+            ),
+          )
       : [];
-    return { locationId: row.location_id, name: row.public_name, visibility: row.visibility, artifactKey: artifact.artifact_key, factionKeys };
+    return {
+      locationId: row.location_id,
+      name: row.public_name,
+      visibility: row.visibility,
+      artifactKey: artifact.artifact_key,
+      factionKeys,
+    };
   }
 
   function readKnownNpcNames(campaignId: string): string[] {
-    return (db.prepare("SELECT public_name FROM campaign_npcs_v28 WHERE campaign_id=? ORDER BY npc_id")
-      .all(campaignId) as Array<{ public_name: string }>).map((row) => row.public_name);
+    return (
+      db
+        .prepare("SELECT public_name FROM campaign_npcs_v28 WHERE campaign_id=? ORDER BY npc_id")
+        .all(campaignId) as Array<{ public_name: string }>
+    ).map((row) => row.public_name);
   }
 
-  function classifyWithContext(identity: string, campaignId: string, sessionId: string, actorId: string, text: string): FreeformNpcClassification {
+  function classifyWithContext(
+    identity: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+  ): FreeformNpcClassification {
     return classifyFreeformNpc({
-      identity, text,
+      identity,
+      text,
       currentLocation: readCurrentLocation(campaignId, sessionId, actorId),
       knownNpcs: readKnownNpcNames(campaignId),
     });
@@ -470,25 +705,43 @@ export function createFreeformNpcRepository(
    * artifact exist. The receipt is read back from the durable content command
    * rather than re-issued.
    */
-  function replayMaterialization(authority: string, campaignId: string, identity: string, normalized: string): FreeformNpcMaterialization {
+  function replayMaterialization(
+    authority: string,
+    campaignId: string,
+    identity: string,
+    normalized: string,
+  ): FreeformNpcMaterialization {
     const draftKey = idempotencyKeySchema.parse(`ff-npc-draft-${sha256(`${identity}:${normalized}`).slice(0, 48)}`);
     const existing = ports.getDraftByIdempotencyKey(authority, campaignId, draftKey);
     if (!existing) throw new FreeformNpcConflictError("materialization replay is unavailable");
     const draft = privateGenerationDraftSchema.parse(existing);
-    const npc = db.prepare(`SELECT artifact_key,server_resource_id,canonical_json FROM campaign_generation_accepted_artifacts_v52
-      WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='npc' LIMIT 1`)
-      .get(campaignId, draft.draftId) as { artifact_key: string; server_resource_id: string | null; canonical_json: string } | undefined;
+    const npc = db
+      .prepare(
+        `SELECT artifact_key,server_resource_id,canonical_json FROM campaign_generation_accepted_artifacts_v52
+      WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='npc' LIMIT 1`,
+      )
+      .get(campaignId, draft.draftId) as
+      { artifact_key: string; server_resource_id: string | null; canonical_json: string } | undefined;
     if (!npc?.server_resource_id) throw new FreeformNpcConflictError("materialized persona is unavailable");
-    const goals = db.prepare(`SELECT artifact_key FROM campaign_generation_accepted_artifacts_v52
-      WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='lore' AND visibility='gm' LIMIT 1`)
+    const goals = db
+      .prepare(
+        `SELECT artifact_key FROM campaign_generation_accepted_artifacts_v52
+      WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='lore' AND visibility='gm' LIMIT 1`,
+      )
       .get(campaignId, draft.draftId) as { artifact_key: string } | undefined;
-    const receipt = db.prepare("SELECT receipt_id FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?")
+    const receipt = db
+      .prepare("SELECT receipt_id FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?")
       .get(campaignId, draft.draftId) as { receipt_id: string } | undefined;
     const value = JSON.parse(npc.canonical_json) as { name?: string };
     return {
       status: "materialized",
-      candidate: { candidateId: `ffn-${sha256(`${identity}:${normalized}`).slice(0, 40)}`, npcKey: npc.artifact_key,
-        gmGoalsKey: goals?.artifact_key ?? "", name: typeof value.name === "string" ? value.name : normalized, visibility: "public" },
+      candidate: {
+        candidateId: `ffn-${sha256(`${identity}:${normalized}`).slice(0, 40)}`,
+        npcKey: npc.artifact_key,
+        gmGoalsKey: goals?.artifact_key ?? "",
+        name: typeof value.name === "string" ? value.name : normalized,
+        visibility: "public",
+      },
       npcId: npc.server_resource_id,
       draftId: draft.draftId,
       contentReceiptId: receipt?.receipt_id ?? null,
@@ -499,14 +752,20 @@ export function createFreeformNpcRepository(
   return {
     classifyFreeformNpcIntent(principalId, campaignId, sessionId, actorId, text) {
       guard();
-      resourceIdSchema.parse(principalId); resourceIdSchema.parse(campaignId); resourceIdSchema.parse(sessionId); resourceIdSchema.parse(actorId);
+      resourceIdSchema.parse(principalId);
+      resourceIdSchema.parse(campaignId);
+      resourceIdSchema.parse(sessionId);
+      resourceIdSchema.parse(actorId);
       authorize(principalId, campaignId, actorId);
       return classifyWithContext(`${campaignId}:${sessionId}:${actorId}`, campaignId, sessionId, actorId, text);
     },
 
     materializeFreeformNpc(principalId, campaignId, sessionId, actorId, text, options) {
       guard();
-      resourceIdSchema.parse(principalId); resourceIdSchema.parse(campaignId); resourceIdSchema.parse(sessionId); resourceIdSchema.parse(actorId);
+      resourceIdSchema.parse(principalId);
+      resourceIdSchema.parse(campaignId);
+      resourceIdSchema.parse(sessionId);
+      resourceIdSchema.parse(actorId);
       authorize(principalId, campaignId, actorId);
 
       const parsed = parseFreeformNpcAddress(text);
@@ -522,74 +781,119 @@ export function createFreeformNpcRepository(
       const authority = gmAuthorityPrincipal(principalId, campaignId);
       if (!authority) throw new FreeformNpcUnavailableError("campaign has no GM authority to materialize an NPC");
 
-      return db.transaction(() => {
-        if (ports.getDraftByIdempotencyKey(authority, campaignId, draftKey)) {
-          return replayMaterialization(authority, campaignId, identity, parsed.normalized);
-        }
+      return db
+        .transaction(() => {
+          if (ports.getDraftByIdempotencyKey(authority, campaignId, draftKey)) {
+            return replayMaterialization(authority, campaignId, identity, parsed.normalized);
+          }
 
-        // Freshness re-check: only materialize a person the classifier still authorizes.
-        const classification = classifyWithContext(identity, campaignId, sessionId, actorId, text);
-        if (classification.intent === "none") return { status: "declined" as const, reason: classification.reason };
-        const candidate = classification.candidates.find((value) => value.candidateId === candidateId);
-        if (!candidate) throw new FreeformNpcConflictError("the chosen candidate is no longer available");
+          // Freshness re-check: only materialize a person the classifier still authorizes.
+          const classification = classifyWithContext(identity, campaignId, sessionId, actorId, text);
+          if (classification.intent === "none") return { status: "declined" as const, reason: classification.reason };
+          const candidate = classification.candidates.find((value) => value.candidateId === candidateId);
+          if (!candidate) throw new FreeformNpcConflictError("the chosen candidate is no longer available");
 
-        const campaign = db.prepare("SELECT active_timeline_id,administration_revision FROM campaigns WHERE id=?")
-          .get(campaignId) as { active_timeline_id: string; administration_revision: number } | undefined;
-        if (!campaign) throw new FreeformNpcUnavailableError("campaign is unavailable");
+          const campaign = db
+            .prepare("SELECT active_timeline_id,administration_revision FROM campaigns WHERE id=?")
+            .get(campaignId) as { active_timeline_id: string; administration_revision: number } | undefined;
+          if (!campaign) throw new FreeformNpcUnavailableError("campaign is unavailable");
 
-        // Public persona only. GM-only goals are a separate `visibility:'gm'` artifact and are
-        // never attached to the public npc artifact.
-        const content = generatedCampaignContentProviderSchema.parse({
-          npcs: [{
-            key: candidate.npcKey, name: candidate.name, archetype: candidate.archetype,
-            description: candidate.description, visibility: "public",
-            locationKey: candidate.locationKey, factionKeys: [...candidate.factionKeys],
-          }],
-          lore: [{
-            key: candidate.gmGoalsKey, title: `GM-only goals: ${candidate.name}`, summary: candidate.gmGoals,
-            details: [], visibility: "gm", locationKeys: [candidate.locationKey], factionKeys: [],
-          }],
-        });
-        const selectedArtifactKeys = [candidate.npcKey, candidate.gmGoalsKey];
-        const requestDigest = sha256(canonical({ kind: "freeform-materialize-npc", campaignId, sessionId, actorId, candidate }));
+          // Public persona only. GM-only goals are a separate `visibility:'gm'` artifact and are
+          // never attached to the public npc artifact.
+          const content = generatedCampaignContentProviderSchema.parse({
+            npcs: [
+              {
+                key: candidate.npcKey,
+                name: candidate.name,
+                archetype: candidate.archetype,
+                description: candidate.description,
+                visibility: "public",
+                locationKey: candidate.locationKey,
+                factionKeys: [...candidate.factionKeys],
+              },
+            ],
+            lore: [
+              {
+                key: candidate.gmGoalsKey,
+                title: `GM-only goals: ${candidate.name}`,
+                summary: candidate.gmGoals,
+                details: [],
+                visibility: "gm",
+                locationKeys: [candidate.locationKey],
+                factionKeys: [],
+              },
+            ],
+          });
+          const selectedArtifactKeys = [candidate.npcKey, candidate.gmGoalsKey];
+          const requestDigest = sha256(
+            canonical({ kind: "freeform-materialize-npc", campaignId, sessionId, actorId, candidate }),
+          );
 
-        const baseRevision = ports.getContentRevision(authority, campaignId);
-        if (baseRevision === null) throw new FreeformNpcUnavailableError("generation context is unavailable");
-        const draft = ports.createDraft(authority, {
-          campaignId, timelineId: campaign.active_timeline_id, sessionId, kind: "content-pack",
-          stagedContent: stagedCampaignContentGenerationSchema.parse({
-            kind: "campaign-content", requestDigest, baseContentRevision: baseRevision, dependencyDigests: {}, ...content,
-          }),
-          validation: { valid: true, issues: [], validatedAt: now() },
-          expectedCampaignRevision: campaign.administration_revision,
-          idempotencyKey: draftKey,
-        });
-        if (!db.prepare("SELECT 1 FROM campaign_generation_candidate_artifacts_v52 WHERE draft_id=? LIMIT 1").get(draft.draftId)) {
-          ports.recordCandidate(draft.draftId, content);
-        }
-        const applied = ports.applyDraft(authority, {
-          draftId: draft.draftId, expectedDraftRevision: draft.revision, expectedCampaignRevision: draft.campaignRevision,
-          idempotencyKey: applyKey, selectedArtifactKeys,
-        });
+          const baseRevision = ports.getContentRevision(authority, campaignId);
+          if (baseRevision === null) throw new FreeformNpcUnavailableError("generation context is unavailable");
+          const draft = ports.createDraft(authority, {
+            campaignId,
+            timelineId: campaign.active_timeline_id,
+            sessionId,
+            kind: "content-pack",
+            stagedContent: stagedCampaignContentGenerationSchema.parse({
+              kind: "campaign-content",
+              requestDigest,
+              baseContentRevision: baseRevision,
+              dependencyDigests: {},
+              ...content,
+            }),
+            validation: { valid: true, issues: [], validatedAt: now() },
+            expectedCampaignRevision: campaign.administration_revision,
+            idempotencyKey: draftKey,
+          });
+          if (
+            !db
+              .prepare("SELECT 1 FROM campaign_generation_candidate_artifacts_v52 WHERE draft_id=? LIMIT 1")
+              .get(draft.draftId)
+          ) {
+            ports.recordCandidate(draft.draftId, content);
+          }
+          const applied = ports.applyDraft(authority, {
+            draftId: draft.draftId,
+            expectedDraftRevision: draft.revision,
+            expectedCampaignRevision: draft.campaignRevision,
+            idempotencyKey: applyKey,
+            selectedArtifactKeys,
+          });
 
-        const npc = db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
-          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='npc'`).get(campaignId, candidate.npcKey) as { server_resource_id: string | null } | undefined;
-        if (!npc?.server_resource_id) throw new FreeformNpcConflictError("materialized persona is unavailable");
-        const goals = db.prepare(`SELECT artifact_key FROM campaign_generation_accepted_artifacts_v52
-          WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='lore' AND visibility='gm' LIMIT 1`)
-          .get(campaignId, draft.draftId) as { artifact_key: string } | undefined;
-        const receipt = db.prepare("SELECT receipt_id FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?")
-          .get(campaignId, draft.draftId) as { receipt_id: string } | undefined;
-        return {
-          status: "materialized" as const,
-          candidate: { candidateId, npcKey: candidate.npcKey, gmGoalsKey: candidate.gmGoalsKey,
-            name: candidate.name, visibility: "public" as const },
-          npcId: npc.server_resource_id,
-          draftId: applied.draftId,
-          contentReceiptId: receipt?.receipt_id ?? null,
-          gmGoalsArtifactKey: goals?.artifact_key ?? null,
-        };
-      }).immediate();
+          const npc = db
+            .prepare(
+              `SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='npc'`,
+            )
+            .get(campaignId, candidate.npcKey) as { server_resource_id: string | null } | undefined;
+          if (!npc?.server_resource_id) throw new FreeformNpcConflictError("materialized persona is unavailable");
+          const goals = db
+            .prepare(
+              `SELECT artifact_key FROM campaign_generation_accepted_artifacts_v52
+          WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='lore' AND visibility='gm' LIMIT 1`,
+            )
+            .get(campaignId, draft.draftId) as { artifact_key: string } | undefined;
+          const receipt = db
+            .prepare("SELECT receipt_id FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?")
+            .get(campaignId, draft.draftId) as { receipt_id: string } | undefined;
+          return {
+            status: "materialized" as const,
+            candidate: {
+              candidateId,
+              npcKey: candidate.npcKey,
+              gmGoalsKey: candidate.gmGoalsKey,
+              name: candidate.name,
+              visibility: "public" as const,
+            },
+            npcId: npc.server_resource_id,
+            draftId: applied.draftId,
+            contentReceiptId: receipt?.receipt_id ?? null,
+            gmGoalsArtifactKey: goals?.artifact_key ?? null,
+          };
+        })
+        .immediate();
     },
   };
 }

@@ -94,11 +94,7 @@ import {
   type AdventureReadout,
   type AdventureSubsetSummary,
 } from "./evaluate-system-one-adventure-lane.js";
-import {
-  MECHANIC_FAMILIES,
-  resolveMechanicFamily,
-  type MechanicFamily,
-} from "./synthetic-player-harness.js";
+import { MECHANIC_FAMILIES, resolveMechanicFamily, type MechanicFamily } from "./synthetic-player-harness.js";
 import { beginAdventureEvidence } from "./system-one-evidence.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -179,9 +175,19 @@ export function parseCompareArgs(args: readonly string[]): CompareCliOptions {
   const out = flagValue(args, "--out") || DEFAULT_COMPARISON_OUT;
   const json = flagValue(args, "--json") || defaultJsonPath(out);
   const topRaw = flagValue(args, "--top");
-  const top = clampInt(topRaw === null || topRaw === "" ? DEFAULT_COMPARISON_TOP : Number(topRaw), 1, COMPARISON_TOP_LIMIT, DEFAULT_COMPARISON_TOP);
+  const top = clampInt(
+    topRaw === null || topRaw === "" ? DEFAULT_COMPARISON_TOP : Number(topRaw),
+    1,
+    COMPARISON_TOP_LIMIT,
+    DEFAULT_COMPARISON_TOP,
+  );
   const repeatRaw = flagValue(args, "--repeat");
-  const repeats = clampInt(repeatRaw === null || repeatRaw === "" ? 1 : Number(repeatRaw), 1, COMPARISON_REPEAT_LIMIT, 1);
+  const repeats = clampInt(
+    repeatRaw === null || repeatRaw === "" ? 1 : Number(repeatRaw),
+    1,
+    COMPARISON_REPEAT_LIMIT,
+    1,
+  );
   const maxCallsRaw = flagValue(args, "--max-calls");
   const maxCalls = maxCallsRaw === null ? null : maxCallsRaw.trim() === "" ? Number.NaN : Number(maxCallsRaw);
   if (maxCalls !== null && (!Number.isInteger(maxCalls) || maxCalls < 1)) {
@@ -307,7 +313,8 @@ export function payloadStructure(request: AdventureRequest): PayloadStructure {
   if (state && Array.isArray(state.candidates)) {
     stateCandidateCount = state.candidates.length;
     stateCandidateIds = state.candidates.flatMap((entry) =>
-      isRecord(entry) && typeof entry.candidateId === "string" ? [entry.candidateId] : []);
+      isRecord(entry) && typeof entry.candidateId === "string" ? [entry.candidateId] : [],
+    );
   } else if (state && typeof state.candidateCount === "number" && Number.isFinite(state.candidateCount)) {
     stateCandidateCount = state.candidateCount;
   }
@@ -355,29 +362,44 @@ export function checkPayloadStructure(
   const expected = testCase.candidates.map((candidate) => candidate.candidateId);
   const mismatches: string[] = [];
   if (legacy.stateCandidateCount !== expected.length) {
-    mismatches.push(`legacy state advertises ${legacy.stateCandidateCount} candidate(s), case advertises ${expected.length}`);
+    mismatches.push(
+      `legacy state advertises ${legacy.stateCandidateCount} candidate(s), case advertises ${expected.length}`,
+    );
   }
   if (shared.stateCandidateCount !== expected.length) {
-    mismatches.push(`shared state advertises ${shared.stateCandidateCount} candidate(s), case advertises ${expected.length}`);
+    mismatches.push(
+      `shared state advertises ${shared.stateCandidateCount} candidate(s), case advertises ${expected.length}`,
+    );
   }
   const sameStateOrder = sameOrder(shared.stateCandidateIds, expected);
   if (!sameStateOrder) {
-    mismatches.push(`shared state candidate ids/order differ from the advertised candidates: [${shared.stateCandidateIds.join(", ")}] vs [${expected.join(", ")}]`);
+    mismatches.push(
+      `shared state candidate ids/order differ from the advertised candidates: [${shared.stateCandidateIds.join(", ")}] vs [${expected.join(", ")}]`,
+    );
   }
   if (!sameOrder(legacy.questionKeys, shared.questionKeys)) {
-    mismatches.push(`question batteries differ between variants: [${legacy.questionKeys.join(", ")}] vs [${shared.questionKeys.join(", ")}]`);
+    mismatches.push(
+      `question batteries differ between variants: [${legacy.questionKeys.join(", ")}] vs [${shared.questionKeys.join(", ")}]`,
+    );
   }
   const sameQuestionOrder = sameOrder(legacy.questionCandidateIds, shared.questionCandidateIds);
   if (!sameMembers(legacy.questionCandidateIds, shared.questionCandidateIds)) {
-    mismatches.push(`question batteries expose different candidate ids: [${legacy.questionCandidateIds.join(", ")}] vs [${shared.questionCandidateIds.join(", ")}]`);
+    mismatches.push(
+      `question batteries expose different candidate ids: [${legacy.questionCandidateIds.join(", ")}] vs [${shared.questionCandidateIds.join(", ")}]`,
+    );
   } else if (!sameQuestionOrder) {
-    mismatches.push(`question candidate order differs between variants: [${legacy.questionCandidateIds.join(", ")}] vs [${shared.questionCandidateIds.join(", ")}]`);
+    mismatches.push(
+      `question candidate order differs between variants: [${legacy.questionCandidateIds.join(", ")}] vs [${shared.questionCandidateIds.join(", ")}]`,
+    );
   }
   if (!sameOrder(legacy.choiceOptions, shared.choiceOptions)) {
-    mismatches.push(`aggregate choice options differ between variants: [${legacy.choiceOptions.join(", ")}] vs [${shared.choiceOptions.join(", ")}]`);
+    mismatches.push(
+      `aggregate choice options differ between variants: [${legacy.choiceOptions.join(", ")}] vs [${shared.choiceOptions.join(", ")}]`,
+    );
   }
   for (const id of legacy.questionCandidateIds) {
-    if (!shared.stateCandidateIds.includes(id)) mismatches.push(`shared state lost candidate \`${id}\` exposed by the legacy battery`);
+    if (!shared.stateCandidateIds.includes(id))
+      mismatches.push(`shared state lost candidate \`${id}\` exposed by the legacy battery`);
   }
   return {
     caseId: testCase.id,
@@ -444,8 +466,10 @@ const meanOf = (values: readonly number[]): number | null => (values.length === 
 
 /** Aggregates the paired byte rows. Rows with an unbuilt side are counted, never silently dropped. */
 export function summarizePayloadBytes(rows: readonly PayloadByteRow[]): PayloadByteSummary {
-  const measured = rows.filter((row): row is PayloadByteRow & { legacyBytes: number; sharedBytes: number; deltaBytes: number } =>
-    row.legacyBytes !== null && row.sharedBytes !== null && row.deltaBytes !== null);
+  const measured = rows.filter(
+    (row): row is PayloadByteRow & { legacyBytes: number; sharedBytes: number; deltaBytes: number } =>
+      row.legacyBytes !== null && row.sharedBytes !== null && row.deltaBytes !== null,
+  );
   const legacy = measured.map((row) => row.legacyBytes);
   const shared = measured.map((row) => row.sharedBytes);
   const legacyTotal = sum(legacy);
@@ -507,7 +531,8 @@ export function buildPayloadComparisons(cases: readonly AdventureCaseRow[]): {
       legacyBytes,
       sharedBytes,
       deltaBytes,
-      deltaPercent: deltaBytes === null || legacyBytes === null || legacyBytes === 0 ? null : (deltaBytes / legacyBytes) * 100,
+      deltaPercent:
+        deltaBytes === null || legacyBytes === null || legacyBytes === 0 ? null : (deltaBytes / legacyBytes) * 100,
       legacyDigest: legacyRequest === null ? null : adventureRequestDigest(legacyRequest),
       sharedDigest: sharedRequest === null ? null : adventureRequestDigest(sharedRequest),
     });
@@ -533,10 +558,15 @@ export function buildPayloadComparisons(cases: readonly AdventureCaseRow[]): {
  * The bounded per-case table selection: rows sorted by absolute delta, taking the first `top` and
  * the last `top` so both the biggest changes and the smallest/near-equal cases stay visible.
  */
-export function boundedDeltaRows(rows: readonly PayloadByteRow[], top: number): { shown: PayloadByteRow[]; omitted: number } {
+export function boundedDeltaRows(
+  rows: readonly PayloadByteRow[],
+  top: number,
+): { shown: PayloadByteRow[]; omitted: number } {
   const measured = rows.filter((row) => row.deltaBytes !== null);
-  const sorted = [...measured].sort((left, right) =>
-    Math.abs(right.deltaBytes ?? 0) - Math.abs(left.deltaBytes ?? 0) || left.caseId.localeCompare(right.caseId));
+  const sorted = [...measured].sort(
+    (left, right) =>
+      Math.abs(right.deltaBytes ?? 0) - Math.abs(left.deltaBytes ?? 0) || left.caseId.localeCompare(right.caseId),
+  );
   const limit = Math.max(1, Math.floor(top));
   if (sorted.length <= limit * 2) return { shown: sorted, omitted: 0 };
   const shown = [...sorted.slice(0, limit), ...sorted.slice(-limit)];
@@ -710,7 +740,9 @@ export function summarizeVariantAgreement(samples: readonly AgreementSample[]): 
       crossVariantConflicted: crossVariantAgreement !== null && crossVariantAgreement < 1,
     };
   });
-  const crossValues = cases.flatMap((entry) => (entry.crossVariantAgreement === null ? [] : [entry.crossVariantAgreement]));
+  const crossValues = cases.flatMap((entry) =>
+    entry.crossVariantAgreement === null ? [] : [entry.crossVariantAgreement],
+  );
   const paired = crossValues.length;
   const conflicts = cases.filter((entry) => entry.conflicted).length;
   const crossConflicts = cases.filter((entry) => entry.crossVariantConflicted).length;
@@ -774,10 +806,10 @@ export const ACTION_FAMILY_TOOL_ALIASES: Readonly<Record<string, MechanicFamily>
 
 /** How the report describes the resolution below; shared by the markdown and the JSON sidecar. */
 export const ACTION_FAMILY_SOURCE =
-  "the case's expected candidate `kind` when the case labels one, falling back to the kind of the pick the call named"
-  + " (the committed selection, or the raw pick the evaluator recovers from a deferral), then `defer`;"
-  + " canonical families and exact candidate kinds from `MECHANIC_FAMILIES` / `KIND_TO_FAMILY`"
-  + " in `scripts/synthetic-player-harness.ts`, plus production proposal tool-name aliases";
+  "the case's expected candidate `kind` when the case labels one, falling back to the kind of the pick the call named" +
+  " (the committed selection, or the raw pick the evaluator recovers from a deferral), then `defer`;" +
+  " canonical families and exact candidate kinds from `MECHANIC_FAMILIES` / `KIND_TO_FAMILY`" +
+  " in `scripts/synthetic-player-harness.ts`, plus production proposal tool-name aliases";
 
 /** The canonical family for one candidate or tool kind, or null when the kind has no mapping. */
 export function familyForAdventureKind(kind: string | null | undefined): MechanicFamily | null {
@@ -818,18 +850,14 @@ export function resolveAdventureFamily(
   const expected = expectedCandidateOf(testCase);
   if (expected) {
     const family = familyForAdventureKind(expected.kind);
-    return family === null
-      ? { family: ACTION_FAMILY_UNKNOWN, kind: expected.kind }
-      : { family, kind: expected.kind };
+    return family === null ? { family: ACTION_FAMILY_UNKNOWN, kind: expected.kind } : { family, kind: expected.kind };
   }
   const named = readout.candidateId;
   if (named !== null) {
     const picked = testCase.candidates.find((entry) => entry.candidateId === named) ?? null;
     if (!picked) return { family: ACTION_FAMILY_UNKNOWN, kind: null };
     const family = familyForAdventureKind(picked.kind);
-    return family === null
-      ? { family: ACTION_FAMILY_UNKNOWN, kind: picked.kind }
-      : { family, kind: picked.kind };
+    return family === null ? { family: ACTION_FAMILY_UNKNOWN, kind: picked.kind } : { family, kind: picked.kind };
   }
   return { family: ACTION_FAMILY_DEFER, kind: null };
 }
@@ -994,7 +1022,10 @@ export function summarizeFamilyGrading(
   cases: readonly AdventureCaseRow[],
 ): FamilyGradingReport {
   const caseById = new Map(cases.map((testCase): [string, AdventureCaseRow] => [testCase.id, testCase]));
-  const buckets = new Map<AdventurePayloadVariant, Map<ActionFamilyKey, { row: FamilyGradingRow; caseIds: Set<string> }>>();
+  const buckets = new Map<
+    AdventurePayloadVariant,
+    Map<ActionFamilyKey, { row: FamilyGradingRow; caseIds: Set<string> }>
+  >();
   for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
     const byFamily = new Map<ActionFamilyKey, { row: FamilyGradingRow; caseIds: Set<string> }>();
     for (const family of ACTION_FAMILY_ORDER) {
@@ -1029,19 +1060,21 @@ export function summarizeFamilyGrading(
     if (attempt.readout.selectedCorrect) bucket.row.exact += 1;
     if (attempt.readout.correct) bucket.row.correct += 1;
   }
-  const variants = Object.fromEntries(ADVENTURE_PAYLOAD_VARIANTS.map((variant): [AdventurePayloadVariant, VariantFamilyGrading] => {
-    const byFamily = buckets.get(variant)!;
-    const families = ACTION_FAMILY_ORDER.map((family): FamilyGradingRow => {
-      const bucket = byFamily.get(family)!;
-      const row = bucket.row;
-      row.cases = bucket.caseIds.size;
-      row.coverage = row.calls === 0 ? 0 : row.acted / row.calls;
-      row.actedAccuracy = row.acted === 0 ? 0 : row.actedCorrect / row.acted;
-      row.accuracy = row.calls === 0 ? 0 : row.correct / row.calls;
-      return row;
-    });
-    return [variant, { variant, families }];
-  })) as Record<AdventurePayloadVariant, VariantFamilyGrading>;
+  const variants = Object.fromEntries(
+    ADVENTURE_PAYLOAD_VARIANTS.map((variant): [AdventurePayloadVariant, VariantFamilyGrading] => {
+      const byFamily = buckets.get(variant)!;
+      const families = ACTION_FAMILY_ORDER.map((family): FamilyGradingRow => {
+        const bucket = byFamily.get(family)!;
+        const row = bucket.row;
+        row.cases = bucket.caseIds.size;
+        row.coverage = row.calls === 0 ? 0 : row.acted / row.calls;
+        row.actedAccuracy = row.acted === 0 ? 0 : row.actedCorrect / row.acted;
+        row.accuracy = row.calls === 0 ? 0 : row.correct / row.calls;
+        return row;
+      });
+      return [variant, { variant, families }];
+    }),
+  ) as Record<AdventurePayloadVariant, VariantFamilyGrading>;
   for (const testCase of cases) {
     const expected = expectedCandidateOf(testCase);
     if (!expected || familyForAdventureKind(expected.kind) !== null) continue;
@@ -1079,16 +1112,16 @@ export function adventurePayloadVersions(variant: AdventurePayloadVariant): Adve
   const contract = SYSTEM_ONE_EXECUTION_CONTRACTS[PROMOTION_LANE];
   return variant === "shared-context"
     ? {
-      ...ADVENTURE_SHARED_CONTEXT_VERSIONS,
-      compositionVersion: contract.compositionVersion,
-      candidateStrategy: BENCHMARK_CANDIDATE_STRATEGY,
-    }
+        ...ADVENTURE_SHARED_CONTEXT_VERSIONS,
+        compositionVersion: contract.compositionVersion,
+        candidateStrategy: BENCHMARK_CANDIDATE_STRATEGY,
+      }
     : {
-      questionVersion: contract.questionVersion,
-      stateVersion: contract.stateVersion,
-      compositionVersion: contract.compositionVersion,
-      candidateStrategy: BENCHMARK_CANDIDATE_STRATEGY,
-    };
+        questionVersion: contract.questionVersion,
+        stateVersion: contract.stateVersion,
+        compositionVersion: contract.compositionVersion,
+        candidateStrategy: BENCHMARK_CANDIDATE_STRATEGY,
+      };
 }
 
 /** One recorded live attempt: the evaluator readout plus the fields the report needs beside it. */
@@ -1204,7 +1237,11 @@ export async function runLiveComparison(input: LiveComparisonInput): Promise<Liv
           const result = await complete({ settings, state: request.state, questions: request.questions });
           model = result.model.responseModel ?? model;
           const readout: AdventureReadout = {
-            ...gradeAdventureCase(testCase, composeAdventureSelection(testCase.candidates, result.answers, thresholds), result.answers),
+            ...gradeAdventureCase(
+              testCase,
+              composeAdventureSelection(testCase.candidates, result.answers, thresholds),
+              result.answers,
+            ),
             evidence: finishEvidence(result.model.responseModel),
           };
           attempts.push({
@@ -1238,16 +1275,21 @@ export async function runLiveComparison(input: LiveComparisonInput): Promise<Liv
       `no paired adventure calls succeeded (${failures.length} failed)${first ? `; first error on \`${first.caseId}\` ${first.variant} repeat ${first.repeat}: ${first.message}` : ""}`,
     );
   }
-  const variants = Object.fromEntries(ADVENTURE_PAYLOAD_VARIANTS.map((variant): [AdventurePayloadVariant, VariantRunSummary] => {
-    const variantAttempts = attempts.filter((attempt) => attempt.variant === variant);
-    const readouts = variantAttempts.map((attempt) => attempt.readout);
-    return [variant, {
-      readouts,
-      metrics: summarizeVariantMetrics(readouts, cases),
-      stability: summarizeAdventureStability(readouts),
-      usage: summarizeAttemptUsage(variantAttempts),
-    }];
-  })) as Record<AdventurePayloadVariant, VariantRunSummary>;
+  const variants = Object.fromEntries(
+    ADVENTURE_PAYLOAD_VARIANTS.map((variant): [AdventurePayloadVariant, VariantRunSummary] => {
+      const variantAttempts = attempts.filter((attempt) => attempt.variant === variant);
+      const readouts = variantAttempts.map((attempt) => attempt.readout);
+      return [
+        variant,
+        {
+          readouts,
+          metrics: summarizeVariantMetrics(readouts, cases),
+          stability: summarizeAdventureStability(readouts),
+          usage: summarizeAttemptUsage(variantAttempts),
+        },
+      ];
+    }),
+  ) as Record<AdventurePayloadVariant, VariantRunSummary>;
   const agreement = summarizeVariantAgreement(
     attempts.map((attempt) => ({ caseId: attempt.caseId, variant: attempt.variant, decision: attempt.decision })),
   );
@@ -1403,56 +1445,95 @@ export function comparisonNotes(view: ComparisonView): string[] {
     "Agent-reviewed harvested cases are scored and reported but are not promotion evidence.",
     "Structural pairing compares the two built requests per case; any mismatch is a reported failure, never a silent drop.",
   ];
-  notes.push(view.mode === "live"
-    ? "Tokens, cost, and latency are provider measurements for this run (null when the provider reported none); cost is derived from reported usage and the configured pricing, not a billed amount."
-    : "Offline mode sends no network calls and measures no tokens, cost, or latency.");
+  notes.push(
+    view.mode === "live"
+      ? "Tokens, cost, and latency are provider measurements for this run (null when the provider reported none); cost is derived from reported usage and the configured pricing, not a billed amount."
+      : "Offline mode sends no network calls and measures no tokens, cost, or latency.",
+  );
   return notes;
 }
 
 /** Renders the markdown report. Pure. */
 export function renderComparisonReport(view: ComparisonView): string {
-  const { mode, generatedAt, cases, harvest, corpusDigest, rows, structural, summary, top, jsonPath, live, familyGrading } = view;
+  const {
+    mode,
+    generatedAt,
+    cases,
+    harvest,
+    corpusDigest,
+    rows,
+    structural,
+    summary,
+    top,
+    jsonPath,
+    live,
+    familyGrading,
+  } = view;
   const failed = structural.filter((result) => !result.ok);
   const frozen = cases.length - harvest.cases;
   const bounded = boundedDeltaRows(rows, top);
-  const structuralByCase = new Map<string, StructuralPairResult>(structural.map((result): [string, StructuralPairResult] => [result.caseId, result]));
+  const structuralByCase = new Map<string, StructuralPairResult>(
+    structural.map((result): [string, StructuralPairResult] => [result.caseId, result]),
+  );
   const lines: string[] = [];
 
   lines.push("# System One adventure payload comparison — legacy vs shared-context");
   lines.push("");
-  lines.push(`Generated ${generatedAt} by \`${SCRIPT}\` (${mode === "live" ? "live paired run" : "provider-free (offline; no network calls)"}).`);
+  lines.push(
+    `Generated ${generatedAt} by \`${SCRIPT}\` (${mode === "live" ? "live paired run" : "provider-free (offline; no network calls)"}).`,
+  );
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
   lines.push("`buildAdventureBenchmarkRequest` builds two payloads for the same case:");
   lines.push("");
-  lines.push("- **legacy** — the benchmark-shaped request the evaluator already runs: state carries the declaration and the");
-  lines.push("  advertised candidate count, and the question battery embeds the declaration into the `supported` noul, each");
+  lines.push(
+    "- **legacy** — the benchmark-shaped request the evaluator already runs: state carries the declaration and the",
+  );
+  lines.push(
+    "  advertised candidate count, and the question battery embeds the declaration into the `supported` noul, each",
+  );
   lines.push("  per-candidate relevance `score`, and the aggregate `best_candidate` choice.");
-  lines.push("- **shared-context** — the experimental request: the declaration and every advertised candidate (including");
+  lines.push(
+    "- **shared-context** — the experimental request: the declaration and every advertised candidate (including",
+  );
   lines.push("  duplicate instances and digest bindings) live in state, and the questions reference candidate ids and");
   lines.push("  describe judgments.");
   lines.push("");
-  lines.push("This runner builds both variants for every case, serializes them as `{ state, questions }`, and compares the");
-  lines.push("UTF-8 byte length, the request digests, and the candidate surfaces. Payload size is not provider input tokens,");
+  lines.push(
+    "This runner builds both variants for every case, serializes them as `{ state, questions }`, and compares the",
+  );
+  lines.push(
+    "UTF-8 byte length, the request digests, and the candidate surfaces. Payload size is not provider input tokens,",
+  );
   lines.push("billed cost, or latency; provider usage is measured separately in live mode.");
   if (mode === "offline") {
     lines.push("");
-    lines.push("Offline mode makes no model calls, so it derives no accuracy claim: a smaller payload is not evidence of a");
+    lines.push(
+      "Offline mode makes no model calls, so it derives no accuracy claim: a smaller payload is not evidence of a",
+    );
     lines.push("correct or equivalent decision. The comparison is a regression guard over payload construction.");
   }
   lines.push("");
-  lines.push("Both variants must expose the same candidate identities and count. A structural mismatch is reported as a");
+  lines.push(
+    "Both variants must expose the same candidate identities and count. A structural mismatch is reported as a",
+  );
   lines.push("failure below and in the JSON sidecar, never silently dropped.");
   lines.push("");
   lines.push("## Corpus");
   lines.push("");
   lines.push("| Setting | Value |");
   lines.push("| --- | --- |");
-  lines.push(`| Mode | ${mode === "live" ? "live paired run (provider calls measured)" : "provider-free (offline; no network calls)"} |`);
-  lines.push(`| Cases | ${cases.length} (${frozen} frozen + ${harvest.cases} harvested: ${harvest.humanCases} human-confirmed, ${harvest.agentCases} agent-reviewed) |`);
+  lines.push(
+    `| Mode | ${mode === "live" ? "live paired run (provider calls measured)" : "provider-free (offline; no network calls)"} |`,
+  );
+  lines.push(
+    `| Cases | ${cases.length} (${frozen} frozen + ${harvest.cases} harvested: ${harvest.humanCases} human-confirmed, ${harvest.agentCases} agent-reviewed) |`,
+  );
   lines.push(`| Frozen corpus | \`${ADVENTURE_EVAL_CORPUS_VERSION}\` |`);
-  lines.push(`| Harvest fixture | \`${harvest.fixture}\` (${harvest.present ? `present${harvest.confirmed > 0 ? `, ${harvest.confirmed} confirmed` : ""}${harvest.skipped > 0 ? `, ${harvest.skipped} skipped` : ""}` : "absent"}) |`);
+  lines.push(
+    `| Harvest fixture | \`${harvest.fixture}\` (${harvest.present ? `present${harvest.confirmed > 0 ? `, ${harvest.confirmed} confirmed` : ""}${harvest.skipped > 0 ? `, ${harvest.skipped} skipped` : ""}` : "absent"}) |`,
+  );
   lines.push(`| Corpus digest | \`${corpusDigest}\` (SHA-256 over the ordered case identities) |`);
   lines.push(`| Structural pairing | ${structural.length - failed.length}/${structural.length} case(s) clean |`);
   if (live) {
@@ -1460,7 +1541,9 @@ export function renderComparisonReport(view: ComparisonView): string {
     lines.push(`| Base URL | ${live.baseUrl} |`);
     lines.push(`| Repeats | ${live.repeats} per variant per case (interleaved per case) |`);
     lines.push(`| Budget | \`--max-calls ${live.maxCalls}\`; projected ${live.projectedCalls} call(s) |`);
-    lines.push(`| Action threshold | act >= ${live.thresholds.actionThreshold}, confirm >= ${live.thresholds.reviewThreshold} |`);
+    lines.push(
+      `| Action threshold | act >= ${live.thresholds.actionThreshold}, confirm >= ${live.thresholds.reviewThreshold} |`,
+    );
   }
   lines.push("");
   if (harvest.warning) {
@@ -1471,8 +1554,12 @@ export function renderComparisonReport(view: ComparisonView): string {
   lines.push("");
   lines.push("| Variant | Total bytes | Mean | Min | Max |");
   lines.push("| --- | ---: | ---: | ---: | ---: |");
-  lines.push(`| legacy | ${bytesText(summary.legacyBytes)} | ${meanBytesText(summary.legacyMean)} | ${bytesText(summary.legacyMin)} | ${bytesText(summary.legacyMax)} |`);
-  lines.push(`| shared-context | ${bytesText(summary.sharedBytes)} | ${meanBytesText(summary.sharedMean)} | ${bytesText(summary.sharedMin)} | ${bytesText(summary.sharedMax)} |`);
+  lines.push(
+    `| legacy | ${bytesText(summary.legacyBytes)} | ${meanBytesText(summary.legacyMean)} | ${bytesText(summary.legacyMin)} | ${bytesText(summary.legacyMax)} |`,
+  );
+  lines.push(
+    `| shared-context | ${bytesText(summary.sharedBytes)} | ${meanBytesText(summary.sharedMean)} | ${bytesText(summary.sharedMin)} | ${bytesText(summary.sharedMax)} |`,
+  );
   lines.push("");
   lines.push("| Metric | Value |");
   lines.push("| --- | ---: |");
@@ -1485,19 +1572,27 @@ export function renderComparisonReport(view: ComparisonView): string {
   lines.push("");
   lines.push("## Per-case byte deltas");
   lines.push("");
-  lines.push(`Sorted by absolute delta; showing the first ${top} and last ${top} row(s). All ${rows.length} case(s) are in the JSON sidecar.`);
+  lines.push(
+    `Sorted by absolute delta; showing the first ${top} and last ${top} row(s). All ${rows.length} case(s) are in the JSON sidecar.`,
+  );
   lines.push("");
-  lines.push("| Case | Category | Provenance | Candidates | Legacy bytes | Shared bytes | Delta | Delta % | Request digest (legacy) | Request digest (shared) | Structure |");
+  lines.push(
+    "| Case | Category | Provenance | Candidates | Legacy bytes | Shared bytes | Delta | Delta % | Request digest (legacy) | Request digest (shared) | Structure |",
+  );
   lines.push("| --- | --- | :---: | ---: | ---: | ---: | ---: | ---: | --- | --- | :---: |");
   for (const row of bounded.shown) {
     const structure = structuralByCase.get(row.caseId);
-    lines.push(`| ${cell(row.caseId)} | ${row.category} | ${provenanceText(row.provenance)} | ${row.candidateCount} | ${bytesText(row.legacyBytes)} | ${bytesText(row.sharedBytes)} | ${signedBytes(row.deltaBytes)} | ${signedPercent(row.deltaPercent)} | ${shortDigest(row.legacyDigest)} | ${shortDigest(row.sharedDigest)} | ${structure?.ok ? "paired" : "mismatch"} |`);
+    lines.push(
+      `| ${cell(row.caseId)} | ${row.category} | ${provenanceText(row.provenance)} | ${row.candidateCount} | ${bytesText(row.legacyBytes)} | ${bytesText(row.sharedBytes)} | ${signedBytes(row.deltaBytes)} | ${signedPercent(row.deltaPercent)} | ${shortDigest(row.legacyDigest)} | ${shortDigest(row.sharedDigest)} | ${structure?.ok ? "paired" : "mismatch"} |`,
+    );
   }
   if (bounded.omitted > 0) lines.push(`| … | | | | | | | | | | ${bounded.omitted} row(s) omitted |`);
   lines.push("");
   lines.push("## Structural pairing");
   lines.push("");
-  lines.push("Both variants must expose the same candidate identities and count for every case: no candidate may be lost,");
+  lines.push(
+    "Both variants must expose the same candidate identities and count for every case: no candidate may be lost,",
+  );
   lines.push("added, or reordered, and the question batteries must agree. A mismatch is a failure, not a silent drop.");
   lines.push("");
   lines.push(`**${structural.length - failed.length}/${structural.length}** case(s) paired cleanly.`);
@@ -1507,7 +1602,8 @@ export function renderComparisonReport(view: ComparisonView): string {
   } else {
     lines.push("| Case | Candidates | Mismatch |");
     lines.push("| --- | ---: | --- |");
-    for (const result of failed.slice(0, top)) lines.push(`| ${cell(result.caseId)} | ${result.candidateCount} | ${cell(result.mismatches.join("; "))} |`);
+    for (const result of failed.slice(0, top))
+      lines.push(`| ${cell(result.caseId)} | ${result.candidateCount} | ${cell(result.mismatches.join("; "))} |`);
     if (failed.length > top) lines.push(`| … | | ${failed.length - top} more failing case(s) |`);
   }
   lines.push("");
@@ -1516,20 +1612,32 @@ export function renderComparisonReport(view: ComparisonView): string {
     const pairedCases = agreement.cases.filter((entry) => entry.crossVariantAgreement !== null).length;
     const conflicts = agreement.cases
       .filter((entry) => entry.conflicted || entry.crossVariantConflicted)
-      .sort((left, right) => (left.crossVariantAgreement ?? 1) - (right.crossVariantAgreement ?? 1) || left.caseId.localeCompare(right.caseId))
+      .sort(
+        (left, right) =>
+          (left.crossVariantAgreement ?? 1) - (right.crossVariantAgreement ?? 1) ||
+          left.caseId.localeCompare(right.caseId),
+      )
       .slice(0, top);
     lines.push("## Agreement");
     lines.push("");
-    lines.push(`Each case ran both variants ${live.repeats} time(s), interleaved per case. \`decision\` is the candidate a call named`);
+    lines.push(
+      `Each case ran both variants ${live.repeats} time(s), interleaved per case. \`decision\` is the candidate a call named`,
+    );
     lines.push("(the composed pick, or the raw pick recovered from a deferral), else `defer`.");
     lines.push("");
     lines.push("| Metric | Value |");
     lines.push("| --- | ---: |");
     lines.push(`| Cases with attempts from both variants | ${pairedCases} of ${agreement.cases.length} |`);
-    lines.push(`| Mean agreement across attempts | ${pctText(agreement.cases.length === 0 ? null : agreement.meanAgreement)} |`);
-    lines.push(`| Cases conflicted across attempts | ${agreement.conflictCases} (${pctText(agreement.conflictRate)}) |`);
+    lines.push(
+      `| Mean agreement across attempts | ${pctText(agreement.cases.length === 0 ? null : agreement.meanAgreement)} |`,
+    );
+    lines.push(
+      `| Cases conflicted across attempts | ${agreement.conflictCases} (${pctText(agreement.conflictRate)}) |`,
+    );
     lines.push(`| Cases with a cross-variant conflict | ${agreement.crossVariantConflictCases} of ${pairedCases} |`);
-    lines.push(`| Mean cross-variant agreement | ${pctText(pairedCases === 0 ? null : agreement.meanCrossVariantAgreement)} |`);
+    lines.push(
+      `| Mean cross-variant agreement | ${pctText(pairedCases === 0 ? null : agreement.meanCrossVariantAgreement)} |`,
+    );
     lines.push("");
     if (conflicts.length === 0) {
       lines.push("No per-case decision conflicts: every case repeated the same decision across variants and repeats.");
@@ -1537,19 +1645,31 @@ export function renderComparisonReport(view: ComparisonView): string {
       lines.push("| Case | Attempts | Legacy decisions | Shared decisions | Agreement | Cross-variant |");
       lines.push("| --- | ---: | --- | --- | ---: | ---: |");
       for (const entry of conflicts) {
-        lines.push(`| ${cell(entry.caseId)} | ${entry.attempts} | ${cell(entry.legacyDecisions.join(" / ") || "—")} | ${cell(entry.sharedDecisions.join(" / ") || "—")} | ${pctText(entry.agreement)} | ${pctText(entry.crossVariantAgreement)} |`);
+        lines.push(
+          `| ${cell(entry.caseId)} | ${entry.attempts} | ${cell(entry.legacyDecisions.join(" / ") || "—")} | ${cell(entry.sharedDecisions.join(" / ") || "—")} | ${pctText(entry.agreement)} | ${pctText(entry.crossVariantAgreement)} |`,
+        );
       }
     }
     lines.push("");
     lines.push("## Grading metrics per variant");
     lines.push("");
-    lines.push(`Composed at the lane's default action threshold (act >= ${live.thresholds.actionThreshold}). Coverage is acted/graded calls;`);
-    lines.push("acted accuracy counts acted decisions in the case's acceptable set; exact preferred counts the single preferred call;");
-    lines.push("asserted-subset accuracy counts committed selections or deferrals in the acceptable set. The **agent-reviewed");
-    lines.push("harvested** scope is scored but is not promotion evidence, and curated benchmark cases bypass production shortlisting,");
+    lines.push(
+      `Composed at the lane's default action threshold (act >= ${live.thresholds.actionThreshold}). Coverage is acted/graded calls;`,
+    );
+    lines.push(
+      "acted accuracy counts acted decisions in the case's acceptable set; exact preferred counts the single preferred call;",
+    );
+    lines.push(
+      "asserted-subset accuracy counts committed selections or deferrals in the acceptable set. The **agent-reviewed",
+    );
+    lines.push(
+      "harvested** scope is scored but is not promotion evidence, and curated benchmark cases bypass production shortlisting,",
+    );
     lines.push("so accuracy claims stay tied to the labeled scope (frozen plus human-confirmed harvested).");
     lines.push("");
-    lines.push("| Variant | Scope | Calls | Acted | Coverage | Acted accuracy | Exact preferred | Asserted-subset accuracy |");
+    lines.push(
+      "| Variant | Scope | Calls | Acted | Coverage | Acted accuracy | Exact preferred | Asserted-subset accuracy |",
+    );
     lines.push("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |");
     for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
       const metrics = live.variants[variant].metrics;
@@ -1564,21 +1684,31 @@ export function renderComparisonReport(view: ComparisonView): string {
     lines.push("| --- | ---: | ---: | ---: |");
     for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
       const stability = live.variants[variant].stability;
-      lines.push(`| ${variant} | ${pctText(stability.meanAgreement)} | ${stability.conflictCases} of ${stability.cases.length} | ${stability.meanSignalStdDev === null ? "n/a" : stability.meanSignalStdDev.toFixed(4)} |`);
+      lines.push(
+        `| ${variant} | ${pctText(stability.meanAgreement)} | ${stability.conflictCases} of ${stability.cases.length} | ${stability.meanSignalStdDev === null ? "n/a" : stability.meanSignalStdDev.toFixed(4)} |`,
+      );
     }
     lines.push("");
     lines.push("## Provider usage (measured separately)");
     lines.push("");
-    lines.push("Tokens, cost, and latency are provider measurements for the calls each variant made; `null` means the provider did");
-    lines.push("not report the value. Cost is derived from reported usage and the configured pricing, not a billed amount. These");
+    lines.push(
+      "Tokens, cost, and latency are provider measurements for the calls each variant made; `null` means the provider did",
+    );
+    lines.push(
+      "not report the value. Cost is derived from reported usage and the configured pricing, not a billed amount. These",
+    );
     lines.push("figures are separate from the payload bytes above.");
     lines.push("");
-    lines.push("| Variant | Attempts | Usage reported | Input tokens | Output tokens | Total tokens | Cost (USD) | Mean latency | Total latency | Failures |");
+    lines.push(
+      "| Variant | Attempts | Usage reported | Input tokens | Output tokens | Total tokens | Cost (USD) | Mean latency | Total latency | Failures |",
+    );
     lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
     for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
       const usage = live.variants[variant].usage;
       const failures = live.failures.filter((failure) => failure.variant === variant).length;
-      lines.push(`| ${variant} | ${usage.attempts} | ${usage.usageReported} | ${bytesText(usage.inputTokens)} | ${bytesText(usage.outputTokens)} | ${bytesText(usage.totalTokens)} | ${usage.costUsd === null ? "n/a" : usage.costUsd.toFixed(6)} | ${usage.meanLatencyMs === null ? "n/a" : `${Math.round(usage.meanLatencyMs)} ms`} | ${Math.round(usage.totalLatencyMs)} ms | ${failures} |`);
+      lines.push(
+        `| ${variant} | ${usage.attempts} | ${usage.usageReported} | ${bytesText(usage.inputTokens)} | ${bytesText(usage.outputTokens)} | ${bytesText(usage.totalTokens)} | ${usage.costUsd === null ? "n/a" : usage.costUsd.toFixed(6)} | ${usage.meanLatencyMs === null ? "n/a" : `${Math.round(usage.meanLatencyMs)} ms`} | ${Math.round(usage.totalLatencyMs)} ms | ${failures} |`,
+      );
     }
     lines.push("");
     lines.push("## Failures");
@@ -1589,7 +1719,9 @@ export function renderComparisonReport(view: ComparisonView): string {
       lines.push("| Variant | Case | Repeat | Code | Message |");
       lines.push("| --- | --- | ---: | --- | --- |");
       for (const failure of live.failures.slice(0, top)) {
-        lines.push(`| ${failure.variant} | ${cell(failure.caseId)} | ${failure.repeat} | ${failure.code} | ${cell(failure.message.slice(0, 200))} |`);
+        lines.push(
+          `| ${failure.variant} | ${cell(failure.caseId)} | ${failure.repeat} | ${failure.code} | ${cell(failure.message.slice(0, 200))} |`,
+        );
       }
       if (live.failures.length > top) lines.push(`| … | | | | ${live.failures.length - top} more failure(s) |`);
     }
@@ -1602,37 +1734,49 @@ export function renderComparisonReport(view: ComparisonView): string {
   lines.push("candidate falls back to the kind of the pick the call named: the committed selection, or the raw pick");
   lines.push("the evaluator recovers from a deferral. A call that named no pick is `defer`; a resolved kind with no");
   lines.push("canonical mapping is `unknown`, listed below and never silently dropped. Families are ordered by the");
-  lines.push("harness taxonomy (`MECHANIC_FAMILIES`), then `defer`, then `unknown` last. Small samples are shown as raw");
+  lines.push(
+    "harness taxonomy (`MECHANIC_FAMILIES`), then `defer`, then `unknown` last. Small samples are shown as raw",
+  );
   lines.push("counts; no significance is claimed. All graded calls count here (frozen, human-confirmed, and");
   lines.push("agent-reviewed harvested); agent-reviewed rows are scored but are not promotion evidence.");
   lines.push("");
   lines.push(`Mapping source: ${familyGrading.source}.`);
   lines.push("");
   if (!live) {
-    lines.push("Offline mode makes no model calls: every call count is zero and no accuracy is measured. The section is");
+    lines.push(
+      "Offline mode makes no model calls: every call count is zero and no accuracy is measured. The section is",
+    );
     lines.push("rendered in both modes so the report keeps a stable shape; live mode fills in the calls.");
     lines.push("");
   }
   for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
     lines.push(`### ${variant}`);
     lines.push("");
-    lines.push("| Family | Calls | Acted | Coverage | Acted accuracy | Exact preferred | Asserted-subset accuracy | Cases (sample) |");
+    lines.push(
+      "| Family | Calls | Acted | Coverage | Acted accuracy | Exact preferred | Asserted-subset accuracy | Cases (sample) |",
+    );
     lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
     for (const row of familyGrading.variants[variant].families) lines.push(familyGradingRow(row));
     lines.push("");
   }
   lines.push("### Cross-variant agreement by family");
   lines.push("");
-  lines.push("Mean agreement is the mean per-case share of the most common decision; a conflict case has more than one");
+  lines.push(
+    "Mean agreement is the mean per-case share of the most common decision; a conflict case has more than one",
+  );
   lines.push("decision across its attempts; a cross-variant conflict has at least one disagreeing legacy/shared pair.");
   lines.push("Counts are raw; no significance is claimed.");
   lines.push("");
-  lines.push("| Family | Calls | Cases | Mean agreement | Conflict cases | Cross-variant conflicts | Mean cross-variant agreement |");
+  lines.push(
+    "| Family | Calls | Cases | Mean agreement | Conflict cases | Cross-variant conflicts | Mean cross-variant agreement |",
+  );
   lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
   for (const row of familyGrading.agreement.families) lines.push(familyAgreementRow(row));
   lines.push("");
   if (familyGrading.agreement.splitCases.length > 0) {
-    lines.push(`Cases whose calls resolved to more than one family (their pairs count inside each family): ${familyGrading.agreement.splitCases.map((caseId) => `\`${cell(caseId)}\``).join(", ")}.`);
+    lines.push(
+      `Cases whose calls resolved to more than one family (their pairs count inside each family): ${familyGrading.agreement.splitCases.map((caseId) => `\`${cell(caseId)}\``).join(", ")}.`,
+    );
     lines.push("");
   }
   if (familyGrading.unmappedKinds.length === 0) {
@@ -1646,7 +1790,9 @@ export function renderComparisonReport(view: ComparisonView): string {
   }
   lines.push("");
   if (familyGrading.unresolvedCaseIds.length > 0) {
-    lines.push(`Attempts without a case row were attributed to \`unknown\`: ${familyGrading.unresolvedCaseIds.map((caseId) => `\`${cell(caseId)}\``).join(", ")}.`);
+    lines.push(
+      `Attempts without a case row were attributed to \`unknown\`: ${familyGrading.unresolvedCaseIds.map((caseId) => `\`${cell(caseId)}\``).join(", ")}.`,
+    );
     lines.push("");
   }
   lines.push("## Honesty notes");
@@ -1659,7 +1805,9 @@ export function renderComparisonReport(view: ComparisonView): string {
   lines.push(`npx tsx ${SCRIPT} --out ${view.out}`);
   lines.push("# live paired run (owner-approved budget; both variants, interleaved per case):");
   lines.push("set -a; . /tmp/opencode/jev/jev.env; set +a   # TYPESAFE_API_KEY");
-  lines.push(`npx tsx ${SCRIPT} --live --max-calls ${live ? live.maxCalls : LIVE_CALL_CAP} --repeat ${live ? live.repeats : 1}`);
+  lines.push(
+    `npx tsx ${SCRIPT} --live --max-calls ${live ? live.maxCalls : LIVE_CALL_CAP} --repeat ${live ? live.repeats : 1}`,
+  );
   lines.push("```");
   lines.push("");
   lines.push(`Raw per-case data: \`${jsonPath}\`.`);
@@ -1768,7 +1916,12 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    const budget = checkLiveBudget({ live: true, maxCalls: options.maxCalls, cases: cases.length, repeats: options.repeats });
+    const budget = checkLiveBudget({
+      live: true,
+      maxCalls: options.maxCalls,
+      cases: cases.length,
+      repeats: options.repeats,
+    });
     const maxCalls = budget.maxCalls;
     if (!budget.ok || maxCalls === null) {
       console.error(budget.error ?? "live paired comparison budget refused");
@@ -1776,7 +1929,9 @@ async function main(): Promise<void> {
       return;
     }
     const settings = { ...defaultSystemOneSettings(), apiKey: key };
-    console.log(`live paired comparison: ${cases.length} case(s) x ${options.repeats} repeat(s) x ${ADVENTURE_PAYLOAD_VARIANTS.length} variants = ${budget.projectedCalls} call(s) against ${settings.model}; --max-calls ${maxCalls}`);
+    console.log(
+      `live paired comparison: ${cases.length} case(s) x ${options.repeats} repeat(s) x ${ADVENTURE_PAYLOAD_VARIANTS.length} variants = ${budget.projectedCalls} call(s) against ${settings.model}; --max-calls ${maxCalls}`,
+    );
     live = await runLiveComparison({ cases, repeats: options.repeats, maxCalls, settings });
   }
 
@@ -1793,18 +1948,29 @@ async function main(): Promise<void> {
   await writeFile(outPath, `${renderComparisonReport(view)}\n`, "utf8");
   await writeFile(jsonPath, `${JSON.stringify(comparisonJson(view), null, 2)}\n`, "utf8");
 
-  console.log(`payload bytes: legacy ${view.summary.legacyBytes} -> shared-context ${view.summary.sharedBytes} (${signedPercent(view.summary.deltaPercent)})`);
-  console.log(`cases: ${view.summary.shrink} shrunk, ${view.summary.grow} grown, ${view.summary.equal} equal, ${view.summary.incomplete} unmeasured`);
+  console.log(
+    `payload bytes: legacy ${view.summary.legacyBytes} -> shared-context ${view.summary.sharedBytes} (${signedPercent(view.summary.deltaPercent)})`,
+  );
+  console.log(
+    `cases: ${view.summary.shrink} shrunk, ${view.summary.grow} grown, ${view.summary.equal} equal, ${view.summary.incomplete} unmeasured`,
+  );
   const failed = view.structural.filter((result) => !result.ok);
   if (failed.length > 0) {
-    console.error(`structural pairing failed for ${failed.length} case(s): ${failed.slice(0, 3).map((result) => result.caseId).join(", ")}`);
+    console.error(
+      `structural pairing failed for ${failed.length} case(s): ${failed
+        .slice(0, 3)
+        .map((result) => result.caseId)
+        .join(", ")}`,
+    );
     process.exitCode = 1;
   } else {
     console.log(`structural pairing: ${view.structural.length}/${view.structural.length} case(s) clean`);
   }
   if (live) {
     const pairedCases = live.agreement.cases.filter((entry) => entry.crossVariantAgreement !== null).length;
-    console.log(`agreement: mean ${pctText(live.agreement.meanAgreement)}, cross-variant conflicts ${live.agreement.crossVariantConflictCases}/${pairedCases}`);
+    console.log(
+      `agreement: mean ${pctText(live.agreement.meanAgreement)}, cross-variant conflicts ${live.agreement.crossVariantConflictCases}/${pairedCases}`,
+    );
     console.log(`failures: ${live.failures.length}`);
   }
   console.log(`wrote ${path.relative(ROOT, outPath)} and ${path.relative(ROOT, jsonPath)}`);

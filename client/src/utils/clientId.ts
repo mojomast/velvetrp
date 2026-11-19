@@ -10,12 +10,18 @@ function randomValuesUuid(cryptoApi: Crypto): string {
 export function createClientId(): string {
   const cryptoApi = globalThis.crypto;
   if (typeof cryptoApi?.randomUUID === "function") {
-    try { return cryptoApi.randomUUID(); }
-    catch { /* Some insecure-origin implementations expose a method that throws. */ }
+    try {
+      return cryptoApi.randomUUID();
+    } catch {
+      /* Some insecure-origin implementations expose a method that throws. */
+    }
   }
   if (typeof cryptoApi?.getRandomValues === "function") {
-    try { return randomValuesUuid(cryptoApi); }
-    catch { /* Fall back when the exposed method is not usable. */ }
+    try {
+      return randomValuesUuid(cryptoApi);
+    } catch {
+      /* Fall back when the exposed method is not usable. */
+    }
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }

@@ -30,10 +30,7 @@ export const NARRATION_INVENTS_MECHANIC_KEY = "invents_mechanic";
 export const NARRATION_CROSSES_BOUNDARY_KEY = "crosses_boundary";
 
 /** The aggregate hazard questions that are not tied to a single committed fact. */
-const NARRATION_GLOBAL_HAZARD_KEYS = [
-  NARRATION_INVENTS_MECHANIC_KEY,
-  NARRATION_CROSSES_BOUNDARY_KEY,
-] as const;
+const NARRATION_GLOBAL_HAZARD_KEYS = [NARRATION_INVENTS_MECHANIC_KEY, NARRATION_CROSSES_BOUNDARY_KEY] as const;
 
 /** Question-key prefixes for the per-fact coverage and contradiction `noul`s. */
 const REFLECTION_PREFIX = "reflects_receipt:";
@@ -232,11 +229,8 @@ export function composeNarrationVerification(
   if (!usable) return { band: "fallback", flags, groundedness: null, topSignal: null };
 
   const fullyGrounded = totalFacts > 0 && reflected === totalFacts && reflectionSignals.length > 0;
-  const topSignal = flags.length > 0
-    ? Math.max(...hazardSignals)
-    : fullyGrounded
-      ? Math.min(...reflectionSignals)
-      : groundedness;
+  const topSignal =
+    flags.length > 0 ? Math.max(...hazardSignals) : fullyGrounded ? Math.min(...reflectionSignals) : groundedness;
 
   if (flags.length > 0) return { band: "fallback", flags, groundedness, topSignal };
   if (moderateHazard) return { band: "confirm", flags, groundedness, topSignal };

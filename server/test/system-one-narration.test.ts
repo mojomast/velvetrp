@@ -90,27 +90,40 @@ describe("System One narration verification battery", () => {
     expect(empty).not.toThrow();
     expect(empty()).toEqual({ band: "fallback", flags: [], groundedness: null, topSignal: null });
 
-    const partial = composeNarrationVerification({ [NARRATION_INVENTS_MECHANIC_KEY]: { type: "choice", choice: "x", confidence: 0.9, probabilities: { x: 1 } } }, thresholds);
+    const partial = composeNarrationVerification(
+      { [NARRATION_INVENTS_MECHANIC_KEY]: { type: "choice", choice: "x", confidence: 0.9, probabilities: { x: 1 } } },
+      thresholds,
+    );
     expect(partial).toEqual({ band: "fallback", flags: [], groundedness: null, topSignal: null });
   });
 
   it("computes coverage from the per-fact reflection nouls", () => {
-    const partly = composeNarrationVerification({
-      [narrationReflectionKey(0)]: hazard(0.9),
-      [narrationReflectionKey(1)]: hazard(0.1),
-    }, thresholds, { factCount: 2 });
+    const partly = composeNarrationVerification(
+      {
+        [narrationReflectionKey(0)]: hazard(0.9),
+        [narrationReflectionKey(1)]: hazard(0.1),
+      },
+      thresholds,
+      { factCount: 2 },
+    );
     expect(partly.groundedness).toBe(0.5);
     expect(partly.band).toBe("confirm");
 
-    const ungrounded = composeNarrationVerification({
-      [narrationReflectionKey(0)]: hazard(0.1),
-      [narrationReflectionKey(1)]: hazard(0.1),
-    }, thresholds, { factCount: 2 });
+    const ungrounded = composeNarrationVerification(
+      {
+        [narrationReflectionKey(0)]: hazard(0.1),
+        [narrationReflectionKey(1)]: hazard(0.1),
+      },
+      thresholds,
+      { factCount: 2 },
+    );
     expect(ungrounded.groundedness).toBe(0);
     expect(ungrounded.band).toBe("fallback");
 
     // A missing reflection answer for a declared fact counts against coverage.
-    const missing = composeNarrationVerification({ [narrationReflectionKey(0)]: hazard(0.9) }, thresholds, { factCount: 2 });
+    const missing = composeNarrationVerification({ [narrationReflectionKey(0)]: hazard(0.9) }, thresholds, {
+      factCount: 2,
+    });
     expect(missing.groundedness).toBe(0.5);
 
     const inferred = composeNarrationVerification({ [narrationReflectionKey(0)]: hazard(0.9) }, thresholds);
@@ -118,21 +131,28 @@ describe("System One narration verification battery", () => {
     expect(inferred.band).toBe("act");
 
     expect(composeNarrationVerification({}, thresholds).groundedness).toBeNull();
-    expect(composeNarrationVerification({ [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.05) }, thresholds).groundedness).toBeNull();
+    expect(
+      composeNarrationVerification({ [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.05) }, thresholds).groundedness,
+    ).toBeNull();
   });
 
   it("honors the thresholds when banding hazards and coverage", () => {
     const strict = { actionThreshold: 0.6, reviewThreshold: 0.4 };
-    expect(composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.6) }, strict).flags).toEqual([NARRATION_CONTRADICTS_RECEIPT_KEY]);
+    expect(composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.6) }, strict).flags).toEqual([
+      NARRATION_CONTRADICTS_RECEIPT_KEY,
+    ]);
 
     const moderateHazard = composeNarrationVerification({ [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.6) }, thresholds);
     expect(moderateHazard.flags).toEqual([]);
     expect(moderateHazard.band).toBe("confirm");
 
-    const moderateCoverage = composeNarrationVerification({
-      [narrationReflectionKey(0)]: hazard(0.9),
-      [narrationReflectionKey(1)]: hazard(0.1),
-    }, thresholds);
+    const moderateCoverage = composeNarrationVerification(
+      {
+        [narrationReflectionKey(0)]: hazard(0.9),
+        [narrationReflectionKey(1)]: hazard(0.1),
+      },
+      thresholds,
+    );
     expect(moderateCoverage.band).toBe("confirm");
   });
 
@@ -147,7 +167,11 @@ describe("System One narration verification battery", () => {
     expect(first).toEqual(second);
 
     const state = narrationVerificationState(input);
-    expect(state).toEqual({ narration: input.narration, committed_facts: [...input.committedFacts], declared_boundaries: [...input.declaredBoundaries!] });
+    expect(state).toEqual({
+      narration: input.narration,
+      committed_facts: [...input.committedFacts],
+      declared_boundaries: [...input.declaredBoundaries!],
+    });
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
 
     expect(JSON.parse(JSON.stringify({ input, answers }))).toEqual(before);

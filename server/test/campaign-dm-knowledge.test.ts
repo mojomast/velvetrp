@@ -14,7 +14,7 @@ useTmpDataDir();
 const BASE = Date.parse("2035-01-01T00:00:00.000Z");
 let tick = 0;
 let sequence = 0;
-const clock = { now: () => new Date(BASE + (tick++) * 1_000) };
+const clock = { now: () => new Date(BASE + tick++ * 1_000) };
 const ids = { nextId: () => `knowledge-id-${++sequence}` };
 const dbPath = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 
@@ -34,27 +34,41 @@ const openDb = (foreignKeys = true) => {
 };
 
 const currentRevision = (db: DatabaseDriver.Database, campaignId: string): number =>
-  (db.prepare("SELECT revision FROM world_narrative_revisions_v32 WHERE campaign_id=?")
-    .get(campaignId) as { revision: number } | undefined)?.revision ?? 0;
+  (
+    db.prepare("SELECT revision FROM world_narrative_revisions_v32 WHERE campaign_id=?").get(campaignId) as
+      { revision: number } | undefined
+  )?.revision ?? 0;
 
 const presenceRevision = (db: DatabaseDriver.Database, campaignId: string, sessionId: string): number =>
-  (db.prepare("SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?")
-    .get(campaignId, sessionId) as { revision: number } | undefined)?.revision ?? 0;
+  (
+    db
+      .prepare("SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?")
+      .get(campaignId, sessionId) as { revision: number } | undefined
+  )?.revision ?? 0;
 
 function createNpc(f: Fixture, db: DatabaseDriver.Database, index: number, present: boolean): string {
   const persona = f.repo.createCharacter({
-    name: `Knowledge ${index}`, age: 30, archetype: "Guide", boundaries: "", fictionalConfirmed: true,
+    name: `Knowledge ${index}`,
+    age: 30,
+    archetype: "Guide",
+    boundaries: "",
+    fictionalConfirmed: true,
   });
   const created = f.repo.createCampaignNpc("local-owner", f.campaign.id, {
-    personaId: persona.id, publicState: { name: `NPC ${index}` },
+    personaId: persona.id,
+    publicState: { name: `NPC ${index}` },
     privateState: { goals: "Goals", gmNotes: "Notes", merchantState: null },
-    expectedRevision: currentRevision(db, f.campaign.id), idempotencyKey: `knowledge-npc-${index}`,
+    expectedRevision: currentRevision(db, f.campaign.id),
+    idempotencyKey: `knowledge-npc-${index}`,
   });
   if (present) {
     const root = presenceRevision(db, f.campaign.id, f.session.id);
     f.repo.mutateNpcPresence("local-owner", {
-      campaignId: f.campaign.id, sessionId: f.session.id, npcId: created.npc.npcId,
-      expectedRevision: root, idempotencyKey: `knowledge-place-${index}-${root}`,
+      campaignId: f.campaign.id,
+      sessionId: f.session.id,
+      npcId: created.npc.npcId,
+      expectedRevision: root,
+      idempotencyKey: `knowledge-place-${index}-${root}`,
       mutation: { kind: "place", locationId: null },
     });
   }
@@ -63,32 +77,53 @@ function createNpc(f: Fixture, db: DatabaseDriver.Database, index: number, prese
 
 function observe(
   ledger: ReturnType<typeof createAgentObservationRepository>,
-  f: Fixture, agentId: string, text: string, authority: AgentObservationAuthority,
+  f: Fixture,
+  agentId: string,
+  text: string,
+  authority: AgentObservationAuthority,
 ): void {
   ledger.record({
-    campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, agentKind: "npc", agentId,
-    sourceCommandId: `knowledge-command-${++sequence}`, observedRevision: 1,
-    channel: "witnessed", hopCount: 0, text, authority,
+    campaignId: f.campaign.id,
+    timelineId: f.campaign.activeTimelineId,
+    agentKind: "npc",
+    agentId,
+    sourceCommandId: `knowledge-command-${++sequence}`,
+    observedRevision: 1,
+    channel: "witnessed",
+    hopCount: 0,
+    text,
+    authority,
   });
 }
 
 function runBeat(f: Fixture): string {
-  f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "knowledge-auto" });
+  f.repo.setDmControl("local-owner", f.campaign.id, {
+    mode: "ai",
+    expectedRevision: 0,
+    idempotencyKey: "knowledge-auto",
+  });
   const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
-    intent: "open", expectedModeRevision: 1, idempotencyKey: "knowledge-open",
+    intent: "open",
+    expectedModeRevision: 1,
+    idempotencyKey: "knowledge-open",
   });
   const work = f.repo.claimDmPlanning("local-owner", run.runId, "fake", "fake")!;
   const candidate = work.candidates[0]!;
-  f.repo.settleDmPlanning("local-owner", run.runId, work.claimId,
-    { candidateId: candidate.candidateId, digest: candidate.digest }, { promptTokens: 10, completionTokens: 10 });
+  f.repo.settleDmPlanning(
+    "local-owner",
+    run.runId,
+    work.claimId,
+    { candidateId: candidate.candidateId, digest: candidate.digest },
+    { promptTokens: 10, completionTokens: 10 },
+  );
   f.repo.executeDmBeat("local-owner", run.runId);
   return run.runId;
 }
 
 function knowledgeContext(runId: string): KnowledgeContext {
   const db = openDb();
-  const job = db.prepare("SELECT public_context_json FROM dm_narration_jobs WHERE run_id=?")
-    .get(runId) as { public_context_json: string } | undefined;
+  const job = db.prepare("SELECT public_context_json FROM dm_narration_jobs WHERE run_id=?").get(runId) as
+    { public_context_json: string } | undefined;
   db.close();
   if (!job) throw new Error("narration job was not queued");
   return JSON.parse(job.public_context_json) as KnowledgeContext;
@@ -105,8 +140,11 @@ describe("director narration knowledge channel", () => {
     const trusted = createNpc(f, db, 2, true);
     const absent = createNpc(f, db, 3, false);
     const relation = openDb(false);
-    relation.prepare(`INSERT INTO campaign_npc_relationships_v32
-      (campaign_id,npc_id,actor_id,affinity,trust,fear,last_command_id,updated_at) VALUES(?,?,?,?,?,?,?,?)`)
+    relation
+      .prepare(
+        `INSERT INTO campaign_npc_relationships_v32
+      (campaign_id,npc_id,actor_id,affinity,trust,fear,last_command_id,updated_at) VALUES(?,?,?,?,?,?,?,?)`,
+      )
       .run(f.campaign.id, trusted, f.actorId, 0, 0, 0, "knowledge-relationship", new Date(BASE).toISOString());
     relation.close();
     const ledgerDb = openDb();
@@ -140,8 +178,15 @@ describe("director narration knowledge channel", () => {
     const ledgerDb = openDb();
     const ledger = createAgentObservationRepository(ledgerDb, { clock, ids });
     for (const npcId of npcs) {
-      for (let index = 0; index < 6; index += 1) observe(ledger, f, npcId, `The witness saw lantern ${index} on the road.`, "verified");
-      observe(ledger, f, npcId, `${"The witness considered the accusation. ".repeat(9)}But it was not true.`, "verified");
+      for (let index = 0; index < 6; index += 1)
+        observe(ledger, f, npcId, `The witness saw lantern ${index} on the road.`, "verified");
+      observe(
+        ledger,
+        f,
+        npcId,
+        `${"The witness considered the accusation. ".repeat(9)}But it was not true.`,
+        "verified",
+      );
     }
     const runId = runBeat(f);
     const { npcKnowledge } = knowledgeContext(runId);
@@ -166,8 +211,11 @@ describe("director narration knowledge channel", () => {
     const npcs = Array.from({ length: 6 }, (_, index) => createNpc(f, db, index, true)).sort();
     const knowledgeable = npcs[4]!;
     const relation = openDb(false);
-    relation.prepare(`INSERT INTO campaign_npc_relationships_v32
-      (campaign_id,npc_id,actor_id,affinity,trust,fear,last_command_id,updated_at) VALUES(?,?,?,?,?,?,?,?)`)
+    relation
+      .prepare(
+        `INSERT INTO campaign_npc_relationships_v32
+      (campaign_id,npc_id,actor_id,affinity,trust,fear,last_command_id,updated_at) VALUES(?,?,?,?,?,?,?,?)`,
+      )
       .run(f.campaign.id, knowledgeable, f.actorId, 0, 0, 0, "knowledge-relationship", new Date(BASE).toISOString());
     relation.close();
     const ledger = createAgentObservationRepository(db, { clock, ids });
@@ -179,8 +227,11 @@ describe("director narration knowledge channel", () => {
     expect(npcKnowledge).toHaveLength(1);
     expect(npcKnowledge[0]!.npcId).toBe(knowledgeable);
     expect(npcKnowledge[0]!.entries).toHaveLength(4);
-    expect(npcKnowledge[0]!.entries[0]).toMatchObject({ text: "The hero did not steal the lantern.", authority: "verified" });
-    expect(npcKnowledge[0]!.entries.slice(1).every(entry => entry.authority === "rumor")).toBe(true);
+    expect(npcKnowledge[0]!.entries[0]).toMatchObject({
+      text: "The hero did not steal the lantern.",
+      authority: "verified",
+    });
+    expect(npcKnowledge[0]!.entries.slice(1).every((entry) => entry.authority === "rumor")).toBe(true);
     db.close();
     f.repo.close();
   });
@@ -189,10 +240,13 @@ describe("director narration knowledge channel", () => {
     const context = {
       cast: [{ name: "Mara", description: "A cautious guide." }],
       players: [{ name: "Hero" }],
-      npcKnowledge: [{
-        npcId: "npc-mara", npcName: "Mara",
-        entries: [{ text: "The hero won the bet.", channel: "witnessed", authority: "verified", relayerNpcId: null }],
-      }],
+      npcKnowledge: [
+        {
+          npcId: "npc-mara",
+          npcName: "Mara",
+          entries: [{ text: "The hero won the bet.", channel: "witnessed", authority: "verified", relayerNpcId: null }],
+        },
+      ],
     };
     const messages = dmNarrationMessages(context, "Committed result.");
     expect(messages[0]!.content).toContain("npcKnowledge lists what present public NPCs witnessed or were told");

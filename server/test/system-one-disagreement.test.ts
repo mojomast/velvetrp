@@ -5,14 +5,8 @@ import {
   renderDirectorDisagreementReport,
   summarizeDirectorDisagreement,
 } from "../src/agent/systemOneDisagreement.js";
-import type {
-  DirectorDisagreementRow,
-  DirectorDisagreementSummary,
-} from "../src/agent/systemOneDisagreement.js";
-import type {
-  DirectorDecisionAuthority,
-  SystemOneDecisionRecord,
-} from "../src/repo/systemOneDecisionRepo.js";
+import type { DirectorDisagreementRow, DirectorDisagreementSummary } from "../src/agent/systemOneDisagreement.js";
+import type { DirectorDecisionAuthority, SystemOneDecisionRecord } from "../src/repo/systemOneDecisionRepo.js";
 
 function decision(overrides: Partial<SystemOneDecisionRecord> = {}): SystemOneDecisionRecord {
   return {

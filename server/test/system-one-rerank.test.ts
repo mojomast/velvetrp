@@ -40,11 +40,21 @@ describe("buildRerankQuestions", () => {
   it("emits one relevance score and one answers noul per candidate", () => {
     const questions = buildRerankQuestions(input);
     expect(Object.keys(questions).sort()).toEqual([
-      "answers:c0", "answers:c1", "answers:c2", "answers:c3",
-      "relevance:c0", "relevance:c1", "relevance:c2", "relevance:c3",
+      "answers:c0",
+      "answers:c1",
+      "answers:c2",
+      "answers:c3",
+      "relevance:c0",
+      "relevance:c1",
+      "relevance:c2",
+      "relevance:c3",
     ]);
-    expect(Object.keys(questions).filter((key) => key.startsWith(RERANK_RELEVANCE_PREFIX))).toHaveLength(candidates.length);
-    expect(Object.keys(questions).filter((key) => key.startsWith(RERANK_ANSWERS_PREFIX))).toHaveLength(candidates.length);
+    expect(Object.keys(questions).filter((key) => key.startsWith(RERANK_RELEVANCE_PREFIX))).toHaveLength(
+      candidates.length,
+    );
+    expect(Object.keys(questions).filter((key) => key.startsWith(RERANK_ANSWERS_PREFIX))).toHaveLength(
+      candidates.length,
+    );
     for (const candidate of candidates) {
       expect(questions[`${RERANK_RELEVANCE_PREFIX}${candidate.candidateId}`]!.type).toBe("score");
       expect(questions[`${RERANK_ANSWERS_PREFIX}${candidate.candidateId}`]!.type).toBe("noul");
@@ -113,7 +123,12 @@ describe("composeRerankOrder", () => {
       ...relevance("c3", 3),
       ...answersAll(0.2),
     };
-    expect(composeRerankOrder(input, answers, thresholds, { deterministic: 0, model: 1 }).order).toEqual(["c3", "c2", "c1", "c0"]);
+    expect(composeRerankOrder(input, answers, thresholds, { deterministic: 0, model: 1 }).order).toEqual([
+      "c3",
+      "c2",
+      "c1",
+      "c0",
+    ]);
     expect(composeRerankOrder(input, answers, thresholds, { deterministic: 1, model: 0 }).order).toEqual(allIds);
     expect(composeRerankOrder(input, answers, thresholds, { deterministic: 0, model: 0 }).order).toEqual(allIds);
   });
@@ -148,7 +163,12 @@ describe("composeRerankOrder", () => {
   });
 
   it("keeps unanswered candidates at their deterministic score when some answers are usable", () => {
-    const answers = { ...relevance("c1", 3), ...answersNoul("c1", 0.9), ...relevance("c3", 0), ...answersNoul("c3", 0.2) };
+    const answers = {
+      ...relevance("c1", 3),
+      ...answersNoul("c1", 0.9),
+      ...relevance("c3", 0),
+      ...answersNoul("c3", 0.2),
+    };
     const composition = composeRerankOrder(input, answers, thresholds);
     expect(composition.order).toHaveLength(candidates.length);
     // A partial model response must not demote candidates it did not answer.

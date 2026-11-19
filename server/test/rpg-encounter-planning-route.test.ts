@@ -6,49 +6,86 @@ process.env.NODE_ENV = "test";
 
 const candidate = { id: "srd-5.1:enemy-template:goblin", name: "Goblin", challengeRating: 0.25 };
 const plan = {
-  targetDifficulty: "medium" as const, targetXp: 300, upperBound: 450,
+  targetDifficulty: "medium" as const,
+  targetXp: 300,
+  upperBound: 450,
   roster: [{ id: candidate.id, challengeRating: 0.25, count: 2 }],
-  rawXp: 50, adjustedXp: 150, difficulty: "easy" as const, monsterCount: 2, legal: false,
+  rawXp: 50,
+  adjustedXp: 150,
+  difficulty: "easy" as const,
+  monsterCount: 2,
+  legal: false,
   reasons: ["the roster is below the medium target"],
 };
 
 const rewardPlan = {
-  xpAwarded: 50, totalXp: 350, currentLevel: 1, nextLevel: 2, nextLevelXp: 300,
-  levelUpEligible: true, levelsGained: 1, legal: true, reasons: [],
+  xpAwarded: 50,
+  totalXp: 350,
+  currentLevel: 1,
+  nextLevel: 2,
+  nextLevelXp: 300,
+  levelUpEligible: true,
+  levelsGained: 1,
+  legal: true,
+  reasons: [],
 };
-const npcSelected = { selected: [{ id: candidate.id, name: "Goblin", challengeRating: 0.25 }], legal: true, reasons: [] };
+const npcSelected = {
+  selected: [{ id: candidate.id, name: "Goblin", challengeRating: 0.25 }],
+  legal: true,
+  reasons: [],
+};
 
 function service(hasCatalog = true) {
   return {
     hasCampaignCatalog: vi.fn(() => hasCatalog),
     listEncounterCandidates: vi.fn(() => [candidate]),
     planEncounter: vi.fn(() => ({ candidates: [candidate], plan })),
-    previewEncounterRewards: vi.fn(() => ({ plan: rewardPlan, defeated: [{ id: candidate.id, challengeRating: 0.25 }] })),
+    previewEncounterRewards: vi.fn(() => ({
+      plan: rewardPlan,
+      defeated: [{ id: candidate.id, challengeRating: 0.25 }],
+    })),
     selectNpcs: vi.fn(() => npcSelected),
   };
 }
 
 function app(planningService = service()) {
   const instance = Fastify({ logger: false });
-  instance.register(encounterPlanningHttpRoutes, { prefix: "/api/rpg/v1", encounterPlanningAccessor: () => planningService as never });
+  instance.register(encounterPlanningHttpRoutes, {
+    prefix: "/api/rpg/v1",
+    encounterPlanningAccessor: () => planningService as never,
+  });
   return { instance, planningService };
 }
 
-afterEach(() => { delete process.env.FEATURE_RPG_CAMPAIGN; delete process.env.FEATURE_RPG_MECHANICS; });
+afterEach(() => {
+  delete process.env.FEATURE_RPG_CAMPAIGN;
+  delete process.env.FEATURE_RPG_MECHANICS;
+});
 
 describe("encounter planning HTTP lane", () => {
   it("gates before the accessor and requires both campaign and mechanics flags", async () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const { instance, planningService } = app();
-    const denied = await instance.inject({ method: "POST", url: "/api/rpg/v1/campaigns/campaign/encounter-plans", payload: { partyLevels: [3], targetDifficulty: "medium" } });
+    const denied = await instance.inject({
+      method: "POST",
+      url: "/api/rpg/v1/campaigns/campaign/encounter-plans",
+      payload: { partyLevels: [3], targetDifficulty: "medium" },
+    });
     expect(denied.statusCode).toBe(404);
     expect(planningService.hasCampaignCatalog).not.toHaveBeenCalled();
     process.env.FEATURE_RPG_MECHANICS = "true";
-    const allowed = await instance.inject({ method: "POST", url: "/api/rpg/v1/campaigns/campaign/encounter-plans", payload: { partyLevels: [3, 3], targetDifficulty: "medium" } });
+    const allowed = await instance.inject({
+      method: "POST",
+      url: "/api/rpg/v1/campaigns/campaign/encounter-plans",
+      payload: { partyLevels: [3, 3], targetDifficulty: "medium" },
+    });
     expect(allowed.statusCode).toBe(200);
     expect(allowed.json()).toEqual({ candidates: [candidate], plan });
     expect(planningService.hasCampaignCatalog).toHaveBeenCalledWith("local-owner", "campaign");
-    expect(planningService.planEncounter).toHaveBeenCalledWith("local-owner", "campaign", { partyLevels: [3, 3], targetDifficulty: "medium" });
+    expect(planningService.planEncounter).toHaveBeenCalledWith("local-owner", "campaign", {
+      partyLevels: [3, 3],
+      targetDifficulty: "medium",
+    });
     expect(allowed.headers["cache-control"]).toBe("no-store");
     await instance.close();
   });
@@ -58,10 +95,27 @@ describe("encounter planning HTTP lane", () => {
     process.env.FEATURE_RPG_MECHANICS = "true";
     const { instance, planningService } = app();
     const base = "/api/rpg/v1/campaigns/campaign/encounter-plans";
-    expect((await instance.inject({ method: "POST", url: `${base}?x=1`, payload: { partyLevels: [1], targetDifficulty: "easy" } })).statusCode).toBe(400);
-    expect((await instance.inject({ method: "POST", url: base, headers: { "content-type": "text/plain" }, payload: "{}" })).statusCode).toBe(415);
-    expect((await instance.inject({ method: "POST", url: base, payload: { partyLevels: [], targetDifficulty: "medium" } })).statusCode).toBe(400);
-    expect((await instance.inject({ method: "POST", url: base, payload: { partyLevels: [0], targetDifficulty: "medium" } })).statusCode).toBe(400);
+    expect(
+      (
+        await instance.inject({
+          method: "POST",
+          url: `${base}?x=1`,
+          payload: { partyLevels: [1], targetDifficulty: "easy" },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (await instance.inject({ method: "POST", url: base, headers: { "content-type": "text/plain" }, payload: "{}" }))
+        .statusCode,
+    ).toBe(415);
+    expect(
+      (await instance.inject({ method: "POST", url: base, payload: { partyLevels: [], targetDifficulty: "medium" } }))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      (await instance.inject({ method: "POST", url: base, payload: { partyLevels: [0], targetDifficulty: "medium" } }))
+        .statusCode,
+    ).toBe(400);
     expect(planningService.planEncounter).not.toHaveBeenCalled();
     await instance.close();
   });
@@ -70,7 +124,11 @@ describe("encounter planning HTTP lane", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     process.env.FEATURE_RPG_MECHANICS = "true";
     const { instance, planningService } = app(service(false));
-    const response = await instance.inject({ method: "POST", url: "/api/rpg/v1/campaigns/campaign/encounter-plans", payload: { partyLevels: [3], targetDifficulty: "medium" } });
+    const response = await instance.inject({
+      method: "POST",
+      url: "/api/rpg/v1/campaigns/campaign/encounter-plans",
+      payload: { partyLevels: [3], targetDifficulty: "medium" },
+    });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({ code: "RPG_CAMPAIGN_NOT_FOUND" });
     expect(planningService.planEncounter).not.toHaveBeenCalled();
@@ -82,14 +140,49 @@ describe("encounter planning HTTP lane", () => {
     process.env.FEATURE_RPG_MECHANICS = "true";
     const { instance, planningService } = app();
     const base = "/api/rpg/v1/campaigns/campaign/encounter-reward-previews";
-    const ok = await instance.inject({ method: "POST", url: base, payload: { defeatedEnemyIds: [candidate.id], currentXp: 300, currentLevel: 1 } });
+    const ok = await instance.inject({
+      method: "POST",
+      url: base,
+      payload: { defeatedEnemyIds: [candidate.id], currentXp: 300, currentLevel: 1 },
+    });
     expect(ok.statusCode, ok.body).toBe(200);
     expect(ok.json()).toEqual(rewardPlan);
-    expect(planningService.previewEncounterRewards).toHaveBeenCalledWith("local-owner", "campaign", { defeatedEnemyIds: [candidate.id], currentXp: 300, currentLevel: 1 });
-    expect((await instance.inject({ method: "POST", url: `${base}?x=1`, payload: { defeatedEnemyIds: [candidate.id], currentXp: 0, currentLevel: 1 } })).statusCode).toBe(400);
-    expect((await instance.inject({ method: "POST", url: base, headers: { "content-type": "text/plain" }, payload: "{}" })).statusCode).toBe(415);
-    expect((await instance.inject({ method: "POST", url: base, payload: { defeatedEnemyIds: [], currentXp: 0, currentLevel: 1 } })).statusCode).toBe(400);
-    expect((await instance.inject({ method: "POST", url: base, payload: { defeatedEnemyIds: [candidate.id], currentXp: -1, currentLevel: 1 } })).statusCode).toBe(400);
+    expect(planningService.previewEncounterRewards).toHaveBeenCalledWith("local-owner", "campaign", {
+      defeatedEnemyIds: [candidate.id],
+      currentXp: 300,
+      currentLevel: 1,
+    });
+    expect(
+      (
+        await instance.inject({
+          method: "POST",
+          url: `${base}?x=1`,
+          payload: { defeatedEnemyIds: [candidate.id], currentXp: 0, currentLevel: 1 },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (await instance.inject({ method: "POST", url: base, headers: { "content-type": "text/plain" }, payload: "{}" }))
+        .statusCode,
+    ).toBe(415);
+    expect(
+      (
+        await instance.inject({
+          method: "POST",
+          url: base,
+          payload: { defeatedEnemyIds: [], currentXp: 0, currentLevel: 1 },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await instance.inject({
+          method: "POST",
+          url: base,
+          payload: { defeatedEnemyIds: [candidate.id], currentXp: -1, currentLevel: 1 },
+        })
+      ).statusCode,
+    ).toBe(400);
     await instance.close();
   });
 
@@ -98,10 +191,18 @@ describe("encounter planning HTTP lane", () => {
     process.env.FEATURE_RPG_MECHANICS = "true";
     const { instance, planningService } = app();
     const base = "/api/rpg/v1/campaigns/campaign/npc-selections";
-    const ok = await instance.inject({ method: "POST", url: base, payload: { count: 1, minChallengeRating: 0.25, maxChallengeRating: 1 } });
+    const ok = await instance.inject({
+      method: "POST",
+      url: base,
+      payload: { count: 1, minChallengeRating: 0.25, maxChallengeRating: 1 },
+    });
     expect(ok.statusCode, ok.body).toBe(200);
     expect(ok.json()).toEqual(npcSelected);
-    expect(planningService.selectNpcs).toHaveBeenCalledWith("local-owner", "campaign", { count: 1, minChallengeRating: 0.25, maxChallengeRating: 1 });
+    expect(planningService.selectNpcs).toHaveBeenCalledWith("local-owner", "campaign", {
+      count: 1,
+      minChallengeRating: 0.25,
+      maxChallengeRating: 1,
+    });
     expect((await instance.inject({ method: "POST", url: base, payload: { count: 0 } })).statusCode).toBe(400);
     expect((await instance.inject({ method: "POST", url: base, payload: { count: 33 } })).statusCode).toBe(400);
     await instance.close();
@@ -111,12 +212,20 @@ describe("encounter planning HTTP lane", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     process.env.FEATURE_RPG_MECHANICS = "true";
     const broken = service();
-    broken.planEncounter = vi.fn(() => { throw new Error("private planner corruption"); });
+    broken.planEncounter = vi.fn(() => {
+      throw new Error("private planner corruption");
+    });
     const { instance } = app(broken);
-    const response = await instance.inject({ method: "POST", url: "/api/rpg/v1/campaigns/campaign/encounter-plans", payload: { partyLevels: [3], targetDifficulty: "medium" } });
+    const response = await instance.inject({
+      method: "POST",
+      url: "/api/rpg/v1/campaigns/campaign/encounter-plans",
+      payload: { partyLevels: [3], targetDifficulty: "medium" },
+    });
     expect(response.statusCode).toBe(500);
     expect(response.body).not.toContain("private planner corruption");
-    expect((await instance.inject({ method: "HEAD", url: "/api/rpg/v1/campaigns/campaign/encounter-plans" })).statusCode).toBe(404);
+    expect(
+      (await instance.inject({ method: "HEAD", url: "/api/rpg/v1/campaigns/campaign/encounter-plans" })).statusCode,
+    ).toBe(404);
     await instance.close();
   });
 });

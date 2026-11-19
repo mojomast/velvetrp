@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { bardDefinition, bardLevels, bardSubclasses } from "../src/content/srdStarter/classes/bard.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -36,14 +40,20 @@ describe("SRD 5.1 Bard class", () => {
 
   it("grants the d8 hit die at level 1", () => {
     const parsed = classLevelCatalogDefinitionSchema.parse(levels[0]);
-    expect(parsed.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 });
+    expect(parsed.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d8",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
   });
 
   it("points the level 3 subclass choice at College of Lore", () => {
     const parsed = classLevelCatalogDefinitionSchema.parse(levels[2]);
     const choice = parsed.mechanics.progressionChoices?.find((candidate) => candidate.kind === "subclass");
     expect(choice).toBeDefined();
-    expect(choice?.kind === "subclass" ? choice.options[0]?.definitionId : undefined).toBe("srd-5.1:subclass:college-of-lore");
+    expect(choice?.kind === "subclass" ? choice.options[0]?.definitionId : undefined).toBe(
+      "srd-5.1:subclass:college-of-lore",
+    );
   });
 
   it("parses the College of Lore subclass bound to the Bard class", () => {

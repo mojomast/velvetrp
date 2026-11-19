@@ -58,13 +58,17 @@ test("corpus covers at least eight cases across at least three categories with u
 
 test("grades a composed verdict against its labelled expectation", () => {
   const groundedCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "g1")!;
-  const composed = composeNarrationVerification(groundedAnswers(groundedCase.committedFacts.length), thresholds, { factCount: groundedCase.committedFacts.length });
+  const composed = composeNarrationVerification(groundedAnswers(groundedCase.committedFacts.length), thresholds, {
+    factCount: groundedCase.committedFacts.length,
+  });
   assert.equal(gradeNarrationVerdict(composed, groundedCase.expected), true);
 
   const contradictionCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "c1")!;
   // A clean verdict must not pass a hazard label, and a flagged verdict must not pass a clean label.
   assert.equal(gradeNarrationVerdict(composed, contradictionCase.expected), false);
-  const flagged = composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.95) }, thresholds, { factCount: 1 });
+  const flagged = composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.95) }, thresholds, {
+    factCount: 1,
+  });
   assert.equal(gradeNarrationVerdict(flagged, contradictionCase.expected), true);
   assert.equal(gradeNarrationVerdict(flagged, groundedCase.expected), false);
 });
@@ -72,10 +76,14 @@ test("grades a composed verdict against its labelled expectation", () => {
 test("grades the partial-grounding label on computed coverage", () => {
   const partialCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "p1")!;
   const factCount = partialCase.committedFacts.length;
-  const partly = composeNarrationVerification({
-    [narrationReflectionKey(0)]: hazard(0.9),
-    [narrationReflectionKey(1)]: hazard(0.1),
-  }, thresholds, { factCount });
+  const partly = composeNarrationVerification(
+    {
+      [narrationReflectionKey(0)]: hazard(0.9),
+      [narrationReflectionKey(1)]: hazard(0.1),
+    },
+    thresholds,
+    { factCount },
+  );
   assert.equal(partly.band, "confirm");
   assert.equal(partly.groundedness, 0.5);
   assert.equal(gradeNarrationVerdict(partly, partialCase.expected), true);
@@ -86,27 +94,38 @@ test("grades the partial-grounding label on computed coverage", () => {
 test("projects a decisive sample only when the lane accepts or flags", () => {
   const benchmarkCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "g1")!;
   const factCount = benchmarkCase.committedFacts.length;
-  const accepted = toNarrationSample(benchmarkCase, composeNarrationVerification(groundedAnswers(factCount), thresholds, { factCount }));
+  const accepted = toNarrationSample(
+    benchmarkCase,
+    composeNarrationVerification(groundedAnswers(factCount), thresholds, { factCount }),
+  );
   assert.equal(accepted.decisive, true);
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.correct, true);
 
   const flaggedCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "c1")!;
-  const flagged = toNarrationSample(flaggedCase, composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.95) }, thresholds, { factCount: 1 }));
+  const flagged = toNarrationSample(
+    flaggedCase,
+    composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.95) }, thresholds, { factCount: 1 }),
+  );
   assert.equal(flagged.decisive, true);
   assert.equal(flagged.accepted, false);
   assert.equal(flagged.correct, true);
 
-  const deferred = toNarrationSample(benchmarkCase, composeNarrationVerification({ [narrationReflectionKey(0)]: hazard(0.1) }, thresholds, { factCount }));
+  const deferred = toNarrationSample(
+    benchmarkCase,
+    composeNarrationVerification({ [narrationReflectionKey(0)]: hazard(0.1) }, thresholds, { factCount }),
+  );
   assert.equal(deferred.decisive, false);
   assert.equal(deferred.correct, false);
 });
 
 test("fits the Platt map on development and promotes only when the calibrated gate passes", () => {
   const dev = Array.from({ length: 30 }, (_, index) =>
-    sample({ caseId: `g${index}`, holdout: false, topSignal: 0.9, correct: true }));
+    sample({ caseId: `g${index}`, holdout: false, topSignal: 0.9, correct: true }),
+  );
   const holdout = Array.from({ length: 10 }, (_, index) =>
-    sample({ caseId: `h${index}`, holdout: true, topSignal: 0.9, correct: true }));
+    sample({ caseId: `h${index}`, holdout: true, topSignal: 0.9, correct: true }),
+  );
   const evaluation = evaluateNarrationBenchmark([...dev, ...holdout]);
 
   assert.equal(evaluation.decisiveSamples, 40);
@@ -131,7 +150,8 @@ test("fits the Platt map on development and promotes only when the calibrated ga
 
 test("reports NOT READY and proposes no record when the sample gate is short", () => {
   const short = Array.from({ length: 5 }, (_, index) =>
-    sample({ caseId: `s${index}`, holdout: index % 2 === 0, topSignal: 0.9, correct: true }));
+    sample({ caseId: `s${index}`, holdout: index % 2 === 0, topSignal: 0.9, correct: true }),
+  );
   const evaluation = evaluateNarrationBenchmark(short);
   assert.equal(evaluation.gate.promoted, false);
   assert.ok(evaluation.gate.reasons.some((reason) => reason.includes("insufficient samples")));
@@ -142,7 +162,17 @@ test("rolls up per-case counts, bands, and signals", () => {
   const samples = [
     sample({ caseId: "g1", accepted: true, decisive: true, correct: true, band: "act", topSignal: 1 }),
     sample({ caseId: "g1", accepted: true, decisive: true, correct: false, band: "act", topSignal: 0.8 }),
-    sample({ caseId: "c1", category: "contradiction", accepted: false, decisive: true, correct: true, band: "fallback", flags: [NARRATION_CONTRADICTS_RECEIPT_KEY], groundedness: null, topSignal: 0.95 }),
+    sample({
+      caseId: "c1",
+      category: "contradiction",
+      accepted: false,
+      decisive: true,
+      correct: true,
+      band: "fallback",
+      flags: [NARRATION_CONTRADICTS_RECEIPT_KEY],
+      groundedness: null,
+      topSignal: 0.95,
+    }),
   ];
   const summaries = summarizeNarrationCases(samples);
   const g1 = summaries.find((entry) => entry.id === "g1")!;
@@ -158,5 +188,8 @@ test("rolls up per-case counts, bands, and signals", () => {
   assert.equal(c1.meanGroundedness, null);
   assert.equal(c1.bands.fallback, 1);
   // Corpus order is preserved even when samples arrive out of order.
-  assert.deepEqual(summaries.map((entry) => entry.id), ["g1", "c1"]);
+  assert.deepEqual(
+    summaries.map((entry) => entry.id),
+    ["g1", "c1"],
+  );
 });

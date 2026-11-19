@@ -25,13 +25,11 @@ import {
   generatedCampaignContentProviderSchema,
   type GeneratedCampaignContentProvider,
 } from "@velvet/contracts";
+import { SRD_5_1_STARTER_CATALOG, addMessage, createSession, type Repository } from "../repo/index.js";
 import {
-  SRD_5_1_STARTER_CATALOG,
-  addMessage,
-  createSession,
-  type Repository,
-} from "../repo/index.js";
-import { campaignGenerationArtifactKinds, campaignGenerationReferenceKinds } from "../repo/campaignGenerationReferences.js";
+  campaignGenerationArtifactKinds,
+  campaignGenerationReferenceKinds,
+} from "../repo/campaignGenerationReferences.js";
 import { getRepositoryDatabase } from "../repo/repoContext.js";
 import { createSintermarkParty } from "./sintermarkParty.js";
 import recipeJson from "./recipes/sintermark-world.json" with { type: "json" };
@@ -42,19 +40,46 @@ const CLIENT_BASE = "http://127.0.0.1:18895";
 const RECIPE_VERSION_FALLBACK = "sintermark-v1";
 
 /** The reviewed recipe name, shared with the in-app quick adventure action. */
-export const SINTERMARK_RECIPE_NAME = asText((recipeJson as unknown as Record<string, unknown>).name)
-  ?? fail("recipe.name is required");
+export const SINTERMARK_RECIPE_NAME =
+  asText((recipeJson as unknown as Record<string, unknown>).name) ?? fail("recipe.name is required");
 
 const CONTENT_FIELDS = [
-  "outlines", "arcs", "locations", "connections", "factions", "npcs", "quests", "encounters",
-  "clues", "storyNodes", "storyRelationships", "lore", "questItems", "monsterConcepts", "handouts", "scenePrompts",
+  "outlines",
+  "arcs",
+  "locations",
+  "connections",
+  "factions",
+  "npcs",
+  "quests",
+  "encounters",
+  "clues",
+  "storyNodes",
+  "storyRelationships",
+  "lore",
+  "questItems",
+  "monsterConcepts",
+  "handouts",
+  "scenePrompts",
 ] as const;
 type ContentField = (typeof CONTENT_FIELDS)[number];
 
 const FIELD_CAPS: Record<ContentField, number> = {
-  outlines: 1, arcs: 8, locations: 16, connections: 24, factions: 12, npcs: 16, quests: 16,
-  encounters: 16, clues: 24, storyNodes: 24, storyRelationships: 32, lore: 24, questItems: 16,
-  monsterConcepts: 16, handouts: 12, scenePrompts: 16,
+  outlines: 1,
+  arcs: 8,
+  locations: 16,
+  connections: 24,
+  factions: 12,
+  npcs: 16,
+  quests: 16,
+  encounters: 16,
+  clues: 24,
+  storyNodes: 24,
+  storyRelationships: 32,
+  lore: 24,
+  questItems: 16,
+  monsterConcepts: 16,
+  handouts: 12,
+  scenePrompts: 16,
 };
 
 /** Waves are ordered so every cross-artifact reference is already accepted. */
@@ -115,23 +140,61 @@ export interface SintermarkSummary {
   campaignName: string;
   heroes: SintermarkHeroSummary[];
   counts: SintermarkCounts;
-  publicGraph: { startLocationId: string | null; reachablePublicLocations: number; unreachablePublicLocations: string[] };
+  publicGraph: {
+    startLocationId: string | null;
+    reachablePublicLocations: number;
+    unreachablePublicLocations: string[];
+  };
   launching: { dataDir: string; apiBase: string; clientBase: string; serverEnv: Record<string, string> };
   warnings: string[];
 }
 
-interface RecipeHero { name: string; class?: string; role?: string }
-interface RecipeRouteProfile { key?: string; connectionKey?: string; environment?: string; risk?: string; chancePercent?: number }
-interface RecipeRouteLock {
-  key?: string; connectionKey?: string; fromKey: string; toKey: string;
-  routeState?: string; requirementKind?: string; requiredFactionKey?: string; minimumReputation?: number;
-  visibility?: string; description?: string;
+interface RecipeHero {
+  name: string;
+  class?: string;
+  role?: string;
 }
-interface RecipeQuestObjective { objectiveId?: string; description: string; targetProgress?: number; dependencyObjectiveIds?: string[]; visibility?: string }
-interface RecipeQuestReward { rewardId?: string; kind?: string; amount?: number | null; label: string; visibility?: string }
+interface RecipeRouteProfile {
+  key?: string;
+  connectionKey?: string;
+  environment?: string;
+  risk?: string;
+  chancePercent?: number;
+}
+interface RecipeRouteLock {
+  key?: string;
+  connectionKey?: string;
+  fromKey: string;
+  toKey: string;
+  routeState?: string;
+  requirementKind?: string;
+  requiredFactionKey?: string;
+  minimumReputation?: number;
+  visibility?: string;
+  description?: string;
+}
+interface RecipeQuestObjective {
+  objectiveId?: string;
+  description: string;
+  targetProgress?: number;
+  dependencyObjectiveIds?: string[];
+  visibility?: string;
+}
+interface RecipeQuestReward {
+  rewardId?: string;
+  kind?: string;
+  amount?: number | null;
+  label: string;
+  visibility?: string;
+}
 interface RecipeQuest {
-  questId?: string; title: string; description?: string | null; journalText?: string;
-  visibility?: string; objectives?: RecipeQuestObjective[]; rewards?: RecipeQuestReward[];
+  questId?: string;
+  title: string;
+  description?: string | null;
+  journalText?: string;
+  visibility?: string;
+  objectives?: RecipeQuestObjective[];
+  rewards?: RecipeQuestReward[];
 }
 export interface SintermarkRecipe {
   version: string;
@@ -148,14 +211,34 @@ export interface SintermarkRecipe {
   content: GeneratedCampaignContentProvider;
 }
 
-interface Wave { label: string; fields: ContentField[]; items: Partial<Record<ContentField, Array<Record<string, unknown>>>> }
+interface Wave {
+  label: string;
+  fields: ContentField[];
+  items: Partial<Record<ContentField, Array<Record<string, unknown>>>>;
+}
 
-interface EncounterSpec { enemySlug: string; name: string; keywords: string[] }
+interface EncounterSpec {
+  enemySlug: string;
+  name: string;
+  keywords: string[];
+}
 
 const ENCOUNTER_SPECS: readonly EncounterSpec[] = [
-  { enemySlug: "salamander", name: "Ember Salamander Vigil", keywords: ["forge", "furnace", "kiln", "ember", "cinder", "lava", "magma", "crag"] },
-  { enemySlug: "water-elemental", name: "Slake Water Elemental", keywords: ["slake", "bay", "harbor", "water", "marsh", "tide", "lake", "sea", "fen"] },
-  { enemySlug: "magma-mephit", name: "Magma Mephit Ambush", keywords: ["vent", "spine", "ridge", "peak", "cliff", "caldera", "spire", "ascent"] },
+  {
+    enemySlug: "salamander",
+    name: "Ember Salamander Vigil",
+    keywords: ["forge", "furnace", "kiln", "ember", "cinder", "lava", "magma", "crag"],
+  },
+  {
+    enemySlug: "water-elemental",
+    name: "Slake Water Elemental",
+    keywords: ["slake", "bay", "harbor", "water", "marsh", "tide", "lake", "sea", "fen"],
+  },
+  {
+    enemySlug: "magma-mephit",
+    name: "Magma Mephit Ambush",
+    keywords: ["vent", "spine", "ridge", "peak", "cliff", "caldera", "spire", "ascent"],
+  },
 ];
 
 function fail(message: string): never {
@@ -186,7 +269,12 @@ function scopedId(prefix: string, ...parts: string[]): string {
   return `${prefix.slice(0, 32)}.${createHash("sha256").update(raw).digest("hex")}`;
 }
 
-function referenceIdentity(reference: { kind: string; packId: string; packVersion: string; definitionId: string }): string {
+function referenceIdentity(reference: {
+  kind: string;
+  packId: string;
+  packVersion: string;
+  definitionId: string;
+}): string {
   return `${reference.kind}\u0000${reference.packId}\u0000${reference.packVersion}\u0000${reference.definitionId}`;
 }
 
@@ -231,17 +319,23 @@ export function readSintermarkRecipe(): SintermarkRecipe {
     if (!isRecord(lock)) continue;
     const key = asText(lock.key) ?? asText(lock.connectionKey);
     const connection = asArray(parsed.content.connections).find((entry) => isRecord(entry) && entry.key === key);
-    const fromKey = asText(lock.fromKey) ?? asText(lock.from) ?? (isRecord(connection) ? asText(connection.fromLocationKey) : undefined);
-    const toKey = asText(lock.toKey) ?? asText(lock.to) ?? (isRecord(connection) ? asText(connection.toLocationKey) : undefined);
+    const fromKey =
+      asText(lock.fromKey) ??
+      asText(lock.from) ??
+      (isRecord(connection) ? asText(connection.fromLocationKey) : undefined);
+    const toKey =
+      asText(lock.toKey) ?? asText(lock.to) ?? (isRecord(connection) ? asText(connection.toLocationKey) : undefined);
     if (!fromKey || !toKey) fail(`unresolved route lock: ${key}`);
     const routeState = asText(lock.routeState) ?? asText(lock.state);
-    const requiredFactionKey = asText(lock.requiredFactionKey) ?? asText(lock.requiredFaction) ?? asText(lock.factionKey);
+    const requiredFactionKey =
+      asText(lock.requiredFactionKey) ?? asText(lock.requiredFaction) ?? asText(lock.factionKey);
     const requirementKind = asText(lock.requirementKind) ?? (requiredFactionKey ? "faction_reputation" : "none");
     const visibility = asText(lock.visibility);
     const description = asText(lock.description);
     const minimum = lock.minimumReputation ?? (requiredFactionKey ? 0 : undefined);
     routeLocks.push({
-      fromKey, toKey,
+      fromKey,
+      toKey,
       ...(key ? { key } : {}),
       ...(routeState ? { routeState } : {}),
       ...(requirementKind ? { requirementKind } : {}),
@@ -265,7 +359,9 @@ export function readSintermarkRecipe(): SintermarkRecipe {
       const objectiveId = asText(objective.objectiveId) ?? asText(objective.key);
       const visibility = asText(objective.visibility);
       const target = objective.targetProgress ?? objective.target;
-      const deps = asArray(objective.dependencyObjectiveIds ?? objective.dependencyObjectiveKeys).filter((value): value is string => typeof value === "string");
+      const deps = asArray(objective.dependencyObjectiveIds ?? objective.dependencyObjectiveKeys).filter(
+        (value): value is string => typeof value === "string",
+      );
       objectives.push({
         description,
         ...(objectiveId ? { objectiveId } : {}),
@@ -296,7 +392,9 @@ export function readSintermarkRecipe(): SintermarkRecipe {
     const visibility = asText(quest.visibility);
     const description = quest.description === null ? null : asText(quest.description);
     operationalQuests.push({
-      title, objectives, rewards,
+      title,
+      objectives,
+      rewards,
       ...(questId ? { questId } : {}),
       ...(visibility ? { visibility } : {}),
       ...(description === null || description ? { description } : {}),
@@ -307,7 +405,10 @@ export function readSintermarkRecipe(): SintermarkRecipe {
   return {
     version: asText(parsed.version) ?? RECIPE_VERSION_FALLBACK,
     name,
-    heroes, routeProfiles, routeLocks, operationalQuests,
+    heroes,
+    routeProfiles,
+    routeLocks,
+    operationalQuests,
     ...(asText(parsed.premise) ? { premise: asText(parsed.premise) } : {}),
     ...(asText(parsed.opening) ? { opening: asText(parsed.opening) } : {}),
     rawContent: parsed.content,
@@ -364,12 +465,45 @@ function coerceConnection(raw: unknown): Record<string, unknown> {
 const FIELD_KEYS: Record<ContentField, readonly string[]> = {
   outlines: ["key", "opening", "premise", "startLocationKey", "visibility"],
   arcs: ["key", "title", "summary", "visibility"],
-  locations: ["key", "name", "description", "visibility", "atmosphere", "discoveries", "hazards", "hooks", "factionKeys"],
+  locations: [
+    "key",
+    "name",
+    "description",
+    "visibility",
+    "atmosphere",
+    "discoveries",
+    "hazards",
+    "hooks",
+    "factionKeys",
+  ],
   connections: ["key", "fromLocationKey", "toLocationKey", "description", "visibility"],
   factions: ["key", "name", "description", "visibility", "gmNotes"],
   npcs: ["key", "name", "archetype", "description", "visibility", "locationKey", "factionKeys", "privateGoals"],
-  quests: ["key", "title", "description", "visibility", "arcKey", "locationKeys", "objectives", "rewards", "journalText"],
-  encounters: ["key", "title", "description", "visibility", "locationKey", "participantNpcKeys", "objectives", "terrain", "escalation", "resolution", "enemyReferences", "monsterConceptKeys"],
+  quests: [
+    "key",
+    "title",
+    "description",
+    "visibility",
+    "arcKey",
+    "locationKeys",
+    "objectives",
+    "rewards",
+    "journalText",
+  ],
+  encounters: [
+    "key",
+    "title",
+    "description",
+    "visibility",
+    "locationKey",
+    "participantNpcKeys",
+    "objectives",
+    "terrain",
+    "escalation",
+    "resolution",
+    "enemyReferences",
+    "monsterConceptKeys",
+  ],
   clues: ["key", "title", "description", "visibility", "locationKey", "revealsStoryNodeKey"],
   storyNodes: ["key", "title", "description", "visibility"],
   storyRelationships: ["key", "fromStoryNodeKey", "toStoryNodeKey", "description", "visibility"],
@@ -393,7 +527,8 @@ function pick(value: unknown, keys: readonly string[]): Record<string, unknown> 
 function normalizeFieldItem(field: ContentField, item: unknown): Record<string, unknown> {
   const picked = pick(item, FIELD_KEYS[field]);
   if (field === "quests") {
-    if (Array.isArray(picked.objectives)) picked.objectives = picked.objectives.map((objective) => pick(objective, QUEST_OBJECTIVE_KEYS));
+    if (Array.isArray(picked.objectives))
+      picked.objectives = picked.objectives.map((objective) => pick(objective, QUEST_OBJECTIVE_KEYS));
     if (Array.isArray(picked.rewards)) picked.rewards = picked.rewards.map((reward) => pick(reward, QUEST_REWARD_KEYS));
   }
   return picked;
@@ -401,7 +536,9 @@ function normalizeFieldItem(field: ContentField, item: unknown): Record<string, 
 
 function parseFieldItem(field: ContentField, item: unknown): Record<string, unknown> | null {
   try {
-    const parsed = generatedCampaignContentProviderSchema.parse({ [field]: [normalizeFieldItem(field, item)] }) as unknown as Record<ContentField, unknown[]>;
+    const parsed = generatedCampaignContentProviderSchema.parse({
+      [field]: [normalizeFieldItem(field, item)],
+    }) as unknown as Record<ContentField, unknown[]>;
     const list = parsed[field];
     return Array.isArray(list) && list.length === 1 && isRecord(list[0]) ? list[0] : null;
   } catch {
@@ -473,7 +610,7 @@ function buildWaves(content: GeneratedCampaignContentProvider, warnings: string[
   for (const group of WAVE_GROUPS) {
     if (group.length === 1) {
       const field = group[0]!;
-      const items = (content[field] as unknown as Array<Record<string, unknown>>);
+      const items = content[field] as unknown as Array<Record<string, unknown>>;
       const cap = FIELD_CAPS[field];
       for (let index = 0; index < items.length; index += cap) {
         const chunk = items.slice(index, index + cap);
@@ -489,9 +626,14 @@ function buildWaves(content: GeneratedCampaignContentProvider, warnings: string[
     for (const field of group) {
       const list = content[field] as unknown as Array<Record<string, unknown>>;
       if (list.length > FIELD_CAPS[field]) {
-        fail(`recipe ${field} has ${list.length} items, exceeding the ${FIELD_CAPS[field]} cap; the story graph cannot be split across waves`);
+        fail(
+          `recipe ${field} has ${list.length} items, exceeding the ${FIELD_CAPS[field]} cap; the story graph cannot be split across waves`,
+        );
       }
-      if (list.length > 0) { items[field] = list; count += list.length; }
+      if (list.length > 0) {
+        items[field] = list;
+        count += list.length;
+      }
     }
     if (count > 0) waves.push({ label: group.join("+"), fields: [...group], items });
   }
@@ -513,13 +655,24 @@ function collectDirectRefs(item: Record<string, unknown>): string[] {
   return refs;
 }
 
-function gmReachable(key: string, edges: Map<string, string[]>, visibility: Map<string, "public" | "gm">, memo: Map<string, boolean>, visiting: Set<string>): boolean {
+function gmReachable(
+  key: string,
+  edges: Map<string, string[]>,
+  visibility: Map<string, "public" | "gm">,
+  memo: Map<string, boolean>,
+  visiting: Set<string>,
+): boolean {
   const cached = memo.get(key);
   if (cached !== undefined) return cached;
   if (visiting.has(key)) return false;
   visiting.add(key);
   let result = visibility.get(key) === "gm";
-  if (!result) for (const next of edges.get(key) ?? []) if (gmReachable(next, edges, visibility, memo, visiting)) { result = true; break; }
+  if (!result)
+    for (const next of edges.get(key) ?? [])
+      if (gmReachable(next, edges, visibility, memo, visiting)) {
+        result = true;
+        break;
+      }
   visiting.delete(key);
   memo.set(key, result);
   return result;
@@ -554,12 +707,17 @@ function sanitizeContent(
   for (const quest of view.quests ?? []) {
     if (!Array.isArray(quest.objectives)) continue;
     const objectives = quest.objectives.filter(isRecord);
-    const objectiveVisibility = new Map<string, unknown>(objectives.map((objective) => [String(objective.key), objective.visibility]));
+    const objectiveVisibility = new Map<string, unknown>(
+      objectives.map((objective) => [String(objective.key), objective.visibility]),
+    );
     for (const objective of objectives) {
       const dependencies = Array.isArray(objective.dependencyObjectiveKeys)
-        ? objective.dependencyObjectiveKeys.filter((key): key is string => typeof key === "string"
-          && objectiveVisibility.has(key)
-          && !(objective.visibility === "public" && objectiveVisibility.get(key) === "gm"))
+        ? objective.dependencyObjectiveKeys.filter(
+            (key): key is string =>
+              typeof key === "string" &&
+              objectiveVisibility.has(key) &&
+              !(objective.visibility === "public" && objectiveVisibility.get(key) === "gm"),
+          )
         : [];
       objective.dependencyObjectiveKeys = dependencies;
     }
@@ -574,13 +732,17 @@ function sanitizeContent(
         const reference = item[refField];
         if (reference === undefined) continue;
         if (Array.isArray(reference)) {
-          item[refField] = reference.filter((key): key is string => typeof key === "string" && kinds.get(key) === refKind && usable(item, key));
+          item[refField] = reference.filter(
+            (key): key is string => typeof key === "string" && kinds.get(key) === refKind && usable(item, key),
+          );
         } else if (typeof reference !== "string" || kinds.get(reference) !== refKind || !usable(item, reference)) {
           delete item[refField];
         }
       }
       if (field === "encounters" && Array.isArray(item.enemyReferences)) {
-        item.enemyReferences = item.enemyReferences.filter((reference) => isRecord(reference) && catalogReferences.has(referenceIdentity(reference as never)));
+        item.enemyReferences = item.enemyReferences.filter(
+          (reference) => isRecord(reference) && catalogReferences.has(referenceIdentity(reference as never)),
+        );
       }
       if (field === "questItems" || field === "monsterConcepts") {
         const mechanics = item.mechanics;
@@ -598,8 +760,12 @@ function sanitizeContent(
     for (const item of view[field] ?? []) {
       for (const [refField, refKind] of Object.entries(campaignGenerationReferenceKinds)) {
         const reference = item[refField];
-        if (typeof reference === "string" && !(kinds.get(reference) === refKind && usable(item, reference))) delete item[refField];
-        if (Array.isArray(reference)) item[refField] = reference.filter((key): key is string => typeof key === "string" && kinds.get(key) === refKind && usable(item, key));
+        if (typeof reference === "string" && !(kinds.get(reference) === refKind && usable(item, reference)))
+          delete item[refField];
+        if (Array.isArray(reference))
+          item[refField] = reference.filter(
+            (key): key is string => typeof key === "string" && kinds.get(key) === refKind && usable(item, key),
+          );
       }
     }
   }
@@ -624,8 +790,13 @@ function sanitizeContent(
             delete item[refField];
             changed = true;
           } else if (Array.isArray(reference)) {
-            const filtered = reference.filter((key): key is string => typeof key === "string" && !gmReachable(key, edges, visibility, memo, new Set()));
-            if (filtered.length !== reference.length) { item[refField] = filtered; changed = true; }
+            const filtered = reference.filter(
+              (key): key is string => typeof key === "string" && !gmReachable(key, edges, visibility, memo, new Set()),
+            );
+            if (filtered.length !== reference.length) {
+              item[refField] = filtered;
+              changed = true;
+            }
           }
         }
       }
@@ -634,10 +805,18 @@ function sanitizeContent(
   }
 
   // Required scalar references cannot simply be deleted; drop the owning artifact instead.
-  view.connections = (view.connections ?? []).filter((item) =>
-    typeof item.fromLocationKey === "string" && typeof item.toLocationKey === "string" && item.fromLocationKey !== item.toLocationKey);
-  view.storyRelationships = (view.storyRelationships ?? []).filter((item) =>
-    typeof item.fromStoryNodeKey === "string" && typeof item.toStoryNodeKey === "string" && item.fromStoryNodeKey !== item.toStoryNodeKey);
+  view.connections = (view.connections ?? []).filter(
+    (item) =>
+      typeof item.fromLocationKey === "string" &&
+      typeof item.toLocationKey === "string" &&
+      item.fromLocationKey !== item.toLocationKey,
+  );
+  view.storyRelationships = (view.storyRelationships ?? []).filter(
+    (item) =>
+      typeof item.fromStoryNodeKey === "string" &&
+      typeof item.toStoryNodeKey === "string" &&
+      item.fromStoryNodeKey !== item.toStoryNodeKey,
+  );
 
   void warnings;
 }
@@ -648,7 +827,10 @@ function collectWaveKeys(content: GeneratedCampaignContentProvider): string[] {
   for (const field of CONTENT_FIELDS) {
     for (const item of content[field] as unknown as Array<Record<string, unknown>>) {
       const key = item.key;
-      if (typeof key === "string" && !seen.has(key)) { seen.add(key); keys.push(key); }
+      if (typeof key === "string" && !seen.has(key)) {
+        seen.add(key);
+        keys.push(key);
+      }
     }
   }
   return keys;
@@ -670,11 +852,16 @@ async function applyWaves(
   const waves = buildWaves(content, warnings);
   const appliedKeys: string[] = [];
   for (const [index, wave] of waves.entries()) {
-    const context = repository.getCampaignGenerationContext(ownerId, campaignId, appliedKeys)
-      ?? fail("campaign generation context is unavailable");
-    const acceptedVisibility = new Map<string, "public" | "gm">(context.artifacts.map((artifact) => [artifact.key, artifact.visibility]));
+    const context =
+      repository.getCampaignGenerationContext(ownerId, campaignId, appliedKeys) ??
+      fail("campaign generation context is unavailable");
+    const acceptedVisibility = new Map<string, "public" | "gm">(
+      context.artifacts.map((artifact) => [artifact.key, artifact.visibility]),
+    );
     const acceptedKinds = new Map<string, string>(context.artifacts.map((artifact) => [artifact.key, artifact.kind]));
-    const catalogReferences = new Set(context.catalogDefinitions.map((definition) => referenceIdentity(definition.reference)));
+    const catalogReferences = new Set(
+      context.catalogDefinitions.map((definition) => referenceIdentity(definition.reference)),
+    );
 
     const candidate = emptyContent();
     const candidateView = candidate as unknown as ProviderView;
@@ -690,44 +877,60 @@ async function applyWaves(
       continue;
     }
 
-    const current = repository.getCampaignAdministration(ownerId, campaignId)
-      ?? fail("campaign administration is unavailable during generation");
+    const current =
+      repository.getCampaignAdministration(ownerId, campaignId) ??
+      fail("campaign administration is unavailable during generation");
     const idempotencyKey = `${keyPrefix}.wave.${index + 1}`;
-    const requestDigest = createHash("sha256").update(JSON.stringify({ seed: keyPrefix, wave: wave.label, content: candidate })).digest("hex");
+    const requestDigest = createHash("sha256")
+      .update(JSON.stringify({ seed: keyPrefix, wave: wave.label, content: candidate }))
+      .digest("hex");
     const jobId = createHash("sha256").update(`${keyPrefix}:${campaignId}:${wave.label}`).digest("hex");
-    const call = repository.beginCampaignGenerationCall(campaignId, idempotencyKey, requestDigest, {
-      provider: "reviewed-static-seed",
-      model: "none",
-      operation: "campaign-content-generation",
-      stage: `sintermark-wave-${index + 1}`,
-      promptVersion: recipe.version,
-      schemaVersion: "v52",
-      jobId,
-    }, null);
+    const call = repository.beginCampaignGenerationCall(
+      campaignId,
+      idempotencyKey,
+      requestDigest,
+      {
+        provider: "reviewed-static-seed",
+        model: "none",
+        operation: "campaign-content-generation",
+        stage: `sintermark-wave-${index + 1}`,
+        promptVersion: recipe.version,
+        schemaVersion: "v52",
+        jobId,
+      },
+      null,
+    );
     if (!call.acquired) fail(`generation call for wave ${wave.label} was not acquired`);
 
-    const draft = repository.stageCampaignGenerationAtomically(ownerId, {
-      campaignId,
-      timelineId: current.activeTimelineId,
-      kind: "content-pack",
-      stagedContent: {
-        kind: "campaign-content",
-        requestDigest,
-        baseContentRevision: context.revision,
-        dependencyDigests: {},
-        ...candidate,
+    const draft = repository.stageCampaignGenerationAtomically(
+      ownerId,
+      {
+        campaignId,
+        timelineId: current.activeTimelineId,
+        kind: "content-pack",
+        stagedContent: {
+          kind: "campaign-content",
+          requestDigest,
+          baseContentRevision: context.revision,
+          dependencyDigests: {},
+          ...candidate,
+        },
+        validation: { valid: true, issues: [], validatedAt: new Date().toISOString() },
+        expectedCampaignRevision: current.revision,
+        idempotencyKey,
       },
-      validation: { valid: true, issues: [], validatedAt: new Date().toISOString() },
-      expectedCampaignRevision: current.revision,
-      idempotencyKey,
-    }, call.attempt, candidate, [], {
-      responseModel: "reviewed-static-seed",
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-      latencyMs: 0,
-      estimatedCostUsd: 0,
-    });
+      call.attempt,
+      candidate,
+      [],
+      {
+        responseModel: "reviewed-static-seed",
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: 0,
+        estimatedCostUsd: 0,
+      },
+    );
 
     repository.applyCampaignContentGenerationDraftAtomically(ownerId, {
       draftId: draft.draftId,
@@ -750,12 +953,18 @@ function withAuthoringDatabase<T>(operation: (db: ReturnType<typeof getRepositor
   return db.transaction(() => operation(db)).immediate();
 }
 
-interface RouteProfileRow { connectionId: string; environment: RouteEnvironment; risk: RouteRisk; chancePercent: number }
+interface RouteProfileRow {
+  connectionId: string;
+  environment: RouteEnvironment;
+  risk: RouteRisk;
+  chancePercent: number;
+}
 
 function authorRouteProfiles(campaignId: string, rows: RouteProfileRow[]): number {
   if (rows.length === 0) return 0;
   return withAuthoringDatabase((db) => {
-    const upsert = db.prepare(`INSERT INTO world_route_event_profiles_v1(campaign_id,connection_id,environment,risk,chance_percent)
+    const upsert =
+      db.prepare(`INSERT INTO world_route_event_profiles_v1(campaign_id,connection_id,environment,risk,chance_percent)
       VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,connection_id)
       DO UPDATE SET environment=excluded.environment,risk=excluded.risk,chance_percent=excluded.chance_percent`);
     for (const row of rows) upsert.run(campaignId, row.connectionId, row.environment, row.risk, row.chancePercent);
@@ -763,7 +972,12 @@ function authorRouteProfiles(campaignId: string, rows: RouteProfileRow[]): numbe
   });
 }
 
-interface AcceptedArtifactLike { key: string; kind: string; visibility: string; serverResourceId: string | null }
+interface AcceptedArtifactLike {
+  key: string;
+  kind: string;
+  visibility: string;
+  serverResourceId: string | null;
+}
 
 function authorCampaignRouteProfiles(
   ownerId: string,
@@ -780,12 +994,18 @@ function authorCampaignRouteProfiles(
   const openIds = new Set(world.visibleConnections.map((connection) => connection.connectionId));
   const connectionKeyById = new Map<string, string>();
   for (const artifact of artifacts) {
-    if (artifact.kind === "connection" && artifact.visibility === "public" && artifact.serverResourceId && openIds.has(artifact.serverResourceId)) {
+    if (
+      artifact.kind === "connection" &&
+      artifact.visibility === "public" &&
+      artifact.serverResourceId &&
+      openIds.has(artifact.serverResourceId)
+    ) {
       connectionKeyById.set(artifact.serverResourceId, artifact.key);
     }
   }
   for (const connection of authoredConnections) {
-    if (connection.open && connection.visibility === "public" && openIds.has(connection.connectionId)) connectionKeyById.set(connection.connectionId, connection.key);
+    if (connection.open && connection.visibility === "public" && openIds.has(connection.connectionId))
+      connectionKeyById.set(connection.connectionId, connection.key);
   }
   const overrides = new Map<string, RecipeRouteProfile>();
   for (const profile of recipe.routeProfiles) if (profile.connectionKey) overrides.set(profile.connectionKey, profile);
@@ -795,32 +1015,52 @@ function authorCampaignRouteProfiles(
   for (const [connectionId, key] of connectionKeyById) {
     const override = overrides.get(key);
     if (override) usedOverrides.add(key);
-    const environment = override?.environment && (ROUTE_ENVIRONMENTS as readonly string[]).includes(override.environment)
-      ? override.environment as RouteEnvironment : "road";
-    const risk = override?.risk && (ROUTE_RISKS as readonly string[]).includes(override.risk)
-      ? override.risk as RouteRisk : "safe";
-    const chancePercent = typeof override?.chancePercent === "number" && override.chancePercent >= 0 && override.chancePercent <= 100
-      ? Math.trunc(override.chancePercent) : 0;
+    const environment =
+      override?.environment && (ROUTE_ENVIRONMENTS as readonly string[]).includes(override.environment)
+        ? (override.environment as RouteEnvironment)
+        : "road";
+    const risk =
+      override?.risk && (ROUTE_RISKS as readonly string[]).includes(override.risk)
+        ? (override.risk as RouteRisk)
+        : "safe";
+    const chancePercent =
+      typeof override?.chancePercent === "number" && override.chancePercent >= 0 && override.chancePercent <= 100
+        ? Math.trunc(override.chancePercent)
+        : 0;
     rows.push({ connectionId, environment, risk, chancePercent });
   }
   for (const key of overrides.keys()) {
     const intentionallyClosed = recipe.routeLocks.some((lock) => lock.key === key && lock.routeState === "closed");
-    if (!usedOverrides.has(key) && !intentionallyClosed) warnings.push(`route profile ${key} did not match an open public connection`);
+    if (!usedOverrides.has(key) && !intentionallyClosed)
+      warnings.push(`route profile ${key} did not match an open public connection`);
   }
   return authorRouteProfiles(campaignId, rows);
 }
 
 function readRouteProfileCount(campaignId: string): number {
-  return (getRepositoryDatabase().prepare("SELECT count(*) count FROM world_route_event_profiles_v1 WHERE campaign_id=?").get(campaignId) as { count: number }).count;
+  return (
+    getRepositoryDatabase()
+      .prepare("SELECT count(*) count FROM world_route_event_profiles_v1 WHERE campaign_id=?")
+      .get(campaignId) as { count: number }
+  ).count;
 }
 
 // ---------------------------------------------------------------------------
 // Character / summary reads
 // ---------------------------------------------------------------------------
 
-interface ProgressionLike { level: number; actorId: string; derived: { maxHp: number } }
+interface ProgressionLike {
+  level: number;
+  actorId: string;
+  derived: { maxHp: number };
+}
 
-function readHeroes(repository: Repository, ownerId: string, campaignId: string, recipe: SintermarkRecipe): SintermarkHeroSummary[] {
+function readHeroes(
+  repository: Repository,
+  ownerId: string,
+  campaignId: string,
+  recipe: SintermarkRecipe,
+): SintermarkHeroSummary[] {
   const roster = repository.getCampaignCharacterRoster(ownerId, campaignId);
   if (!roster) fail("campaign character roster is unavailable");
   const characters = repository.listCampaignCharacters(ownerId, campaignId);
@@ -837,7 +1077,10 @@ function readHeroes(repository: Repository, ownerId: string, campaignId: string,
     });
   }
   const order = new Map(recipe.heroes.map((hero, index) => [hero.name, index]));
-  heroes.sort((left, right) => (order.get(left.name) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.name) ?? Number.MAX_SAFE_INTEGER));
+  heroes.sort(
+    (left, right) =>
+      (order.get(left.name) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.name) ?? Number.MAX_SAFE_INTEGER),
+  );
   return heroes;
 }
 
@@ -875,7 +1118,11 @@ function publicGraph(
     }
   }
   const unreachable = [...publicLocationIds].filter((id) => !reached.has(id));
-  return { startLocationId, reachablePublicLocations: [...publicLocationIds].filter((id) => reached.has(id)).length, unreachablePublicLocations: unreachable };
+  return {
+    startLocationId,
+    reachablePublicLocations: [...publicLocationIds].filter((id) => reached.has(id)).length,
+    unreachablePublicLocations: unreachable,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -910,9 +1157,12 @@ export function prepareSintermarkRecipe(recipe: SintermarkRecipe = readSintermar
 } {
   const warnings: string[] = [];
   const content = normalizeRecipeContent(recipe.rawContent, warnings);
-  const authoredRouteKeys = new Set(recipe.routeLocks.map((lock) => lock.key).filter((key): key is string => typeof key === "string"));
-  content.connections = content.connections.filter((connection) =>
-    typeof connection.key !== "string" || !authoredRouteKeys.has(connection.key));
+  const authoredRouteKeys = new Set(
+    recipe.routeLocks.map((lock) => lock.key).filter((key): key is string => typeof key === "string"),
+  );
+  content.connections = content.connections.filter(
+    (connection) => typeof connection.key !== "string" || !authoredRouteKeys.has(connection.key),
+  );
   recipe.content = content;
   return { recipe, content, warnings };
 }
@@ -951,7 +1201,10 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
 
   await buildStep("catalog", () => {
     ensureStarterCatalog(repository, ownerId);
-    repository.configureSrdStarterCatalog(ownerId, campaignId, { expectedRevision: 0, idempotencyKey: `${keyPrefix}.catalog` });
+    repository.configureSrdStarterCatalog(ownerId, campaignId, {
+      expectedRevision: 0,
+      idempotencyKey: `${keyPrefix}.catalog`,
+    });
   });
 
   const heroes = await buildStep("party", () => createSintermarkParty(repository, ownerId, campaignId, keyPrefix));
@@ -964,23 +1217,35 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
       presetId: "default",
     });
     repository.transitionSession(session.id, "active", "Sintermark campaign opened");
-    repository.addConsentEvent(session.id, "campaign-safety", true, "Fictional adults. Follow the reviewed Sintermark safety policy and boundaries.");
+    repository.addConsentEvent(
+      session.id,
+      "campaign-safety",
+      true,
+      "Fictional adults. Follow the reviewed Sintermark safety policy and boundaries.",
+    );
     repository.updateSessionContextSource(session.id, recipe.premise ?? `The opening of ${recipe.name}.`);
     await addMessage(session.id, "system", recipe.opening ?? recipe.premise ?? `${recipe.name} begins.`);
-    await addMessage(session.id, "character", "Those readings disagree. Orra, keep the street clear while I compare the raw log with the gauge.", { speakerCharacterId: heroes[0]!.personaId });
+    await addMessage(
+      session.id,
+      "character",
+      "Those readings disagree. Orra, keep the street clear while I compare the raw log with the gauge.",
+      { speakerCharacterId: heroes[0]!.personaId },
+    );
     repository.attachCampaignSession(ownerId, { campaignId, sessionId: session.id });
     return session.id;
   });
 
   const waves = await buildStep("waves", async () => {
     const appliedArtifactKeys = await applyWaves(repository, ownerId, campaignId, keyPrefix, recipe, content, warnings);
-    const context = repository.getCampaignGenerationContext(ownerId, campaignId, appliedArtifactKeys)
-      ?? fail("campaign generation context is unavailable after generation");
+    const context =
+      repository.getCampaignGenerationContext(ownerId, campaignId, appliedArtifactKeys) ??
+      fail("campaign generation context is unavailable after generation");
     return { appliedArtifactKeys, context };
   });
   const { appliedArtifactKeys, context } = waves;
   const resourceIdByArtifactKey = new Map<string, string>();
-  for (const artifact of context.artifacts) if (artifact.serverResourceId) resourceIdByArtifactKey.set(artifact.key, artifact.serverResourceId);
+  for (const artifact of context.artifacts)
+    if (artifact.serverResourceId) resourceIdByArtifactKey.set(artifact.key, artifact.serverResourceId);
 
   const authoredConnections = await buildStep("starting-location", () => {
     // Authored closed / reputation-gated shortcuts (never close generated routes).
@@ -994,10 +1259,17 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
       }
       const authoredKey = lock.key ?? `sintermark-lock-${index + 1}`;
       const connectionKey = scopedId(keyPrefix, "lock", authoredKey);
-      const requirementKind = lock.requirementKind === "faction_reputation" || lock.requirementKind === "discovery" ? lock.requirementKind : "none";
-      const requiredFactionId = lock.requiredFactionKey ? resourceIdByArtifactKey.get(lock.requiredFactionKey) : undefined;
+      const requirementKind =
+        lock.requirementKind === "faction_reputation" || lock.requirementKind === "discovery"
+          ? lock.requirementKind
+          : "none";
+      const requiredFactionId = lock.requiredFactionKey
+        ? resourceIdByArtifactKey.get(lock.requiredFactionKey)
+        : undefined;
       if (requirementKind === "faction_reputation" && !requiredFactionId) {
-        warnings.push(`route lock ${connectionKey} requested a reputation gate without a known faction; using an open route`);
+        warnings.push(
+          `route lock ${connectionKey} requested a reputation gate without a known faction; using an open route`,
+        );
       }
       const visibility = lock.visibility === "gm" ? "gm" : lock.visibility === "hidden" ? "hidden" : "public";
       const routeState = lock.routeState === "closed" ? "closed" : "open";
@@ -1012,14 +1284,20 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
         ...(requiredFactionId ? { requiredFactionId } : {}),
         ...(typeof lock.minimumReputation === "number" ? { minimumReputation: lock.minimumReputation } : {}),
       });
-      authored.push({ key: authoredKey, connectionId: created.locationConnectionId, visibility: visibility === "gm" ? "gm" : "public", open: routeState === "open" });
+      authored.push({
+        key: authoredKey,
+        connectionId: created.locationConnectionId,
+        visibility: visibility === "gm" ? "gm" : "public",
+        open: routeState === "open",
+      });
     }
 
     // Starting location: outline sets it during apply; otherwise designate the fallback.
     let starting = repository.getCampaignStartingLocation(ownerId, campaignId);
     if (!starting?.startingLocation) {
-      const fallbackKey = recipe.content.locations.find((location) => location.key === "slake-head")?.key
-        ?? recipe.content.locations.find((location) => location.visibility === "public")?.key;
+      const fallbackKey =
+        recipe.content.locations.find((location) => location.key === "slake-head")?.key ??
+        recipe.content.locations.find((location) => location.visibility === "public")?.key;
       const fallbackId = fallbackKey ? resourceIdByArtifactKey.get(fallbackKey) : undefined;
       if (!fallbackId) fail("no public starting location is available to designate");
       repository.designateCampaignStartingLocation(ownerId, campaignId, {
@@ -1033,11 +1311,14 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
   });
 
   // Operational quests remain offered (status open with actionable objectives/rewards).
-  await buildStep("quests", () => createOperationalQuests(repository, ownerId, campaignId, keyPrefix, recipe, resourceIdByArtifactKey, warnings));
+  await buildStep("quests", () =>
+    createOperationalQuests(repository, ownerId, campaignId, keyPrefix, recipe, resourceIdByArtifactKey, warnings),
+  );
 
   // Publish campaign with the reviewed Sintermark policy before activation.
   await buildStep("publish", () => {
-    const administration = repository.getCampaignAdministration(ownerId, campaignId) ?? fail("campaign administration is unavailable");
+    const administration =
+      repository.getCampaignAdministration(ownerId, campaignId) ?? fail("campaign administration is unavailable");
     if (administration.status !== "published" && administration.status !== "completed") {
       repository.updateCampaignAdministration(ownerId, campaignId, {
         expectedRevision: administration.revision,
@@ -1067,11 +1348,27 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
     const openingWorld = repository.getCampaignWorld(ownerId, campaignId, sessionId)!;
     const anchor = openingWorld.currentLocations.find((location) => location.actorId === heroes[0]!.actorId)!;
     repository.generateTacticalMapForSession(ownerId, campaignId, sessionId, {
-      mode: "exploration", encounterId: null, kind: "arena", seed: "sintermark-slake-head-v1", width: 16, height: 16,
-      grounding: { actorId: anchor.actorId, expectedLocationId: anchor.locationId, expectedLocationRevision: anchor.revision },
-      tokens: heroes.map((hero, index) => ({ tokenId: `sintermark-opening-${index}`, label: hero.name,
-        actorId: hero.actorId, combatantId: null, position: { x: 7 + index, y: 8 },
-        footprint: { width: 1, height: 1 }, disposition: "friendly", hidden: false })),
+      mode: "exploration",
+      encounterId: null,
+      kind: "arena",
+      seed: "sintermark-slake-head-v1",
+      width: 16,
+      height: 16,
+      grounding: {
+        actorId: anchor.actorId,
+        expectedLocationId: anchor.locationId,
+        expectedLocationRevision: anchor.revision,
+      },
+      tokens: heroes.map((hero, index) => ({
+        tokenId: `sintermark-opening-${index}`,
+        label: hero.name,
+        actorId: hero.actorId,
+        combatantId: null,
+        position: { x: 7 + index, y: 8 },
+        footprint: { width: 1, height: 1 },
+        disposition: "friendly",
+        hidden: false,
+      })),
       idempotencyKey: `${keyPrefix}.opening-map`,
     });
   });
@@ -1079,16 +1376,37 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
   // Reviewed route event profiles for every open public edge (defaults safe / 30,
   // overridden only by reviewed recipe entries).
   await buildStep("route-profiles", () => {
-    authorCampaignRouteProfiles(ownerId, campaignId, sessionId, repository, recipe, context.artifacts, authoredConnections, warnings);
+    authorCampaignRouteProfiles(
+      ownerId,
+      campaignId,
+      sessionId,
+      repository,
+      recipe,
+      context.artifacts,
+      authoredConnections,
+      warnings,
+    );
   });
 
   // Prepared-only encounters: created but never started, so no active combat.
   const encounterIds = await buildStep("encounters", () =>
-    createPreparedEncounters(repository, ownerId, campaignId, sessionId, keyPrefix, recipe, resourceIdByArtifactKey, heroes, warnings));
+    createPreparedEncounters(
+      repository,
+      ownerId,
+      campaignId,
+      sessionId,
+      keyPrefix,
+      recipe,
+      resourceIdByArtifactKey,
+      heroes,
+      warnings,
+    ),
+  );
 
   // Vendor economy: materialize reviewed freeform shops, then fund wallets.
   const shops = await buildStep("vendors", () =>
-    materializeVendors(repository, ownerId, campaignId, sessionId, heroes[0]!.actorId, context, warnings));
+    materializeVendors(repository, ownerId, campaignId, sessionId, heroes[0]!.actorId, context, warnings),
+  );
   await buildStep("wallets", () => fundPartyWallets(campaignId, heroes, shops, warnings));
 
   // Publish only public handouts and scene prompts.
@@ -1128,11 +1446,18 @@ async function createOperationalQuests(
   let storylineId: string | null = null;
   for (const arc of recipe.content.arcs) {
     const id = resourceIdByArtifactKey.get(arc.key);
-    if (id) { storylineId = id; break; }
+    if (id) {
+      storylineId = id;
+      break;
+    }
   }
   if (!storylineId) {
     const snapshot = repository.listCampaignQuests(ownerId, campaignId);
-    for (const quest of snapshot?.quests ?? []) if ("storylineId" in quest && typeof quest.storylineId === "string") { storylineId = quest.storylineId; break; }
+    for (const quest of snapshot?.quests ?? [])
+      if ("storylineId" in quest && typeof quest.storylineId === "string") {
+        storylineId = quest.storylineId;
+        break;
+      }
   }
   if (!storylineId) {
     const story = repository.getCampaignStory(ownerId, campaignId);
@@ -1142,7 +1467,15 @@ async function createOperationalQuests(
         storylineId,
         title: `${recipe.name} Operations`,
         summary: "Operational quest container for the reviewed Sintermark campaign.",
-        nodes: [{ nodeId: `${storylineId}-root`, title: "Operations Board", description: "Reviewed Sintermark operational leads.", gmNotes: "Reviewed operational container.", revealThreshold: 0 }],
+        nodes: [
+          {
+            nodeId: `${storylineId}-root`,
+            title: "Operations Board",
+            description: "Reviewed Sintermark operational leads.",
+            gmNotes: "Reviewed operational container.",
+            revealThreshold: 0,
+          },
+        ],
         edges: [],
         plotPoints: [],
         clues: [],
@@ -1155,13 +1488,20 @@ async function createOperationalQuests(
   for (const [index, quest] of recipe.operationalQuests.entries()) {
     // Generated quests already have runnable, receipted objectives and rewards.
     // Do not create a second journal entry for the same reviewed quest.
-    if (recipe.content.quests.some((generated) => generated.title === quest.title && resourceIdByArtifactKey.has(generated.key))) continue;
+    if (
+      recipe.content.quests.some(
+        (generated) => generated.title === quest.title && resourceIdByArtifactKey.has(generated.key),
+      )
+    )
+      continue;
     const objectives = (quest.objectives ?? []).filter((objective) => objective.description.trim().length > 0);
     if (objectives.length === 0) {
       warnings.push(`operational quest ${quest.title} had no objectives and was skipped`);
       continue;
     }
-    const objectiveIds = objectives.map((objective) => objective.objectiveId ?? `sintermark-objective-${index + 1}-${objectives.indexOf(objective) + 1}`);
+    const objectiveIds = objectives.map(
+      (objective) => objective.objectiveId ?? `sintermark-objective-${index + 1}-${objectives.indexOf(objective) + 1}`,
+    );
     const revision = repository.listCampaignQuests(ownerId, campaignId)?.revision ?? 0;
     repository.createCampaignQuest(ownerId, campaignId, {
       expectedRevision: revision,
@@ -1176,16 +1516,23 @@ async function createOperationalQuests(
         objectives: objectives.map((objective, objectiveIndex) => ({
           objectiveId: objectiveIds[objectiveIndex]!,
           description: objective.description,
-          targetProgress: typeof objective.targetProgress === "number" && objective.targetProgress >= 1 ? objective.targetProgress : 1,
-          dependencyObjectiveIds: (objective.dependencyObjectiveIds ?? []).filter((dependency) => objectiveIds.includes(dependency)),
+          targetProgress:
+            typeof objective.targetProgress === "number" && objective.targetProgress >= 1
+              ? objective.targetProgress
+              : 1,
+          dependencyObjectiveIds: (objective.dependencyObjectiveIds ?? []).filter((dependency) =>
+            objectiveIds.includes(dependency),
+          ),
           visibility: objective.visibility === "gm" ? "gm" : "public",
         })),
         rewards: (quest.rewards ?? []).map((reward, rewardIndex) => ({
           rewardId: reward.rewardId ?? `sintermark-reward-${index + 1}-${rewardIndex + 1}`,
-          kind: reward.kind === "xp" || reward.kind === "currency" || reward.kind === "custom" ? reward.kind : "currency",
-          amount: reward.amount === null || reward.amount === undefined
-            ? null
-            : Math.min(1_000, Math.max(1, Math.trunc(reward.amount))),
+          kind:
+            reward.kind === "xp" || reward.kind === "currency" || reward.kind === "custom" ? reward.kind : "currency",
+          amount:
+            reward.amount === null || reward.amount === undefined
+              ? null
+              : Math.min(1_000, Math.max(1, Math.trunc(reward.amount))),
           label: reward.label,
           visibility: reward.visibility === "gm" ? "gm" : "public",
         })),
@@ -1230,7 +1577,8 @@ function createPreparedEncounters(
   // remain accepted encounter concepts and can be prepared after this one ends.
   for (const [index, spec] of ENCOUNTER_SPECS.slice(0, 1).entries()) {
     const resolved = resolveEnemyDefinitionId(spec.enemySlug, available);
-    if (resolved.fallback) warnings.push(`enemy ${spec.enemySlug} was unavailable; encounter "${spec.name}" uses ${resolved.definitionId}`);
+    if (resolved.fallback)
+      warnings.push(`enemy ${spec.enemySlug} was unavailable; encounter "${spec.name}" uses ${resolved.definitionId}`);
     const matched = publicLocations.find((location) => {
       const haystack = `${location.key} ${location.name}`.toLowerCase();
       return spec.keywords.some((keyword) => haystack.includes(keyword));
@@ -1244,7 +1592,12 @@ function createPreparedEncounters(
         ...heroes.map((hero) => ({ kind: "actor" as const, actorId: hero.actorId, team: "allies" as const })),
         {
           kind: "enemy" as const,
-          template: { kind: "enemy-template" as const, packId: SRD_5_1_STARTER_PACK_ID, packVersion: SRD_5_1_STARTER_PACK_VERSION, definitionId: resolved.definitionId },
+          template: {
+            kind: "enemy-template" as const,
+            packId: SRD_5_1_STARTER_PACK_ID,
+            packVersion: SRD_5_1_STARTER_PACK_VERSION,
+            definitionId: resolved.definitionId,
+          },
           team: "enemies" as const,
         },
       ],
@@ -1255,8 +1608,17 @@ function createPreparedEncounters(
   return encounterIds;
 }
 
-export interface ShopLineLike { stockId: string; unitPriceMinor: number; currencyCode: string }
-export interface ShopLike { shopId: string; npcId: string; status: string; stock: ShopLineLike[] }
+export interface ShopLineLike {
+  stockId: string;
+  unitPriceMinor: number;
+  currencyCode: string;
+}
+export interface ShopLike {
+  shopId: string;
+  npcId: string;
+  status: string;
+  stock: ShopLineLike[];
+}
 
 function materializeVendors(
   repository: Repository,
@@ -1264,7 +1626,15 @@ function materializeVendors(
   campaignId: string,
   sessionId: string,
   actorId: string,
-  context: { artifacts: Array<{ key: string; kind: string; visibility: string; canonical: Record<string, unknown>; serverResourceId: string | null }> },
+  context: {
+    artifacts: Array<{
+      key: string;
+      kind: string;
+      visibility: string;
+      canonical: Record<string, unknown>;
+      serverResourceId: string | null;
+    }>;
+  },
   warnings: string[],
 ): ShopLike[] {
   const vendorHints = /merchant|smith|trader|vendor|shop|market|inn|provision|quarter|store|outfitt/i;
@@ -1275,20 +1645,33 @@ function materializeVendors(
       const archetype = typeof artifact.canonical.archetype === "string" ? artifact.canonical.archetype : "";
       return vendorHints.test(`${name} ${archetype}`);
     });
-  const ordered = candidates.length >= 2 ? candidates : context.artifacts.filter((artifact) => artifact.kind === "npc" && artifact.visibility === "public" && artifact.serverResourceId);
+  const ordered =
+    candidates.length >= 2
+      ? candidates
+      : context.artifacts.filter(
+          (artifact) => artifact.kind === "npc" && artifact.visibility === "public" && artifact.serverResourceId,
+        );
   const chosen = ordered.slice(0, 2);
   if (chosen.length < 2) warnings.push("fewer than two public NPCs are available for vendor materialization");
   const shops: ShopLike[] = [];
   for (const npc of chosen) {
     try {
-      const materialization = repository.materializeFreeformShop(ownerId, campaignId, sessionId, actorId, npc.serverResourceId!) as unknown as ShopLike;
+      const materialization = repository.materializeFreeformShop(
+        ownerId,
+        campaignId,
+        sessionId,
+        actorId,
+        npc.serverResourceId!,
+      ) as unknown as ShopLike;
       if (materialization.status !== "materialized") {
         warnings.push(`vendor ${npc.key} did not materialize a shop: ${materialization.status}`);
         continue;
       }
       shops.push(materialization);
     } catch (error) {
-      warnings.push(`vendor ${npc.key} shop materialization failed: ${error instanceof Error ? error.message : String(error)}`);
+      warnings.push(
+        `vendor ${npc.key} shop materialization failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
   return shops;
@@ -1316,7 +1699,13 @@ async function fundPartyWallets(
   });
 }
 
-function publishPublicMaterials(repository: Repository, ownerId: string, campaignId: string, keyPrefix: string, warnings: string[]): void {
+function publishPublicMaterials(
+  repository: Repository,
+  ownerId: string,
+  campaignId: string,
+  keyPrefix: string,
+  warnings: string[],
+): void {
   let planning = repository.getCampaignGeneratedPlanning(ownerId, campaignId);
   if (!planning) return;
   for (const material of planning.deliverables.filter((candidate) => candidate.visibility === "public")) {
@@ -1328,7 +1717,9 @@ function publishPublicMaterials(repository: Repository, ownerId: string, campaig
       });
       planning = { ...planning, deliveryRevision: published.receipt.revisionAfter };
     } catch (error) {
-      warnings.push(`public material ${material.artifactKey} was not published: ${error instanceof Error ? error.message : String(error)}`);
+      warnings.push(
+        `public material ${material.artifactKey} was not published: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }
@@ -1337,7 +1728,11 @@ function publishPublicMaterials(repository: Repository, ownerId: string, campaig
 // Summary + validation
 // ---------------------------------------------------------------------------
 
-export function readSintermarkActiveSessionId(repository: Repository, ownerId: string, campaignId: string): string | null {
+export function readSintermarkActiveSessionId(
+  repository: Repository,
+  ownerId: string,
+  campaignId: string,
+): string | null {
   const attachments = repository.listCampaignSessionAttachments(ownerId, campaignId);
   for (const attachment of attachments) {
     const session = repository.getSession(attachment.sessionId);
@@ -1360,10 +1755,12 @@ export function summarizeSintermarkCampaign(
   status: "created" | "existing" | "validated",
 ): SintermarkSummary {
   const heroes = readHeroes(repository, ownerId, campaignId, recipe);
-  const context = repository.getCampaignGenerationContext(ownerId, campaignId, appliedArtifactKeys)
-    ?? fail("campaign generation context is unavailable for summary");
+  const context =
+    repository.getCampaignGenerationContext(ownerId, campaignId, appliedArtifactKeys) ??
+    fail("campaign generation context is unavailable for summary");
   const resourceIdByArtifactKey = new Map<string, string>();
-  for (const artifact of context.artifacts) if (artifact.serverResourceId) resourceIdByArtifactKey.set(artifact.key, artifact.serverResourceId);
+  for (const artifact of context.artifacts)
+    if (artifact.serverResourceId) resourceIdByArtifactKey.set(artifact.key, artifact.serverResourceId);
 
   const world = repository.getCampaignWorld(ownerId, campaignId, sessionId);
   const starting = repository.getCampaignStartingLocation(ownerId, campaignId);
@@ -1374,7 +1771,11 @@ export function summarizeSintermarkCampaign(
 
   const acceptedLocations = context.artifacts.filter((artifact) => artifact.kind === "location");
   const publicLocations = acceptedLocations.filter((artifact) => artifact.visibility === "public");
-  const connectionCount = (getRepositoryDatabase().prepare("SELECT count(*) count FROM campaign_location_connections_v28 WHERE campaign_id=?").get(campaignId) as { count: number }).count;
+  const connectionCount = (
+    getRepositoryDatabase()
+      .prepare("SELECT count(*) count FROM campaign_location_connections_v28 WHERE campaign_id=?")
+      .get(campaignId) as { count: number }
+  ).count;
   const factions = repository.listCampaignFactions(ownerId, campaignId)?.factions.length ?? 0;
   const npcs = repository.listCampaignNpcs(ownerId, campaignId)?.npcs.length ?? 0;
   const quests = repository.listCampaignQuests(ownerId, campaignId)?.quests.length ?? 0;
@@ -1385,14 +1786,18 @@ export function summarizeSintermarkCampaign(
   let heroHealthMin = Number.MAX_SAFE_INTEGER;
   let heroesWithInventory = 0;
   for (const hero of heroes) {
-    const progression = repository.getCharacterProgression(ownerId, hero.campaignCharacterId) as unknown as ProgressionLike | null;
+    const progression = repository.getCharacterProgression(
+      ownerId,
+      hero.campaignCharacterId,
+    ) as unknown as ProgressionLike | null;
     if (!progression) fail(`missing progression for ${hero.name}`);
     partyLevel = partyLevel === 0 ? progression.level : Math.min(partyLevel, progression.level);
     const health = repository.getActorResource(ownerId, campaignId, hero.actorId, "health");
     if (!health) warnings.push(`${hero.name} has no health resource`);
     else {
       heroHealthMin = Math.min(heroHealthMin, health.max);
-      if (health.max < 1_000) warnings.push(`${hero.name} baseline health is ${health.max}, below the reviewed 1000 target`);
+      if (health.max < 1_000)
+        warnings.push(`${hero.name} baseline health is ${health.max}, below the reviewed 1000 target`);
     }
     const inventory = repository.getActorInventorySnapshot(ownerId, campaignId, hero.actorId);
     if (!inventory) warnings.push(`${hero.name} has no inventory snapshot`);
@@ -1412,12 +1817,12 @@ export function summarizeSintermarkCampaign(
       acceptedArtifacts: context.artifacts.length,
       locations: acceptedLocations.length,
       publicLocations: publicLocations.length,
-       connections: connectionCount,
+      connections: connectionCount,
       routeProfiles,
       factions,
       npcs,
       quests,
-       encounters: context.artifacts.filter((artifact) => artifact.kind === "encounter").length,
+      encounters: context.artifacts.filter((artifact) => artifact.kind === "encounter").length,
       materialDeliveries: materials,
       partyActors: heroes.length,
       partyLevel,
@@ -1444,17 +1849,24 @@ export function summarizeSintermarkCampaign(
 
 export function assertSintermarkSummary(summary: SintermarkSummary): void {
   if (summary.heroes.length !== 2) fail(`Sintermark requires exactly two heroes; found ${summary.heroes.length}`);
-  if (summary.counts.locations < 26) fail(`Sintermark requires at least 26 accepted locations; found ${summary.counts.locations}`);
+  if (summary.counts.locations < 26)
+    fail(`Sintermark requires at least 26 accepted locations; found ${summary.counts.locations}`);
   if (summary.counts.factions < 6) fail(`Sintermark requires at least 6 factions; found ${summary.counts.factions}`);
   if (summary.counts.npcs < 15) fail(`Sintermark requires at least 15 NPCs; found ${summary.counts.npcs}`);
   if (summary.counts.quests < 5) fail(`Sintermark requires at least 5 quests; found ${summary.counts.quests}`);
   if (summary.counts.routeProfiles < 1) fail("Sintermark requires at least one route event profile");
-  if (summary.counts.encounters < 3) fail(`Sintermark requires at least 3 encounter scenarios; found ${summary.counts.encounters}`);
+  if (summary.counts.encounters < 3)
+    fail(`Sintermark requires at least 3 encounter scenarios; found ${summary.counts.encounters}`);
   if (summary.counts.materialDeliveries < 1) fail("Sintermark requires at least one published public material");
-  if (summary.counts.partyLevel < 3) fail(`Sintermark requires level-3 heroes; highest level is ${summary.counts.partyLevel}`);
-  if (summary.counts.heroHealthMin < 1_000) fail(`Sintermark requires baseline health 1000 for every hero; minimum is ${summary.counts.heroHealthMin}`);
-  if (summary.counts.heroesWithInventory !== 2) fail(`Sintermark requires an inventory snapshot for both heroes; found ${summary.counts.heroesWithInventory}`);
+  if (summary.counts.partyLevel < 3)
+    fail(`Sintermark requires level-3 heroes; highest level is ${summary.counts.partyLevel}`);
+  if (summary.counts.heroHealthMin < 1_000)
+    fail(`Sintermark requires baseline health 1000 for every hero; minimum is ${summary.counts.heroHealthMin}`);
+  if (summary.counts.heroesWithInventory !== 2)
+    fail(`Sintermark requires an inventory snapshot for both heroes; found ${summary.counts.heroesWithInventory}`);
   if (summary.publicGraph.unreachablePublicLocations.length > 0) {
-    fail(`Sintermark public graph has ${summary.publicGraph.unreachablePublicLocations.length} unreachable public location(s); connect every public location to the start`);
+    fail(
+      `Sintermark public graph has ${summary.publicGraph.unreachablePublicLocations.length} unreachable public location(s); connect every public location to the start`,
+    );
   }
 }

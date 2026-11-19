@@ -8,14 +8,7 @@ import { frozenList, requireInteger } from "./internal.js";
  */
 
 /** The seven classes this bounded SRD 5.1 pack models. */
-export type Dnd5eMulticlassClassId =
-  | "barbarian"
-  | "cleric"
-  | "fighter"
-  | "paladin"
-  | "ranger"
-  | "rogue"
-  | "wizard";
+export type Dnd5eMulticlassClassId = "barbarian" | "cleric" | "fighter" | "paladin" | "ranger" | "rogue" | "wizard";
 
 export const DND_5E_MULTICLASS_CLASS_IDS: readonly Dnd5eMulticlassClassId[] = frozenList([
   "barbarian",
@@ -54,8 +47,9 @@ export function qualifiesForMulticlass(
   scores: Readonly<Record<AbilityId, number>>,
 ): boolean {
   const entry = DND_5E_MULTICLASS_PREREQUISITES[classId];
-  const checks = (Object.entries(entry.minimums) as Array<[AbilityId, number]>)
-    .map(([ability, minimum]) => scores[ability] >= minimum);
+  const checks = (Object.entries(entry.minimums) as Array<[AbilityId, number]>).map(
+    ([ability, minimum]) => scores[ability] >= minimum,
+  );
   return entry.mode === "any" ? checks.some(Boolean) : checks.every(Boolean);
 }
 
@@ -64,30 +58,26 @@ export function qualifiesForMulticlass(
 export function multiclassClassIdFromDefinitionId(definitionId: string): Dnd5eMulticlassClassId | null {
   const suffix = definitionId.split(":").at(-1) ?? "";
   return (DND_5E_MULTICLASS_CLASS_IDS as readonly string[]).includes(suffix)
-    ? suffix as Dnd5eMulticlassClassId
+    ? (suffix as Dnd5eMulticlassClassId)
     : null;
 }
 
 /** Closed proficiency categories granted when multiclassing into a class. */
 export type Dnd5eMulticlassProficiency =
-  | "light-armor"
-  | "medium-armor"
-  | "heavy-armor"
-  | "shields"
-  | "simple-weapons"
-  | "martial-weapons";
+  "light-armor" | "medium-armor" | "heavy-armor" | "shields" | "simple-weapons" | "martial-weapons";
 
 /** SRD 5.1 proficiencies gained on multiclassing into each modeled class. */
-export const DND_5E_MULTICLASS_PROFICIENCY_GRANTS: Readonly<Record<Dnd5eMulticlassClassId, readonly Dnd5eMulticlassProficiency[]>> =
-  Object.freeze({
-    barbarian: frozenList(["shields", "simple-weapons", "martial-weapons"] as const),
-    cleric: frozenList(["light-armor", "medium-armor", "shields"] as const),
-    fighter: frozenList(["light-armor", "medium-armor", "shields", "simple-weapons", "martial-weapons"] as const),
-    paladin: frozenList(["light-armor", "medium-armor", "shields", "simple-weapons", "martial-weapons"] as const),
-    ranger: frozenList(["light-armor", "medium-armor", "shields", "simple-weapons", "martial-weapons"] as const),
-    rogue: frozenList(["light-armor"] as const),
-    wizard: frozenList([] as const),
-  });
+export const DND_5E_MULTICLASS_PROFICIENCY_GRANTS: Readonly<
+  Record<Dnd5eMulticlassClassId, readonly Dnd5eMulticlassProficiency[]>
+> = Object.freeze({
+  barbarian: frozenList(["shields", "simple-weapons", "martial-weapons"] as const),
+  cleric: frozenList(["light-armor", "medium-armor", "shields"] as const),
+  fighter: frozenList(["light-armor", "medium-armor", "shields", "simple-weapons", "martial-weapons"] as const),
+  paladin: frozenList(["light-armor", "medium-armor", "shields", "simple-weapons", "martial-weapons"] as const),
+  ranger: frozenList(["light-armor", "medium-armor", "shields", "simple-weapons", "martial-weapons"] as const),
+  rogue: frozenList(["light-armor"] as const),
+  wizard: frozenList([] as const),
+});
 
 /** Grants only proficiencies not already held, in stable SRD grant order. */
 export function multiclassProficiencyGrants(

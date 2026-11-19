@@ -22,9 +22,13 @@ export interface EconomyRepository extends EconomyReadRepository, EconomyWriteRe
 /** Currency codes are legacy storage keys.  The v25 reference sidecar is the
  * authoritative public projection and prevents a code from silently meaning a
  * different pinned definition. */
-export function createEconomyRepository(db:DatabaseDriver.Database,deps:M15Dependencies,assertMutation:()=>void):EconomyRepository {
-  const reads=createEconomyReadRepository(db);
-  const writes=createEconomyWriteRepository(db,deps,assertMutation,reads);
-  const {currencyReference:_currencyReference,...readRepository}=reads;
-  return {...readRepository,...writes};
+export function createEconomyRepository(
+  db: DatabaseDriver.Database,
+  deps: M15Dependencies,
+  assertMutation: () => void,
+): EconomyRepository {
+  const reads = createEconomyReadRepository(db);
+  const writes = createEconomyWriteRepository(db, deps, assertMutation, reads);
+  const { currencyReference: _currencyReference, ...readRepository } = reads;
+  return { ...readRepository, ...writes };
 }

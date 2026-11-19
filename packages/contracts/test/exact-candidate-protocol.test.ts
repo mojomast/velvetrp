@@ -13,8 +13,11 @@ import {
   computeExactCandidateActionDigest,
   computeExactCandidateEnvelopeDigest,
   computeExactCandidateQuoteDigest,
-  canonicalExactCandidateSelectionFrame,computeExactCandidateSelectionDigest,
-  canonicalExactCandidateExecutionResultFrame,computeExactCandidateExecutionResultDigest,verifyExactCandidateExecutionResult,
+  canonicalExactCandidateSelectionFrame,
+  computeExactCandidateSelectionDigest,
+  canonicalExactCandidateExecutionResultFrame,
+  computeExactCandidateExecutionResultDigest,
+  verifyExactCandidateExecutionResult,
   exactCandidateKindSchema,
   exactCandidateQuoteSchema,
   exactCandidateSafeLabelSchema,
@@ -81,7 +84,12 @@ const sealCandidateState = <T extends InternalExactCandidate>(value: T): T => ({
   canonicalEnvelopeDigest: computeExactCandidateEnvelopeDigest(value, crypto),
 });
 
-const selection = () => ({ candidateId: "candidate-1", kind: "actor.travel" as const, version: "v1" as const, choices: [] as [] });
+const selection = () => ({
+  candidateId: "candidate-1",
+  kind: "actor.travel" as const,
+  version: "v1" as const,
+  choices: [] as [],
+});
 const context = () => ({
   campaignId: "campaign-1",
   sessionId: "session-1",
@@ -100,25 +108,48 @@ describe("exact candidate v1 closed protocol", () => {
     const exhaustive: Record<ExactCandidateKind, readonly string[]> = EXACT_CANDIDATE_POLICY_REASONS;
     expect(Object.keys(exhaustive)).toEqual(exactCandidateKindSchema.options);
     expect(exhaustive["actor.travel"]).toEqual([
-      "legal-visible-connection", "actor-location-unavailable", "connection-not-visible",
-      "connection-not-adjacent", "party-ineligible", "world-revision-stale",
+      "legal-visible-connection",
+      "actor-location-unavailable",
+      "connection-not-visible",
+      "connection-not-adjacent",
+      "party-ineligible",
+      "world-revision-stale",
     ]);
     for (const reason of exhaustive["actor.travel"]) {
       const result = reason === "legal-visible-connection" ? "allowed" : "denied";
-      expect(internalExactCandidateSchema.safeParse({ ...candidate(), policy: { kind: "actor.travel", result, reason } }).success).toBe(true);
-      expect(internalExactCandidateSchema.safeParse({ ...candidate(), policy: {
-        kind: "actor.travel", result: result === "allowed" ? "denied" : "allowed", reason,
-      } }).success).toBe(false);
+      expect(
+        internalExactCandidateSchema.safeParse({ ...candidate(), policy: { kind: "actor.travel", result, reason } })
+          .success,
+      ).toBe(true);
+      expect(
+        internalExactCandidateSchema.safeParse({
+          ...candidate(),
+          policy: {
+            kind: "actor.travel",
+            result: result === "allowed" ? "denied" : "allowed",
+            reason,
+          },
+        }).success,
+      ).toBe(false);
     }
     expect(internalExactCandidateSchema.safeParse({ ...candidate(), kind: "actor.rest" }).success).toBe(false);
-    expect(internalExactCandidateSchema.safeParse({ ...candidate(), policy: { kind: "actor.travel", result: "denied", reason: "unknown" } }).success).toBe(false);
+    expect(
+      internalExactCandidateSchema.safeParse({
+        ...candidate(),
+        policy: { kind: "actor.travel", result: "denied", reason: "unknown" },
+      }).success,
+    ).toBe(false);
   });
 
   it("freezes canonical action framing and its digest vector", () => {
     const frame = canonicalExactCandidateActionFrame(candidate());
-    expect(frame).toBe("{\"candidateId\":\"candidate-1\",\"domain\":\"velvet.exact-candidate.action.v1\",\"expectedRevisions\":[{\"domain\":\"world\",\"revision\":4}],\"kind\":\"actor.travel\",\"privateParameters\":{\"connectionId\":\"hidden-world-edge-7\",\"kind\":\"actor.travel\",\"partyActorIds\":[\"actor-1\"]},\"purpose\":\"execute-once\",\"scope\":{\"actorId\":\"actor-1\",\"authorizationEffect\":\"none\",\"campaignId\":\"campaign-1\",\"connectionId\":\"adventure-turn:turn-1\",\"principalId\":\"principal-1\",\"sessionId\":\"session-1\"},\"version\":\"v1\"}");
+    expect(frame).toBe(
+      '{"candidateId":"candidate-1","domain":"velvet.exact-candidate.action.v1","expectedRevisions":[{"domain":"world","revision":4}],"kind":"actor.travel","privateParameters":{"connectionId":"hidden-world-edge-7","kind":"actor.travel","partyActorIds":["actor-1"]},"purpose":"execute-once","scope":{"actorId":"actor-1","authorizationEffect":"none","campaignId":"campaign-1","connectionId":"adventure-turn:turn-1","principalId":"principal-1","sessionId":"session-1"},"version":"v1"}',
+    );
     expect(EXACT_CANDIDATE_ACTION_FRAME).toBe("velvet.exact-candidate.action.v1");
-    expect(computeExactCandidateActionDigest(candidate(), crypto)).toBe("db4b6fc7811fe2a1a9ba128f2eab2e9db24600fe9d2b7a685e020125768bc118");
+    expect(computeExactCandidateActionDigest(candidate(), crypto)).toBe(
+      "db4b6fc7811fe2a1a9ba128f2eab2e9db24600fe9d2b7a685e020125768bc118",
+    );
   });
 
   it("freezes the complete versioned execution-gating envelope vector", () => {
@@ -129,27 +160,64 @@ describe("exact candidate v1 closed protocol", () => {
       domain: "velvet.exact-candidate.envelope.v1",
       candidateId: "candidate-1",
       policy: { result: "allowed", reason: "legal-visible-connection" },
-      confirmation: { requirement: "not-required", authorizer: null,
-        decision: { state: "not-applicable", decisionId: null, binding: null, decidedAt: null } },
-      quote: { kind: "not-applicable", version: null, quoteId: null, binding: null, cost: null,
-        issuedAt: null, expiresAt: null, canonicalQuoteDigest: null },
+      confirmation: {
+        requirement: "not-required",
+        authorizer: null,
+        decision: { state: "not-applicable", decisionId: null, binding: null, decidedAt: null },
+      },
+      quote: {
+        kind: "not-applicable",
+        version: null,
+        quoteId: null,
+        binding: null,
+        cost: null,
+        issuedAt: null,
+        expiresAt: null,
+        canonicalQuoteDigest: null,
+      },
       supersession: { state: "current", supersededAt: null, replacement: null },
       execution: { state: "unexecuted", receiptId: null, binding: null, linkedAt: null },
     });
-    expect(computeExactCandidateEnvelopeDigest(candidate(), crypto)).toBe("2ab9fe2b9b4cd2ad44d0b162c82e59672fb73701660894b8096302bf6f38457b");
+    expect(computeExactCandidateEnvelopeDigest(candidate(), crypto)).toBe(
+      "2ab9fe2b9b4cd2ad44d0b162c82e59672fb73701660894b8096302bf6f38457b",
+    );
   });
 
   it("keeps lifecycle absence and presence injective in the envelope frame", () => {
     const base = candidate();
-    const pending = { ...base, confirmation: { requirement: "required" as const, authorizer: "controller" as const,
-      decision: { state: "pending" as const } } };
-    const superseded = { ...base, supersession: { state: "superseded" as const, supersededAt: EXPIRES_AT,
-      replacement: { candidateId: "candidate-2", kind: base.kind, version: base.version, scope: base.scope } } };
-    const receiptLinked = { ...base, execution: { state: "receipt-linked" as const, receiptId: "receipt-1",
-      binding: { ...candidateBinding(base), commandId: "command-1" }, linkedAt: "2030-01-01T00:00:30.000Z" } };
+    const pending = {
+      ...base,
+      confirmation: {
+        requirement: "required" as const,
+        authorizer: "controller" as const,
+        decision: { state: "pending" as const },
+      },
+    };
+    const superseded = {
+      ...base,
+      supersession: {
+        state: "superseded" as const,
+        supersededAt: EXPIRES_AT,
+        replacement: { candidateId: "candidate-2", kind: base.kind, version: base.version, scope: base.scope },
+      },
+    };
+    const receiptLinked = {
+      ...base,
+      execution: {
+        state: "receipt-linked" as const,
+        receiptId: "receipt-1",
+        binding: { ...candidateBinding(base), commandId: "command-1" },
+        linkedAt: "2030-01-01T00:00:30.000Z",
+      },
+    };
     const frames = [base, pending, superseded, receiptLinked].map(canonicalExactCandidateEnvelopeFrame);
     expect(new Set(frames).size).toBe(frames.length);
-    expect(JSON.parse(frames[0]!).execution).toEqual({ state: "unexecuted", receiptId: null, binding: null, linkedAt: null });
+    expect(JSON.parse(frames[0]!).execution).toEqual({
+      state: "unexecuted",
+      receiptId: null,
+      binding: null,
+      linkedAt: null,
+    });
     expect(JSON.parse(frames[3]!).execution).toMatchObject({ state: "receipt-linked", receiptId: "receipt-1" });
   });
 
@@ -157,10 +225,18 @@ describe("exact candidate v1 closed protocol", () => {
     const zeroRevision = { ...candidate(), expectedRevisions: [{ domain: "world" as const, revision: 0 }] as const };
     const oneRevision = { ...candidate(), expectedRevisions: [{ domain: "world" as const, revision: 1 }] as const };
     expect(internalExactCandidateSchema.safeParse(zeroRevision).success).toBe(true);
-    expect(internalExactCandidateSchema.safeParse({ ...candidate(), expectedRevisions: [{ domain: "world", revision: -0 }] }).success).toBe(false);
+    expect(
+      internalExactCandidateSchema.safeParse({ ...candidate(), expectedRevisions: [{ domain: "world", revision: -0 }] })
+        .success,
+    ).toBe(false);
     expect(canonicalExactCandidateActionFrame(zeroRevision)).not.toBe(canonicalExactCandidateActionFrame(oneRevision));
-    expect(() => canonicalExactCandidateActionFrame({ ...candidate(), expectedRevisions: [{ domain: "world", revision: -0 }] })).toThrow();
-    expect(internalExactCandidateSchema.safeParse({ ...candidate(), label: { ...candidate().label, routeOption: -0 } }).success).toBe(false);
+    expect(() =>
+      canonicalExactCandidateActionFrame({ ...candidate(), expectedRevisions: [{ domain: "world", revision: -0 }] }),
+    ).toThrow();
+    expect(
+      internalExactCandidateSchema.safeParse({ ...candidate(), label: { ...candidate().label, routeOption: -0 } })
+        .success,
+    ).toBe(false);
   });
 
   it("enforces bounded, expiring, single-purpose, non-authorizing travel candidates", () => {
@@ -173,7 +249,10 @@ describe("exact candidate v1 closed protocol", () => {
       { ...candidate(), expiresAt: "2030-01-01T00:05:00.001Z" },
       { ...candidate(), expiresAt: ISSUED_AT },
       { ...candidate(), privateParameters: { ...candidate().privateParameters, partyActorIds: ["actor-2"] } },
-      { ...candidate(), privateParameters: { ...candidate().privateParameters, partyActorIds: ["actor-1", "actor-1"] } },
+      {
+        ...candidate(),
+        privateParameters: { ...candidate().privateParameters, partyActorIds: ["actor-1", "actor-1"] },
+      },
       { ...candidate(), expectedRevisions: [] },
       { ...candidate(), quote: { kind: "exact-cost" } },
       { ...candidate(), extra: true },
@@ -184,8 +263,13 @@ describe("exact candidate v1 closed protocol", () => {
   it("uses enforceable closed display structures rather than opaque-ID heuristics", () => {
     expect(exactCandidateSafeLabelSchema.parse(candidate().label)).toEqual(candidate().label);
     for (const ordinaryOpaqueId of ["location_123", "private-edge-7", "01J8Y4K7M2N6Q9R3T5V8W1X4Z7", "npc:secret-42"]) {
-      expect(exactCandidateSafeLabelSchema.safeParse({ format: "message-key-v1", key: ordinaryOpaqueId, routeOption: 1 }).success).toBe(false);
-      expect(exactCandidateSafeLabelSchema.safeParse({ ...candidate().label, text: ordinaryOpaqueId }).success).toBe(false);
+      expect(
+        exactCandidateSafeLabelSchema.safeParse({ format: "message-key-v1", key: ordinaryOpaqueId, routeOption: 1 })
+          .success,
+      ).toBe(false);
+      expect(exactCandidateSafeLabelSchema.safeParse({ ...candidate().label, text: ordinaryOpaqueId }).success).toBe(
+        false,
+      );
     }
   });
 
@@ -195,7 +279,11 @@ describe("exact candidate v1 closed protocol", () => {
       version: "v1" as const,
       quoteId: "quote-1",
       binding: candidateBinding(candidate()),
-      cost: { currencyId: "currency-gold", minorUnits: 125, display: { format: "minor-units-v1" as const, currency: "gold" as const } },
+      cost: {
+        currencyId: "currency-gold",
+        minorUnits: 125,
+        display: { format: "minor-units-v1" as const, currency: "gold" as const },
+      },
       issuedAt: ISSUED_AT,
       expiresAt: EXPIRES_AT,
       canonicalQuoteDigest: "0".repeat(64),
@@ -203,14 +291,18 @@ describe("exact candidate v1 closed protocol", () => {
     const quote = { ...unsigned, canonicalQuoteDigest: computeExactCandidateQuoteDigest(unsigned, crypto) };
     expect(exactCandidateQuoteSchema.parse(quote)).toEqual(quote);
     expect(EXACT_CANDIDATE_QUOTE_FRAME).toBe("velvet.exact-candidate.quote.v1");
-    expect(canonicalExactCandidateQuoteFrame(quote)).toContain("\"domain\":\"velvet.exact-candidate.quote.v1\"");
+    expect(canonicalExactCandidateQuoteFrame(quote)).toContain('"domain":"velvet.exact-candidate.quote.v1"');
     expect(quote.canonicalQuoteDigest).toBe("82a2a859d70bf6ac8e9414ec79cfd43a47c56d0d6180d30b4972281748f76994");
     expect(verifyExactCandidateQuoteDigest(quote, crypto)).toBe(true);
     expect(verifyExactCandidateQuoteDigest({ ...quote, cost: { ...quote.cost, minorUnits: 126 } }, crypto)).toBe(false);
-    expect(verifyExactCandidateQuoteDigest({ ...quote, binding: { ...quote.binding, candidateId: "candidate-2" } }, crypto)).toBe(false);
+    expect(
+      verifyExactCandidateQuoteDigest({ ...quote, binding: { ...quote.binding, candidateId: "candidate-2" } }, crypto),
+    ).toBe(false);
     expect(exactCandidateQuoteSchema.safeParse({ ...quote, version: "v2" }).success).toBe(false);
     expect(exactCandidateQuoteSchema.safeParse({ ...quote, expiresAt: ISSUED_AT }).success).toBe(false);
-    expect(exactCandidateQuoteSchema.safeParse({ ...quote, cost: { ...quote.cost, minorUnits: -0 } }).success).toBe(false);
+    expect(exactCandidateQuoteSchema.safeParse({ ...quote, cost: { ...quote.cost, minorUnits: -0 } }).success).toBe(
+      false,
+    );
     const zeroCost = { ...quote, cost: { ...quote.cost, minorUnits: 0 } };
     const oneUnit = { ...quote, cost: { ...quote.cost, minorUnits: 1 } };
     expect(canonicalExactCandidateQuoteFrame(zeroCost)).not.toBe(canonicalExactCandidateQuoteFrame(oneUnit));
@@ -219,91 +311,299 @@ describe("exact candidate v1 closed protocol", () => {
 
   it("fails quote verification closed for malformed or throwing trusted crypto output", () => {
     const unsigned = {
-      kind: "exact-cost" as const, version: "v1" as const, quoteId: "quote-1", binding: candidateBinding(candidate()),
-      cost: { currencyId: "currency-gold", minorUnits: 1, display: { format: "minor-units-v1" as const, currency: "gold" as const } },
-      issuedAt: ISSUED_AT, expiresAt: EXPIRES_AT, canonicalQuoteDigest: "0".repeat(64),
+      kind: "exact-cost" as const,
+      version: "v1" as const,
+      quoteId: "quote-1",
+      binding: candidateBinding(candidate()),
+      cost: {
+        currencyId: "currency-gold",
+        minorUnits: 1,
+        display: { format: "minor-units-v1" as const, currency: "gold" as const },
+      },
+      issuedAt: ISSUED_AT,
+      expiresAt: EXPIRES_AT,
+      canonicalQuoteDigest: "0".repeat(64),
     };
     const quote = { ...unsigned, canonicalQuoteDigest: computeExactCandidateQuoteDigest(unsigned, crypto) };
     expect(verifyExactCandidateQuoteDigest(quote, { sha256: () => "A".repeat(64) })).toBe(false);
     expect(verifyExactCandidateQuoteDigest(quote, { sha256: () => "a".repeat(63) })).toBe(false);
-    expect(verifyExactCandidateQuoteDigest(quote, { sha256: () => { throw new Error("crypto unavailable"); } })).toBe(false);
+    expect(
+      verifyExactCandidateQuoteDigest(quote, {
+        sha256: () => {
+          throw new Error("crypto unavailable");
+        },
+      }),
+    ).toBe(false);
   });
 
   it("projects only exact provider-safe keys during the explicit current instant", () => {
-    const value=candidate();value.label={...value.label,origin:"Old Gate",destination:"Silver Harbor"};
+    const value = candidate();
+    value.label = { ...value.label, origin: "Old Gate", destination: "Silver Harbor" };
     const projection = projectExactCandidateForProvider(value, context().now);
     expect(Object.keys(projection)).toEqual([
-      "candidateId", "kind", "version", "label", "semanticLabel", "summary", "confirmation", "quote", "expiresAt", "choices",
+      "candidateId",
+      "kind",
+      "version",
+      "label",
+      "semanticLabel",
+      "summary",
+      "confirmation",
+      "quote",
+      "expiresAt",
+      "choices",
     ]);
     expect(Object.keys(projection.label)).toEqual(["format", "key", "routeOption", "destination", "origin"]);
-    expect(projection.semanticLabel).toEqual({action:"Travel",source:"Old Gate",target:"Silver Harbor",cost:null,
-      consequence:"Move from Old Gate to Silver Harbor."});
+    expect(projection.semanticLabel).toEqual({
+      action: "Travel",
+      source: "Old Gate",
+      target: "Silver Harbor",
+      cost: null,
+      consequence: "Move from Old Gate to Silver Harbor.",
+    });
     expect(Object.keys(projection.summary)).toEqual(["format", "key"]);
     expect(Object.keys(projection.confirmation)).toEqual(["required"]);
     expect(Object.keys(projection.quote)).toEqual(["kind"]);
     expectTypeOf(projection).toEqualTypeOf<ProviderSafeExactCandidate>();
     const serialized = JSON.stringify(projection);
     for (const forbidden of [
-      "campaignId", "sessionId", "actorId", "principalId", "connectionId", "authorizationEffect",
-      "canonicalActionDigest", "canonicalEnvelopeDigest", "privateParameters", "expectedRevisions", "policy", "reason", "decision",
-      "supersession", "execution", "receiptId", "commandId", "hidden-world-edge-7", candidate().canonicalActionDigest,
-    ]) expect(serialized).not.toContain(forbidden);
+      "campaignId",
+      "sessionId",
+      "actorId",
+      "principalId",
+      "connectionId",
+      "authorizationEffect",
+      "canonicalActionDigest",
+      "canonicalEnvelopeDigest",
+      "privateParameters",
+      "expectedRevisions",
+      "policy",
+      "reason",
+      "decision",
+      "supersession",
+      "execution",
+      "receiptId",
+      "commandId",
+      "hidden-world-edge-7",
+      candidate().canonicalActionDigest,
+    ])
+      expect(serialized).not.toContain(forbidden);
     for (const extraKey of ["privateParameters", "principalId", "policy", "providerMetadata", "receiptId"]) {
       expect(providerSafeExactCandidateSchema.safeParse({ ...projection, [extraKey]: "leak" }).success).toBe(false);
     }
-    expect(providerSafeExactCandidateListSchema.safeParse({ version: "v1", candidates: [projection, projection] }).success).toBe(false);
+    expect(
+      providerSafeExactCandidateListSchema.safeParse({ version: "v1", candidates: [projection, projection] }).success,
+    ).toBe(false);
   });
 
   it("rejects expired and not-yet-issued projections", () => {
     expect(() => projectExactCandidateForProvider(candidate(), EXPIRES_AT)).toThrow("outside its selectable lifetime");
-    expect(() => projectExactCandidateForProvider(candidate(), "2029-12-31T23:59:59.999Z")).toThrow("outside its selectable lifetime");
+    expect(() => projectExactCandidateForProvider(candidate(), "2029-12-31T23:59:59.999Z")).toThrow(
+      "outside its selectable lifetime",
+    );
     expect(() => projectExactCandidateForProvider(candidate(), "invalid")).toThrow();
   });
 
   it("binds decisions, replacement candidates, and receipts", () => {
     const base = candidate();
     const binding = candidateBinding(base);
-    const approved = { ...base, confirmation: { requirement: "required" as const, authorizer: "controller" as const,
-      decision: { state: "approved" as const, decisionId: "decision-1", binding, decidedAt: "2030-01-01T00:00:30.000Z" } } };
+    const approved = {
+      ...base,
+      confirmation: {
+        requirement: "required" as const,
+        authorizer: "controller" as const,
+        decision: {
+          state: "approved" as const,
+          decisionId: "decision-1",
+          binding,
+          decidedAt: "2030-01-01T00:00:30.000Z",
+        },
+      },
+    };
     expect(internalExactCandidateSchema.safeParse(approved).success).toBe(true);
-    expect(internalExactCandidateSchema.safeParse({ ...approved, confirmation: { ...approved.confirmation,
-      decision: { ...approved.confirmation.decision, binding: { ...binding, candidateId: "candidate-2" } } } }).success).toBe(false);
-    expect(internalExactCandidateSchema.safeParse({ ...approved, confirmation: { ...approved.confirmation,
-      decision: { ...approved.confirmation.decision, decidedAt: "2030-01-01T00:05:00.001Z" } } }).success).toBe(false);
-    expect(internalExactCandidateSchema.safeParse({ ...approved, confirmation: { ...approved.confirmation,
-      decision: { ...approved.confirmation.decision, decidedAt: EXPIRES_AT } } }).success).toBe(false);
+    expect(
+      internalExactCandidateSchema.safeParse({
+        ...approved,
+        confirmation: {
+          ...approved.confirmation,
+          decision: { ...approved.confirmation.decision, binding: { ...binding, candidateId: "candidate-2" } },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      internalExactCandidateSchema.safeParse({
+        ...approved,
+        confirmation: {
+          ...approved.confirmation,
+          decision: { ...approved.confirmation.decision, decidedAt: "2030-01-01T00:05:00.001Z" },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      internalExactCandidateSchema.safeParse({
+        ...approved,
+        confirmation: {
+          ...approved.confirmation,
+          decision: { ...approved.confirmation.decision, decidedAt: EXPIRES_AT },
+        },
+      }).success,
+    ).toBe(false);
 
     const replacement = { candidateId: "candidate-2", kind: base.kind, version: base.version, scope: base.scope };
-    expect(internalExactCandidateSchema.safeParse({ ...base, supersession: { state: "superseded", supersededAt: EXPIRES_AT, replacement } }).success).toBe(true);
-    expect(internalExactCandidateSchema.safeParse({ ...base, supersession: { state: "superseded", supersededAt: EXPIRES_AT,
-      replacement: { ...replacement, scope: { ...replacement.scope, sessionId: "session-2" } } } }).success).toBe(false);
+    expect(
+      internalExactCandidateSchema.safeParse({
+        ...base,
+        supersession: { state: "superseded", supersededAt: EXPIRES_AT, replacement },
+      }).success,
+    ).toBe(true);
+    expect(
+      internalExactCandidateSchema.safeParse({
+        ...base,
+        supersession: {
+          state: "superseded",
+          supersededAt: EXPIRES_AT,
+          replacement: { ...replacement, scope: { ...replacement.scope, sessionId: "session-2" } },
+        },
+      }).success,
+    ).toBe(false);
 
-    const receipt = { state: "receipt-linked" as const, receiptId: "receipt-1", binding: { ...binding, commandId: "command-1" }, linkedAt: "2030-01-01T00:00:30.000Z" };
+    const receipt = {
+      state: "receipt-linked" as const,
+      receiptId: "receipt-1",
+      binding: { ...binding, commandId: "command-1" },
+      linkedAt: "2030-01-01T00:00:30.000Z",
+    };
     expect(internalExactCandidateSchema.safeParse({ ...base, execution: receipt }).success).toBe(true);
-    expect(internalExactCandidateSchema.safeParse({ ...base, execution: { ...receipt,
-      binding: { ...receipt.binding, canonicalActionDigest: "f".repeat(64) } } }).success).toBe(false);
-    expect(internalExactCandidateSchema.safeParse({ ...base, execution: { ...receipt,
-      binding: { ...receipt.binding, commandId: "" } } }).success).toBe(false);
-    const pending = { requirement: "required" as const, authorizer: "controller" as const, decision: { state: "pending" as const } };
-    const rejected = { requirement: "required" as const, authorizer: "controller" as const,
-      decision: { state: "rejected" as const, decisionId: "decision-1", binding, decidedAt: "2030-01-01T00:00:30.000Z" } };
-    expect(internalExactCandidateSchema.safeParse({ ...base, confirmation: pending, execution: receipt }).success).toBe(false);
-    expect(internalExactCandidateSchema.safeParse({ ...base, confirmation: rejected, execution: receipt }).success).toBe(false);
+    expect(
+      internalExactCandidateSchema.safeParse({
+        ...base,
+        execution: { ...receipt, binding: { ...receipt.binding, canonicalActionDigest: "f".repeat(64) } },
+      }).success,
+    ).toBe(false);
+    expect(
+      internalExactCandidateSchema.safeParse({
+        ...base,
+        execution: { ...receipt, binding: { ...receipt.binding, commandId: "" } },
+      }).success,
+    ).toBe(false);
+    const pending = {
+      requirement: "required" as const,
+      authorizer: "controller" as const,
+      decision: { state: "pending" as const },
+    };
+    const rejected = {
+      requirement: "required" as const,
+      authorizer: "controller" as const,
+      decision: {
+        state: "rejected" as const,
+        decisionId: "decision-1",
+        binding,
+        decidedAt: "2030-01-01T00:00:30.000Z",
+      },
+    };
+    expect(internalExactCandidateSchema.safeParse({ ...base, confirmation: pending, execution: receipt }).success).toBe(
+      false,
+    );
+    expect(
+      internalExactCandidateSchema.safeParse({ ...base, confirmation: rejected, execution: receipt }).success,
+    ).toBe(false);
     expect(internalExactCandidateSchema.safeParse({ ...approved, execution: receipt }).success).toBe(true);
   });
 });
 
 describe("exact candidate execution-boundary vectors", () => {
-  it("freezes a strict injective canonical selection frame and digest",()=>{expect(canonicalExactCandidateSelectionFrame(selection())).toBe("{\"candidateId\":\"candidate-1\",\"choices\":[],\"domain\":\"velvet.exact-candidate.selection.v1\",\"kind\":\"actor.travel\",\"version\":\"v1\"}");
-    expect(computeExactCandidateSelectionDigest(selection(),crypto)).toBe("0a424bea3e89ef959918b1ca5f47d099cf326bec64c4ac0f6498f21d1474891d");expect(()=>canonicalExactCandidateSelectionFrame({...selection(),extra:true})).toThrow();});
-  it("freezes and verifies the complete execution result frame",()=>{const base=candidate(),linkedUnsigned={...base,execution:{state:"receipt-linked" as const,receiptId:"execution-1",binding:{...candidateBinding(base),commandId:"command-1"},linkedAt:"2030-01-01T00:00:30.000Z"}};
-    const linkedCandidate=sealCandidateState(linkedUnsigned),unsigned={version:"v1" as const,executionId:"execution-1",selection:selection(),canonicalSelectionDigest:computeExactCandidateSelectionDigest(selection(),crypto),linkedCandidate,
-      actorTravelResult:{campaignId:"campaign-1",sessionId:"session-1",locations:[{actorId:"actor-1",locationId:"location-2",revision:1,updatedAt:"2030-01-01T00:00:30.000Z"}],discoveries:[{actorId:"actor-1",locationId:"location-2",discoveredAt:"2030-01-01T00:00:30.000Z"}],receipt:{commandId:"command-1",idempotencyKey:`exact-candidate:${base.canonicalActionDigest}`,revisionBefore:4,revisionAfter:5,occurredAt:"2030-01-01T00:00:30.000Z"}},canonicalResultDigest:"0".repeat(64)};
-    const result={...unsigned,canonicalResultDigest:computeExactCandidateExecutionResultDigest(unsigned,crypto)};expect(canonicalExactCandidateExecutionResultFrame(result)).toContain("\"domain\":\"velvet.exact-candidate.execution-result.v1\"");
-    expect(result.canonicalResultDigest).toBe("f8184bd63ad2138bb67512ef19546b30edadbb66f02b401b4486530490261bdd");expect(verifyExactCandidateExecutionResult(result,crypto)).toBe(true);
-    expect(verifyExactCandidateExecutionResult({...result,canonicalSelectionDigest:"f".repeat(64)},crypto)).toBe(false);expect(verifyExactCandidateExecutionResult({...result,canonicalResultDigest:"f".repeat(64)},crypto)).toBe(false);});
-  it("structurally rejects a receipt idempotency key not derived from the linked action",()=>{const base=candidate(),linked=sealCandidateState({...base,execution:{state:"receipt-linked" as const,receiptId:"execution-1",binding:{...candidateBinding(base),commandId:"command-1"},linkedAt:"2030-01-01T00:00:30.000Z"}});
-    const malformed={version:"v1",executionId:"execution-1",selection:selection(),canonicalSelectionDigest:"0".repeat(64),linkedCandidate:linked,actorTravelResult:{campaignId:"campaign-1",sessionId:"session-1",locations:[{actorId:"actor-1",locationId:"location-2",revision:1,updatedAt:"2030-01-01T00:00:30.000Z"}],discoveries:[{actorId:"actor-1",locationId:"location-2",discoveredAt:"2030-01-01T00:00:30.000Z"}],receipt:{commandId:"command-1",idempotencyKey:"wrong",revisionBefore:4,revisionAfter:5,occurredAt:"2030-01-01T00:00:30.000Z"}},canonicalResultDigest:"0".repeat(64)};expect(verifyExactCandidateExecutionResult(malformed,crypto)).toBe(false);});
+  it("freezes a strict injective canonical selection frame and digest", () => {
+    expect(canonicalExactCandidateSelectionFrame(selection())).toBe(
+      '{"candidateId":"candidate-1","choices":[],"domain":"velvet.exact-candidate.selection.v1","kind":"actor.travel","version":"v1"}',
+    );
+    expect(computeExactCandidateSelectionDigest(selection(), crypto)).toBe(
+      "0a424bea3e89ef959918b1ca5f47d099cf326bec64c4ac0f6498f21d1474891d",
+    );
+    expect(() => canonicalExactCandidateSelectionFrame({ ...selection(), extra: true })).toThrow();
+  });
+  it("freezes and verifies the complete execution result frame", () => {
+    const base = candidate(),
+      linkedUnsigned = {
+        ...base,
+        execution: {
+          state: "receipt-linked" as const,
+          receiptId: "execution-1",
+          binding: { ...candidateBinding(base), commandId: "command-1" },
+          linkedAt: "2030-01-01T00:00:30.000Z",
+        },
+      };
+    const linkedCandidate = sealCandidateState(linkedUnsigned),
+      unsigned = {
+        version: "v1" as const,
+        executionId: "execution-1",
+        selection: selection(),
+        canonicalSelectionDigest: computeExactCandidateSelectionDigest(selection(), crypto),
+        linkedCandidate,
+        actorTravelResult: {
+          campaignId: "campaign-1",
+          sessionId: "session-1",
+          locations: [
+            { actorId: "actor-1", locationId: "location-2", revision: 1, updatedAt: "2030-01-01T00:00:30.000Z" },
+          ],
+          discoveries: [{ actorId: "actor-1", locationId: "location-2", discoveredAt: "2030-01-01T00:00:30.000Z" }],
+          receipt: {
+            commandId: "command-1",
+            idempotencyKey: `exact-candidate:${base.canonicalActionDigest}`,
+            revisionBefore: 4,
+            revisionAfter: 5,
+            occurredAt: "2030-01-01T00:00:30.000Z",
+          },
+        },
+        canonicalResultDigest: "0".repeat(64),
+      };
+    const result = { ...unsigned, canonicalResultDigest: computeExactCandidateExecutionResultDigest(unsigned, crypto) };
+    expect(canonicalExactCandidateExecutionResultFrame(result)).toContain(
+      '"domain":"velvet.exact-candidate.execution-result.v1"',
+    );
+    expect(result.canonicalResultDigest).toBe("f8184bd63ad2138bb67512ef19546b30edadbb66f02b401b4486530490261bdd");
+    expect(verifyExactCandidateExecutionResult(result, crypto)).toBe(true);
+    expect(verifyExactCandidateExecutionResult({ ...result, canonicalSelectionDigest: "f".repeat(64) }, crypto)).toBe(
+      false,
+    );
+    expect(verifyExactCandidateExecutionResult({ ...result, canonicalResultDigest: "f".repeat(64) }, crypto)).toBe(
+      false,
+    );
+  });
+  it("structurally rejects a receipt idempotency key not derived from the linked action", () => {
+    const base = candidate(),
+      linked = sealCandidateState({
+        ...base,
+        execution: {
+          state: "receipt-linked" as const,
+          receiptId: "execution-1",
+          binding: { ...candidateBinding(base), commandId: "command-1" },
+          linkedAt: "2030-01-01T00:00:30.000Z",
+        },
+      });
+    const malformed = {
+      version: "v1",
+      executionId: "execution-1",
+      selection: selection(),
+      canonicalSelectionDigest: "0".repeat(64),
+      linkedCandidate: linked,
+      actorTravelResult: {
+        campaignId: "campaign-1",
+        sessionId: "session-1",
+        locations: [
+          { actorId: "actor-1", locationId: "location-2", revision: 1, updatedAt: "2030-01-01T00:00:30.000Z" },
+        ],
+        discoveries: [{ actorId: "actor-1", locationId: "location-2", discoveredAt: "2030-01-01T00:00:30.000Z" }],
+        receipt: {
+          commandId: "command-1",
+          idempotencyKey: "wrong",
+          revisionBefore: 4,
+          revisionAfter: 5,
+          occurredAt: "2030-01-01T00:00:30.000Z",
+        },
+      },
+      canonicalResultDigest: "0".repeat(64),
+    };
+    expect(verifyExactCandidateExecutionResult(malformed, crypto)).toBe(false);
+  });
   it("accepts only the exact current selection without granting authority", () => {
     const result = validateExactCandidateSelection(selection(), [candidate()], context());
     expect(result).toMatchObject({ ok: true, authorityRecheckRequired: true });
@@ -311,40 +611,148 @@ describe("exact candidate execution-boundary vectors", () => {
   });
 
   it.each([
-    ["unknown candidate", { ...selection(), candidateId: "candidate-unknown" }, candidate(), context(), "unknown-candidate"],
+    [
+      "unknown candidate",
+      { ...selection(), candidateId: "candidate-unknown" },
+      candidate(),
+      context(),
+      "unknown-candidate",
+    ],
     ["tampered kind", { ...selection(), kind: "actor.rest" }, candidate(), context(), "invalid-response"],
-    ["tampered visible choice", { ...selection(), choices: [{ choiceId: "destination", optionId: "hidden-world-edge-7" }] }, candidate(), context(), "invalid-response"],
-    ["extra provider argument", { ...selection(), connectionId: "hidden-world-edge-7" }, candidate(), context(), "invalid-response"],
-    ["valid-hex digest substitution", selection(), { ...candidate(), canonicalActionDigest: "f".repeat(64) }, context(), "tampered-candidate"],
-    ["private parameter substitution", selection(), { ...candidate(), privateParameters: { ...candidate().privateParameters, connectionId: "hidden-world-edge-8" } }, context(), "tampered-candidate"],
-    ["private party substitution", selection(), { ...candidate(), privateParameters: { ...candidate().privateParameters, partyActorIds: ["actor-1", "actor-3"] } }, context(), "tampered-candidate"],
+    [
+      "tampered visible choice",
+      { ...selection(), choices: [{ choiceId: "destination", optionId: "hidden-world-edge-7" }] },
+      candidate(),
+      context(),
+      "invalid-response",
+    ],
+    [
+      "extra provider argument",
+      { ...selection(), connectionId: "hidden-world-edge-7" },
+      candidate(),
+      context(),
+      "invalid-response",
+    ],
+    [
+      "valid-hex digest substitution",
+      selection(),
+      { ...candidate(), canonicalActionDigest: "f".repeat(64) },
+      context(),
+      "tampered-candidate",
+    ],
+    [
+      "private parameter substitution",
+      selection(),
+      { ...candidate(), privateParameters: { ...candidate().privateParameters, connectionId: "hidden-world-edge-8" } },
+      context(),
+      "tampered-candidate",
+    ],
+    [
+      "private party substitution",
+      selection(),
+      {
+        ...candidate(),
+        privateParameters: { ...candidate().privateParameters, partyActorIds: ["actor-1", "actor-3"] },
+      },
+      context(),
+      "tampered-candidate",
+    ],
     ["expired candidate", selection(), candidate(), { ...context(), now: EXPIRES_AT }, "expired"],
-    ["not-yet-issued candidate", selection(), candidate(), { ...context(), now: "2029-12-31T23:59:59.999Z" }, "expired"],
-    ["stale world revision", selection(), candidate(), { ...context(), observedRevisions: { world: 5 } }, "stale-revision"],
+    [
+      "not-yet-issued candidate",
+      selection(),
+      candidate(),
+      { ...context(), now: "2029-12-31T23:59:59.999Z" },
+      "expired",
+    ],
+    [
+      "stale world revision",
+      selection(),
+      candidate(),
+      { ...context(), observedRevisions: { world: 5 } },
+      "stale-revision",
+    ],
     ["missing world revision", selection(), candidate(), { ...context(), observedRevisions: {} }, "invalid-context"],
     ["cross-campaign", selection(), candidate(), { ...context(), campaignId: "campaign-2" }, "cross-scope"],
     ["cross-session", selection(), candidate(), { ...context(), sessionId: "session-2" }, "cross-scope"],
     ["cross-actor", selection(), candidate(), { ...context(), actorId: "actor-2" }, "cross-scope"],
     ["cross-principal", selection(), candidate(), { ...context(), principalId: "principal-2" }, "cross-scope"],
-    ["cross-connection", selection(), candidate(), { ...context(), connectionId: "provider-connection-2" }, "cross-scope"],
-    ["denied policy", selection(), sealCandidateState({ ...candidate(), policy: { kind: "actor.travel", result: "denied", reason: "party-ineligible" } }), context(), "policy-denied"],
-    ["pending confirmation", selection(), sealCandidateState({ ...candidate(), confirmation: { requirement: "required", authorizer: "controller", decision: { state: "pending" } } }), context(), "confirmation-required"],
+    [
+      "cross-connection",
+      selection(),
+      candidate(),
+      { ...context(), connectionId: "provider-connection-2" },
+      "cross-scope",
+    ],
+    [
+      "denied policy",
+      selection(),
+      sealCandidateState({
+        ...candidate(),
+        policy: { kind: "actor.travel", result: "denied", reason: "party-ineligible" },
+      }),
+      context(),
+      "policy-denied",
+    ],
+    [
+      "pending confirmation",
+      selection(),
+      sealCandidateState({
+        ...candidate(),
+        confirmation: { requirement: "required", authorizer: "controller", decision: { state: "pending" } },
+      }),
+      context(),
+      "confirmation-required",
+    ],
   ])("rejects %s", (_name, response, knownCandidate, boundaryContext, code) => {
     expect(validateExactCandidateSelection(response, [knownCandidate], boundaryContext)).toEqual({ ok: false, code });
   });
 
   it("rejects every valid-shape execution-gate mutation against the sealed envelope", () => {
     const base = candidate();
-    const denied = sealCandidateState({ ...base, policy: { kind: "actor.travel", result: "denied", reason: "party-ineligible" } });
-    const required = sealCandidateState({ ...base, confirmation: { requirement: "required" as const, authorizer: "controller" as const,
-      decision: { state: "pending" as const } } });
+    const denied = sealCandidateState({
+      ...base,
+      policy: { kind: "actor.travel", result: "denied", reason: "party-ineligible" },
+    });
+    const required = sealCandidateState({
+      ...base,
+      confirmation: {
+        requirement: "required" as const,
+        authorizer: "controller" as const,
+        decision: { state: "pending" as const },
+      },
+    });
     const shortLived = sealCandidateState({ ...base, expiresAt: "2030-01-01T00:04:00.000Z" });
-    const superseded = sealCandidateState({ ...base, supersession: { state: "superseded" as const, supersededAt: EXPIRES_AT,
-      replacement: { candidateId: "candidate-2", kind: base.kind, version: base.version, scope: base.scope } } });
-    const receiptLinked = sealCandidateState({ ...base, execution: { state: "receipt-linked" as const, receiptId: "receipt-1",
-      binding: { ...candidateBinding(base), commandId: "command-1" }, linkedAt: "2030-01-01T00:00:30.000Z" } });
-    const approved = sealCandidateState({ ...base, confirmation: { requirement: "required" as const, authorizer: "controller" as const,
-      decision: { state: "approved" as const, decisionId: "decision-1", binding: candidateBinding(base), decidedAt: "2030-01-01T00:00:30.000Z" } } });
+    const superseded = sealCandidateState({
+      ...base,
+      supersession: {
+        state: "superseded" as const,
+        supersededAt: EXPIRES_AT,
+        replacement: { candidateId: "candidate-2", kind: base.kind, version: base.version, scope: base.scope },
+      },
+    });
+    const receiptLinked = sealCandidateState({
+      ...base,
+      execution: {
+        state: "receipt-linked" as const,
+        receiptId: "receipt-1",
+        binding: { ...candidateBinding(base), commandId: "command-1" },
+        linkedAt: "2030-01-01T00:00:30.000Z",
+      },
+    });
+    const approved = sealCandidateState({
+      ...base,
+      confirmation: {
+        requirement: "required" as const,
+        authorizer: "controller" as const,
+        decision: {
+          state: "approved" as const,
+          decisionId: "decision-1",
+          binding: candidateBinding(base),
+          decidedAt: "2030-01-01T00:00:30.000Z",
+        },
+      },
+    });
     const mutations = [
       { ...denied, policy: { kind: "actor.travel", result: "allowed", reason: "legal-visible-connection" } },
       { ...required, confirmation: { requirement: "not-required", decision: { state: "not-applicable" } } },
@@ -352,23 +760,52 @@ describe("exact candidate execution-boundary vectors", () => {
       { ...base, issuedAt: "2030-01-01T00:00:01.000Z" },
       { ...superseded, supersession: { state: "current" } },
       { ...receiptLinked, execution: { state: "unexecuted" } },
-      { ...approved, confirmation: { ...approved.confirmation,
-        decision: { ...approved.confirmation.decision, decisionId: "decision-2" } } },
+      {
+        ...approved,
+        confirmation: {
+          ...approved.confirmation,
+          decision: { ...approved.confirmation.decision, decisionId: "decision-2" },
+        },
+      },
       { ...base, canonicalEnvelopeDigest: "f".repeat(64) },
     ];
     for (const mutation of mutations) {
       expect(internalExactCandidateSchema.safeParse(mutation).success).toBe(true);
-      expect(validateExactCandidateSelection(selection(), [mutation], context())).toEqual({ ok: false, code: "tampered-candidate" });
+      expect(validateExactCandidateSelection(selection(), [mutation], context())).toEqual({
+        ok: false,
+        code: "tampered-candidate",
+      });
     }
   });
 
   it("requires an exact bound approval no later than now and expiry", () => {
     const base = candidate();
-    const approval = (decidedAt: string) => ({ ...base, confirmation: { requirement: "required" as const, authorizer: "controller" as const,
-      decision: { state: "approved" as const, decisionId: "decision-1", binding: candidateBinding(base), decidedAt } } });
-    expect(validateExactCandidateSelection(selection(), [sealCandidateState(approval("2030-01-01T00:00:30.000Z"))], context())).toMatchObject({ ok: true });
-    expect(validateExactCandidateSelection(selection(), [sealCandidateState(approval("2030-01-01T00:02:00.000Z"))], context())).toEqual({ ok: false, code: "invalid-decision" });
-    expect(validateExactCandidateSelection(selection(), [approval("2030-01-01T00:05:00.001Z")], context())).toEqual({ ok: false, code: "tampered-candidate" });
+    const approval = (decidedAt: string) => ({
+      ...base,
+      confirmation: {
+        requirement: "required" as const,
+        authorizer: "controller" as const,
+        decision: { state: "approved" as const, decisionId: "decision-1", binding: candidateBinding(base), decidedAt },
+      },
+    });
+    expect(
+      validateExactCandidateSelection(
+        selection(),
+        [sealCandidateState(approval("2030-01-01T00:00:30.000Z"))],
+        context(),
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      validateExactCandidateSelection(
+        selection(),
+        [sealCandidateState(approval("2030-01-01T00:02:00.000Z"))],
+        context(),
+      ),
+    ).toEqual({ ok: false, code: "invalid-decision" });
+    expect(validateExactCandidateSelection(selection(), [approval("2030-01-01T00:05:00.001Z")], context())).toEqual({
+      ok: false,
+      code: "tampered-candidate",
+    });
   });
 
   it("strictly parses canonical runtime context and never throws for malformed data", () => {
@@ -382,7 +819,10 @@ describe("exact candidate execution-boundary vectors", () => {
     ];
     for (const runtimeContext of invalidContexts) {
       expect(() => validateExactCandidateSelection(selection(), [candidate()], runtimeContext)).not.toThrow();
-      expect(validateExactCandidateSelection(selection(), [candidate()], runtimeContext)).toEqual({ ok: false, code: "invalid-context" });
+      expect(validateExactCandidateSelection(selection(), [candidate()], runtimeContext)).toEqual({
+        ok: false,
+        code: "invalid-context",
+      });
     }
   });
 
@@ -391,34 +831,59 @@ describe("exact candidate execution-boundary vectors", () => {
       { sha256: () => "A".repeat(64) },
       { sha256: () => "a".repeat(63) },
       { sha256: () => "g".repeat(64) },
-      { sha256: () => { throw new Error("crypto unavailable"); } },
+      {
+        sha256: () => {
+          throw new Error("crypto unavailable");
+        },
+      },
     ]) {
-      expect(() => validateExactCandidateSelectionWithCrypto(selection(), [candidate()], context(), trustedCrypto)).not.toThrow();
-      expect(validateExactCandidateSelectionWithCrypto(selection(), [candidate()], context(), trustedCrypto))
-        .toEqual({ ok: false, code: "tampered-candidate" });
+      expect(() =>
+        validateExactCandidateSelectionWithCrypto(selection(), [candidate()], context(), trustedCrypto),
+      ).not.toThrow();
+      expect(validateExactCandidateSelectionWithCrypto(selection(), [candidate()], context(), trustedCrypto)).toEqual({
+        ok: false,
+        code: "tampered-candidate",
+      });
     }
   });
 
   it("rejects duplicate candidate IDs before selection", () => {
-    expect(validateExactCandidateSelection(selection(), [candidate(), candidate()], context()))
-      .toEqual({ ok: false, code: "duplicate-candidate-id" });
+    expect(validateExactCandidateSelection(selection(), [candidate(), candidate()], context())).toEqual({
+      ok: false,
+      code: "duplicate-candidate-id",
+    });
   });
 
   it("rejects superseded and receipt-linked candidates with exact bindings", () => {
     const base = candidate();
     const replacement = { candidateId: "candidate-2", kind: base.kind, version: base.version, scope: base.scope };
-    expect(validateExactCandidateSelection(selection(), [sealCandidateState({ ...base, supersession: { state: "superseded", supersededAt: EXPIRES_AT, replacement } })], context()))
-      .toEqual({ ok: false, code: "superseded" });
-    const execution = { state: "receipt-linked" as const, receiptId: "receipt-1",
-      binding: { ...candidateBinding(base), commandId: "command-1" }, linkedAt: "2030-01-01T00:00:30.000Z" };
-    expect(validateExactCandidateSelection(selection(), [sealCandidateState({ ...base, execution })], context()))
-      .toEqual({ ok: false, code: "already-executed" });
+    expect(
+      validateExactCandidateSelection(
+        selection(),
+        [sealCandidateState({ ...base, supersession: { state: "superseded", supersededAt: EXPIRES_AT, replacement } })],
+        context(),
+      ),
+    ).toEqual({ ok: false, code: "superseded" });
+    const execution = {
+      state: "receipt-linked" as const,
+      receiptId: "receipt-1",
+      binding: { ...candidateBinding(base), commandId: "command-1" },
+      linkedAt: "2030-01-01T00:00:30.000Z",
+    };
+    expect(
+      validateExactCandidateSelection(selection(), [sealCandidateState({ ...base, execution })], context()),
+    ).toEqual({ ok: false, code: "already-executed" });
   });
 
   it("rejects unknown fields, versions, and unbounded batches", () => {
     expect(exactCandidateSelectionResponseSchema.safeParse({ ...selection(), unexpected: true }).success).toBe(false);
     expect(exactCandidateSelectionResponseSchema.safeParse({ ...selection(), version: "v2" }).success).toBe(false);
-    expect(validateExactCandidateSelection(selection(), Array.from({ length: 33 }, (_, index) => ({ ...candidate(), candidateId: `candidate-${index}` })), context()))
-      .toEqual({ ok: false, code: "invalid-response" });
+    expect(
+      validateExactCandidateSelection(
+        selection(),
+        Array.from({ length: 33 }, (_, index) => ({ ...candidate(), candidateId: `candidate-${index}` })),
+        context(),
+      ),
+    ).toEqual({ ok: false, code: "invalid-response" });
   });
 });

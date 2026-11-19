@@ -162,7 +162,11 @@ describe("pure deterministic dice expression evaluator", () => {
     for (const expression of ["3d6", "3d6kh1", "3d6kl2"] as const) {
       const harness = recordingRng([1, 2, 6]);
       evaluateDiceExpression(expression, harness.rng);
-      expect(harness.calls).toEqual([[1, 7], [1, 7], [1, 7]]);
+      expect(harness.calls).toEqual([
+        [1, 7],
+        [1, 7],
+        [1, 7],
+      ]);
       expect(harness.consumed()).toBe(3);
     }
   });
@@ -171,13 +175,16 @@ describe("pure deterministic dice expression evaluator", () => {
     for (const expression of ["1d1000adv", "1d1000dis"] as const) {
       const harness = recordingRng([1, 1_000]);
       evaluateDiceExpression(expression, harness.rng);
-      expect(harness.calls).toEqual([[1, 1_001], [1, 1_001]]);
+      expect(harness.calls).toEqual([
+        [1, 1_001],
+        [1, 1_001],
+      ]);
       expect(harness.consumed()).toBe(2);
     }
   });
 
   it("supports the maximum 100d1000 roll and contract total bounds", () => {
-    const values = Array.from({ length: 100 }, (_, index) => index === 0 ? 1 : 1_000);
+    const values = Array.from({ length: 100 }, (_, index) => (index === 0 ? 1 : 1_000));
     const harness = recordingRng(values);
     const result = evaluateDiceExpression("100d1000+1000", harness.rng);
     expect(result.terms).toHaveLength(100);
@@ -214,7 +221,10 @@ describe("pure deterministic dice expression evaluator", () => {
       expect(() => evaluateDiceExpression("3d6", harness.rng)).toThrow(
         "random number generator returned an invalid die value",
       );
-      expect(harness.calls).toEqual([[1, 7], [1, 7]]);
+      expect(harness.calls).toEqual([
+        [1, 7],
+        [1, 7],
+      ]);
       expect(harness.consumed()).toBe(2);
     }
   });

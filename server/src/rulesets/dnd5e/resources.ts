@@ -1,5 +1,10 @@
 import type {
-  ResourceCost, ResourceCostPlan, ResourcePool, RulesetCapability, SpellCostInput, SpellCostPlan,
+  ResourceCost,
+  ResourceCostPlan,
+  ResourcePool,
+  RulesetCapability,
+  SpellCostInput,
+  SpellCostPlan,
 } from "../types.js";
 import { frozenList, requireNonNegativeInteger } from "./internal.js";
 
@@ -8,7 +13,10 @@ export const DND_5E_RESOURCE_CAPABILITIES: readonly RulesetCapability[] = Object
   Object.freeze({ id: "spell-costs", version: "1.2.0", status: "partial" as const }),
 ]);
 
-export function planDnd5eResourceCosts(pools: readonly ResourcePool[], costs: readonly ResourceCost[]): ResourceCostPlan {
+export function planDnd5eResourceCosts(
+  pools: readonly ResourcePool[],
+  costs: readonly ResourceCost[],
+): ResourceCostPlan {
   const reasons: string[] = [];
   const amounts = new Map<string, number>();
   const poolIds = new Set<string>();
@@ -29,8 +37,15 @@ export function planDnd5eResourceCosts(pools: readonly ResourcePool[], costs: re
     else if (amount > pool.current) reasons.push(`insufficient resource: ${id}`);
   });
   const legal = reasons.length === 0;
-  const resultingPools = pools.map((pool) => Object.freeze({ ...pool, current: legal ? pool.current - (amounts.get(pool.id) ?? 0) : pool.current }));
-  return Object.freeze({ legal, costs: frozenList(costs.map((cost) => Object.freeze({ ...cost }))), resultingPools: frozenList(resultingPools), reasons: frozenList(reasons) });
+  const resultingPools = pools.map((pool) =>
+    Object.freeze({ ...pool, current: legal ? pool.current - (amounts.get(pool.id) ?? 0) : pool.current }),
+  );
+  return Object.freeze({
+    legal,
+    costs: frozenList(costs.map((cost) => Object.freeze({ ...cost }))),
+    resultingPools: frozenList(resultingPools),
+    reasons: frozenList(reasons),
+  });
 }
 
 export function planDnd5eSpellCost(input: SpellCostInput): SpellCostPlan {
@@ -39,10 +54,17 @@ export function planDnd5eSpellCost(input: SpellCostInput): SpellCostPlan {
   const reasons: string[] = [];
   if (input.spellLevel > 9 || input.slotLevel > 9) reasons.push("spell and slot levels must not exceed 9");
   if (input.spellLevel > 0 && input.slotLevel < input.spellLevel) reasons.push("slot level is below spell level");
-  if (input.spellLevel > 0 && (input.slots[input.slotLevel] ?? 0) < 1) reasons.push("no spell slot is available at that level");
+  if (input.spellLevel > 0 && (input.slots[input.slotLevel] ?? 0) < 1)
+    reasons.push("no spell slot is available at that level");
   if (input.consumesMaterial && !input.materialAvailable) reasons.push("consumed material is unavailable");
   const legal = reasons.length === 0;
   const resultingSlots = { ...input.slots };
   if (legal && input.spellLevel > 0) resultingSlots[input.slotLevel] = resultingSlots[input.slotLevel]! - 1;
-  return Object.freeze({ legal, slotLevel: input.slotLevel, resultingSlots: Object.freeze(resultingSlots), consumesMaterial: legal && (input.consumesMaterial ?? false), reasons: frozenList(reasons) });
+  return Object.freeze({
+    legal,
+    slotLevel: input.slotLevel,
+    resultingSlots: Object.freeze(resultingSlots),
+    consumesMaterial: legal && (input.consumesMaterial ?? false),
+    reasons: frozenList(reasons),
+  });
 }

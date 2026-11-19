@@ -40,12 +40,19 @@ function documentedOperations(): DocumentedOperation[] {
       malformed.push(line);
       continue;
     }
-    rows.push({ method: match[1]!, route: match[2]!, inventoryClass: match[3]! as DocumentedOperation["inventoryClass"] });
+    rows.push({
+      method: match[1]!,
+      route: match[2]!,
+      inventoryClass: match[3]! as DocumentedOperation["inventoryClass"],
+    });
   }
   expect(malformed, "malformed API inventory rows").toEqual([]);
   const keys = rows.map(operationKey);
   expect(new Set(keys).size, "duplicate API inventory operations").toBe(keys.length);
-  expect(rows.every(({ route }) => route.startsWith("/api/rpg/v1") && !route.includes("?")), "canonical API inventory routes").toBe(true);
+  expect(
+    rows.every(({ route }) => route.startsWith("/api/rpg/v1") && !route.includes("?")),
+    "canonical API inventory routes",
+  ).toBe(true);
   return rows;
 }
 
@@ -58,7 +65,9 @@ function markdownFiles(): string[] {
     "server/src/content/mechanicsStarterCatalog.provenance.md",
     "server/src/content/originalStarterManifest.provenance.md",
   ];
-  return [...rootFiles, ...docs, ...maintainedInternal].filter((relativePath) => existsSync(path.join(ROOT, relativePath)));
+  return [...rootFiles, ...docs, ...maintainedInternal].filter((relativePath) =>
+    existsSync(path.join(ROOT, relativePath)),
+  );
 }
 
 function visibleMarkdownLines(source: string): Array<string | null> {
@@ -113,13 +122,22 @@ function inlineLinkTargets(line: string): { targets: string[]; unterminated: boo
     let end = start + 2;
     for (; end < source.length; end += 1) {
       const character = source[end]!;
-      if (escaped) { escaped = false; continue; }
-      if (character === "\\") { escaped = true; continue; }
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === "\\") {
+        escaped = true;
+        continue;
+      }
       if (character === "(") depth += 1;
       if (character === ")") depth -= 1;
       if (depth === 0) break;
     }
-    if (depth !== 0) { unterminated = true; continue; }
+    if (depth !== 0) {
+      unterminated = true;
+      continue;
+    }
     targets.push(source.slice(start + 2, end));
   }
   return { targets, unterminated };
@@ -132,7 +150,10 @@ function linkTargets(line: string): string[] {
   return targets;
 }
 
-function referenceLinkTargets(line: string, definitions: ReadonlyMap<string, string>): { targets: string[]; undefinedLabels: string[] } {
+function referenceLinkTargets(
+  line: string,
+  definitions: ReadonlyMap<string, string>,
+): { targets: string[]; undefinedLabels: string[] } {
   const targets: string[] = [];
   const undefinedLabels: string[] = [];
   for (const reference of line.matchAll(/(?<!!)\[([^\]]+)\]\[([^\]]*)\]/g)) {
@@ -166,15 +187,24 @@ function environmentUsageInSource(source: string, relativePath: string): { keys:
   const dynamic: string[] = [];
   const unwrap = (value: ts.Node): ts.Node => {
     let node = value;
-    while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
-      || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node)) node = node.expression;
+    while (
+      ts.isParenthesizedExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isTypeAssertionExpression(node) ||
+      ts.isNonNullExpression(node) ||
+      ts.isSatisfiesExpression(node)
+    )
+      node = node.expression;
     return node;
   };
   const staticMember = (value: ts.Node): { expression: ts.Expression; name: string } | null => {
     const node = unwrap(value);
     if (ts.isPropertyAccessExpression(node)) return { expression: node.expression, name: node.name.text };
-    if (ts.isElementAccessExpression(node) && node.argumentExpression
-      && (ts.isStringLiteral(node.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))) {
+    if (
+      ts.isElementAccessExpression(node) &&
+      node.argumentExpression &&
+      (ts.isStringLiteral(node.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))
+    ) {
       return { expression: node.expression, name: node.argumentExpression.text };
     }
     return null;
@@ -191,19 +221,32 @@ function environmentUsageInSource(source: string, relativePath: string): { keys:
   const isProcessEnv = (value: ts.Node, scopes: readonly Scope[]): boolean => {
     const member = staticMember(value);
     const expression = member ? unwrap(member.expression) : null;
-    return member?.name === "env" && expression !== null && ts.isIdentifier(expression) && expression.text === "process"
-      && resolveBinding("process", scopes) === undefined;
+    return (
+      member?.name === "env" &&
+      expression !== null &&
+      ts.isIdentifier(expression) &&
+      expression.text === "process" &&
+      resolveBinding("process", scopes) === undefined
+    );
   };
   const isImportMetaEnv = (value: ts.Node): boolean => {
     const member = staticMember(value);
     const expression = member ? unwrap(member.expression) : null;
-    return member?.name === "env" && expression !== null && ts.isMetaProperty(expression)
-      && expression.keywordToken === ts.SyntaxKind.ImportKeyword;
+    return (
+      member?.name === "env" &&
+      expression !== null &&
+      ts.isMetaProperty(expression) &&
+      expression.keywordToken === ts.SyntaxKind.ImportKeyword
+    );
   };
   const isEnvironment = (value: ts.Node | undefined, scopes: readonly Scope[]): boolean => {
     if (!value) return false;
     const node = unwrap(value);
-    return isProcessEnv(node, scopes) || isImportMetaEnv(node) || (ts.isIdentifier(node) && resolveBinding(node.text, scopes) === true);
+    return (
+      isProcessEnv(node, scopes) ||
+      isImportMetaEnv(node) ||
+      (ts.isIdentifier(node) && resolveBinding(node.text, scopes) === true)
+    );
   };
   const environmentTypes = new Set(["ProcessEnv", "NodeJS.ProcessEnv"]);
   let discoveredType = true;
@@ -212,14 +255,21 @@ function environmentUsageInSource(source: string, relativePath: string): { keys:
     for (const statement of sourceFile.statements) {
       if (!ts.isTypeAliasDeclaration(statement) || environmentTypes.has(statement.name.text)) continue;
       const definition = statement.type.getText(sourceFile);
-      if ([...environmentTypes].some((name) => new RegExp(`(^|\\W)${name.replace(".", "\\.")}(?:$|\\W)`).test(definition))) {
+      if (
+        [...environmentTypes].some((name) => new RegExp(`(^|\\W)${name.replace(".", "\\.")}(?:$|\\W)`).test(definition))
+      ) {
         environmentTypes.add(statement.name.text);
         discoveredType = true;
       }
     }
   }
-  const isEnvironmentType = (type: ts.TypeNode | undefined): boolean => Boolean(type
-    && [...environmentTypes].some((name) => new RegExp(`(^|\\W)${name.replace(".", "\\.")}(?:$|\\W)`).test(type.getText(sourceFile))));
+  const isEnvironmentType = (type: ts.TypeNode | undefined): boolean =>
+    Boolean(
+      type &&
+      [...environmentTypes].some((name) =>
+        new RegExp(`(^|\\W)${name.replace(".", "\\.")}(?:$|\\W)`).test(type.getText(sourceFile)),
+      ),
+    );
   const recordEnvironmentBinding = (name: ts.BindingName): void => {
     if (!ts.isObjectBindingPattern(name)) return;
     for (const element of name.elements) {
@@ -229,8 +279,12 @@ function environmentUsageInSource(source: string, relativePath: string): { keys:
     }
   };
   const declareBinding = (name: ts.BindingName, environment: boolean, scope: Scope): void => {
-    if (ts.isIdentifier(name)) { scope.set(name.text, environment); return; }
-    for (const element of name.elements) if (!ts.isOmittedExpression(element)) declareBinding(element.name, false, scope);
+    if (ts.isIdentifier(name)) {
+      scope.set(name.text, environment);
+      return;
+    }
+    for (const element of name.elements)
+      if (!ts.isOmittedExpression(element)) declareBinding(element.name, false, scope);
   };
   const visit = (node: ts.Node, scopes: Scope[]): void => {
     if (ts.isFunctionLike(node)) {
@@ -264,7 +318,10 @@ function environmentUsageInSource(source: string, relativePath: string): { keys:
     }
     if (ts.isPropertyAccessExpression(node) && isEnvironment(node.expression, scopes)) keys.add(node.name.text);
     if (ts.isElementAccessExpression(node) && isEnvironment(node.expression, scopes)) {
-      if (node.argumentExpression && (ts.isStringLiteral(node.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))) {
+      if (
+        node.argumentExpression &&
+        (ts.isStringLiteral(node.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))
+      ) {
         keys.add(node.argumentExpression.text);
       } else dynamic.push(`${relativePath}:${lineOf(node)}`);
     }
@@ -279,20 +336,30 @@ function explicitHeadRegistrations(source: string, relativePath: string): string
   const sourceFile = ts.createSourceFile(relativePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const findings: string[] = [];
   const lineOf = (node: ts.Node) => sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-  const memberName = (node: ts.Node): string | null => ts.isPropertyAccessExpression(node) ? node.name.text
-    : ts.isElementAccessExpression(node) && node.argumentExpression
-      && (ts.isStringLiteral(node.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))
-      ? node.argumentExpression.text : null;
+  const memberName = (node: ts.Node): string | null =>
+    ts.isPropertyAccessExpression(node)
+      ? node.name.text
+      : ts.isElementAccessExpression(node) &&
+          node.argumentExpression &&
+          (ts.isStringLiteral(node.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))
+        ? node.argumentExpression.text
+        : null;
   const visit = (node: ts.Node): void => {
-    if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && memberName(node) === "head"
-      && !(ts.isCallExpression(node.parent) && node.parent.expression === node)) {
+    if (
+      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+      memberName(node) === "head" &&
+      !(ts.isCallExpression(node.parent) && node.parent.expression === node)
+    ) {
       findings.push(`${relativePath}:${lineOf(node)} explicit .head reference`);
     }
-    if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name)
-      && node.name.elements.some((element) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isObjectBindingPattern(node.name) &&
+      node.name.elements.some((element) => {
         const key = element.propertyName ?? element.name;
         return (ts.isIdentifier(key) || ts.isStringLiteral(key)) && key.text === "head";
-      })) {
+      })
+    ) {
       findings.push(`${relativePath}:${lineOf(node)} explicit .head binding`);
     }
     if (ts.isCallExpression(node)) {
@@ -301,18 +368,29 @@ function explicitHeadRegistrations(source: string, relativePath: string): string
       if (method === "head") findings.push(`${relativePath}:${lineOf(node)} explicit .head registration`);
       if (method === "route") {
         const options = node.arguments[0];
-        const method = options && ts.isObjectLiteralExpression(options)
-          ? options.properties.find((property): property is ts.PropertyAssignment => ts.isPropertyAssignment(property)
-            && ((ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) && property.name.text === "method"))
-          : undefined;
+        const method =
+          options && ts.isObjectLiteralExpression(options)
+            ? options.properties.find(
+                (property): property is ts.PropertyAssignment =>
+                  ts.isPropertyAssignment(property) &&
+                  (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
+                  property.name.text === "method",
+              )
+            : undefined;
         if (!method) findings.push(`${relativePath}:${lineOf(node)} dynamic route options`);
         else if (ts.isStringLiteral(method.initializer)) {
-          if (method.initializer.text.toUpperCase() === "HEAD") findings.push(`${relativePath}:${lineOf(method)} explicit HEAD method`);
+          if (method.initializer.text.toUpperCase() === "HEAD")
+            findings.push(`${relativePath}:${lineOf(method)} explicit HEAD method`);
         } else if (ts.isArrayLiteralExpression(method.initializer)) {
-          if (method.initializer.elements.some((element) => ts.isStringLiteral(element) && element.text.toUpperCase() === "HEAD")) {
+          if (
+            method.initializer.elements.some(
+              (element) => ts.isStringLiteral(element) && element.text.toUpperCase() === "HEAD",
+            )
+          ) {
             findings.push(`${relativePath}:${lineOf(method)} explicit HEAD method array`);
           }
-          if (method.initializer.elements.some((element) => !ts.isStringLiteral(element))) findings.push(`${relativePath}:${lineOf(method)} dynamic route method array`);
+          if (method.initializer.elements.some((element) => !ts.isStringLiteral(element)))
+            findings.push(`${relativePath}:${lineOf(method)} dynamic route method array`);
         } else findings.push(`${relativePath}:${lineOf(method)} dynamic route method`);
       }
     }
@@ -328,36 +406,59 @@ function serializedCaughtErrors(source: string, relativePath: string): string[] 
   const lineOf = (node: ts.Node) => sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
   const loggerCall = (node: ts.CallExpression): boolean => {
     const member = node.expression;
-    const method = ts.isPropertyAccessExpression(member) ? member.name.text
-      : ts.isElementAccessExpression(member) && member.argumentExpression
-        && (ts.isStringLiteral(member.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(member.argumentExpression))
-        ? member.argumentExpression.text : null;
+    const method = ts.isPropertyAccessExpression(member)
+      ? member.name.text
+      : ts.isElementAccessExpression(member) &&
+          member.argumentExpression &&
+          (ts.isStringLiteral(member.argumentExpression) ||
+            ts.isNoSubstitutionTemplateLiteral(member.argumentExpression))
+        ? member.argumentExpression.text
+        : null;
     if (!method || !["fatal", "error", "warn", "info", "debug", "trace"].includes(method)) return false;
-    const receiver = ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member) ? member.expression : null;
+    const receiver =
+      ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member) ? member.expression : null;
     if (!receiver) return false;
-    return (ts.isIdentifier(receiver) && receiver.text === "log")
-      || ((ts.isPropertyAccessExpression(receiver) || ts.isElementAccessExpression(receiver))
-        && (ts.isPropertyAccessExpression(receiver) ? receiver.name.text
-          : receiver.argumentExpression && (ts.isStringLiteral(receiver.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(receiver.argumentExpression))
-            ? receiver.argumentExpression.text : null) === "log");
+    return (
+      (ts.isIdentifier(receiver) && receiver.text === "log") ||
+      ((ts.isPropertyAccessExpression(receiver) || ts.isElementAccessExpression(receiver)) &&
+        (ts.isPropertyAccessExpression(receiver)
+          ? receiver.name.text
+          : receiver.argumentExpression &&
+              (ts.isStringLiteral(receiver.argumentExpression) ||
+                ts.isNoSubstitutionTemplateLiteral(receiver.argumentExpression))
+            ? receiver.argumentExpression.text
+            : null) === "log")
+    );
   };
   const containsIdentifier = (node: ts.Node, names: ReadonlySet<string>): boolean => {
     if (ts.isIdentifier(node) && names.has(node.text)) return true;
     let found = false;
-    ts.forEachChild(node, (child) => { if (!found && containsIdentifier(child, names)) found = true; });
+    ts.forEachChild(node, (child) => {
+      if (!found && containsIdentifier(child, names)) found = true;
+    });
     return found;
   };
   const visit = (node: ts.Node, tainted: Set<string>): void => {
     if (ts.isCatchClause(node)) {
       const nested = new Set(tainted);
-      if (node.variableDeclaration && ts.isIdentifier(node.variableDeclaration.name)) nested.add(node.variableDeclaration.name.text);
+      if (node.variableDeclaration && ts.isIdentifier(node.variableDeclaration.name))
+        nested.add(node.variableDeclaration.name.text);
       visit(node.block, nested);
       return;
     }
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && containsIdentifier(node.initializer, tainted)) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      containsIdentifier(node.initializer, tainted)
+    ) {
       tainted.add(node.name.text);
     }
-    if (ts.isCallExpression(node) && loggerCall(node) && node.arguments.some((argument) => containsIdentifier(argument, tainted))) {
+    if (
+      ts.isCallExpression(node) &&
+      loggerCall(node) &&
+      node.arguments.some((argument) => containsIdentifier(argument, tainted))
+    ) {
       findings.push(`${relativePath}:${lineOf(node)} serializes a caught error`);
     }
     ts.forEachChild(node, (child) => visit(child, tainted));
@@ -393,7 +494,10 @@ function directEnvironmentUsage(): { keys: Set<string>; dynamic: string[] } {
 
 function documentedEnvironment(): Map<string, string> {
   const source = read("docs/operations.md");
-  const section = source.slice(source.indexOf("## Environment"), source.indexOf("## Data directory and current schema"));
+  const section = source.slice(
+    source.indexOf("## Environment"),
+    source.indexOf("## Data directory and current schema"),
+  );
   const inventory = new Map<string, string>();
   for (const match of section.matchAll(/^\| `([A-Z][A-Z0-9_]*)` \| ([a-z-]+) \|/gm)) {
     expect(inventory.has(match[1]!), `duplicate environment inventory key ${match[1]}`).toBe(false);
@@ -406,14 +510,32 @@ describe("documentation drift guards", () => {
   it("keeps designated schema-persistence and operation claims aligned", () => {
     const schemaClaims: Array<[string, string]> = [
       ["README.md", "Development databases are kept, not deleted, when the schema changes"],
-      ["docs/api.md", "Development databases use one current schema and are kept, not deleted, when the schema changes"],
+      [
+        "docs/api.md",
+        "Development databases use one current schema and are kept, not deleted, when the schema changes",
+      ],
       ["docs/operations.md", "Development databases are kept, not deleted, when the schema changes"],
-      ["docs/repo-architecture.md", "Development databases are kept, not deleted, when the schema changes: numbered forward-only [migrations](migrations.md) advance stamped stores"],
-      ["docs/ROADMAP.md", "Development persistence uses one current versioned schema with numbered forward-only migrations, the exact pre-grounding tactical-map upgrade to map v2"],
-      ["docs/roleplay-architecture-2026.md", "one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
-      ["docs/operations.md", "Startup recognizes that predecessor only when every schema object exactly matches the current schema minus the map-v2 changes"],
+      [
+        "docs/repo-architecture.md",
+        "Development databases are kept, not deleted, when the schema changes: numbered forward-only [migrations](migrations.md) advance stamped stores",
+      ],
+      [
+        "docs/ROADMAP.md",
+        "Development persistence uses one current versioned schema with numbered forward-only migrations, the exact pre-grounding tactical-map upgrade to map v2",
+      ],
+      [
+        "docs/roleplay-architecture-2026.md",
+        "one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2",
+      ],
+      [
+        "docs/operations.md",
+        "Startup recognizes that predecessor only when every schema object exactly matches the current schema minus the map-v2 changes",
+      ],
       ["docs/operations.md", "The upgrade uses one independent immediate transaction"],
-      ["docs/operations.md", "an explicit foreign-key check plus complete current-schema, SQLite quick-check, local-ownership, and effect-vocabulary validation must succeed before commit"],
+      [
+        "docs/operations.md",
+        "an explicit foreign-key check plus complete current-schema, SQLite quick-check, local-ownership, and effect-vocabulary validation must succeed before commit",
+      ],
       ["docs/operations.md", "Any failure rolls back schema and data changes"],
       ["docs/operations.md", "Every other unknown, modified, or partially upgraded schema is rejected without repair"],
     ];
@@ -428,14 +550,31 @@ describe("documentation drift guards", () => {
 
   it("keeps agent-era plans, handoffs and progress reports in docs/archive, outside the maintained set", () => {
     const archived = [
-      "plan-1-campaign-readiness.md", "plan-2-reviewed-adventure.md", "plan-3-memory-evaluation.md", "plan-4-living-knowledge.md", "plan-5-living-director.md",
-      "playability-execution.md", "playability-progress.md", "playability-next-agent-handoff.txt",
-      "jev-deadline-shadow-followup.txt", "jev-next-agent-handoff.txt", "jev-shortlist-coverage.txt",
-      "revision-2-integration-plan.md", "rpg-integration-plan.md", "harness-wars-campaign-report.md", "supra2-inference-setup-prompt.md",
-      "adventure-table-design-2026-10-03.md", "play-sheet-context-audit-2026-10-02.md", "roleplay-worldbuilding-audit-2026-10-02.md",
-      "handoff.md", "devplan.md", "todo.md",
+      "plan-1-campaign-readiness.md",
+      "plan-2-reviewed-adventure.md",
+      "plan-3-memory-evaluation.md",
+      "plan-4-living-knowledge.md",
+      "plan-5-living-director.md",
+      "playability-execution.md",
+      "playability-progress.md",
+      "playability-next-agent-handoff.txt",
+      "jev-deadline-shadow-followup.txt",
+      "jev-next-agent-handoff.txt",
+      "jev-shortlist-coverage.txt",
+      "revision-2-integration-plan.md",
+      "rpg-integration-plan.md",
+      "harness-wars-campaign-report.md",
+      "supra2-inference-setup-prompt.md",
+      "adventure-table-design-2026-10-03.md",
+      "play-sheet-context-audit-2026-10-02.md",
+      "roleplay-worldbuilding-audit-2026-10-02.md",
+      "handoff.md",
+      "devplan.md",
+      "todo.md",
     ];
-    const misplaced = archived.filter((name) => existsSync(path.join(ROOT, name)) || existsSync(path.join(ROOT, "docs", name)));
+    const misplaced = archived.filter(
+      (name) => existsSync(path.join(ROOT, name)) || existsSync(path.join(ROOT, "docs", name)),
+    );
     const missing = archived.filter((name) => !existsSync(path.join(ROOT, "docs", "archive", name)));
     expect({ misplaced, missing }).toEqual({ misplaced: [], missing: [] });
     expect(existsSync(path.join(ROOT, "docs", "archive", "README.md"))).toBe(true);
@@ -443,7 +582,9 @@ describe("documentation drift guards", () => {
   });
 
   it("matches explicit Fastify RPG registration without runtime side effects", async () => {
-    const factory = vi.fn(() => { throw new Error("route collection opened the repository"); });
+    const factory = vi.fn(() => {
+      throw new Error("route collection opened the repository");
+    });
     const registered: Array<{ method: string; route: string }> = [];
     const app = Fastify({ logger: false });
     app.addHook("onRoute", (route) => {
@@ -462,10 +603,15 @@ describe("documentation drift guards", () => {
 
       const implicitHeads = registered.filter(({ method }) => method === "HEAD");
       const explicit = registered.filter(({ method, route }) => method !== "HEAD" && route.startsWith("/api/rpg/v1"));
-      const explicitHeadSources = walkFiles(path.join(ROOT, "server/src/routes/rpg/v1"), new Set([".ts"]))
-        .flatMap((absolute) => explicitHeadRegistrations(readFileSync(absolute, "utf8"), path.relative(ROOT, absolute)));
-      expect(explicitHeadSources, "explicit RPG HEAD registrations must be documented rather than filtered as aliases").toEqual([]);
-      for (const head of implicitHeads) expect(explicit.map(operationKey), `implicit HEAD without GET ${head.route}`).toContain(`GET ${head.route}`);
+      const explicitHeadSources = walkFiles(path.join(ROOT, "server/src/routes/rpg/v1"), new Set([".ts"])).flatMap(
+        (absolute) => explicitHeadRegistrations(readFileSync(absolute, "utf8"), path.relative(ROOT, absolute)),
+      );
+      expect(
+        explicitHeadSources,
+        "explicit RPG HEAD registrations must be documented rather than filtered as aliases",
+      ).toEqual([]);
+      for (const head of implicitHeads)
+        expect(explicit.map(operationKey), `implicit HEAD without GET ${head.route}`).toContain(`GET ${head.route}`);
       const runtimeKeys = explicit.map(operationKey).sort();
       expect(new Set(runtimeKeys).size, "duplicate runtime RPG operations").toBe(runtimeKeys.length);
       const documented = documentedOperations();
@@ -495,8 +641,10 @@ describe("documentation drift guards", () => {
         if (localPath.endsWith(".md")) indexed.add(path.posix.basename(localPath));
       }
     }
-    expect({ unlisted: maintained.filter((name) => !indexed.has(name)), missing: [...indexed].filter((name) => !maintained.includes(name)).sort() })
-      .toEqual({ unlisted: [], missing: [] });
+    expect({
+      unlisted: maintained.filter((name) => !indexed.has(name)),
+      missing: [...indexed].filter((name) => !maintained.includes(name)).sort(),
+    }).toEqual({ unlisted: [], missing: [] });
   });
 
   it("resolves maintained local Markdown links and anchors offline", () => {
@@ -517,9 +665,13 @@ describe("documentation drift guards", () => {
         const targets = linkTargets(line);
         const references = referenceLinkTargets(line, definitions);
         targets.push(...references.targets);
-        for (const label of references.undefinedLabels) failures.push(`${sourcePath}:${index + 1} undefined reference link ${label}`);
+        for (const label of references.undefinedLabels)
+          failures.push(`${sourcePath}:${index + 1} undefined reference link ${label}`);
         for (const rawTarget of targets) {
-          const target = rawTarget.trim().replace(/^<|>$/g, "").split(/\s+["']/)[0]!;
+          const target = rawTarget
+            .trim()
+            .replace(/^<|>$/g, "")
+            .split(/\s+["']/)[0]!;
           if (/^(?:https?:|mailto:|\/\/)/i.test(target)) continue;
           const hash = target.indexOf("#");
           const rawPath = (hash === -1 ? target : target.slice(0, hash)).split("?", 1)[0]!;
@@ -534,10 +686,17 @@ describe("documentation drift guards", () => {
             continue;
           }
           const resolved = decodedPath
-            ? path.resolve(decodedPath.startsWith("/") ? ROOT : path.dirname(path.join(ROOT, sourcePath)), decodedPath.replace(/^\//, ""))
+            ? path.resolve(
+                decodedPath.startsWith("/") ? ROOT : path.dirname(path.join(ROOT, sourcePath)),
+                decodedPath.replace(/^\//, ""),
+              )
             : path.join(ROOT, sourcePath);
           const repositoryRelative = path.relative(ROOT, resolved);
-          if (repositoryRelative === ".." || repositoryRelative.startsWith(`..${path.sep}`) || path.isAbsolute(repositoryRelative)) {
+          if (
+            repositoryRelative === ".." ||
+            repositoryRelative.startsWith(`..${path.sep}`) ||
+            path.isAbsolute(repositoryRelative)
+          ) {
             failures.push(`${sourcePath}:${index + 1} target escapes repository ${rawTarget}`);
             continue;
           }
@@ -549,7 +708,8 @@ describe("documentation drift guards", () => {
             const relativeTarget = path.relative(ROOT, resolved).split(path.sep).join(path.posix.sep);
             const anchors = anchorCache.get(relativeTarget) ?? markdownAnchors(relativeTarget);
             anchorCache.set(relativeTarget, anchors);
-            if (!anchors.has(fragment)) failures.push(`${sourcePath}:${index + 1} missing anchor ${rawTarget} in ${relativeTarget}`);
+            if (!anchors.has(fragment))
+              failures.push(`${sourcePath}:${index + 1} missing anchor ${rawTarget} in ${relativeTarget}`);
           }
         }
       });
@@ -563,32 +723,49 @@ describe("documentation drift guards", () => {
     const used = [...usage.keys].sort();
     const documentedKeys = [...documented.keys()].sort();
     expect(usage.dynamic, "unclassified dynamic process.env access").toEqual([]);
-    expect({ undocumented: used.filter((key) => !documented.has(key)), unused: documentedKeys.filter((key) => !usage.keys.has(key)) })
-      .toEqual({ undocumented: [], unused: [] });
+    expect({
+      undocumented: used.filter((key) => !documented.has(key)),
+      unused: documentedKeys.filter((key) => !usage.keys.has(key)),
+    }).toEqual({ undocumented: [], unused: [] });
 
-    const rootAssignments = new Map([...read(".env.example").matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)]
-      .map((match) => [match[1]!, match[2]!] as const));
+    const rootAssignments = new Map(
+      [...read(".env.example").matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)].map((match) => [match[1]!, match[2]!] as const),
+    );
     const userKeys = [...documented]
       .filter(([, category]) => category === "server-runtime" || category === "client-development")
       .map(([key]) => key)
       .sort();
-    expect(userKeys.filter((key) => !rootAssignments.has(key)), "user-facing keys missing from root .env.example").toEqual([]);
-    for (const secret of ["OPENROUTER_API_KEY", "OPENAI_API_KEY"]) expect(rootAssignments.get(secret), `${secret} must stay empty`).toBe("");
+    expect(
+      userKeys.filter((key) => !rootAssignments.has(key)),
+      "user-facing keys missing from root .env.example",
+    ).toEqual([]);
+    for (const secret of ["OPENROUTER_API_KEY", "OPENAI_API_KEY"])
+      expect(rootAssignments.get(secret), `${secret} must stay empty`).toBe("");
 
-    const serverAssignments = new Map([...read("server/.env.example").matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)]
-      .map((match) => [match[1]!, match[2]!] as const));
+    const serverAssignments = new Map(
+      [...read("server/.env.example").matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)].map(
+        (match) => [match[1]!, match[2]!] as const,
+      ),
+    );
     expect([...serverAssignments.keys()].filter((key) => !rootAssignments.has(key))).toEqual([]);
     expect(serverAssignments.get("OPENAI_API_KEY"), "server example secret must stay empty").toBe("");
   });
 
   it("parses supported Markdown links and environment access forms", () => {
-    expect(inlineLinkTargets("[nested](guide_(local).md#section)")).toEqual({ targets: ["guide_(local).md#section"], unterminated: false });
+    expect(inlineLinkTargets("[nested](guide_(local).md#section)")).toEqual({
+      targets: ["guide_(local).md#section"],
+      unterminated: false,
+    });
     expect(inlineLinkTargets("[broken](guide.md").unterminated).toBe(true);
     const references = new Map([["operations", "operations.md#environment"]]);
     expect(referenceLinkTargets("[Operations][operations] and [Operations][]", references)).toEqual({
-      targets: ["operations.md#environment", "operations.md#environment"], undefinedLabels: [],
+      targets: ["operations.md#environment", "operations.md#environment"],
+      undefinedLabels: [],
     });
-    expect(referenceLinkTargets("[Missing][missing]", references)).toEqual({ targets: [], undefinedLabels: ["missing"] });
+    expect(referenceLinkTargets("[Missing][missing]", references)).toEqual({
+      targets: [],
+      undefinedLabels: ["missing"],
+    });
     const source = `
       const runtimeEnv = process.env;
       const { ALIASED, RENAMED: renamed } = runtimeEnv;
@@ -603,22 +780,27 @@ describe("documentation drift guards", () => {
       runtimeEnv[dynamicKey];
     `;
     const usage = environmentUsageInSource(source, "synthetic.ts");
-    expect([...usage.keys].sort()).toEqual(["ALIASED", "ASSERTED", "BRACKET", "CLIENT_VALUE", "INJECTED", "OPTIONAL", "PARAMETER_KEY", "RENAMED"].sort());
+    expect([...usage.keys].sort()).toEqual(
+      ["ALIASED", "ASSERTED", "BRACKET", "CLIENT_VALUE", "INJECTED", "OPTIONAL", "PARAMETER_KEY", "RENAMED"].sort(),
+    );
     expect(usage.dynamic).toEqual(["synthetic.ts:12"]);
-    const advancedUsage = environmentUsageInSource(`
+    const advancedUsage = environmentUsageInSource(
+      `
       type RuntimeEnvironment = NodeJS.ProcessEnv;
       process["env"].PROCESS_ELEMENT;
       import.meta["env"].META_ELEMENT;
       function injected({ TYPE_ALIAS_KEY }: RuntimeEnvironment) { return TYPE_ALIAS_KEY; }
       function shadow(process: { env: { LOCAL: string } }) { return process.env.LOCAL; }
-    `, "advanced.ts");
+    `,
+      "advanced.ts",
+    );
     expect([...advancedUsage.keys].sort()).toEqual(["META_ELEMENT", "PROCESS_ELEMENT", "TYPE_ALIAS_KEY"]);
-    expect(explicitHeadRegistrations("app.route({\n method:\n 'HEAD', url: '/x', handler });", "synthetic.ts")).toEqual([
-      "synthetic.ts:2 explicit HEAD method",
-    ]);
-    expect(explicitHeadRegistrations("app.route({ method: dynamicMethod, url: '/x', handler });", "synthetic.ts")).toEqual([
-      "synthetic.ts:1 dynamic route method",
-    ]);
+    expect(explicitHeadRegistrations("app.route({\n method:\n 'HEAD', url: '/x', handler });", "synthetic.ts")).toEqual(
+      ["synthetic.ts:2 explicit HEAD method"],
+    );
+    expect(
+      explicitHeadRegistrations("app.route({ method: dynamicMethod, url: '/x', handler });", "synthetic.ts"),
+    ).toEqual(["synthetic.ts:1 dynamic route method"]);
     expect(explicitHeadRegistrations("app['head']('/x', handler);", "synthetic.ts")).toEqual([
       "synthetic.ts:1 explicit .head registration",
     ]);
@@ -628,14 +810,25 @@ describe("documentation drift guards", () => {
     expect(explicitHeadRegistrations("const { head: registerHead } = app;", "synthetic.ts")).toEqual([
       "synthetic.ts:1 explicit .head binding",
     ]);
-    expect(serializedCaughtErrors("try { work(); } catch (error) { request.log.warn({ operation: 'x', error }, 'failed'); }", "synthetic.ts"))
-      .toEqual(["synthetic.ts:1 serializes a caught error"]);
-    expect(serializedCaughtErrors("try { work(); } catch (error) { const details = { error }; request['log'].warn(details, 'failed'); }", "synthetic.ts"))
-      .toEqual(["synthetic.ts:1 serializes a caught error"]);
+    expect(
+      serializedCaughtErrors(
+        "try { work(); } catch (error) { request.log.warn({ operation: 'x', error }, 'failed'); }",
+        "synthetic.ts",
+      ),
+    ).toEqual(["synthetic.ts:1 serializes a caught error"]);
+    expect(
+      serializedCaughtErrors(
+        "try { work(); } catch (error) { const details = { error }; request['log'].warn(details, 'failed'); }",
+        "synthetic.ts",
+      ),
+    ).toEqual(["synthetic.ts:1 serializes a caught error"]);
   });
 
   it("does not serialize caught provider errors in roleplay logs", () => {
-    for (const relativePath of ["server/src/routes/roleplay/generationService.ts", "server/src/routes/roleplay/interactions.ts"]) {
+    for (const relativePath of [
+      "server/src/routes/roleplay/generationService.ts",
+      "server/src/routes/roleplay/interactions.ts",
+    ]) {
       expect(serializedCaughtErrors(read(relativePath), relativePath), relativePath).toEqual([]);
     }
   });

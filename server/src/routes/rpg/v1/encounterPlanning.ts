@@ -33,7 +33,9 @@ function campaignNotFound(request: FastifyRequest, reply: FastifyReply) {
 }
 
 function hasQuery(request: FastifyRequest): boolean {
-  return (request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0;
+  return (
+    (request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0
+  );
 }
 
 function json(request: FastifyRequest): boolean {
@@ -50,7 +52,14 @@ export const encounterPlanningHttpRoutes: FastifyPluginAsync<EncounterPlanningHt
       if (hasQuery(request)) return invalid(request, reply, "Encounter planning does not accept query parameters");
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
       if (!campaignId.success) return campaignNotFound(request, reply);
-      if (!json(request)) return sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Encounter planning requires application/json");
+      if (!json(request))
+        return sendApiProblem(
+          request,
+          reply,
+          415,
+          "RPG_UNSUPPORTED_MEDIA_TYPE",
+          "Encounter planning requires application/json",
+        );
       const body = encounterPlanningRequestSchema.safeParse(request.body);
       if (!body.success) return invalid(request, reply, "Encounter planning request is invalid");
       const service = options.encounterPlanningAccessor();
@@ -71,10 +80,18 @@ export const encounterPlanningHttpRoutes: FastifyPluginAsync<EncounterPlanningHt
     async (request, reply) => {
       reply.header("cache-control", "no-store");
       if (!enabled()) return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
-      if (hasQuery(request)) return invalid(request, reply, "Encounter reward preview does not accept query parameters");
+      if (hasQuery(request))
+        return invalid(request, reply, "Encounter reward preview does not accept query parameters");
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
       if (!campaignId.success) return campaignNotFound(request, reply);
-      if (!json(request)) return sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Encounter reward preview requires application/json");
+      if (!json(request))
+        return sendApiProblem(
+          request,
+          reply,
+          415,
+          "RPG_UNSUPPORTED_MEDIA_TYPE",
+          "Encounter reward preview requires application/json",
+        );
       const body = encounterRewardPreviewRequestSchema.safeParse(request.body);
       if (!body.success) return invalid(request, reply, "Encounter reward preview request is invalid");
       const service = options.encounterPlanningAccessor();
@@ -84,7 +101,13 @@ export const encounterPlanningHttpRoutes: FastifyPluginAsync<EncounterPlanningHt
         return reply.send(encounterRewardPreviewResponseSchema.parse(plan));
       } catch (error) {
         request.log.error({ err: error instanceof Error ? error.name : "unknown" }, "encounter reward preview failed");
-        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Encounter reward preview could not be completed");
+        return sendApiProblem(
+          request,
+          reply,
+          500,
+          "RPG_INTERNAL_ERROR",
+          "Encounter reward preview could not be completed",
+        );
       }
     },
   );
@@ -98,13 +121,22 @@ export const encounterPlanningHttpRoutes: FastifyPluginAsync<EncounterPlanningHt
       if (hasQuery(request)) return invalid(request, reply, "NPC selection does not accept query parameters");
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
       if (!campaignId.success) return campaignNotFound(request, reply);
-      if (!json(request)) return sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "NPC selection requires application/json");
+      if (!json(request))
+        return sendApiProblem(
+          request,
+          reply,
+          415,
+          "RPG_UNSUPPORTED_MEDIA_TYPE",
+          "NPC selection requires application/json",
+        );
       const body = npcSelectionRequestSchema.safeParse(request.body);
       if (!body.success) return invalid(request, reply, "NPC selection request is invalid");
       const service = options.encounterPlanningAccessor();
       if (!service.hasCampaignCatalog(LOCAL_OWNER, campaignId.data)) return campaignNotFound(request, reply);
       try {
-        return reply.send(npcSelectionResponseSchema.parse(service.selectNpcs(LOCAL_OWNER, campaignId.data, body.data)));
+        return reply.send(
+          npcSelectionResponseSchema.parse(service.selectNpcs(LOCAL_OWNER, campaignId.data, body.data)),
+        );
       } catch (error) {
         request.log.error({ err: error instanceof Error ? error.name : "unknown" }, "NPC selection failed");
         return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "NPC selection could not be completed");

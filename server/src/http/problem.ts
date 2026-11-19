@@ -25,12 +25,14 @@ function safeProblemInstance(requestTarget: string): string {
   const queryIndex = requestTarget.indexOf("?");
   const path = queryIndex === -1 ? requestTarget : requestTarget.slice(0, queryIndex);
   const campaignPrefix = "/api/rpg/v1/campaigns/";
-  if (path === "/api/rpg/v1/adventure-turns/stream"
-    || path === "/api/rpg/v1/adventure-turns/reconcile-initial") return path;
-  if (/^\/api\/rpg\/v1\/adventure-turns\/[^/]+\/confirm$/.test(path)) return "/api/rpg/v1/adventure-turns/:turnId/confirm";
+  if (path === "/api/rpg/v1/adventure-turns/stream" || path === "/api/rpg/v1/adventure-turns/reconcile-initial")
+    return path;
+  if (/^\/api\/rpg\/v1\/adventure-turns\/[^/]+\/confirm$/.test(path))
+    return "/api/rpg/v1/adventure-turns/:turnId/confirm";
   if (/^\/api\/rpg\/v1\/adventure-turns\/[^/]+$/.test(path)) return "/api/rpg/v1/adventure-turns/:turnId";
   if (path === "/api/rpg/v1/generation-drafts") return path;
-  if (/^\/api\/rpg\/v1\/generation-drafts\/[^/]+\/apply$/.test(path)) return "/api/rpg/v1/generation-drafts/:draftId/apply";
+  if (/^\/api\/rpg\/v1\/generation-drafts\/[^/]+\/apply$/.test(path))
+    return "/api/rpg/v1/generation-drafts/:draftId/apply";
   if (/^\/api\/rpg\/v1\/generation-drafts\/[^/]+$/.test(path)) return "/api/rpg/v1/generation-drafts/:draftId";
   if (/^\/api\/rpg\/v1\/actors\/[^/]+\/check-commands$/.test(path)) {
     return "/api/rpg/v1/actors/:actorId/check-commands";
@@ -104,17 +106,19 @@ function safeProblemInstance(requestTarget: string): string {
   if (suffixIndex === -1) return `${campaignPrefix}:campaignId`;
 
   const suffix = remainder.slice(suffixIndex);
-  if (suffix === "/starter-setup"
-    || suffix === "/mechanics-starter-setup"
-    || suffix === "/characters"
-    || suffix === "/characters/creation-options"
-    || suffix === "/rooms"
-    || suffix === "/memberships"
-    || suffix === "/dice-rolls"
-    || suffix === "/encounters"
-    || suffix === "/world"
-    || suffix === "/npcs"
-    || suffix === "/factions") {
+  if (
+    suffix === "/starter-setup" ||
+    suffix === "/mechanics-starter-setup" ||
+    suffix === "/characters" ||
+    suffix === "/characters/creation-options" ||
+    suffix === "/rooms" ||
+    suffix === "/memberships" ||
+    suffix === "/dice-rolls" ||
+    suffix === "/encounters" ||
+    suffix === "/world" ||
+    suffix === "/npcs" ||
+    suffix === "/factions"
+  ) {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
   if (suffix === "/administration" || suffix === "/character-drafts" || suffix === "/export") {
@@ -124,8 +128,13 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/content-packs\/[^/]+\/versions\/[^/]+$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/content-packs/:packId/versions/:packVersion`;
   }
-  if (suffix === "/timelines" || suffix === "/events" || suffix === "/checkpoints"
-    || suffix === "/timeline-forks" || suffix === "/recaps") {
+  if (
+    suffix === "/timelines" ||
+    suffix === "/events" ||
+    suffix === "/checkpoints" ||
+    suffix === "/timeline-forks" ||
+    suffix === "/recaps"
+  ) {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
   if (/^\/commands\/[^/]+\/receipt$/.test(suffix)) {

@@ -9,13 +9,7 @@
 
 export const MAGIC_ITEM_ATTUNEMENT_LIMIT = 3 as const;
 
-export type MagicAbilityId =
-  | "strength"
-  | "dexterity"
-  | "constitution"
-  | "intelligence"
-  | "wisdom"
-  | "charisma";
+export type MagicAbilityId = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
 
 export type MagicDamageType =
   | "acid"
@@ -67,10 +61,7 @@ export type MagicFlatTarget = Readonly<
   | { kind: "damage-roll" }
 >;
 
-export type MagicCheckTarget = Readonly<
-  | { kind: "saving-throw"; ability: MagicAbilityId }
-  | { kind: "attack-roll" }
->;
+export type MagicCheckTarget = Readonly<{ kind: "saving-throw"; ability: MagicAbilityId } | { kind: "attack-roll" }>;
 
 export type MagicDamageScope = MagicDamageType | "all";
 

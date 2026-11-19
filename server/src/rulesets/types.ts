@@ -71,24 +71,41 @@ export type D20TestResolution = Readonly<{
 }>;
 
 export type SkillId =
-  | "acrobatics" | "animal-handling" | "arcana" | "athletics" | "deception" | "history"
-  | "insight" | "intimidation" | "investigation" | "medicine" | "nature" | "perception"
-  | "performance" | "persuasion" | "religion" | "sleight-of-hand" | "stealth" | "survival";
+  | "acrobatics"
+  | "animal-handling"
+  | "arcana"
+  | "athletics"
+  | "deception"
+  | "history"
+  | "insight"
+  | "intimidation"
+  | "investigation"
+  | "medicine"
+  | "nature"
+  | "perception"
+  | "performance"
+  | "persuasion"
+  | "religion"
+  | "sleight-of-hand"
+  | "stealth"
+  | "survival";
 
 export type TestKind = "ability-check" | "skill-check" | "saving-throw" | "concentration-check";
 export type TestResolution = D20TestResolution & Readonly<{ kind: TestKind; ability: AbilityId; skill?: SkillId }>;
 
-export type AttackInput = Omit<D20TestInput, "abilityScore" | "dc"> & Readonly<{
-  abilityScore: number;
-  armorClass: number;
-  criticalThreshold?: number;
-}>;
-export type AttackResolution = D20TestResolution & Readonly<{
-  armorClass: number;
-  hit: boolean;
-  critical: boolean;
-  automaticMiss: boolean;
-}>;
+export type AttackInput = Omit<D20TestInput, "abilityScore" | "dc"> &
+  Readonly<{
+    abilityScore: number;
+    armorClass: number;
+    criticalThreshold?: number;
+  }>;
+export type AttackResolution = D20TestResolution &
+  Readonly<{
+    armorClass: number;
+    hit: boolean;
+    critical: boolean;
+    automaticMiss: boolean;
+  }>;
 
 export type DiceTerm = Readonly<{ count: number; sides: number }>;
 export type DiceTermEvidence = DiceTerm & Readonly<{ rolls: readonly number[]; subtotal: number }>;
@@ -168,9 +185,20 @@ export type ConcentrationPlan = Readonly<{
 }>;
 
 export type ConditionId =
-  | "blinded" | "charmed" | "deafened" | "frightened" | "grappled" | "incapacitated"
-  | "invisible" | "paralyzed" | "petrified" | "poisoned" | "prone" | "restrained"
-  | "stunned" | "unconscious";
+  | "blinded"
+  | "charmed"
+  | "deafened"
+  | "frightened"
+  | "grappled"
+  | "incapacitated"
+  | "invisible"
+  | "paralyzed"
+  | "petrified"
+  | "poisoned"
+  | "prone"
+  | "restrained"
+  | "stunned"
+  | "unconscious";
 export type ConditionStatePlan = Readonly<{
   operation: "add" | "remove";
   condition: ConditionId;
@@ -278,8 +306,16 @@ export type RulesetMechanics = Readonly<{
   resolveInitiative(entries: readonly InitiativeEntry[]): readonly InitiativeResult[];
   planMovement(input: MovementInput): MovementPlan;
   planRest(input: RestInput): RecoveryPlan;
-  planConcentrationDamage(damage: number, concentrating: boolean, checkInput?: Omit<D20TestInput, "dc" | "abilityScore"> & Readonly<{ constitutionScore: number }>): ConcentrationPlan;
-  planCondition(before: readonly ConditionId[], operation: "add" | "remove", condition: ConditionId): ConditionStatePlan;
+  planConcentrationDamage(
+    damage: number,
+    concentrating: boolean,
+    checkInput?: Omit<D20TestInput, "dc" | "abilityScore"> & Readonly<{ constitutionScore: number }>,
+  ): ConcentrationPlan;
+  planCondition(
+    before: readonly ConditionId[],
+    operation: "add" | "remove",
+    condition: ConditionId,
+  ): ConditionStatePlan;
   planResourceCosts(pools: readonly ResourcePool[], costs: readonly ResourceCost[]): ResourceCostPlan;
   planSpellCost(input: SpellCostInput): SpellCostPlan;
   deriveCharacter(input: CharacterDerivedInput): CharacterDerivedValues;

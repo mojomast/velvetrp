@@ -18,12 +18,24 @@ import { writeFile } from "node:fs/promises";
 import { beginSpeakerEvidence } from "./system-one-evidence.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRoomRoutingQuestions, composeRoomRoutingSelection, type RoomRoutingParticipant } from "../server/src/agent/systemOneRoomRouting.js";
+import {
+  buildRoomRoutingQuestions,
+  composeRoomRoutingSelection,
+  type RoomRoutingParticipant,
+} from "../server/src/agent/systemOneRoomRouting.js";
 import { defaultHarnessSettings, defaultProviderSettings, defaultSystemOneSettings } from "../server/src/defaults.js";
 import { ensureGroupSpeakers, fallbackRoomSpeakers, selectRoomSpeakers } from "../server/src/llm.js";
 import { getPromptPreset } from "../server/src/presets.js";
-import { completeWithSystemOne, type SystemOneCompletionResult, type SystemOneJsonValue } from "../server/src/provider/systemOneCompletion.js";
-import { applyCalibration, fitPlattCalibration, type PlattCalibration } from "../server/src/agent/systemOneCalibration.js";
+import {
+  completeWithSystemOne,
+  type SystemOneCompletionResult,
+  type SystemOneJsonValue,
+} from "../server/src/provider/systemOneCompletion.js";
+import {
+  applyCalibration,
+  fitPlattCalibration,
+  type PlattCalibration,
+} from "../server/src/agent/systemOneCalibration.js";
 import { evaluatePromotionGate } from "../server/src/agent/systemOnePromotion.js";
 import { gradeCalibration } from "../server/test/evals/dmGraders.js";
 import type { Character, Message, TokenUsage } from "../server/src/types.js";
@@ -94,26 +106,166 @@ const cast = (key: keyof typeof CASTS, omit: string[] = []): RoomRoutingParticip
   CASTS[key].filter((participant) => !omit.includes(participant.name));
 
 const SCENARIOS: Scenario[] = [
-  { id: "b1", participants: cast("bridge"), primaryName: "Aria", message: "Aria, take the conn.", maxSpeakers: 2, expectedNames: ["Aria"] },
-  { id: "b2", participants: cast("bridge"), primaryName: "Aria", message: "Rowan, what do you make of the signal?", maxSpeakers: 2, expectedNames: ["Rowan"] },
-  { id: "b3", participants: cast("bridge"), primaryName: "Aria", message: "Mira, is the wound infected?", maxSpeakers: 2, expectedNames: ["Mira"] },
-  { id: "b4", participants: cast("bridge"), primaryName: "Aria", message: "Captain, your orders?", maxSpeakers: 2, expectedNames: ["Aria"] },
-  { id: "b5", participants: cast("bridge"), primaryName: "Aria", message: "Engineer, can you fix the coupling?", maxSpeakers: 2, expectedNames: ["Rowan"] },
-  { id: "b6", participants: cast("bridge"), primaryName: "Aria", message: "Aria and Rowan, meet me in the medbay.", maxSpeakers: 2, expectedNames: ["Aria", "Rowan"] },
-  { id: "b7", participants: cast("bridge"), primaryName: "Aria", message: "Both of you, get to the airlock.", maxSpeakers: 2, expectedNames: ["Aria", "Rowan"] },
-  { id: "b8", participants: cast("bridge"), primaryName: "Aria", message: "Everyone, brace for impact.", maxSpeakers: 3, expectedNames: ["Aria", "Rowan", "Mira"] },
-  { id: "b9", participants: cast("bridge"), primaryName: "Aria", message: "What's our status?", maxSpeakers: 2, expectedNames: ["Aria"] },
-  { id: "t1", participants: cast("tavern"), primaryName: "Bram", message: "Bram, another round!", maxSpeakers: 2, expectedNames: ["Bram"] },
-  { id: "t2", participants: cast("tavern"), primaryName: "Bram", message: "Sela, play something cheerful.", maxSpeakers: 2, expectedNames: ["Sela"] },
-  { id: "t3", participants: cast("tavern"), primaryName: "Bram", message: "Kade, watch the door.", maxSpeakers: 2, expectedNames: ["Kade"] },
-  { id: "t4", participants: cast("tavern"), primaryName: "Bram", message: "Innkeeper, we need rooms.", maxSpeakers: 2, expectedNames: ["Bram"] },
-  { id: "t5", participants: cast("tavern"), primaryName: "Bram", message: "Sela and Kade, what do you two think?", maxSpeakers: 2, expectedNames: ["Sela", "Kade"] },
-  { id: "t6", participants: cast("tavern"), primaryName: "Bram", message: "Everyone, listen up.", maxSpeakers: 3, expectedNames: ["Bram", "Sela", "Kade"] },
-  { id: "a1", participants: cast("archive"), primaryName: "Ivo", message: "Ivo, where is the ledger?", maxSpeakers: 2, expectedNames: ["Ivo"] },
-  { id: "a2", participants: cast("archive"), primaryName: "Ivo", message: "Nia, fetch the map.", maxSpeakers: 2, expectedNames: ["Nia"] },
-  { id: "a3", participants: cast("archive"), primaryName: "Ivo", message: "Warden, lock the vault.", maxSpeakers: 2, expectedNames: ["Oren"] },
-  { id: "a4", participants: cast("archive"), primaryName: "Ivo", message: "Archivist, is this shelf cursed?", maxSpeakers: 2, expectedNames: ["Ivo"] },
-  { id: "a5", participants: cast("archive"), primaryName: "Ivo", message: "What did we find last night?", maxSpeakers: 2, expectedNames: ["Ivo"] },
+  {
+    id: "b1",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "Aria, take the conn.",
+    maxSpeakers: 2,
+    expectedNames: ["Aria"],
+  },
+  {
+    id: "b2",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "Rowan, what do you make of the signal?",
+    maxSpeakers: 2,
+    expectedNames: ["Rowan"],
+  },
+  {
+    id: "b3",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "Mira, is the wound infected?",
+    maxSpeakers: 2,
+    expectedNames: ["Mira"],
+  },
+  {
+    id: "b4",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "Captain, your orders?",
+    maxSpeakers: 2,
+    expectedNames: ["Aria"],
+  },
+  {
+    id: "b5",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "Engineer, can you fix the coupling?",
+    maxSpeakers: 2,
+    expectedNames: ["Rowan"],
+  },
+  {
+    id: "b6",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "Aria and Rowan, meet me in the medbay.",
+    maxSpeakers: 2,
+    expectedNames: ["Aria", "Rowan"],
+  },
+  {
+    id: "b7",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "Both of you, get to the airlock.",
+    maxSpeakers: 2,
+    expectedNames: ["Aria", "Rowan"],
+  },
+  {
+    id: "b8",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "Everyone, brace for impact.",
+    maxSpeakers: 3,
+    expectedNames: ["Aria", "Rowan", "Mira"],
+  },
+  {
+    id: "b9",
+    participants: cast("bridge"),
+    primaryName: "Aria",
+    message: "What's our status?",
+    maxSpeakers: 2,
+    expectedNames: ["Aria"],
+  },
+  {
+    id: "t1",
+    participants: cast("tavern"),
+    primaryName: "Bram",
+    message: "Bram, another round!",
+    maxSpeakers: 2,
+    expectedNames: ["Bram"],
+  },
+  {
+    id: "t2",
+    participants: cast("tavern"),
+    primaryName: "Bram",
+    message: "Sela, play something cheerful.",
+    maxSpeakers: 2,
+    expectedNames: ["Sela"],
+  },
+  {
+    id: "t3",
+    participants: cast("tavern"),
+    primaryName: "Bram",
+    message: "Kade, watch the door.",
+    maxSpeakers: 2,
+    expectedNames: ["Kade"],
+  },
+  {
+    id: "t4",
+    participants: cast("tavern"),
+    primaryName: "Bram",
+    message: "Innkeeper, we need rooms.",
+    maxSpeakers: 2,
+    expectedNames: ["Bram"],
+  },
+  {
+    id: "t5",
+    participants: cast("tavern"),
+    primaryName: "Bram",
+    message: "Sela and Kade, what do you two think?",
+    maxSpeakers: 2,
+    expectedNames: ["Sela", "Kade"],
+  },
+  {
+    id: "t6",
+    participants: cast("tavern"),
+    primaryName: "Bram",
+    message: "Everyone, listen up.",
+    maxSpeakers: 3,
+    expectedNames: ["Bram", "Sela", "Kade"],
+  },
+  {
+    id: "a1",
+    participants: cast("archive"),
+    primaryName: "Ivo",
+    message: "Ivo, where is the ledger?",
+    maxSpeakers: 2,
+    expectedNames: ["Ivo"],
+  },
+  {
+    id: "a2",
+    participants: cast("archive"),
+    primaryName: "Ivo",
+    message: "Nia, fetch the map.",
+    maxSpeakers: 2,
+    expectedNames: ["Nia"],
+  },
+  {
+    id: "a3",
+    participants: cast("archive"),
+    primaryName: "Ivo",
+    message: "Warden, lock the vault.",
+    maxSpeakers: 2,
+    expectedNames: ["Oren"],
+  },
+  {
+    id: "a4",
+    participants: cast("archive"),
+    primaryName: "Ivo",
+    message: "Archivist, is this shelf cursed?",
+    maxSpeakers: 2,
+    expectedNames: ["Ivo"],
+  },
+  {
+    id: "a5",
+    participants: cast("archive"),
+    primaryName: "Ivo",
+    message: "What did we find last night?",
+    maxSpeakers: 2,
+    expectedNames: ["Ivo"],
+  },
 ];
 
 function toCharacter(participant: RoomRoutingParticipant): Character {
@@ -129,7 +281,10 @@ function toCharacter(participant: RoomRoutingParticipant): Character {
   };
 }
 
-function grade(selectedNames: string[], expectedNames: string[]): Pick<RawCall, "exact" | "precision" | "recall" | "f1"> {
+function grade(
+  selectedNames: string[],
+  expectedNames: string[],
+): Pick<RawCall, "exact" | "precision" | "recall" | "f1"> {
   const selected = new Set(selectedNames);
   const expected = new Set(expectedNames);
   const truePositives = [...selected].filter((name) => expected.has(name)).length;
@@ -164,9 +319,8 @@ function llmUsageCost(usage: TokenUsage | null): { input: number; output: number
 function tokenUsageCost(usage: TokenUsage | null, arm: "jev" | "llm"): { input: number; output: number; cost: number } {
   const input = usage?.promptTokens ?? 0;
   const output = usage?.completionTokens ?? 0;
-  const [inputRate, outputRate] = arm === "jev"
-    ? [JEV_INPUT_PER_MILLION, JEV_OUTPUT_PER_MILLION]
-    : [LLM_INPUT_PER_MILLION, LLM_OUTPUT_PER_MILLION];
+  const [inputRate, outputRate] =
+    arm === "jev" ? [JEV_INPUT_PER_MILLION, JEV_OUTPUT_PER_MILLION] : [LLM_INPUT_PER_MILLION, LLM_OUTPUT_PER_MILLION];
   return { input, output, cost: (input * inputRate + output * outputRate) / 1_000_000 };
 }
 
@@ -191,7 +345,12 @@ async function main(): Promise<void> {
     apiKey: jevKey,
     enabled: true,
     // The benchmark intentionally disables lane budgets so cap behavior does not skew results.
-    budget: { maxTotalTokens: 1_000_000_000, maxEstimatedCostUsd: null, maxRequestsPerWindow: 100_000, rateWindowMs: 1_000 },
+    budget: {
+      maxTotalTokens: 1_000_000_000,
+      maxEstimatedCostUsd: null,
+      maxRequestsPerWindow: 100_000,
+      rateWindowMs: 1_000,
+    },
   };
   const thresholds = jevSettings.confidencePolicy["speaker-routing"];
   const llmProvider = {
@@ -206,7 +365,9 @@ async function main(): Promise<void> {
 
   const calls: RawCall[] = [];
   console.log(`benchmarking ${scenarios.length} scenarios x ${repeats} repeats x 2 arms`);
-  console.log(`Jev model=${jevSettings.model} base=${jevSettings.baseUrl}; LLM model=${llmProvider.model} base=${llmProvider.baseUrl}`);
+  console.log(
+    `Jev model=${jevSettings.model} base=${jevSettings.baseUrl}; LLM model=${llmProvider.model} base=${llmProvider.baseUrl}`,
+  );
 
   for (const scenario of scenarios) {
     const participants = scenario.participants;
@@ -216,39 +377,74 @@ async function main(): Promise<void> {
       user_message: scenario.message,
       recent_history: "",
       max_speakers: scenario.maxSpeakers,
-      participants: participants.map((participant) => ({ id: participant.id, name: participant.name, archetype: participant.archetype })),
+      participants: participants.map((participant) => ({
+        id: participant.id,
+        name: participant.name,
+        archetype: participant.archetype,
+      })),
     };
 
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
       // Jev arm: the real System One transport + lane composition.
       const jevStart = performance.now();
       const finishEvidence = beginSpeakerEvidence({
-        settings: jevSettings, caseId: scenario.id, repeat, state, questions, corpus: scenarios,
+        settings: jevSettings,
+        caseId: scenario.id,
+        repeat,
+        state,
+        questions,
+        corpus: scenarios,
       });
       try {
         const result = await completeWithSystemOne({ settings: jevSettings, state, questions });
         const composed = composeRoomRoutingSelection(participants, result.answers, thresholds, scenario.maxSpeakers);
         const cost = jevUsageCost(result);
         // Apply the same group-expansion post-pass the production lane uses.
-        const ids = composed.band === "act"
-          ? ensureGroupSpeakers(composed.speakerIds, participants.map(toCharacter), scenario.message, scenario.maxSpeakers)
-          : [];
+        const ids =
+          composed.band === "act"
+            ? ensureGroupSpeakers(
+                composed.speakerIds,
+                participants.map(toCharacter),
+                scenario.message,
+                scenario.maxSpeakers,
+              )
+            : [];
         const selectedNames = ids.map((id) => participants.find((participant) => participant.id === id)?.name ?? id);
         calls.push({
-          scenarioId: scenario.id, arm: "jev", repeat, ok: true, deferred: composed.band !== "act",
+          scenarioId: scenario.id,
+          arm: "jev",
+          repeat,
+          ok: true,
+          deferred: composed.band !== "act",
           evidence: finishEvidence(result.model.responseModel),
           latencyMs: Math.max(0, Math.round(performance.now() - jevStart)),
-          inputTokens: cost.input, outputTokens: cost.output, costUsd: cost.cost,
+          inputTokens: cost.input,
+          outputTokens: cost.output,
+          costUsd: cost.cost,
           predictedProbability: composed.topSignal,
-          selectedNames, expectedNames: scenario.expectedNames, ...grade(selectedNames, scenario.expectedNames),
+          selectedNames,
+          expectedNames: scenario.expectedNames,
+          ...grade(selectedNames, scenario.expectedNames),
         });
       } catch (error) {
         calls.push({
-          scenarioId: scenario.id, arm: "jev", repeat, ok: false, deferred: true, error: error instanceof Error ? error.message : "error",
+          scenarioId: scenario.id,
+          arm: "jev",
+          repeat,
+          ok: false,
+          deferred: true,
+          error: error instanceof Error ? error.message : "error",
           evidence: finishEvidence(undefined),
           latencyMs: Math.max(0, Math.round(performance.now() - jevStart)),
-          inputTokens: 0, outputTokens: 0, costUsd: 0, selectedNames: [], expectedNames: scenario.expectedNames,
-          exact: false, precision: 0, recall: 0, f1: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+          selectedNames: [],
+          expectedNames: scenario.expectedNames,
+          exact: false,
+          precision: 0,
+          recall: 0,
+          f1: 0,
         });
       }
 
@@ -266,19 +462,41 @@ async function main(): Promise<void> {
           preset,
         });
         const cost = llmUsageCost(selection.usage);
-        const selectedNames = selection.speakerIds.map((id) => participants.find((participant) => participant.id === id)?.name ?? id);
+        const selectedNames = selection.speakerIds.map(
+          (id) => participants.find((participant) => participant.id === id)?.name ?? id,
+        );
         calls.push({
-          scenarioId: scenario.id, arm: "llm", repeat, ok: true, deferred: false,
+          scenarioId: scenario.id,
+          arm: "llm",
+          repeat,
+          ok: true,
+          deferred: false,
           latencyMs: Math.max(0, Math.round(performance.now() - llmStart)),
-          inputTokens: cost.input, outputTokens: cost.output, costUsd: cost.cost,
-          selectedNames, expectedNames: scenario.expectedNames, ...grade(selectedNames, scenario.expectedNames),
+          inputTokens: cost.input,
+          outputTokens: cost.output,
+          costUsd: cost.cost,
+          selectedNames,
+          expectedNames: scenario.expectedNames,
+          ...grade(selectedNames, scenario.expectedNames),
         });
       } catch (error) {
         calls.push({
-          scenarioId: scenario.id, arm: "llm", repeat, ok: false, deferred: false, error: error instanceof Error ? error.message : "error",
+          scenarioId: scenario.id,
+          arm: "llm",
+          repeat,
+          ok: false,
+          deferred: false,
+          error: error instanceof Error ? error.message : "error",
           latencyMs: Math.max(0, Math.round(performance.now() - llmStart)),
-          inputTokens: 0, outputTokens: 0, costUsd: 0, selectedNames: [], expectedNames: scenario.expectedNames,
-          exact: false, precision: 0, recall: 0, f1: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+          selectedNames: [],
+          expectedNames: scenario.expectedNames,
+          exact: false,
+          precision: 0,
+          recall: 0,
+          f1: 0,
         });
       }
 
@@ -297,23 +515,48 @@ async function main(): Promise<void> {
           preset,
           systemOne: { settings: jevSettings, caller: completeWithSystemOne, thresholds },
         });
-        laneKind = selection.kind === "system-one" ? "system-one" : selection.source === "fallback" ? "fallback" : "llm";
+        laneKind =
+          selection.kind === "system-one" ? "system-one" : selection.source === "fallback" ? "fallback" : "llm";
         const cost = tokenUsageCost(selection.usage, laneKind === "system-one" ? "jev" : "llm");
-        const selectedNames = selection.speakerIds.map((id) => participants.find((participant) => participant.id === id)?.name ?? id);
+        const selectedNames = selection.speakerIds.map(
+          (id) => participants.find((participant) => participant.id === id)?.name ?? id,
+        );
         calls.push({
-          scenarioId: scenario.id, arm: "lane", repeat, ok: true, deferred: false, laneKind,
+          scenarioId: scenario.id,
+          arm: "lane",
+          repeat,
+          ok: true,
+          deferred: false,
+          laneKind,
           latencyMs: Math.max(0, Math.round(performance.now() - laneStart)),
-          inputTokens: cost.input, outputTokens: cost.output, costUsd: cost.cost,
-          selectedNames, expectedNames: scenario.expectedNames, ...grade(selectedNames, scenario.expectedNames),
+          inputTokens: cost.input,
+          outputTokens: cost.output,
+          costUsd: cost.cost,
+          selectedNames,
+          expectedNames: scenario.expectedNames,
+          ...grade(selectedNames, scenario.expectedNames),
         });
       } catch (error) {
-        const selectedNames = fallbackRoomSpeakers(participants.map(toCharacter), primary.id, scenario.message, scenario.maxSpeakers)
-          .map((id) => participants.find((participant) => participant.id === id)?.name ?? id);
+        const selectedNames = fallbackRoomSpeakers(
+          participants.map(toCharacter),
+          primary.id,
+          scenario.message,
+          scenario.maxSpeakers,
+        ).map((id) => participants.find((participant) => participant.id === id)?.name ?? id);
         calls.push({
-          scenarioId: scenario.id, arm: "lane", repeat, ok: true, deferred: false, laneKind: "fallback",
+          scenarioId: scenario.id,
+          arm: "lane",
+          repeat,
+          ok: true,
+          deferred: false,
+          laneKind: "fallback",
           latencyMs: Math.max(0, Math.round(performance.now() - laneStart)),
-          inputTokens: 0, outputTokens: 0, costUsd: 0,
-          selectedNames, expectedNames: scenario.expectedNames, ...grade(selectedNames, scenario.expectedNames),
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+          selectedNames,
+          expectedNames: scenario.expectedNames,
+          ...grade(selectedNames, scenario.expectedNames),
         });
         void error;
       }
@@ -325,31 +568,76 @@ async function main(): Promise<void> {
   // Calibration and the promotion gate are scored on the decisions the Jev lane actually took.
   // The bridge/tavern scenarios fit the map; the archive scenarios are held out, so the
   // reported calibration is out of sample.
-  const jevActed = calls.filter((row) => row.arm === "jev" && row.ok && !row.deferred && typeof row.predictedProbability === "number");
-  const toPoints = (rows: RawCall[]) => rows.map((row) => ({ predictedProbability: row.predictedProbability as number, correct: row.exact }));
+  const jevActed = calls.filter(
+    (row) => row.arm === "jev" && row.ok && !row.deferred && typeof row.predictedProbability === "number",
+  );
+  const toPoints = (rows: RawCall[]) =>
+    rows.map((row) => ({ predictedProbability: row.predictedProbability as number, correct: row.exact }));
   const isHoldout = (id: string) => id.startsWith("a");
   const devActed = jevActed.filter((row) => !isHoldout(row.scenarioId));
   const holdoutActed = jevActed.filter((row) => isHoldout(row.scenarioId));
   const rawReport = gradeCalibration(toPoints(jevActed), 10);
   const fitted = fitPlattCalibration(toPoints(devActed));
-  const calibrate = (map: PlattCalibration) => toPoints(jevActed).map((point) => ({ predictedProbability: applyCalibration(point.predictedProbability, map), correct: point.correct }));
+  const calibrate = (map: PlattCalibration) =>
+    toPoints(jevActed).map((point) => ({
+      predictedProbability: applyCalibration(point.predictedProbability, map),
+      correct: point.correct,
+    }));
   const calibratedAll = gradeCalibration(calibrate(fitted), 10);
   const holdoutRaw = gradeCalibration(toPoints(holdoutActed), 10);
-  const holdoutCalibrated = gradeCalibration(toPoints(holdoutActed).map((point) => ({ predictedProbability: applyCalibration(point.predictedProbability, fitted), correct: point.correct })), 10);
+  const holdoutCalibrated = gradeCalibration(
+    toPoints(holdoutActed).map((point) => ({
+      predictedProbability: applyCalibration(point.predictedProbability, fitted),
+      correct: point.correct,
+    })),
+    10,
+  );
   const actedAccuracy = jevActed.length === 0 ? 0 : jevActed.filter((row) => row.exact).length / jevActed.length;
   const routingGate = evaluatePromotionGate("speaker-routing", {
-    samples: jevActed.length, accuracy: actedAccuracy, brier: calibratedAll.brier, expectedCalibrationError: calibratedAll.expectedCalibrationError,
+    samples: jevActed.length,
+    accuracy: actedAccuracy,
+    brier: calibratedAll.brier,
+    expectedCalibrationError: calibratedAll.expectedCalibrationError,
   });
-  const calibration = { fitted, rawReport, calibratedAll, holdoutRaw, holdoutCalibrated, devSamples: devActed.length, holdoutSamples: holdoutActed.length };
+  const calibration = {
+    fitted,
+    rawReport,
+    calibratedAll,
+    holdoutRaw,
+    holdoutCalibrated,
+    devSamples: devActed.length,
+    holdoutSamples: holdoutActed.length,
+  };
 
-  const report = renderReport({ scenarios, calls, repeats, jevSettings, llmProvider, thresholds, routingGate, actedAccuracy, actedSamples: jevActed.length, calibration });
+  const report = renderReport({
+    scenarios,
+    calls,
+    repeats,
+    jevSettings,
+    llmProvider,
+    thresholds,
+    routingGate,
+    actedAccuracy,
+    actedSamples: jevActed.length,
+    calibration,
+  });
   const outPath = path.resolve(ROOT, process.env.BENCH_OUT ?? "docs/system-one-benchmark.md");
   await writeFile(outPath, report, "utf8");
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
-  console.log(`promotion gate: promoted=${routingGate.promoted}${routingGate.reasons.length ? ` reasons=${routingGate.reasons.join("; ")}` : ""}`);
+  console.log(
+    `promotion gate: promoted=${routingGate.promoted}${routingGate.reasons.length ? ` reasons=${routingGate.reasons.join("; ")}` : ""}`,
+  );
 
   // Also emit machine-readable raw data next to the report.
-  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ scenarios, calls, routingGate, actedAccuracy, actedSamples: jevActed.length, calibration }, null, 2), "utf8");
+  await writeFile(
+    outPath.replace(/\.md$/, ".json"),
+    JSON.stringify(
+      { scenarios, calls, routingGate, actedAccuracy, actedSamples: jevActed.length, calibration },
+      null,
+      2,
+    ),
+    "utf8",
+  );
 }
 
 interface Summary {
@@ -375,7 +663,14 @@ interface Summary {
 function summarize(rows: RawCall[]): Summary {
   const ok = rows.filter((row) => row.ok);
   const n = rows.length;
-  const totals = rows.reduce((acc, row) => ({ input: acc.input + row.inputTokens, output: acc.output + row.outputTokens, cost: acc.cost + row.costUsd }), { input: 0, output: 0, cost: 0 });
+  const totals = rows.reduce(
+    (acc, row) => ({
+      input: acc.input + row.inputTokens,
+      output: acc.output + row.outputTokens,
+      cost: acc.cost + row.costUsd,
+    }),
+    { input: 0, output: 0, cost: 0 },
+  );
   const latencies = rows.map((row) => row.latencyMs);
   const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
   return {
@@ -419,7 +714,18 @@ function renderReport(input: {
     holdoutSamples: number;
   };
 }): string {
-  const { scenarios, calls, repeats, jevSettings, llmProvider, thresholds, routingGate, actedAccuracy, actedSamples, calibration } = input;
+  const {
+    scenarios,
+    calls,
+    repeats,
+    jevSettings,
+    llmProvider,
+    thresholds,
+    routingGate,
+    actedAccuracy,
+    actedSamples,
+    calibration,
+  } = input;
   const jev = summarize(calls.filter((row) => row.arm === "jev"));
   const llm = summarize(calls.filter((row) => row.arm === "llm"));
   const lane = summarize(calls.filter((row) => row.arm === "lane"));
@@ -438,7 +744,8 @@ function renderReport(input: {
   const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 
   const agreement = (() => {
-    let same = 0, both = 0;
+    let same = 0,
+      both = 0;
     for (const scenario of scenarios) {
       for (let repeat = 1; repeat <= repeats; repeat += 1) {
         const j = calls.find((row) => row.arm === "jev" && row.scenarioId === scenario.id && row.repeat === repeat);
@@ -468,12 +775,20 @@ function renderReport(input: {
   lines.push("");
   lines.push("| Setting | Jev arm | LLM arm |");
   lines.push("| --- | --- | --- |");
-  lines.push(`| Endpoint | \`${jevSettings.baseUrl}\` (\`/systemone\`) | \`${llmProvider.baseUrl}\` (\`/chat/completions\`) |`);
+  lines.push(
+    `| Endpoint | \`${jevSettings.baseUrl}\` (\`/systemone\`) | \`${llmProvider.baseUrl}\` (\`/chat/completions\`) |`,
+  );
   lines.push(`| Model | ${jevSettings.model} | ${llmProvider.model} |`);
-  lines.push(`| Price in / out (USD per million) | ${JEV_INPUT_PER_MILLION} / ${JEV_OUTPUT_PER_MILLION} | ${LLM_INPUT_PER_MILLION} / ${LLM_OUTPUT_PER_MILLION} |`);
-  lines.push(`| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} | n/a (always answers) |`);
+  lines.push(
+    `| Price in / out (USD per million) | ${JEV_INPUT_PER_MILLION} / ${JEV_OUTPUT_PER_MILLION} | ${LLM_INPUT_PER_MILLION} / ${LLM_OUTPUT_PER_MILLION} |`,
+  );
+  lines.push(
+    `| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} | n/a (always answers) |`,
+  );
   lines.push("");
-  lines.push(`Battery: ${scenarios.length} scenarios x ${repeats} repeats = ${scenarios.length * repeats} calls per arm.`);
+  lines.push(
+    `Battery: ${scenarios.length} scenarios x ${repeats} repeats = ${scenarios.length * repeats} calls per arm.`,
+  );
   lines.push("Costs for the DeepSeek arm are computed at OpenRouter's published V4 Flash rate for calculation parity");
   lines.push("with the router deployment, per operator instruction.");
   lines.push("");
@@ -483,25 +798,39 @@ function renderReport(input: {
   lines.push("| --- | ---: | ---: | ---: |");
   lines.push(`| Calls | ${jev.calls} | ${llm.calls} | ${lane.calls} |`);
   lines.push(`| Success rate | ${pct(jev.okRate)} | ${pct(llm.okRate)} | ${pct(lane.okRate)} |`);
-  lines.push(`| Deferral rate (no action taken) | ${pct(jev.deferRate)} | ${pct(llm.deferRate)} | ${pct(lane.deferRate)} |`);
+  lines.push(
+    `| Deferral rate (no action taken) | ${pct(jev.deferRate)} | ${pct(llm.deferRate)} | ${pct(lane.deferRate)} |`,
+  );
   lines.push(`| Exact-set accuracy | ${pct(jev.exactRate)} | ${pct(llm.exactRate)} | ${pct(lane.exactRate)} |`);
   lines.push(`| Micro precision | ${pct(jev.precision)} | ${pct(llm.precision)} | ${pct(lane.precision)} |`);
   lines.push(`| Micro recall | ${pct(jev.recall)} | ${pct(llm.recall)} | ${pct(lane.recall)} |`);
   lines.push(`| Micro F1 | ${pct(jev.f1)} | ${pct(llm.f1)} | ${pct(lane.f1)} |`);
-  lines.push(`| Latency mean | ${jev.latencyMean.toFixed(0)} ms | ${llm.latencyMean.toFixed(0)} ms | ${lane.latencyMean.toFixed(0)} ms |`);
-  lines.push(`| Latency p50 | ${jev.latencyP50.toFixed(0)} ms | ${llm.latencyP50.toFixed(0)} ms | ${lane.latencyP50.toFixed(0)} ms |`);
-  lines.push(`| Latency p95 | ${jev.latencyP95.toFixed(0)} ms | ${llm.latencyP95.toFixed(0)} ms | ${lane.latencyP95.toFixed(0)} ms |`);
+  lines.push(
+    `| Latency mean | ${jev.latencyMean.toFixed(0)} ms | ${llm.latencyMean.toFixed(0)} ms | ${lane.latencyMean.toFixed(0)} ms |`,
+  );
+  lines.push(
+    `| Latency p50 | ${jev.latencyP50.toFixed(0)} ms | ${llm.latencyP50.toFixed(0)} ms | ${lane.latencyP50.toFixed(0)} ms |`,
+  );
+  lines.push(
+    `| Latency p95 | ${jev.latencyP95.toFixed(0)} ms | ${llm.latencyP95.toFixed(0)} ms | ${lane.latencyP95.toFixed(0)} ms |`,
+  );
   lines.push(`| Input tokens (total) | ${jev.inputTotal} | ${llm.inputTotal} | ${lane.inputTotal} |`);
   lines.push(`| Output tokens (total) | ${jev.outputTotal} | ${llm.outputTotal} | ${lane.outputTotal} |`);
-  lines.push(`| Input tokens (mean/call) | ${jev.inputMean.toFixed(1)} | ${llm.inputMean.toFixed(1)} | ${lane.inputMean.toFixed(1)} |`);
-  lines.push(`| Output tokens (mean/call) | ${jev.outputMean.toFixed(1)} | ${llm.outputMean.toFixed(1)} | ${lane.outputMean.toFixed(1)} |`);
+  lines.push(
+    `| Input tokens (mean/call) | ${jev.inputMean.toFixed(1)} | ${llm.inputMean.toFixed(1)} | ${lane.inputMean.toFixed(1)} |`,
+  );
+  lines.push(
+    `| Output tokens (mean/call) | ${jev.outputMean.toFixed(1)} | ${llm.outputMean.toFixed(1)} | ${lane.outputMean.toFixed(1)} |`,
+  );
   lines.push(`| Total cost | ${money(jev.costTotal)} | ${money(llm.costTotal)} | ${money(lane.costTotal)} |`);
   lines.push(`| Cost / call | ${money(jev.costMean)} | ${money(llm.costMean)} | ${money(lane.costMean)} |`);
   lines.push(`| Cost / 1,000 calls | ${money(jev.costPer1k)} | ${money(llm.costPer1k)} | ${money(lane.costPer1k)} |`);
   lines.push(`| Arm agreement | ${pct(agreement)} | — | — |`);
   lines.push("");
   lines.push("The **gated lane** is the production behavior with the toggle on: Jev answers when a participant clears");
-  lines.push(`the action threshold, otherwise the LLM path runs, otherwise the deterministic fallback. This battery resolved`);
+  lines.push(
+    `the action threshold, otherwise the LLM path runs, otherwise the deterministic fallback. This battery resolved`,
+  );
   lines.push(`as Jev ${laneKinds["system-one"]}, LLM ${laneKinds.llm}, fallback ${laneKinds.fallback}.`);
   lines.push("");
   lines.push("## Per-scenario results");
@@ -515,47 +844,81 @@ function renderReport(input: {
     const jevRow = calls.find((row) => row.arm === "jev" && row.scenarioId === scenario.id)!;
     const llmRow = calls.find((row) => row.arm === "llm" && row.scenarioId === scenario.id)!;
     const laneRow = calls.find((row) => row.arm === "lane" && row.scenarioId === scenario.id)!;
-    lines.push(`| ${scenario.id} | ${scenario.message} | ${scenario.expectedNames.join(", ")} | ${jevRow.selectedNames.join(", ") || "—"} | ${jevRow.deferred ? "defer" : "act"} | ${llmRow.selectedNames.join(", ") || "—"}${llmRow.ok ? "" : " (error)"} | ${laneRow.selectedNames.join(", ") || "—"}${laneRow.laneKind ? ` (${laneRow.laneKind})` : ""} | ${jevRow.exact ? "yes" : "no"} / ${llmRow.exact ? "yes" : "no"} / ${laneRow.exact ? "yes" : "no"} |`);
+    lines.push(
+      `| ${scenario.id} | ${scenario.message} | ${scenario.expectedNames.join(", ")} | ${jevRow.selectedNames.join(", ") || "—"} | ${jevRow.deferred ? "defer" : "act"} | ${llmRow.selectedNames.join(", ") || "—"}${llmRow.ok ? "" : " (error)"} | ${laneRow.selectedNames.join(", ") || "—"}${laneRow.laneKind ? ` (${laneRow.laneKind})` : ""} | ${jevRow.exact ? "yes" : "no"} / ${llmRow.exact ? "yes" : "no"} / ${laneRow.exact ? "yes" : "no"} |`,
+    );
   }
   lines.push("");
   lines.push("## Promotion gate — `speaker-routing`");
   lines.push("");
-  lines.push(`Scored on the ${actedSamples} decisions the Jev lane actually took: exact-set accuracy ${pct(actedAccuracy)}, calibrated Brier ${calibration.calibratedAll.brier.toFixed(4)}, calibrated ECE ${calibration.calibratedAll.expectedCalibrationError.toFixed(4)}.`);
+  lines.push(
+    `Scored on the ${actedSamples} decisions the Jev lane actually took: exact-set accuracy ${pct(actedAccuracy)}, calibrated Brier ${calibration.calibratedAll.brier.toFixed(4)}, calibrated ECE ${calibration.calibratedAll.expectedCalibrationError.toFixed(4)}.`,
+  );
   lines.push("");
   lines.push(`**${routingGate.promoted ? "PROMOTE" : "NOT READY"}**`);
   lines.push("");
   if (routingGate.reasons.length === 0) lines.push("All gates passed.");
   else for (const reason of routingGate.reasons) lines.push(`- ${reason}`);
   lines.push("");
-  lines.push("This is an exploratory statistical gate, not a production approval. Runtime also requires matching version-bound evidence.");
-  lines.push("Per-call evidence covers the direct Jev arm only, including failed attempts with missing model metadata. The gated/fallback arm is not attributed to that evidence.");
-  lines.push("Direct composition uses raw signals (identity calibration); the fitted map below is post-hoc analysis, not an evaluated runtime configuration. Repeats do not add unique scenarios.");
+  lines.push(
+    "This is an exploratory statistical gate, not a production approval. Runtime also requires matching version-bound evidence.",
+  );
+  lines.push(
+    "Per-call evidence covers the direct Jev arm only, including failed attempts with missing model metadata. The gated/fallback arm is not attributed to that evidence.",
+  );
+  lines.push(
+    "Direct composition uses raw signals (identity calibration); the fitted map below is post-hoc analysis, not an evaluated runtime configuration. Repeats do not add unique scenarios.",
+  );
   lines.push("");
   lines.push("### Calibration (fit on bridge/tavern, scored on the held-out archive)");
   lines.push("");
   lines.push("| Split | Signal | Brier | ECE |");
   lines.push("| --- | --- | ---: | ---: |");
-  lines.push(`| all acted (${actedSamples}) | raw | ${calibration.rawReport.brier.toFixed(4)} | ${calibration.rawReport.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| all acted (${actedSamples}) | calibrated | ${calibration.calibratedAll.brier.toFixed(4)} | ${calibration.calibratedAll.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| held-out archive (${calibration.holdoutSamples}) | raw | ${calibration.holdoutRaw.brier.toFixed(4)} | ${calibration.holdoutRaw.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| held-out archive (${calibration.holdoutSamples}) | calibrated | ${calibration.holdoutCalibrated.brier.toFixed(4)} | ${calibration.holdoutCalibrated.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(
+    `| all acted (${actedSamples}) | raw | ${calibration.rawReport.brier.toFixed(4)} | ${calibration.rawReport.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| all acted (${actedSamples}) | calibrated | ${calibration.calibratedAll.brier.toFixed(4)} | ${calibration.calibratedAll.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| held-out archive (${calibration.holdoutSamples}) | raw | ${calibration.holdoutRaw.brier.toFixed(4)} | ${calibration.holdoutRaw.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| held-out archive (${calibration.holdoutSamples}) | calibrated | ${calibration.holdoutCalibrated.brier.toFixed(4)} | ${calibration.holdoutCalibrated.expectedCalibrationError.toFixed(4)} |`,
+  );
   lines.push("");
-  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)}.`);
+  lines.push(
+    `Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)}.`,
+  );
   lines.push("");
   lines.push("## Observations");
   lines.push("");
-  lines.push(`- **Reliability.** Jev returned a schema-valid answer on ${pct(jev.okRate)} of calls with no text parsing; the raw LLM path returned a usable JSON array on only ${pct(llm.okRate)}. Its failures were dominated by non-JSON replies${topLlmError ? ` (\`${topLlmError[0]}\`, ${topLlmError[1]}x)` : ""}; in production those throw and the route falls back deterministically.`);
-  lines.push(`- **Confidence gating.** Jev deferred on ${pct(jev.deferRate)} of calls rather than guess. The gated lane resolved ${laneKinds["system-one"]}/${lane.calls} calls with Jev, ${laneKinds.llm} with the LLM, and ${laneKinds.fallback} with the deterministic fallback.`);
-  lines.push(`- **Latency.** Jev p50 is ${jev.latencyP50.toFixed(0)} ms vs ${llm.latencyP50.toFixed(0)} ms (about ${(llm.latencyP50 / Math.max(jev.latencyP50, 1)).toFixed(1)}x faster).`);
-  lines.push(`- **Tokens.** Jev uses the most input tokens (${jev.inputMean.toFixed(0)}/call) because it asks one question per participant with full criteria; the LLM prompt is smaller (${llm.inputMean.toFixed(0)}/call) but its production output is capped at 512 tokens.`);
-  lines.push(`- **Cost.** Per call, Jev costs ${money(jev.costMean)} vs ${money(llm.costMean)} (${(llm.costMean / Math.max(jev.costMean, 1e-9)).toFixed(1)}x). Jev is cheaper than the LLM only if its larger per-call input is outweighed by the LLM's output rate, and free Jev output makes it competitive for multi-question batteries.`);
-  lines.push(`- **Accuracy.** Named, role, and group turns are handled well: Jev's per-participant \`noul\`s select multiple speakers and the shared \`ensureGroupSpeakers\` post-pass expands "both"/"everyone" turns in both arms. The remaining misses are no-addressee turns where Jev defers to the LLM and the LLM over-selects (e.g. it adds a second speaker when only the primary is expected); the deterministic single-primary rule would have been correct there.`);
+  lines.push(
+    `- **Reliability.** Jev returned a schema-valid answer on ${pct(jev.okRate)} of calls with no text parsing; the raw LLM path returned a usable JSON array on only ${pct(llm.okRate)}. Its failures were dominated by non-JSON replies${topLlmError ? ` (\`${topLlmError[0]}\`, ${topLlmError[1]}x)` : ""}; in production those throw and the route falls back deterministically.`,
+  );
+  lines.push(
+    `- **Confidence gating.** Jev deferred on ${pct(jev.deferRate)} of calls rather than guess. The gated lane resolved ${laneKinds["system-one"]}/${lane.calls} calls with Jev, ${laneKinds.llm} with the LLM, and ${laneKinds.fallback} with the deterministic fallback.`,
+  );
+  lines.push(
+    `- **Latency.** Jev p50 is ${jev.latencyP50.toFixed(0)} ms vs ${llm.latencyP50.toFixed(0)} ms (about ${(llm.latencyP50 / Math.max(jev.latencyP50, 1)).toFixed(1)}x faster).`,
+  );
+  lines.push(
+    `- **Tokens.** Jev uses the most input tokens (${jev.inputMean.toFixed(0)}/call) because it asks one question per participant with full criteria; the LLM prompt is smaller (${llm.inputMean.toFixed(0)}/call) but its production output is capped at 512 tokens.`,
+  );
+  lines.push(
+    `- **Cost.** Per call, Jev costs ${money(jev.costMean)} vs ${money(llm.costMean)} (${(llm.costMean / Math.max(jev.costMean, 1e-9)).toFixed(1)}x). Jev is cheaper than the LLM only if its larger per-call input is outweighed by the LLM's output rate, and free Jev output makes it competitive for multi-question batteries.`,
+  );
+  lines.push(
+    `- **Accuracy.** Named, role, and group turns are handled well: Jev's per-participant \`noul\`s select multiple speakers and the shared \`ensureGroupSpeakers\` post-pass expands "both"/"everyone" turns in both arms. The remaining misses are no-addressee turns where Jev defers to the LLM and the LLM over-selects (e.g. it adds a second speaker when only the primary is expected); the deterministic single-primary rule would have been correct there.`,
+  );
   lines.push("");
   lines.push("## Reproduce");
   lines.push("");
   lines.push("```bash");
   lines.push("set -a; . /tmp/opencode/jev/jev.env; set +a   # TYPESAFE_API_KEY");
-  lines.push('export PROXY_API_KEY="$(rg -o \'^PROXY_API_KEY=.*\' /home/mojo/projects/agentrouterrouter/.env | cut -d= -f2-)"');
+  lines.push(
+    "export PROXY_API_KEY=\"$(rg -o '^PROXY_API_KEY=.*' /home/mojo/projects/agentrouterrouter/.env | cut -d= -f2-)\"",
+  );
   lines.push("export OPENROUTER_BASE_URL=http://100.72.41.9:8787/v1 OPENROUTER_MODEL=deepseek-v4-flash");
   lines.push("npx tsx scripts/benchmark-system-one-lanes.ts");
   lines.push("```");

@@ -50,14 +50,22 @@ describe("prompt template api compatibility", () => {
     expect(body).not.toHaveProperty("requestId");
     expect(body.templates).toHaveLength(20);
     expect(body.templates.map((entry: { id: string }) => entry.id)).toEqual(templateIds);
-    expect(body.templates).toEqual(PROMPT_TEMPLATES.map((entry) => ({
-      ...entry,
-      template: entry.defaultTemplate,
-      overridden: false,
-    })));
+    expect(body.templates).toEqual(
+      PROMPT_TEMPLATES.map((entry) => ({
+        ...entry,
+        template: entry.defaultTemplate,
+        overridden: false,
+      })),
+    );
     for (const entry of body.templates) {
       expect(Object.keys(entry)).toEqual([
-        "id", "label", "description", "defaultTemplate", "placeholders", "template", "overridden",
+        "id",
+        "label",
+        "description",
+        "defaultTemplate",
+        "placeholders",
+        "template",
+        "overridden",
       ]);
       expect(entry.template).toBe(entry.defaultTemplate);
       expect(entry.overridden).toBe(false);
@@ -99,16 +107,24 @@ describe("prompt template api compatibility", () => {
     const app = buildApp();
     const harnessPatch = { recentTurns: 17, temperature: 0.37 };
     expect((await app.inject({ method: "PUT", url: "/api/harness", payload: harnessPatch })).statusCode).toBe(200);
-    expect((await app.inject({
-      method: "PUT",
-      url: "/api/prompt-templates/character.final",
-      payload: { template: "Final {{target.name}}" },
-    })).statusCode).toBe(200);
-    expect((await app.inject({
-      method: "PUT",
-      url: "/api/prompt-templates/provider.startReply",
-      payload: { template: "Opening: {{reply.start}}" },
-    })).statusCode).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "PUT",
+          url: "/api/prompt-templates/character.final",
+          payload: { template: "Final {{target.name}}" },
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "PUT",
+          url: "/api/prompt-templates/provider.startReply",
+          payload: { template: "Opening: {{reply.start}}" },
+        })
+      ).statusCode,
+    ).toBe(200);
 
     const reset = await app.inject({
       method: "PUT",
@@ -175,7 +191,9 @@ describe("prompt template api compatibility", () => {
       payload: { template: "x".repeat(64_000) },
     });
     expect(accepted.statusCode).toBe(200);
-    expect(accepted.json().templates.find((entry: { id: string }) => entry.id === "scene.synthesizer.system")).toMatchObject({
+    expect(
+      accepted.json().templates.find((entry: { id: string }) => entry.id === "scene.synthesizer.system"),
+    ).toMatchObject({
       template: "x".repeat(64_000),
       overridden: true,
     });

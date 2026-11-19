@@ -37,12 +37,36 @@ const NPC: FreeformMaterializationCandidate = {
 const KIND_CANDIDATE: Record<FreeformMaterializationCandidate["kind"], FreeformMaterializationCandidate> = {
   "materialize-location": LOCATION,
   "materialize-npc": NPC,
-  "hostile-encounter": { candidateId: "ffe-cccccccccccccccccccccccccccccccccccccccc", kind: "hostile-encounter", label: "Goblin raiders" },
-  "shop-stock": { candidateId: "ffsc-dddddddddddddddddddddddddddddddddddddddd", kind: "shop-stock", label: "The merchant's wares" },
-  "new-clue": { candidateId: "ffl-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", kind: "new-clue", label: "The drowned courier" },
-  "materialize-faction": { candidateId: "fff-ffffffffffffffffffffffffffffffffffffffff", kind: "materialize-faction", label: "The thieves' guild" },
-  "materialize-quest": { candidateId: "ffq-1111111111111111111111111111111111111111", kind: "materialize-quest", label: "A bounty on the road bandits" },
-  "materialize-rumor": { candidateId: "ffr-2222222222222222222222222222222222222222", kind: "materialize-rumor", label: "The pale tide" },
+  "hostile-encounter": {
+    candidateId: "ffe-cccccccccccccccccccccccccccccccccccccccc",
+    kind: "hostile-encounter",
+    label: "Goblin raiders",
+  },
+  "shop-stock": {
+    candidateId: "ffsc-dddddddddddddddddddddddddddddddddddddddd",
+    kind: "shop-stock",
+    label: "The merchant's wares",
+  },
+  "new-clue": {
+    candidateId: "ffl-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    kind: "new-clue",
+    label: "The drowned courier",
+  },
+  "materialize-faction": {
+    candidateId: "fff-ffffffffffffffffffffffffffffffffffffffff",
+    kind: "materialize-faction",
+    label: "The thieves' guild",
+  },
+  "materialize-quest": {
+    candidateId: "ffq-1111111111111111111111111111111111111111",
+    kind: "materialize-quest",
+    label: "A bounty on the road bandits",
+  },
+  "materialize-rumor": {
+    candidateId: "ffr-2222222222222222222222222222222222222222",
+    kind: "materialize-rumor",
+    label: "The pale tide",
+  },
 };
 
 /** The single receipted repository method each advertised kind may route to. */
@@ -62,12 +86,14 @@ interface PortCall {
   args: readonly unknown[];
 }
 
-function answers(options: {
-  choice?: string;
-  choiceProbability?: number;
-  needsContent?: number;
-  legal?: number;
-} = {}): Record<string, SystemOneAnswer> {
+function answers(
+  options: {
+    choice?: string;
+    choiceProbability?: number;
+    needsContent?: number;
+    legal?: number;
+  } = {},
+): Record<string, SystemOneAnswer> {
   const choice = options.choice ?? LOCATION.candidateId;
   const probability = options.choiceProbability ?? 0.95;
   return {
@@ -92,35 +118,51 @@ function fakePort(failWith?: Error): FreeformMaterializationExecutionPort & { ca
     calls,
     materializeFreeformTravel(...args) {
       record("materializeFreeformTravel", args);
-      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformTravel"]>;
+      return { status: "materialized" } as unknown as ReturnType<
+        FreeformMaterializationExecutionPort["materializeFreeformTravel"]
+      >;
     },
     materializeFreeformNpc(...args) {
       record("materializeFreeformNpc", args);
-      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformNpc"]>;
+      return { status: "materialized" } as unknown as ReturnType<
+        FreeformMaterializationExecutionPort["materializeFreeformNpc"]
+      >;
     },
     materializeFreeformEncounter(...args) {
       record("materializeFreeformEncounter", args);
-      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformEncounter"]>;
+      return { status: "materialized" } as unknown as ReturnType<
+        FreeformMaterializationExecutionPort["materializeFreeformEncounter"]
+      >;
     },
     materializeFreeformShop(...args) {
       record("materializeFreeformShop", args);
-      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformShop"]>;
+      return { status: "materialized" } as unknown as ReturnType<
+        FreeformMaterializationExecutionPort["materializeFreeformShop"]
+      >;
     },
     materializeFreeformLore(...args) {
       record("materializeFreeformLore", args);
-      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformLore"]>;
+      return { status: "materialized" } as unknown as ReturnType<
+        FreeformMaterializationExecutionPort["materializeFreeformLore"]
+      >;
     },
     materializeFreeformFaction(...args) {
       record("materializeFreeformFaction", args);
-      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformFaction"]>;
+      return { status: "materialized" } as unknown as ReturnType<
+        FreeformMaterializationExecutionPort["materializeFreeformFaction"]
+      >;
     },
     materializeFreeformQuest(...args) {
       record("materializeFreeformQuest", args);
-      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformQuest"]>;
+      return { status: "materialized" } as unknown as ReturnType<
+        FreeformMaterializationExecutionPort["materializeFreeformQuest"]
+      >;
     },
     materializeFreeformRumor(...args) {
       record("materializeFreeformRumor", args);
-      return { status: "materialized" } as unknown as ReturnType<FreeformMaterializationExecutionPort["materializeFreeformRumor"]>;
+      return { status: "materialized" } as unknown as ReturnType<
+        FreeformMaterializationExecutionPort["materializeFreeformRumor"]
+      >;
     },
   };
 }
@@ -138,7 +180,9 @@ function laneSettings(overrides: Partial<SystemOneSettings> = {}): SystemOneSett
 /** Test-only promotion override; removed after every test so the lane stays unpromoted elsewhere. */
 function approveForTest(settings: SystemOneSettings, responseModel = settings.model): void {
   SYSTEM_ONE_PROMOTION_RECORDS[LANE] = {
-    evaluatedBindings: [systemOneEvaluationBinding(LANE, settings, responseModel, FREEFORM_MATERIALIZATION_ACTION_FAMILY)],
+    evaluatedBindings: [
+      systemOneEvaluationBinding(LANE, settings, responseModel, FREEFORM_MATERIALIZATION_ACTION_FAMILY),
+    ],
     metrics: { samples: 60, accuracy: 0.98, brier: 0.02, expectedCalibrationError: 0.02 },
     calibration: null,
     promotedAt: "2026-01-01",
@@ -228,7 +272,11 @@ describe("executeFreeformMaterializationLane", () => {
     expect(port.calls[0]!.method).toBe("materializeFreeformTravel");
     // The lane hands the repository the server-authored candidate id; it never writes directly.
     expect(port.calls[0]!.args).toEqual([
-      "local-owner", INPUT.campaignId, INPUT.sessionId, INPUT.actorId, INPUT.attempt,
+      "local-owner",
+      INPUT.campaignId,
+      INPUT.sessionId,
+      INPUT.actorId,
+      INPUT.attempt,
       { candidateId: LOCATION.candidateId },
     ]);
   });
@@ -314,17 +362,21 @@ describe("executeFreeformMaterializationLane", () => {
       return { status: "declined", reason: "current-location-unmapped" };
     }) as FreeformMaterializationExecutionPort["materializeFreeformTravel"];
     const first = await executeFreeformMaterializationLane(
-      "local-owner", settings,
+      "local-owner",
+      settings,
       createFakeSystemOneCaller({ scripted: answers(), responseModel: "jev-1.13.0" }),
-      { port: declining, deterministicFallback: () => "classifier" }, INPUT,
+      { port: declining, deterministicFallback: () => "classifier" },
+      INPUT,
     );
     expect(first.source).toBe("deterministic");
 
     const throwing = fakePort(new Error("repository unavailable"));
     const second = await executeFreeformMaterializationLane(
-      "local-owner", settings,
+      "local-owner",
+      settings,
       createFakeSystemOneCaller({ scripted: answers(), responseModel: "jev-1.13.0" }),
-      { port: throwing, deterministicFallback: () => "classifier" }, INPUT,
+      { port: throwing, deterministicFallback: () => "classifier" },
+      INPUT,
     );
     expect(second.source).toBe("deterministic");
     expect(throwing.calls).toHaveLength(1);
@@ -336,7 +388,11 @@ describe("executeFreeformMaterializationLane", () => {
     const malformed: FreeformMaterializationCandidate[][] = [
       [],
       [{ candidateId: "x", kind: "invented-kind", label: "x" } as unknown as FreeformMaterializationCandidate],
-      Array.from({ length: 33 }, (_value, index) => ({ candidateId: `candidate:${index}`, kind: "new-clue", label: `clue ${index}` })),
+      Array.from({ length: 33 }, (_value, index) => ({
+        candidateId: `candidate:${index}`,
+        kind: "new-clue",
+        label: `clue ${index}`,
+      })),
     ];
     for (const candidates of malformed) {
       const result = await executeFreeformMaterializationLane(

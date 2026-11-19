@@ -15,7 +15,11 @@ async function prepare() {
   const f = await dmFixture();
   f.graph();
   f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "auto" });
-  const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, { intent: "open", expectedModeRevision: 1, idempotencyKey: "open" });
+  const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+    intent: "open",
+    expectedModeRevision: 1,
+    idempotencyKey: "open",
+  });
   return { ...f, run };
 }
 
@@ -39,8 +43,12 @@ describe("campaign DM narration provider resilience", () => {
     expect(input.tools![0]!.name).toBe("submit_dm_scene");
     expect(input.bodyOverrides).toMatchObject({ reasoning_effort: "none" });
     const db = database();
-    expect(db.prepare("SELECT source,outcome_code FROM dm_narration_dispatches").get()).toEqual({ source: "provider-assisted", outcome_code: "ok" });
-    db.close(); f.repo.close();
+    expect(db.prepare("SELECT source,outcome_code FROM dm_narration_dispatches").get()).toEqual({
+      source: "provider-assisted",
+      outcome_code: "ok",
+    });
+    db.close();
+    f.repo.close();
   });
 
   it("retries exactly once on a pre-dispatch 400 and still seals provider-assisted prose", async () => {
@@ -55,8 +63,12 @@ describe("campaign DM narration provider resilience", () => {
     await orchestrateCampaignDmBeat(f.repo, "local-owner", f.run.runId, dmDependencies(complete));
     expect(narrationCalls).toBe(2);
     const db = database();
-    expect(db.prepare("SELECT source,outcome_code FROM dm_narration_dispatches").get()).toEqual({ source: "provider-assisted", outcome_code: "ok" });
-    db.close(); f.repo.close();
+    expect(db.prepare("SELECT source,outcome_code FROM dm_narration_dispatches").get()).toEqual({
+      source: "provider-assisted",
+      outcome_code: "ok",
+    });
+    db.close();
+    f.repo.close();
   });
 
   it("never retries an ambiguous 5xx and settles deterministic fallback", async () => {
@@ -70,8 +82,11 @@ describe("campaign DM narration provider resilience", () => {
     await orchestrateCampaignDmBeat(f.repo, "local-owner", f.run.runId, dmDependencies(complete));
     expect(narrationCalls).toBe(1);
     const db = database();
-    expect(db.prepare("SELECT source FROM dm_narration_dispatches").get()).toEqual({ source: "deterministic-fallback" });
-    db.close(); f.repo.close();
+    expect(db.prepare("SELECT source FROM dm_narration_dispatches").get()).toEqual({
+      source: "deterministic-fallback",
+    });
+    db.close();
+    f.repo.close();
   });
 
   it("states the complete-scene word budget so the model cannot overflow the validator", () => {

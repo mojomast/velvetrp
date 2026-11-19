@@ -10,16 +10,58 @@ export function speakerColor(identity: string, light = false): string {
   return `hsl(${hash % 360} ${light ? "45% 28%" : "75% 78%"})`;
 }
 export function SpeakerName({ identity, name }: { identity: string; name: string }) {
-  return <strong className="conversation-speaker" style={{ "--speaker-color": speakerColor(identity), "--speaker-color-light": speakerColor(identity, true) } as CSSProperties}>{name}</strong>;
+  return (
+    <strong
+      className="conversation-speaker"
+      style={
+        {
+          "--speaker-color": speakerColor(identity),
+          "--speaker-color-light": speakerColor(identity, true),
+        } as CSSProperties
+      }
+    >
+      {name}
+    </strong>
+  );
 }
 
 /** Presentation only. Never evaluates HTML/Markdown or infers game mechanics. */
-export function ConversationText({ text, kind }: { text: string; kind: "action" | "narration" | "dialogue" | "system" }) {
-  return <div className={`conversation-text text-${kind}`}><span className="conversation-kind">{kind}</span>
-    {text.split(/\n\s*\n/u).filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph.split(/("[^"\n]+"|“[^”\n]+”|\*[^*\n]+\*|\b\d*d\d+(?:\s*[+-]\s*\d+)?\b)/u).map((part, partIndex) =>
-      /^(?:"[^"\n]+"|“[^”\n]+”)$/u.test(part) ? <q className="conversation-dialogue" key={partIndex}>{part.slice(1, -1)}</q>
-        : /^\*[^*]+\*$/u.test(part) ? <em className="conversation-action" key={partIndex}>{part.slice(1, -1)}</em>
-          : /^\d*d\d+(?:\s*[+-]\s*\d+)?$/u.test(part) ? <code className="conversation-roll" title="Dice notation (text, not a new roll)" key={partIndex}>{part}</code>
-          : part)}</p>)}
-  </div>;
+export function ConversationText({
+  text,
+  kind,
+}: {
+  text: string;
+  kind: "action" | "narration" | "dialogue" | "system";
+}) {
+  return (
+    <div className={`conversation-text text-${kind}`}>
+      <span className="conversation-kind">{kind}</span>
+      {text
+        .split(/\n\s*\n/u)
+        .filter(Boolean)
+        .map((paragraph, index) => (
+          <p key={index}>
+            {paragraph
+              .split(/("[^"\n]+"|“[^”\n]+”|\*[^*\n]+\*|\b\d*d\d+(?:\s*[+-]\s*\d+)?\b)/u)
+              .map((part, partIndex) =>
+                /^(?:"[^"\n]+"|“[^”\n]+”)$/u.test(part) ? (
+                  <q className="conversation-dialogue" key={partIndex}>
+                    {part.slice(1, -1)}
+                  </q>
+                ) : /^\*[^*]+\*$/u.test(part) ? (
+                  <em className="conversation-action" key={partIndex}>
+                    {part.slice(1, -1)}
+                  </em>
+                ) : /^\d*d\d+(?:\s*[+-]\s*\d+)?$/u.test(part) ? (
+                  <code className="conversation-roll" title="Dice notation (text, not a new roll)" key={partIndex}>
+                    {part}
+                  </code>
+                ) : (
+                  part
+                ),
+              )}
+          </p>
+        ))}
+    </div>
+  );
 }

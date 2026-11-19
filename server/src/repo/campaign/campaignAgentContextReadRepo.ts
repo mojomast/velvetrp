@@ -1,9 +1,6 @@
 import type DatabaseDriver from "better-sqlite3";
 import { generatedCampaignContentProviderSchema, npcPublicStateHttpSchema, resourceIdSchema } from "@velvet/contracts";
-import type {
-  CampaignAgentAudience,
-  CampaignAgentContextSnapshot,
-} from "../../context.js";
+import type { CampaignAgentAudience, CampaignAgentContextSnapshot } from "../../context.js";
 import { CAMPAIGN_COMPANION_CONTEXT_SUPPORTED } from "../../context.js";
 import { buildCombatActionPlans } from "../encounter/combatActionPlan.js";
 import { createNpcPresenceReadRepository } from "../world/npcPresenceReadRepo.js";
@@ -13,8 +10,13 @@ import { createCampaignPlayReadRepository } from "./campaignPlayReadRepo.js";
 import { resolveCampaignRuleset } from "../../rulesets/index.js";
 
 const MAX_CAMPAIGN_CONTEXT_COMBATANTS = 32;
-const semanticLabel = (value: string) => value.split(/[._:-]+/u).filter(Boolean)
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ").slice(0, 200);
+const semanticLabel = (value: string) =>
+  value
+    .split(/[._:-]+/u)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+    .slice(0, 200);
 
 interface EncounterRow {
   encounter_id: string;
@@ -98,12 +100,15 @@ export function createCampaignAgentContextReadRepository(
       } else if (audience.kind === "player") {
         targetActorId = resourceIdSchema.parse(audience.actorId);
         if (!play.playableActors.some((actor) => actor.actorId === targetActorId)) return null;
-        const target = db.prepare(`SELECT character.id character_id,character.name FROM campaign_actors actor
+        const target = db
+          .prepare(
+            `SELECT character.id character_id,character.name FROM campaign_actors actor
           JOIN campaign_characters campaign_character ON campaign_character.campaign_id=actor.campaign_id
             AND campaign_character.id=actor.campaign_character_id
           JOIN characters character ON character.id=campaign_character.character_id
           JOIN campaign_actor_private_state private ON private.campaign_id=actor.campaign_id AND private.actor_id=actor.id
-          WHERE actor.campaign_id=? AND actor.id=?`)
+          WHERE actor.campaign_id=? AND actor.id=?`,
+          )
           .get(campaign, targetActorId) as { character_id: string; name: string } | undefined;
         if (!target) return null;
         targetName = target.name;
@@ -111,12 +116,16 @@ export function createCampaignAgentContextReadRepository(
       } else if (audience.kind === "npc") {
         if (!isGm) return null;
         targetNpcId = resourceIdSchema.parse(audience.npcId);
-        const target = db.prepare(`SELECT npc.persona_id,character.name persona_name,npc.public_name
+        const target = db
+          .prepare(
+            `SELECT npc.persona_id,character.name persona_name,npc.public_name
           FROM campaign_npc_presence_v43 presence
           JOIN campaign_npcs_v28 npc ON npc.campaign_id=presence.campaign_id AND npc.npc_id=presence.npc_id
           JOIN characters character ON character.id=npc.persona_id
-          WHERE presence.campaign_id=? AND presence.session_id=? AND presence.npc_id=? AND presence.state='present'`)
-          .get(campaign, sessionId, targetNpcId) as { persona_id: string; persona_name: string; public_name: string } | undefined;
+          WHERE presence.campaign_id=? AND presence.session_id=? AND presence.npc_id=? AND presence.state='present'`,
+          )
+          .get(campaign, sessionId, targetNpcId) as
+          { persona_id: string; persona_name: string; public_name: string } | undefined;
         sessionIsRunning = sessionLifecycle.getCampaignRoomSessionLifecycle(sessionId) === "running";
         if (!sessionIsRunning || !target) return null;
         targetName = target.public_name;
@@ -124,10 +133,13 @@ export function createCampaignAgentContextReadRepository(
       } else {
         if (!isGm) return null;
         targetEnemyId = resourceIdSchema.parse(audience.combatantId);
-        const target = db.prepare(`SELECT combatant.combatant_id FROM combatant
+        const target = db
+          .prepare(
+            `SELECT combatant.combatant_id FROM combatant
           JOIN encounter ON encounter.encounter_id=combatant.encounter_id
           WHERE encounter.campaign_id=? AND encounter.session_id=? AND encounter.status='active'
-            AND combatant.combatant_id=? AND combatant.combatant_kind='enemy' AND combatant.status='active'`)
+            AND combatant.combatant_id=? AND combatant.combatant_kind='enemy' AND combatant.status='active'`,
+          )
           .get(campaign, sessionId, targetEnemyId) as { combatant_id: string } | undefined;
         if (!target) return null;
         targetName = "Enemy combatant";
@@ -135,10 +147,14 @@ export function createCampaignAgentContextReadRepository(
 
       npcPresence.assertScopedIntegrity(campaign, sessionId);
       sessionIsRunning ??= sessionLifecycle.getCampaignRoomSessionLifecycle(sessionId) === "running";
-      const campaignState = db.prepare(`SELECT campaign.active_timeline_id,campaign.administration_revision,timeline.revision timeline_revision
+      const campaignState = db
+        .prepare(
+          `SELECT campaign.active_timeline_id,campaign.administration_revision,timeline.revision timeline_revision
         FROM campaigns campaign JOIN campaign_timelines timeline ON timeline.campaign_id=campaign.id
-          AND timeline.id=campaign.active_timeline_id WHERE campaign.id=?`)
-        .get(campaign) as { active_timeline_id: string; administration_revision: number; timeline_revision: number } | undefined;
+          AND timeline.id=campaign.active_timeline_id WHERE campaign.id=?`,
+        )
+        .get(campaign) as
+        { active_timeline_id: string; administration_revision: number; timeline_revision: number } | undefined;
       if (!campaignState) return null;
       let ruleset;
       try {
@@ -147,24 +163,41 @@ export function createCampaignAgentContextReadRepository(
         return null;
       }
 
-      const principalVisibleLocationIds = audience.kind === "player" ? new Set((db.prepare(`SELECT DISTINCT discovery.location_id
+      const principalVisibleLocationIds =
+        audience.kind === "player"
+          ? new Set(
+              (
+                db
+                  .prepare(
+                    `SELECT DISTINCT discovery.location_id
         FROM campaign_location_discoveries_v28 discovery JOIN campaign_actor_private_state actor
           ON actor.campaign_id=discovery.campaign_id AND actor.actor_id=discovery.actor_id
-        WHERE discovery.campaign_id=? AND actor.controller_principal_id=?`)
-        .all(campaign, principal) as Array<{ location_id: string }>).map((row) => row.location_id)) : new Set<string>();
+        WHERE discovery.campaign_id=? AND actor.controller_principal_id=?`,
+                  )
+                  .all(campaign, principal) as Array<{ location_id: string }>
+              ).map((row) => row.location_id),
+            )
+          : new Set<string>();
 
-      const canon = db.prepare("SELECT source_of_truth,synthesized_source FROM session_context WHERE session_id=?")
+      const canon = db
+        .prepare("SELECT source_of_truth,synthesized_source FROM session_context WHERE session_id=?")
         .get(sessionId) as { source_of_truth: string; synthesized_source: string } | undefined;
       const humanCanon = canon?.source_of_truth.trim() ? canon.source_of_truth.split(/\r?\n/) : [];
       const synthesizedSummaryFacts = canon?.synthesized_source.trim() ? canon.synthesized_source.split(/\r?\n/) : [];
 
-      const encounter = db.prepare(`SELECT encounter.encounter_id,lifecycle.name,encounter.status,
+      const encounter = db
+        .prepare(
+          `SELECT encounter.encounter_id,lifecycle.name,encounter.status,
           encounter.round_number,encounter.current_turn_combatant_id,revision.revision
         FROM encounter JOIN encounter_lifecycle_v31 lifecycle USING(encounter_id)
         JOIN combat_mutation_revisions_v27 revision USING(encounter_id)
-        WHERE encounter.campaign_id=? AND encounter.session_id=? AND encounter.status='active'`)
+        WHERE encounter.campaign_id=? AND encounter.session_id=? AND encounter.status='active'`,
+        )
         .get(campaign, sessionId) as EncounterRow | undefined;
-      const combatants = encounter ? db.prepare(`SELECT combatant.combatant_id,combatant.actor_id,
+      const combatants = encounter
+        ? (db
+            .prepare(
+              `SELECT combatant.combatant_id,combatant.actor_id,
           combatant.combatant_kind,combatant.team,combatant.hit_points,combatant.maximum_hit_points,
           combatant.status,combatant.enemy_tactic,character.name,provenance.definition_id
         FROM combatant
@@ -174,18 +207,29 @@ export function createCampaignAgentContextReadRepository(
         LEFT JOIN characters character ON character.id=campaign_character.character_id
         LEFT JOIN encounter_enemy_provenance_v31 provenance ON provenance.encounter_id=combatant.encounter_id
           AND provenance.combatant_id=combatant.combatant_id
-        WHERE combatant.encounter_id=? ORDER BY combatant.combatant_id COLLATE BINARY LIMIT ?`)
-        .all(encounter.encounter_id, MAX_CAMPAIGN_CONTEXT_COMBATANTS + 1) as CombatantRow[] : [];
+        WHERE combatant.encounter_id=? ORDER BY combatant.combatant_id COLLATE BINARY LIMIT ?`,
+            )
+            .all(encounter.encounter_id, MAX_CAMPAIGN_CONTEXT_COMBATANTS + 1) as CombatantRow[])
+        : [];
       if (combatants.length > MAX_CAMPAIGN_CONTEXT_COMBATANTS) return null;
-      const combatantLabels=new Map(combatants.map((row,index)=>[row.combatant_id,row.name?.trim()||`Enemy combatant ${index+1}`]));
+      const combatantLabels = new Map(
+        combatants.map((row, index) => [row.combatant_id, row.name?.trim() || `Enemy combatant ${index + 1}`]),
+      );
 
-      const committedMechanics: string[] = encounter ? [
-        `Active encounter ${encounter.name}; round ${encounter.round_number}.`,
-        `Current combatant: ${encounter.current_turn_combatant_id ? combatantLabels.get(encounter.current_turn_combatant_id) ?? "unknown" : "none"}.`,
-        ...combatants.map((row) => `${combatantLabels.get(row.combatant_id)}: HP ${row.hit_points}/${row.maximum_hit_points}; status ${row.status}; team ${row.team}.`),
-      ] : ["No active encounter is committed for this session."];
+      const committedMechanics: string[] = encounter
+        ? [
+            `Active encounter ${encounter.name}; round ${encounter.round_number}.`,
+            `Current combatant: ${encounter.current_turn_combatant_id ? (combatantLabels.get(encounter.current_turn_combatant_id) ?? "unknown") : "none"}.`,
+            ...combatants.map(
+              (row) =>
+                `${combatantLabels.get(row.combatant_id)}: HP ${row.hit_points}/${row.maximum_hit_points}; status ${row.status}; team ${row.team}.`,
+            ),
+          ]
+        : ["No active encounter is committed for this session."];
 
-      const castRows = db.prepare(`SELECT character.name,actor.id actor_id,location.public_name location_name,
+      const castRows = db
+        .prepare(
+          `SELECT character.name,actor.id actor_id,location.public_name location_name,
           location.visibility location_visibility,location.location_id
         FROM session_characters participant JOIN characters character ON character.id=participant.character_id
         LEFT JOIN campaign_characters campaign_character ON campaign_character.campaign_id=?
@@ -195,15 +239,28 @@ export function createCampaignAgentContextReadRepository(
           AND actor_location.session_id=? AND actor_location.actor_id=actor.id
         LEFT JOIN campaign_locations_v28 location ON location.campaign_id=actor_location.campaign_id
           AND location.location_id=actor_location.location_id
-        WHERE participant.session_id=? ORDER BY participant.position,participant.character_id COLLATE BINARY LIMIT 12`)
-        .all(campaign, campaign, campaign, sessionId, sessionId) as Array<{ name: string; actor_id: string | null;
-          location_name: string | null; location_visibility: string | null; location_id: string | null }>;
-      const canSeeCastLocation = (row: typeof castRows[number]) => audience.kind === "dm"
-        || (audience.kind === "player" && row.location_visibility !== "gm" && row.location_id !== null
-          && principalVisibleLocationIds.has(row.location_id));
-      const visibleCast = castRows.map((row) => `${row.name}${canSeeCastLocation(row) && row.location_name ? ` at ${row.location_name}` : ""}.`);
+        WHERE participant.session_id=? ORDER BY participant.position,participant.character_id COLLATE BINARY LIMIT 12`,
+        )
+        .all(campaign, campaign, campaign, sessionId, sessionId) as Array<{
+        name: string;
+        actor_id: string | null;
+        location_name: string | null;
+        location_visibility: string | null;
+        location_id: string | null;
+      }>;
+      const canSeeCastLocation = (row: (typeof castRows)[number]) =>
+        audience.kind === "dm" ||
+        (audience.kind === "player" &&
+          row.location_visibility !== "gm" &&
+          row.location_id !== null &&
+          principalVisibleLocationIds.has(row.location_id));
+      const visibleCast = castRows.map(
+        (row) => `${row.name}${canSeeCastLocation(row) && row.location_name ? ` at ${row.location_name}` : ""}.`,
+      );
       if (sessionIsRunning) {
-        const presentNpcs = db.prepare(`SELECT presence.npc_id,npc.public_name,metadata.public_state_json,
+        const presentNpcs = db
+          .prepare(
+            `SELECT presence.npc_id,npc.public_name,metadata.public_state_json,
             location.public_name location_name,location.visibility location_visibility,presence.location_id
           FROM campaign_npc_presence_v43 presence
           JOIN campaign_npcs_v28 npc ON npc.campaign_id=presence.campaign_id AND npc.npc_id=presence.npc_id
@@ -214,25 +271,39 @@ export function createCampaignAgentContextReadRepository(
              AND (?='dm' OR NOT EXISTS (SELECT 1 FROM campaign_generation_accepted_artifacts_v52 generated
                WHERE generated.campaign_id=npc.campaign_id AND generated.server_resource_id=npc.npc_id
                  AND generated.artifact_kind='npc' AND generated.visibility='gm'))
-          ORDER BY presence.npc_id COLLATE BINARY`).all(campaign, sessionId, audience.kind) as PresentNpcRow[];
+          ORDER BY presence.npc_id COLLATE BINARY`,
+          )
+          .all(campaign, sessionId, audience.kind) as PresentNpcRow[];
         for (const row of presentNpcs) {
-          const publicState = npcPublicStateHttpSchema.parse(row.public_state_json
-            ? JSON.parse(row.public_state_json) as unknown
-            : { name: row.public_name });
-          const locationVisible = audience.kind === "dm"
-            || (audience.kind === "player" && row.location_visibility !== "gm" && row.location_id !== null
-              && principalVisibleLocationIds.has(row.location_id));
-          visibleCast.push(`${publicState.name}${locationVisible && row.location_name ? ` at ${row.location_name}` : ""}.`);
+          const publicState = npcPublicStateHttpSchema.parse(
+            row.public_state_json ? (JSON.parse(row.public_state_json) as unknown) : { name: row.public_name },
+          );
+          const locationVisible =
+            audience.kind === "dm" ||
+            (audience.kind === "player" &&
+              row.location_visibility !== "gm" &&
+              row.location_id !== null &&
+              principalVisibleLocationIds.has(row.location_id));
+          visibleCast.push(
+            `${publicState.name}${locationVisible && row.location_name ? ` at ${row.location_name}` : ""}.`,
+          );
         }
       }
 
-      const locationRows = audience.kind === "dm"
-        ? db.prepare(`SELECT DISTINCT location.location_id,location.public_name,location.public_description FROM campaign_actor_locations_v28 actor_location
+      const locationRows =
+        audience.kind === "dm"
+          ? db
+              .prepare(
+                `SELECT DISTINCT location.location_id,location.public_name,location.public_description FROM campaign_actor_locations_v28 actor_location
             JOIN campaign_locations_v28 location ON location.campaign_id=actor_location.campaign_id AND location.location_id=actor_location.location_id
             WHERE actor_location.campaign_id=? AND actor_location.session_id=?
-            ORDER BY location.public_name COLLATE BINARY,location.location_id COLLATE BINARY LIMIT 12`).all(campaign, sessionId)
-        : audience.kind === "player" && targetActorId
-          ? db.prepare(`SELECT location.location_id,location.public_name,location.public_description FROM campaign_actor_locations_v28 current
+            ORDER BY location.public_name COLLATE BINARY,location.location_id COLLATE BINARY LIMIT 12`,
+              )
+              .all(campaign, sessionId)
+          : audience.kind === "player" && targetActorId
+            ? db
+                .prepare(
+                  `SELECT location.location_id,location.public_name,location.public_description FROM campaign_actor_locations_v28 current
               JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
               WHERE current.campaign_id=? AND current.session_id=? AND current.actor_id=?
                 AND location.visibility<>'gm' AND EXISTS(SELECT 1 FROM campaign_location_discoveries_v28 discovery
@@ -240,83 +311,212 @@ export function createCampaignAgentContextReadRepository(
                     AND actor.actor_id=discovery.actor_id
                   WHERE discovery.campaign_id=location.campaign_id AND discovery.location_id=location.location_id
                     AND actor.controller_principal_id=?)
-              ORDER BY location.location_id COLLATE BINARY LIMIT 1`).all(campaign, sessionId, targetActorId, principal)
-          : [];
-      const visibleWorld = (locationRows as Array<{ public_name: string; public_description: string }>).map((row) =>
-        `${row.public_name}${row.public_description.trim() ? ` — ${row.public_description}` : ""}`);
-      const currentActorLocation = audience.kind === "player"
-        ? (locationRows as Array<{ public_name: string }>)[0]?.public_name ?? null
-        : null;
+              ORDER BY location.location_id COLLATE BINARY LIMIT 1`,
+                )
+                .all(campaign, sessionId, targetActorId, principal)
+            : [];
+      const visibleWorld = (locationRows as Array<{ public_name: string; public_description: string }>).map(
+        (row) => `${row.public_name}${row.public_description.trim() ? ` — ${row.public_description}` : ""}`,
+      );
+      const currentActorLocation =
+        audience.kind === "player" ? ((locationRows as Array<{ public_name: string }>)[0]?.public_name ?? null) : null;
 
-      const questRows = db.prepare(`SELECT quest.title,quest.description,quest.status FROM quests quest
+      const questRows = db
+        .prepare(
+          `SELECT quest.title,quest.description,quest.status FROM quests quest
         LEFT JOIN quest_definitions_v33 definition ON definition.campaign_id=quest.campaign_id AND definition.quest_id=quest.id
         WHERE quest.campaign_id=? AND quest.status IN ('open','active')
           AND (? OR definition.visibility='public')
-        ORDER BY quest.sort_order,quest.id COLLATE BINARY LIMIT 32`).all(campaign, audience.kind === "dm" ? 1 : 0) as
-        Array<{ title: string; description: string | null; status: string }>;
-      const visibleQuests = questRows.map((row) => `${row.title} (${row.status})${row.description ? ` — ${row.description}` : ""}`);
+        ORDER BY quest.sort_order,quest.id COLLATE BINARY LIMIT 32`,
+        )
+        .all(campaign, audience.kind === "dm" ? 1 : 0) as Array<{
+        title: string;
+        description: string | null;
+        status: string;
+      }>;
+      const visibleQuests = questRows.map(
+        (row) => `${row.title} (${row.status})${row.description ? ` — ${row.description}` : ""}`,
+      );
 
-      const recapRows = db.prepare(`SELECT recap.text FROM campaign_recaps recap
+      const recapRows = db
+        .prepare(
+          `SELECT recap.text FROM campaign_recaps recap
         WHERE recap.campaign_id=? AND recap.timeline_id=? AND recap.through_revision<=? AND (? OR recap.visibility='members')
           AND (json_array_length(recap.selected_session_ids)=0 OR EXISTS(
             SELECT 1 FROM json_each(recap.selected_session_ids) selected WHERE selected.value=?))
-        ORDER BY recap.created_at DESC,recap.id COLLATE BINARY DESC LIMIT 3`).all(campaign, campaignState.active_timeline_id,
-          campaignState.timeline_revision, audience.kind === "dm" ? 1 : 0, sessionId) as Array<{ text: string }>;
+        ORDER BY recap.created_at DESC,recap.id COLLATE BINARY DESC LIMIT 3`,
+        )
+        .all(
+          campaign,
+          campaignState.active_timeline_id,
+          campaignState.timeline_revision,
+          audience.kind === "dm" ? 1 : 0,
+          sessionId,
+        ) as Array<{ text: string }>;
       const recap = recapRows.reverse().flatMap((row) => row.text.split(/\r?\n/));
 
       let legalActions: string[] = [];
       let legalActionCandidates: NonNullable<CampaignAgentContextSnapshot["encounter"]>["legalActionCandidates"] = [];
       if (encounter) {
         const current = combatants.find((row) => row.combatant_id === encounter.current_turn_combatant_id);
-        const audienceOwnsCurrent = audience.kind === "dm"
-          || (audience.kind === "player" && current?.actor_id === targetActorId)
-          || (audience.kind === "enemy" && current?.combatant_id === targetEnemyId);
+        const audienceOwnsCurrent =
+          audience.kind === "dm" ||
+          (audience.kind === "player" && current?.actor_id === targetActorId) ||
+          (audience.kind === "enemy" && current?.combatant_id === targetEnemyId);
         if (audienceOwnsCurrent) {
-          const plans=buildCombatActionPlans(db, principal, campaign, encounter.encounter_id,encounter.current_turn_combatant_id);
-          const actionLabel=(kind:(typeof plans)[number]["kind"],targetLabel:string|null):string=>kind==="attack"?`Basic attack against ${targetLabel}`
-            :kind==="grapple"?`Grapple ${targetLabel}`:kind==="shove"?`Shove ${targetLabel}`:kind==="help"?`Help ${targetLabel}`
-            :kind==="stabilize"?`Stabilize ${targetLabel}`:kind==="escape-grapple"?"Escape grapple":kind==="stand-up"?"Stand up from prone":kind==="dash"?"Dash"
-            :kind==="disengage"?"Disengage":kind==="hide"?"Hide":kind==="ready"?"Ready an action":kind==="death-save"?"Roll death saving throw"
-            :kind==="flee"?"Flee encounter":"End turn";
-          const actionConsequence=(kind:(typeof plans)[number]["kind"]):string=>kind==="attack"?"resolve one basic attack and advance the turn"
-            :kind==="grapple"?"contest Strength to grapple the target":kind==="shove"?"contest Strength to knock the target prone"
-            :kind==="help"?"grant the ally advantage on their next attack":kind==="stabilize"?"stabilize the unconscious ally"
-            :kind==="escape-grapple"?"contest to escape the grapple":kind==="stand-up"?"spend half your speed to stand up":kind==="dash"?"gain extra movement this turn"
-            :kind==="disengage"?"move without provoking opportunity attacks":kind==="hide"?"attempt to hide and gain advantage"
-            :kind==="ready"?"hold a bounded response until your next turn":kind==="death-save"?"roll a death saving throw"
-            :kind==="flee"?"leave the encounter if the action succeeds":"finish the current turn";
-          legalActionCandidates=plans.flatMap((plan)=>(plan.targetIds.length?plan.targetIds:[null]).flatMap((targetId)=>{
-            const targetRow=targetId===null?null:combatants.find((combatant)=>combatant.combatant_id===targetId);
-            const targetLabel=targetRow ? combatantLabels.get(targetRow.combatant_id) ?? null : null;
-            if(targetId!==null&&!targetLabel)return[];
-            const legalActionId=targetId===null?plan.legalActionId:`${plan.legalActionId}:target:${createHash("sha256").update(targetId).digest("hex").slice(0,12)}`;
-            return[{legalActionId,commandLegalActionId:plan.legalActionId,kind:plan.kind,targetId,label:actionLabel(plan.kind,targetLabel),targetLabel,
-              digest:createHash("sha256").update(JSON.stringify([encounter.encounter_id,encounter.revision,legalActionId,plan.actingCombatantId,targetId])).digest("hex")}];}));
-          legalActions = legalActionCandidates.map((candidate) => `${candidate.label}; consequence: ${actionConsequence(candidate.kind)}.`);
+          const plans = buildCombatActionPlans(
+            db,
+            principal,
+            campaign,
+            encounter.encounter_id,
+            encounter.current_turn_combatant_id,
+          );
+          const actionLabel = (kind: (typeof plans)[number]["kind"], targetLabel: string | null): string =>
+            kind === "attack"
+              ? `Basic attack against ${targetLabel}`
+              : kind === "grapple"
+                ? `Grapple ${targetLabel}`
+                : kind === "shove"
+                  ? `Shove ${targetLabel}`
+                  : kind === "help"
+                    ? `Help ${targetLabel}`
+                    : kind === "stabilize"
+                      ? `Stabilize ${targetLabel}`
+                      : kind === "escape-grapple"
+                        ? "Escape grapple"
+                        : kind === "stand-up"
+                          ? "Stand up from prone"
+                          : kind === "dash"
+                            ? "Dash"
+                            : kind === "disengage"
+                              ? "Disengage"
+                              : kind === "hide"
+                                ? "Hide"
+                                : kind === "ready"
+                                  ? "Ready an action"
+                                  : kind === "death-save"
+                                    ? "Roll death saving throw"
+                                    : kind === "flee"
+                                      ? "Flee encounter"
+                                      : "End turn";
+          const actionConsequence = (kind: (typeof plans)[number]["kind"]): string =>
+            kind === "attack"
+              ? "resolve one basic attack and advance the turn"
+              : kind === "grapple"
+                ? "contest Strength to grapple the target"
+                : kind === "shove"
+                  ? "contest Strength to knock the target prone"
+                  : kind === "help"
+                    ? "grant the ally advantage on their next attack"
+                    : kind === "stabilize"
+                      ? "stabilize the unconscious ally"
+                      : kind === "escape-grapple"
+                        ? "contest to escape the grapple"
+                        : kind === "stand-up"
+                          ? "spend half your speed to stand up"
+                          : kind === "dash"
+                            ? "gain extra movement this turn"
+                            : kind === "disengage"
+                              ? "move without provoking opportunity attacks"
+                              : kind === "hide"
+                                ? "attempt to hide and gain advantage"
+                                : kind === "ready"
+                                  ? "hold a bounded response until your next turn"
+                                  : kind === "death-save"
+                                    ? "roll a death saving throw"
+                                    : kind === "flee"
+                                      ? "leave the encounter if the action succeeds"
+                                      : "finish the current turn";
+          legalActionCandidates = plans.flatMap((plan) =>
+            (plan.targetIds.length ? plan.targetIds : [null]).flatMap((targetId) => {
+              const targetRow =
+                targetId === null ? null : combatants.find((combatant) => combatant.combatant_id === targetId);
+              const targetLabel = targetRow ? (combatantLabels.get(targetRow.combatant_id) ?? null) : null;
+              if (targetId !== null && !targetLabel) return [];
+              const legalActionId =
+                targetId === null
+                  ? plan.legalActionId
+                  : `${plan.legalActionId}:target:${createHash("sha256").update(targetId).digest("hex").slice(0, 12)}`;
+              return [
+                {
+                  legalActionId,
+                  commandLegalActionId: plan.legalActionId,
+                  kind: plan.kind,
+                  targetId,
+                  label: actionLabel(plan.kind, targetLabel),
+                  targetLabel,
+                  digest: createHash("sha256")
+                    .update(
+                      JSON.stringify([
+                        encounter.encounter_id,
+                        encounter.revision,
+                        legalActionId,
+                        plan.actingCombatantId,
+                        targetId,
+                      ]),
+                    )
+                    .digest("hex"),
+                },
+              ];
+            }),
+          );
+          legalActions = legalActionCandidates.map(
+            (candidate) => `${candidate.label}; consequence: ${actionConsequence(candidate.kind)}.`,
+          );
         }
       }
 
       const privateTargetFacts: string[] = [];
-      let attributeCandidates:CampaignAgentContextSnapshot["attributeCandidates"]=[];
+      let attributeCandidates: CampaignAgentContextSnapshot["attributeCandidates"] = [];
       if (targetActorId) {
-        const actor = db.prepare(`SELECT private.private_notes,actor.sheet_id FROM campaign_actors actor
+        const actor = db
+          .prepare(
+            `SELECT private.private_notes,actor.sheet_id FROM campaign_actors actor
           JOIN campaign_actor_private_state private ON private.campaign_id=actor.campaign_id AND private.actor_id=actor.id
-          WHERE actor.campaign_id=? AND actor.id=?`)
+          WHERE actor.campaign_id=? AND actor.id=?`,
+          )
           .get(campaign, targetActorId) as { private_notes: string | null; sheet_id: string };
         privateTargetFacts.push(`Target player: ${targetName}.`);
         if (actor.private_notes?.trim()) privateTargetFacts.push(`Target notes: ${actor.private_notes}`);
-        const attributes = db.prepare(`SELECT attribute_id,value FROM rpg_character_attributes
-          WHERE campaign_id=? AND sheet_id=? ORDER BY position LIMIT 64`).all(campaign, actor.sheet_id) as Array<{ attribute_id: string; value: number }>;
-        privateTargetFacts.push(...attributes.map((row) => `Target attribute ${semanticLabel(row.attribute_id)}: ${row.value}.`));
-        attributeCandidates=attributes.map((row)=>{const candidateId=`attribute:${createHash("sha256").update(row.attribute_id).digest("hex").slice(0,24)}`;
-          return{candidateId,commandAttributeId:row.attribute_id,label:semanticLabel(row.attribute_id),currentValue:row.value,
-            digest:createHash("sha256").update(JSON.stringify([campaign,campaignState.active_timeline_id,campaignState.timeline_revision,targetActorId,row.attribute_id,row.value])).digest("hex")};});
+        const attributes = db
+          .prepare(
+            `SELECT attribute_id,value FROM rpg_character_attributes
+          WHERE campaign_id=? AND sheet_id=? ORDER BY position LIMIT 64`,
+          )
+          .all(campaign, actor.sheet_id) as Array<{ attribute_id: string; value: number }>;
+        privateTargetFacts.push(
+          ...attributes.map((row) => `Target attribute ${semanticLabel(row.attribute_id)}: ${row.value}.`),
+        );
+        attributeCandidates = attributes.map((row) => {
+          const candidateId = `attribute:${createHash("sha256").update(row.attribute_id).digest("hex").slice(0, 24)}`;
+          return {
+            candidateId,
+            commandAttributeId: row.attribute_id,
+            label: semanticLabel(row.attribute_id),
+            currentValue: row.value,
+            digest: createHash("sha256")
+              .update(
+                JSON.stringify([
+                  campaign,
+                  campaignState.active_timeline_id,
+                  campaignState.timeline_revision,
+                  targetActorId,
+                  row.attribute_id,
+                  row.value,
+                ]),
+              )
+              .digest("hex"),
+          };
+        });
       } else if (targetNpcId) {
-        const npc = db.prepare(`SELECT private.private_goals
+        const npc = db
+          .prepare(
+            `SELECT private.private_goals
           FROM campaign_npcs_v28 npc
           LEFT JOIN campaign_npc_private_state_v28 private ON private.campaign_id=npc.campaign_id AND private.npc_id=npc.npc_id
-          WHERE npc.campaign_id=? AND npc.npc_id=?`).get(campaign, targetNpcId) as
-          { private_goals: string | null };
+          WHERE npc.campaign_id=? AND npc.npc_id=?`,
+          )
+          .get(campaign, targetNpcId) as { private_goals: string | null };
         privateTargetFacts.push(`Target NPC: ${targetName}.`);
         if (npc.private_goals?.trim()) privateTargetFacts.push(`Target goals: ${npc.private_goals}`);
       } else if (targetEnemyId) {
@@ -339,9 +539,21 @@ export function createCampaignAgentContextReadRepository(
         }
       };
       const currentLocations = new Set((locationRows as Array<{ location_id: string }>).map((row) => row.location_id));
-      const presentNpcIds = new Set(sessionIsRunning ? (db.prepare(`SELECT npc_id FROM campaign_npc_presence_v43
-        WHERE campaign_id=? AND session_id=? AND state='present'`).all(campaign, sessionId) as Array<{ npc_id: string }>).map((row) => row.npc_id) : []);
-      const preparationRows = db.prepare(`SELECT artifact.artifact_key,artifact.artifact_kind,artifact.visibility,
+      const presentNpcIds = new Set(
+        sessionIsRunning
+          ? (
+              db
+                .prepare(
+                  `SELECT npc_id FROM campaign_npc_presence_v43
+        WHERE campaign_id=? AND session_id=? AND state='present'`,
+                )
+                .all(campaign, sessionId) as Array<{ npc_id: string }>
+            ).map((row) => row.npc_id)
+          : [],
+      );
+      const preparationRows = db
+        .prepare(
+          `SELECT artifact.artifact_key,artifact.artifact_kind,artifact.visibility,
           artifact.canonical_json,artifact.server_resource_id,delivery.published_at
         FROM campaign_generation_accepted_artifacts_v52 artifact
         LEFT JOIN campaign_material_deliveries_v53 delivery USING(campaign_id,artifact_key)
@@ -352,10 +564,21 @@ export function createCampaignAgentContextReadRepository(
           AND (artifact.artifact_kind<>'arc' OR artifact.visibility='gm')
           AND (artifact.artifact_kind NOT IN ('scene-prompt','handout') OR artifact.visibility='gm' OR delivery.published_at IS NOT NULL)
         ORDER BY CASE artifact.artifact_kind WHEN 'outline' THEN 0 WHEN 'location' THEN 1 WHEN 'npc' THEN 2 ELSE 3 END,
-          artifact.accepted_at DESC,artifact.artifact_key COLLATE BINARY LIMIT 256`).all(campaign, audience.kind,
-            JSON.stringify([...currentLocations]), JSON.stringify([...presentNpcIds])) as
-        Array<{ artifact_key: string; artifact_kind: string; visibility: string; canonical_json: string;
-          server_resource_id: string | null; published_at: string | null }>;
+          artifact.accepted_at DESC,artifact.artifact_key COLLATE BINARY LIMIT 256`,
+        )
+        .all(
+          campaign,
+          audience.kind,
+          JSON.stringify([...currentLocations]),
+          JSON.stringify([...presentNpcIds]),
+        ) as Array<{
+        artifact_key: string;
+        artifact_kind: string;
+        visibility: string;
+        canonical_json: string;
+        server_resource_id: string | null;
+        published_at: string | null;
+      }>;
       const resourceForKey = db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
         WHERE campaign_id=? AND artifact_key=? AND visibility='public'`);
       const locationIsCurrent = (key: string) => {
@@ -366,45 +589,85 @@ export function createCampaignAgentContextReadRepository(
         const resource = resourceForKey.get(campaign, key) as { server_resource_id: string } | undefined;
         return Boolean(resource && presentNpcIds.has(resource.server_resource_id));
       };
-      const fields: Record<string, string> = { outline: "outlines", location: "locations", npc: "npcs", lore: "lore",
-        "scene-prompt": "scenePrompts", handout: "handouts", arc: "arcs" };
+      const fields: Record<string, string> = {
+        outline: "outlines",
+        location: "locations",
+        npc: "npcs",
+        lore: "lore",
+        "scene-prompt": "scenePrompts",
+        handout: "handouts",
+        arc: "arcs",
+      };
       let includedOutline = false;
       let gmPreparationSize = 0;
       for (const row of preparationRows) {
         let value: unknown;
-        try { value = JSON.parse(row.canonical_json); } catch { continue; }
+        try {
+          value = JSON.parse(row.canonical_json);
+        } catch {
+          continue;
+        }
         const parsed = generatedCampaignContentProviderSchema.safeParse({ [fields[row.artifact_kind]!]: [value] });
         if (!parsed.success) continue;
         const content = parsed.data;
-        const artifact = [...content.outlines, ...content.locations, ...content.npcs, ...content.lore,
-          ...content.scenePrompts, ...content.handouts, ...content.arcs][0]!;
+        const artifact = [
+          ...content.outlines,
+          ...content.locations,
+          ...content.npcs,
+          ...content.lore,
+          ...content.scenePrompts,
+          ...content.handouts,
+          ...content.arcs,
+        ][0]!;
         if (artifact.key !== row.artifact_key || artifact.visibility !== row.visibility) continue;
         if (row.visibility === "gm") {
           // The DM snapshot is already owner/GM-authorized. Other audiences never receive these plans.
-          const scene = content.scenePrompts[0], arc = content.arcs[0];
-          const plan = scene && (!scene.locationKey || locationIsCurrent(scene.locationKey))
-              && scene.npcKeys.every(npcIsPresent)
-            ? { title: scene.title, text: scene.prompt } : arc ? { title: arc.title, text: arc.summary } : null;
+          const scene = content.scenePrompts[0],
+            arc = content.arcs[0];
+          const plan =
+            scene && (!scene.locationKey || locationIsCurrent(scene.locationKey)) && scene.npcKeys.every(npcIsPresent)
+              ? { title: scene.title, text: scene.prompt }
+              : arc
+                ? { title: arc.title, text: arc.summary }
+                : null;
           for (const paragraph of plan?.text.split(/\r?\n/).filter((line) => line.trim()) ?? []) {
-            const line = `GM preparation (possibility, not committed): ${plan!.title}: ${paragraph}`.replace(/\s+/g, " ");
+            const line = `GM preparation (possibility, not committed): ${plan!.title}: ${paragraph}`.replace(
+              /\s+/g,
+              " ",
+            );
             if (line.length <= 1_000 && gmPreparationSize + line.length + 1 <= 2_000) {
-              privateTargetFacts.push(line); gmPreparationSize += line.length + 1;
+              privateTargetFacts.push(line);
+              gmPreparationSize += line.length + 1;
             }
           }
           continue;
         }
-        const outline = content.outlines[0], location = content.locations[0], npc = content.npcs[0], lore = content.lore[0];
-        const scene = content.scenePrompts[0], handout = content.handouts[0];
+        const outline = content.outlines[0],
+          location = content.locations[0],
+          npc = content.npcs[0],
+          lore = content.lore[0];
+        const scene = content.scenePrompts[0],
+          handout = content.handouts[0];
         if (outline && !includedOutline) {
-          addPreparation("Campaign premise", [outline.premise]); includedOutline = true;
+          addPreparation("Campaign premise", [outline.premise]);
+          includedOutline = true;
         } else if (location && row.server_resource_id && currentLocations.has(row.server_resource_id)) {
           addPreparation(location.name, [location.description, location.atmosphere]);
         } else if (npc && row.server_resource_id && presentNpcIds.has(row.server_resource_id)) {
           addPreparation(`${npc.name} portrayal`, [npc.description]);
-        } else if (lore && lore.locationKeys.some(locationIsCurrent) && !lore.storyNodeKeys.length && !lore.factionKeys.length) {
+        } else if (
+          lore &&
+          lore.locationKeys.some(locationIsCurrent) &&
+          !lore.storyNodeKeys.length &&
+          !lore.factionKeys.length
+        ) {
           addPreparation(lore.title, [lore.summary, ...lore.details]);
-        } else if (scene && row.published_at && (!scene.locationKey || locationIsCurrent(scene.locationKey))
-            && scene.npcKeys.every(npcIsPresent)) {
+        } else if (
+          scene &&
+          row.published_at &&
+          (!scene.locationKey || locationIsCurrent(scene.locationKey)) &&
+          scene.npcKeys.every(npcIsPresent)
+        ) {
           addPreparation(`Published scene ${scene.title}`, [scene.prompt]);
         } else if (handout && row.published_at) {
           addPreparation(`Published handout ${handout.title}`, [handout.content]);
@@ -438,15 +701,20 @@ export function createCampaignAgentContextReadRepository(
         attributeCandidates,
         synthesizedSummaryFacts,
         recap,
-        encounter: encounter ? {
-          encounterId: encounter.encounter_id,
-          phase: "active",
-          revision: encounter.revision,
-          currentCombatantId: encounter.current_turn_combatant_id,
-          currentCombatantKind: combatants.find((row) => row.combatant_id === encounter.current_turn_combatant_id)?.combatant_kind ?? null,
-          currentActorId: combatants.find((row) => row.combatant_id === encounter.current_turn_combatant_id)?.actor_id ?? null,
-          legalActionCandidates,
-        } : null,
+        encounter: encounter
+          ? {
+              encounterId: encounter.encounter_id,
+              phase: "active",
+              revision: encounter.revision,
+              currentCombatantId: encounter.current_turn_combatant_id,
+              currentCombatantKind:
+                combatants.find((row) => row.combatant_id === encounter.current_turn_combatant_id)?.combatant_kind ??
+                null,
+              currentActorId:
+                combatants.find((row) => row.combatant_id === encounter.current_turn_combatant_id)?.actor_id ?? null,
+              legalActionCandidates,
+            }
+          : null,
       };
     },
   };

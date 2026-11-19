@@ -11,10 +11,19 @@ describe("campaign room activation contracts", () => {
     expect(campaignRoomActivationRequestSchema.safeParse({ ...input, expectedRevision: -1 }).success).toBe(false);
   });
   it("requires readiness to agree with its bounded blockers", () => {
-    const state = { campaignId: "campaign", sessionId: "room", expectedRevision: 0, active: false,
-      ready: false, blockers: ["starting-location-required"], actorIds: ["actor"] };
+    const state = {
+      campaignId: "campaign",
+      sessionId: "room",
+      expectedRevision: 0,
+      active: false,
+      ready: false,
+      blockers: ["starting-location-required"],
+      actorIds: ["actor"],
+    };
     expect(campaignRoomActivationReadinessSchema.parse(state)).toEqual(state);
     expect(campaignRoomActivationReadinessSchema.safeParse({ ...state, ready: true }).success).toBe(false);
-    expect(campaignRoomActivationReadinessSchema.safeParse({ ...state, blockers: ["private-note"] }).success).toBe(false);
+    expect(campaignRoomActivationReadinessSchema.safeParse({ ...state, blockers: ["private-note"] }).success).toBe(
+      false,
+    );
   });
 });

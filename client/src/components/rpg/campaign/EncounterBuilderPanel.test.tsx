@@ -11,9 +11,16 @@ const response: EncounterPlanResponse = {
     { id: "srd-5.1:enemy-template:orc", name: "Orc", challengeRating: 0.5 },
   ],
   plan: {
-    targetDifficulty: "hard", targetXp: 450, upperBound: 800,
+    targetDifficulty: "hard",
+    targetXp: 450,
+    upperBound: 800,
     roster: [{ id: "srd-5.1:enemy-template:orc", challengeRating: 0.5, count: 3 }],
-    rawXp: 300, adjustedXp: 600, difficulty: "hard", monsterCount: 3, legal: true, reasons: [],
+    rawXp: 300,
+    adjustedXp: 600,
+    difficulty: "hard",
+    monsterCount: 3,
+    legal: true,
+    reasons: [],
   },
 };
 
@@ -28,7 +35,12 @@ describe("EncounterBuilderPanel", () => {
     fireEvent.change(screen.getByLabelText(/Party levels/), { target: { value: "3, 3, 3" } });
     fireEvent.change(screen.getByLabelText(/Target difficulty/), { target: { value: "hard" } });
     fireEvent.click(screen.getByRole("button", { name: "Plan encounter" }));
-    await waitFor(() => expect(api.planCampaignEncounter).toHaveBeenCalledWith("campaign", { partyLevels: [3, 3, 3], targetDifficulty: "hard" }));
+    await waitFor(() =>
+      expect(api.planCampaignEncounter).toHaveBeenCalledWith("campaign", {
+        partyLevels: [3, 3, 3],
+        targetDifficulty: "hard",
+      }),
+    );
     expect(await screen.findByText(/Resulting difficulty:/)).toBeTruthy();
     expect(screen.getByText("Orc ×3 (CR 0.5)")).toBeTruthy();
     expect(screen.getByLabelText("Encounter plan")).toBeTruthy();

@@ -34,14 +34,18 @@ function seed(): void {
     }
     db.prepare("UPDATE application_owner SET principal_id = ? WHERE singleton = 1").run(ownerId);
 
-    db.prepare(`INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
+    db.prepare(
+      `INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
       VALUES ('profile-z', 'Z rules', 'Secondary rules', '["z"]'),
-             ('profile-a', 'A rules', 'Campaign rules', '["ordered","ordered","last"]')`).run();
-    db.prepare(`INSERT INTO rpg_content_packs
+             ('profile-a', 'A rules', 'Campaign rules', '["ordered","ordered","last"]')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO rpg_content_packs
       (pack_id, pack_version, rules_profile_id, name, description, tags, sealed) VALUES
       ('pack-z', '1', 'profile-a', 'Z pack', 'Z description', '["z"]', 0),
       ('pack-core', '2.0.0', 'profile-a', 'Core two', 'Pinned version', '["two","two"]', 0),
-      ('pack-core', '1.0.0', 'profile-a', 'Core one', 'Older exact version', '["one"]', 0)`).run();
+      ('pack-core', '1.0.0', 'profile-a', 'Core one', 'Older exact version', '["one"]', 0)`,
+    ).run();
 
     const insertDefinition = db.prepare(`INSERT INTO rpg_definitions
       (pack_id, pack_version, kind, definition_id, name, description, tags)
@@ -57,26 +61,37 @@ function seed(): void {
       ["class", "fighter", "Fighter", '["martial","martial"]'],
     ] as const;
     for (const definition of definitions) insertDefinition.run(...definition);
-    db.prepare(`INSERT INTO rpg_definitions
+    db.prepare(
+      `INSERT INTO rpg_definitions
       (pack_id, pack_version, kind, definition_id, name, description, tags)
-      VALUES ('pack-core', '1.0.0', 'class', 'fighter', 'Old fighter', 'Old exact definition', '[]')`).run();
+      VALUES ('pack-core', '1.0.0', 'class', 'fighter', 'Old fighter', 'Old exact definition', '[]')`,
+    ).run();
     db.prepare("UPDATE rpg_content_packs SET sealed = 1 WHERE sealed = 0").run();
 
     const at = "2030-01-02T03:04:05.006Z";
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
-      VALUES (?, 'Content reads', 'timeline-content-reads', 'campaign-owner', ?, ?)`).run(campaignId, at, at);
-    db.prepare("INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES ('timeline-content-reads', ?, ?)")
-      .run(campaignId, at);
-    db.prepare("INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at) VALUES (?, ?, ?, ?)")
-      .run(campaignId, "campaign-owner", "owner", at);
+      VALUES (?, 'Content reads', 'timeline-content-reads', 'campaign-owner', ?, ?)`,
+    ).run(campaignId, at, at);
+    db.prepare(
+      "INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES ('timeline-content-reads', ?, ?)",
+    ).run(campaignId, at);
+    db.prepare(
+      "INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at) VALUES (?, ?, ?, ?)",
+    ).run(campaignId, "campaign-owner", "owner", at);
     for (const role of ["gm", "player", "observer"] as const) {
-      db.prepare("INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at) VALUES (?, ?, ?, ?)")
-        .run(campaignId, `campaign-${role}`, role, at);
+      db.prepare(
+        "INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at) VALUES (?, ?, ?, ?)",
+      ).run(campaignId, `campaign-${role}`, role, at);
     }
-    db.prepare("INSERT INTO campaign_rules_profiles (campaign_id, rules_profile_id) VALUES (?, 'profile-a')").run(campaignId);
-    db.prepare(`INSERT INTO campaign_content_packs
-      (campaign_id, pack_id, pack_version, rules_profile_id) VALUES (?, 'pack-core', '2.0.0', 'profile-a')`).run(campaignId);
+    db.prepare("INSERT INTO campaign_rules_profiles (campaign_id, rules_profile_id) VALUES (?, 'profile-a')").run(
+      campaignId,
+    );
+    db.prepare(
+      `INSERT INTO campaign_content_packs
+      (campaign_id, pack_id, pack_version, rules_profile_id) VALUES (?, 'pack-core', '2.0.0', 'profile-a')`,
+    ).run(campaignId);
   })();
   db.close();
 }
@@ -84,11 +99,27 @@ function seed(): void {
 function snapshot(): unknown {
   const db = new DatabaseDriver(dbPath(), { readonly: true });
   const result = {
-    profiles: db.prepare("SELECT rules_profile_id, name, description, tags FROM rpg_rules_profiles ORDER BY rules_profile_id").all(),
-    packs: db.prepare("SELECT pack_id, pack_version, rules_profile_id, name, description, tags FROM rpg_content_packs ORDER BY pack_id, pack_version").all(),
-    definitions: db.prepare("SELECT pack_id, pack_version, kind, definition_id, name, description, tags FROM rpg_definitions ORDER BY pack_id, pack_version, kind, definition_id").all(),
-    selections: db.prepare("SELECT campaign_id, rules_profile_id FROM campaign_rules_profiles ORDER BY campaign_id").all(),
-    pins: db.prepare("SELECT campaign_id, pack_id, pack_version, rules_profile_id FROM campaign_content_packs ORDER BY campaign_id, pack_id").all(),
+    profiles: db
+      .prepare("SELECT rules_profile_id, name, description, tags FROM rpg_rules_profiles ORDER BY rules_profile_id")
+      .all(),
+    packs: db
+      .prepare(
+        "SELECT pack_id, pack_version, rules_profile_id, name, description, tags FROM rpg_content_packs ORDER BY pack_id, pack_version",
+      )
+      .all(),
+    definitions: db
+      .prepare(
+        "SELECT pack_id, pack_version, kind, definition_id, name, description, tags FROM rpg_definitions ORDER BY pack_id, pack_version, kind, definition_id",
+      )
+      .all(),
+    selections: db
+      .prepare("SELECT campaign_id, rules_profile_id FROM campaign_rules_profiles ORDER BY campaign_id")
+      .all(),
+    pins: db
+      .prepare(
+        "SELECT campaign_id, pack_id, pack_version, rules_profile_id FROM campaign_content_packs ORDER BY campaign_id, pack_id",
+      )
+      .all(),
   };
   db.close();
   return result;
@@ -99,7 +130,10 @@ describe("RPG content queries", () => {
     seed();
     const repository = createRepository({ dataDir: dataDir() });
 
-    expect(repository.listRulesProfiles(ownerId).map((profile) => profile.rulesProfileId)).toEqual(["profile-a", "profile-z"]);
+    expect(repository.listRulesProfiles(ownerId).map((profile) => profile.rulesProfileId)).toEqual([
+      "profile-a",
+      "profile-z",
+    ]);
     expect(repository.getRulesProfile(ownerId, { rulesProfileId: "profile-a" })).toEqual({
       rulesProfileId: "profile-a",
       name: "A rules",
@@ -113,12 +147,29 @@ describe("RPG content queries", () => {
     ]);
     expect(repository.getContentPack(ownerId, packTwo)?.tags).toEqual(["two", "two"]);
     expect(repository.getContentPack(ownerId, packOne)?.name).toBe("Core one");
-    expect(repository.listContentPackDefinitions(ownerId, packTwo).map(({ kind, definitionId }) => `${kind}:${definitionId}`))
-      .toEqual(["class:fighter", "class:wizard", "race:human", "background:sage", "item:rope", "spell:bolt", "ability:action", "enemy:dragon"]);
+    expect(
+      repository
+        .listContentPackDefinitions(ownerId, packTwo)
+        .map(({ kind, definitionId }) => `${kind}:${definitionId}`),
+    ).toEqual([
+      "class:fighter",
+      "class:wizard",
+      "race:human",
+      "background:sage",
+      "item:rope",
+      "spell:bolt",
+      "ability:action",
+      "enemy:dragon",
+    ]);
     expect(repository.getContentPackDefinition(ownerId, classReference)).toMatchObject({
-      kind: "class", definitionId: "fighter", name: "Fighter", tags: ["martial", "martial"],
+      kind: "class",
+      definitionId: "fighter",
+      name: "Fighter",
+      tags: ["martial", "martial"],
     });
-    expect(repository.getContentPackDefinition(ownerId, { ...classReference, packVersion: "1.0.0" })?.name).toBe("Old fighter");
+    expect(repository.getContentPackDefinition(ownerId, { ...classReference, packVersion: "1.0.0" })?.name).toBe(
+      "Old fighter",
+    );
 
     for (const denied of ["local-owner", "campaign-owner", "missing-principal"]) {
       expect(repository.listRulesProfiles(denied)).toEqual([]);
@@ -137,10 +188,25 @@ describe("RPG content queries", () => {
 
     for (const actorId of roles) {
       expect(repository.getCampaignRulesProfile(actorId, campaignId)?.rulesProfileId).toBe("profile-a");
-      expect(repository.listCampaignContentPacks(actorId, campaignId).map(({ packId, packVersion }) => ({ packId, packVersion })))
-        .toEqual([packTwo]);
-      expect(repository.listCampaignContentPackDefinitions(actorId, campaignId, packTwo).map(({ kind, definitionId }) => `${kind}:${definitionId}`))
-        .toEqual(["class:fighter", "class:wizard", "race:human", "background:sage", "item:rope", "spell:bolt", "ability:action", "enemy:dragon"]);
+      expect(
+        repository
+          .listCampaignContentPacks(actorId, campaignId)
+          .map(({ packId, packVersion }) => ({ packId, packVersion })),
+      ).toEqual([packTwo]);
+      expect(
+        repository
+          .listCampaignContentPackDefinitions(actorId, campaignId, packTwo)
+          .map(({ kind, definitionId }) => `${kind}:${definitionId}`),
+      ).toEqual([
+        "class:fighter",
+        "class:wizard",
+        "race:human",
+        "background:sage",
+        "item:rope",
+        "spell:bolt",
+        "ability:action",
+        "enemy:dragon",
+      ]);
       expect(repository.getCampaignContentPackDefinition(actorId, campaignId, classReference)?.name).toBe("Fighter");
     }
     expect(repository.getCampaignRulesProfile(ownerId, campaignId)).toBeNull();
@@ -157,12 +223,16 @@ describe("RPG content queries", () => {
     expect(repository.getCampaignRulesProfile("campaign-owner", "campaign-missing")).toBeNull();
     expect(repository.listCampaignContentPacks("campaign-owner", "campaign-missing")).toEqual([]);
     expect(repository.listCampaignContentPackDefinitions("campaign-owner", campaignId, packOne)).toEqual([]);
-    expect(repository.getCampaignContentPackDefinition("campaign-owner", campaignId, { ...classReference, packVersion: "1.0.0" }))
-      .toBeNull();
+    expect(
+      repository.getCampaignContentPackDefinition("campaign-owner", campaignId, {
+        ...classReference,
+        packVersion: "1.0.0",
+      }),
+    ).toBeNull();
     repository.close();
 
     const db = new DatabaseDriver(dbPath());
-    deleteCampaignForCorruptionTest(db,campaignId);
+    deleteCampaignForCorruptionTest(db, campaignId);
     db.prepare("DELETE FROM campaign_content_packs WHERE campaign_id = ?").run(campaignId);
     db.prepare("DELETE FROM campaign_rules_profiles WHERE campaign_id = ?").run(campaignId);
     db.close();
@@ -191,10 +261,10 @@ describe("RPG content queries", () => {
     expect(nextId).not.toHaveBeenCalled();
     repository.close();
 
-    expect(() => repository.getRulesProfile("bad actor", { rulesProfileId: "bad id" }))
-      .toThrow("repository is closed");
-    expect(() => repository.getCampaignContentPackDefinition("bad actor", "bad campaign", {} as never))
-      .toThrow("repository is closed");
+    expect(() => repository.getRulesProfile("bad actor", { rulesProfileId: "bad id" })).toThrow("repository is closed");
+    expect(() => repository.getCampaignContentPackDefinition("bad actor", "bad campaign", {} as never)).toThrow(
+      "repository is closed",
+    );
   });
 
   it("supports all reads in an active unit of work, matches factory results, and expires before validation", () => {
@@ -214,14 +284,21 @@ describe("RPG content queries", () => {
       expect(unitOfWork.getContentPackDefinition(ownerId, classReference)?.definitionId).toBe("fighter");
       expect(unitOfWork.getCampaignRulesProfile("campaign-player", campaignId)?.rulesProfileId).toBe("profile-a");
       expect(unitOfWork.listCampaignContentPacks("campaign-player", campaignId)).toHaveLength(1);
-      expect(unitOfWork.listCampaignContentPackDefinitions("campaign-player", campaignId, packTwo)).toEqual(factoryDefinitions);
-      expect(unitOfWork.getCampaignContentPackDefinition("campaign-player", campaignId, classReference)?.name).toBe("Fighter");
+      expect(unitOfWork.listCampaignContentPackDefinitions("campaign-player", campaignId, packTwo)).toEqual(
+        factoryDefinitions,
+      );
+      expect(unitOfWork.getCampaignContentPackDefinition("campaign-player", campaignId, classReference)?.name).toBe(
+        "Fighter",
+      );
     });
 
     expect(() => expired!.listRulesProfiles("bad actor")).toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getContentPack("bad actor", {} as never)).toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getCampaignContentPackDefinition("bad actor", "bad campaign", {} as never))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.getContentPack("bad actor", {} as never)).toThrow(
+      "transaction unit of work is no longer active",
+    );
+    expect(() => expired!.getCampaignContentPackDefinition("bad actor", "bad campaign", {} as never)).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
   });
 
@@ -294,7 +371,9 @@ describe("RPG content queries", () => {
       DROP TRIGGER rpg_content_packs_prevent_update;
     `);
     corruptPackDb.prepare("UPDATE rpg_rules_profiles SET tags = '[]' WHERE rules_profile_id = 'profile-a'").run();
-    corruptPackDb.prepare("UPDATE rpg_content_packs SET tags = '[1]' WHERE pack_id = 'pack-core' AND pack_version = '2.0.0'").run();
+    corruptPackDb
+      .prepare("UPDATE rpg_content_packs SET tags = '[1]' WHERE pack_id = 'pack-core' AND pack_version = '2.0.0'")
+      .run();
     corruptPackDb.close();
     const corruptPack = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => corruptPack.getContentPack(ownerId, packTwo)).toThrow();
@@ -307,13 +386,21 @@ describe("RPG content queries", () => {
       DROP TRIGGER rpg_definitions_tags_update;
       DROP TRIGGER rpg_definitions_prevent_update;
     `);
-    corruptDefinitionDb.prepare("UPDATE rpg_content_packs SET tags = '[]' WHERE pack_id = 'pack-core' AND pack_version = '2.0.0'").run();
-    corruptDefinitionDb.prepare(`UPDATE rpg_definitions SET tags = '["bad tag"]'
-      WHERE pack_id = 'pack-core' AND pack_version = '2.0.0' AND kind = 'class' AND definition_id = 'fighter'`).run();
+    corruptDefinitionDb
+      .prepare("UPDATE rpg_content_packs SET tags = '[]' WHERE pack_id = 'pack-core' AND pack_version = '2.0.0'")
+      .run();
+    corruptDefinitionDb
+      .prepare(
+        `UPDATE rpg_definitions SET tags = '["bad tag"]'
+      WHERE pack_id = 'pack-core' AND pack_version = '2.0.0' AND kind = 'class' AND definition_id = 'fighter'`,
+      )
+      .run();
     corruptDefinitionDb.close();
     const corruptDefinition = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => corruptDefinition.getContentPackDefinition(ownerId, classReference)).toThrow();
-    expect(() => corruptDefinition.getCampaignContentPackDefinition("campaign-owner", campaignId, classReference)).toThrow();
+    expect(() =>
+      corruptDefinition.getCampaignContentPackDefinition("campaign-owner", campaignId, classReference),
+    ).toThrow();
     corruptDefinition.close();
   });
 });

@@ -46,10 +46,15 @@ test("speaker evidence identifies case, repeat, request and corpus independently
 });
 
 function fixture() {
-  return { settings: defaultSystemOneSettings(), caseId: "case-1", repeat: 1,
-    state: { declaration: "rest" }, questions: [{ key: "supported" }],
+  return {
+    settings: defaultSystemOneSettings(),
+    caseId: "case-1",
+    repeat: 1,
+    state: { declaration: "rest" },
+    questions: [{ key: "supported" }],
     candidates: [{ kind: "exact_actor_rest.select" }, { kind: "exact_actor_rest.select" }],
-    corpus: [{ id: "case-1", expected: "rest" }] };
+    corpus: [{ id: "case-1", expected: "rest" }],
+  };
 }
 
 test("captures configuration before transport and never includes credentials", () => {

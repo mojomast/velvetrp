@@ -71,10 +71,17 @@ export async function startLiveServer(): Promise<LiveServer> {
     baseURL,
     stop: async () => {
       if (child.pid && child.exitCode === null) {
-        try { process.kill(-child.pid, "SIGTERM"); } catch { /* already stopped */ }
+        try {
+          process.kill(-child.pid, "SIGTERM");
+        } catch {
+          /* already stopped */
+        }
         await new Promise<void>((resolve) => {
           const timer = setTimeout(resolve, 2_000);
-          child.once("exit", () => { clearTimeout(timer); resolve(); });
+          child.once("exit", () => {
+            clearTimeout(timer);
+            resolve();
+          });
         });
       }
       rmSync(dataDir, { recursive: true, force: true });

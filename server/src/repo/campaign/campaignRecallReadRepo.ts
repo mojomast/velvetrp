@@ -13,7 +13,19 @@ export interface CampaignRecallQuery {
   excludeRootTurnId?: string;
 }
 export interface CampaignRecallHit {
-  sourceKind: "declaration" | "presentation" | "recap" | "director-receipt" | "check-receipt" | "inventory-receipt" | "commerce-receipt" | "action-receipt" | "travel-receipt" | "mechanic-receipt" | "combat-receipt" | "quest-receipt";
+  sourceKind:
+    | "declaration"
+    | "presentation"
+    | "recap"
+    | "director-receipt"
+    | "check-receipt"
+    | "inventory-receipt"
+    | "commerce-receipt"
+    | "action-receipt"
+    | "travel-receipt"
+    | "mechanic-receipt"
+    | "combat-receipt"
+    | "quest-receipt";
   authority: "intent" | "noncanonical-presentation" | "authored-recap" | "committed-outcome";
   sourceId: string;
   digest: string;
@@ -38,46 +50,99 @@ export interface CampaignRecallReadRepository {
   getCampaignRecall(principalId: string, input: CampaignRecallQuery): CampaignRecallResult | null;
 }
 export const CAMPAIGN_RECALL_MAX_BYTES = 6_144;
-const sha = (value: unknown) => createHash("sha256").update(canonicalAgentJson(value as never)).digest("hex");
-const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-const stop = new Set("a an and are as at be been did do does for from had has have how i in is it me my of on or our recall remember said say that the their them then there these they this to us was we were what when where which who why with you your happened about tell please before after".split(" "));
+const sha = (value: unknown) =>
+  createHash("sha256")
+    .update(canonicalAgentJson(value as never))
+    .digest("hex");
+const normalize = (value: string) =>
+  value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+const stop = new Set(
+  "a an and are as at be been did do does for from had has have how i in is it me my of on or our recall remember said say that the their them then there these they this to us was we were what when where which who why with you your happened about tell please before after".split(
+    " ",
+  ),
+);
 
 /** Read-time authorization precedes ranking. The index-free v1 deliberately makes no SQL scan-cost guarantee. */
-export function createCampaignRecallReadRepository(db: DatabaseDriver.Database, services: {
-  getCampaignAgentContextSnapshot(principal: string, campaign: string, session: string, audience: CampaignAgentAudience): CampaignAgentContextSnapshot | null;
-  getAdventureCheckPublicReceipt(principal: string, campaign: string, command: string): unknown;
-  getAdventureReceipt(principal: string, turn: string, command: string, kind: CampaignRecallHit["sourceKind"]): unknown;
-  getMechanicReceipt(principal: string, campaign: string, command: string): unknown;
-}): CampaignRecallReadRepository {
-  return { getCampaignRecall(principal, input) {
-    return db.transaction(() => {
-      if (input.purpose === "public-narration" && input.audience.kind !== "player") return null;
-      if (input.purpose.startsWith("dm-") && input.audience.kind !== "dm") return null;
-      const snapshot = services.getCampaignAgentContextSnapshot(principal, input.campaignId, input.sessionId, input.audience);
-      if (!snapshot) return null;
-      let query = "";
-      for (const character of normalize(input.query.slice(0, 512))) {
-        if (query.length + character.length > 512 || Buffer.byteLength(query + character) > 1_024) break;
-        query += character;
-      }
-      const terms = [...new Set(query.split(" ").filter(term => term.length > 1 && !stop.has(term) && Buffer.byteLength(term) <= 64))].slice(0, 12);
-      const result: CampaignRecallResult = { version: "recall-v1", query,
-        scopeDigest: sha([input.campaignId, input.sessionId, input.audience, input.purpose, snapshot.authority,
-          snapshot.timelineId, snapshot.timelineRevision, snapshot.campaignRevision]), hits: [], scan: "direct-sql-unbounded",
-        coverage: "bounded-records-active-timeline", incomplete: false };
-      if (!terms.length) return result;
-      // Literal word/phrase matching, never caller-supplied SQL or FTS syntax.
-      db.function("velvet_recall_score", { deterministic: true }, (value: unknown) => {
-        if (typeof value !== "string") return 0;
-        const text = ` ${normalize(value)} `;
-        const count = terms.filter(term => text.includes(` ${term} `)
-          || (term === "now" && text.includes(" current "))).length;
-        return count ? count * 10 + (text.includes(` ${terms.join(" ")} `) ? 20 : 0) : 0;
-      });
-      const dm = input.audience.kind === "dm";
-      const actor = input.audience.kind === "player" ? input.audience.actorId : null;
-      const publicOnly = input.purpose === "dm-narration";
-      const rows = db.prepare(`WITH RECURSIVE eligible AS (
+export function createCampaignRecallReadRepository(
+  db: DatabaseDriver.Database,
+  services: {
+    getCampaignAgentContextSnapshot(
+      principal: string,
+      campaign: string,
+      session: string,
+      audience: CampaignAgentAudience,
+    ): CampaignAgentContextSnapshot | null;
+    getAdventureCheckPublicReceipt(principal: string, campaign: string, command: string): unknown;
+    getAdventureReceipt(
+      principal: string,
+      turn: string,
+      command: string,
+      kind: CampaignRecallHit["sourceKind"],
+    ): unknown;
+    getMechanicReceipt(principal: string, campaign: string, command: string): unknown;
+  },
+): CampaignRecallReadRepository {
+  return {
+    getCampaignRecall(principal, input) {
+      return db
+        .transaction(() => {
+          if (input.purpose === "public-narration" && input.audience.kind !== "player") return null;
+          if (input.purpose.startsWith("dm-") && input.audience.kind !== "dm") return null;
+          const snapshot = services.getCampaignAgentContextSnapshot(
+            principal,
+            input.campaignId,
+            input.sessionId,
+            input.audience,
+          );
+          if (!snapshot) return null;
+          let query = "";
+          for (const character of normalize(input.query.slice(0, 512))) {
+            if (query.length + character.length > 512 || Buffer.byteLength(query + character) > 1_024) break;
+            query += character;
+          }
+          const terms = [
+            ...new Set(
+              query.split(" ").filter((term) => term.length > 1 && !stop.has(term) && Buffer.byteLength(term) <= 64),
+            ),
+          ].slice(0, 12);
+          const result: CampaignRecallResult = {
+            version: "recall-v1",
+            query,
+            scopeDigest: sha([
+              input.campaignId,
+              input.sessionId,
+              input.audience,
+              input.purpose,
+              snapshot.authority,
+              snapshot.timelineId,
+              snapshot.timelineRevision,
+              snapshot.campaignRevision,
+            ]),
+            hits: [],
+            scan: "direct-sql-unbounded",
+            coverage: "bounded-records-active-timeline",
+            incomplete: false,
+          };
+          if (!terms.length) return result;
+          // Literal word/phrase matching, never caller-supplied SQL or FTS syntax.
+          db.function("velvet_recall_score", { deterministic: true }, (value: unknown) => {
+            if (typeof value !== "string") return 0;
+            const text = ` ${normalize(value)} `;
+            const count = terms.filter(
+              (term) => text.includes(` ${term} `) || (term === "now" && text.includes(" current ")),
+            ).length;
+            return count ? count * 10 + (text.includes(` ${terms.join(" ")} `) ? 20 : 0) : 0;
+          });
+          const dm = input.audience.kind === "dm";
+          const actor = input.audience.kind === "player" ? input.audience.actorId : null;
+          const publicOnly = input.purpose === "dm-narration";
+          const rows = db
+            .prepare(
+              `WITH RECURSIVE eligible AS (
         SELECT turn.* FROM adventure_turns turn
         JOIN campaign_sessions attached ON attached.campaign_id=turn.campaign_id AND attached.session_id=turn.session_id
         WHERE turn.campaign_id=@campaign AND turn.timeline_id=@timeline AND turn.mode='original'
@@ -208,34 +273,62 @@ export function createCampaignRecallReadRepository(db: DatabaseDriver.Database, 
         LEFT JOIN characters character ON character.id=persona.character_id
         WHERE typeof(text)='text' AND length(CAST(text AS BLOB))<=2048
         AND velvet_recall_score(text || ' ' || coalesce(character.name,''))>0 ORDER BY velvet_recall_score(text || ' ' || coalesce(character.name,'')) DESC,
-        CASE authority WHEN 'committed-outcome' THEN 0 WHEN 'intent' THEN 1 ELSE 2 END,sourceKind,sourceId COLLATE BINARY LIMIT 64`)
-        .all({ campaign: input.campaignId, timeline: snapshot.timelineId, revision: snapshot.timelineRevision,
-          session: input.sessionId, excluded: input.excludeRootTurnId ?? "", dm: Number(dm), actor, principal, publicOnly: Number(publicOnly) }) as Omit<CampaignRecallHit, "digest">[];
-      result.incomplete = rows.length === 64;
-      for (const row of rows) {
-        if (result.hits.length === 8) { result.incomplete = true; break; }
-        if (row.sourceKind === "check-receipt") {
-          const receipt = services.getAdventureCheckPublicReceipt(principal, input.campaignId, row.sourceId);
-          if (!receipt) continue;
-          row.text = JSON.stringify(receipt);
-        } else if (row.sourceKind === "mechanic-receipt") {
-          const receipt = services.getMechanicReceipt(principal, input.campaignId, row.sourceId);
-          if (!receipt) continue;
-          row.text = JSON.stringify(receipt);
-        } else if (["inventory-receipt", "commerce-receipt", "action-receipt", "travel-receipt", "combat-receipt", "quest-receipt"].includes(row.sourceKind)) {
-          const receipt = services.getAdventureReceipt(principal, row.rootTurnId!, row.sourceId, row.sourceKind);
-          if (!receipt) continue;
-          row.text = JSON.stringify(receipt);
-        }
-        const hit = { ...row, digest: sha(row) };
-        if (Buffer.byteLength(hit.text) > 2_048) { result.incomplete = true; continue; }
-        result.hits.push(hit);
-        // Reserve the longer boolean spelling so toggling metadata never exceeds the packet limit.
-        if (Buffer.byteLength(JSON.stringify({ ...result, incomplete: false })) > CAMPAIGN_RECALL_MAX_BYTES) {
-          result.hits.pop(); result.incomplete = true;
-        }
-      }
-      return result;
-    }).deferred();
-  } };
+        CASE authority WHEN 'committed-outcome' THEN 0 WHEN 'intent' THEN 1 ELSE 2 END,sourceKind,sourceId COLLATE BINARY LIMIT 64`,
+            )
+            .all({
+              campaign: input.campaignId,
+              timeline: snapshot.timelineId,
+              revision: snapshot.timelineRevision,
+              session: input.sessionId,
+              excluded: input.excludeRootTurnId ?? "",
+              dm: Number(dm),
+              actor,
+              principal,
+              publicOnly: Number(publicOnly),
+            }) as Omit<CampaignRecallHit, "digest">[];
+          result.incomplete = rows.length === 64;
+          for (const row of rows) {
+            if (result.hits.length === 8) {
+              result.incomplete = true;
+              break;
+            }
+            if (row.sourceKind === "check-receipt") {
+              const receipt = services.getAdventureCheckPublicReceipt(principal, input.campaignId, row.sourceId);
+              if (!receipt) continue;
+              row.text = JSON.stringify(receipt);
+            } else if (row.sourceKind === "mechanic-receipt") {
+              const receipt = services.getMechanicReceipt(principal, input.campaignId, row.sourceId);
+              if (!receipt) continue;
+              row.text = JSON.stringify(receipt);
+            } else if (
+              [
+                "inventory-receipt",
+                "commerce-receipt",
+                "action-receipt",
+                "travel-receipt",
+                "combat-receipt",
+                "quest-receipt",
+              ].includes(row.sourceKind)
+            ) {
+              const receipt = services.getAdventureReceipt(principal, row.rootTurnId!, row.sourceId, row.sourceKind);
+              if (!receipt) continue;
+              row.text = JSON.stringify(receipt);
+            }
+            const hit = { ...row, digest: sha(row) };
+            if (Buffer.byteLength(hit.text) > 2_048) {
+              result.incomplete = true;
+              continue;
+            }
+            result.hits.push(hit);
+            // Reserve the longer boolean spelling so toggling metadata never exceeds the packet limit.
+            if (Buffer.byteLength(JSON.stringify({ ...result, incomplete: false })) > CAMPAIGN_RECALL_MAX_BYTES) {
+              result.hits.pop();
+              result.incomplete = true;
+            }
+          }
+          return result;
+        })
+        .deferred();
+    },
+  };
 }

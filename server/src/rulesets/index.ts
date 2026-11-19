@@ -86,12 +86,7 @@ export type {
   Dnd5eUnderwaterAttackInput,
   Dnd5eUnderwaterAttackPlan,
 } from "./dnd5e.js";
-export {
-  DEFAULT_RULESET,
-  DEFAULT_RULESET_ID,
-  RulesetRegistry,
-  createDefaultRulesetRegistry,
-} from "./registry.js";
+export { DEFAULT_RULESET, DEFAULT_RULESET_ID, RulesetRegistry, createDefaultRulesetRegistry } from "./registry.js";
 export { VELVET_LEGACY_RULESET, VELVET_LEGACY_RULESET_DESCRIPTOR } from "./velvetLegacy.js";
 export type {
   AbilityDescriptor,

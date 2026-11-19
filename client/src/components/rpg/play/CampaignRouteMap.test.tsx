@@ -22,7 +22,9 @@ describe("CampaignRouteMap", () => {
 
   it("offers indirect reachable destinations without requiring separate hop declarations", () => {
     const prefill = vi.fn();
-    const { container } = render(<CampaignRouteMap world={world} selectedActorId="actor" onPrefillDeclaration={prefill} onOpenWorld={vi.fn()} />);
+    const { container } = render(
+      <CampaignRouteMap world={world} selectedActorId="actor" onPrefillDeclaration={prefill} onOpenWorld={vi.fn()} />,
+    );
     expect(screen.getByText(/Topological route map, not to scale/)).toBeTruthy();
     expect(container.querySelector('[data-location-id="town"]')?.classList.contains("is-current")).toBe(true);
     expect(container.querySelector('[data-location-id="wood"]')?.classList.contains("is-reachable")).toBe(true);
@@ -43,7 +45,14 @@ describe("CampaignRouteMap", () => {
         { connectionId: "hidden", fromLocationId: "wood", toLocationId: "secret" },
       ],
     };
-    const { container } = render(<CampaignRouteMap world={projection} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
+    const { container } = render(
+      <CampaignRouteMap
+        world={projection}
+        selectedActorId="actor"
+        onPrefillDeclaration={vi.fn()}
+        onOpenWorld={vi.fn()}
+      />,
+    );
     expect(screen.getByText("No server-visible reachable destinations for the selected actor.")).toBeTruthy();
     expect(container.querySelectorAll(".route-map-connection")).toHaveLength(1);
     expect(screen.queryByText(/secret/i)).toBeNull();
@@ -51,8 +60,17 @@ describe("CampaignRouteMap", () => {
 
   it("uses stable hierarchy depth and order coordinates without mutating the projection", () => {
     const locationsBefore = structuredClone(world.visibleLocations);
-    const { container, rerender } = render(<CampaignRouteMap world={world} selectedActorId={null} onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
-    rerender(<CampaignRouteMap world={{ ...world, visibleLocations: [...world.visibleLocations].reverse() }} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
+    const { container, rerender } = render(
+      <CampaignRouteMap world={world} selectedActorId={null} onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />,
+    );
+    rerender(
+      <CampaignRouteMap
+        world={{ ...world, visibleLocations: [...world.visibleLocations].reverse() }}
+        selectedActorId="actor"
+        onPrefillDeclaration={vi.fn()}
+        onOpenWorld={vi.fn()}
+      />,
+    );
     expect(container.querySelector('[data-location-id="town"]')?.getAttribute("transform")).toBe("translate(80 55)");
     expect(container.querySelector('[data-location-id="wood"]')?.getAttribute("transform")).toBe("translate(260 145)");
     expect(container.querySelector('[data-location-id="tower"]')?.getAttribute("transform")).toBe("translate(440 235)");
@@ -61,7 +79,9 @@ describe("CampaignRouteMap", () => {
 
   it("offers native keyboard controls for destination and World actions", () => {
     const openWorld = vi.fn();
-    render(<CampaignRouteMap world={world} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={openWorld} />);
+    render(
+      <CampaignRouteMap world={world} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={openWorld} />,
+    );
     const destination = screen.getByRole("button", { name: "Prefill travel to Whisper Wood" });
     expect(destination.tagName).toBe("BUTTON");
     expect(destination.getAttribute("tabindex")).toBeNull();
@@ -70,7 +90,20 @@ describe("CampaignRouteMap", () => {
   });
 
   it("draws direction-aware endpoint arrows and separates reciprocal routes", () => {
-    const { container } = render(<CampaignRouteMap world={{ ...world, visibleConnections: [...world.visibleConnections, { connectionId: "return", fromLocationId: "wood", toLocationId: "town" }] }} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
+    const { container } = render(
+      <CampaignRouteMap
+        world={{
+          ...world,
+          visibleConnections: [
+            ...world.visibleConnections,
+            { connectionId: "return", fromLocationId: "wood", toLocationId: "town" },
+          ],
+        }}
+        selectedActorId="actor"
+        onPrefillDeclaration={vi.fn()}
+        onOpenWorld={vi.fn()}
+      />,
+    );
     const paths = container.querySelectorAll(".route-map-connection path");
     expect(paths).toHaveLength(3);
     expect(paths[0]?.getAttribute("marker-end")).toMatch(/^url\(#/);

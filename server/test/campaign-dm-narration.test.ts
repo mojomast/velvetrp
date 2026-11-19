@@ -11,259 +11,567 @@ import { dmCompletion, dmDependencies, dmFixture } from "./fixtures/dmCampaign.j
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
-const database=()=>new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
-const scene='Rain beads on the stone beside the gate. Mara tilts her lantern and murmurs, "A patient eye is worth a hurried step." Would you like to examine the stonework or speak with Mara?';
-const response=(text=scene):ProviderCompletionResult=>{
-  const index=Math.max(text.lastIndexOf('Would you'),text.lastIndexOf('What '));
-  return {message:{role:'assistant',content:'DISCARDED_PROVIDER_PROSE',
-    toolCalls:[{id:'narration',name:'submit_dm_scene',arguments:JSON.stringify({atmosphere:text.slice(0,index).trim(),dialogue:[],question:text.slice(index)})}]},
-    usage:{promptTokens:10,completionTokens:30,totalTokens:40},model:{requestedModel:'fake-dm',responseModel:'fake-dm'}};
+const database = () => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+const scene =
+  'Rain beads on the stone beside the gate. Mara tilts her lantern and murmurs, "A patient eye is worth a hurried step." Would you like to examine the stonework or speak with Mara?';
+const response = (text = scene): ProviderCompletionResult => {
+  const index = Math.max(text.lastIndexOf("Would you"), text.lastIndexOf("What "));
+  return {
+    message: {
+      role: "assistant",
+      content: "DISCARDED_PROVIDER_PROSE",
+      toolCalls: [
+        {
+          id: "narration",
+          name: "submit_dm_scene",
+          arguments: JSON.stringify({
+            atmosphere: text.slice(0, index).trim(),
+            dialogue: [],
+            question: text.slice(index),
+          }),
+        },
+      ],
+    },
+    usage: { promptTokens: 10, completionTokens: 30, totalTokens: 40 },
+    model: { requestedModel: "fake-dm", responseModel: "fake-dm" },
+  };
 };
-async function prepare(){
-  const f=await dmFixture();f.graph();f.repo.setDmControl('local-owner',f.campaign.id,{mode:'ai',expectedRevision:0,idempotencyKey:'auto'});
-  const request={intent:'open' as const,expectedModeRevision:1,idempotencyKey:'open'};
-  const run=f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,request);
-  return {...f,run,request};
+async function prepare() {
+  const f = await dmFixture();
+  f.graph();
+  f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "auto" });
+  const request = { intent: "open" as const, expectedModeRevision: 1, idempotencyKey: "open" };
+  const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, request);
+  return { ...f, run, request };
 }
-function commitWithoutNarration(f:Awaited<ReturnType<typeof prepare>>){
-  const work=f.repo.claimDmPlanning('local-owner',f.run.runId,'fake','fake')!;
-  const candidate=work.candidates[0]!;
-  f.repo.settleDmPlanning('local-owner',f.run.runId,work.claimId,{candidateId:candidate.candidateId,digest:candidate.digest},{promptTokens:10,completionTokens:10});
-  return f.repo.executeDmBeat('local-owner',f.run.runId);
+function commitWithoutNarration(f: Awaited<ReturnType<typeof prepare>>) {
+  const work = f.repo.claimDmPlanning("local-owner", f.run.runId, "fake", "fake")!;
+  const candidate = work.candidates[0]!;
+  f.repo.settleDmPlanning(
+    "local-owner",
+    f.run.runId,
+    work.claimId,
+    { candidateId: candidate.candidateId, digest: candidate.digest },
+    { promptTokens: 10, completionTokens: 10 },
+  );
+  return f.repo.executeDmBeat("local-owner", f.run.runId);
 }
-describe('public AI DM narration',()=>{
-  it('retains every composed outcome and atmospheric continuity from a receipt-free hold',async()=>{
-    const f=await dmFixture();
-    f.repo.setDmControl('local-owner',f.campaign.id,{mode:'ai',expectedRevision:0,idempotencyKey:'auto'});
-    const open=(key:string)=>f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,
-      {intent:'continue',expectedModeRevision:1,idempotencyKey:key});
-    const finish=(runId:string,text:string)=>{
-      const claim=f.repo.claimDmNarration('local-owner',runId,'fake','fake',{messages:[]},100,100)!;
-      f.repo.settleDmNarration('local-owner',runId,claim,text,'ok');
-      f.repo.getDmNarrationWork('local-owner',runId);
-      expect(f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,runId).state).toBe('completed');
+describe("public AI DM narration", () => {
+  it("retains every composed outcome and atmospheric continuity from a receipt-free hold", async () => {
+    const f = await dmFixture();
+    f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "auto" });
+    const open = (key: string) =>
+      f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+        intent: "continue",
+        expectedModeRevision: 1,
+        idempotencyKey: key,
+      });
+    const finish = (runId: string, text: string) => {
+      const claim = f.repo.claimDmNarration("local-owner", runId, "fake", "fake", { messages: [] }, 100, 100)!;
+      f.repo.settleDmNarration("local-owner", runId, claim, text, "ok");
+      f.repo.getDmNarrationWork("local-owner", runId);
+      expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, runId).state).toBe("completed");
     };
-    const first=open('composition');
-    const planning=f.repo.claimDmPlanning('local-owner',first.runId,'fake','fake')!;
-    const selected=['ambient-beat','advance-time'].map(action=>{
-      const candidate=planning.candidates.find(item=>item.action===action)!;
-      return {candidateId:candidate.candidateId,digest:candidate.digest};
+    const first = open("composition");
+    const planning = f.repo.claimDmPlanning("local-owner", first.runId, "fake", "fake")!;
+    const selected = ["ambient-beat", "advance-time"].map((action) => {
+      const candidate = planning.candidates.find((item) => item.action === action)!;
+      return { candidateId: candidate.candidateId, digest: candidate.digest };
     });
-    f.repo.settleDmPlanning('local-owner',first.runId,planning.claimId,selected,null);
-    f.repo.executeDmBeat('local-owner',first.runId);
-    finish(first.runId,'Rain patters on the road.');
-    const receipts=f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,first.runId).receipts;
-    const hold=open('hold');
-    const holdPlanning=f.repo.claimDmPlanning('local-owner',hold.runId,'fake','fake')!;
-    f.repo.settleDmPlanning('local-owner',hold.runId,holdPlanning.claimId,null,null);
-    const context=f.repo.getDmNarrationWork('local-owner',hold.runId)!.context as {history:string[]};
+    f.repo.settleDmPlanning("local-owner", first.runId, planning.claimId, selected, null);
+    f.repo.executeDmBeat("local-owner", first.runId);
+    finish(first.runId, "Rain patters on the road.");
+    const receipts = f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, first.runId).receipts;
+    const hold = open("hold");
+    const holdPlanning = f.repo.claimDmPlanning("local-owner", hold.runId, "fake", "fake")!;
+    f.repo.settleDmPlanning("local-owner", hold.runId, holdPlanning.claimId, null, null);
+    const context = f.repo.getDmNarrationWork("local-owner", hold.runId)!.context as { history: string[] };
     expect(receipts).toHaveLength(2);
-    for(const receipt of receipts)expect(context.history.join('\n')).toContain(receipt.summary);
-    finish(hold.runId,'A breeze stirs the roadside grass. What would you like to inspect?');
-    expect(f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,hold.runId).receipts).toEqual([]);
-    const next=open('next');
-    const nextPlanning=f.repo.claimDmPlanning('local-owner',next.runId,'fake','fake')!;
-    f.repo.settleDmPlanning('local-owner',next.runId,nextPlanning.claimId,null,null);
-    const nextContext=f.repo.getDmNarrationWork('local-owner',next.runId)!.context as {history:string[];priorScenes:string[]};
-    expect(nextContext.priorScenes).toEqual(['Rain patters on the road.','A breeze stirs the roadside grass. What would you like to inspect?']);
-    expect(nextContext.history.join('\n')).not.toContain('roadside grass');
+    for (const receipt of receipts) expect(context.history.join("\n")).toContain(receipt.summary);
+    finish(hold.runId, "A breeze stirs the roadside grass. What would you like to inspect?");
+    expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, hold.runId).receipts).toEqual([]);
+    const next = open("next");
+    const nextPlanning = f.repo.claimDmPlanning("local-owner", next.runId, "fake", "fake")!;
+    f.repo.settleDmPlanning("local-owner", next.runId, nextPlanning.claimId, null, null);
+    const nextContext = f.repo.getDmNarrationWork("local-owner", next.runId)!.context as {
+      history: string[];
+      priorScenes: string[];
+    };
+    expect(nextContext.priorScenes).toEqual([
+      "Rain patters on the road.",
+      "A breeze stirs the roadside grass. What would you like to inspect?",
+    ]);
+    expect(nextContext.history.join("\n")).not.toContain("roadside grass");
     f.repo.close();
   });
 
-  it('uses public place and NPC portrayal, committed reveals and public history, never private plans or harness strings',async()=>{
-    const f=await dmFixture();f.graph();f.advance();const db=database();
-    const content=generatedCampaignContentProviderSchema.parse({
-      locations:[{key:'road',name:'Rain Road',description:'Wet stone beside an old gate.',atmosphere:'Rain patters on slate.',visibility:'public'}],
-      npcs:[{key:'mara',name:'Mara',archetype:'Patient lantern keeper',description:'A cautious guide with a dry voice.',privateGoals:'SECRET_NPC_GOAL',visibility:'public',locationKey:'road'}],
-      handouts:[{key:'letter',title:'SECRET_UNPUBLISHED_TITLE',content:'SECRET_UNPUBLISHED_CONTENT',visibility:'public'}],
+  it("uses public place and NPC portrayal, committed reveals and public history, never private plans or harness strings", async () => {
+    const f = await dmFixture();
+    f.graph();
+    f.advance();
+    const db = database();
+    const content = generatedCampaignContentProviderSchema.parse({
+      locations: [
+        {
+          key: "road",
+          name: "Rain Road",
+          description: "Wet stone beside an old gate.",
+          atmosphere: "Rain patters on slate.",
+          visibility: "public",
+        },
+      ],
+      npcs: [
+        {
+          key: "mara",
+          name: "Mara",
+          archetype: "Patient lantern keeper",
+          description: "A cautious guide with a dry voice.",
+          privateGoals: "SECRET_NPC_GOAL",
+          visibility: "public",
+          locationKey: "road",
+        },
+      ],
+      handouts: [
+        {
+          key: "letter",
+          title: "SECRET_UNPUBLISHED_TITLE",
+          content: "SECRET_UNPUBLISHED_CONTENT",
+          visibility: "public",
+        },
+      ],
     });
-    const context=f.repo.getCampaignGenerationContext('local-owner',f.campaign.id,[])!;
-    const draft=f.repo.createGenerationDraft('local-owner',{campaignId:f.campaign.id,timelineId:f.campaign.activeTimelineId,kind:'content-pack',
-      stagedContent:{kind:'campaign-content',requestDigest:'a'.repeat(64),baseContentRevision:context.revision,dependencyDigests:{},...content},
-      validation:{valid:true,issues:[],validatedAt:f.options.clock.now().toISOString()},expectedCampaignRevision:f.repo.getCampaignAdministration('local-owner',f.campaign.id)!.revision,idempotencyKey:'public-preparation'});
-    f.repo.recordCampaignGenerationCandidate(draft.draftId,content,[]);
-    f.repo.applyCampaignContentGenerationDraftAtomically('local-owner',{draftId:draft.draftId,expectedDraftRevision:0,expectedCampaignRevision:draft.campaignRevision,idempotencyKey:'accept',selectedArtifactKeys:['road','mara','letter']});
-    const resource=(key:string)=>(db.prepare('SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_key=?').get(f.campaign.id,key) as any).server_resource_id;
-    db.prepare('INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)').run(f.campaign.id,f.actorId,resource('road'),f.session.id,f.options.clock.now().toISOString());
-    const presence=db.prepare('SELECT location_id FROM campaign_npc_presence_v43 WHERE campaign_id=? AND session_id=? AND npc_id=?').get(f.campaign.id,f.session.id,resource('mara')) as {location_id:string}|undefined;
-    if(presence?.location_id!==resource('road'))f.repo.mutateNpcPresence('local-owner',{campaignId:f.campaign.id,sessionId:f.session.id,npcId:resource('mara'),
-      expectedRevision:(db.prepare('SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?').get(f.campaign.id,f.session.id) as {revision:number}|undefined)?.revision??0,
-      idempotencyKey:'present',mutation:{kind:presence?'move':'place',locationId:resource('road')}});
-    const first=f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,{intent:'open',expectedModeRevision:0,idempotencyKey:'open'});
-    let publicCalls=0;
-    const complete=vi.fn(async input=>{
-      if(input.promptVersion!=='campaign-dm-narration-v1'){expect(JSON.stringify(input.messages)).toContain('SECRET_GATE');return dmCompletion(input);}
-      publicCalls++;const prompt=JSON.stringify(input.messages);
+    const context = f.repo.getCampaignGenerationContext("local-owner", f.campaign.id, [])!;
+    const draft = f.repo.createGenerationDraft("local-owner", {
+      campaignId: f.campaign.id,
+      timelineId: f.campaign.activeTimelineId,
+      kind: "content-pack",
+      stagedContent: {
+        kind: "campaign-content",
+        requestDigest: "a".repeat(64),
+        baseContentRevision: context.revision,
+        dependencyDigests: {},
+        ...content,
+      },
+      validation: { valid: true, issues: [], validatedAt: f.options.clock.now().toISOString() },
+      expectedCampaignRevision: f.repo.getCampaignAdministration("local-owner", f.campaign.id)!.revision,
+      idempotencyKey: "public-preparation",
+    });
+    f.repo.recordCampaignGenerationCandidate(draft.draftId, content, []);
+    f.repo.applyCampaignContentGenerationDraftAtomically("local-owner", {
+      draftId: draft.draftId,
+      expectedDraftRevision: 0,
+      expectedCampaignRevision: draft.campaignRevision,
+      idempotencyKey: "accept",
+      selectedArtifactKeys: ["road", "mara", "letter"],
+    });
+    const resource = (key: string) =>
+      (
+        db
+          .prepare(
+            "SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_key=?",
+          )
+          .get(f.campaign.id, key) as any
+      ).server_resource_id;
+    db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(
+      f.campaign.id,
+      f.actorId,
+      resource("road"),
+      f.session.id,
+      f.options.clock.now().toISOString(),
+    );
+    const presence = db
+      .prepare("SELECT location_id FROM campaign_npc_presence_v43 WHERE campaign_id=? AND session_id=? AND npc_id=?")
+      .get(f.campaign.id, f.session.id, resource("mara")) as { location_id: string } | undefined;
+    if (presence?.location_id !== resource("road"))
+      f.repo.mutateNpcPresence("local-owner", {
+        campaignId: f.campaign.id,
+        sessionId: f.session.id,
+        npcId: resource("mara"),
+        expectedRevision:
+          (
+            db
+              .prepare("SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?")
+              .get(f.campaign.id, f.session.id) as { revision: number } | undefined
+          )?.revision ?? 0,
+        idempotencyKey: "present",
+        mutation: { kind: presence ? "move" : "place", locationId: resource("road") },
+      });
+    const first = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+      intent: "open",
+      expectedModeRevision: 0,
+      idempotencyKey: "open",
+    });
+    let publicCalls = 0;
+    const complete = vi.fn(async (input) => {
+      if (input.promptVersion !== "campaign-dm-narration-v1") {
+        expect(JSON.stringify(input.messages)).toContain("SECRET_GATE");
+        return dmCompletion(input);
+      }
+      publicCalls++;
+      const prompt = JSON.stringify(input.messages);
       expect(prompt).not.toMatch(/SECRET_|gmNotes|privateGoals|candidateId|proposal/);
-      expect(JSON.stringify(input.harness)).not.toContain('SECRET_HARNESS');
-      expect(prompt).toContain('Rain patters');expect(prompt).toContain('Patient lantern keeper');
-      expect(prompt).toContain('stone gate');
-      expect((db.prepare("SELECT status FROM story_node_state_v34 WHERE node_id='gate'").get() as any).status).toBe('revealed');
-      if(publicCalls===2){const publicScene=JSON.parse(input.messages[1]!.content as string).publicScene;
-        expect(publicScene.history).toContain('Scene revealed: The gate. A stone gate blocks the road.');
+      expect(JSON.stringify(input.harness)).not.toContain("SECRET_HARNESS");
+      expect(prompt).toContain("Rain patters");
+      expect(prompt).toContain("Patient lantern keeper");
+      expect(prompt).toContain("stone gate");
+      expect((db.prepare("SELECT status FROM story_node_state_v34 WHERE node_id='gate'").get() as any).status).toBe(
+        "revealed",
+      );
+      if (publicCalls === 2) {
+        const publicScene = JSON.parse(input.messages[1]!.content as string).publicScene;
+        expect(publicScene.history).toContain("Scene revealed: The gate. A stone gate blocks the road.");
         // Prior prose now flows only through the labeled non-authoritative continuity channel, never canonical history.
-        expect(publicScene.priorScenes.join(' ')).toContain('Mara tilts her lantern');
-        expect(publicScene.history.join(' ')).not.toContain('Mara tilts her lantern');}
+        expect(publicScene.priorScenes.join(" ")).toContain("Mara tilts her lantern");
+        expect(publicScene.history.join(" ")).not.toContain("Mara tilts her lantern");
+      }
       return response();
     });
-    const deps=dmDependencies(complete),harness=await deps.getHarness();deps.getHarness=async()=>({...harness,systemPrompt:'SECRET_HARNESS'});
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',first.runId,deps);
-    expect(publicCalls).toBe(0);expect(f.repo.getDmNarrationWork('local-owner',first.runId)).toBeNull();
-    const pending=f.repo.getDmProposal('local-owner',f.campaign.id,f.session.id,first.runId);
-    f.repo.decideDmBeat('local-owner',f.campaign.id,f.session.id,first.runId,{decision:'approved',expectedRevision:pending.run.revision,idempotencyKey:'approve'});
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',first.runId,deps);
-    const result=f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,first.runId);
-    expect(result.narration).toContain(scene);expect(result.narration).toContain(result.receipts[0]!.summary);
-    expect(JSON.stringify(result)).not.toContain('SECRET_');
-    f.repo.setDmControl('local-owner',f.campaign.id,{mode:'ai',expectedRevision:0,idempotencyKey:'auto'});
-    const next=f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,{intent:'continue',expectedModeRevision:1,idempotencyKey:'next'});
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',next.runId,deps);
+    const deps = dmDependencies(complete),
+      harness = await deps.getHarness();
+    deps.getHarness = async () => ({ ...harness, systemPrompt: "SECRET_HARNESS" });
+    await orchestrateCampaignDmBeat(f.repo, "local-owner", first.runId, deps);
+    expect(publicCalls).toBe(0);
+    expect(f.repo.getDmNarrationWork("local-owner", first.runId)).toBeNull();
+    const pending = f.repo.getDmProposal("local-owner", f.campaign.id, f.session.id, first.runId);
+    f.repo.decideDmBeat("local-owner", f.campaign.id, f.session.id, first.runId, {
+      decision: "approved",
+      expectedRevision: pending.run.revision,
+      idempotencyKey: "approve",
+    });
+    await orchestrateCampaignDmBeat(f.repo, "local-owner", first.runId, deps);
+    const result = f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, first.runId);
+    expect(result.narration).toContain(scene);
+    expect(result.narration).toContain(result.receipts[0]!.summary);
+    expect(JSON.stringify(result)).not.toContain("SECRET_");
+    f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "auto" });
+    const next = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+      intent: "continue",
+      expectedModeRevision: 1,
+      idempotencyKey: "next",
+    });
+    await orchestrateCampaignDmBeat(f.repo, "local-owner", next.runId, deps);
     expect(publicCalls).toBe(2);
-    const requests=db.prepare('SELECT request_json FROM dm_narration_dispatches').all();expect(JSON.stringify(requests)).not.toMatch(/SECRET_|privateContext/);
-    expect(db.prepare("SELECT count(*) n FROM dm_narration_dispatches WHERE source='provider-assisted'").get()).toEqual({n:2});db.close();f.repo.close();
+    const requests = db.prepare("SELECT request_json FROM dm_narration_dispatches").all();
+    expect(JSON.stringify(requests)).not.toMatch(/SECRET_|privateContext/);
+    expect(db.prepare("SELECT count(*) n FROM dm_narration_dispatches WHERE source='provider-assisted'").get()).toEqual(
+      { n: 2 },
+    );
+    db.close();
+    f.repo.close();
   });
 
-  it.each(['failure','mechanics'] as const)('seals deterministic fallback on %s without rerunning mechanics or retrying a paid call',async(kind)=>{
-    const f=await prepare();const complete=vi.fn(async input=>{
-      if(input.promptVersion!=='campaign-dm-narration-v1')return dmCompletion(input);
-      if(kind==='failure')throw new Error('ambiguous paid failure');return response('You gain 100 gold and defeat the dragon. What do you do?');
+  it.each(["failure", "mechanics"] as const)(
+    "seals deterministic fallback on %s without rerunning mechanics or retrying a paid call",
+    async (kind) => {
+      const f = await prepare();
+      const complete = vi.fn(async (input) => {
+        if (input.promptVersion !== "campaign-dm-narration-v1") return dmCompletion(input);
+        if (kind === "failure") throw new Error("ambiguous paid failure");
+        return response("You gain 100 gold and defeat the dragon. What do you do?");
+      });
+      await orchestrateCampaignDmBeat(f.repo, "local-owner", f.run.runId, dmDependencies(complete));
+      const result = f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, f.run.runId);
+      expect(result.state).toBe("completed");
+      expect(result.narration).toBe(result.receipts[0]!.summary);
+      expect(complete).toHaveBeenCalledTimes(2);
+      f.repo.close();
+      const repo = createRepository(f.options),
+        again = vi.fn(async () => {
+          throw new Error("must not call");
+        });
+      await orchestrateCampaignDmBeat(repo, "local-owner", f.run.runId, dmDependencies(again));
+      expect(again).not.toHaveBeenCalled();
+      expect(repo.openDmBeat("local-owner", f.campaign.id, f.session.id, f.request)).toEqual(result);
+      const db = database();
+      expect(db.prepare("SELECT count(*) n FROM dm_receipts").get()).toEqual({ n: 1 });
+      expect(db.prepare("SELECT count(*) n FROM dm_public_history").get()).toEqual({ n: 1 });
+      db.close();
+      repo.close();
+    },
+  );
+
+  it.each(["claimed", "settled"] as const)(
+    "recovers %s narration across restart, preserving receipts and never repaying",
+    async (phase) => {
+      const f = await prepare();
+      const committed = commitWithoutNarration(f);
+      expect(committed).toMatchObject({ state: "planning", narration: null });
+      expect(committed.receipts).toHaveLength(1);
+      const work = f.repo.getDmNarrationWork("local-owner", f.run.runId)!;
+      const claim = f.repo.claimDmNarration(
+        "local-owner",
+        f.run.runId,
+        "fake",
+        "fake",
+        { messages: dmNarrationMessages(work.context, work.fallback) },
+        100,
+        100,
+      )!;
+      expect(f.repo.claimDmNarration("local-owner", f.run.runId, "fake", "fake", {}, 100, 100)).toBeNull();
+      if (phase === "settled") f.repo.settleDmNarration("local-owner", f.run.runId, claim, scene, "ok");
+      f.repo.close();
+      f.advance(DM_PROVIDER_DEADLINE_MS + 1_000);
+      const repo = createRepository(f.options),
+        complete = vi.fn(async () => {
+          throw new Error("must not call");
+        });
+      await orchestrateCampaignDmBeat(repo, "local-owner", f.run.runId, dmDependencies(complete));
+      expect(complete).not.toHaveBeenCalled();
+      const result = repo.getDmRun("local-owner", f.campaign.id, f.session.id, f.run.runId);
+      expect(result.state).toBe("completed");
+      if (phase === "settled") expect(result.narration).toContain(scene);
+      else expect(result.narration).toBe(result.receipts[0]!.summary);
+      repo.settleDmNarration("local-owner", f.run.runId, claim, scene, "late");
+      expect(repo.getDmRun("local-owner", f.campaign.id, f.session.id, f.run.runId)).toEqual(result);
+      repo.close();
+    },
+  );
+
+  it.each(["mode", "safety"] as const)(
+    "blocks publication on %s changes during narration but keeps mechanics",
+    async (kind) => {
+      const f = await prepare();
+      const complete = vi.fn(async (input) => {
+        if (input.promptVersion !== "campaign-dm-narration-v1") return dmCompletion(input);
+        expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, f.run.runId).receipts).toHaveLength(1);
+        if (kind === "mode")
+          f.repo.setDmControl("local-owner", f.campaign.id, {
+            mode: "human",
+            expectedRevision: 1,
+            idempotencyKey: "takeover",
+          });
+        else {
+          f.advance();
+          f.repo.requestCampaignSafetyAction("local-owner", f.campaign.id, {
+            action: "pause",
+            confirmed: true,
+            expectedRevision: f.repo.getCampaignAdministration("local-owner", f.campaign.id)!.revision,
+            idempotencyKey: "pause",
+          });
+        }
+        return response();
+      });
+      await orchestrateCampaignDmBeat(f.repo, "local-owner", f.run.runId, dmDependencies(complete));
+      expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, f.run.runId)).toMatchObject({
+        state: "cancelled",
+        narration: null,
+        receipts: [{ action: "reveal-node" }],
+      });
+      const db = database();
+      expect(db.prepare("SELECT count(*) n FROM dm_public_history").get()).toEqual({ n: 0 });
+      expect(db.prepare("SELECT count(*) n FROM dm_receipts").get()).toEqual({ n: 1 });
+      await orchestrateCampaignDmBeat(f.repo, "local-owner", f.run.runId, dmDependencies(complete));
+      expect(complete).toHaveBeenCalledTimes(2);
+      db.close();
+      f.repo.close();
+    },
+  );
+
+  it("holds the room lock during narration and charges both reservations to one aggregate budget", async () => {
+    const f = await prepare();
+    const db = database();
+    let limit = 24000;
+    const complete = vi.fn(async (input) => {
+      expect(input.promptVersion).toBe("campaign-dm-v1");
+      const reservation = db
+        .prepare(
+          "SELECT reserved_prompt_tokens+reserved_completion_tokens tokens FROM dm_provider_requests WHERE run_id=?",
+        )
+        .get(f.run.runId) as any;
+      limit = reservation.tokens + 64;
+      return dmCompletion(input);
     });
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',f.run.runId,dmDependencies(complete));
-    const result=f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,f.run.runId);
-    expect(result.state).toBe('completed');expect(result.narration).toBe(result.receipts[0]!.summary);expect(complete).toHaveBeenCalledTimes(2);
-    f.repo.close();const repo=createRepository(f.options),again=vi.fn(async()=>{throw new Error('must not call');});
-    await orchestrateCampaignDmBeat(repo,'local-owner',f.run.runId,dmDependencies(again));expect(again).not.toHaveBeenCalled();
-    expect(repo.openDmBeat('local-owner',f.campaign.id,f.session.id,f.request)).toEqual(result);
-    const db=database();expect(db.prepare('SELECT count(*) n FROM dm_receipts').get()).toEqual({n:1});expect(db.prepare('SELECT count(*) n FROM dm_public_history').get()).toEqual({n:1});db.close();repo.close();
-  });
-
-  it.each(['claimed','settled'] as const)('recovers %s narration across restart, preserving receipts and never repaying',async(phase)=>{
-    const f=await prepare();const committed=commitWithoutNarration(f);expect(committed).toMatchObject({state:'planning',narration:null});expect(committed.receipts).toHaveLength(1);
-    const work=f.repo.getDmNarrationWork('local-owner',f.run.runId)!;
-    const claim=f.repo.claimDmNarration('local-owner',f.run.runId,'fake','fake',{messages:dmNarrationMessages(work.context,work.fallback)},100,100)!;
-    expect(f.repo.claimDmNarration('local-owner',f.run.runId,'fake','fake',{},100,100)).toBeNull();
-    if(phase==='settled')f.repo.settleDmNarration('local-owner',f.run.runId,claim,scene,'ok');
-    f.repo.close();f.advance(DM_PROVIDER_DEADLINE_MS+1_000);const repo=createRepository(f.options),complete=vi.fn(async()=>{throw new Error('must not call');});
-    await orchestrateCampaignDmBeat(repo,'local-owner',f.run.runId,dmDependencies(complete));expect(complete).not.toHaveBeenCalled();
-    const result=repo.getDmRun('local-owner',f.campaign.id,f.session.id,f.run.runId);expect(result.state).toBe('completed');
-    if(phase==='settled')expect(result.narration).toContain(scene);else expect(result.narration).toBe(result.receipts[0]!.summary);
-    repo.settleDmNarration('local-owner',f.run.runId,claim,scene,'late');expect(repo.getDmRun('local-owner',f.campaign.id,f.session.id,f.run.runId)).toEqual(result);repo.close();
-  });
-
-  it.each(['mode','safety'] as const)('blocks publication on %s changes during narration but keeps mechanics',async(kind)=>{
-    const f=await prepare();const complete=vi.fn(async input=>{
-      if(input.promptVersion!=='campaign-dm-narration-v1')return dmCompletion(input);
-      expect(f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,f.run.runId).receipts).toHaveLength(1);
-      if(kind==='mode')f.repo.setDmControl('local-owner',f.campaign.id,{mode:'human',expectedRevision:1,idempotencyKey:'takeover'});
-      else {f.advance();f.repo.requestCampaignSafetyAction('local-owner',f.campaign.id,{action:'pause',confirmed:true,
-        expectedRevision:f.repo.getCampaignAdministration('local-owner',f.campaign.id)!.revision,idempotencyKey:'pause'});}
-      return response();
+    const deps = dmDependencies(complete),
+      provider = await deps.getProvider();
+    deps.getProvider = async () => ({
+      ...provider,
+      adventureTurnBudget: { maxTotalTokens: limit, maxEstimatedCostUsd: null },
     });
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',f.run.runId,dmDependencies(complete));
-    expect(f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,f.run.runId)).toMatchObject({state:'cancelled',narration:null,receipts:[{action:'reveal-node'}]});
-    const db=database();expect(db.prepare('SELECT count(*) n FROM dm_public_history').get()).toEqual({n:0});expect(db.prepare('SELECT count(*) n FROM dm_receipts').get()).toEqual({n:1});
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',f.run.runId,dmDependencies(complete));expect(complete).toHaveBeenCalledTimes(2);db.close();f.repo.close();
-  });
-
-  it('holds the room lock during narration and charges both reservations to one aggregate budget',async()=>{
-    const f=await prepare();const db=database();let limit=24000;
-    const complete=vi.fn(async input=>{
-      expect(input.promptVersion).toBe('campaign-dm-v1');
-      const reservation=db.prepare('SELECT reserved_prompt_tokens+reserved_completion_tokens tokens FROM dm_provider_requests WHERE run_id=?').get(f.run.runId) as any;
-      limit=reservation.tokens+64;return dmCompletion(input);
+    await orchestrateCampaignDmBeat(f.repo, "local-owner", f.run.runId, deps);
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(db.prepare("SELECT source,outcome_code FROM dm_narration_dispatches").get()).toEqual({
+      source: "deterministic-fallback",
+      outcome_code: "aggregate-budget-exceeded",
     });
-    const deps=dmDependencies(complete),provider=await deps.getProvider();deps.getProvider=async()=>({...provider,adventureTurnBudget:{maxTotalTokens:limit,maxEstimatedCostUsd:null}});
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',f.run.runId,deps);expect(complete).toHaveBeenCalledTimes(1);
-    expect(db.prepare('SELECT source,outcome_code FROM dm_narration_dispatches').get()).toEqual({source:'deterministic-fallback',outcome_code:'aggregate-budget-exceeded'});
-    const next=f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,{intent:'continue',expectedModeRevision:1,idempotencyKey:'next'});
-    const work=f.repo.claimDmPlanning('local-owner',next.runId,'fake','fake')!;f.repo.settleDmPlanning('local-owner',next.runId,work.claimId,null,null);
-    expect(()=>f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,{intent:'continue',expectedModeRevision:1,idempotencyKey:'concurrent'})).toThrow();
-    db.close();f.repo.close();
+    const next = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+      intent: "continue",
+      expectedModeRevision: 1,
+      idempotencyKey: "next",
+    });
+    const work = f.repo.claimDmPlanning("local-owner", next.runId, "fake", "fake")!;
+    f.repo.settleDmPlanning("local-owner", next.runId, work.claimId, null, null);
+    expect(() =>
+      f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+        intent: "continue",
+        expectedModeRevision: 1,
+        idempotencyKey: "concurrent",
+      }),
+    ).toThrow();
+    db.close();
+    f.repo.close();
   });
 
-  it('requires an actionable question and rejects player control and mechanical inventions',()=>{
+  it("requires an actionable question and rejects player control and mechanical inventions", () => {
     expect(validDmScene(scene)).toBe(true);
-    for(const text of ['You decide to leave. What next?','You gain 50 gold. What next?','The scene is resolved. What next?','You feel afraid. What next?','Rain falls.'])expect(validDmScene(text)).toBe(false);
+    for (const text of [
+      "You decide to leave. What next?",
+      "You gain 50 gold. What next?",
+      "The scene is resolved. What next?",
+      "You feel afraid. What next?",
+      "Rain falls.",
+    ])
+      expect(validDmScene(text)).toBe(false);
   });
-  it('allows up to four lines including NPC-to-NPC exchange, but never an unadvertised or player speaker',()=>{
-    const context={cast:[{name:'Mara'},{name:'Joss'}],players:[{name:'Hero'}]};
-    const four={atmosphere:'The two keepers trade a glance in the lamplight.',dialogue:[
-      {speaker:'Mara',text:'Mind the step.'},{speaker:'Joss',text:'Aye, and the draft.'},
-      {speaker:'Mara',text:'Hold the lamp higher.'},{speaker:'Joss',text:'Right away.'}],question:'What do you do?'};
-    expect(parseDmScene(four,context)).toContain('Joss: "Right away."');
-    expect(parseDmScene({...four,dialogue:[...four.dialogue,{speaker:'Mara',text:'One more.'}]},context)).toBeNull();
-    expect(parseDmScene({...four,dialogue:[...four.dialogue.slice(0,3),{speaker:'Hero',text:'I will.'}]},context)).toBeNull();
-    expect(dmNarrationMessages({priorScenes:['Rain on the road.']},'fallback')[0]!.content)
-      .toContain('priorScenes holds earlier published atmospheric prose');
+  it("allows up to four lines including NPC-to-NPC exchange, but never an unadvertised or player speaker", () => {
+    const context = { cast: [{ name: "Mara" }, { name: "Joss" }], players: [{ name: "Hero" }] };
+    const four = {
+      atmosphere: "The two keepers trade a glance in the lamplight.",
+      dialogue: [
+        { speaker: "Mara", text: "Mind the step." },
+        { speaker: "Joss", text: "Aye, and the draft." },
+        { speaker: "Mara", text: "Hold the lamp higher." },
+        { speaker: "Joss", text: "Right away." },
+      ],
+      question: "What do you do?",
+    };
+    expect(parseDmScene(four, context)).toContain('Joss: "Right away."');
+    expect(
+      parseDmScene({ ...four, dialogue: [...four.dialogue, { speaker: "Mara", text: "One more." }] }, context),
+    ).toBeNull();
+    expect(
+      parseDmScene(
+        { ...four, dialogue: [...four.dialogue.slice(0, 3), { speaker: "Hero", text: "I will." }] },
+        context,
+      ),
+    ).toBeNull();
+    expect(dmNarrationMessages({ priorScenes: ["Rain on the road."] }, "fallback")[0]!.content).toContain(
+      "priorScenes holds earlier published atmospheric prose",
+    );
   });
-  it('makes the question optional only for transition beats while keeping every other rejection',()=>{
-    const transition={cast:[],players:[],transition:true},normal={cast:[],players:[]};
-    expect(dmNarrationTool(transition).parameters.required).toEqual(['atmosphere','dialogue']);
-    expect(dmNarrationTool(normal).parameters.required).toEqual(['atmosphere','dialogue','question']);
-    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[]},transition)).toBe('A lull settles over the road.');
-    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[]},normal)).toBeNull();
-    expect(validDmScene('A lull settles over the road.',transition)).toBe(true);
-    expect(validDmScene('Rain falls.',normal)).toBe(false);
-    for(const text of ['You decide to leave.','You gain 50 gold.','The scene is resolved.','The king lies dead.'])expect(validDmScene(text,transition)).toBe(false);
+  it("makes the question optional only for transition beats while keeping every other rejection", () => {
+    const transition = { cast: [], players: [], transition: true },
+      normal = { cast: [], players: [] };
+    expect(dmNarrationTool(transition).parameters.required).toEqual(["atmosphere", "dialogue"]);
+    expect(dmNarrationTool(normal).parameters.required).toEqual(["atmosphere", "dialogue", "question"]);
+    expect(parseDmScene({ atmosphere: "A lull settles over the road.", dialogue: [] }, transition)).toBe(
+      "A lull settles over the road.",
+    );
+    expect(parseDmScene({ atmosphere: "A lull settles over the road.", dialogue: [] }, normal)).toBeNull();
+    expect(validDmScene("A lull settles over the road.", transition)).toBe(true);
+    expect(validDmScene("Rain falls.", normal)).toBe(false);
+    for (const text of ["You decide to leave.", "You gain 50 gold.", "The scene is resolved.", "The king lies dead."])
+      expect(validDmScene(text, transition)).toBe(false);
   });
-  it('accepts required choice questions and figurative live prose without weakening declarative rejection',()=>{
-    const normal={cast:[],players:[]},transition={cast:[],players:[],transition:true};
-    for(const text of [
-      'The road waits, empty in both directions — do you take the cracked shoulder, or the overgrown verge?',
-      'A brass key lies among the stones. Do you pick it up, or leave it where it lies and follow the road on?',
-      'Late light lies long across the tarmac, thin and gold. Do you follow the road onward, or stop here a while?',
-      'Nothing hurries here; the ruts hold their small puddles like coins in a palm. Do you linger here, or press on?',
-      'The wind has died entirely. Do you take the road on, or pause by the verge?',
-      'A silence so complete it seems to have weight settles over the lane. Do you listen on, or keep walking?',
-      'Nothing has shifted, no door has opened, no voice has spoken. Do you wait and watch?',
-      'The light has begun to fail and the tarmac lies dead grey. Do you press on?',
-      'Nothing along the road gains or loses a shadow. Do you move on?',
-      'The horizon never quite resolves. Do you keep walking?',
-      'The ruts have gone the color of old coin, indifferent to which you choose. Do you take the road on?',
-      'The moment is holding its breath, waiting to see what you decide to do with it. Do you wait?',
-      'The quiet is complete, unhurried, and entirely indifferent. Do you wait a while, or move on?',
-    ])expect(validDmScene(text,normal),text).toBe(true);
+  it("accepts required choice questions and figurative live prose without weakening declarative rejection", () => {
+    const normal = { cast: [], players: [] },
+      transition = { cast: [], players: [], transition: true };
+    for (const text of [
+      "The road waits, empty in both directions — do you take the cracked shoulder, or the overgrown verge?",
+      "A brass key lies among the stones. Do you pick it up, or leave it where it lies and follow the road on?",
+      "Late light lies long across the tarmac, thin and gold. Do you follow the road onward, or stop here a while?",
+      "Nothing hurries here; the ruts hold their small puddles like coins in a palm. Do you linger here, or press on?",
+      "The wind has died entirely. Do you take the road on, or pause by the verge?",
+      "A silence so complete it seems to have weight settles over the lane. Do you listen on, or keep walking?",
+      "Nothing has shifted, no door has opened, no voice has spoken. Do you wait and watch?",
+      "The light has begun to fail and the tarmac lies dead grey. Do you press on?",
+      "Nothing along the road gains or loses a shadow. Do you move on?",
+      "The horizon never quite resolves. Do you keep walking?",
+      "The ruts have gone the color of old coin, indifferent to which you choose. Do you take the road on?",
+      "The moment is holding its breath, waiting to see what you decide to do with it. Do you wait?",
+      "The quiet is complete, unhurried, and entirely indifferent. Do you wait a while, or move on?",
+    ])
+      expect(validDmScene(text, normal), text).toBe(true);
     // A declarative completion is still rejected.
-    expect(validDmScene('You complete the ritual and close the path. Do you rest?',normal)).toBe(false);
+    expect(validDmScene("You complete the ritual and close the path. Do you rest?", normal)).toBe(false);
     // A later sentence cannot borrow a negation from an earlier one.
-    expect(validDmScene('No wind stirs. The door has opened. Do you enter?',normal)).toBe(false);
+    expect(validDmScene("No wind stirs. The door has opened. Do you enter?", normal)).toBe(false);
     // Declarative assertions and numeric mechanics remain rejected even beside a choice question.
-    for(const text of [
-      'You take the road and leave the key behind. Do you press on?',
-      'Then you take the road and leave the key behind. Do you press on?',
-      'The king lies dead. Do you approach?',
-      'Do you spend 50 gold?',
-    ])expect(validDmScene(text,normal),text).toBe(false);
+    for (const text of [
+      "You take the road and leave the key behind. Do you press on?",
+      "Then you take the road and leave the key behind. Do you press on?",
+      "The king lies dead. Do you approach?",
+      "Do you spend 50 gold?",
+    ])
+      expect(validDmScene(text, normal), text).toBe(false);
     // An echoed transition flag is ignored, but an unknown field is still rejected.
-    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],transition:true},transition)).toBe('A lull settles over the road.');
-    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],transition:true,scene:'extra'},transition)).toBeNull();
+    expect(
+      parseDmScene({ atmosphere: "A lull settles over the road.", dialogue: [], transition: true }, transition),
+    ).toBe("A lull settles over the road.");
+    expect(
+      parseDmScene(
+        { atmosphere: "A lull settles over the road.", dialogue: [], transition: true, scene: "extra" },
+        transition,
+      ),
+    ).toBeNull();
     // A blank question is treated as absent: allowed on a transition, still rejected when one is required.
-    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],question:'  '},transition)).toBe('A lull settles over the road.');
-    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],question:'  '},normal)).toBeNull();
+    expect(
+      parseDmScene({ atmosphere: "A lull settles over the road.", dialogue: [], question: "  " }, transition),
+    ).toBe("A lull settles over the road.");
+    expect(
+      parseDmScene({ atmosphere: "A lull settles over the road.", dialogue: [], question: "  " }, normal),
+    ).toBeNull();
   });
-  it('accepts bounded public NPC dialogue but rejects unadvertised speakers, extra fields, and inflected agency/outcome claims',()=>{
-    const context={cast:[{name:'Mara',description:'A cautious guide.'}],players:[{name:'Hero'}],scenes:[{title:'The gate',description:'A stone gate blocks the road.'}],receipts:[{action:'reveal-node',summary:'Scene revealed: The gate.'}]};
-    const value={atmosphere:'Rain beads on the stone beside the gate.',dialogue:[{speaker:'Mara',text:'A patient eye is worth a hurried step.'}],question:'Would you like to inspect the stonework or speak with Mara?'};
-    expect(parseDmScene(value,context)).toContain('Mara: "A patient eye');
-    expect(dmNarrationTool(context).parameters.required).toEqual(['atmosphere','dialogue','question']);
-    expect(parseDmScene({...value,dialogue:[{speaker:'Secret villain',text:'Wait here.'}]},context)).toBeNull();
-    expect(parseDmScene({...value,scene:'extra'},context)).toBeNull();
-    for(const atmosphere of [
-      'You agreed to serve the mayor and handed him your sword. The gate swings wide and the king lies dead.',
-      'You had already promised to follow the mayor.', 'Hero handed the mayor your sword.',
-      'The door swung open.', 'The king was killed.', 'You accepted the bargain and gave away your shield.',
-    ]){expect(validDmScene(`${atmosphere} What would you like to inspect?`,context)).toBe(false);expect(parseDmScene({...value,atmosphere},context)).toBeNull();}
+  it("accepts bounded public NPC dialogue but rejects unadvertised speakers, extra fields, and inflected agency/outcome claims", () => {
+    const context = {
+      cast: [{ name: "Mara", description: "A cautious guide." }],
+      players: [{ name: "Hero" }],
+      scenes: [{ title: "The gate", description: "A stone gate blocks the road." }],
+      receipts: [{ action: "reveal-node", summary: "Scene revealed: The gate." }],
+    };
+    const value = {
+      atmosphere: "Rain beads on the stone beside the gate.",
+      dialogue: [{ speaker: "Mara", text: "A patient eye is worth a hurried step." }],
+      question: "Would you like to inspect the stonework or speak with Mara?",
+    };
+    expect(parseDmScene(value, context)).toContain('Mara: "A patient eye');
+    expect(dmNarrationTool(context).parameters.required).toEqual(["atmosphere", "dialogue", "question"]);
+    expect(
+      parseDmScene({ ...value, dialogue: [{ speaker: "Secret villain", text: "Wait here." }] }, context),
+    ).toBeNull();
+    expect(parseDmScene({ ...value, scene: "extra" }, context)).toBeNull();
+    for (const atmosphere of [
+      "You agreed to serve the mayor and handed him your sword. The gate swings wide and the king lies dead.",
+      "You had already promised to follow the mayor.",
+      "Hero handed the mayor your sword.",
+      "The door swung open.",
+      "The king was killed.",
+      "You accepted the bargain and gave away your shield.",
+    ]) {
+      expect(validDmScene(`${atmosphere} What would you like to inspect?`, context)).toBe(false);
+      expect(parseDmScene({ ...value, atmosphere }, context)).toBeNull();
+    }
   });
-  it('falls back on the reproduced agency/death/opening bypass and never feeds that prose into later canonical history',async()=>{
-    const f=await prepare();
-    const malicious='You agreed to serve the mayor and handed him your sword. The gate swings wide and the king lies dead.';
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',f.run.runId,dmDependencies(async input=>input.promptVersion==='campaign-dm-narration-v1'
-      ?response(`${malicious} What would you like to inspect?`):dmCompletion(input)));
-    const result=f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,f.run.runId);
-    expect(result.narration).toBe(result.receipts[0]!.summary);expect(result.narration).not.toContain('agreed');
-    const next=f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,{intent:'continue',expectedModeRevision:1,idempotencyKey:'next'});
-    await orchestrateCampaignDmBeat(f.repo,'local-owner',next.runId,dmDependencies(async input=>{
-      expect(JSON.stringify(input.messages)).not.toContain('agreed to serve');return dmCompletion(input);
-    }));f.repo.close();
+  it("falls back on the reproduced agency/death/opening bypass and never feeds that prose into later canonical history", async () => {
+    const f = await prepare();
+    const malicious =
+      "You agreed to serve the mayor and handed him your sword. The gate swings wide and the king lies dead.";
+    await orchestrateCampaignDmBeat(
+      f.repo,
+      "local-owner",
+      f.run.runId,
+      dmDependencies(async (input) =>
+        input.promptVersion === "campaign-dm-narration-v1"
+          ? response(`${malicious} What would you like to inspect?`)
+          : dmCompletion(input),
+      ),
+    );
+    const result = f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, f.run.runId);
+    expect(result.narration).toBe(result.receipts[0]!.summary);
+    expect(result.narration).not.toContain("agreed");
+    const next = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+      intent: "continue",
+      expectedModeRevision: 1,
+      idempotencyKey: "next",
+    });
+    await orchestrateCampaignDmBeat(
+      f.repo,
+      "local-owner",
+      next.runId,
+      dmDependencies(async (input) => {
+        expect(JSON.stringify(input.messages)).not.toContain("agreed to serve");
+        return dmCompletion(input);
+      }),
+    );
+    f.repo.close();
   });
 });

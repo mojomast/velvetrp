@@ -50,12 +50,27 @@ const JSON_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0
 /** Structural service seam; the concrete `SceneImageService` satisfies it. */
 export interface SceneImageRouteService {
   getSettings(principalId: string, campaignId: string): SceneImageSettingsRead;
-  updateSettings(principalId: string, campaignId: string,
-    input: { patch: SceneImageSettingsPatch; expectedRevision: number; idempotencyKey: string }): SceneImageSettingsUpdate;
-  enqueue(principalId: string, campaignId: string, input: SceneImageEnqueueInput, idempotencyKey: string): SceneImageEnqueueResult;
-  listGallery(principalId: string, campaignId: string, query?: { sessionId?: string; limit?: number }): SceneImageGallery;
-  selectImage(principalId: string, campaignId: string,
-    input: { sessionId: string; sceneKey: string; assetId: string; expectedRevision: number; idempotencyKey: string }): SceneImageSelectionResult;
+  updateSettings(
+    principalId: string,
+    campaignId: string,
+    input: { patch: SceneImageSettingsPatch; expectedRevision: number; idempotencyKey: string },
+  ): SceneImageSettingsUpdate;
+  enqueue(
+    principalId: string,
+    campaignId: string,
+    input: SceneImageEnqueueInput,
+    idempotencyKey: string,
+  ): SceneImageEnqueueResult;
+  listGallery(
+    principalId: string,
+    campaignId: string,
+    query?: { sessionId?: string; limit?: number },
+  ): SceneImageGallery;
+  selectImage(
+    principalId: string,
+    campaignId: string,
+    input: { sessionId: string; sceneKey: string; assetId: string; expectedRevision: number; idempotencyKey: string },
+  ): SceneImageSelectionResult;
   getJob(principalId: string, campaignId: string, jobId: string): { job: SceneImageJob };
   readAsset(principalId: string, campaignId: string, assetId: string): SceneImageAssetBytes;
   /** Optional worker lifecycle; injected fakes may omit it. */
@@ -78,7 +93,11 @@ export interface SceneImageSceneSnapshot {
   readonly locationDescription: string | null;
 }
 
-export type SceneImageSceneResolver = (campaignId: string, sessionId: string, actorId?: string) => SceneImageSceneSnapshot | null;
+export type SceneImageSceneResolver = (
+  campaignId: string,
+  sessionId: string,
+  actorId?: string,
+) => SceneImageSceneSnapshot | null;
 
 export interface SceneImagesHttpOptions {
   /** Lazily resolves the app-owned sidecar; null when it cannot be opened. */
@@ -89,48 +108,60 @@ export interface SceneImagesHttpOptions {
   resolveScene?: SceneImageSceneResolver;
 }
 
-const sceneKeySchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/);
+const sceneKeySchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9._:-]+$/);
 const sessionIdSchema = resourceIdSchema;
-const settingsPatchSchema = z.object({
-  enabled: z.boolean().optional(),
-  mode: z.enum(["off", "manual", "automatic"]).optional(),
-  stylePresetId: z.string().min(1).max(64).optional(),
-  stylePhrase: z.string().max(200).optional(),
-  promptOverrides: z.record(z.string().min(1).max(64), z.string().max(500)).optional(),
-  steps: z.number().int().min(SCENE_IMAGE_STEPS_MIN).max(SCENE_IMAGE_STEPS_MAX).optional(),
-  guidance: z.number().min(SCENE_IMAGE_GUIDANCE_MIN).max(SCENE_IMAGE_GUIDANCE_MAX).optional(),
-  seedMode: z.enum(["random", "fixed"]).optional(),
-  fixedSeed: z.number().int().min(SCENE_IMAGE_MIN_SEED).max(SCENE_IMAGE_MAX_SEED).optional(),
-  variationCount: z.number().int().min(SCENE_IMAGE_VARIATION_MIN).max(SCENE_IMAGE_VARIATION_MAX).optional(),
-  autoPerSessionLimit: z.number().int().min(0).max(32).optional(),
-  cooldownSeconds: z.number().int().min(0).max(3_600).optional(),
-  bandwidth: z.enum(["full", "reduced", "text-only"]).optional(),
-  hideImages: z.boolean().optional(),
-  advancedOnlyDm: z.boolean().optional(),
-}).strict();
-const settingsWriteSchema = z.object({
-  expectedRevision: z.number().int().min(0),
-  idempotencyKey: idempotencyKeySchema,
-  settings: settingsPatchSchema,
-}).strict();
-const generateRequestSchema = z.object({
-  sessionId: sessionIdSchema,
-  sceneKey: sceneKeySchema,
-  prompt: z.string().min(1).max(1_000).optional(),
-  seed: z.number().int().min(SCENE_IMAGE_MIN_SEED).max(SCENE_IMAGE_MAX_SEED).optional(),
-  steps: z.number().int().min(SCENE_IMAGE_STEPS_MIN).max(SCENE_IMAGE_STEPS_MAX).optional(),
-  guidance: z.number().min(SCENE_IMAGE_GUIDANCE_MIN).max(SCENE_IMAGE_GUIDANCE_MAX).optional(),
-  count: z.number().int().min(SCENE_IMAGE_VARIATION_MIN).max(SCENE_IMAGE_VARIATION_MAX).optional(),
-  auto: z.boolean().optional(),
-  idempotencyKey: idempotencyKeySchema,
-}).strict();
-const selectRequestSchema = z.object({
-  sessionId: sessionIdSchema,
-  sceneKey: sceneKeySchema,
-  assetId: sessionIdSchema,
-  expectedRevision: z.number().int().min(0),
-  idempotencyKey: idempotencyKeySchema,
-}).strict();
+const settingsPatchSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    mode: z.enum(["off", "manual", "automatic"]).optional(),
+    stylePresetId: z.string().min(1).max(64).optional(),
+    stylePhrase: z.string().max(200).optional(),
+    promptOverrides: z.record(z.string().min(1).max(64), z.string().max(500)).optional(),
+    steps: z.number().int().min(SCENE_IMAGE_STEPS_MIN).max(SCENE_IMAGE_STEPS_MAX).optional(),
+    guidance: z.number().min(SCENE_IMAGE_GUIDANCE_MIN).max(SCENE_IMAGE_GUIDANCE_MAX).optional(),
+    seedMode: z.enum(["random", "fixed"]).optional(),
+    fixedSeed: z.number().int().min(SCENE_IMAGE_MIN_SEED).max(SCENE_IMAGE_MAX_SEED).optional(),
+    variationCount: z.number().int().min(SCENE_IMAGE_VARIATION_MIN).max(SCENE_IMAGE_VARIATION_MAX).optional(),
+    autoPerSessionLimit: z.number().int().min(0).max(32).optional(),
+    cooldownSeconds: z.number().int().min(0).max(3_600).optional(),
+    bandwidth: z.enum(["full", "reduced", "text-only"]).optional(),
+    hideImages: z.boolean().optional(),
+    advancedOnlyDm: z.boolean().optional(),
+  })
+  .strict();
+const settingsWriteSchema = z
+  .object({
+    expectedRevision: z.number().int().min(0),
+    idempotencyKey: idempotencyKeySchema,
+    settings: settingsPatchSchema,
+  })
+  .strict();
+const generateRequestSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    sceneKey: sceneKeySchema,
+    prompt: z.string().min(1).max(1_000).optional(),
+    seed: z.number().int().min(SCENE_IMAGE_MIN_SEED).max(SCENE_IMAGE_MAX_SEED).optional(),
+    steps: z.number().int().min(SCENE_IMAGE_STEPS_MIN).max(SCENE_IMAGE_STEPS_MAX).optional(),
+    guidance: z.number().min(SCENE_IMAGE_GUIDANCE_MIN).max(SCENE_IMAGE_GUIDANCE_MAX).optional(),
+    count: z.number().int().min(SCENE_IMAGE_VARIATION_MIN).max(SCENE_IMAGE_VARIATION_MAX).optional(),
+    auto: z.boolean().optional(),
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .strict();
+const selectRequestSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    sceneKey: sceneKeySchema,
+    assetId: sessionIdSchema,
+    expectedRevision: z.number().int().min(0),
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .strict();
 
 /** Persisted sidecar statuses projected onto the frozen client vocabulary. */
 const JOB_STATUS_PROJECTION: Readonly<Record<SceneImageJobStatus, string>> = {
@@ -213,20 +244,44 @@ function problemForRefusal(refusal: SceneImageEnqueueRefusal): { status: 409 | 4
 function mapSceneImageFailure(request: FastifyRequest, reply: FastifyReply, error: unknown): FastifyReply {
   if (error instanceof SceneImageError) {
     if (error.statusCode === 400) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", error.message);
-    if (error.statusCode === 403) return sendApiProblem(request, reply, 403, "RPG_SCENE_IMAGE_FORBIDDEN", "Scene image management requires the campaign owner or GM");
-    if (error.statusCode === 404) return sendApiProblem(request, reply, 404, "RPG_SCENE_IMAGE_NOT_FOUND", "Scene image resource not found");
+    if (error.statusCode === 403)
+      return sendApiProblem(
+        request,
+        reply,
+        403,
+        "RPG_SCENE_IMAGE_FORBIDDEN",
+        "Scene image management requires the campaign owner or GM",
+      );
+    if (error.statusCode === 404)
+      return sendApiProblem(request, reply, 404, "RPG_SCENE_IMAGE_NOT_FOUND", "Scene image resource not found");
     if (error.statusCode === 409) return sendApiProblem(request, reply, 409, "RPG_SCENE_IMAGE_CONFLICT", error.message);
-    if (error.statusCode === 503) return sendApiProblem(request, reply, 503, "RPG_SCENE_IMAGE_UNAVAILABLE", "Scene images are unavailable; no image work was started");
+    if (error.statusCode === 503)
+      return sendApiProblem(
+        request,
+        reply,
+        503,
+        "RPG_SCENE_IMAGE_UNAVAILABLE",
+        "Scene images are unavailable; no image work was started",
+      );
   }
-  request.log.error({ operation: "scene-images", method: request.method, route: request.routeOptions.url }, "scene image operation failed");
+  request.log.error(
+    { operation: "scene-images", method: request.method, route: request.routeOptions.url },
+    "scene image operation failed",
+  );
   return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Scene image operation could not be completed");
 }
 
 function hasQueryValue(request: FastifyRequest): boolean {
-  return (request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0;
+  return (
+    (request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0
+  );
 }
 
-function notFound(request: FastifyRequest, reply: FastifyReply, detail = "Scene image resource not found"): FastifyReply {
+function notFound(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  detail = "Scene image resource not found",
+): FastifyReply {
   return sendApiProblem(request, reply, 404, "RPG_SCENE_IMAGE_NOT_FOUND", detail);
 }
 
@@ -256,28 +311,34 @@ export function createSceneImageNarrationHook(options: {
       const scene = options.resolveScene(settled.campaignId, settled.sessionId, settled.actorId);
       const sceneKey = scene?.sceneKey ?? `session:${settled.sessionId}`;
       const override = settings.promptOverrides[sceneKey];
-      const prompt = override && override.trim().length > 0
-        ? override.trim()
-        : buildScenePrompt({
-            locationName: scene?.locationLabel ?? sceneKey,
-            focalFeature: scene?.locationDescription ?? "",
-            composition: "",
-            lighting: "",
-            materials: [],
-            stylePhrase: settings.stylePhrase,
-            facts: [],
-          });
-      service.enqueue(OWNER, settled.campaignId, {
-        sessionId: settled.sessionId,
-        sceneKey,
-        sceneRevision: scene?.sceneRevision ?? 0,
-        narrationEventId: settled.turnId,
-        prompt,
-        steps: settings.steps,
-        guidance: settings.guidance,
-        kind: "single",
-        auto: true,
-      }, `auto-narration:${settled.turnId}`);
+      const prompt =
+        override && override.trim().length > 0
+          ? override.trim()
+          : buildScenePrompt({
+              locationName: scene?.locationLabel ?? sceneKey,
+              focalFeature: scene?.locationDescription ?? "",
+              composition: "",
+              lighting: "",
+              materials: [],
+              stylePhrase: settings.stylePhrase,
+              facts: [],
+            });
+      service.enqueue(
+        OWNER,
+        settled.campaignId,
+        {
+          sessionId: settled.sessionId,
+          sceneKey,
+          sceneRevision: scene?.sceneRevision ?? 0,
+          narrationEventId: settled.turnId,
+          prompt,
+          steps: settings.steps,
+          guidance: settings.guidance,
+          kind: "single",
+          auto: true,
+        },
+        `auto-narration:${settled.turnId}`,
+      );
     } catch {
       // The hook is best-effort by contract: never surface failure.
     }
@@ -323,14 +384,20 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
   const resolveScene = (campaignId: string, sessionId: string, actorId?: string): SceneImageSceneSnapshot | null => {
     try {
       return actorId === undefined
-        ? options.resolveScene?.(campaignId, sessionId) ?? null
-        : options.resolveScene?.(campaignId, sessionId, actorId) ?? null;
+        ? (options.resolveScene?.(campaignId, sessionId) ?? null)
+        : (options.resolveScene?.(campaignId, sessionId, actorId) ?? null);
     } catch {
       return null;
     }
   };
   const unavailable = (request: FastifyRequest, reply: FastifyReply): FastifyReply =>
-    sendApiProblem(request, reply, 503, "RPG_SCENE_IMAGE_UNAVAILABLE", "Scene images are unavailable; no image work was started");
+    sendApiProblem(
+      request,
+      reply,
+      503,
+      "RPG_SCENE_IMAGE_UNAVAILABLE",
+      "Scene images are unavailable; no image work was started",
+    );
   const guard = (request: FastifyRequest, reply: FastifyReply, rejectQuery = true): boolean => {
     reply.header("cache-control", "no-store");
     if (!readRpgFeatureFlags().campaign) {
@@ -353,7 +420,13 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
     sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", detail);
 
   app.get<{ Params: { campaignId: string }; Querystring: Record<string, unknown> }>(
-    `${base}/settings`, { exposeHeadRoute: false, onRequest: async (request, reply) => { guard(request, reply); } },
+    `${base}/settings`,
+    {
+      exposeHeadRoute: false,
+      onRequest: async (request, reply) => {
+        guard(request, reply);
+      },
+    },
     async (request, reply) => {
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
       if (!campaignId.success) return notFound(request, reply);
@@ -365,16 +438,19 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       } catch (error) {
         return mapSceneImageFailure(request, reply, error);
       }
-    });
+    },
+  );
 
   app.put<{ Params: { campaignId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
-    `${base}/settings`, {
+    `${base}/settings`,
+    {
       exposeHeadRoute: false,
       onRequest: async (request, reply) => {
         if (!guard(request, reply)) return;
         await requireJson(request, reply, "Scene image settings");
       },
-      errorHandler: (_error, request, reply) => malformedBody(request, reply, "Scene image settings request is invalid"),
+      errorHandler: (_error, request, reply) =>
+        malformedBody(request, reply, "Scene image settings request is invalid"),
     },
     async (request, reply) => {
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
@@ -385,7 +461,9 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       if (!service) return unavailable(request, reply);
       try {
         const updated = service.updateSettings(OWNER, campaignId.data, {
-          patch: Object.fromEntries(Object.entries(body.data.settings).filter(([, value]) => value !== undefined)) as Partial<SceneImageSettings>,
+          patch: Object.fromEntries(
+            Object.entries(body.data.settings).filter(([, value]) => value !== undefined),
+          ) as Partial<SceneImageSettings>,
           expectedRevision: body.data.expectedRevision,
           idempotencyKey: body.data.idempotencyKey,
         });
@@ -393,16 +471,19 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       } catch (error) {
         return mapSceneImageFailure(request, reply, error);
       }
-    });
+    },
+  );
 
   app.post<{ Params: { campaignId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
-    `${base}/generate`, {
+    `${base}/generate`,
+    {
       exposeHeadRoute: false,
       onRequest: async (request, reply) => {
         if (!guard(request, reply)) return;
         await requireJson(request, reply, "Scene image generation");
       },
-      errorHandler: (_error, request, reply) => malformedBody(request, reply, "Scene image generation request is invalid"),
+      errorHandler: (_error, request, reply) =>
+        malformedBody(request, reply, "Scene image generation request is invalid"),
     },
     async (request, reply) => {
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
@@ -411,7 +492,13 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       if (!body.success) return malformedBody(request, reply, "Scene image generation request is invalid");
       // The installation-level opt-in precedes every sidecar/network surface.
       if (!installationEnabled()) {
-        return sendApiProblem(request, reply, 422, "RPG_SCENE_IMAGE_DISABLED", "Scene image generation is disabled for this installation");
+        return sendApiProblem(
+          request,
+          reply,
+          422,
+          "RPG_SCENE_IMAGE_DISABLED",
+          "Scene image generation is disabled for this installation",
+        );
       }
       const service = getService();
       if (!service) return unavailable(request, reply);
@@ -423,7 +510,11 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
           sessionId: body.data.sessionId,
           sceneKey: body.data.sceneKey,
           sceneRevision: scene?.sceneRevision ?? 0,
-          prompt: resolveGenerationPrompt({ sceneKey: body.data.sceneKey, ...(body.data.prompt !== undefined ? { prompt: body.data.prompt } : {}) }, settings, scene),
+          prompt: resolveGenerationPrompt(
+            { sceneKey: body.data.sceneKey, ...(body.data.prompt !== undefined ? { prompt: body.data.prompt } : {}) },
+            settings,
+            scene,
+          ),
           steps: body.data.steps ?? settings.steps,
           guidance: body.data.guidance ?? settings.guidance,
           kind: count > 1 ? "batch" : "single",
@@ -440,10 +531,12 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       } catch (error) {
         return mapSceneImageFailure(request, reply, error);
       }
-    });
+    },
+  );
 
   app.get<{ Params: { campaignId: string }; Querystring: Record<string, unknown> }>(
-    `${base}/gallery`, {
+    `${base}/gallery`,
+    {
       exposeHeadRoute: false,
       onRequest: async (request, reply) => {
         reply.header("cache-control", "no-store");
@@ -453,7 +546,13 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
         }
         const query = request.query as Record<string, unknown>;
         if (Object.keys(query).some((key) => key !== "sessionId")) {
-          sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Scene image gallery does not accept query parameters");
+          sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Scene image gallery does not accept query parameters",
+          );
           return;
         }
         if (typeof query.sessionId !== "string" || !sessionIdSchema.safeParse(query.sessionId).success) {
@@ -465,26 +564,33 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
       if (!campaignId.success) return notFound(request, reply);
       const query = request.query as Record<string, unknown>;
-      if (typeof query.sessionId !== "string") return malformedBody(request, reply, "Scene image gallery requires a valid sessionId");
+      if (typeof query.sessionId !== "string")
+        return malformedBody(request, reply, "Scene image gallery requires a valid sessionId");
       const service = getService();
       if (!service) return unavailable(request, reply);
       try {
         const gallery = service.listGallery(OWNER, campaignId.data, { sessionId: query.sessionId });
         const jobs = gallery.jobs ?? [];
-        return reply.send({ images: gallery.images.map((image) => projectGalleryImage(image, jobs)), ...(gallery.jobs ? { jobs: jobs.filter((job) => job.sessionId === query.sessionId).map(projectJob) } : {}) });
+        return reply.send({
+          images: gallery.images.map((image) => projectGalleryImage(image, jobs)),
+          ...(gallery.jobs ? { jobs: jobs.filter((job) => job.sessionId === query.sessionId).map(projectJob) } : {}),
+        });
       } catch (error) {
         return mapSceneImageFailure(request, reply, error);
       }
-    });
+    },
+  );
 
   app.post<{ Params: { campaignId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
-    `${base}/select`, {
+    `${base}/select`,
+    {
       exposeHeadRoute: false,
       onRequest: async (request, reply) => {
         if (!guard(request, reply)) return;
         await requireJson(request, reply, "Scene image selection");
       },
-      errorHandler: (_error, request, reply) => malformedBody(request, reply, "Scene image selection request is invalid"),
+      errorHandler: (_error, request, reply) =>
+        malformedBody(request, reply, "Scene image selection request is invalid"),
     },
     async (request, reply) => {
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
@@ -505,10 +611,17 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       } catch (error) {
         return mapSceneImageFailure(request, reply, error);
       }
-    });
+    },
+  );
 
   app.get<{ Params: { campaignId: string; jobId: string }; Querystring: Record<string, unknown> }>(
-    `${base}/jobs/:jobId`, { exposeHeadRoute: false, onRequest: async (request, reply) => { guard(request, reply); } },
+    `${base}/jobs/:jobId`,
+    {
+      exposeHeadRoute: false,
+      onRequest: async (request, reply) => {
+        guard(request, reply);
+      },
+    },
     async (request, reply) => {
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
       const jobId = resourceIdSchema.safeParse(request.params.jobId);
@@ -520,10 +633,12 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       } catch (error) {
         return mapSceneImageFailure(request, reply, error);
       }
-    });
+    },
+  );
 
   app.get<{ Params: { campaignId: string; assetId: string }; Querystring: Record<string, unknown> }>(
-    `${base}/assets/:assetId`, {
+    `${base}/assets/:assetId`,
+    {
       exposeHeadRoute: false,
       onRequest: async (request, reply) => {
         // Bytes are candidate material: never shared-cached and never sniffed.
@@ -534,11 +649,19 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
         }
         const query = request.query as Record<string, unknown>;
         if (Object.keys(query).some((key) => key !== "sessionId")) {
-          sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Scene image asset does not accept query parameters");
+          sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Scene image asset does not accept query parameters",
+          );
           return;
         }
-        if (query.sessionId !== undefined
-          && (typeof query.sessionId !== "string" || !sessionIdSchema.safeParse(query.sessionId).success)) {
+        if (
+          query.sessionId !== undefined &&
+          (typeof query.sessionId !== "string" || !sessionIdSchema.safeParse(query.sessionId).success)
+        ) {
           sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Scene image asset session is invalid");
         }
       },
@@ -564,5 +687,6 @@ export const sceneImagesHttpRoutes: FastifyPluginAsync<SceneImagesHttpOptions> =
       } catch (error) {
         return mapSceneImageFailure(request, reply, error);
       }
-    });
+    },
+  );
 };

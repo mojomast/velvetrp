@@ -171,7 +171,12 @@ describe("harness api compatibility", () => {
 
   it("supports temperature null, clamps, fractions, and ignores non-numbers", async () => {
     const app = buildApp();
-    for (const [temperature, expected] of [[null, null], [-0.4, 0], [2.4, 2], [0.375, 0.375]] as const) {
+    for (const [temperature, expected] of [
+      [null, null],
+      [-0.4, 0],
+      [2.4, 2],
+      [0.375, 0.375],
+    ] as const) {
       const response = await app.inject({ method: "PUT", url: "/api/harness", payload: { temperature } });
       expect(response.statusCode).toBe(200);
       expect(response.json().temperature).toBe(expected);
@@ -237,7 +242,9 @@ describe("harness api compatibility", () => {
       error: "Internal Server Error",
       message: expect.any(String),
     });
-    expect((await app.inject({ method: "GET", url: "/api/harness" })).json().promptOverrides).toEqual({ retained: "yes" });
+    expect((await app.inject({ method: "GET", url: "/api/harness" })).json().promptOverrides).toEqual({
+      retained: "yes",
+    });
     await app.close();
   });
 

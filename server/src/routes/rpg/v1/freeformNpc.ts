@@ -52,59 +52,73 @@ const noneReasonSchema = z.enum([
 
 const boundingText = (max: number) => z.string().min(1).max(max);
 
-const candidateSchema = z.object({
-  candidateId: boundingText(128),
-  npcKey: boundingText(128),
-  gmGoalsKey: boundingText(128),
-  locationKey: boundingText(128),
-  factionKeys: z.array(boundingText(128)).max(MAX_FACTIONS),
-  name: boundingText(MAX_NAME_LENGTH),
-  archetype: boundingText(MAX_ARCHETYPE_LENGTH),
-  description: boundingText(MAX_DESCRIPTION_LENGTH),
-  gmGoals: boundingText(MAX_GOALS_LENGTH),
-  visibility: z.literal("public"),
-}).strict();
+const candidateSchema = z
+  .object({
+    candidateId: boundingText(128),
+    npcKey: boundingText(128),
+    gmGoalsKey: boundingText(128),
+    locationKey: boundingText(128),
+    factionKeys: z.array(boundingText(128)).max(MAX_FACTIONS),
+    name: boundingText(MAX_NAME_LENGTH),
+    archetype: boundingText(MAX_ARCHETYPE_LENGTH),
+    description: boundingText(MAX_DESCRIPTION_LENGTH),
+    gmGoals: boundingText(MAX_GOALS_LENGTH),
+    visibility: z.literal("public"),
+  })
+  .strict();
 
 const classificationSchema = z.discriminatedUnion("intent", [
-  z.object({
-    intent: z.literal("none"),
-    reason: noneReasonSchema,
-    npcName: boundingText(MAX_NAME_LENGTH).optional(),
-  }).strict(),
-  z.object({
-    intent: z.literal("materialize-npc"),
-    npcName: boundingText(MAX_NAME_LENGTH),
-    candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
-  }).strict(),
+  z
+    .object({
+      intent: z.literal("none"),
+      reason: noneReasonSchema,
+      npcName: boundingText(MAX_NAME_LENGTH).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      intent: z.literal("materialize-npc"),
+      npcName: boundingText(MAX_NAME_LENGTH),
+      candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
+    })
+    .strict(),
 ]);
 
 const materializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: noneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: z.object({
-      candidateId: boundingText(128),
-      npcKey: boundingText(128),
-      gmGoalsKey: boundingText(128),
-      name: boundingText(MAX_NAME_LENGTH),
-      visibility: z.literal("public"),
-    }).strict(),
-    npcId: boundingText(128),
-    draftId: boundingText(128),
-    contentReceiptId: boundingText(128).nullable(),
-    gmGoalsArtifactKey: boundingText(128).nullable(),
-  }).strict(),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: z
+        .object({
+          candidateId: boundingText(128),
+          npcKey: boundingText(128),
+          gmGoalsKey: boundingText(128),
+          name: boundingText(MAX_NAME_LENGTH),
+          visibility: z.literal("public"),
+        })
+        .strict(),
+      npcId: boundingText(128),
+      draftId: boundingText(128),
+      contentReceiptId: boundingText(128).nullable(),
+      gmGoalsArtifactKey: boundingText(128).nullable(),
+    })
+    .strict(),
 ]);
 
-const requestSchema = z.object({
-  text: boundingText(MAX_TEXT_LENGTH),
-  candidateId: boundingText(128).optional(),
-}).strict();
+const requestSchema = z
+  .object({
+    text: boundingText(MAX_TEXT_LENGTH),
+    candidateId: boundingText(128).optional(),
+  })
+  .strict();
 
-const responseSchema = z.object({
-  classification: classificationSchema,
-  materialization: materializationSchema.optional(),
-}).strict();
+const responseSchema = z
+  .object({
+    classification: classificationSchema,
+    materialization: materializationSchema.optional(),
+  })
+  .strict();
 
 export interface FreeformNpcHttpOptions {
   repositoryAccessor: () => FreeformNpcRepository;
@@ -127,13 +141,25 @@ function failure(error: unknown, request: FastifyRequest, reply: FastifyReply): 
     return unavailable(request, reply);
   }
   if (error instanceof FreeformNpcConflictError) {
-    return sendApiProblem(request, reply, 409, "RPG_FREEFORM_NPC_CONFLICT",
-      "Freeform NPC conflicts with current state; refresh before retrying");
+    return sendApiProblem(
+      request,
+      reply,
+      409,
+      "RPG_FREEFORM_NPC_CONFLICT",
+      "Freeform NPC conflicts with current state; refresh before retrying",
+    );
   }
-  request.log.error({ operation: "freeform-npc", method: request.method, route: request.routeOptions.url },
-    "freeform NPC command failed");
-  return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR",
-    "Freeform NPC outcome may be unknown; reconcile before retrying");
+  request.log.error(
+    { operation: "freeform-npc", method: request.method, route: request.routeOptions.url },
+    "freeform NPC command failed",
+  );
+  return sendApiProblem(
+    request,
+    reply,
+    500,
+    "RPG_INTERNAL_ERROR",
+    "Freeform NPC outcome may be unknown; reconcile before retrying",
+  );
 }
 
 export const freeformNpcHttpRoutes: FastifyPluginAsync<FreeformNpcHttpOptions> = async (app, options) => {
@@ -147,8 +173,17 @@ export const freeformNpcHttpRoutes: FastifyPluginAsync<FreeformNpcHttpOptions> =
           await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
           return;
         }
-        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0) {
-          await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Freeform NPC does not accept query parameters");
+        if (
+          (request.raw.url ?? request.url).includes("?") ||
+          Object.keys(request.query as Record<string, unknown>).length > 0
+        ) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Freeform NPC does not accept query parameters",
+          );
           return;
         }
         if (Object.values(request.params).some((value) => !resourceIdSchema.safeParse(value).success)) {
@@ -157,7 +192,13 @@ export const freeformNpcHttpRoutes: FastifyPluginAsync<FreeformNpcHttpOptions> =
         }
         const contentType = request.headers["content-type"];
         if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Freeform NPC requires application/json");
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Freeform NPC requires application/json",
+          );
         }
       },
       errorHandler: (_error, request, reply) =>
@@ -171,12 +212,24 @@ export const freeformNpcHttpRoutes: FastifyPluginAsync<FreeformNpcHttpOptions> =
       try {
         const repository = options.repositoryAccessor();
         const { campaignId, sessionId, actorId } = request.params;
-        const classification = repository.classifyFreeformNpcIntent(PRINCIPAL, campaignId, sessionId, actorId, body.data.text);
+        const classification = repository.classifyFreeformNpcIntent(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.text,
+        );
         if (classification.intent === "none") {
           return reply.code(200).send(responseSchema.parse({ classification }));
         }
-        const materialization = repository.materializeFreeformNpc(PRINCIPAL, campaignId, sessionId, actorId, body.data.text,
-          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {});
+        const materialization = repository.materializeFreeformNpc(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.text,
+          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {},
+        );
         return reply.code(200).send(responseSchema.parse({ classification, materialization }));
       } catch (error) {
         return failure(error, request, reply);

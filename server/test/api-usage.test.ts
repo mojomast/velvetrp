@@ -11,7 +11,7 @@ const characterInput = {
   age: 29,
   archetype: "archivist",
   boundaries: "fictional only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 };
 
 describe("usage api compatibility", () => {
@@ -64,10 +64,18 @@ describe("usage api compatibility", () => {
       usage: { promptTokens: 16, completionTokens: 4, totalTokens: 20, source: "provider", model: "model-b" },
     });
     await recordUsageEvent(first.id, "scene_synthesis", {
-      promptTokens: 4, completionTokens: 1, totalTokens: 5, source: "estimated", model: "model-a",
+      promptTokens: 4,
+      completionTokens: 1,
+      totalTokens: 5,
+      source: "estimated",
+      model: "model-a",
     });
     await recordUsageEvent(second.id, "room_routing", {
-      promptTokens: 24, completionTokens: 6, totalTokens: 30, source: "estimated", model: "model-a",
+      promptTokens: 24,
+      completionTokens: 6,
+      totalTokens: 30,
+      source: "estimated",
+      model: "model-a",
     });
 
     const unpriced = await app.inject({ method: "GET", url: "/api/usage" });
@@ -93,17 +101,68 @@ describe("usage api compatibility", () => {
       pricing: { promptPerMillion: 2, completionPerMillion: 8 },
     });
     expect(usage.byKind).toEqual([
-      { kind: "room_routing", calls: 1, promptTokens: 24, completionTokens: 6, totalTokens: 30, estimatedCostUsd: 0.000096 },
-      { kind: "character_reply", calls: 1, promptTokens: 16, completionTokens: 4, totalTokens: 20, estimatedCostUsd: 0.000064 },
-      { kind: "scene_synthesis", calls: 1, promptTokens: 4, completionTokens: 1, totalTokens: 5, estimatedCostUsd: 0.000016 },
+      {
+        kind: "room_routing",
+        calls: 1,
+        promptTokens: 24,
+        completionTokens: 6,
+        totalTokens: 30,
+        estimatedCostUsd: 0.000096,
+      },
+      {
+        kind: "character_reply",
+        calls: 1,
+        promptTokens: 16,
+        completionTokens: 4,
+        totalTokens: 20,
+        estimatedCostUsd: 0.000064,
+      },
+      {
+        kind: "scene_synthesis",
+        calls: 1,
+        promptTokens: 4,
+        completionTokens: 1,
+        totalTokens: 5,
+        estimatedCostUsd: 0.000016,
+      },
     ]);
     expect(usage.byModel).toEqual([
-      { model: "model-a", calls: 2, promptTokens: 28, completionTokens: 7, totalTokens: 35, estimatedCostUsd: 0.000112 },
-      { model: "model-b", calls: 1, promptTokens: 16, completionTokens: 4, totalTokens: 20, estimatedCostUsd: 0.000064 },
+      {
+        model: "model-a",
+        calls: 2,
+        promptTokens: 28,
+        completionTokens: 7,
+        totalTokens: 35,
+        estimatedCostUsd: 0.000112,
+      },
+      {
+        model: "model-b",
+        calls: 1,
+        promptTokens: 16,
+        completionTokens: 4,
+        totalTokens: 20,
+        estimatedCostUsd: 0.000064,
+      },
     ]);
     expect(usage.bySession).toEqual([
-      { sessionId: second.id, title: "Second session", calls: 1, promptTokens: 24, completionTokens: 6, totalTokens: 30, estimatedCostUsd: 0.000096 },
-      { sessionId: first.id, title: "First session", calls: 2, promptTokens: 20, completionTokens: 5, totalTokens: 25, estimatedCostUsd: 0.00008 },
+      {
+        sessionId: second.id,
+        title: "Second session",
+        calls: 1,
+        promptTokens: 24,
+        completionTokens: 6,
+        totalTokens: 30,
+        estimatedCostUsd: 0.000096,
+      },
+      {
+        sessionId: first.id,
+        title: "First session",
+        calls: 2,
+        promptTokens: 20,
+        completionTokens: 5,
+        totalTokens: 25,
+        estimatedCostUsd: 0.00008,
+      },
     ]);
     await app.close();
   });

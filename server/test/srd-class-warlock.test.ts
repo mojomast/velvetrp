@@ -26,7 +26,9 @@ describe("SRD 5.1 Warlock", () => {
 
   it("builds exactly twenty contiguous class levels", () => {
     expect(levels).toHaveLength(20);
-    expect(parsedLevels.map((level) => level.mechanics.level)).toEqual(Array.from({ length: 20 }, (_, index) => index + 1));
+    expect(parsedLevels.map((level) => level.mechanics.level)).toEqual(
+      Array.from({ length: 20 }, (_, index) => index + 1),
+    );
   });
 
   it("parses every level with derived proficiency and hit-point gain", () => {
@@ -40,9 +42,11 @@ describe("SRD 5.1 Warlock", () => {
 
   it("grants the d8 hit die at level 1", () => {
     const first = parsedLevels.find((level) => level.mechanics.level === 1)!;
-    expect(first.mechanics.resourceGrants).toEqual(expect.arrayContaining([
-      expect.objectContaining({ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 }),
-    ]));
+    expect(first.mechanics.resourceGrants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 }),
+      ]),
+    );
   });
 
   it("points the level-three subclass choice at The Fiend", () => {

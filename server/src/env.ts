@@ -13,10 +13,7 @@ export function defaultEnvFileCandidates(env: EnvFileEnvironment, cwd = process.
   return [...new Set([path.resolve(cwd, ".env"), path.join(repoRoot, ".env")])];
 }
 
-export function loadDotEnv(
-  env: Record<string, string | undefined>,
-  candidates: readonly string[],
-): string | null {
+export function loadDotEnv(env: Record<string, string | undefined>, candidates: readonly string[]): string | null {
   const file = candidates.find((candidate) => existsSync(candidate));
   if (!file) return null;
   const parsed = parseEnv(readFileSync(file, "utf8"));

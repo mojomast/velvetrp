@@ -63,12 +63,14 @@ function authorizedCampaignAccess(row: CampaignAccessRow, actorId: string): Camp
   }
 
   try {
-    if (row.owner_role_count !== 1
-      || row.owner_campaign_id === null
-      || row.owner_membership_principal_id === null
-      || row.owner_role === null
-      || row.owner_created_at === null
-      || row.owner_parent_id === null) {
+    if (
+      row.owner_role_count !== 1 ||
+      row.owner_campaign_id === null ||
+      row.owner_membership_principal_id === null ||
+      row.owner_role === null ||
+      row.owner_created_at === null ||
+      row.owner_parent_id === null
+    ) {
       throw new Error("missing or non-sole campaign owner");
     }
     const owner = campaignMembershipReadSchema.parse({
@@ -77,10 +79,12 @@ function authorizedCampaignAccess(row: CampaignAccessRow, actorId: string): Camp
       role: row.owner_role,
       createdAt: row.owner_created_at,
     });
-    if (owner.role !== "owner"
-      || owner.campaignId !== row.id
-      || owner.principalId !== row.owner_principal_id
-      || row.owner_parent_id !== owner.principalId) {
+    if (
+      owner.role !== "owner" ||
+      owner.campaignId !== row.id ||
+      owner.principalId !== row.owner_principal_id ||
+      row.owner_parent_id !== owner.principalId
+    ) {
       throw new Error("campaign owner identities do not agree");
     }
   } catch {
@@ -98,7 +102,9 @@ export function createCampaignAccessRepository(db: DatabaseDriver.Database): Cam
   return {
     listCampaigns(actorPrincipalId) {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
-      const rows = db.prepare(`SELECT ${CAMPAIGN_ACCESS_PROJECTION}
+      const rows = db
+        .prepare(
+          `SELECT ${CAMPAIGN_ACCESS_PROJECTION}
     FROM campaign_memberships cm
     JOIN principals actor_principal ON actor_principal.id = cm.principal_id
     JOIN campaigns c ON c.id = cm.campaign_id
@@ -108,7 +114,9 @@ export function createCampaignAccessRepository(db: DatabaseDriver.Database): Cam
       AND owner_membership.role = 'owner'
     LEFT JOIN principals owner_principal ON owner_principal.id = owner_membership.principal_id
     WHERE cm.principal_id = ?
-    ORDER BY c.created_at ASC, c.id ASC`).all(actorId) as CampaignAccessRow[];
+    ORDER BY c.created_at ASC, c.id ASC`,
+        )
+        .all(actorId) as CampaignAccessRow[];
       return rows.flatMap((row) => {
         const campaign = authorizedCampaignAccess(row, actorId);
         return campaign ? [campaign] : [];
@@ -117,7 +125,9 @@ export function createCampaignAccessRepository(db: DatabaseDriver.Database): Cam
     getCampaign(actorPrincipalId, campaignId) {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
       const id = resourceIdSchema.parse(campaignId);
-      const row = db.prepare(`SELECT ${CAMPAIGN_ACCESS_PROJECTION}
+      const row = db
+        .prepare(
+          `SELECT ${CAMPAIGN_ACCESS_PROJECTION}
     FROM campaign_memberships cm
     JOIN principals actor_principal ON actor_principal.id = cm.principal_id
     JOIN campaigns c ON c.id = cm.campaign_id
@@ -126,7 +136,9 @@ export function createCampaignAccessRepository(db: DatabaseDriver.Database): Cam
       AND owner_membership.principal_id = c.owner_principal_id
       AND owner_membership.role = 'owner'
     LEFT JOIN principals owner_principal ON owner_principal.id = owner_membership.principal_id
-    WHERE cm.principal_id = ? AND c.id = ?`).get(actorId, id) as CampaignAccessRow | undefined;
+    WHERE cm.principal_id = ? AND c.id = ?`,
+        )
+        .get(actorId, id) as CampaignAccessRow | undefined;
       return row ? authorizedCampaignAccess(row, actorId) : null;
     },
   };

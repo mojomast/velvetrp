@@ -15,22 +15,35 @@ useTmpDataDir();
 const database = () => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
 
 const director = (caller: SystemOneDirectorDependency["caller"]): SystemOneDirectorDependency => ({
-  settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key" },
+  settings: {
+    ...defaultSystemOneSettings(),
+    enabled: true,
+    laneModes: defaultSystemOneLaneModes(),
+    apiKey: "test-key",
+  },
   caller,
 });
 
 async function openForShadow() {
   const fixture = await dmFixture();
-  fixture.repo.setDmControl("local-owner", fixture.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "narration-shadow-ai" });
-  const run = fixture.repo.openDmBeat("local-owner", fixture.campaign.id, fixture.session.id,
-    { intent: "open", expectedModeRevision: 1, idempotencyKey: "narration-shadow-open" });
+  fixture.repo.setDmControl("local-owner", fixture.campaign.id, {
+    mode: "ai",
+    expectedRevision: 0,
+    idempotencyKey: "narration-shadow-ai",
+  });
+  const run = fixture.repo.openDmBeat("local-owner", fixture.campaign.id, fixture.session.id, {
+    intent: "open",
+    expectedModeRevision: 1,
+    idempotencyKey: "narration-shadow-open",
+  });
   return { fixture, run };
 }
 
 async function runBeat(getSystemOneDirector?: AdventureAgentDependencies["getSystemOneDirector"]) {
   const { fixture, run } = await openForShadow();
   await orchestrateCampaignDmBeat(fixture.repo, "local-owner", run.runId, {
-    ...dmDependencies(), ...(getSystemOneDirector ? { getSystemOneDirector } : {}),
+    ...dmDependencies(),
+    ...(getSystemOneDirector ? { getSystemOneDirector } : {}),
   });
   const result = fixture.repo.getDmRun("local-owner", fixture.campaign.id, fixture.session.id, run.runId);
   return { fixture, run, result };
@@ -38,7 +51,11 @@ async function runBeat(getSystemOneDirector?: AdventureAgentDependencies["getSys
 
 function narrationVerificationRows() {
   const db = database();
-  const rows = db.prepare("SELECT lane,shadow,fallback_used,provider,confidence_band,turn_id,state_json,questions_json,selection_json FROM system_one_decisions_v1 WHERE lane='narration-verification'").all() as Array<Record<string, unknown>>;
+  const rows = db
+    .prepare(
+      "SELECT lane,shadow,fallback_used,provider,confidence_band,turn_id,state_json,questions_json,selection_json FROM system_one_decisions_v1 WHERE lane='narration-verification'",
+    )
+    .all() as Array<Record<string, unknown>>;
   db.close();
   return rows;
 }
@@ -57,10 +74,20 @@ describe("System One narration verification shadow lane", () => {
 
     const rows = narrationVerificationRows();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ lane: "narration-verification", shadow: 1, fallback_used: 1, provider: "typesafe", turn_id: run.runId });
+    expect(rows[0]).toMatchObject({
+      lane: "narration-verification",
+      shadow: 1,
+      fallback_used: 1,
+      provider: "typesafe",
+      turn_id: run.runId,
+    });
     expect(rows[0]!.confidence_band).toBeTruthy();
 
-    const state = JSON.parse(rows[0]!.state_json as string) as { narration: string; committed_facts: string[]; declared_boundaries: string[] };
+    const state = JSON.parse(rows[0]!.state_json as string) as {
+      narration: string;
+      committed_facts: string[];
+      declared_boundaries: string[];
+    };
     // The recorded candidate is the produced scene, verbatim, and committed receipts are embedded as facts.
     expect(result.narration).toContain(state.narration.trim());
     expect(state.declared_boundaries).toEqual([]);
@@ -93,7 +120,9 @@ describe("System One narration verification shadow lane", () => {
     baseline.fixture.repo.close();
 
     makeTmpDataDir();
-    const { fixture, result } = await runBeat(async () => director(createFakeSystemOneCaller({ failWith: new Error("narration shadow endpoint down") })));
+    const { fixture, result } = await runBeat(async () =>
+      director(createFakeSystemOneCaller({ failWith: new Error("narration shadow endpoint down") })),
+    );
     fixture.repo.close();
 
     expect(result.narration).toBe(baselineNarration);

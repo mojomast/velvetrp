@@ -35,23 +35,31 @@ export function createCampaignContentSelectionReadRepository(
     getCampaignRulesProfile(actorPrincipalId, campaignId) {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
       const id = resourceIdSchema.parse(campaignId);
-      const row = db.prepare(`SELECT ${projectors.rulesProfileProjection}
+      const row = db
+        .prepare(
+          `SELECT ${projectors.rulesProfileProjection}
     FROM campaign_memberships cm
     JOIN campaign_rules_profiles crp ON crp.campaign_id = cm.campaign_id
     JOIN rpg_rules_profiles rp ON rp.rules_profile_id = crp.rules_profile_id
-    WHERE cm.principal_id = ? AND cm.campaign_id = ?`).get(actorId, id) as RulesProfileRow | undefined;
+    WHERE cm.principal_id = ? AND cm.campaign_id = ?`,
+        )
+        .get(actorId, id) as RulesProfileRow | undefined;
       return row ? projectors.toRulesProfile(row) : null;
     },
     listCampaignContentPacks(actorPrincipalId, campaignId) {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
       const id = resourceIdSchema.parse(campaignId);
-      const rows = db.prepare(`SELECT ${projectors.contentPackProjection}
+      const rows = db
+        .prepare(
+          `SELECT ${projectors.contentPackProjection}
     FROM campaign_memberships cm
     JOIN campaign_content_packs cp ON cp.campaign_id = cm.campaign_id
     JOIN rpg_content_packs p ON p.pack_id = cp.pack_id AND p.pack_version = cp.pack_version
       AND p.rules_profile_id = cp.rules_profile_id AND p.sealed = 1
     WHERE cm.principal_id = ? AND cm.campaign_id = ?
-    ORDER BY p.pack_id ASC, p.pack_version ASC`).all(actorId, id) as ContentPackRow[];
+    ORDER BY p.pack_id ASC, p.pack_version ASC`,
+        )
+        .all(actorId, id) as ContentPackRow[];
       return rows.map(projectors.toContentPack);
     },
   };
