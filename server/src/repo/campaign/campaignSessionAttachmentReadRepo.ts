@@ -1,6 +1,11 @@
 // Part of db.ts refactor — see server/src/repo/db/schema.ts for migration order
 import type DatabaseDriver from "better-sqlite3";
-import { attachCampaignSessionInputSchema, campaignMembershipReadSchema, campaignSessionAttachmentSchema, resourceIdSchema } from "@velvet/contracts";
+import {
+  attachCampaignSessionInputSchema,
+  campaignMembershipReadSchema,
+  campaignSessionAttachmentSchema,
+  resourceIdSchema,
+} from "@velvet/contracts";
 import type { CampaignSessionAttachment } from "../../types.js";
 
 interface CampaignSessionAttachmentReadRow {
@@ -14,9 +19,7 @@ interface CampaignSessionAttachmentReadRow {
   session_presence: string | null;
 }
 
-function toCampaignSessionAttachmentRead(
-  row: CampaignSessionAttachmentReadRow,
-): CampaignSessionAttachment {
+function toCampaignSessionAttachmentRead(row: CampaignSessionAttachmentReadRow): CampaignSessionAttachment {
   if (row.session_presence === null || row.session_presence !== row.session_id) {
     throw new Error("campaign session attachment is malformed");
   }
@@ -71,9 +74,13 @@ export function createCampaignSessionAttachmentReadRepository(
     listCampaignSessionAttachments(actorPrincipalId, campaignId) {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
       const id = resourceIdSchema.parse(campaignId);
-      const rows = db.prepare(`${CAMPAIGN_SESSION_ATTACHMENT_READ_SELECT}
+      const rows = db
+        .prepare(
+          `${CAMPAIGN_SESSION_ATTACHMENT_READ_SELECT}
 ORDER BY attachment.attached_at ASC,
-  attachment.session_id COLLATE BINARY ASC`).all(actorId, id) as CampaignSessionAttachmentReadRow[];
+  attachment.session_id COLLATE BINARY ASC`,
+        )
+        .all(actorId, id) as CampaignSessionAttachmentReadRow[];
       return rows.map(toCampaignSessionAttachmentRead);
     },
     getCampaignSessionAttachment(actorPrincipalId, campaignId, sessionId) {
@@ -81,10 +88,12 @@ ORDER BY attachment.attached_at ASC,
       const id = resourceIdSchema.parse(campaignId);
       // Legacy session identifiers are deliberately opaque and are not resource IDs.
       const targetSessionId = attachCampaignSessionInputSchema.shape.sessionId.parse(sessionId);
-      const row = db.prepare(`${CAMPAIGN_SESSION_ATTACHMENT_READ_SELECT}
-  AND attachment.session_id = ?`).get(actorId, id, targetSessionId) as
-        | CampaignSessionAttachmentReadRow
-        | undefined;
+      const row = db
+        .prepare(
+          `${CAMPAIGN_SESSION_ATTACHMENT_READ_SELECT}
+  AND attachment.session_id = ?`,
+        )
+        .get(actorId, id, targetSessionId) as CampaignSessionAttachmentReadRow | undefined;
       return row ? toCampaignSessionAttachmentRead(row) : null;
     },
   };

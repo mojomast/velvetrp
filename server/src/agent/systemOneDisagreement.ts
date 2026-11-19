@@ -45,9 +45,11 @@ export function directorSelectedCandidateIds(selection: unknown): string[] {
   if (selection === null || typeof selection !== "object") return [];
   const selections = (selection as { selections?: unknown }).selections;
   if (!Array.isArray(selections)) return [];
-  return selections.flatMap((item) => item && typeof item === "object" && typeof (item as { candidateId?: unknown }).candidateId === "string"
-    ? [(item as { candidateId: string }).candidateId]
-    : []);
+  return selections.flatMap((item) =>
+    item && typeof item === "object" && typeof (item as { candidateId?: unknown }).candidateId === "string"
+      ? [(item as { candidateId: string }).candidateId]
+      : [],
+  );
 }
 
 function sameOrdered(left: readonly string[], right: readonly string[]): boolean {
@@ -81,9 +83,7 @@ export function compareDirectorAuthority(rows: readonly DirectorDecisionAuthorit
 }
 
 /** Counts the agreement verdicts, highlighting disagreements the Director would have acted on. */
-export function summarizeDirectorDisagreement(
-  rows: readonly DirectorDisagreementRow[],
-): DirectorDisagreementSummary {
+export function summarizeDirectorDisagreement(rows: readonly DirectorDisagreementRow[]): DirectorDisagreementSummary {
   const disagreements = rows.filter((row) => row.agreement === "disagree");
   return {
     total: rows.length,
@@ -113,7 +113,8 @@ export function renderDirectorDisagreementReport(
   const lines: string[] = [];
   lines.push("# System One Director disagreement report");
   lines.push("");
-  if (options.generatedAt) lines.push(`Generated ${options.generatedAt} by \`scripts/report-system-one-disagreements.ts\`.`);
+  if (options.generatedAt)
+    lines.push(`Generated ${options.generatedAt} by \`scripts/report-system-one-disagreements.ts\`.`);
   if (options.source) lines.push(`Source: ${options.source}.`);
   if (options.generatedAt || options.source) lines.push("");
   lines.push("## Summary");
@@ -126,21 +127,27 @@ export function renderDirectorDisagreementReport(
   lines.push("## Review queue");
   lines.push("");
   if (shown.length === 0) {
-    lines.push(rows.length === 0
-      ? "No Director decisions were recorded."
-      : "Every Director decision agreed with the authoritative composition.");
+    lines.push(
+      rows.length === 0
+        ? "No Director decisions were recorded."
+        : "Every Director decision agreed with the authoritative composition.",
+    );
     lines.push("");
     return lines.join("\n");
   }
   lines.push("| Decision | Created | Agreement | Director | Authoritative | Shadow |");
   lines.push("| --- | --- | --- | --- | --- | --- |");
   for (const row of shown) {
-    lines.push(`| ${row.decisionId} | ${row.createdAt} | ${row.agreement}`
-      + ` | ${formatIds(row.directorCandidateIds)} | ${formatIds(row.authoritativeCandidateIds)}`
-      + ` | ${row.shadow ? "yes" : "no"} |`);
+    lines.push(
+      `| ${row.decisionId} | ${row.createdAt} | ${row.agreement}` +
+        ` | ${formatIds(row.directorCandidateIds)} | ${formatIds(row.authoritativeCandidateIds)}` +
+        ` | ${row.shadow ? "yes" : "no"} |`,
+    );
   }
   lines.push("");
-  lines.push(`Disagreeing decisions: ${summary.disagreementDecisionIds.length > 0 ? summary.disagreementDecisionIds.join(", ") : NONE}`);
+  lines.push(
+    `Disagreeing decisions: ${summary.disagreementDecisionIds.length > 0 ? summary.disagreementDecisionIds.join(", ") : NONE}`,
+  );
   lines.push("");
   return lines.join("\n");
 }

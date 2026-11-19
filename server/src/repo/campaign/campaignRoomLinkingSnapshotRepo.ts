@@ -53,10 +53,7 @@ const SQL_VALID_STORED_RESOURCE_ID = (column: string): string =>
     AND ${column} NOT GLOB '*[^A-Za-z0-9._:-]*'`;
 
 interface CampaignRoomLinkingSnapshotRepository {
-  getCampaignRoomLinkingSnapshot(
-    actorPrincipalId: string,
-    campaignId: string,
-  ): CampaignRoomLinkingSnapshot | null;
+  getCampaignRoomLinkingSnapshot(actorPrincipalId: string, campaignId: string): CampaignRoomLinkingSnapshot | null;
 }
 
 /** Factory-local reader; presentation remains owned by session integrity. */
@@ -67,7 +64,9 @@ export function createCampaignRoomLinkingSnapshotRepository(
     getCampaignRoomLinkingSnapshot(actorPrincipalId, campaignId) {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
       const id = resourceIdSchema.parse(campaignId);
-      const rows = db.prepare(`WITH authority AS MATERIALIZED (
+      const rows = db
+        .prepare(
+          `WITH authority AS MATERIALIZED (
       SELECT campaign.id AS campaign_id, campaign.owner_principal_id,
         campaign.owner_role AS campaign_owner_role,
         actor_membership.principal_id AS actor_principal_id,
@@ -190,34 +189,47 @@ export function createCampaignRoomLinkingSnapshotRepository(
       selected.ordering_time
     FROM selected CROSS JOIN authorized AS authority
     LEFT JOIN sessions session ON session.id = selected.session_id
-    ORDER BY kind_order ASC, ordering_time ASC, session_id COLLATE BINARY ASC`)
+    ORDER BY kind_order ASC, ordering_time ASC, session_id COLLATE BINARY ASC`,
+        )
         .all({ actorId, campaignId: id }) as CampaignRoomSnapshotRow[];
       if (rows.length === 0) return null;
       const authority = rows[0]!;
-      if (authority.actor_principal_id !== actorId || authority.actor_parent_id !== actorId
-        || authority.actor_role === null) return null;
+      if (
+        authority.actor_principal_id !== actorId ||
+        authority.actor_parent_id !== actorId ||
+        authority.actor_role === null
+      )
+        return null;
       // These states cannot establish attributable membership. Mask them before
       // parsing any actor-controlled fields, preserving non-disclosure.
       if (!["owner", "gm", "player", "observer"].includes(authority.actor_role)) return null;
       if (authority.actor_role === "owner" && authority.owner_principal_id !== actorId) return null;
       try {
         campaignMembershipReadSchema.parse({
-          campaignId: id, principalId: actorId, role: authority.actor_role, createdAt: authority.actor_created_at,
+          campaignId: id,
+          principalId: actorId,
+          role: authority.actor_role,
+          createdAt: authority.actor_created_at,
         });
       } catch {
         throw new Error("campaign room linking authority is malformed");
       }
-      if (authority.campaign_id !== id || authority.campaign_owner_role !== "owner"
-        || authority.owner_count !== 1
-        || authority.owner_membership_principal_id !== authority.owner_principal_id
-        || authority.owner_membership_role !== "owner"
-        || authority.owner_parent_id !== authority.owner_principal_id) {
+      if (
+        authority.campaign_id !== id ||
+        authority.campaign_owner_role !== "owner" ||
+        authority.owner_count !== 1 ||
+        authority.owner_membership_principal_id !== authority.owner_principal_id ||
+        authority.owner_membership_role !== "owner" ||
+        authority.owner_parent_id !== authority.owner_principal_id
+      ) {
         throw new Error("campaign room linking authority is malformed");
       }
       try {
         campaignMembershipReadSchema.parse({
-          campaignId: id, principalId: authority.owner_principal_id,
-          role: authority.owner_membership_role, createdAt: authority.owner_created_at,
+          campaignId: id,
+          principalId: authority.owner_principal_id,
+          role: authority.owner_membership_role,
+          createdAt: authority.owner_created_at,
         });
       } catch {
         throw new Error("campaign room linking authority is malformed");
@@ -226,17 +238,22 @@ export function createCampaignRoomLinkingSnapshotRepository(
       const attached: CampaignRoomLinkingResponse["attached"] = [];
       const eligible: CampaignRoomLinkingResponse["eligible"] = [];
       for (const row of rows.slice(1)) {
-        if (row.session_id === null || row.session_presence !== row.session_id
-          || row.created_at === null || row.session_state === null
-          || !Number.isInteger(row.participant_count) || (row.participant_count as number) < 1
-          || (row.participant_count as number) > 12
-          || row.joined_character_count !== row.participant_count
-          || row.primary_participant_count !== 1
-          || row.distinct_character_count !== row.participant_count
-          || row.distinct_position_count !== row.participant_count
-          || row.malformed_position_count !== 0
-          || row.minimum_position !== 0
-          || row.maximum_position !== (row.participant_count as number) - 1) {
+        if (
+          row.session_id === null ||
+          row.session_presence !== row.session_id ||
+          row.created_at === null ||
+          row.session_state === null ||
+          !Number.isInteger(row.participant_count) ||
+          (row.participant_count as number) < 1 ||
+          (row.participant_count as number) > 12 ||
+          row.joined_character_count !== row.participant_count ||
+          row.primary_participant_count !== 1 ||
+          row.distinct_character_count !== row.participant_count ||
+          row.distinct_position_count !== row.participant_count ||
+          row.malformed_position_count !== 0 ||
+          row.minimum_position !== 0 ||
+          row.maximum_position !== (row.participant_count as number) - 1
+        ) {
           throw new Error("campaign room summary is malformed");
         }
         const rawNames = JSON.parse(row.participant_names ?? "null") as unknown;
@@ -249,8 +266,10 @@ export function createCampaignRoomLinkingSnapshotRepository(
         } catch {
           throw new Error("campaign room summary is malformed");
         }
-        const running = (RUNNING_CAMPAIGN_ROOM_STATES as readonly string[]).includes(row.session_state)
-          && row.stopped_at === null && row.stop_reason_kind === 0;
+        const running =
+          (RUNNING_CAMPAIGN_ROOM_STATES as readonly string[]).includes(row.session_state) &&
+          row.stopped_at === null &&
+          row.stop_reason_kind === 0;
         let stopped = false;
         if (!running && row.session_state === "closed" && row.stopped_at !== null && row.stop_reason_kind === 1) {
           try {
@@ -275,8 +294,7 @@ export function createCampaignRoomLinkingSnapshotRepository(
           }
           attached.push({ ...summary, attachedAt: row.attached_at, stopped });
         } else if (row.row_kind === "eligible") {
-          if (authority.actor_role !== "owner" || authority.owner_principal_id !== actorId
-            || !running) {
+          if (authority.actor_role !== "owner" || authority.owner_principal_id !== actorId || !running) {
             throw new Error("campaign room summary is malformed");
           }
           eligible.push(summary);

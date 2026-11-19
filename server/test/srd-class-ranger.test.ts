@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { rangerDefinition, rangerLevels, rangerSubclasses } from "../src/content/srdStarter/classes/ranger.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -34,7 +38,11 @@ describe("SRD 5.1 Ranger class", () => {
   it("grants the d10 hit die at level 1 and points the level-3 choice at the Hunter", () => {
     const levels = rangerLevels(refs);
     const levelOne = classLevelCatalogDefinitionSchema.parse(levels.find((level) => level.mechanics.level === 1)!);
-    expect(levelOne.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d10", maxIncrease: 1, currentIncrease: 1 });
+    expect(levelOne.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d10",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
     const levelThree = classLevelCatalogDefinitionSchema.parse(levels.find((level) => level.mechanics.level === 3)!);
     const choice = levelThree.mechanics.progressionChoices?.find((entry) => entry.choiceId === "ranger-subclass");
     expect(choice).toMatchObject({ required: true, count: 1, kind: "subclass" });

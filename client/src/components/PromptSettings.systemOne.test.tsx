@@ -3,23 +3,59 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PromptSettings } from "./PromptSettings";
 import * as api from "../api";
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
-const provider: api.ProviderSettings = { id: "provider", providerType: "openai-compatible", baseUrl: "", model: "test",
-  hasApiKey: false, streaming: false, httpReferer: "", appTitle: "Velvet", requireParameters: false, allowFallbacks: true,
-  routingSort: "default", dataCollection: "default", zdr: false, requestTimeoutSeconds: 90,
+const provider: api.ProviderSettings = {
+  id: "provider",
+  providerType: "openai-compatible",
+  baseUrl: "",
+  model: "test",
+  hasApiKey: false,
+  streaming: false,
+  httpReferer: "",
+  appTitle: "Velvet",
+  requireParameters: false,
+  allowFallbacks: true,
+  routingSort: "default",
+  dataCollection: "default",
+  zdr: false,
+  requestTimeoutSeconds: 90,
   pricing: { promptPerMillion: null, completionPerMillion: null },
   adventureTurnBudget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null },
-  samplers: { maxTokens: null, topP: null, topK: null, minP: null, repetitionPenalty: null, frequencyPenalty: null,
-    presencePenalty: null, seed: null, reasoningEffort: null, stopStrings: [], startReplyWith: "" }, updatedAt: "" };
+  samplers: {
+    maxTokens: null,
+    topP: null,
+    topK: null,
+    minP: null,
+    repetitionPenalty: null,
+    frequencyPenalty: null,
+    presencePenalty: null,
+    seed: null,
+    reasoningEffort: null,
+    stopStrings: [],
+    startReplyWith: "",
+  },
+  updatedAt: "",
+};
 
 function show(systemOneAvailable?: boolean) {
   vi.spyOn(api, "listPromptTemplates").mockResolvedValue({ templates: [] });
   // A rejected load keeps the panel's own heading and error text deterministic.
   const getSystemOne = vi.spyOn(api, "getSystemOne").mockRejectedValue(new Error("not under test"));
-  render(<PromptSettings provider={provider} harness={null} features={{ voice: false, images: false }}
-    {...(systemOneAvailable === undefined ? {} : { systemOneAvailable })}
-    onProviderChange={() => undefined} onHarnessChange={() => undefined} onClose={() => undefined} />);
+  render(
+    <PromptSettings
+      provider={provider}
+      harness={null}
+      features={{ voice: false, images: false }}
+      {...(systemOneAvailable === undefined ? {} : { systemOneAvailable })}
+      onProviderChange={() => undefined}
+      onHarnessChange={() => undefined}
+      onClose={() => undefined}
+    />,
+  );
   return getSystemOne;
 }
 

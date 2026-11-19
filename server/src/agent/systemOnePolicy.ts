@@ -26,7 +26,11 @@ function validThreshold(value: number): boolean {
  * reinterpreted.
  */
 export function bandForConfidence(signal: number, thresholds: SystemOneConfidenceThresholds): SystemOneBand {
-  if (!validThreshold(signal) || !validThreshold(thresholds.reviewThreshold) || !validThreshold(thresholds.actionThreshold)) {
+  if (
+    !validThreshold(signal) ||
+    !validThreshold(thresholds.reviewThreshold) ||
+    !validThreshold(thresholds.actionThreshold)
+  ) {
     throw new RangeError("confidence thresholds must be finite values between 0 and 1");
   }
   if (thresholds.reviewThreshold > thresholds.actionThreshold) {

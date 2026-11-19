@@ -14,11 +14,17 @@ export function hasAttachedRunningNpcPresence(
 ): boolean {
   const lifecycle = createCampaignRoomSessionLifecycleRepository(db).getCampaignRoomSessionLifecycle(sessionId);
   if (lifecycle !== "running") return false;
-  return db.prepare(`SELECT 1 FROM campaign_sessions attachment
+  return (
+    db
+      .prepare(
+        `SELECT 1 FROM campaign_sessions attachment
     JOIN campaign_npc_presence_v43 presence ON presence.campaign_id=attachment.campaign_id
       AND presence.session_id=attachment.session_id AND presence.state='present'
     WHERE attachment.campaign_id=? AND attachment.session_id=?
-    LIMIT 1`).get(campaignId, sessionId) !== undefined;
+    LIMIT 1`,
+      )
+      .get(campaignId, sessionId) !== undefined
+  );
 }
 
 /** Composes NPC-presence operations over the enclosing repository's owned database. */

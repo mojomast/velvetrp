@@ -12,7 +12,8 @@ const OWNER = "local-owner";
 
 type Fixture = Awaited<ReturnType<typeof dmFixture>>;
 
-const openDb = (): DatabaseDriver.Database => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+const openDb = (): DatabaseDriver.Database =>
+  new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
 const countOf = (db: DatabaseDriver.Database, sql: string, ...params: unknown[]): number =>
   (db.prepare(sql).get(...params) as { n: number }).n;
 
@@ -32,28 +33,51 @@ const enableRpg = (): void => {
  */
 function seedHarbor(f: Fixture): string {
   const content = generatedCampaignContentProviderSchema.parse({
-    locations: [{ key: "harbor", name: "Rain Harbor", description: "A public harbor under grey rain.", visibility: "public" }],
+    locations: [
+      { key: "harbor", name: "Rain Harbor", description: "A public harbor under grey rain.", visibility: "public" },
+    ],
   });
   const context = f.repo.getCampaignGenerationContext(OWNER, f.campaign.id, [])!;
   const draft = f.repo.createGenerationDraft(OWNER, {
-    campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, kind: "content-pack",
-    stagedContent: { kind: "campaign-content", requestDigest: "c".repeat(64), baseContentRevision: context.revision, dependencyDigests: {}, ...content },
+    campaignId: f.campaign.id,
+    timelineId: f.campaign.activeTimelineId,
+    kind: "content-pack",
+    stagedContent: {
+      kind: "campaign-content",
+      requestDigest: "c".repeat(64),
+      baseContentRevision: context.revision,
+      dependencyDigests: {},
+      ...content,
+    },
     validation: { valid: true, issues: [], validatedAt: f.options.clock.now().toISOString() },
     expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
     idempotencyKey: "freeform-faction-route-seed",
   });
   f.repo.recordCampaignGenerationCandidate(draft.draftId, content, []);
   f.repo.applyCampaignContentGenerationDraftAtomically(OWNER, {
-    draftId: draft.draftId, expectedDraftRevision: 0, expectedCampaignRevision: draft.campaignRevision,
-    idempotencyKey: "freeform-faction-route-seed-apply", selectedArtifactKeys: ["harbor"],
+    draftId: draft.draftId,
+    expectedDraftRevision: 0,
+    expectedCampaignRevision: draft.campaignRevision,
+    idempotencyKey: "freeform-faction-route-seed-apply",
+    selectedArtifactKeys: ["harbor"],
   });
   const db = openDb();
-  const locationId = (db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
-    WHERE campaign_id=? AND artifact_key='harbor'`).get(f.campaign.id) as { server_resource_id: string }).server_resource_id;
+  const locationId = (
+    db
+      .prepare(
+        `SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+    WHERE campaign_id=? AND artifact_key='harbor'`,
+      )
+      .get(f.campaign.id) as { server_resource_id: string }
+  ).server_resource_id;
   db.close();
   f.repo.setActorLocation(OWNER, f.session.id, {
-    type: "set_actor_location", campaignId: f.campaign.id, actorId: f.actorId, locationId,
-    expectedRevision: 0, idempotencyKey: "place-hero-faction-route",
+    type: "set_actor_location",
+    campaignId: f.campaign.id,
+    actorId: f.actorId,
+    locationId,
+    expectedRevision: 0,
+    idempotencyKey: "place-hero-faction-route",
   });
   return locationId;
 }
@@ -62,7 +86,10 @@ const appFor = (f: Fixture) => buildApp({ campaignRepositoryFactory: () => f.rep
 const factionUrl = (campaignId: string, sessionId: string, actorId: string) =>
   `/api/rpg/v1/campaigns/${campaignId}/rooms/${sessionId}/actors/${actorId}/freeform-faction-commands`;
 const post = (url: string, payload: Record<string, unknown>) => ({
-  method: "POST" as const, url, headers: { "content-type": "application/json" }, payload,
+  method: "POST" as const,
+  url,
+  headers: { "content-type": "application/json" },
+  payload,
 });
 
 describe("freeform faction HTTP command", () => {
@@ -72,10 +99,9 @@ describe("freeform faction HTTP command", () => {
     seedHarbor(f);
     const app = appFor(f);
 
-    const response = await app.inject(post(
-      factionUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: "I look for the local thieves' guild" },
-    ));
+    const response = await app.inject(
+      post(factionUrl(f.campaign.id, f.session.id, f.actorId), { text: "I look for the local thieves' guild" }),
+    );
     expect(response.statusCode, response.body).toBe(200);
     const body = response.json();
     expect(body.classification).toMatchObject({ intent: "materialize-faction", factionName: "local thieves' guild" });
@@ -87,14 +113,24 @@ describe("freeform faction HTTP command", () => {
     expect(body.materialization.candidate.name.toLowerCase()).toContain("guild");
 
     const db = openDb();
-    expect(db.prepare("SELECT public_name,visibility FROM campaign_factions_v28 WHERE campaign_id=? AND faction_id=?")
-      .get(f.campaign.id, body.materialization.factionId)).toMatchObject({ visibility: "public" });
+    expect(
+      db
+        .prepare("SELECT public_name,visibility FROM campaign_factions_v28 WHERE campaign_id=? AND faction_id=?")
+        .get(f.campaign.id, body.materialization.factionId),
+    ).toMatchObject({ visibility: "public" });
     // Exactly one public faction artifact and one separate GM-only agenda artifact.
-    const artifacts = db.prepare(`SELECT artifact_kind,visibility FROM campaign_generation_accepted_artifacts_v52
-      WHERE campaign_id=? AND source_draft_id=? ORDER BY artifact_kind`).all(f.campaign.id, body.materialization.draftId) as Array<{ artifact_kind: string; visibility: string }>;
+    const artifacts = db
+      .prepare(
+        `SELECT artifact_kind,visibility FROM campaign_generation_accepted_artifacts_v52
+      WHERE campaign_id=? AND source_draft_id=? ORDER BY artifact_kind`,
+      )
+      .all(f.campaign.id, body.materialization.draftId) as Array<{ artifact_kind: string; visibility: string }>;
     expect(artifacts.map((row) => `${row.artifact_kind}:${row.visibility}`)).toEqual(["faction:public", "lore:gm"]);
-    expect(db.prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE receipt_id=? AND draft_id=?")
-      .get(body.materialization.contentReceiptId, body.materialization.draftId)).toBeTruthy();
+    expect(
+      db
+        .prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE receipt_id=? AND draft_id=?")
+        .get(body.materialization.contentReceiptId, body.materialization.draftId),
+    ).toBeTruthy();
     db.close();
     await app.close();
   });
@@ -107,10 +143,9 @@ describe("freeform faction HTTP command", () => {
     f.repo.materializeFreeformFaction(OWNER, f.campaign.id, f.session.id, f.actorId, "I look for the mages guild");
     const app = appFor(f);
 
-    const response = await app.inject(post(
-      factionUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: "I search for the mages guild" },
-    ));
+    const response = await app.inject(
+      post(factionUrl(f.campaign.id, f.session.id, f.actorId), { text: "I search for the mages guild" }),
+    );
     expect(response.statusCode, response.body).toBe(200);
     const body = response.json();
     expect(body.classification).toMatchObject({ intent: "none", reason: "known-faction" });
@@ -127,10 +162,9 @@ describe("freeform faction HTTP command", () => {
 
     // A well-formed campaign the trusted-local principal has no membership in:
     // the repository's authorize() rejects it before any materialization.
-    const response = await app.inject(post(
-      factionUrl("foreign-campaign", f.session.id, f.actorId),
-      { text: "I look for the local thieves' guild" },
-    ));
+    const response = await app.inject(
+      post(factionUrl("foreign-campaign", f.session.id, f.actorId), { text: "I look for the local thieves' guild" }),
+    );
     expect(response.statusCode, response.body).toBe(404);
     expect(response.json()).toMatchObject({ code: "RPG_FREEFORM_FACTION_NOT_FOUND" });
 
@@ -146,16 +180,24 @@ describe("freeform faction HTTP command", () => {
     seedHarbor(f);
     const app = appFor(f);
 
-    const response = await app.inject(post(
-      factionUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: "I look for the local thieves' guild", candidateId: "fff-not-a-real-candidate" },
-    ));
+    const response = await app.inject(
+      post(factionUrl(f.campaign.id, f.session.id, f.actorId), {
+        text: "I look for the local thieves' guild",
+        candidateId: "fff-not-a-real-candidate",
+      }),
+    );
     expect(response.statusCode, response.body).toBe(409);
     expect(response.json()).toMatchObject({ code: "RPG_FREEFORM_FACTION_CONFLICT" });
 
     const db = openDb();
     expect(countOf(db, "SELECT count(*) n FROM campaign_factions_v28 WHERE campaign_id=?", f.campaign.id)).toBe(0);
-    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-faction-draft-%'", f.campaign.id)).toBe(0);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-faction-draft-%'",
+        f.campaign.id,
+      ),
+    ).toBe(0);
     db.close();
     await app.close();
   });
@@ -181,8 +223,21 @@ describe("freeform faction HTTP command", () => {
 
     const db = openDb();
     expect(countOf(db, "SELECT count(*) n FROM campaign_factions_v28 WHERE campaign_id=?", f.campaign.id)).toBe(1);
-    expect(countOf(db, "SELECT count(*) n FROM campaign_factions_v28 WHERE campaign_id=? AND faction_id=?", f.campaign.id, firstBody.materialization.factionId)).toBe(1);
-    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-faction-draft-%'", f.campaign.id)).toBe(1);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM campaign_factions_v28 WHERE campaign_id=? AND faction_id=?",
+        f.campaign.id,
+        firstBody.materialization.factionId,
+      ),
+    ).toBe(1);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-faction-draft-%'",
+        f.campaign.id,
+      ),
+    ).toBe(1);
     db.close();
     await app.close();
   });

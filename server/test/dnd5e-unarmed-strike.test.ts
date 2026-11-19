@@ -1,19 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { DND_5E_RULESET_DESCRIPTOR, DND_5E_UNARMED_STRIKE, resolveDnd5eAttack, resolveDnd5eDamageRoll } from "../src/rulesets/index.js";
+import {
+  DND_5E_RULESET_DESCRIPTOR,
+  DND_5E_UNARMED_STRIKE,
+  resolveDnd5eAttack,
+  resolveDnd5eDamageRoll,
+} from "../src/rulesets/index.js";
 
 describe("SRD 5.1 unarmed strike", () => {
   it("is a proficient melee Strength attack for one plus the Strength modifier bludgeoning", () => {
     expect(DND_5E_UNARMED_STRIKE).toMatchObject({
-      attackAbility: "strength", attackType: "melee", damageType: "bludgeoning", flatDamageBonus: 1, proficient: true,
+      attackAbility: "strength",
+      attackType: "melee",
+      damageType: "bludgeoning",
+      flatDamageBonus: 1,
+      proficient: true,
     });
     expect(DND_5E_UNARMED_STRIKE.damageDie).toEqual({ count: 0, sides: 4 });
   });
 
   it("adds the flat bonus once and never doubles it on a critical", () => {
-    const normal = resolveDnd5eDamageRoll({ dice: [DND_5E_UNARMED_STRIKE.damageDie], rolls: [[]], modifier: DND_5E_UNARMED_STRIKE.flatDamageBonus + 3 });
+    const normal = resolveDnd5eDamageRoll({
+      dice: [DND_5E_UNARMED_STRIKE.damageDie],
+      rolls: [[]],
+      modifier: DND_5E_UNARMED_STRIKE.flatDamageBonus + 3,
+    });
     expect(normal.total).toBe(4);
     expect(normal.evidence).toEqual([expect.objectContaining({ count: 0, sides: 4, subtotal: 0 })]);
-    const critical = resolveDnd5eDamageRoll({ dice: [DND_5E_UNARMED_STRIKE.damageDie], rolls: [[]], modifier: DND_5E_UNARMED_STRIKE.flatDamageBonus + 3, critical: true });
+    const critical = resolveDnd5eDamageRoll({
+      dice: [DND_5E_UNARMED_STRIKE.damageDie],
+      rolls: [[]],
+      modifier: DND_5E_UNARMED_STRIKE.flatDamageBonus + 3,
+      critical: true,
+    });
     expect(critical.total).toBe(4);
     expect(critical.critical).toBe(true);
   });
@@ -28,7 +46,7 @@ describe("SRD 5.1 unarmed strike", () => {
   });
 
   it("advertises the unarmed extension through the attacks capability", () => {
-    const attacks = DND_5E_RULESET_DESCRIPTOR.capabilities?.find(capability => capability.id === "attacks");
+    const attacks = DND_5E_RULESET_DESCRIPTOR.capabilities?.find((capability) => capability.id === "attacks");
     expect(attacks).toEqual({ id: "attacks", version: "1.7.0", status: "supported" });
   });
 });

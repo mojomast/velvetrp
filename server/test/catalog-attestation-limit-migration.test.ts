@@ -8,22 +8,42 @@ import {
 } from "../src/repo/db/schema.js";
 
 const asset = (name: string) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8");
-const currentSql = () => ["currentSchema.sql", "campaignDmSchema.sql", "recallSchema.sql", "contextInspectionProvenanceSchema.sql",
-  "npcKnowledgeSchema.sql", "combatMarkerSchema.sql", "attunementSchema.sql", "combatReadyActionSchema.sql", "systemOneSchema.sql",
-  "combatantLabelSchema.sql"].map(asset).join("\n");
+const currentSql = () =>
+  [
+    "currentSchema.sql",
+    "campaignDmSchema.sql",
+    "recallSchema.sql",
+    "contextInspectionProvenanceSchema.sql",
+    "npcKnowledgeSchema.sql",
+    "combatMarkerSchema.sql",
+    "attunementSchema.sql",
+    "combatReadyActionSchema.sql",
+    "systemOneSchema.sql",
+    "combatantLabelSchema.sql",
+  ]
+    .map(asset)
+    .join("\n");
 
 const TABLE = "rpg_catalog_publication_attestations";
 
 const tableSql = (db: DatabaseDriver.Database) =>
   (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(TABLE) as { sql: string }).sql;
 const triggerNames = (db: DatabaseDriver.Database) =>
-  (db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=? ORDER BY name").all(TABLE) as Array<{ name: string }>)
-    .map((row) => row.name);
+  (
+    db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=? ORDER BY name").all(TABLE) as Array<{
+      name: string;
+    }>
+  ).map((row) => row.name);
 
 /** Rebuilds the attestation table at its exact 1024 predecessor, preserving triggers. */
 function toPredecessor(db: DatabaseDriver.Database): void {
-  const triggers = db.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger' AND tbl_name=?").all(TABLE) as Array<{ name: string; sql: string }>;
-  const predecessor = tableSql(db).replace(CATALOG_ATTESTATION_LIMIT_CHECK, CATALOG_ATTESTATION_LIMIT_PREDECESSOR_CHECK);
+  const triggers = db
+    .prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger' AND tbl_name=?")
+    .all(TABLE) as Array<{ name: string; sql: string }>;
+  const predecessor = tableSql(db).replace(
+    CATALOG_ATTESTATION_LIMIT_CHECK,
+    CATALOG_ATTESTATION_LIMIT_PREDECESSOR_CHECK,
+  );
   db.exec(`CREATE TEMP TABLE ${TABLE}_upgrade AS SELECT * FROM ${TABLE}`);
   db.exec(`DROP TABLE ${TABLE}`);
   db.exec(predecessor);

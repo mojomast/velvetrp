@@ -1,6 +1,15 @@
 import type {
-  AbilityId, CheckInput, CheckResolution, D20RollEvidence, D20TestInput,
-  D20TestResolution, RollMode, RulesetCapability, SkillId, TestKind, TestResolution,
+  AbilityId,
+  CheckInput,
+  CheckResolution,
+  D20RollEvidence,
+  D20TestInput,
+  D20TestResolution,
+  RollMode,
+  RulesetCapability,
+  SkillId,
+  TestKind,
+  TestResolution,
 } from "../types.js";
 import { frozenList, requireInteger, requireNonNegativeInteger } from "./internal.js";
 
@@ -27,7 +36,14 @@ export function resolveDnd5eCheck(input: CheckInput): CheckResolution {
   requireInteger(input.dc, "DC");
   const abilityModifier = dnd5eAbilityModifier(input.abilityScore);
   const total = input.d20 + abilityModifier + input.proficiencyBonus;
-  return Object.freeze({ d20: input.d20, abilityModifier, proficiencyBonus: input.proficiencyBonus, total, dc: input.dc, success: total >= input.dc });
+  return Object.freeze({
+    d20: input.d20,
+    abilityModifier,
+    proficiencyBonus: input.proficiencyBonus,
+    total,
+    dc: input.dc,
+    success: total >= input.dc,
+  });
 }
 
 export function dnd5eRollMode(advantageSources = 0, disadvantageSources = 0): RollMode {
@@ -40,7 +56,8 @@ export function dnd5eRollMode(advantageSources = 0, disadvantageSources = 0): Ro
 
 function selectD20(rolls: readonly number[], mode: RollMode): D20RollEvidence {
   const expected = mode === "normal" ? 1 : 2;
-  if (rolls.length !== expected) throw new RangeError(`${mode} requires exactly ${expected} d20 roll${expected === 1 ? "" : "s"}`);
+  if (rolls.length !== expected)
+    throw new RangeError(`${mode} requires exactly ${expected} d20 roll${expected === 1 ? "" : "s"}`);
   rolls.forEach((roll) => {
     requireInteger(roll, "d20");
     if (roll < 1 || roll > 20) throw new RangeError("d20 must be between 1 and 20");
@@ -55,13 +72,24 @@ export function resolveDnd5eD20Test(input: D20TestInput): D20TestResolution {
   const proficiencyMultiplier = input.proficiencyMultiplier ?? (proficiencyBonus > 0 ? 1 : 0);
   const flatBonus = input.flatBonus ?? 0;
   requireNonNegativeInteger(proficiencyBonus, "proficiency bonus");
-  if (![0, 0.5, 1, 2].includes(proficiencyMultiplier)) throw new RangeError("proficiency multiplier must be 0, 0.5, 1, or 2");
+  if (![0, 0.5, 1, 2].includes(proficiencyMultiplier))
+    throw new RangeError("proficiency multiplier must be 0, 0.5, 1, or 2");
   requireInteger(flatBonus, "flat bonus");
   const evidence = selectD20(input.rolls, dnd5eRollMode(input.advantageSources, input.disadvantageSources));
   const abilityModifier = dnd5eAbilityModifier(input.abilityScore);
   const appliedProficiency = Math.floor(proficiencyBonus * proficiencyMultiplier);
   const total = evidence.selected + abilityModifier + appliedProficiency + flatBonus;
-  return Object.freeze({ evidence, abilityModifier, proficiencyBonus, proficiencyMultiplier, appliedProficiency, flatBonus, total, dc: input.dc, success: total >= input.dc });
+  return Object.freeze({
+    evidence,
+    abilityModifier,
+    proficiencyBonus,
+    proficiencyMultiplier,
+    appliedProficiency,
+    flatBonus,
+    total,
+    dc: input.dc,
+    success: total >= input.dc,
+  });
 }
 
 /**
@@ -80,24 +108,54 @@ export const DND_5E_UNARMED_STRIKE = Object.freeze({
 });
 
 export const DND_5E_SKILL_ABILITIES: Readonly<Record<SkillId, AbilityId>> = Object.freeze({
-  acrobatics: "dexterity", "animal-handling": "wisdom", arcana: "intelligence", athletics: "strength",
-  deception: "charisma", history: "intelligence", insight: "wisdom", intimidation: "charisma",
-  investigation: "intelligence", medicine: "wisdom", nature: "intelligence", perception: "wisdom",
-  performance: "charisma", persuasion: "charisma", religion: "intelligence", "sleight-of-hand": "dexterity",
-  stealth: "dexterity", survival: "wisdom",
+  acrobatics: "dexterity",
+  "animal-handling": "wisdom",
+  arcana: "intelligence",
+  athletics: "strength",
+  deception: "charisma",
+  history: "intelligence",
+  insight: "wisdom",
+  intimidation: "charisma",
+  investigation: "intelligence",
+  medicine: "wisdom",
+  nature: "intelligence",
+  perception: "wisdom",
+  performance: "charisma",
+  persuasion: "charisma",
+  religion: "intelligence",
+  "sleight-of-hand": "dexterity",
+  stealth: "dexterity",
+  survival: "wisdom",
 });
 
-export function resolveDnd5eAbilityTest(kind: Exclude<TestKind, "skill-check">, ability: AbilityId, input: D20TestInput): TestResolution {
+export function resolveDnd5eAbilityTest(
+  kind: Exclude<TestKind, "skill-check">,
+  ability: AbilityId,
+  input: D20TestInput,
+): TestResolution {
   return Object.freeze({ ...resolveDnd5eD20Test(input), kind, ability });
 }
 
 export function resolveDnd5eSkillTest(skill: SkillId, input: D20TestInput): TestResolution {
-  return Object.freeze({ ...resolveDnd5eD20Test(input), kind: "skill-check", ability: DND_5E_SKILL_ABILITIES[skill], skill });
+  return Object.freeze({
+    ...resolveDnd5eD20Test(input),
+    kind: "skill-check",
+    ability: DND_5E_SKILL_ABILITIES[skill],
+    skill,
+  });
 }
 
-export function dnd5ePassiveCheck(abilityScore: number, proficiencyBonus = 0, proficiencyMultiplier: 0 | 0.5 | 1 | 2 = proficiencyBonus > 0 ? 1 : 0, advantageSources = 0, disadvantageSources = 0): number {
+export function dnd5ePassiveCheck(
+  abilityScore: number,
+  proficiencyBonus = 0,
+  proficiencyMultiplier: 0 | 0.5 | 1 | 2 = proficiencyBonus > 0 ? 1 : 0,
+  advantageSources = 0,
+  disadvantageSources = 0,
+): number {
   requireNonNegativeInteger(proficiencyBonus, "proficiency bonus");
   const mode = dnd5eRollMode(advantageSources, disadvantageSources);
   const modeAdjustment = mode === "advantage" ? 5 : mode === "disadvantage" ? -5 : 0;
-  return 10 + dnd5eAbilityModifier(abilityScore) + Math.floor(proficiencyBonus * proficiencyMultiplier) + modeAdjustment;
+  return (
+    10 + dnd5eAbilityModifier(abilityScore) + Math.floor(proficiencyBonus * proficiencyMultiplier) + modeAdjustment
+  );
 }

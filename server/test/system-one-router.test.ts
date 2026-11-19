@@ -68,7 +68,12 @@ describe("System One cost router", () => {
       [ROUTER_DETERMINISTIC_KEY]: deterministic(0.99),
       [ROUTER_COMPLEXITY_KEY]: complexity(0),
     };
-    const decision = composeRouterDecision(request({ safetySensitive: true }), answers, thresholds, "frontier-generation");
+    const decision = composeRouterDecision(
+      request({ safetySensitive: true }),
+      answers,
+      thresholds,
+      "frontier-generation",
+    );
     expect(decision.handler).toBe("human-review");
     expect(decision.band).toBe("confirm");
     expect(decision.deterministicSufficient).toBe(true);
@@ -76,13 +81,17 @@ describe("System One cost router", () => {
 
   it("acts on human review only when that choice is confident, and still never routes away", () => {
     const confident: Record<string, SystemOneAnswer> = { [ROUTER_HANDLER_KEY]: handlerChoice("human-review", 0.9) };
-    expect(composeRouterDecision(request({ requiresHumanDecision: true }), confident, thresholds, "cheap-generation")).toMatchObject({
+    expect(
+      composeRouterDecision(request({ requiresHumanDecision: true }), confident, thresholds, "cheap-generation"),
+    ).toMatchObject({
       band: "act",
       handler: "human-review",
     });
 
     const unconfident: Record<string, SystemOneAnswer> = { [ROUTER_HANDLER_KEY]: handlerChoice("human-review", 0.6) };
-    expect(composeRouterDecision(request({ requiresHumanDecision: true }), unconfident, thresholds, "cheap-generation")).toMatchObject({
+    expect(
+      composeRouterDecision(request({ requiresHumanDecision: true }), unconfident, thresholds, "cheap-generation"),
+    ).toMatchObject({
       band: "confirm",
       handler: "human-review",
     });
@@ -128,7 +137,9 @@ describe("System One cost router", () => {
       [ROUTER_HANDLER_KEY]: handlerChoice("frontier-generation", 0.99),
       [ROUTER_DETERMINISTIC_KEY]: deterministic(0.9),
     };
-    expect(composeRouterDecision(request({ hasDeterministicPath: true }), answers, thresholds, "frontier-generation")).toMatchObject({
+    expect(
+      composeRouterDecision(request({ hasDeterministicPath: true }), answers, thresholds, "frontier-generation"),
+    ).toMatchObject({
       band: "act",
       handler: "deterministic",
       deterministicSufficient: true,
@@ -136,19 +147,30 @@ describe("System One cost router", () => {
 
     // A confident deterministic answer without a real deterministic path cannot act on it.
     const deterministicOnly: Record<string, SystemOneAnswer> = { [ROUTER_DETERMINISTIC_KEY]: deterministic(0.9) };
-    expect(composeRouterDecision(request({ hasDeterministicPath: false }), deterministicOnly, thresholds, "frontier-generation")).toMatchObject({
+    expect(
+      composeRouterDecision(
+        request({ hasDeterministicPath: false }),
+        deterministicOnly,
+        thresholds,
+        "frontier-generation",
+      ),
+    ).toMatchObject({
       handler: "frontier-generation",
     });
   });
 
   it("never upgrades to a more capable handler", () => {
-    const answers: Record<string, SystemOneAnswer> = { [ROUTER_HANDLER_KEY]: handlerChoice("frontier-generation", 0.95) };
+    const answers: Record<string, SystemOneAnswer> = {
+      [ROUTER_HANDLER_KEY]: handlerChoice("frontier-generation", 0.95),
+    };
     expect(composeRouterDecision(request(), answers, thresholds, "cheap-generation")).toMatchObject({
       band: "confirm",
       handler: "cheap-generation",
     });
 
-    const deterministicCurrent: Record<string, SystemOneAnswer> = { [ROUTER_HANDLER_KEY]: handlerChoice("cheap-generation", 0.95) };
+    const deterministicCurrent: Record<string, SystemOneAnswer> = {
+      [ROUTER_HANDLER_KEY]: handlerChoice("cheap-generation", 0.95),
+    };
     expect(composeRouterDecision(request(), deterministicCurrent, thresholds, "deterministic")).toMatchObject({
       band: "confirm",
       handler: "deterministic",
@@ -161,11 +183,15 @@ describe("System One cost router", () => {
       [ROUTER_DETERMINISTIC_KEY]: deterministic(noul),
     };
     expect(composeRouterDecision(request(), answers, thresholds, "frontier-generation")).toMatchObject({
-      band: "confirm", handler: "frontier-generation",
+      band: "confirm",
+      handler: "frontier-generation",
       reason: "refused deterministic: no deterministic path exists",
     });
-    expect(composeRouterDecision(request({ hasDeterministicPath: true }), answers, thresholds, "frontier-generation")).toMatchObject({
-      band: "act", handler: "deterministic",
+    expect(
+      composeRouterDecision(request({ hasDeterministicPath: true }), answers, thresholds, "frontier-generation"),
+    ).toMatchObject({
+      band: "act",
+      handler: "deterministic",
     });
   });
 

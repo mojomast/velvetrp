@@ -29,7 +29,11 @@ const DEFAULT_SUPPORT = 0.9;
 /** Deterministic candidate-choice oracle: build a state, then read the exact advertised action set. */
 function plan(f: Fixture, key: string) {
   f.repo.setDmControl("local-owner", f.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: `${key}-ai` });
-  const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, { intent: "open", expectedModeRevision: 1, idempotencyKey: key });
+  const run = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id, {
+    intent: "open",
+    expectedModeRevision: 1,
+    idempotencyKey: key,
+  });
   const work = f.repo.claimDmPlanning("local-owner", run.runId, "eval", "eval");
   const candidates = work?.candidates ?? [];
   const actions = [...new Set(candidates.map((candidate) => candidate.action))].sort();
@@ -43,15 +47,27 @@ async function gmOnlyFixture(key: string) {
   });
   const context = f.repo.getCampaignGenerationContext("local-owner", f.campaign.id, [])!;
   const draft = f.repo.createGenerationDraft("local-owner", {
-    campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, kind: "content-pack",
-    stagedContent: { kind: "campaign-content", requestDigest: "a".repeat(64), baseContentRevision: context.revision, dependencyDigests: {}, ...content },
+    campaignId: f.campaign.id,
+    timelineId: f.campaign.activeTimelineId,
+    kind: "content-pack",
+    stagedContent: {
+      kind: "campaign-content",
+      requestDigest: "a".repeat(64),
+      baseContentRevision: context.revision,
+      dependencyDigests: {},
+      ...content,
+    },
     validation: { valid: true, issues: [], validatedAt: f.options.clock.now().toISOString() },
-    expectedCampaignRevision: f.repo.getCampaignAdministration("local-owner", f.campaign.id)!.revision, idempotencyKey: `${key}-draft`,
+    expectedCampaignRevision: f.repo.getCampaignAdministration("local-owner", f.campaign.id)!.revision,
+    idempotencyKey: `${key}-draft`,
   });
   f.repo.recordCampaignGenerationCandidate(draft.draftId, content, []);
   f.repo.applyCampaignContentGenerationDraftAtomically("local-owner", {
-    draftId: draft.draftId, expectedDraftRevision: 0, expectedCampaignRevision: draft.campaignRevision,
-    idempotencyKey: `${key}-accept`, selectedArtifactKeys: ["secret"],
+    draftId: draft.draftId,
+    expectedDraftRevision: 0,
+    expectedCampaignRevision: draft.campaignRevision,
+    idempotencyKey: `${key}-accept`,
+    selectedArtifactKeys: ["secret"],
   });
   return f;
 }
@@ -62,20 +78,28 @@ interface StateReadout {
   actions: string[];
 }
 
-async function readState(id: string, options: { gmOnly?: boolean; setup?: (fixture: Fixture) => void }): Promise<StateReadout> {
+async function readState(
+  id: string,
+  options: { gmOnly?: boolean; setup?: (fixture: Fixture) => void },
+): Promise<StateReadout> {
   const fixture = options.gmOnly ? await gmOnlyFixture(id) : await dmFixture();
   options.setup?.(fixture);
   const { candidates, actions } = plan(fixture, id);
   fixture.repo.close();
   const projection = candidates.map((candidate) => ({
-    candidateId: candidate.candidateId, digest: candidate.digest, action: candidate.action, label: candidate.label,
+    candidateId: candidate.candidateId,
+    digest: candidate.digest,
+    action: candidate.action,
+    label: candidate.label,
   }));
   return { id, projection, actions };
 }
 
 const noul = (value: number): SystemOneAnswer => ({ type: "noul", noul: value });
 const priority = (score: number): SystemOneAnswer => ({
-  type: "score", score, confidence: 0.9,
+  type: "score",
+  score,
+  confidence: 0.9,
   legend: { "0": "low priority", "1": "medium priority", "2": "high priority" },
   probabilities: { "0": 0.05, "1": 0.15, "2": 0.8 },
 });
@@ -122,8 +146,14 @@ async function runSelector(spec: SelectorSpec): Promise<ScenarioOutcome> {
   if (spec.method === "best-pick") {
     if (!winner) throw new Error(`scenario ${spec.id} requires an advertised pick`);
     answers[DIRECTOR_BEST_KEY] = {
-      type: "choice", choice: winner.candidateId, confidence: support,
-      probabilities: distribution([...projection.map((candidate) => candidate.candidateId), DIRECTOR_NONE], winner.candidateId, support),
+      type: "choice",
+      choice: winner.candidateId,
+      confidence: support,
+      probabilities: distribution(
+        [...projection.map((candidate) => candidate.candidateId), DIRECTOR_NONE],
+        winner.candidateId,
+        support,
+      ),
     };
   }
 
@@ -131,16 +161,26 @@ async function runSelector(spec: SelectorSpec): Promise<ScenarioOutcome> {
   const settings = defaultSystemOneSettings();
   const caller = createFakeSystemOneCaller({ scripted: answers });
   const result = await caller({ settings, state: { scenario: spec.id }, questions });
-  const composed = composeDirectorSelection(projection, result.answers, settings.confidencePolicy["director-selection"]);
+  const composed = composeDirectorSelection(
+    projection,
+    result.answers,
+    settings.confidencePolicy["director-selection"],
+  );
 
   const selected = composed.selections[0];
   const selectedAction = selected
-    ? projection.find((candidate) => candidate.candidateId === selected.candidateId)?.action ?? null
+    ? (projection.find((candidate) => candidate.candidateId === selected.candidateId)?.action ?? null)
     : null;
   const correct = spec.expected === "hold" ? composed.hold : selectedAction === spec.expected;
   const predictedProbability = composed.topSignal ?? 0;
-  return { id: spec.id, expected: spec.expected, actions: spec.state.actions, method: composed.method, selectedAction,
-    point: { predictedProbability, correct } };
+  return {
+    id: spec.id,
+    expected: spec.expected,
+    actions: spec.state.actions,
+    method: composed.method,
+    selectedAction,
+    point: { predictedProbability, correct },
+  };
 }
 
 describe("Director selector calibration through the provider-free oracle", () => {
@@ -158,7 +198,13 @@ describe("Director selector calibration through the provider-free oracle", () =>
     const specs: SelectorSpec[] = [
       { id: "empty-world", state: empty, expected: "ambient-beat", method: "candidates", pick: "ambient-beat" },
       { id: "story-graph", state: graph, expected: "reveal-node", method: "candidates", pick: "reveal-node" },
-      { id: "encounter-prep", state: prepared, expected: "encounter-start", method: "candidates", pick: "encounter-start" },
+      {
+        id: "encounter-prep",
+        state: prepared,
+        expected: "encounter-start",
+        method: "candidates",
+        pick: "encounter-start",
+      },
       { id: "gm-only", state: gmOnly, expected: "hold", method: "hold" },
       { id: "story-graph-miscalibrated", state: graph, expected: "reveal-node", method: "hold", support: 0.95 },
       { id: "story-graph-best-pick", state: graph, expected: "reveal-node", method: "best-pick", pick: "reveal-node" },
@@ -167,7 +213,14 @@ describe("Director selector calibration through the provider-free oracle", () =>
     const outcomes: ScenarioOutcome[] = [];
     for (const spec of specs) outcomes.push(await runSelector(spec));
 
-    expect(outcomes.map((outcome) => outcome.method)).toEqual(["candidates", "candidates", "candidates", "hold", "hold", "best-pick"]);
+    expect(outcomes.map((outcome) => outcome.method)).toEqual([
+      "candidates",
+      "candidates",
+      "candidates",
+      "hold",
+      "hold",
+      "best-pick",
+    ]);
     for (const outcome of outcomes) {
       if (outcome.selectedAction !== null) expect(outcome.actions).toContain(outcome.selectedAction);
     }

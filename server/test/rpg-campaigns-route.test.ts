@@ -52,16 +52,26 @@ function repository(campaigns: CampaignAccess[] = []) {
       content: { status: "unconfigured" },
     })),
     createCampaign: vi.fn((_actor: string, input: { name: string }): Campaign => ({
-      id: "campaign-created", name: input.name, activeTimelineId: "timeline-created",
-      ownerPrincipalId: "local-owner", createdAt: "2030-01-05T00:00:00.000Z", updatedAt: "2030-01-05T00:00:00.000Z",
+      id: "campaign-created",
+      name: input.name,
+      activeTimelineId: "timeline-created",
+      ownerPrincipalId: "local-owner",
+      createdAt: "2030-01-05T00:00:00.000Z",
+      updatedAt: "2030-01-05T00:00:00.000Z",
     })),
     getCampaignCharacterCreationOptions: vi.fn(() => null),
     getCampaignCharacterRoster: vi.fn(() => null),
     getCampaignCharacterWorkspace: vi.fn(() => null),
-    createOriginalStarterCampaignCharacter: vi.fn(() => { throw new Error("unused"); }),
+    createOriginalStarterCampaignCharacter: vi.fn(() => {
+      throw new Error("unused");
+    }),
     renameCampaignIfUnchanged: vi.fn((_actor: string, campaignId: string, input: { name: string }): Campaign => ({
-      id: campaignId, name: input.name, activeTimelineId: "timeline-created",
-      ownerPrincipalId: "local-owner", createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-06T00:00:00.000Z",
+      id: campaignId,
+      name: input.name,
+      activeTimelineId: "timeline-created",
+      ownerPrincipalId: "local-owner",
+      createdAt: "2030-01-01T00:00:00.000Z",
+      updatedAt: "2030-01-06T00:00:00.000Z",
     })),
     close: vi.fn(),
   };
@@ -140,7 +150,9 @@ describe("GET /api/rpg/v1/campaigns", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const secret = "sqlite path /private/velvet.sqlite";
     const repo = repository();
-    repo.listCampaigns.mockImplementation(() => { throw new Error(secret); });
+    repo.listCampaigns.mockImplementation(() => {
+      throw new Error(secret);
+    });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
 
     const response = await app.inject({
@@ -186,7 +198,9 @@ describe("GET /api/rpg/v1/campaigns", () => {
 
   it("redacts repository factory failures without creating a connection per retry", async () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
-    const factory = vi.fn(() => { throw new Error("private factory detail"); });
+    const factory = vi.fn(() => {
+      throw new Error("private factory detail");
+    });
     const app = buildApp({ campaignRepositoryFactory: factory });
 
     const first = await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns" });
@@ -248,20 +262,25 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     const factory = vi.fn(() => repo);
     const app = buildApp({ campaignRepositoryFactory: factory });
     const disabled = await app.inject({
-      method: "GET", url: "/api/rpg/v1/campaigns/campaign-one", headers: { "x-request-id": "detail-disabled" },
+      method: "GET",
+      url: "/api/rpg/v1/campaigns/campaign-one",
+      headers: { "x-request-id": "detail-disabled" },
     });
     expect(disabled.statusCode).toBe(404);
     expect(disabled.headers["cache-control"]).toBe("no-store");
     expect(disabled.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND", requestId: "detail-disabled" });
     const disabledMalformed = await app.inject({
-      method: "GET", url: "/api/rpg/v1/campaigns/%zz", headers: { "x-request-id": "detail-disabled-malformed" },
+      method: "GET",
+      url: "/api/rpg/v1/campaigns/%zz",
+      headers: { "x-request-id": "detail-disabled-malformed" },
     });
     expect(disabledMalformed.statusCode).toBe(404);
     expect(disabledMalformed.headers["cache-control"]).toBe("no-store");
     expect(disabledMalformed.headers["content-type"]).toContain("application/problem+json");
     expect(disabledMalformed.headers["x-request-id"]).toBe("detail-disabled-malformed");
     expect(disabledMalformed.json()).toMatchObject({
-      code: "RPG_ROUTE_NOT_FOUND", requestId: "detail-disabled-malformed",
+      code: "RPG_ROUTE_NOT_FOUND",
+      requestId: "detail-disabled-malformed",
     });
 
     process.env.FEATURE_RPG_CAMPAIGN = "true";
@@ -300,7 +319,9 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
 
     const legacyLong = `/api/characters/${"x".repeat(129)}`;
     const legacyResponse = await app.inject({
-      method: "GET", url: legacyLong, headers: { "x-request-id": "legacy-long" },
+      method: "GET",
+      url: legacyLong,
+      headers: { "x-request-id": "legacy-long" },
     });
     expect(legacyResponse.statusCode).toBe(414);
     expect(legacyResponse.headers["content-type"]).toBe("application/json");
@@ -313,7 +334,9 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     });
 
     const unknownResponse = await app.inject({
-      method: "GET", url: "/api/rpg/v1/unknown/%zz", headers: { "x-request-id": "unknown-bad-url" },
+      method: "GET",
+      url: "/api/rpg/v1/unknown/%zz",
+      headers: { "x-request-id": "unknown-bad-url" },
     });
     expect(unknownResponse.statusCode).toBe(400);
     expect(unknownResponse.headers["content-type"]).toBe("application/json");
@@ -362,11 +385,27 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
       ["PATCH", "/api/rpg/v1/campaigns/%zz", "Campaign rename does not accept query parameters"],
       ["PATCH", `/api/rpg/v1/campaigns/${"x".repeat(129)}`, "Campaign rename does not accept query parameters"],
       ["PUT", "/api/rpg/v1/campaigns/%zz/starter-setup", "Starter setup does not accept query parameters"],
-      ["PUT", `/api/rpg/v1/campaigns/${"x".repeat(129)}/starter-setup`, "Starter setup does not accept query parameters"],
-      ["GET", "/api/rpg/v1/campaigns/%zz/characters/creation-options", "Campaign character creation options do not accept query parameters"],
-      ["GET", `/api/rpg/v1/campaigns/${"x".repeat(129)}/characters/creation-options`, "Campaign character creation options do not accept query parameters"],
+      [
+        "PUT",
+        `/api/rpg/v1/campaigns/${"x".repeat(129)}/starter-setup`,
+        "Starter setup does not accept query parameters",
+      ],
+      [
+        "GET",
+        "/api/rpg/v1/campaigns/%zz/characters/creation-options",
+        "Campaign character creation options do not accept query parameters",
+      ],
+      [
+        "GET",
+        `/api/rpg/v1/campaigns/${"x".repeat(129)}/characters/creation-options`,
+        "Campaign character creation options do not accept query parameters",
+      ],
       ["GET", "/api/rpg/v1/campaigns/%zz/characters", "Campaign character roster does not accept query parameters"],
-      ["GET", `/api/rpg/v1/campaigns/${"x".repeat(129)}/characters`, "Campaign character roster does not accept query parameters"],
+      [
+        "GET",
+        `/api/rpg/v1/campaigns/${"x".repeat(129)}/characters`,
+        "Campaign character roster does not accept query parameters",
+      ],
     ] as const;
 
     for (const [method, path, detail] of routes) {
@@ -417,10 +456,8 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     const secret = "raw-router-secret";
     for (const [path, statusCode, code, message] of [
       ["/api/rpg/v1/unknown/%zz", 400, "FST_ERR_BAD_URL", "Request URL is invalid"],
-      ["/api/rpg/v1/campaigns/%zz/characters/creation_option", 400, "FST_ERR_BAD_URL",
-        "Request URL is invalid"],
-      [`/api/characters/${"x".repeat(129)}`, 414, "FST_ERR_MAX_PARAM_LENGTH",
-        "Request URL exceeds the routing limit"],
+      ["/api/rpg/v1/campaigns/%zz/characters/creation_option", 400, "FST_ERR_BAD_URL", "Request URL is invalid"],
+      [`/api/characters/${"x".repeat(129)}`, 414, "FST_ERR_MAX_PARAM_LENGTH", "Request URL exceeds the routing limit"],
     ] as const) {
       const response = await app.inject({ method: "GET", url: `${path}?token=${secret}` });
       expect(response.statusCode).toBe(statusCode);
@@ -463,7 +500,10 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     });
     expect(raw.statusCode).toBe(400);
     expect(raw.json()).toEqual({
-      error: "Bad Request", code: "FST_ERR_BAD_URL", message: "Request URL is invalid", statusCode: 400,
+      error: "Bad Request",
+      code: "FST_ERR_BAD_URL",
+      message: "Request URL is invalid",
+      statusCode: 400,
     });
     for (const marker of [...Object.values(markers), "query-marker"]) expect(raw.body).not.toContain(marker);
     await app.close();
@@ -553,13 +593,17 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     repo.getCampaignDetail.mockReturnValue(null);
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "GET", url: "/api/rpg/v1/campaigns/campaign-missing", headers: { "x-request-id": "detail-missing" },
+      method: "GET",
+      url: "/api/rpg/v1/campaigns/campaign-missing",
+      headers: { "x-request-id": "detail-missing" },
     });
     expect(response.statusCode).toBe(404);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["content-type"]).toContain("application/problem+json");
     expect(response.json()).toMatchObject({
-      code: "RPG_CAMPAIGN_NOT_FOUND", requestId: "detail-missing", error: "Campaign not found",
+      code: "RPG_CAMPAIGN_NOT_FOUND",
+      requestId: "detail-missing",
+      error: "Campaign not found",
     });
     await app.close();
   });
@@ -571,7 +615,9 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
       const secret = `private ${kind} campaign detail`;
       const repo = repository();
       if (kind === "repository") {
-        repo.getCampaignDetail.mockImplementation(() => { throw new Error(secret); });
+        repo.getCampaignDetail.mockImplementation(() => {
+          throw new Error(secret);
+        });
       } else {
         repo.getCampaignDetail.mockReturnValue({
           id: "campaign-detail",
@@ -582,13 +628,17 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
       }
       const app = buildApp({ campaignRepositoryFactory: () => repo });
       const response = await app.inject({
-        method: "GET", url: "/api/rpg/v1/campaigns/campaign-detail", headers: { "x-request-id": `detail-${kind}` },
+        method: "GET",
+        url: "/api/rpg/v1/campaigns/campaign-detail",
+        headers: { "x-request-id": `detail-${kind}` },
       });
       expect(response.statusCode).toBe(500);
       expect(response.headers["cache-control"]).toBe("no-store");
       expect(response.headers["content-type"]).toContain("application/problem+json");
       expect(response.json()).toMatchObject({
-        code: "RPG_INTERNAL_ERROR", requestId: `detail-${kind}`, error: "Campaign could not be loaded",
+        code: "RPG_INTERNAL_ERROR",
+        requestId: `detail-${kind}`,
+        error: "Campaign could not be loaded",
       });
       expect(response.body).not.toContain(secret);
       await app.close();
@@ -599,8 +649,11 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const repo = repository();
     repo.getCampaignDetail.mockReturnValue({
-      id: "campaign-other", name: "Private other campaign", actorRole: "owner",
-      createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-03T00:00:00.000Z",
+      id: "campaign-other",
+      name: "Private other campaign",
+      actorRole: "owner",
+      createdAt: "2030-01-01T00:00:00.000Z",
+      updatedAt: "2030-01-03T00:00:00.000Z",
       content: { status: "unconfigured" },
     });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
@@ -611,21 +664,26 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     await app.close();
   });
 
-  it.each(["HEAD", "POST", "PUT", "DELETE"] as const)("does not expose %s and never initializes the repository", async (method) => {
-    process.env.FEATURE_RPG_CAMPAIGN = "true";
-    const repo = repository();
-    const factory = vi.fn(() => repo);
-    const app = buildApp({ campaignRepositoryFactory: factory });
-    const response = await app.inject({
-      method, url: "/api/rpg/v1/campaigns/campaign-detail", headers: { "x-request-id": `detail-${method}` },
-    });
-    expect(response.statusCode).toBe(404);
-    expect(response.headers["x-request-id"]).toBe(`detail-${method}`);
-    expect(response.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND", requestId: `detail-${method}` });
-    expect(factory).not.toHaveBeenCalled();
-    expect(repo.getCampaignDetail).not.toHaveBeenCalled();
-    await app.close();
-  });
+  it.each(["HEAD", "POST", "PUT", "DELETE"] as const)(
+    "does not expose %s and never initializes the repository",
+    async (method) => {
+      process.env.FEATURE_RPG_CAMPAIGN = "true";
+      const repo = repository();
+      const factory = vi.fn(() => repo);
+      const app = buildApp({ campaignRepositoryFactory: factory });
+      const response = await app.inject({
+        method,
+        url: "/api/rpg/v1/campaigns/campaign-detail",
+        headers: { "x-request-id": `detail-${method}` },
+      });
+      expect(response.statusCode).toBe(404);
+      expect(response.headers["x-request-id"]).toBe(`detail-${method}`);
+      expect(response.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND", requestId: `detail-${method}` });
+      expect(factory).not.toHaveBeenCalled();
+      expect(repo.getCampaignDetail).not.toHaveBeenCalled();
+      await app.close();
+    },
+  );
 
   it("shares one cached repository with collection reads and closes it once", async () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
@@ -684,7 +742,9 @@ describe("PATCH /api/rpg/v1/campaigns/:campaignId", () => {
     const repo = repository();
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const disabled = await app.inject({
-      method: "PATCH", url: "/api/rpg/v1/campaigns/campaign-detail", payload: "{",
+      method: "PATCH",
+      url: "/api/rpg/v1/campaigns/campaign-detail",
+      payload: "{",
       headers: { "content-type": "application/json", "x-request-id": "rename-disabled" },
     });
     expect(disabled.statusCode).toBe(404);
@@ -692,11 +752,14 @@ describe("PATCH /api/rpg/v1/campaigns/:campaignId", () => {
 
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const query = await app.inject({
-      method: "PATCH", url: "/api/rpg/v1/campaigns/campaign-detail?actor=other", payload: renamePayload,
+      method: "PATCH",
+      url: "/api/rpg/v1/campaigns/campaign-detail?actor=other",
+      payload: renamePayload,
     });
     expect(query.statusCode).toBe(400);
     expect(query.json()).toMatchObject({
-      code: "RPG_INVALID_REQUEST", error: "Campaign rename does not accept query parameters",
+      code: "RPG_INVALID_REQUEST",
+      error: "Campaign rename does not accept query parameters",
     });
     for (const contentType of [undefined, "application/problem+json", "application/json; profile=x", "text/json"]) {
       const media = await app.inject({
@@ -716,14 +779,21 @@ describe("PATCH /api/rpg/v1/campaigns/:campaignId", () => {
     ["empty", "", "application/json"],
     ["malformed", "{", "application/json"],
     ["missing timestamp", JSON.stringify({ name: "Road" }), "application/json"],
-    ["noncanonical timestamp", JSON.stringify({ name: "Road", expectedUpdatedAt: "2030-01-03T00:00:00Z" }), "application/json"],
+    [
+      "noncanonical timestamp",
+      JSON.stringify({ name: "Road", expectedUpdatedAt: "2030-01-03T00:00:00Z" }),
+      "application/json",
+    ],
     ["unknown field", JSON.stringify({ ...renamePayload, extra: true }), "application/json"],
   ])("normalizes %s request bodies to 400 without a rename", async (_label, payload, contentType) => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const repo = repository();
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "PATCH", url: "/api/rpg/v1/campaigns/campaign-detail", payload, headers: { "content-type": contentType },
+      method: "PATCH",
+      url: "/api/rpg/v1/campaigns/campaign-detail",
+      payload,
+      headers: { "content-type": contentType },
     });
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({ code: "RPG_INVALID_REQUEST", error: "Campaign rename request is invalid" });
@@ -743,7 +813,10 @@ describe("PATCH /api/rpg/v1/campaigns/:campaignId", () => {
       ["/api/rpg/v1/campaigns/campaign-detail/rename", "RPG_ROUTE_NOT_FOUND"],
     ] as const) {
       const response = await app.inject({
-        method: "PATCH", url, payload: renamePayload, headers: { "x-request-id": "rename-path" },
+        method: "PATCH",
+        url,
+        payload: renamePayload,
+        headers: { "x-request-id": "rename-path" },
       });
       expect(response.statusCode).toBe(404);
       expect(response.headers["content-type"]).toContain("application/problem+json");
@@ -763,10 +836,14 @@ describe("PATCH /api/rpg/v1/campaigns/:campaignId", () => {
   ])("maps only typed rename failures without leaking details", async (failure, status, code) => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const repo = repository();
-    repo.renameCampaignIfUnchanged.mockImplementation(() => { throw failure; });
+    repo.renameCampaignIfUnchanged.mockImplementation(() => {
+      throw failure;
+    });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "PATCH", url: "/api/rpg/v1/campaigns/campaign-detail", payload: renamePayload,
+      method: "PATCH",
+      url: "/api/rpg/v1/campaigns/campaign-detail",
+      payload: renamePayload,
       headers: { "x-request-id": "rename-failure" },
     });
     expect(response.statusCode).toBe(status);
@@ -790,7 +867,9 @@ describe("PATCH /api/rpg/v1/campaigns/:campaignId", () => {
     });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "PATCH", url: "/api/rpg/v1/campaigns/campaign-detail", payload: renamePayload,
+      method: "PATCH",
+      url: "/api/rpg/v1/campaigns/campaign-detail",
+      payload: renamePayload,
     });
     expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({ code: "RPG_INTERNAL_ERROR", error: "Campaign could not be renamed" });
@@ -799,9 +878,21 @@ describe("PATCH /api/rpg/v1/campaigns/:campaignId", () => {
   });
 
   it.each([
-    ["wrong ID", { id: "private-other-campaign", name: "Renamed road", updatedAt: "2030-01-06T00:00:00.000Z" }, "private-other-campaign"],
-    ["wrong name", { id: "campaign-detail", name: "Private repository name", updatedAt: "2030-01-06T00:00:00.000Z" }, "Private repository name"],
-    ["older timestamp", { id: "campaign-detail", name: "Renamed road", updatedAt: "2030-01-02T00:00:00.000Z" }, "2030-01-02T00:00:00.000Z"],
+    [
+      "wrong ID",
+      { id: "private-other-campaign", name: "Renamed road", updatedAt: "2030-01-06T00:00:00.000Z" },
+      "private-other-campaign",
+    ],
+    [
+      "wrong name",
+      { id: "campaign-detail", name: "Private repository name", updatedAt: "2030-01-06T00:00:00.000Z" },
+      "Private repository name",
+    ],
+    [
+      "older timestamp",
+      { id: "campaign-detail", name: "Renamed road", updatedAt: "2030-01-02T00:00:00.000Z" },
+      "2030-01-02T00:00:00.000Z",
+    ],
   ])("redacts schema-valid %s output as a request-correlated 500", async (_label, campaign, privateDetail) => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const repo = repository();
@@ -844,7 +935,9 @@ describe("PATCH /api/rpg/v1/campaigns/:campaignId", () => {
     });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "PATCH", url: "/api/rpg/v1/campaigns/campaign-detail", payload: renamePayload,
+      method: "PATCH",
+      url: "/api/rpg/v1/campaigns/campaign-detail",
+      payload: renamePayload,
     });
 
     expect(response.statusCode).toBe(500);
@@ -876,12 +969,20 @@ describe("POST /api/rpg/v1/campaigns", () => {
     const repo = repository();
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "POST", url: "/api/rpg/v1/campaigns", payload: { name: "  New road  " },
-      headers: { "content-type": "application/json; charset=utf-8", authorization: "Bearer spoof", "x-principal-id": "spoof" },
+      method: "POST",
+      url: "/api/rpg/v1/campaigns",
+      payload: { name: "  New road  " },
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        authorization: "Bearer spoof",
+        "x-principal-id": "spoof",
+      },
     });
     expect(response.statusCode).toBe(201);
     expect(response.headers.location).toBeUndefined();
-    expect(response.json()).toEqual({ campaign: expect.objectContaining({ name: "New road", ownerPrincipalId: "local-owner" }) });
+    expect(response.json()).toEqual({
+      campaign: expect.objectContaining({ name: "New road", ownerPrincipalId: "local-owner" }),
+    });
     expect(repo.createCampaign).toHaveBeenCalledWith("local-owner", { name: "New road" });
     await app.close();
   });
@@ -891,8 +992,20 @@ describe("POST /api/rpg/v1/campaigns", () => {
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     expect((await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns", payload: "{" })).statusCode).toBe(404);
     process.env.FEATURE_RPG_CAMPAIGN = "true";
-    expect((await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns?actor=x", payload: { name: "Road" } })).statusCode).toBe(400);
-    expect((await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns", payload: "{}", headers: { "content-type": "application/problem+json" } })).statusCode).toBe(415);
+    expect(
+      (await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns?actor=x", payload: { name: "Road" } }))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/rpg/v1/campaigns",
+          payload: "{}",
+          headers: { "content-type": "application/problem+json" },
+        })
+      ).statusCode,
+    ).toBe(415);
     expect(repo.createCampaign).not.toHaveBeenCalled();
     await app.close();
   });
@@ -905,9 +1018,17 @@ describe("POST /api/rpg/v1/campaigns", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const repo = repository();
     const app = buildApp({ campaignRepositoryFactory: () => repo });
-    const response = await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns", payload, headers: { "content-type": contentType } });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/rpg/v1/campaigns",
+      payload,
+      headers: { "content-type": contentType },
+    });
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toMatchObject({ code: "RPG_INVALID_REQUEST", error: "Campaign creation request is invalid" });
+    expect(response.json()).toMatchObject({
+      code: "RPG_INVALID_REQUEST",
+      error: "Campaign creation request is invalid",
+    });
     expect(repo.createCampaign).not.toHaveBeenCalled();
     await app.close();
   });
@@ -964,7 +1085,9 @@ describe("POST /api/rpg/v1/campaigns", () => {
   ])("maps only typed repository failures without leaking details", async (failure, status, code) => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const repo = repository();
-    repo.createCampaign.mockImplementation(() => { throw failure; });
+    repo.createCampaign.mockImplementation(() => {
+      throw failure;
+    });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns", payload: { name: "Road" } });
     expect(response.statusCode).toBe(status);
@@ -977,8 +1100,12 @@ describe("POST /api/rpg/v1/campaigns", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     const repo = repository();
     repo.createCampaign.mockReturnValue({
-      id: "private invalid id", name: "Road", activeTimelineId: "timeline-created",
-      ownerPrincipalId: "local-owner", createdAt: "2030-01-05T00:00:00.000Z", updatedAt: "2030-01-05T00:00:00.000Z",
+      id: "private invalid id",
+      name: "Road",
+      activeTimelineId: "timeline-created",
+      ownerPrincipalId: "local-owner",
+      createdAt: "2030-01-05T00:00:00.000Z",
+      updatedAt: "2030-01-05T00:00:00.000Z",
     });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns", payload: { name: "Road" } });

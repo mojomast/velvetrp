@@ -77,23 +77,19 @@ function malformed(): never {
 
 /** One-statement, authorization-rooted campaign play bootstrap reader. */
 export interface CampaignPlayReadRepository {
-  getCampaignPlayBootstrap(
-    principalId: string,
-    campaignId: string,
-    sessionId: string,
-  ): CampaignPlayBootstrap | null;
+  getCampaignPlayBootstrap(principalId: string, campaignId: string, sessionId: string): CampaignPlayBootstrap | null;
 }
 
 /** Creates the campaign play reader over a caller-owned SQLite connection. */
-export function createCampaignPlayReadRepository(
-  db: DatabaseDriver.Database,
-): CampaignPlayReadRepository {
+export function createCampaignPlayReadRepository(db: DatabaseDriver.Database): CampaignPlayReadRepository {
   return {
     getCampaignPlayBootstrap(principalId, campaignId, sessionId) {
       const actorId = resourceIdSchema.parse(principalId);
       const id = resourceIdSchema.parse(campaignId);
       const roomId = campaignPlaySessionIdSchema.parse(sessionId);
-      const rows = db.prepare(`WITH authority AS MATERIALIZED (
+      const rows = db
+        .prepare(
+          `WITH authority AS MATERIALIZED (
         SELECT campaign.id AS campaign_id, campaign.owner_principal_id,
           campaign.owner_role AS campaign_owner_role, campaign.lifecycle_status,
           campaign.administration_revision, campaign.settings AS campaign_settings,
@@ -242,21 +238,30 @@ export function createCampaignPlayReadRepository(
       LEFT JOIN campaign_memberships controller_membership
         ON controller_membership.campaign_id = target.campaign_id
         AND controller_membership.principal_id = private_state.controller_principal_id
-      ORDER BY row_order, participant_order`).all({ actorId, campaignId: id, sessionId: roomId }) as CampaignPlayRow[];
+      ORDER BY row_order, participant_order`,
+        )
+        .all({ actorId, campaignId: id, sessionId: roomId }) as CampaignPlayRow[];
 
       if (rows.length === 0) return null;
       const authority = rows[0]!;
       // Missing principals, unknown roles, and stale purported owners cannot
       // establish attributable access and are deliberately null-masked.
-      if (authority.actor_campaign_id !== id || authority.actor_principal_id !== actorId
-        || authority.actor_parent_id !== actorId || authority.actor_role === null
-        || !CAMPAIGN_ROLES.includes(authority.actor_role as typeof CAMPAIGN_ROLES[number])
-        || (authority.actor_role === "owner" && authority.owner_principal_id !== actorId)) return null;
+      if (
+        authority.actor_campaign_id !== id ||
+        authority.actor_principal_id !== actorId ||
+        authority.actor_parent_id !== actorId ||
+        authority.actor_role === null ||
+        !CAMPAIGN_ROLES.includes(authority.actor_role as (typeof CAMPAIGN_ROLES)[number]) ||
+        (authority.actor_role === "owner" && authority.owner_principal_id !== actorId)
+      )
+        return null;
 
       try {
         const membership = campaignMembershipReadSchema.parse({
-          campaignId: authority.actor_campaign_id, principalId: authority.actor_principal_id,
-          role: authority.actor_role, createdAt: authority.actor_created_at,
+          campaignId: authority.actor_campaign_id,
+          principalId: authority.actor_principal_id,
+          role: authority.actor_role,
+          createdAt: authority.actor_created_at,
         });
         const owner = campaignMembershipReadSchema.parse({
           campaignId: authority.owner_campaign_id,
@@ -264,11 +269,18 @@ export function createCampaignPlayReadRepository(
           role: authority.owner_membership_role,
           createdAt: authority.owner_created_at,
         });
-        if (membership.campaignId !== id || membership.principalId !== actorId
-          || authority.campaign_id !== id || authority.campaign_owner_role !== "owner"
-          || authority.owner_count !== 1 || owner.campaignId !== id || owner.role !== "owner"
-          || owner.principalId !== authority.owner_principal_id
-          || authority.owner_parent_id !== authority.owner_principal_id) malformed();
+        if (
+          membership.campaignId !== id ||
+          membership.principalId !== actorId ||
+          authority.campaign_id !== id ||
+          authority.campaign_owner_role !== "owner" ||
+          authority.owner_count !== 1 ||
+          owner.campaignId !== id ||
+          owner.role !== "owner" ||
+          owner.principalId !== authority.owner_principal_id ||
+          authority.owner_parent_id !== authority.owner_principal_id
+        )
+          malformed();
         campaignPlayLifecycleSchema.parse(authority.lifecycle_status);
         revisionSchema.parse(authority.administration_revision);
         campaignSettingsSchema.parse(JSON.parse(authority.campaign_settings));
@@ -281,10 +293,15 @@ export function createCampaignPlayReadRepository(
       if (participants.length === 0) return null;
       const first = participants[0]!;
       try {
-        if (first.session_id !== roomId || first.session_presence !== roomId
-          || first.attached_at === null || first.session_created_at === null
-          || first.session_state === null
-          || !SESSION_STATES.includes(first.session_state as typeof SESSION_STATES[number])) malformed();
+        if (
+          first.session_id !== roomId ||
+          first.session_presence !== roomId ||
+          first.attached_at === null ||
+          first.session_created_at === null ||
+          first.session_state === null ||
+          !SESSION_STATES.includes(first.session_state as (typeof SESSION_STATES)[number])
+        )
+          malformed();
         const attachedAt = utcIsoTimestampSchema.parse(first.attached_at);
         const createdAt = utcIsoTimestampSchema.parse(first.session_created_at);
         const active = first.session_state === "active" && first.stopped_at === null && first.stop_reason_kind === 0;
@@ -292,58 +309,100 @@ export function createCampaignPlayReadRepository(
           const stoppedAt = utcIsoTimestampSchema.parse(first.stopped_at);
           if (first.stop_reason_kind !== 1 || stoppedAt < createdAt) malformed();
         } else if (first.stopped_at !== null || first.stop_reason_kind !== 0) malformed();
-        if (!Number.isSafeInteger(first.participant_count) || (first.participant_count as number) < 1
-          || (first.participant_count as number) > 12 || participants.length !== first.participant_count
-          || first.joined_character_count !== first.participant_count
-          || first.primary_participant_count !== 1
-          || first.distinct_character_count !== first.participant_count
-          || first.distinct_position_count !== first.participant_count
-          || first.malformed_position_count !== 0 || first.minimum_position !== 0
-          || first.maximum_position !== (first.participant_count as number) - 1) malformed();
+        if (
+          !Number.isSafeInteger(first.participant_count) ||
+          (first.participant_count as number) < 1 ||
+          (first.participant_count as number) > 12 ||
+          participants.length !== first.participant_count ||
+          first.joined_character_count !== first.participant_count ||
+          first.primary_participant_count !== 1 ||
+          first.distinct_character_count !== first.participant_count ||
+          first.distinct_position_count !== first.participant_count ||
+          first.malformed_position_count !== 0 ||
+          first.minimum_position !== 0 ||
+          first.maximum_position !== (first.participant_count as number) - 1
+        )
+          malformed();
 
         const seenActors = new Set<string>();
         const allActors: Array<{ actorId: string; name: string; controller: string }> = [];
         let hasUnfinalizedParticipant = false;
         for (const row of participants) {
-          if (row.campaign_id !== id || row.session_id !== roomId
-            || row.lifecycle_status !== first.lifecycle_status
-            || row.administration_revision !== first.administration_revision
-            || row.campaign_settings !== first.campaign_settings
-            || row.session_state !== first.session_state || row.attached_at !== first.attached_at
-            || row.participant_count !== first.participant_count
-            || row.participant_character_id === null || row.participant_name === null) malformed();
+          if (
+            row.campaign_id !== id ||
+            row.session_id !== roomId ||
+            row.lifecycle_status !== first.lifecycle_status ||
+            row.administration_revision !== first.administration_revision ||
+            row.campaign_settings !== first.campaign_settings ||
+            row.session_state !== first.session_state ||
+            row.attached_at !== first.attached_at ||
+            row.participant_count !== first.participant_count ||
+            row.participant_character_id === null ||
+            row.participant_name === null
+          )
+            malformed();
           if (row.campaign_character_id === null) {
-            if (row.campaign_character_count !== 0 || row.sheet_id !== null || row.sheet_count !== 0
-              || row.actor_id !== null || row.actor_kind !== null || row.actor_control !== null
-              || row.actor_count !== 0 || row.private_actor_id !== null || row.private_state_count !== 0
-              || row.controller_principal_id !== null || row.controller_parent_id !== null
-              || row.controller_campaign_id !== null || row.controller_role !== null
-              || row.controller_created_at !== null) malformed();
+            if (
+              row.campaign_character_count !== 0 ||
+              row.sheet_id !== null ||
+              row.sheet_count !== 0 ||
+              row.actor_id !== null ||
+              row.actor_kind !== null ||
+              row.actor_control !== null ||
+              row.actor_count !== 0 ||
+              row.private_actor_id !== null ||
+              row.private_state_count !== 0 ||
+              row.controller_principal_id !== null ||
+              row.controller_parent_id !== null ||
+              row.controller_campaign_id !== null ||
+              row.controller_role !== null ||
+              row.controller_created_at !== null
+            )
+              malformed();
             hasUnfinalizedParticipant = true;
             continue;
           }
-          if (row.campaign_character_count !== 1
-            || row.sheet_id === null || row.sheet_count !== 1
-            || row.actor_id === null || row.actor_count !== 1 || seenActors.has(row.actor_id)
-            || row.actor_kind !== "player-character" || row.actor_control !== "principal"
-            || row.private_actor_id !== row.actor_id || row.private_state_count !== 1
-            || row.controller_principal_id === null
-            || row.controller_parent_id !== row.controller_principal_id
-            || row.controller_campaign_id !== id
-            || !["owner", "gm", "player"].includes(row.controller_role ?? "")
-            || (row.controller_role === "owner" && row.controller_principal_id !== authority.owner_principal_id)) malformed();
-          campaignMembershipReadSchema.parse({ campaignId: row.controller_campaign_id,
-            principalId: row.controller_principal_id, role: row.controller_role,
-            createdAt: row.controller_created_at });
+          if (
+            row.campaign_character_count !== 1 ||
+            row.sheet_id === null ||
+            row.sheet_count !== 1 ||
+            row.actor_id === null ||
+            row.actor_count !== 1 ||
+            seenActors.has(row.actor_id) ||
+            row.actor_kind !== "player-character" ||
+            row.actor_control !== "principal" ||
+            row.private_actor_id !== row.actor_id ||
+            row.private_state_count !== 1 ||
+            row.controller_principal_id === null ||
+            row.controller_parent_id !== row.controller_principal_id ||
+            row.controller_campaign_id !== id ||
+            !["owner", "gm", "player"].includes(row.controller_role ?? "") ||
+            (row.controller_role === "owner" && row.controller_principal_id !== authority.owner_principal_id)
+          )
+            malformed();
+          campaignMembershipReadSchema.parse({
+            campaignId: row.controller_campaign_id,
+            principalId: row.controller_principal_id,
+            role: row.controller_role,
+            createdAt: row.controller_created_at,
+          });
           resourceIdSchema.parse(row.actor_id);
           seenActors.add(row.actor_id);
-          allActors.push({ actorId: row.actor_id, name: row.participant_name, controller: row.controller_principal_id });
+          allActors.push({
+            actorId: row.actor_id,
+            name: row.participant_name,
+            controller: row.controller_principal_id,
+          });
         }
 
-        const role = authority.actor_role as typeof CAMPAIGN_ROLES[number];
+        const role = authority.actor_role as (typeof CAMPAIGN_ROLES)[number];
         const control = role === "owner" || role === "gm" ? "all" : role === "player" ? "controlled" : "none";
-        const playableActors = control === "all" ? allActors
-          : control === "controlled" ? allActors.filter(({ controller }) => controller === actorId) : [];
+        const playableActors =
+          control === "all"
+            ? allActors
+            : control === "controlled"
+              ? allActors.filter(({ controller }) => controller === actorId)
+              : [];
         const settings = campaignSettingsSchema.parse(JSON.parse(authority.campaign_settings));
         const playerDiceHistory = role === "player" && settings.allowPlayerDice;
         const playerDiceRoll = playerDiceHistory && playableActors.length > 0;
@@ -356,15 +415,23 @@ export function createCampaignPlayReadRepository(
             attached: true,
             attachedAt,
             active,
-            adventureEligible: !hasUnfinalizedParticipant && authority.lifecycle_status === "published" && active
-              && resourceIdSchema.safeParse(roomId).success,
+            adventureEligible:
+              !hasUnfinalizedParticipant &&
+              authority.lifecycle_status === "published" &&
+              active &&
+              resourceIdSchema.safeParse(roomId).success,
           },
           principal: { role, control },
-          capabilities: { campaignDice: {
-            canView: role === "owner" || role === "gm" || playerDiceHistory,
-            canRoll: role === "owner" || role === "gm" || playerDiceRoll,
-          } },
-          playableActors: playableActors.map(({ actorId: playableActorId, name }) => ({ actorId: playableActorId, name })),
+          capabilities: {
+            campaignDice: {
+              canView: role === "owner" || role === "gm" || playerDiceHistory,
+              canRoll: role === "owner" || role === "gm" || playerDiceRoll,
+            },
+          },
+          playableActors: playableActors.map(({ actorId: playableActorId, name }) => ({
+            actorId: playableActorId,
+            name,
+          })),
         });
       } catch (error) {
         if (error instanceof Error && error.message === "campaign play bootstrap is malformed") throw error;

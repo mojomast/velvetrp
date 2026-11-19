@@ -1,28 +1,83 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, type FreeformFactionHttpResponse, type FreeformQuestHttpResponse, type FreeformRumorHttpResponse } from "../../../api";
+import {
+  ApiError,
+  type FreeformFactionHttpResponse,
+  type FreeformQuestHttpResponse,
+  type FreeformRumorHttpResponse,
+} from "../../../api";
 import { FreeformSeekPanel, type FreeformSeekApi } from "./FreeformSeekPanel";
 
 afterEach(cleanup);
 
 const factionResponse: FreeformFactionHttpResponse = {
-  classification: { intent: "materialize-faction", factionName: "Ashen Circle",
-    candidates: [{ candidateId: "ffac-1", factionKey: "ff-faction-1", gmAgendaKey: "ff-agenda-1", name: "Ashen Circle",
-      archetype: "order", description: "A quiet order.", gmAgenda: "secret agenda", visibility: "public" }] },
-  materialization: { status: "materialized",
-    candidate: { candidateId: "ffac-1", factionKey: "ff-faction-1", gmAgendaKey: "ff-agenda-1", name: "Ashen Circle", visibility: "public" },
-    factionId: "ff-faction-1", draftId: "draft-1", contentReceiptId: "receipt-1", gmAgendaArtifactKey: "ff-agenda-1" },
+  classification: {
+    intent: "materialize-faction",
+    factionName: "Ashen Circle",
+    candidates: [
+      {
+        candidateId: "ffac-1",
+        factionKey: "ff-faction-1",
+        gmAgendaKey: "ff-agenda-1",
+        name: "Ashen Circle",
+        archetype: "order",
+        description: "A quiet order.",
+        gmAgenda: "secret agenda",
+        visibility: "public",
+      },
+    ],
+  },
+  materialization: {
+    status: "materialized",
+    candidate: {
+      candidateId: "ffac-1",
+      factionKey: "ff-faction-1",
+      gmAgendaKey: "ff-agenda-1",
+      name: "Ashen Circle",
+      visibility: "public",
+    },
+    factionId: "ff-faction-1",
+    draftId: "draft-1",
+    contentReceiptId: "receipt-1",
+    gmAgendaArtifactKey: "ff-agenda-1",
+  },
 };
 const questDeclined: FreeformQuestHttpResponse = { classification: { intent: "none", reason: "known-quest" } };
 const rumorResponse: FreeformRumorHttpResponse = {
-  classification: { intent: "materialize-rumor", subject: "the drowned bell",
-    candidates: [{ candidateId: "ffrc-1", hearsayKey: "ff-rumor-hearsay-1", truthKey: "ff-rumor-truth-1", locationKey: "gate",
-      subject: "the drowned bell", source: "a dockhand", publicText: "They say the bell tolls beneath the tide.",
-      gmTruth: "It is a signal.", templateId: "drowned-bell", visibility: "public" }] },
-  materialization: { status: "materialized",
-    candidate: { candidateId: "ffrc-1", hearsayKey: "ff-rumor-hearsay-1", truthKey: "ff-rumor-truth-1", subject: "the drowned bell",
-      source: "a dockhand", publicText: "They say the bell tolls beneath the tide.", visibility: "public" },
-    rumorId: "ff-rumor-hearsay-1", draftId: "draft-2", contentReceiptId: "receipt-2", gmTruthArtifactKey: "ff-rumor-truth-1" },
+  classification: {
+    intent: "materialize-rumor",
+    subject: "the drowned bell",
+    candidates: [
+      {
+        candidateId: "ffrc-1",
+        hearsayKey: "ff-rumor-hearsay-1",
+        truthKey: "ff-rumor-truth-1",
+        locationKey: "gate",
+        subject: "the drowned bell",
+        source: "a dockhand",
+        publicText: "They say the bell tolls beneath the tide.",
+        gmTruth: "It is a signal.",
+        templateId: "drowned-bell",
+        visibility: "public",
+      },
+    ],
+  },
+  materialization: {
+    status: "materialized",
+    candidate: {
+      candidateId: "ffrc-1",
+      hearsayKey: "ff-rumor-hearsay-1",
+      truthKey: "ff-rumor-truth-1",
+      subject: "the drowned bell",
+      source: "a dockhand",
+      publicText: "They say the bell tolls beneath the tide.",
+      visibility: "public",
+    },
+    rumorId: "ff-rumor-hearsay-1",
+    draftId: "draft-2",
+    contentReceiptId: "receipt-2",
+    gmTruthArtifactKey: "ff-rumor-truth-1",
+  },
 };
 
 function apiMock(overrides: Partial<FreeformSeekApi> = {}): FreeformSeekApi {
@@ -30,7 +85,9 @@ function apiMock(overrides: Partial<FreeformSeekApi> = {}): FreeformSeekApi {
 }
 
 function renderPanel(api: FreeformSeekApi, audience: "gm" | "player" = "gm", actorId: string | null = "actor") {
-  return render(<FreeformSeekPanel campaignId="campaign" sessionId="session" actorId={actorId} audience={audience} api={api} />);
+  return render(
+    <FreeformSeekPanel campaignId="campaign" sessionId="session" actorId={actorId} audience={audience} api={api} />,
+  );
 }
 
 describe("FreeformSeekPanel", () => {

@@ -27,8 +27,20 @@ const REQUEST: RouterRequestProjection = {
   safetySensitive: false,
 };
 
-function lane(caller: SystemOneCaller, overrides: Partial<SystemOneSettings> = {}): { settings: SystemOneSettings; caller: SystemOneCaller } {
-  return { settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key", ...overrides }, caller };
+function lane(
+  caller: SystemOneCaller,
+  overrides: Partial<SystemOneSettings> = {},
+): { settings: SystemOneSettings; caller: SystemOneCaller } {
+  return {
+    settings: {
+      ...defaultSystemOneSettings(),
+      enabled: true,
+      laneModes: defaultSystemOneLaneModes(),
+      apiKey: "test-key",
+      ...overrides,
+    },
+    caller,
+  };
 }
 
 function routerAnswers(): Record<string, SystemOneAnswer> {
@@ -92,13 +104,19 @@ describe("recordRouterShadowDecision", () => {
 
   it("records nothing and never throws when the caller fails", async () => {
     const caller = createFakeSystemOneCaller({ failWith: new Error("system one down") });
-    await expect(recordRouterShadowDecision("session-2", REQUEST, lane(caller), "frontier-generation")).resolves.toBeUndefined();
+    await expect(
+      recordRouterShadowDecision("session-2", REQUEST, lane(caller), "frontier-generation"),
+    ).resolves.toBeUndefined();
     expect(listSystemOneDecisionsByLane("cost-router", 10)).toHaveLength(0);
   });
 
   it("records nothing and never throws when the caller throws synchronously", async () => {
-    const caller = (() => { throw new Error("sync boom"); }) as unknown as SystemOneCaller;
-    await expect(recordRouterShadowDecision("session-3", REQUEST, lane(caller), "frontier-generation")).resolves.toBeUndefined();
+    const caller = (() => {
+      throw new Error("sync boom");
+    }) as unknown as SystemOneCaller;
+    await expect(
+      recordRouterShadowDecision("session-3", REQUEST, lane(caller), "frontier-generation"),
+    ).resolves.toBeUndefined();
     expect(listSystemOneDecisionsByLane("cost-router", 10)).toHaveLength(0);
   });
 });
@@ -152,7 +170,9 @@ async function startFakeSystemOne(responseGate?: Promise<void>): Promise<FakeSys
   const server: Server = createServer((req, res) => {
     if (req.method === "POST" && req.url === "/v1/systemone") {
       let body = "";
-      req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
+      req.on("data", (chunk: Buffer) => {
+        body += chunk.toString("utf8");
+      });
       req.on("end", () => {
         requests += 1;
         void (responseGate ?? Promise.resolve()).then(() => {
@@ -184,14 +204,26 @@ let provider: FakeProvider | null = null;
 let systemOne: FakeSystemOne | null = null;
 
 afterEach(async () => {
-  if (provider) { await provider.close(); provider = null; }
-  if (systemOne) { await systemOne.close(); systemOne = null; }
-  if (savedSystemOneEnv.feature === undefined) delete process.env.FEATURE_SYSTEM_ONE; else process.env.FEATURE_SYSTEM_ONE = savedSystemOneEnv.feature;
-  if (savedSystemOneEnv.base === undefined) delete process.env.TYPESAFE_BASE_URL; else process.env.TYPESAFE_BASE_URL = savedSystemOneEnv.base;
-  if (savedSystemOneEnv.key === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = savedSystemOneEnv.key;
+  if (provider) {
+    await provider.close();
+    provider = null;
+  }
+  if (systemOne) {
+    await systemOne.close();
+    systemOne = null;
+  }
+  if (savedSystemOneEnv.feature === undefined) delete process.env.FEATURE_SYSTEM_ONE;
+  else process.env.FEATURE_SYSTEM_ONE = savedSystemOneEnv.feature;
+  if (savedSystemOneEnv.base === undefined) delete process.env.TYPESAFE_BASE_URL;
+  else process.env.TYPESAFE_BASE_URL = savedSystemOneEnv.base;
+  if (savedSystemOneEnv.key === undefined) delete process.env.TYPESAFE_API_KEY;
+  else process.env.TYPESAFE_API_KEY = savedSystemOneEnv.key;
 });
 
-async function runRoomTurn(systemOneEnabled: boolean, responseGate?: Promise<void>): Promise<{
+async function runRoomTurn(
+  systemOneEnabled: boolean,
+  responseGate?: Promise<void>,
+): Promise<{
   status: number;
   routing: string;
   selectedSpeakerIds: string[];
@@ -215,20 +247,34 @@ async function runRoomTurn(systemOneEnabled: boolean, responseGate?: Promise<voi
     url: "/api/provider/system-one",
     // The guardrails lane has its own shadow test; keep it off here so this test counts only
     // the speaker-routing and cost-router lanes it exercises.
-    payload: systemOneEnabled ? { enabled: true, laneModes: { guardrails: responseGate ? "shadow" : "off" } } : { enabled: false },
+    payload: systemOneEnabled
+      ? { enabled: true, laneModes: { guardrails: responseGate ? "shadow" : "off" } }
+      : { enabled: false },
   });
 
   const characterInput = (name: string) => ({
-    name, age: 30, archetype: `${name} archetype`, boundaries: "fictional", fictionalConfirmed: true,
+    name,
+    age: 30,
+    archetype: `${name} archetype`,
+    boundaries: "fictional",
+    fictionalConfirmed: true,
   });
-  const one = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("One") })).json() as { id: string };
-  const two = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("Two") })).json() as { id: string };
-  const three = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("Three") })).json() as { id: string };
-  const session = (await app.inject({
-    method: "POST",
-    url: "/api/sessions",
-    payload: { characterIds: [one.id, two.id, three.id], primaryCharacterId: one.id },
-  })).json() as { id: string };
+  const one = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("One") })).json() as {
+    id: string;
+  };
+  const two = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("Two") })).json() as {
+    id: string;
+  };
+  const three = (
+    await app.inject({ method: "POST", url: "/api/characters", payload: characterInput("Three") })
+  ).json() as { id: string };
+  const session = (
+    await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { characterIds: [one.id, two.id, three.id], primaryCharacterId: one.id },
+    })
+  ).json() as { id: string };
 
   const response = await app.inject({
     method: "POST",
@@ -263,9 +309,14 @@ async function runRoomTurn(systemOneEnabled: boolean, responseGate?: Promise<voi
 describe("cost-router shadow classification in the room turn", () => {
   it("finishes the room turn before all three advisory lanes respond and records each late decision once", async () => {
     let release!: () => void;
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     let completed = false;
-    const turn = runRoomTurn(true, gate).then((result) => { completed = true; return result; });
+    const turn = runRoomTurn(true, gate).then((result) => {
+      completed = true;
+      return result;
+    });
     try {
       await expect.poll(() => completed, { timeout: 3000 }).toBe(true);
       const result = await turn;
@@ -273,7 +324,10 @@ describe("cost-router shadow classification in the room turn", () => {
       expect(result.replyContents).toEqual(["One answers first.", "Two reacts to One."]);
       expect(result.costRouter).toEqual([]);
       expect(result.speakerRouting).toEqual([]);
-    } finally { release(); await turn; }
+    } finally {
+      release();
+      await turn;
+    }
     for (const lane of ["speaker-routing", "cost-router", "guardrails"] as const) {
       await expect.poll(() => listSystemOneDecisionsByLane(lane, 10).length).toBe(1);
       const row = listSystemOneDecisionsByLane(lane, 10)[0]!;
@@ -291,7 +345,10 @@ describe("cost-router shadow classification in the room turn", () => {
     expect(result.replyContents).toEqual(["One answers first.", "Two reacts to One."]);
     expect(result.costRouter).toHaveLength(1);
     expect(result.costRouter[0]).toMatchObject({
-      lane: "cost-router", provider: "typesafe", shadow: true, fallbackUsed: true,
+      lane: "cost-router",
+      provider: "typesafe",
+      shadow: true,
+      fallbackUsed: true,
     });
     expect(result.costRouter[0]!.selection).toMatchObject({ handler: expect.any(String), band: expect.any(String) });
     // The speaker-routing shadow lane also records, and both lanes use the same caller.

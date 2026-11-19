@@ -47,22 +47,13 @@ import {
 } from "./characterProgressionErrors.js";
 import type { CharacterProgressionReadRepository } from "./characterProgressionReadRepo.js";
 
-const digest = (value: unknown) =>
-  createHash("sha256").update(canonicalCatalogJson(value)).digest("hex");
+const digest = (value: unknown) => createHash("sha256").update(canonicalCatalogJson(value)).digest("hex");
 const sortReferences = <T extends ExactReference>(values: T[]) =>
-  [...values].sort((left, right) =>
-    progressionReferenceKey(left).localeCompare(progressionReferenceKey(right)),
-  );
+  [...values].sort((left, right) => progressionReferenceKey(left).localeCompare(progressionReferenceKey(right)));
 
 /** Installs and validates the canonical starter progression profiles. */
 function ensureProfiles(db: DatabaseDriver.Database, rulesProfileId: string): void {
-  if (
-    !db
-      .prepare(
-        "SELECT 1 FROM rpg_rules_profiles WHERE rules_profile_id=?",
-      )
-      .get(rulesProfileId)
-  )
+  if (!db.prepare("SELECT 1 FROM rpg_rules_profiles WHERE rules_profile_id=?").get(rulesProfileId))
     throw new CharacterProgressionUnavailableError("unsupported rules profile");
   const insert = db.prepare(
     `INSERT OR IGNORE INTO rpg_progression_profiles_v23(profile_id,rules_profile_id,mode,max_level,thresholds_json,profile_digest) VALUES(?,?,?,?,?,?)`,
@@ -97,7 +88,8 @@ export function initializeCharacterProgressionV24(
     mode?: "xp" | "milestone";
   },
 ): boolean {
-  const profile = db.prepare("SELECT rules_profile_id FROM campaign_rules_profiles WHERE campaign_id=?")
+  const profile = db
+    .prepare("SELECT rules_profile_id FROM campaign_rules_profiles WHERE campaign_id=?")
     .get(input.campaignId) as { rules_profile_id: string } | undefined;
   if (!profile) throw new CharacterProgressionUnavailableError("unsupported rules profile");
   ensureProfiles(db, profile.rules_profile_id);
@@ -107,8 +99,10 @@ export function initializeCharacterProgressionV24(
       campaign_id: input.campaignId,
       sheet_id: input.sheetId,
       actor_id: input.actorId,
-      profile_id: profile.rules_profile_id === "srd-5.1:rules:starter-v1"
-        ? srdStarterProgressionProfileId(mode) : starterProgressionProfileId(mode),
+      profile_id:
+        profile.rules_profile_id === "srd-5.1:rules:starter-v1"
+          ? srdStarterProgressionProfileId(mode)
+          : starterProgressionProfileId(mode),
       class_pack_id: input.classRef.packId,
       class_pack_version: input.classRef.packVersion,
       class_definition_id: input.classRef.definitionId,
@@ -145,17 +139,18 @@ export function initializeCharacterProgressionV24(
     );
   if (result.changes === 0) return false;
   const sheet = db
-      .prepare(
-        "SELECT race_pack_id,race_pack_version,race_definition_id FROM rpg_campaign_sheets WHERE id=?",
-      )
+      .prepare("SELECT race_pack_id,race_pack_version,race_definition_id FROM rpg_campaign_sheets WHERE id=?")
       .get(input.sheetId) as any,
-     levelsJson = canonicalCatalogJson(catalog.levels),
-     initialPowers = [...catalog.initialPowers, ...(input.preparedSpells ?? []).map((reference) => ({
-       reference,
-       source: "class-level" as const,
-       sourceReference: input.preparedSpellSource!,
-     }))],
-     powersJson = canonicalCatalogJson(initialPowers);
+    levelsJson = canonicalCatalogJson(catalog.levels),
+    initialPowers = [
+      ...catalog.initialPowers,
+      ...(input.preparedSpells ?? []).map((reference) => ({
+        reference,
+        source: "class-level" as const,
+        sourceReference: input.preparedSpellSource!,
+      })),
+    ],
+    powersJson = canonicalCatalogJson(initialPowers);
   db.prepare(
     `INSERT INTO character_progression_bootstrap_v24(campaign_character_id,race_pack_id,race_pack_version,race_kind,race_definition_id,class_progression_json,class_progression_digest,initial_powers_json,initial_powers_digest,created_at) VALUES(?,?,?,'race',?,?,?,?,?,?)`,
   ).run(
@@ -214,42 +209,25 @@ export function initializeCharacterProgressionV24(
   const pendingJson = canonicalCatalogJson([]);
   db.prepare(
     `INSERT INTO character_progression_pending_snapshots_v24(campaign_character_id,revision,command_id,pending_json,pending_digest,created_at) VALUES(?,0,NULL,?,?,?)`,
-  ).run(
-    input.campaignCharacterId,
-    pendingJson,
-    progressionCatalogDigest([]),
-    input.now,
-  );
+  ).run(input.campaignCharacterId, pendingJson, progressionCatalogDigest([]), input.now);
   return true;
 }
 
-function retry(
-  db: DatabaseDriver.Database,
-  campaignId: string,
-  actor: string,
-  key: string,
-) {
+function retry(db: DatabaseDriver.Database, campaignId: string, actor: string, key: string) {
   return db
     .prepare(
       `SELECT command.type,command.requested_json,command.campaign_character_id,receipt.result_json FROM character_progression_commands_v23 command JOIN character_progression_receipts_v23 receipt ON receipt.campaign_character_id=command.campaign_character_id AND receipt.command_id=command.command_id JOIN character_progression_command_proposals_v24 proposal ON proposal.campaign_character_id=command.campaign_character_id AND proposal.command_id=command.command_id AND proposal.proposed_result_json=receipt.result_json JOIN character_progression_events_v24 event ON event.campaign_character_id=command.campaign_character_id AND event.command_id=command.command_id AND event.event_id=proposal.proposed_event_id WHERE command.campaign_id=? AND command.actor_principal_id=? AND command.idempotency_key=?`,
     )
     .get(campaignId, actor, key) as any;
 }
-function exactRetry(
-  found: any,
-  type: string,
-  requested: unknown,
-  id: string,
-): ProgressionCommandResult | null {
+function exactRetry(found: any, type: string, requested: unknown, id: string): ProgressionCommandResult | null {
   if (!found) return null;
   if (
     found.type !== type ||
     found.campaign_character_id !== id ||
     found.requested_json !== canonicalCatalogJson(requested)
   )
-    throw new CharacterProgressionConflictError(
-      "idempotency key was reused for a different progression command",
-    );
+    throw new CharacterProgressionConflictError("idempotency key was reused for a different progression command");
   return progressionCommandResultSchema.parse(JSON.parse(found.result_json));
 }
 const snapshotJson = (row: ProgressionRootRow) =>
@@ -314,14 +292,7 @@ function insertPending(
   const json = canonicalCatalogJson(pending);
   db.prepare(
     `INSERT INTO character_progression_pending_snapshots_v24(campaign_character_id,revision,command_id,pending_json,pending_digest,created_at) VALUES(?,?,?,?,?,?)`,
-  ).run(
-    row.campaign_character_id,
-    row.revision,
-    commandId,
-    json,
-    progressionCatalogDigest(pending),
-    now,
-  );
+  ).run(row.campaign_character_id, row.revision, commandId, json, progressionCatalogDigest(pending), now);
 }
 function finishAudit(
   db: DatabaseDriver.Database,
@@ -345,22 +316,10 @@ function finishAudit(
   );
   db.prepare(
     "INSERT INTO character_progression_snapshots_v23(campaign_character_id,revision,command_id,snapshot_json,created_at) VALUES(?,?,?,?,?)",
-  ).run(
-    row.campaign_character_id,
-    row.revision,
-    event.commandId,
-    snapshotJson(row),
-    now,
-  );
+  ).run(row.campaign_character_id, row.revision, event.commandId, snapshotJson(row), now);
   db.prepare(
     "INSERT INTO character_progression_receipts_v23(campaign_character_id,command_id,revision_before,revision_after,result_json) VALUES(?,?,?,?,?)",
-  ).run(
-    row.campaign_character_id,
-    event.commandId,
-    expected,
-    row.revision,
-    canonicalCatalogJson(result),
-  );
+  ).run(row.campaign_character_id, event.commandId, expected, row.revision, canonicalCatalogJson(result));
 }
 function eventFor(values: {
   eventId: string;
@@ -441,42 +400,27 @@ export function createCharacterProgressionWriteRepository(
     input: GrantCharacterXpInput | GrantCharacterMilestoneInput,
   ) => {
     deps.assertFactoryMutation();
-    const normalized = (
-      kind === "grant-xp"
-        ? grantCharacterXpInputSchema
-        : grantCharacterMilestoneInputSchema
-    ).parse(input) as any;
+    const normalized = (kind === "grant-xp" ? grantCharacterXpInputSchema : grantCharacterMilestoneInputSchema).parse(
+      input,
+    ) as any;
     return db
       .transaction(() => {
         const row = authorized(actor, id);
         if (!row) throw new CharacterProgressionAuthorizationError();
         requireSupportedProgression(row);
-        const again = exactRetry(
-          retry(db, row.campaign_id, actor, normalized.idempotencyKey),
-          kind,
-          normalized,
-          id,
-        );
+        const again = exactRetry(retry(db, row.campaign_id, actor, normalized.idempotencyKey), kind, normalized, id);
         if (again) return again;
-        if (row.revision !== normalized.expectedRevision)
-          throw new CharacterProgressionStaleError();
+        if (row.revision !== normalized.expectedRevision) throw new CharacterProgressionStaleError();
         const mode = loadCanonicalProgressionProfile(db, row.profile_id).mode;
         if ((kind === "grant-xp") !== (mode === "xp"))
-          throw new CharacterProgressionConflictError(
-            "grant kind does not match progression mode",
-          );
+          throw new CharacterProgressionConflictError("grant kind does not match progression mode");
         const now = utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),
           commandId = resourceIdSchema.parse(deps.ids.nextId()),
           eventId = resourceIdSchema.parse(deps.ids.nextId()),
           entryId = resourceIdSchema.parse(deps.ids.nextId());
         db.prepare(
           "UPDATE character_progression_v23 SET total_xp=total_xp+?,milestone_count=milestone_count+?,revision=revision+1,updated_at=? WHERE campaign_character_id=?",
-        ).run(
-          kind === "grant-xp" ? normalized.amount : 0,
-          kind === "grant-milestone" ? 1 : 0,
-          now,
-          id,
-        );
+        ).run(kind === "grant-xp" ? normalized.amount : 0, kind === "grant-milestone" ? 1 : 0, now, id);
         const updated = rootFor(id)!,
           preview = previewFor(updated),
           state = stateFor(updated, preview.pendingChoices),
@@ -554,8 +498,7 @@ export function createCharacterProgressionWriteRepository(
           if (!row) throw new CharacterProgressionAuthorizationError();
           requireSupportedProgression(row);
           const role = authority(actor, row);
-          if (role !== "owner" && role !== "gm")
-            throw new CharacterProgressionAuthorizationError();
+          if (role !== "owner" && role !== "gm") throw new CharacterProgressionAuthorizationError();
           const again = exactRetry(
             retry(db, row.campaign_id, actor, normalized.idempotencyKey),
             "correct-xp",
@@ -563,20 +506,14 @@ export function createCharacterProgressionWriteRepository(
             id,
           );
           if (again) return again;
-          if (row.revision !== normalized.expectedRevision)
-            throw new CharacterProgressionStaleError();
+          if (row.revision !== normalized.expectedRevision) throw new CharacterProgressionStaleError();
           const original = db
             .prepare(
               "SELECT * FROM character_progression_ledger_v23 WHERE entry_id=? AND campaign_character_id=? AND kind IN ('xp','milestone')",
             )
             .get(normalized.entryId, id) as any;
-          if (!original)
-            throw new CharacterProgressionConflictError(
-              "corrected entry is unavailable",
-            );
-          const now = utcIsoTimestampSchema.parse(
-              deps.clock.now().toISOString(),
-            ),
+          if (!original) throw new CharacterProgressionConflictError("corrected entry is unavailable");
+          const now = utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),
             commandId = resourceIdSchema.parse(deps.ids.nextId()),
             eventId = resourceIdSchema.parse(deps.ids.nextId()),
             entryId = resourceIdSchema.parse(deps.ids.nextId());
@@ -659,21 +596,15 @@ export function createCharacterProgressionWriteRepository(
             id,
           );
           if (again) return again;
-          if (row.revision !== normalized.previewRevision)
-            throw new CharacterProgressionStaleError();
+          if (row.revision !== normalized.previewRevision) throw new CharacterProgressionStaleError();
           const base = previewFor(row),
             selected = previewFor(row, normalized.selections);
-          if (base.token !== normalized.previewToken)
-            throw new CharacterProgressionStaleError();
-          if (!base.levels.length)
-            throw new CharacterProgressionConflictError("no eligible levels");
-          const required = new Map(
-            base.pendingChoices.map((choice) => [choice.choiceId, choice]),
-          );
+          if (base.token !== normalized.previewToken) throw new CharacterProgressionStaleError();
+          if (!base.levels.length) throw new CharacterProgressionConflictError("no eligible levels");
+          const required = new Map(base.pendingChoices.map((choice) => [choice.choiceId, choice]));
           if (
             normalized.selections.length !== required.size ||
-            new Set(normalized.selections.map((value) => value.choiceId))
-              .size !== required.size
+            new Set(normalized.selections.map((value) => value.choiceId)).size !== required.size
           )
             throw new CharacterProgressionConflictError(
               "every required progression choice must be selected exactly once",
@@ -681,18 +612,13 @@ export function createCharacterProgressionWriteRepository(
           for (const selection of normalized.selections) {
             const choice = required.get(selection.choiceId);
             if (!choice)
-              throw new CharacterProgressionConflictError(
-                "progression selection is not an exact offered option",
-              );
+              throw new CharacterProgressionConflictError("progression selection is not an exact offered option");
             if (selection.kind === "ability-score-increase") {
               if (choice.kind !== "ability-score-increase")
                 throw new CharacterProgressionConflictError(
                   "progression selection does not match its pending choice kind",
                 );
-              const spent = selection.increases.reduce(
-                (total, increase) => total + increase.amount,
-                0,
-              );
+              const spent = selection.increases.reduce((total, increase) => total + increase.amount, 0);
               if (spent !== choice.points)
                 throw new CharacterProgressionConflictError(
                   "ability score increase must spend exactly the offered points",
@@ -700,83 +626,64 @@ export function createCharacterProgressionWriteRepository(
               if (
                 !selection.increases.every((increase) =>
                   choice.options.some(
-                    (option) =>
-                      progressionReferenceKey(option) ===
-                      progressionReferenceKey(increase.ability),
+                    (option) => progressionReferenceKey(option) === progressionReferenceKey(increase.ability),
                   ),
                 )
               )
-                throw new CharacterProgressionConflictError(
-                  "progression selection is not an exact offered option",
-                );
+                throw new CharacterProgressionConflictError("progression selection is not an exact offered option");
             } else if (
               choice.kind === "ability-score-increase" ||
               !choice.options.some(
-                (option) =>
-                  progressionReferenceKey(option) ===
-                  progressionReferenceKey(selection.ability),
+                (option) => progressionReferenceKey(option) === progressionReferenceKey(selection.ability),
               )
             )
-              throw new CharacterProgressionConflictError(
-                "progression selection is not an exact offered option",
-              );
+              throw new CharacterProgressionConflictError("progression selection is not an exact offered option");
           }
-          const now = utcIsoTimestampSchema.parse(
-              deps.clock.now().toISOString(),
-            ),
+          const now = utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),
             commandId = resourceIdSchema.parse(deps.ids.nextId()),
             eventId = resourceIdSchema.parse(deps.ids.nextId()),
             final = selected.levels.at(-1)!,
-            advancementIds = selected.levels.map(() =>
-              resourceIdSchema.parse(deps.ids.nextId()),
-            ),
+            advancementIds = selected.levels.map(() => resourceIdSchema.parse(deps.ids.nextId())),
             known = stateFor(row),
             newAbilities = [
               ...known.knownAbilities,
-              ...selected.levels.flatMap((level) => [
-                ...level.fixedAbilities,
-                ...level.selectedAbilities,
-              ]),
+              ...selected.levels.flatMap((level) => [...level.fixedAbilities, ...level.selectedAbilities]),
             ],
-            newSpells = [
-              ...known.knownSpells,
-              ...selected.levels.flatMap((level) => level.spells),
-            ],
-            newFeats = [
-              ...(known.knownFeats ?? []),
-              ...selected.levels.flatMap((level) => level.selectedFeats ?? []),
-            ],
+            newSpells = [...known.knownSpells, ...selected.levels.flatMap((level) => level.spells)],
+            newFeats = [...(known.knownFeats ?? []), ...selected.levels.flatMap((level) => level.selectedFeats ?? [])],
             newSubclasses = [
               ...(known.knownSubclasses ?? []),
               ...selected.levels.flatMap((level) => level.selectedSubclasses ?? []),
             ];
           if (
-            new Set(newAbilities.map(progressionReferenceKey)).size !==
-              newAbilities.length ||
-            new Set(newSpells.map(progressionReferenceKey)).size !==
-              newSpells.length ||
-            new Set(newFeats.map(progressionReferenceKey)).size !==
-              newFeats.length ||
-            new Set(newSubclasses.map(progressionReferenceKey)).size !==
-              newSubclasses.length
+            new Set(newAbilities.map(progressionReferenceKey)).size !== newAbilities.length ||
+            new Set(newSpells.map(progressionReferenceKey)).size !== newSpells.length ||
+            new Set(newFeats.map(progressionReferenceKey)).size !== newFeats.length ||
+            new Set(newSubclasses.map(progressionReferenceKey)).size !== newSubclasses.length
           )
-            throw new CharacterProgressionConflictError(
-              "advancement contains a duplicate known power",
-            );
+            throw new CharacterProgressionConflictError("advancement contains a duplicate known power");
           const classLevelMap = new Map(
-              (known.classLevelsByClass ?? [{ classRef: known.classRef, level: known.level }])
-                .map((entry) => [progressionReferenceKey(entry.classRef), entry]),
-            );
+            (known.classLevelsByClass ?? [{ classRef: known.classRef, level: known.level }]).map((entry) => [
+              progressionReferenceKey(entry.classRef),
+              entry,
+            ]),
+          );
           for (const level of selected.levels) {
             if (!level.classRef || !level.classLevel) continue;
-            classLevelMap.set(progressionReferenceKey(level.classRef), { classRef: level.classRef, level: level.classLevel });
+            classLevelMap.set(progressionReferenceKey(level.classRef), {
+              classRef: level.classRef,
+              level: level.classLevel,
+            });
           }
-          const classLevelsAfter = [...classLevelMap.values()]
-            .sort((left, right) => progressionReferenceKey(left.classRef).localeCompare(progressionReferenceKey(right.classRef)));
-          const knownProficiencies = [...new Set([
+          const classLevelsAfter = [...classLevelMap.values()].sort((left, right) =>
+            progressionReferenceKey(left.classRef).localeCompare(progressionReferenceKey(right.classRef)),
+          );
+          const knownProficiencies = [
+            ...new Set([
               ...(known.knownProficiencies ?? []),
               ...selected.levels.flatMap((level) => level.grantedProficiencies ?? []),
-            ])].sort();
+            ]),
+          ].sort();
           const projected = progressionStateSchema.parse({
               ...known,
               level: final.level,
@@ -835,50 +742,62 @@ export function createCharacterProgressionWriteRepository(
             // a new class row the first time the character enters it.
             for (const level of selected.levels) {
               if (!level.classRef || !level.classLevel) continue;
-              const existing = db.prepare(
-                "SELECT position FROM rpg_character_classes WHERE sheet_id=? AND pack_id=? AND pack_version=? AND definition_id=?",
-              ).get(row.sheet_id, level.classRef.packId, level.classRef.packVersion, level.classRef.definitionId) as { position: number } | undefined;
+              const existing = db
+                .prepare(
+                  "SELECT position FROM rpg_character_classes WHERE sheet_id=? AND pack_id=? AND pack_version=? AND definition_id=?",
+                )
+                .get(row.sheet_id, level.classRef.packId, level.classRef.packVersion, level.classRef.definitionId) as
+                { position: number } | undefined;
               if (existing)
                 db.prepare(
                   "UPDATE rpg_character_classes SET level=? WHERE sheet_id=? AND pack_id=? AND pack_version=? AND definition_id=?",
-                ).run(level.classLevel, row.sheet_id, level.classRef.packId, level.classRef.packVersion, level.classRef.definitionId);
+                ).run(
+                  level.classLevel,
+                  row.sheet_id,
+                  level.classRef.packId,
+                  level.classRef.packVersion,
+                  level.classRef.definitionId,
+                );
               else {
-                const nextPosition = (db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS next FROM rpg_character_classes WHERE sheet_id=?")
-                  .get(row.sheet_id) as { next: number }).next;
+                const nextPosition = (
+                  db
+                    .prepare("SELECT COALESCE(MAX(position),-1)+1 AS next FROM rpg_character_classes WHERE sheet_id=?")
+                    .get(row.sheet_id) as { next: number }
+                ).next;
                 db.prepare(
                   `INSERT INTO rpg_character_classes(campaign_id,sheet_id,position,pack_id,pack_version,kind,definition_id,level) VALUES(?,?,?,?,?,'class',?,?)`,
-                ).run(row.campaign_id, row.sheet_id, nextPosition, level.classRef.packId, level.classRef.packVersion, level.classRef.definitionId, level.classLevel);
+                ).run(
+                  row.campaign_id,
+                  row.sheet_id,
+                  nextPosition,
+                  level.classRef.packId,
+                  level.classRef.packVersion,
+                  level.classRef.definitionId,
+                  level.classLevel,
+                );
               }
             }
           } else
-            db.prepare(
-              "UPDATE rpg_character_classes SET level=? WHERE sheet_id=? AND position=0",
-            ).run(final.level, row.sheet_id);
+            db.prepare("UPDATE rpg_character_classes SET level=? WHERE sheet_id=? AND position=0").run(
+              final.level,
+              row.sheet_id,
+            );
           const applyAttributeIncrease = db.prepare(
             "UPDATE rpg_character_attributes SET value=value+? WHERE sheet_id=? AND attribute_id=?",
           );
           for (const level of selected.levels) {
-            db.prepare(
-              "UPDATE rpg_actor_resources SET current=?,max=? WHERE actor_id=? AND name='health'",
-            ).run(level.hp.currentAfter, level.hp.maxAfter, row.actor_id);
+            db.prepare("UPDATE rpg_actor_resources SET current=?,max=? WHERE actor_id=? AND name='health'").run(
+              level.hp.currentAfter,
+              level.hp.maxAfter,
+              row.actor_id,
+            );
             for (const resource of level.resources)
               db.prepare(
                 `INSERT INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,?,?,?) ON CONFLICT(actor_id,name) DO UPDATE SET current=excluded.current,max=excluded.max`,
-              ).run(
-                row.campaign_id,
-                row.actor_id,
-                resource.resourceId,
-                resource.currentAfter,
-                resource.maxAfter,
-              );
+              ).run(row.campaign_id, row.actor_id, resource.resourceId, resource.currentAfter, resource.maxAfter);
             for (const increase of level.abilityScoreIncreases ?? []) {
-              if (
-                applyAttributeIncrease.run(increase.amount, row.sheet_id, increase.attribute)
-                  .changes !== 1
-              )
-                throw new CharacterProgressionConflictError(
-                  "ability score increase target is unavailable",
-                );
+              if (applyAttributeIncrease.run(increase.amount, row.sheet_id, increase.attribute).changes !== 1)
+                throw new CharacterProgressionConflictError("ability score increase target is unavailable");
             }
           }
           db.prepare(
@@ -896,8 +815,7 @@ export function createCharacterProgressionWriteRepository(
           for (const [index, level] of selected.levels.entries()) {
             const advancementId = advancementIds[index]!,
               levelSelections = normalized.selections.filter(
-                (selection) =>
-                  required.get(selection.choiceId)?.level === level.level,
+                (selection) => required.get(selection.choiceId)?.level === level.level,
               );
             db.prepare(
               "INSERT INTO character_level_advancements_v23(advancement_id,campaign_character_id,command_id,level,position,preview_token,selections_json,changes_json,applied_at) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -912,10 +830,7 @@ export function createCharacterProgressionWriteRepository(
               canonicalCatalogJson(level),
               now,
             );
-            for (const reference of [
-              ...level.fixedAbilities,
-              ...level.spells,
-            ]) {
+            for (const reference of [...level.fixedAbilities, ...level.spells]) {
               const sourceRef = {
                   advancementId,
                   commandId,
@@ -948,8 +863,7 @@ export function createCharacterProgressionWriteRepository(
               const selection = levelSelections.find(
                   (value) =>
                     value.kind !== "ability-score-increase" &&
-                    progressionReferenceKey(value.ability) ===
-                    progressionReferenceKey(reference),
+                    progressionReferenceKey(value.ability) === progressionReferenceKey(reference),
                 )!,
                 sourceRef = {
                   advancementId,
@@ -980,15 +894,11 @@ export function createCharacterProgressionWriteRepository(
                 progressionCatalogDigest(sourceRef),
               );
             }
-            for (const reference of [
-              ...(level.selectedFeats ?? []),
-              ...(level.selectedSubclasses ?? []),
-            ]) {
+            for (const reference of [...(level.selectedFeats ?? []), ...(level.selectedSubclasses ?? [])]) {
               const selection = levelSelections.find(
                 (value) =>
                   value.kind !== "ability-score-increase" &&
-                  progressionReferenceKey(value.ability) ===
-                  progressionReferenceKey(reference),
+                  progressionReferenceKey(value.ability) === progressionReferenceKey(reference),
               )!;
               option.run(
                 id,
@@ -1007,9 +917,7 @@ export function createCharacterProgressionWriteRepository(
           insertPending(db, updated, commandId, [], now);
           const actual = stateFor(updated);
           if (canonicalCatalogJson(actual) !== canonicalCatalogJson(projected))
-            throw new Error(
-              "applied progression result does not match inserted authoritative state",
-            );
+            throw new Error("applied progression result does not match inserted authoritative state");
           finishAudit(db, updated, event, row.revision, now, result);
           return result;
         })

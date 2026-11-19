@@ -63,5 +63,8 @@ export function appendSentences(base: string, ...extra: readonly string[]): stri
 
 /** True when a flavor string stays free of invented mechanics or prices. */
 export function isFlavorOnly(value: string): boolean {
-  return !/\d/.test(value) && !/\b(?:hp|hit points?|damage|gold|silver|copper|platinum|coin|price|cost|gp|sp|cp)\b/i.test(value);
+  return (
+    !/\d/.test(value) &&
+    !/\b(?:hp|hit points?|damage|gold|silver|copper|platinum|coin|price|cost|gp|sp|cp)\b/i.test(value)
+  );
 }

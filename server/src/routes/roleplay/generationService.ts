@@ -1,6 +1,12 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { buildSessionContextBasket, contextBasketText } from "../../context.js";
-import { fallbackRoomSpeakers, generateReply, selectRoomSpeakers, streamReply, synthesizeSceneState } from "../../llm.js";
+import {
+  fallbackRoomSpeakers,
+  generateReply,
+  selectRoomSpeakers,
+  streamReply,
+  synthesizeSceneState,
+} from "../../llm.js";
 import { selectLoreEntries } from "../../lore.js";
 import { buildEpisodeSummary, shouldUpdateSummary } from "../../memory.js";
 import { checkAssistantOutput } from "../../policy.js";
@@ -72,23 +78,36 @@ export async function assemblePipelineContext(input: {
   const provider = await getProviderSettings();
   const memoryScope = {
     sessionId: session.id,
-    sourceTurnIds: (input.contextHistory ?? await listMessages(session.id)).map((message) => message.id),
+    sourceTurnIds: (input.contextHistory ?? (await listMessages(session.id))).map((message) => message.id),
   };
   const memories = await listApprovedMemories(character.id, 8, memoryScope);
   const archivedHistory = history.slice(0, Math.max(0, history.length - harness.recentTurns));
   const summary = input.contextHistory
-    ? (archivedHistory.length ? {
-      sessionId: session.id,
-      ...buildEpisodeSummary(archivedHistory, harness.summaryChars,
-        Object.fromEntries(session.participants.map((participant) => [participant.id, participant.name]))),
-      updatedAt: new Date().toISOString(),
-    } : null)
+    ? archivedHistory.length
+      ? {
+          sessionId: session.id,
+          ...buildEpisodeSummary(
+            archivedHistory,
+            harness.summaryChars,
+            Object.fromEntries(session.participants.map((participant) => [participant.id, participant.name])),
+          ),
+          updatedAt: new Date().toISOString(),
+        }
+      : null
     : await getSummary(session.id);
   const contextText = [...history.map((message) => message.content), userContent].join("\n");
   const participantIds = session.participants.map((participant) => participant.id);
   const lore = selectLoreEntries(await listLoreEntries(participantIds), participantIds, contextText, harness.loreChars);
-  const sharedMemories = (await Promise.all(session.participants.map(async (participant) =>
-    (await listApprovedMemories(participant.id, 3, memoryScope)).map((memory) => ({ characterName: participant.name, memory }))))).flat();
+  const sharedMemories = (
+    await Promise.all(
+      session.participants.map(async (participant) =>
+        (await listApprovedMemories(participant.id, 3, memoryScope)).map((memory) => ({
+          characterName: participant.name,
+          memory,
+        })),
+      ),
+    )
+  ).flat();
   const source = await getSessionContextSource(session.id);
   // Session-wide synthesized state belongs to the old leaf during a retry/edit.
   if (input.contextHistory) {
@@ -173,7 +192,13 @@ async function streamCharacterPipeline(input: {
   let providerError = false;
   const boundaryOutcome = (violations: string[]): StreamPipelineResult => ({
     kind: "boundary",
-    outcome: { text: BOUNDARY_REPLACEMENT_REPLY, presetId: preset.id, loreTriggered: lore.length, providerError, usage: null },
+    outcome: {
+      text: BOUNDARY_REPLACEMENT_REPLY,
+      presetId: preset.id,
+      loreTriggered: lore.length,
+      providerError,
+      usage: null,
+    },
     violations,
   });
   let full = "";
@@ -181,7 +206,20 @@ async function streamCharacterPipeline(input: {
   let violations: string[] | null = null;
   try {
     const generated = await streamReply(
-      { character, participants: session.participants, session, history, memories, summary, preset, lore, harness, provider, userContent, sharedContext },
+      {
+        character,
+        participants: session.participants,
+        session,
+        history,
+        memories,
+        summary,
+        preset,
+        lore,
+        harness,
+        provider,
+        userContent,
+        sharedContext,
+      },
       (delta) => {
         full += delta;
         if (violations) return;

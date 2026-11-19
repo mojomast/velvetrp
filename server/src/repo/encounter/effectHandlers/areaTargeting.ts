@@ -10,21 +10,36 @@ const MAX_AREA_TARGETS = 32;
  * combatant rows, deduplicated in stable order, and rebinds its working target
  * for each one so nested damage/healing/save handlers remain per-target.
  */
-export function handleAreaTargetingEffect(ctx:EffectContext,effect:StarterAreaTargetingEffect,powerUseId:string,targets:Row[],apply:EffectApplier):void{
-  const bounded:Row[]=[];const seen=new Set<string>();
-  for(const target of (targets.length>0?targets:[ctx.target])){
-    if(seen.has(target.combatant_id))continue;
-    seen.add(target.combatant_id);bounded.push(target);
-    if(bounded.length>=MAX_AREA_TARGETS)break;
+export function handleAreaTargetingEffect(
+  ctx: EffectContext,
+  effect: StarterAreaTargetingEffect,
+  powerUseId: string,
+  targets: Row[],
+  apply: EffectApplier,
+): void {
+  const bounded: Row[] = [];
+  const seen = new Set<string>();
+  for (const target of targets.length > 0 ? targets : [ctx.target]) {
+    if (seen.has(target.combatant_id)) continue;
+    seen.add(target.combatant_id);
+    bounded.push(target);
+    if (bounded.length >= MAX_AREA_TARGETS) break;
   }
-  const marker:any={kind:"area-targeting",shape:effect.shape,sizeFeet:effect.sizeFeet,origin:effect.origin,targetCombatantIds:bounded.map(target=>target.combatant_id),outcomes:[]};
+  const marker: any = {
+    kind: "area-targeting",
+    shape: effect.shape,
+    sizeFeet: effect.sizeFeet,
+    origin: effect.origin,
+    targetCombatantIds: bounded.map((target) => target.combatant_id),
+    outcomes: [],
+  };
   ctx.outcomes.push(marker);
-  const previous=ctx.target;
-  for(const target of bounded){
-    ctx.target=target;
-    const start=ctx.outcomes.length;
-    for(const nested of effect.effects)apply(ctx,nested,powerUseId,[target]);
-    marker.outcomes.push({targetCombatantId:target.combatant_id,outcomes:ctx.outcomes.slice(start)});
+  const previous = ctx.target;
+  for (const target of bounded) {
+    ctx.target = target;
+    const start = ctx.outcomes.length;
+    for (const nested of effect.effects) apply(ctx, nested, powerUseId, [target]);
+    marker.outcomes.push({ targetCombatantId: target.combatant_id, outcomes: ctx.outcomes.slice(start) });
   }
-  ctx.target=previous;
+  ctx.target = previous;
 }

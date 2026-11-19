@@ -16,19 +16,28 @@ function seed(): void {
   createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }).close();
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys = ON");
-  db.prepare(`INSERT INTO principals VALUES
+  db.prepare(
+    `INSERT INTO principals VALUES
     ('gm','GM',0),('player','Player',0),('observer','Observer',0),
-    ('outsider','Outsider',0),('app-owner','App owner',0)`).run();
+    ('outsider','Outsider',0),('app-owner','App owner',0)`,
+  ).run();
   db.prepare("UPDATE application_owner SET principal_id='app-owner' WHERE singleton=1").run();
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns (id,name,active_timeline_id,owner_principal_id,created_at,updated_at)
+    db.prepare(
+      `INSERT INTO campaigns (id,name,active_timeline_id,owner_principal_id,created_at,updated_at)
       VALUES ('campaign','Campaign','timeline-old','local-owner',?,?),
-        ('campaign-other','Other','timeline-other','local-owner',?,?)`).run(BEFORE, BEFORE, BEFORE, BEFORE);
-    db.prepare(`INSERT INTO campaign_timelines (id,campaign_id,created_at) VALUES
+        ('campaign-other','Other','timeline-other','local-owner',?,?)`,
+    ).run(BEFORE, BEFORE, BEFORE, BEFORE);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id,campaign_id,created_at) VALUES
       ('timeline-old','campaign',?),('timeline-new','campaign',?),
-      ('timeline-other','campaign-other',?)`).run(BEFORE, BEFORE, BEFORE);
+      ('timeline-other','campaign-other',?)`,
+    ).run(BEFORE, BEFORE, BEFORE);
     for (const [principal, role] of [
-      ["local-owner", "owner"], ["gm", "gm"], ["player", "player"], ["observer", "observer"],
+      ["local-owner", "owner"],
+      ["gm", "gm"],
+      ["player", "player"],
+      ["observer", "observer"],
     ] as const) {
       db.prepare("INSERT INTO campaign_memberships VALUES ('campaign',?,?,?)").run(principal, role, BEFORE);
     }
@@ -43,28 +52,40 @@ function seed(): void {
   db.prepare("INSERT INTO campaign_rules_profiles VALUES ('campaign','profile')").run();
   db.prepare("INSERT INTO campaign_content_packs VALUES ('campaign','core','1','profile')").run();
   db.prepare("INSERT INTO campaign_characters VALUES ('cc','campaign','persona',?,?)").run(BEFORE, BEFORE);
-  db.prepare(`INSERT INTO rpg_campaign_sheets VALUES
-    ('sheet','campaign','cc','core','1','race','human','core','1','background','sage',?,?)`).run(BEFORE, BEFORE);
+  db.prepare(
+    `INSERT INTO rpg_campaign_sheets VALUES
+    ('sheet','campaign','cc','core','1','race','human','core','1','background','sage',?,?)`,
+  ).run(BEFORE, BEFORE);
   db.prepare("INSERT INTO rpg_character_attributes VALUES ('campaign','sheet',0,'strength',10)").run();
-  db.prepare(`INSERT INTO campaign_actors VALUES
-    ('actor','campaign','cc','sheet','player-character','principal',?,?)`).run(BEFORE, BEFORE);
+  db.prepare(
+    `INSERT INTO campaign_actors VALUES
+    ('actor','campaign','cc','sheet','player-character','principal',?,?)`,
+  ).run(BEFORE, BEFORE);
   db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor','campaign','local-owner','secret')").run();
   db.close();
 }
 
 function diceEnvelope(expression: string, revision = 0, commandId = "dice-command"): CommandEnvelope {
   return {
-    commandId, idempotencyKey: `key-${commandId}`, campaignId: "campaign", timelineId: "timeline-old",
-    actorId: "actor", expectedRevision: revision, sourceTurnId: revision === 0 ? "turn" : null,
+    commandId,
+    idempotencyKey: `key-${commandId}`,
+    campaignId: "campaign",
+    timelineId: "timeline-old",
+    actorId: "actor",
+    expectedRevision: revision,
+    sourceTurnId: revision === 0 ? "turn" : null,
     command: { type: "roll_actor_dice", payload: { expression } },
   };
 }
 
 function executeDice(expression = "1d20adv", values = [10, 10]): void {
   let index = 0;
-  const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
-    rng: { integer: () => values[index++]! }, ids: { nextId: () => "dice-event" },
-    clock: { now: () => new Date(AT) } });
+  const repository = createRepository({
+    dataDir: process.env.VELVET_DATA_DIR as string,
+    rng: { integer: () => values[index++]! },
+    ids: { nextId: () => "dice-event" },
+    clock: { now: () => new Date(AT) },
+  });
   repository.executeRollActorDice("local-owner", diceEnvelope(expression));
   repository.close();
 }
@@ -100,11 +121,26 @@ describe("getCommandReceipt dice projection", () => {
     executeDice(expression, [...values]);
     const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     const receipt = repository.getCommandReceipt("observer", "campaign", "dice-command")!;
-    expect(receipt).toMatchObject({ commandId: "dice-command", campaignId: "campaign",
-      revisionBefore: 0, revisionAfter: 1, events: [{ eventId: "dice-event", commandId: "dice-command",
-        campaignId: "campaign", timelineId: "timeline-old", actorId: "actor", sourceTurnId: "turn",
-        type: "actor_dice_rolled", revision: 1, occurredAt: AT,
-        data: { expression, terms: values.map((value, index) => ({ value, kept: kept[index] })), total } }] });
+    expect(receipt).toMatchObject({
+      commandId: "dice-command",
+      campaignId: "campaign",
+      revisionBefore: 0,
+      revisionAfter: 1,
+      events: [
+        {
+          eventId: "dice-event",
+          commandId: "dice-command",
+          campaignId: "campaign",
+          timelineId: "timeline-old",
+          actorId: "actor",
+          sourceTurnId: "turn",
+          type: "actor_dice_rolled",
+          revision: 1,
+          occurredAt: AT,
+          data: { expression, terms: values.map((value, index) => ({ value, kept: kept[index] })), total },
+        },
+      ],
+    });
     expect(Object.keys(receipt)).toEqual(["commandId", "campaignId", "revisionBefore", "revisionAfter", "events"]);
     expect(JSON.stringify(receipt)).not.toMatch(/idempotency|controller|private|notes|payload|key-dice/i);
     repository.close();
@@ -112,7 +148,10 @@ describe("getCommandReceipt dice projection", () => {
 
   it("groups and returns all 100 physical terms in order", () => {
     seed();
-    executeDice("100d1000kh1+1000", Array.from({ length: 100 }, (_, index) => index + 1));
+    executeDice(
+      "100d1000kh1+1000",
+      Array.from({ length: 100 }, (_, index) => index + 1),
+    );
     const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     const event = repository.getCommandReceipt("player", "campaign", "dice-command")!.events[0]!;
     expect(event.type).toBe("actor_dice_rolled");
@@ -127,26 +166,40 @@ describe("getCommandReceipt dice projection", () => {
   it("provides role parity for historical receipts and preserves old variants", () => {
     seed();
     const ids = ["dice-event", "attribute-event"];
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
-      rng: { integer: () => 6 }, ids: { nextId: () => ids.shift()! }, clock: { now: () => new Date(AT) } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      rng: { integer: () => 6 },
+      ids: { nextId: () => ids.shift()! },
+      clock: { now: () => new Date(AT) },
+    });
     repository.executeRollActorDice("gm", diceEnvelope("1d6"));
-    repository.executeSetActorAttribute("local-owner", { commandId: "attribute-command", idempotencyKey: "attribute-key",
-      campaignId: "campaign", timelineId: "timeline-old", actorId: "actor", expectedRevision: 1,
-      sourceTurnId: null, command: { type: "set_actor_attribute", payload: { attributeId: "strength", value: 11 } } });
+    repository.executeSetActorAttribute("local-owner", {
+      commandId: "attribute-command",
+      idempotencyKey: "attribute-key",
+      campaignId: "campaign",
+      timelineId: "timeline-old",
+      actorId: "actor",
+      expectedRevision: 1,
+      sourceTurnId: null,
+      command: { type: "set_actor_attribute", payload: { attributeId: "strength", value: 11 } },
+    });
     const db = new DatabaseDriver(dbPath());
     db.prepare("UPDATE campaigns SET active_timeline_id='timeline-new' WHERE id='campaign'").run();
     db.close();
     for (const principal of ["local-owner", "gm", "player", "observer"]) {
-      expect(repository.getCommandReceipt(principal, "campaign", "dice-command")?.events[0]?.type)
-        .toBe("actor_dice_rolled");
-      expect(repository.getCommandReceipt(principal, "campaign", "attribute-command")?.events[0]?.type)
-        .toBe("actor_attribute_set");
+      expect(repository.getCommandReceipt(principal, "campaign", "dice-command")?.events[0]?.type).toBe(
+        "actor_dice_rolled",
+      );
+      expect(repository.getCommandReceipt(principal, "campaign", "attribute-command")?.events[0]?.type).toBe(
+        "actor_attribute_set",
+      );
     }
     repository.close();
   });
 
   it("masks missing, outsider, application-owner-only, and cross-campaign requests", () => {
-    seed(); executeDice();
+    seed();
+    executeDice();
     const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.getCommandReceipt("outsider", "campaign", "dice-command")).toBeNull();
     expect(repository.getCommandReceipt("app-owner", "campaign", "dice-command")).toBeNull();
@@ -156,46 +209,67 @@ describe("getCommandReceipt dice projection", () => {
   });
 
   it("denies a stale owner identity while retaining GM access and outsider masking", () => {
-    seed(); executeDice(); corrupt("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign'");
-    const repository=createCorruptionTestRepository({dataDir:process.env.VELVET_DATA_DIR as string});
-    expect(repository.getCommandReceipt("local-owner","campaign","dice-command")).toBeNull();
-    expect(repository.getCommandReceipt("gm","campaign","dice-command")?.events).toHaveLength(1);
-    expect(repository.getCommandReceipt("outsider","campaign","dice-command")).toBeNull();
+    seed();
+    executeDice();
+    corrupt("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign'");
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    expect(repository.getCommandReceipt("local-owner", "campaign", "dice-command")).toBeNull();
+    expect(repository.getCommandReceipt("gm", "campaign", "dice-command")?.events).toHaveLength(1);
+    expect(repository.getCommandReceipt("outsider", "campaign", "dice-command")).toBeNull();
     repository.close();
   });
 
   it("uses one explicit membership-rooted all query without writes, transactions, dependencies, or private projection", () => {
-    seed(); executeDice();
-    const rng = vi.fn(() => 1); const nextId = vi.fn(() => "unused"); const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
-      rng: { integer: rng }, ids: { nextId }, clock: { now } });
+    seed();
+    executeDice();
+    const rng = vi.fn(() => 1);
+    const nextId = vi.fn(() => "unused");
+    const now = vi.fn(() => new Date(AT));
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      rng: { integer: rng },
+      ids: { nextId },
+      clock: { now },
+    });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
     try {
       expect(repository.getCommandReceipt("observer", "campaign", "dice-command")?.events).toHaveLength(1);
       expect(prepare).toHaveBeenCalledOnce();
       const sql = prepare.mock.calls[0]![0] as string;
-      expect(sql).toMatch(/^SELECT\s/i); expect(sql).toMatch(/FROM campaign_memberships membership/);
+      expect(sql).toMatch(/^SELECT\s/i);
+      expect(sql).toMatch(/FROM campaign_memberships membership/);
       expect(sql).not.toMatch(/SELECT\s+\*/i);
       expect(sql).not.toMatch(/(?:SELECT|,)\s*command\.idempotency_key\s*(?:,|AS|FROM)/i);
       expect(sql).not.toMatch(/private_notes|controller_principal_id|command\.dice_expression\s+AS/i);
       expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE)\b/i);
-      expect(transaction).not.toHaveBeenCalled(); expect(rng).not.toHaveBeenCalled();
-      expect(nextId).not.toHaveBeenCalled(); expect(now).not.toHaveBeenCalled();
-    } finally { prepare.mockRestore(); transaction.mockRestore(); repository.close(); }
+      expect(transaction).not.toHaveBeenCalled();
+      expect(rng).not.toHaveBeenCalled();
+      expect(nextId).not.toHaveBeenCalled();
+      expect(now).not.toHaveBeenCalled();
+    } finally {
+      prepare.mockRestore();
+      transaction.mockRestore();
+      repository.close();
+    }
   });
 
   it("supports units of work and enforces unit/repository lifecycle before argument validation", () => {
-    seed(); executeDice();
+    seed();
+    executeDice();
     const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     let expired: RepositoryUnitOfWork | undefined;
-    repository.transaction((unit) => { expired = unit;
-      expect(unit.getCommandReceipt("player", "campaign", "dice-command")?.events[0]?.type).toBe("actor_dice_rolled"); });
-    expect(() => expired!.getCommandReceipt("bad actor", "bad campaign", "bad command"))
-      .toThrow("transaction unit of work is no longer active");
+    repository.transaction((unit) => {
+      expired = unit;
+      expect(unit.getCommandReceipt("player", "campaign", "dice-command")?.events[0]?.type).toBe("actor_dice_rolled");
+    });
+    expect(() => expired!.getCommandReceipt("bad actor", "bad campaign", "bad command")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
-    expect(() => repository.getCommandReceipt("bad actor", "bad campaign", "bad command"))
-      .toThrow("repository is closed");
+    expect(() => repository.getCommandReceipt("bad actor", "bad campaign", "bad command")).toThrow(
+      "repository is closed",
+    );
   });
 
   it.each([
@@ -237,10 +311,18 @@ describe("getCommandReceipt dice projection", () => {
     ["missing timeline parent", "DELETE FROM campaign_timelines WHERE id='timeline-old'"],
     ["missing actor parent", "DELETE FROM campaign_actors WHERE id='actor'"],
     ["trailing history gap", "UPDATE campaign_timelines SET revision=2 WHERE id='timeline-old'"],
-    ["leading history gap", "UPDATE campaign_events SET revision=2; UPDATE command_receipts SET revision_before=1,revision_after=2; UPDATE campaign_commands SET expected_revision=1; UPDATE campaign_timelines SET revision=2"],
-    ["roll-only identity", "DELETE FROM command_receipts; DELETE FROM campaign_events; DELETE FROM campaign_commands; UPDATE campaign_timelines SET revision=0"],
+    [
+      "leading history gap",
+      "UPDATE campaign_events SET revision=2; UPDATE command_receipts SET revision_before=1,revision_after=2; UPDATE campaign_commands SET expected_revision=1; UPDATE campaign_timelines SET revision=2",
+    ],
+    [
+      "roll-only identity",
+      "DELETE FROM command_receipts; DELETE FROM campaign_events; DELETE FROM campaign_commands; UPDATE campaign_timelines SET revision=0",
+    ],
   ])("fails loudly for authorized %s corruption while masking outsiders", (_label, mutation) => {
-    seed(); executeDice(); corrupt(mutation);
+    seed();
+    executeDice();
+    corrupt(mutation);
     const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(() => repository.getCommandReceipt("observer", "campaign", "dice-command")).toThrow();
     expect(repository.getCommandReceipt("outsider", "campaign", "dice-command")).toBeNull();

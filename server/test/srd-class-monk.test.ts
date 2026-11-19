@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { monkDefinition, monkLevels, monkSubclasses } from "../src/content/srdStarter/classes/monk.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -36,7 +40,11 @@ describe("SRD 5.1 Monk class", () => {
 
   it("grants the level-one hit die and the level-three subclass choice", () => {
     const levelOne = classLevelCatalogDefinitionSchema.parse(levels[0]!);
-    expect(levelOne.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 });
+    expect(levelOne.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d8",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
 
     const levelThree = classLevelCatalogDefinitionSchema.parse(levels[2]!);
     expect(levelThree.mechanics.progressionChoices).toEqual([

@@ -27,23 +27,11 @@ import {
   type UpdateCharacterDraftInput,
 } from "@velvet/contracts";
 import { calculateCharacterDerivedStats } from "../../characterBuilderCalculator.js";
-import type {
-  Clock,
-  IdGenerator,
-  RandomNumberGenerator,
-} from "../../runtime.js";
+import type { Clock, IdGenerator, RandomNumberGenerator } from "../../runtime.js";
 import { canonicalCatalogJson } from "../contentCatalog/index.js";
 import { initializeCharacterProgressionV24 } from "../characterProgressionRepo.js";
-import {
-  materializeStarterGrantsV51,
-  placeFinalizedActorAtCampaignStartV51,
-} from "../grantSettlementRepo.js";
-import {
-  allocationFor,
-  buildView,
-  pinsFor,
-  rowFor,
-} from "./characterBuilderRowTypes.js";
+import { materializeStarterGrantsV51, placeFinalizedActorAtCampaignStartV51 } from "../grantSettlementRepo.js";
+import { allocationFor, buildView, pinsFor, rowFor } from "./characterBuilderRowTypes.js";
 import {
   CharacterBuilderAuthorizationError,
   CharacterBuilderConflictError,
@@ -115,12 +103,16 @@ function resolveAllocation(
     const parsed = characterBuilderAllocationSchema.parse(request);
     const srd = rulesProfileId === SRD_5_1_STARTER_RULES_PROFILE_ID;
     if (srd && !("strength" in parsed.scores)) {
-      const remapped = Object.fromEntries(SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((id, index) => [
-        id, (parsed.scores as Record<string, number>)[CHARACTER_BUILDER_ATTRIBUTE_IDS[index]!],
-      ]));
+      const remapped = Object.fromEntries(
+        SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((id, index) => [
+          id,
+          (parsed.scores as Record<string, number>)[CHARACTER_BUILDER_ATTRIBUTE_IDS[index]!],
+        ]),
+      );
       return characterBuilderAllocationSchema.parse({ ...parsed, scores: remapped });
     }
-    if (!srd && "strength" in parsed.scores) throw new CharacterBuilderUnavailableError("allocation abilities do not match the campaign ruleset");
+    if (!srd && "strength" in parsed.scores)
+      throw new CharacterBuilderUnavailableError("allocation abilities do not match the campaign ruleset");
     return parsed;
   }
   const nextDie = () => {
@@ -146,9 +138,7 @@ function resolveAllocation(
       rulesProfileId === SRD_5_1_STARTER_RULES_PROFILE_ID
         ? "srd-5.1-4d6-drop-lowest-v1"
         : "velvet-4d6-drop-first-lowest-v1",
-    scores: Object.fromEntries(
-      terms.map((term) => [term.attributeId, term.score]),
-    ),
+    scores: Object.fromEntries(terms.map((term) => [term.attributeId, term.score])),
     terms,
   });
 }
@@ -195,9 +185,7 @@ function exactRetry<T>(
     retry.requested_json !== canonicalCatalogJson(requested) ||
     (draftId && retry.draft_id !== draftId)
   )
-    throw new CharacterBuilderConflictError(
-      "idempotency key was reused for a different draft command",
-    );
+    throw new CharacterBuilderConflictError("idempotency key was reused for a different draft command");
   return parser.parse(JSON.parse(retry.result_json));
 }
 function insertAudit(
@@ -227,12 +215,7 @@ function insertAudit(
     publicData = {
       draftId: values.draftId,
       revision: values.revisionAfter,
-      status:
-        values.type === "finalize"
-          ? "finalized"
-          : values.type === "abandon"
-            ? "abandoned"
-            : "active",
+      status: values.type === "finalize" ? "finalized" : values.type === "abandon" ? "abandoned" : "active",
     },
     proposedEvent = {
       actorPrincipalId: values.actor,
@@ -321,10 +304,7 @@ export function createCharacterBuilderWriteRepository(
       return db
         .transaction(() => {
           const auth = reads.authority(actor, campaign);
-          if (
-            !auth ||
-            !reads.mayControl(actor, auth, normalized.controllerPrincipalId)
-          )
+          if (!auth || !reads.mayControl(actor, auth, normalized.controllerPrincipalId))
             throw new CharacterBuilderAuthorizationError();
           const retry = exactRetry(
             commandRetry(db, campaign, actor, normalized.idempotencyKey),
@@ -335,25 +315,16 @@ export function createCharacterBuilderWriteRepository(
           if (retry) return retry;
           reads.validateController(campaign, normalized.controllerPrincipalId);
           const catalog = reads.currentCatalog(campaign),
-            now = utcIsoTimestampSchema.parse(
-              dependencies.clock.now().toISOString(),
-            );
+            now = utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString());
           reads.validatePersona(campaign, normalized.personaId, now);
-          const allocation = resolveAllocation(
-              normalized.allocation,
-              dependencies.rng,
-              catalog.rulesProfileId,
-            ),
+          const allocation = resolveAllocation(normalized.allocation, dependencies.rng, catalog.rulesProfileId),
             draftId = resourceIdSchema.parse(dependencies.ids.nextId()),
             commandId = resourceIdSchema.parse(dependencies.ids.nextId()),
             eventId = resourceIdSchema.parse(dependencies.ids.nextId()),
             expiresAt =
               normalized.durability === "expiring"
                 ? utcIsoTimestampSchema.parse(
-                    new Date(
-                      new Date(now).getTime() +
-                        CHARACTER_DRAFT_EXPIRY_SECONDS * 1_000,
-                    ).toISOString(),
+                    new Date(new Date(now).getTime() + CHARACTER_DRAFT_EXPIRY_SECONDS * 1_000).toISOString(),
                   )
                 : null,
             selections = {
@@ -382,21 +353,9 @@ export function createCharacterBuilderWriteRepository(
             "INSERT INTO character_draft_pins_v19 (draft_id,position,pack_id,pack_version,publication_digest) VALUES (?,?,?,?,?)",
           );
           catalog.pins.forEach((pin, position) =>
-            insertPin.run(
-              draftId,
-              position,
-              pin.packId,
-              pin.packVersion,
-              pin.publicationDigest,
-            ),
+            insertPin.run(draftId, position, pin.packId, pin.packVersion, pin.publicationDigest),
           );
-          const draft = buildView(
-              db,
-              rowFor(db, draftId)!,
-              auth.role,
-              now,
-              reads.viewMappers,
-            ),
+          const draft = buildView(db, rowFor(db, draftId)!, auth.role, now, reads.viewMappers),
             receipt = characterDraftMutationReceiptSchema.parse({
               draftId,
               commandId,
@@ -443,10 +402,7 @@ export function createCharacterBuilderWriteRepository(
           const row = rowFor(db, id);
           if (!row) throw new CharacterBuilderAuthorizationError();
           const auth = reads.authority(actor, row.campaign_id);
-          if (
-            !auth ||
-            !reads.mayControl(actor, auth, row.controller_principal_id)
-          )
+          if (!auth || !reads.mayControl(actor, auth, row.controller_principal_id))
             throw new CharacterBuilderAuthorizationError();
           const retry = exactRetry(
             commandRetry(db, row.campaign_id, actor, normalized.idempotencyKey),
@@ -456,41 +412,20 @@ export function createCharacterBuilderWriteRepository(
             id,
           );
           if (retry) return retry;
-          if (
-            row.status !== "active" ||
-            allocationFor(db, row).method !== "server-roll"
-          )
-            throw new CharacterBuilderConflictError(
-              "only active server-roll drafts can be rerolled",
-            );
-          if (row.revision !== normalized.expectedRevision)
-            throw new CharacterBuilderStaleError();
-          const now = utcIsoTimestampSchema.parse(
-            dependencies.clock.now().toISOString(),
-          );
-          if (row.expires_at !== null && row.expires_at <= now)
-            throw new CharacterBuilderExpiredError();
-          const allocation = resolveAllocation(
-              { method: "server-roll" },
-              dependencies.rng,
-              row.rules_profile_id,
-            ),
+          if (row.status !== "active" || allocationFor(db, row).method !== "server-roll")
+            throw new CharacterBuilderConflictError("only active server-roll drafts can be rerolled");
+          if (row.revision !== normalized.expectedRevision) throw new CharacterBuilderStaleError();
+          const now = utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString());
+          if (row.expires_at !== null && row.expires_at <= now) throw new CharacterBuilderExpiredError();
+          const allocation = resolveAllocation({ method: "server-roll" }, dependencies.rng, row.rules_profile_id),
             revisionAfter = row.revision + 1,
             commandId = resourceIdSchema.parse(dependencies.ids.nextId()),
             eventId = resourceIdSchema.parse(dependencies.ids.nextId());
-          db.prepare(
-            "UPDATE character_drafts_v19 SET revision=revision+1,updated_at=? WHERE id=?",
-          ).run(now, id);
+          db.prepare("UPDATE character_drafts_v19 SET revision=revision+1,updated_at=? WHERE id=?").run(now, id);
           db.prepare(
             "INSERT INTO character_draft_rerolls_v49 (draft_id,revision,allocation_json,created_at) VALUES (?,?,?,?)",
           ).run(id, revisionAfter, canonicalCatalogJson(allocation), now);
-          const draft = buildView(
-              db,
-              rowFor(db, id)!,
-              auth.role,
-              now,
-              reads.viewMappers,
-            ),
+          const draft = buildView(db, rowFor(db, id)!, auth.role, now, reads.viewMappers),
             receipt = characterDraftMutationReceiptSchema.parse({
               draftId: id,
               commandId,
@@ -537,10 +472,7 @@ export function createCharacterBuilderWriteRepository(
           const row = rowFor(db, id);
           if (!row) throw new CharacterBuilderAuthorizationError();
           const auth = reads.authority(actor, row.campaign_id);
-          if (
-            !auth ||
-            !reads.mayControl(actor, auth, row.controller_principal_id)
-          )
+          if (!auth || !reads.mayControl(actor, auth, row.controller_principal_id))
             throw new CharacterBuilderAuthorizationError();
           const retry = exactRetry(
             commandRetry(db, row.campaign_id, actor, normalized.idempotencyKey),
@@ -550,37 +482,20 @@ export function createCharacterBuilderWriteRepository(
             id,
           );
           if (retry) return retry;
-          if (row.status !== "active")
-            throw new CharacterBuilderConflictError(
-              "only active drafts can be finalized",
-            );
-          if (row.revision !== normalized.expectedRevision)
-            throw new CharacterBuilderStaleError();
-          const now = utcIsoTimestampSchema.parse(
-            dependencies.clock.now().toISOString(),
-          );
-          if (row.expires_at !== null && row.expires_at <= now)
-            throw new CharacterBuilderExpiredError();
-          reads.validateController(
-            row.campaign_id,
-            row.controller_principal_id,
-          );
+          if (row.status !== "active") throw new CharacterBuilderConflictError("only active drafts can be finalized");
+          if (row.revision !== normalized.expectedRevision) throw new CharacterBuilderStaleError();
+          const now = utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString());
+          if (row.expires_at !== null && row.expires_at <= now) throw new CharacterBuilderExpiredError();
+          reads.validateController(row.campaign_id, row.controller_principal_id);
           reads.validatePersona(row.campaign_id, row.persona_id, now, id);
           const pins = pinsFor(db, id),
             current = reads.currentCatalog(row.campaign_id);
           if (!reads.samePins(current, row.rules_profile_id, pins))
-            throw new CharacterBuilderConflictError(
-              "campaign content pins changed after draft creation",
-            );
-          const allocation = characterBuilderAllocationSchema.parse(
-              JSON.parse(row.allocation_json),
-            ),
-            selections = characterBuilderSelectionsSchema.parse(
-              JSON.parse(row.selections_json),
-            ),
+            throw new CharacterBuilderConflictError("campaign content pins changed after draft creation");
+          const allocation = characterBuilderAllocationSchema.parse(JSON.parse(row.allocation_json)),
+            selections = characterBuilderSelectionsSchema.parse(JSON.parse(row.selections_json)),
             chosen = reads.selectedDefinitions(current.definitions, selections);
-          if (!chosen || !selections.starterGrant)
-            throw new CharacterBuilderIncompleteError();
+          if (!chosen || !selections.starterGrant) throw new CharacterBuilderIncompleteError();
           const [rulesetId, rulesetVersion] = resolveProfileRulesetIdentity(db, row.rules_profile_id);
           const derived = calculateCharacterDerivedStats({
               rulesetId,
@@ -598,9 +513,7 @@ export function createCharacterBuilderWriteRepository(
               selections.starterGrant,
               reads.grantsFor(chosen.background, selections.starterGrant),
             ),
-            campaignCharacterId = resourceIdSchema.parse(
-              dependencies.ids.nextId(),
-            ),
+            campaignCharacterId = resourceIdSchema.parse(dependencies.ids.nextId()),
             sheetId = resourceIdSchema.parse(dependencies.ids.nextId()),
             actorId = resourceIdSchema.parse(dependencies.ids.nextId()),
             commandId = resourceIdSchema.parse(dependencies.ids.nextId()),
@@ -642,7 +555,9 @@ export function createCharacterBuilderWriteRepository(
               position,
               attributeId,
               (allocation.scores as Record<string, number>)[attributeId]! +
-                (chosen.race.mechanics.attributeBonuses[attributeId as keyof typeof chosen.race.mechanics.attributeBonuses] ?? 0),
+                (chosen.race.mechanics.attributeBonuses[
+                  attributeId as keyof typeof chosen.race.mechanics.attributeBonuses
+                ] ?? 0),
             ),
           );
           const proficiencyInsert = db.prepare(
@@ -658,30 +573,13 @@ export function createCharacterBuilderWriteRepository(
                 id: attributeId,
               })),
             ];
-          [
-            ...new Map(
-              proficiencies.map((value) => [
-                `${value.category}\0${value.id}`,
-                value,
-              ]),
-            ).values(),
-          ].forEach((value, position) =>
-            proficiencyInsert.run(
-              row.campaign_id,
-              sheetId,
-              position,
-              value.category,
-              value.id,
-            ),
+          [...new Map(proficiencies.map((value) => [`${value.category}\0${value.id}`, value])).values()].forEach(
+            (value, position) => proficiencyInsert.run(row.campaign_id, sheetId, position, value.category, value.id),
           );
           const choiceInsert = db.prepare(
             `INSERT INTO rpg_character_choices (campaign_id,sheet_id,position,choice_id,pack_id,pack_version,kind,definition_id) VALUES (?,?,?,?,?,?,?,?)`,
           );
-          [
-            chosen.race.reference,
-            chosen.background.reference,
-            chosen.klass.reference,
-          ].forEach((reference, position) =>
+          [chosen.race.reference, chosen.background.reference, chosen.klass.reference].forEach((reference, position) =>
             choiceInsert.run(
               row.campaign_id,
               sheetId,
@@ -695,65 +593,60 @@ export function createCharacterBuilderWriteRepository(
           );
           db.prepare(
             `INSERT INTO campaign_actors (id,campaign_id,campaign_character_id,sheet_id,kind,control,created_at,updated_at) VALUES (?,?,?,?,'player-character','principal',?,?)`,
-          ).run(
-            actorId,
-            row.campaign_id,
-            campaignCharacterId,
-            sheetId,
-            now,
-            now,
-          );
+          ).run(actorId, row.campaign_id, campaignCharacterId, sheetId, now, now);
           db.prepare(
             "INSERT INTO campaign_actor_private_state (actor_id,campaign_id,controller_principal_id,private_notes) VALUES (?,?,?,NULL)",
           ).run(actorId, row.campaign_id, row.controller_principal_id);
-           db.prepare(
-             "INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,'health',?,?)",
-           ).run(row.campaign_id, actorId, derived.maxHp, derived.maxHp);
-           const raceResourceGrants = chosen.race.mechanics.resourceGrants ?? [];
-           const classResourceGrants = chosen.level.mechanics.resourceGrants ?? [];
-           const resourceGrants = new Map<string, { currentIncrease: number; maxIncrease: number }>();
-           const resourceBindings = new Map<string, { kind: "ability" | "spell"; recovery: "encounter" | "short-rest" | "long-rest" }>();
-           for (const grant of [...raceResourceGrants, ...classResourceGrants]) {
-             const resourceId = grant.resourceId.replace(/^spell-slot-/, "slot-");
-             if (resourceId === "health") throw new CharacterBuilderUnavailableError("race resource grant cannot replace health");
-             const prior = resourceGrants.get(resourceId);
-             resourceGrants.set(resourceId, {
-               currentIncrease: (prior?.currentIncrease ?? 0) + grant.currentIncrease,
-               maxIncrease: (prior?.maxIncrease ?? 0) + grant.maxIncrease,
-             });
-             // Rest recovery is declared on the class grant; spell slots default to a long rest.
-             const recovery = grant.recovery ?? (resourceId.startsWith("slot-") ? "long-rest" : undefined);
-             if (recovery && recovery !== "none" && !resourceId.startsWith("hit-dice-")) {
-               resourceBindings.set(resourceId, { kind: resourceId.startsWith("slot-") ? "spell" : "ability", recovery });
-             }
-           }
-           const insertResourceGrant = (resourceId: string, current: number, maximum: number) => db.prepare(
-             "INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,?,?,?)",
-           ).run(row.campaign_id, actorId, resourceId, current, maximum);
-           for (const [resourceId, grant] of resourceGrants) insertResourceGrant(resourceId, grant.currentIncrease, grant.maxIncrease);
-           if (row.rules_profile_id === SRD_5_1_STARTER_RULES_PROFILE_ID) {
-             if (!resourceGrants.has("slot-1") && chosen.level.mechanics.preparedSpellRefs?.length) {
-               insertResourceGrant("slot-1", 2, 2);
-               resourceBindings.set("slot-1", { kind: "spell", recovery: "long-rest" });
-             }
-             insertResourceGrant("exhaustion", 0, 6);
-           }
-           for (const [resourceId, binding] of resourceBindings) db.prepare(
-             `INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json)
+          db.prepare(
+            "INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,'health',?,?)",
+          ).run(row.campaign_id, actorId, derived.maxHp, derived.maxHp);
+          const raceResourceGrants = chosen.race.mechanics.resourceGrants ?? [];
+          const classResourceGrants = chosen.level.mechanics.resourceGrants ?? [];
+          const resourceGrants = new Map<string, { currentIncrease: number; maxIncrease: number }>();
+          const resourceBindings = new Map<
+            string,
+            { kind: "ability" | "spell"; recovery: "encounter" | "short-rest" | "long-rest" }
+          >();
+          for (const grant of [...raceResourceGrants, ...classResourceGrants]) {
+            const resourceId = grant.resourceId.replace(/^spell-slot-/, "slot-");
+            if (resourceId === "health")
+              throw new CharacterBuilderUnavailableError("race resource grant cannot replace health");
+            const prior = resourceGrants.get(resourceId);
+            resourceGrants.set(resourceId, {
+              currentIncrease: (prior?.currentIncrease ?? 0) + grant.currentIncrease,
+              maxIncrease: (prior?.maxIncrease ?? 0) + grant.maxIncrease,
+            });
+            // Rest recovery is declared on the class grant; spell slots default to a long rest.
+            const recovery = grant.recovery ?? (resourceId.startsWith("slot-") ? "long-rest" : undefined);
+            if (recovery && recovery !== "none" && !resourceId.startsWith("hit-dice-")) {
+              resourceBindings.set(resourceId, {
+                kind: resourceId.startsWith("slot-") ? "spell" : "ability",
+                recovery,
+              });
+            }
+          }
+          const insertResourceGrant = (resourceId: string, current: number, maximum: number) =>
+            db
+              .prepare("INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,?,?,?)")
+              .run(row.campaign_id, actorId, resourceId, current, maximum);
+          for (const [resourceId, grant] of resourceGrants)
+            insertResourceGrant(resourceId, grant.currentIncrease, grant.maxIncrease);
+          if (row.rules_profile_id === SRD_5_1_STARTER_RULES_PROFILE_ID) {
+            if (!resourceGrants.has("slot-1") && chosen.level.mechanics.preparedSpellRefs?.length) {
+              insertResourceGrant("slot-1", 2, 2);
+              resourceBindings.set("slot-1", { kind: "spell", recovery: "long-rest" });
+            }
+            insertResourceGrant("exhaustion", 0, 6);
+          }
+          for (const [resourceId, binding] of resourceBindings)
+            db.prepare(
+              `INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json)
               VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name)
               DO UPDATE SET binding_key=excluded.binding_key,binding_json=excluded.binding_json`,
-           ).run(row.campaign_id, actorId, resourceId, binding.kind, canonicalCatalogJson(binding));
+            ).run(row.campaign_id, actorId, resourceId, binding.kind, canonicalCatalogJson(binding));
           db.prepare(
             `INSERT INTO character_derived_snapshots_v19 (draft_id,campaign_id,campaign_character_id,sheet_id,actor_id,calculator_version,derived_json,created_at) VALUES (?,?,?,?,?,'velvet-character-derived-v1',?,?)`,
-          ).run(
-            id,
-            row.campaign_id,
-            campaignCharacterId,
-            sheetId,
-            actorId,
-            canonicalCatalogJson(derived),
-            now,
-          );
+          ).run(id, row.campaign_id, campaignCharacterId, sheetId, actorId, canonicalCatalogJson(derived), now);
           initializeCharacterProgressionV24(db, {
             campaignCharacterId,
             campaignId: row.campaign_id,
@@ -764,10 +657,10 @@ export function createCharacterBuilderWriteRepository(
               packVersion: chosen.klass.reference.packVersion,
               definitionId: chosen.klass.reference.definitionId,
             },
-             derived,
-             preparedSpells: selections.preparedSpells,
-             preparedSpellSource: chosen.level.reference,
-             now,
+            derived,
+            preparedSpells: selections.preparedSpells,
+            preparedSpellSource: chosen.level.reference,
+            now,
             mode: normalized.progressionMode ?? "xp",
           });
           const grantInsert = db.prepare(
@@ -801,13 +694,7 @@ export function createCharacterBuilderWriteRepository(
           db.prepare(
             "UPDATE character_drafts_v19 SET status='finalized',revision=revision+1,updated_at=? WHERE id=?",
           ).run(now, id);
-          const draft = buildView(
-              db,
-              rowFor(db, id)!,
-              auth.role,
-              now,
-              reads.viewMappers,
-            ),
+          const draft = buildView(db, rowFor(db, id)!, auth.role, now, reads.viewMappers),
             receipt = characterFinalizationReceiptSchema.parse({
               draftId: id,
               commandId,
@@ -850,9 +737,7 @@ export function createCharacterBuilderWriteRepository(
     type: "update" | "abandon",
     actorPrincipalId: string,
     draftId: string,
-    input:
-      | UpdateCharacterDraftInput
-      | { expectedRevision: number; idempotencyKey: string },
+    input: UpdateCharacterDraftInput | { expectedRevision: number; idempotencyKey: string },
   ): CharacterDraftMutationResult {
     dependencies.assertFactoryMutation();
     const actor = resourceIdSchema.parse(actorPrincipalId),
@@ -867,10 +752,7 @@ export function createCharacterBuilderWriteRepository(
         const row = rowFor(db, id);
         if (!row) throw new CharacterBuilderAuthorizationError();
         const auth = reads.authority(actor, row.campaign_id);
-        if (
-          !auth ||
-          !reads.mayControl(actor, auth, row.controller_principal_id)
-        )
+        if (!auth || !reads.mayControl(actor, auth, row.controller_principal_id))
           throw new CharacterBuilderAuthorizationError();
         const retry = exactRetry(
           commandRetry(db, row.campaign_id, actor, normalized.idempotencyKey),
@@ -884,50 +766,33 @@ export function createCharacterBuilderWriteRepository(
           throw new CharacterBuilderConflictError(
             `only active drafts can be ${type === "update" ? "updated" : "abandoned"}`,
           );
-        if (row.revision !== normalized.expectedRevision)
-          throw new CharacterBuilderStaleError();
-        const now = utcIsoTimestampSchema.parse(
-          dependencies.clock.now().toISOString(),
-        );
-        if (
-          type === "update" &&
-          row.expires_at !== null &&
-          row.expires_at <= now
-        )
+        if (row.revision !== normalized.expectedRevision) throw new CharacterBuilderStaleError();
+        const now = utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString());
+        if (type === "update" && row.expires_at !== null && row.expires_at <= now)
           throw new CharacterBuilderExpiredError();
         const commandId = resourceIdSchema.parse(dependencies.ids.nextId()),
           eventId = resourceIdSchema.parse(dependencies.ids.nextId());
         if (type === "update") {
           const update = normalized as UpdateCharacterDraftInput,
-            definitions = reads.catalogForPins(
-              row.rules_profile_id,
-              pinsFor(db, id),
-            ),
+            definitions = reads.catalogForPins(row.rules_profile_id, pinsFor(db, id)),
             valid = new Set(
               definitions
-                .filter((value) =>
-                  ["race", "background", "class"].includes(
-                    value.reference.kind,
-                  ),
-                )
+                .filter((value) => ["race", "background", "class"].includes(value.reference.kind))
                 .map((value) => reads.refKey(value.reference)),
             );
-          for (const reference of [
-            update.selections.race,
-            update.selections.background,
-            update.selections.class,
-          ])
+          for (const reference of [update.selections.race, update.selections.background, update.selections.class])
             if (reference && !valid.has(reads.refKey(reference)))
-              throw new CharacterBuilderUnavailableError(
-                "selection is not in the draft's exact pins",
-              );
+              throw new CharacterBuilderUnavailableError("selection is not in the draft's exact pins");
           for (const reference of update.selections.preparedSpells ?? [])
-            if (!definitions.some((value) => value.reference.kind === "spell" && reads.refKey(value.reference) === reads.refKey(reference)))
+            if (
+              !definitions.some(
+                (value) =>
+                  value.reference.kind === "spell" && reads.refKey(value.reference) === reads.refKey(reference),
+              )
+            )
               throw new CharacterBuilderUnavailableError("prepared spell is not in the draft's exact pins");
           const selections = characterBuilderSelectionsSchema.parse({
-            ...characterBuilderSelectionsSchema.parse(
-              JSON.parse(row.selections_json),
-            ),
+            ...characterBuilderSelectionsSchema.parse(JSON.parse(row.selections_json)),
             ...update.selections,
           });
           db.prepare(
@@ -937,13 +802,7 @@ export function createCharacterBuilderWriteRepository(
           db.prepare(
             "UPDATE character_drafts_v19 SET status='abandoned',revision=revision+1,updated_at=? WHERE id=?",
           ).run(now, id);
-        const draft = buildView(
-            db,
-            rowFor(db, id)!,
-            auth.role,
-            now,
-            reads.viewMappers,
-          ),
+        const draft = buildView(db, rowFor(db, id)!, auth.role, now, reads.viewMappers),
           receipt = characterDraftMutationReceiptSchema.parse({
             draftId: id,
             commandId,

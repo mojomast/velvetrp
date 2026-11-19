@@ -23,21 +23,75 @@ export const AFTER_LONG_TRAVEL_MINUTES = 480;
 export const MAX_INTERRUPTIONS_PER_TRANCHE = 1;
 
 export interface TravelEventDefinition {
-  readonly id: string; readonly kind: TravelEventKind; readonly summary: string; readonly weight: number;
-  readonly condition?: TravelEventCondition; readonly environments: readonly TravelEnvironment[];
+  readonly id: string;
+  readonly kind: TravelEventKind;
+  readonly summary: string;
+  readonly weight: number;
+  readonly condition?: TravelEventCondition;
+  readonly environments: readonly TravelEnvironment[];
   /** Stable key of a pre-prepared encounter; the parent resolves and re-validates it. */
   readonly encounterId?: string;
 }
 /** Server-authored, original campaign travel table (deliberately not an SRD table). */
 export const TRAVEL_EVENT_POOL: readonly TravelEventDefinition[] = Object.freeze([
-  { id: "weather-squall", kind: "weather", summary: "A cold squall crosses the route; the party pauses to find shelter before continuing.", weight: 30, environments: ["road", "wilderness", "water"] },
-  { id: "weather-fog", kind: "weather", summary: "Fog closes in until only the next short stretch of ground is certain.", weight: 20, condition: "after-long-travel", environments: ["road", "water"] },
-  { id: "obstacle-washout", kind: "obstacle", summary: "Broken ground blocks the way; the party pauses to assess a safe crossing.", weight: 25, environments: ["road", "wilderness"] },
-  { id: "obstacle-crowd", kind: "obstacle", summary: "A crowd chokes the way; the party stops to look for a gap.", weight: 15, environments: ["urban", "road"] },
-  { id: "social-news", kind: "social", summary: "A passing traveler stops to ask the party for news of the road ahead.", weight: 20, environments: ["urban", "road"] },
-  { id: "social-kindness", kind: "social", summary: "A wayside stranger notices the party's injuries and offers help.", weight: 20, condition: "party-injured", environments: ["urban", "road", "wilderness"] },
-  { id: "discovery-marker", kind: "discovery", summary: "A verge-stone carries a sigil the party has not seen before, still sharp.", weight: 15, environments: ["wilderness", "water"] },
-  { id: "encounter-traveler", kind: "encounter", summary: "A wary traveler steps into view and signals for the party to stop.", weight: 10, environments: ["wilderness", "road"] },
+  {
+    id: "weather-squall",
+    kind: "weather",
+    summary: "A cold squall crosses the route; the party pauses to find shelter before continuing.",
+    weight: 30,
+    environments: ["road", "wilderness", "water"],
+  },
+  {
+    id: "weather-fog",
+    kind: "weather",
+    summary: "Fog closes in until only the next short stretch of ground is certain.",
+    weight: 20,
+    condition: "after-long-travel",
+    environments: ["road", "water"],
+  },
+  {
+    id: "obstacle-washout",
+    kind: "obstacle",
+    summary: "Broken ground blocks the way; the party pauses to assess a safe crossing.",
+    weight: 25,
+    environments: ["road", "wilderness"],
+  },
+  {
+    id: "obstacle-crowd",
+    kind: "obstacle",
+    summary: "A crowd chokes the way; the party stops to look for a gap.",
+    weight: 15,
+    environments: ["urban", "road"],
+  },
+  {
+    id: "social-news",
+    kind: "social",
+    summary: "A passing traveler stops to ask the party for news of the road ahead.",
+    weight: 20,
+    environments: ["urban", "road"],
+  },
+  {
+    id: "social-kindness",
+    kind: "social",
+    summary: "A wayside stranger notices the party's injuries and offers help.",
+    weight: 20,
+    condition: "party-injured",
+    environments: ["urban", "road", "wilderness"],
+  },
+  {
+    id: "discovery-marker",
+    kind: "discovery",
+    summary: "A verge-stone carries a sigil the party has not seen before, still sharp.",
+    weight: 15,
+    environments: ["wilderness", "water"],
+  },
+  {
+    id: "encounter-traveler",
+    kind: "encounter",
+    summary: "A wary traveler steps into view and signals for the party to stop.",
+    weight: 10,
+    environments: ["wilderness", "road"],
+  },
 ]);
 export interface TravelEventRouteProfile {
   readonly environment: TravelEnvironment;
@@ -46,11 +100,14 @@ export interface TravelEventRouteProfile {
   readonly chancePercent: number;
 }
 export interface TravelEventSituation {
-  readonly elapsedMinutes: number; readonly partyInjured: boolean;
-  readonly activeEncounter: boolean; readonly journeyInterruptionCount: number;
+  readonly elapsedMinutes: number;
+  readonly partyInjured: boolean;
+  readonly activeEncounter: boolean;
+  readonly journeyInterruptionCount: number;
 }
 export interface SelectTravelInterruptionInput {
-  readonly route: TravelEventRouteProfile; readonly situation: TravelEventSituation;
+  readonly route: TravelEventRouteProfile;
+  readonly situation: TravelEventSituation;
   /** Injected 1..100 trigger roll; required only when the route can interrupt. */
   readonly triggerRoll?: number;
   /** Injected 1..100 selection roll; required only when several events are eligible. */
@@ -59,7 +116,9 @@ export interface SelectTravelInterruptionInput {
   readonly pool?: readonly TravelEventDefinition[];
 }
 export interface TravelInterruption {
-  readonly event: TravelEventDefinition; readonly triggerRoll: number; readonly eventRoll: number | null;
+  readonly event: TravelEventDefinition;
+  readonly triggerRoll: number;
+  readonly eventRoll: number | null;
 }
 const KINDS: readonly TravelEventKind[] = ["weather", "obstacle", "social", "discovery", "encounter"];
 const CONDITIONS: readonly TravelEventCondition[] = ["always", "party-injured", "after-long-travel"];
@@ -86,21 +145,30 @@ function conditionSatisfied(condition: TravelEventCondition, situation: TravelEv
 }
 /** Validates one server-authored event and tests it against the route and situation. */
 export function isEligibleTravelEvent(
-  event: TravelEventDefinition, environment: TravelEnvironment, situation: TravelEventSituation,
+  event: TravelEventDefinition,
+  environment: TravelEnvironment,
+  situation: TravelEventSituation,
 ): boolean {
   if (typeof event.id !== "string" || event.id.length === 0) throw new RangeError("event id is invalid");
   requireEnum(event.kind, KINDS, "event kind");
-  if (typeof event.summary !== "string" || event.summary.trim().length === 0) throw new RangeError("event summary is invalid");
+  if (typeof event.summary !== "string" || event.summary.trim().length === 0)
+    throw new RangeError("event summary is invalid");
   requireInteger(event.weight, 1, 100, "event weight");
   if (event.condition !== undefined) requireEnum(event.condition, CONDITIONS, "event condition");
-  if (!Array.isArray(event.environments) || event.environments.length === 0
-    || event.environments.some((value) => !ENVIRONMENTS.includes(value))) throw new RangeError("event environments are invalid");
+  if (
+    !Array.isArray(event.environments) ||
+    event.environments.length === 0 ||
+    event.environments.some((value) => !ENVIRONMENTS.includes(value))
+  )
+    throw new RangeError("event environments are invalid");
   if (!event.environments.includes(environment)) return false;
   return conditionSatisfied(event.condition ?? "always", situation);
 }
 /** The ordered eligible subset of the pool for one environment and situation. */
 export function eligibleTravelEvents(
-  route: TravelEventRouteProfile, situation: TravelEventSituation, pool: readonly TravelEventDefinition[] = TRAVEL_EVENT_POOL,
+  route: TravelEventRouteProfile,
+  situation: TravelEventSituation,
+  pool: readonly TravelEventDefinition[] = TRAVEL_EVENT_POOL,
 ): readonly TravelEventDefinition[] {
   const environment = requireEnum(route.environment, ENVIRONMENTS, "environment");
   requireBoolean(situation.partyInjured, "partyInjured");
@@ -130,8 +198,14 @@ export function selectTravelInterruption(input: SelectTravelInterruptionInput): 
   requireInteger(situation.elapsedMinutes, 0, Number.MAX_SAFE_INTEGER, "elapsedMinutes");
   requireBoolean(situation.partyInjured, "partyInjured");
   requireBoolean(situation.activeEncounter, "activeEncounter");
-  const count = requireInteger(situation.journeyInterruptionCount, 0, Number.MAX_SAFE_INTEGER, "journeyInterruptionCount");
-  if (route.risk === "safe" || chance === 0 || situation.activeEncounter || count >= MAX_INTERRUPTIONS_PER_TRANCHE) return null;
+  const count = requireInteger(
+    situation.journeyInterruptionCount,
+    0,
+    Number.MAX_SAFE_INTEGER,
+    "journeyInterruptionCount",
+  );
+  if (route.risk === "safe" || chance === 0 || situation.activeEncounter || count >= MAX_INTERRUPTIONS_PER_TRANCHE)
+    return null;
   const eligible = eligibleTravelEvents({ ...route, environment }, situation, input.pool);
   if (eligible.length === 0) return null;
   if (input.triggerRoll === undefined) throw new RangeError("triggerRoll is required when the route can interrupt");

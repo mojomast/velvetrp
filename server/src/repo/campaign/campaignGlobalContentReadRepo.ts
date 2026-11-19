@@ -6,7 +6,14 @@ import {
   resourceIdSchema,
   rulesProfileIdentifierSchema,
 } from "@velvet/contracts";
-import type { ContentPack, ContentPackIdentifier, DefinitionReference, RpgDefinition, RulesProfile, RulesProfileIdentifier } from "../../types.js";
+import type {
+  ContentPack,
+  ContentPackIdentifier,
+  DefinitionReference,
+  RpgDefinition,
+  RulesProfile,
+  RulesProfileIdentifier,
+} from "../../types.js";
 import {
   toContentPack,
   toRpgDefinition,
@@ -37,11 +44,15 @@ export const DEFINITION_ORDER = `CASE d.kind
 
 function listRulesProfilesSync(db: DatabaseDriver.Database, actorPrincipalId: string): RulesProfile[] {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const rows = db.prepare(`SELECT ${RULES_PROFILE_PROJECTION}
+  const rows = db
+    .prepare(
+      `SELECT ${RULES_PROFILE_PROJECTION}
     FROM application_owner ao
     JOIN rpg_rules_profiles rp ON ao.principal_id = ?
     WHERE ao.singleton = 1
-    ORDER BY rp.rules_profile_id ASC`).all(actorId) as RulesProfileRow[];
+    ORDER BY rp.rules_profile_id ASC`,
+    )
+    .all(actorId) as RulesProfileRow[];
   return rows.map(toRulesProfile);
 }
 
@@ -52,20 +63,28 @@ function getRulesProfileSync(
 ): RulesProfile | null {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const normalized = rulesProfileIdentifierSchema.parse(identifier);
-  const row = db.prepare(`SELECT ${RULES_PROFILE_PROJECTION}
+  const row = db
+    .prepare(
+      `SELECT ${RULES_PROFILE_PROJECTION}
     FROM application_owner ao
     JOIN rpg_rules_profiles rp ON ao.principal_id = ? AND rp.rules_profile_id = ?
-    WHERE ao.singleton = 1`).get(actorId, normalized.rulesProfileId) as RulesProfileRow | undefined;
+    WHERE ao.singleton = 1`,
+    )
+    .get(actorId, normalized.rulesProfileId) as RulesProfileRow | undefined;
   return row ? toRulesProfile(row) : null;
 }
 
 function listContentPacksSync(db: DatabaseDriver.Database, actorPrincipalId: string): ContentPack[] {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const rows = db.prepare(`SELECT ${CONTENT_PACK_PROJECTION}
+  const rows = db
+    .prepare(
+      `SELECT ${CONTENT_PACK_PROJECTION}
     FROM application_owner ao
     JOIN rpg_content_packs p ON ao.principal_id = ?
     WHERE ao.singleton = 1 AND p.sealed = 1
-    ORDER BY p.pack_id ASC, p.pack_version ASC`).all(actorId) as ContentPackRow[];
+    ORDER BY p.pack_id ASC, p.pack_version ASC`,
+    )
+    .all(actorId) as ContentPackRow[];
   return rows.map(toContentPack);
 }
 
@@ -76,10 +95,14 @@ function getContentPackSync(
 ): ContentPack | null {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const normalized = contentPackIdentifierSchema.parse(identifier);
-  const row = db.prepare(`SELECT ${CONTENT_PACK_PROJECTION}
+  const row = db
+    .prepare(
+      `SELECT ${CONTENT_PACK_PROJECTION}
     FROM application_owner ao
     JOIN rpg_content_packs p ON ao.principal_id = ? AND p.pack_id = ? AND p.pack_version = ?
-    WHERE ao.singleton = 1 AND p.sealed = 1`).get(actorId, normalized.packId, normalized.packVersion) as ContentPackRow | undefined;
+    WHERE ao.singleton = 1 AND p.sealed = 1`,
+    )
+    .get(actorId, normalized.packId, normalized.packVersion) as ContentPackRow | undefined;
   return row ? toContentPack(row) : null;
 }
 
@@ -90,12 +113,16 @@ function listContentPackDefinitionsSync(
 ): RpgDefinition[] {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const normalized = contentPackIdentifierSchema.parse(identifier);
-  const rows = db.prepare(`SELECT ${DEFINITION_PROJECTION}
+  const rows = db
+    .prepare(
+      `SELECT ${DEFINITION_PROJECTION}
     FROM application_owner ao
     JOIN rpg_definitions d ON ao.principal_id = ? AND d.pack_id = ? AND d.pack_version = ?
     JOIN rpg_content_packs p ON p.pack_id = d.pack_id AND p.pack_version = d.pack_version AND p.sealed = 1
     WHERE ao.singleton = 1
-    ORDER BY ${DEFINITION_ORDER}`).all(actorId, normalized.packId, normalized.packVersion) as RpgDefinitionRow[];
+    ORDER BY ${DEFINITION_ORDER}`,
+    )
+    .all(actorId, normalized.packId, normalized.packVersion) as RpgDefinitionRow[];
   return rows.map(toRpgDefinition);
 }
 
@@ -106,18 +133,17 @@ function getContentPackDefinitionSync(
 ): RpgDefinition | null {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const normalized = definitionReferenceSchema.parse(reference);
-  const row = db.prepare(`SELECT ${DEFINITION_PROJECTION}
+  const row = db
+    .prepare(
+      `SELECT ${DEFINITION_PROJECTION}
     FROM application_owner ao
     JOIN rpg_definitions d ON ao.principal_id = ? AND d.pack_id = ? AND d.pack_version = ?
       AND d.kind = ? AND d.definition_id = ?
     JOIN rpg_content_packs p ON p.pack_id = d.pack_id AND p.pack_version = d.pack_version AND p.sealed = 1
-    WHERE ao.singleton = 1`).get(
-      actorId,
-      normalized.packId,
-      normalized.packVersion,
-      normalized.kind,
-      normalized.definitionId,
-    ) as RpgDefinitionRow | undefined;
+    WHERE ao.singleton = 1`,
+    )
+    .get(actorId, normalized.packId, normalized.packVersion, normalized.kind, normalized.definitionId) as
+    RpgDefinitionRow | undefined;
   return row ? toRpgDefinition(row) : null;
 }
 

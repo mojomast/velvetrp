@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { DND_5E_RULESET_DESCRIPTOR, planDnd5eAttackConditions, type ConditionId } from "../src/rulesets/index.js";
 
-const plan = (attacker: ConditionId[], target: ConditionId[], kind: "melee" | "ranged" | "thrown" = "melee", longRange = false) =>
-  planDnd5eAttackConditions({ attacker, target, kind, longRange });
+const plan = (
+  attacker: ConditionId[],
+  target: ConditionId[],
+  kind: "melee" | "ranged" | "thrown" = "melee",
+  longRange = false,
+) => planDnd5eAttackConditions({ attacker, target, kind, longRange });
 
 describe("SRD 5.1 condition attack effects", () => {
   it("keeps an unhindered attack normal", () => {
@@ -29,14 +33,24 @@ describe("SRD 5.1 condition attack effects", () => {
 
   it("grants advantage for a help or hidden benefit that cancels against hindrance", () => {
     expect(plan([], [], "melee")).toMatchObject({ mode: "normal" });
-    expect(planDnd5eAttackConditions({ attacker: [], target: [], kind: "melee", attackerBenefit: true })).toMatchObject({ mode: "advantage" });
-    expect(planDnd5eAttackConditions({ attacker: ["prone"], target: [], kind: "melee", attackerBenefit: true })).toMatchObject({ mode: "normal" });
+    expect(planDnd5eAttackConditions({ attacker: [], target: [], kind: "melee", attackerBenefit: true })).toMatchObject(
+      { mode: "advantage" },
+    );
+    expect(
+      planDnd5eAttackConditions({ attacker: ["prone"], target: [], kind: "melee", attackerBenefit: true }),
+    ).toMatchObject({ mode: "normal" });
   });
 
   it("imposes disadvantage on a ranged attack made within five feet of a hostile", () => {
-    expect(planDnd5eAttackConditions({ attacker: [], target: [], kind: "ranged", attackerInMelee: true })).toMatchObject({ mode: "disadvantage" });
-    expect(planDnd5eAttackConditions({ attacker: [], target: [], kind: "melee", attackerInMelee: true })).toMatchObject({ mode: "normal" });
-    expect(planDnd5eAttackConditions({ attacker: [], target: ["restrained"], kind: "thrown", attackerInMelee: true })).toMatchObject({ mode: "normal" });
+    expect(
+      planDnd5eAttackConditions({ attacker: [], target: [], kind: "ranged", attackerInMelee: true }),
+    ).toMatchObject({ mode: "disadvantage" });
+    expect(planDnd5eAttackConditions({ attacker: [], target: [], kind: "melee", attackerInMelee: true })).toMatchObject(
+      { mode: "normal" },
+    );
+    expect(
+      planDnd5eAttackConditions({ attacker: [], target: ["restrained"], kind: "thrown", attackerInMelee: true }),
+    ).toMatchObject({ mode: "normal" });
   });
 
   it("cancels advantage and disadvantage from any source", () => {
@@ -53,7 +67,7 @@ describe("SRD 5.1 condition attack effects", () => {
   });
 
   it("advertises the expanded condition effects as conditions@1.2.0", () => {
-    const conditions = DND_5E_RULESET_DESCRIPTOR.capabilities?.find(capability => capability.id === "conditions");
+    const conditions = DND_5E_RULESET_DESCRIPTOR.capabilities?.find((capability) => capability.id === "conditions");
     expect(conditions).toEqual({ id: "conditions", version: "1.2.0", status: "partial" });
   });
 });

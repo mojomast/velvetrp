@@ -15,8 +15,10 @@ export const progressionReferenceKey = (reference: ExactReference): string =>
 
 /** Metadata-only features can still carry safe HP/proficiency progression. */
 export const isExecutableClassLevel = (level: { tags: readonly string[] }): boolean =>
-  !level.tags.some((tag) =>
-    tag === "martial-archetype-gate" || tag === "subclass-gate" || tag === "feat-gate" || tag === "multiclass-gate");
+  !level.tags.some(
+    (tag) =>
+      tag === "martial-archetype-gate" || tag === "subclass-gate" || tag === "feat-gate" || tag === "multiclass-gate",
+  );
 
 export interface ResolvedInitialPower {
   reference: Extract<ExactReference, { kind: "ability" | "spell" }>;
@@ -39,14 +41,18 @@ export function resolveSelectedClassProgression(input: {
     if (exact.has(key)) throw new Error("selected class progression contains a duplicate exact definition");
     exact.set(key, parsed.data);
   }
-  const levels = selectedClass.mechanics.levelRefs.map((reference) => {
-    const parsed = classLevelCatalogDefinitionSchema.safeParse(exact.get(progressionReferenceKey(reference)));
-    if (!parsed.success) throw new Error("selected class progression reference is unavailable");
-    if (progressionReferenceKey(parsed.data.mechanics.classRef) !== progressionReferenceKey(selectedClass.reference)) {
-      throw new Error("selected class progression level has a mismatched class owner");
-    }
-    return parsed.data;
-  }).filter(isExecutableClassLevel);
+  const levels = selectedClass.mechanics.levelRefs
+    .map((reference) => {
+      const parsed = classLevelCatalogDefinitionSchema.safeParse(exact.get(progressionReferenceKey(reference)));
+      if (!parsed.success) throw new Error("selected class progression reference is unavailable");
+      if (
+        progressionReferenceKey(parsed.data.mechanics.classRef) !== progressionReferenceKey(selectedClass.reference)
+      ) {
+        throw new Error("selected class progression level has a mismatched class owner");
+      }
+      return parsed.data;
+    })
+    .filter(isExecutableClassLevel);
   if (!levels.length) throw new Error("selected class has no executable progression levels");
   const byLevel = new Map<number, (typeof levels)[number]>();
   const choiceIds = new Set<string>();
@@ -61,19 +67,36 @@ export function resolveSelectedClassProgression(input: {
     }
   }
   const supported = Array.from({ length: input.profileMaximum }, (_, index) => byLevel.get(index + 1));
-  if (supported.some((level) => level === undefined)) throw new Error("selected class progression is incomplete for the profile maximum");
+  if (supported.some((level) => level === undefined))
+    throw new Error("selected class progression is incomplete for the profile maximum");
   return supported as Array<(typeof levels)[number]>;
 }
 
-export function resolveInitialKnownPowers(input: { selectedRace: unknown; levels: readonly unknown[] }): ResolvedInitialPower[] {
+export function resolveInitialKnownPowers(input: {
+  selectedRace: unknown;
+  levels: readonly unknown[];
+}): ResolvedInitialPower[] {
   const race = raceCatalogDefinitionSchema.parse(input.selectedRace);
-  const levelOne = input.levels.map((level) => classLevelCatalogDefinitionSchema.parse(level))
+  const levelOne = input.levels
+    .map((level) => classLevelCatalogDefinitionSchema.parse(level))
     .filter((level) => level.mechanics.level === 1);
   if (levelOne.length !== 1) throw new Error("selected class requires one exact level-one definition");
   const sources: ResolvedInitialPower[] = [
-    ...race.mechanics.abilityRefs.map((reference) => ({ reference, source: "race" as const, sourceReference: race.reference })),
-    ...levelOne[0]!.mechanics.abilityRefs.map((reference) => ({ reference, source: "class-level" as const, sourceReference: levelOne[0]!.reference })),
-    ...levelOne[0]!.mechanics.spellRefs.map((reference) => ({ reference, source: "class-level" as const, sourceReference: levelOne[0]!.reference })),
+    ...race.mechanics.abilityRefs.map((reference) => ({
+      reference,
+      source: "race" as const,
+      sourceReference: race.reference,
+    })),
+    ...levelOne[0]!.mechanics.abilityRefs.map((reference) => ({
+      reference,
+      source: "class-level" as const,
+      sourceReference: levelOne[0]!.reference,
+    })),
+    ...levelOne[0]!.mechanics.spellRefs.map((reference) => ({
+      reference,
+      source: "class-level" as const,
+      sourceReference: levelOne[0]!.reference,
+    })),
   ];
   const seen = new Set<string>();
   for (const source of sources) {

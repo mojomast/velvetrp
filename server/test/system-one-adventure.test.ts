@@ -13,7 +13,12 @@ import {
 
 const thresholds = { actionThreshold: 0.75, reviewThreshold: 0.5 };
 const candidates: AdventureSelectionCandidate[] = [
-  { candidateId: "travel:mill", digest: "a".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
+  {
+    candidateId: "travel:mill",
+    digest: "a".repeat(64),
+    kind: "exact_actor_travel.select",
+    label: "Travel to the mill",
+  },
   { candidateId: "check:climb", digest: "b".repeat(64), kind: "exact_srd_check.select", label: "Climb the mill wall" },
 ];
 
@@ -24,7 +29,13 @@ const choice = (value: string, top: number): SystemOneAnswer => ({
   confidence: top,
   probabilities: { [value]: top, [ADVENTURE_NONE]: Math.max(0, 1 - top) },
 });
-const score = (value: number): SystemOneAnswer => ({ type: "score", score: value, confidence: 0.9, legend: {}, probabilities: {} });
+const score = (value: number): SystemOneAnswer => ({
+  type: "score",
+  score: value,
+  confidence: 0.9,
+  legend: {},
+  probabilities: {},
+});
 
 describe("buildAdventureSelectionQuestions", () => {
   it("builds one support noul, one relevance score per candidate, and a fail-closed aggregate choice", () => {
@@ -56,10 +67,14 @@ describe("buildAdventureSelectionQuestions", () => {
 
 describe("composeAdventureSelection", () => {
   it("acts on an advertised candidate when both independent claims clear the action threshold", () => {
-    const composition = composeAdventureSelection(candidates, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
-      [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.9),
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      candidates,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+        [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.9),
+      },
+      thresholds,
+    );
     expect(composition).toEqual({
       band: "act",
       method: "choice",
@@ -69,10 +84,14 @@ describe("composeAdventureSelection", () => {
   });
 
   it("confirms, rather than acts, when the weaker claim sits in the review band", () => {
-    const composition = composeAdventureSelection(candidates, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.6),
-      [ADVENTURE_BEST_KEY]: choice("check:climb", 0.9),
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      candidates,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.6),
+        [ADVENTURE_BEST_KEY]: choice("check:climb", 0.9),
+      },
+      thresholds,
+    );
     expect(composition.band).toBe("confirm");
     expect(composition.method).toBe("choice");
     expect(composition.selection?.candidateId).toBe("check:climb");
@@ -80,64 +99,164 @@ describe("composeAdventureSelection", () => {
   });
 
   it("fails closed when either claim is weak, even if the other is confident", () => {
-    const unsupported = composeAdventureSelection(candidates, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.2),
-      [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.95),
-    }, thresholds);
+    const unsupported = composeAdventureSelection(
+      candidates,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.2),
+        [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.95),
+      },
+      thresholds,
+    );
     expect(unsupported).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: 0.2 });
-    const hesitant = composeAdventureSelection(candidates, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.95),
-      [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.4),
-    }, thresholds);
+    const hesitant = composeAdventureSelection(
+      candidates,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.95),
+        [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.4),
+      },
+      thresholds,
+    );
     expect(hesitant.selection).toBeNull();
     expect(hesitant.topSignal).toBe(0.4);
   });
 
   it("defers on none_of_these, an undeclared id, a missing noul, or no candidates", () => {
-    expect(composeAdventureSelection(candidates, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
-      [ADVENTURE_BEST_KEY]: choice(ADVENTURE_NONE, 0.99),
-    }, thresholds).selection).toBeNull();
-    expect(composeAdventureSelection(candidates, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
-      [ADVENTURE_BEST_KEY]: choice("invented:teleport", 0.99),
-    }, thresholds).band).toBe("fallback");
-    expect(composeAdventureSelection(candidates, {
-      [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.99),
-    }, thresholds).band).toBe("fallback");
-    expect(composeAdventureSelection([], {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
-      [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.99),
-    }, thresholds)).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
+    expect(
+      composeAdventureSelection(
+        candidates,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+          [ADVENTURE_BEST_KEY]: choice(ADVENTURE_NONE, 0.99),
+        },
+        thresholds,
+      ).selection,
+    ).toBeNull();
+    expect(
+      composeAdventureSelection(
+        candidates,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+          [ADVENTURE_BEST_KEY]: choice("invented:teleport", 0.99),
+        },
+        thresholds,
+      ).band,
+    ).toBe("fallback");
+    expect(
+      composeAdventureSelection(
+        candidates,
+        {
+          [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.99),
+        },
+        thresholds,
+      ).band,
+    ).toBe("fallback");
+    expect(
+      composeAdventureSelection(
+        [],
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+          [ADVENTURE_BEST_KEY]: choice("travel:mill", 0.99),
+        },
+        thresholds,
+      ),
+    ).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
   });
 
   it("never throws on malformed or missing probability maps", () => {
     const malformed = { type: "choice", choice: "travel:mill", confidence: 0.9, probabilities: {} } as SystemOneAnswer;
-    expect(() => composeAdventureSelection(candidates, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
-      [ADVENTURE_BEST_KEY]: malformed,
-    }, thresholds)).not.toThrow();
-    expect(composeAdventureSelection(candidates, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
-      [ADVENTURE_BEST_KEY]: malformed,
-    }, thresholds).band).toBe("fallback");
+    expect(() =>
+      composeAdventureSelection(
+        candidates,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+          [ADVENTURE_BEST_KEY]: malformed,
+        },
+        thresholds,
+      ),
+    ).not.toThrow();
+    expect(
+      composeAdventureSelection(
+        candidates,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+          [ADVENTURE_BEST_KEY]: malformed,
+        },
+        thresholds,
+      ).band,
+    ).toBe("fallback");
   });
 
   it("normalizes the per-candidate relevance score and clamps out-of-range values", () => {
-    expect(adventureCandidateRelevance({ [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: { type: "score", score: 3, confidence: 0.9, legend: {}, probabilities: {} } }, "travel:mill")).toBe(1);
-    expect(adventureCandidateRelevance({ [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: { type: "score", score: 0, confidence: 0.9, legend: {}, probabilities: {} } }, "travel:mill")).toBe(0);
-    expect(adventureCandidateRelevance({ [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: { type: "score", score: 9, confidence: 0.9, legend: {}, probabilities: {} } }, "travel:mill")).toBe(1);
+    expect(
+      adventureCandidateRelevance(
+        {
+          [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: {
+            type: "score",
+            score: 3,
+            confidence: 0.9,
+            legend: {},
+            probabilities: {},
+          },
+        },
+        "travel:mill",
+      ),
+    ).toBe(1);
+    expect(
+      adventureCandidateRelevance(
+        {
+          [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: {
+            type: "score",
+            score: 0,
+            confidence: 0.9,
+            legend: {},
+            probabilities: {},
+          },
+        },
+        "travel:mill",
+      ),
+    ).toBe(0);
+    expect(
+      adventureCandidateRelevance(
+        {
+          [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: {
+            type: "score",
+            score: 9,
+            confidence: 0.9,
+            legend: {},
+            probabilities: {},
+          },
+        },
+        "travel:mill",
+      ),
+    ).toBe(1);
     expect(adventureCandidateRelevance({}, "travel:mill")).toBeNull();
-    expect(adventureCandidateRelevance({ [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: noul(0.9) }, "travel:mill")).toBeNull();
+    expect(
+      adventureCandidateRelevance({ [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: noul(0.9) }, "travel:mill"),
+    ).toBeNull();
   });
 });
 
 describe("interchangeable candidate collapse", () => {
   const potionLabel = "Use combat consumable: Potion of Healing → Aster Vale";
   const potions: AdventureSelectionCandidate[] = [
-    { candidateId: "consumable:potion-b", digest: "b".repeat(64), kind: "exact_combat_consumable.select", label: potionLabel },
-    { candidateId: "consumable:potion-a", digest: "a".repeat(64), kind: "exact_combat_consumable.select", label: potionLabel },
-    { candidateId: "consumable:potion-c", digest: "c".repeat(64), kind: "exact_combat_consumable.select", label: potionLabel },
+    {
+      candidateId: "consumable:potion-b",
+      digest: "b".repeat(64),
+      kind: "exact_combat_consumable.select",
+      label: potionLabel,
+    },
+    {
+      candidateId: "consumable:potion-a",
+      digest: "a".repeat(64),
+      kind: "exact_combat_consumable.select",
+      label: potionLabel,
+    },
+    {
+      candidateId: "consumable:potion-c",
+      digest: "c".repeat(64),
+      kind: "exact_combat_consumable.select",
+      label: potionLabel,
+    },
   ];
   const representative = potions[1]!;
 
@@ -173,12 +292,20 @@ describe("interchangeable candidate collapse", () => {
     if (aggregate?.type !== "choice") throw new Error("aggregate must be a choice");
     expect(Object.keys(aggregate.criteria)).toEqual([representative.candidateId, ADVENTURE_NONE]);
 
-    const composition = composeAdventureSelection(potions, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
-      [`${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`]: score(3),
-      [ADVENTURE_BEST_KEY]: { type: "choice", choice: representative.candidateId, confidence: 0.95,
-        probabilities: { [representative.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 } },
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      potions,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+        [`${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`]: score(3),
+        [ADVENTURE_BEST_KEY]: {
+          type: "choice",
+          choice: representative.candidateId,
+          confidence: 0.95,
+          probabilities: { [representative.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 },
+        },
+      },
+      thresholds,
+    );
     expect(composition).toEqual({
       band: "act",
       method: "choice",
@@ -192,20 +319,41 @@ describe("interchangeable candidate collapse", () => {
     // the multi-group member-to-representative mapping.
     const mixed = [candidates[0]!, ...potions];
     const member = potions[2]!;
-    const composition = composeAdventureSelection(mixed, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
-      [ADVENTURE_BEST_KEY]: { type: "choice", choice: member.candidateId, confidence: 0.95,
-        probabilities: { [member.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 } },
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      mixed,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+        [ADVENTURE_BEST_KEY]: {
+          type: "choice",
+          choice: member.candidateId,
+          confidence: 0.95,
+          probabilities: { [member.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 },
+        },
+      },
+      thresholds,
+    );
 
-    expect(composition).toMatchObject({ band: "act", method: "choice",
-      selection: { candidateId: representative.candidateId, digest: representative.digest } });
+    expect(composition).toMatchObject({
+      band: "act",
+      method: "choice",
+      selection: { candidateId: representative.candidateId, digest: representative.digest },
+    });
   });
 
   it("keeps identical labels under different kinds as separate candidates", () => {
     const crossKind: AdventureSelectionCandidate[] = [
-      { candidateId: "consumable:heal-1", digest: "1".repeat(64), kind: "exact_combat_consumable.select", label: "Use a healing item on Aster Vale" },
-      { candidateId: "power:heal-1", digest: "2".repeat(64), kind: "exact_power_use.select", label: "Use a healing item on Aster Vale" },
+      {
+        candidateId: "consumable:heal-1",
+        digest: "1".repeat(64),
+        kind: "exact_combat_consumable.select",
+        label: "Use a healing item on Aster Vale",
+      },
+      {
+        candidateId: "power:heal-1",
+        digest: "2".repeat(64),
+        kind: "exact_power_use.select",
+        label: "Use a healing item on Aster Vale",
+      },
     ];
     const questions = buildAdventureSelectionQuestions("I heal Aster.", crossKind);
 
@@ -220,27 +368,50 @@ describe("interchangeable candidate collapse", () => {
     expect(Object.keys(aggregate.criteria)).toEqual(["consumable:heal-1", "power:heal-1", ADVENTURE_NONE]);
 
     for (const picked of crossKind) {
-      const composition = composeAdventureSelection(crossKind, {
-        [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
-        [ADVENTURE_BEST_KEY]: { type: "choice", choice: picked.candidateId, confidence: 0.9,
-          probabilities: { [picked.candidateId]: 0.9, [ADVENTURE_NONE]: 0.1 } },
-      }, thresholds);
+      const composition = composeAdventureSelection(
+        crossKind,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+          [ADVENTURE_BEST_KEY]: {
+            type: "choice",
+            choice: picked.candidateId,
+            confidence: 0.9,
+            probabilities: { [picked.candidateId]: 0.9, [ADVENTURE_NONE]: 0.1 },
+          },
+        },
+        thresholds,
+      );
       expect(composition.selection).toEqual({ candidateId: picked.candidateId, digest: picked.digest });
     }
   });
 
   it("keeps distinct labels separate and collapses only the exact duplicate group in advertised order", () => {
     const mixed: AdventureSelectionCandidate[] = [
-      { candidateId: "travel:mill", digest: "d".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
+      {
+        candidateId: "travel:mill",
+        digest: "d".repeat(64),
+        kind: "exact_actor_travel.select",
+        label: "Travel to the mill",
+      },
       potions[0]!,
       potions[1]!,
-      { candidateId: "check:climb", digest: "e".repeat(64), kind: "exact_srd_check.select", label: "Climb the mill wall" },
+      {
+        candidateId: "check:climb",
+        digest: "e".repeat(64),
+        kind: "exact_srd_check.select",
+        label: "Climb the mill wall",
+      },
     ];
     const questions = buildAdventureSelectionQuestions("I head to the mill.", mixed);
     const aggregate = questions[ADVENTURE_BEST_KEY];
     if (aggregate?.type !== "choice") throw new Error("aggregate must be a choice");
 
-    expect(Object.keys(aggregate.criteria)).toEqual(["travel:mill", representative.candidateId, "check:climb", ADVENTURE_NONE]);
+    expect(Object.keys(aggregate.criteria)).toEqual([
+      "travel:mill",
+      representative.candidateId,
+      "check:climb",
+      ADVENTURE_NONE,
+    ]);
     expect(questions[`${ADVENTURE_RELEVANCE_PREFIX}consumable:potion-b`]).toBeUndefined();
     expect(questions[`${ADVENTURE_RELEVANCE_PREFIX}check:climb`]).toBeDefined();
   });
@@ -249,19 +420,37 @@ describe("interchangeable candidate collapse", () => {
     // The second distinct group keeps the aggregate choice authoritative; with a sole group the
     // aggregate answer is advisory only (covered under single-group composition).
     const mixed = [...potions, candidates[0]!];
-    expect(composeAdventureSelection(mixed, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
-      [ADVENTURE_BEST_KEY]: choice(ADVENTURE_NONE, 0.99),
-    }, thresholds)).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
-    expect(composeAdventureSelection(mixed, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
-      [ADVENTURE_BEST_KEY]: choice("invented:teleport", 0.99),
-    }, thresholds).band).toBe("fallback");
+    expect(
+      composeAdventureSelection(
+        mixed,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+          [ADVENTURE_BEST_KEY]: choice(ADVENTURE_NONE, 0.99),
+        },
+        thresholds,
+      ),
+    ).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
+    expect(
+      composeAdventureSelection(
+        mixed,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+          [ADVENTURE_BEST_KEY]: choice("invented:teleport", 0.99),
+        },
+        thresholds,
+      ).band,
+    ).toBe("fallback");
   });
 
   it("resolves the shared relevance answer for every member id of a collapsed group", () => {
     const answers: Record<string, SystemOneAnswer> = {
-      [`${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`]: { type: "score", score: 3, confidence: 0.9, legend: {}, probabilities: {} },
+      [`${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`]: {
+        type: "score",
+        score: 3,
+        confidence: 0.9,
+        legend: {},
+        probabilities: {},
+      },
     };
 
     expect(adventureCandidateRelevance(answers, representative.candidateId)).toBe(1);
@@ -278,8 +467,18 @@ describe("single-group composition ignores the aggregate choice", () => {
   const potionLabel = "Use combat consumable: Potion of Healing → Aster Vale";
   // Two interchangeable copies collapse to one group; the representative is the lowest candidateId.
   const potions: AdventureSelectionCandidate[] = [
-    { candidateId: "consumable:potion-b", digest: "b".repeat(64), kind: "exact_combat_consumable.select", label: potionLabel },
-    { candidateId: "consumable:potion-a", digest: "a".repeat(64), kind: "exact_combat_consumable.select", label: potionLabel },
+    {
+      candidateId: "consumable:potion-b",
+      digest: "b".repeat(64),
+      kind: "exact_combat_consumable.select",
+      label: potionLabel,
+    },
+    {
+      candidateId: "consumable:potion-a",
+      digest: "a".repeat(64),
+      kind: "exact_combat_consumable.select",
+      label: potionLabel,
+    },
   ];
   const representative = potions[1]!;
   const relevanceKey = `${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`;
@@ -288,11 +487,15 @@ describe("single-group composition ignores the aggregate choice", () => {
     // Mirrors the live battery: supported 0.91, relevance 2.76/3 = 0.92, best_candidate
     // none_of_these. Under these test thresholds (act >= 0.75, confirm >= 0.5) the composed
     // signal min(0.91, 0.92) = 0.91 lands in `act`, so this documents the expected band.
-    const composition = composeAdventureSelection(potions, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.91),
-      [relevanceKey]: score(2.76),
-      [ADVENTURE_BEST_KEY]: choice(ADVENTURE_NONE, 0.59),
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      potions,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.91),
+        [relevanceKey]: score(2.76),
+        [ADVENTURE_BEST_KEY]: choice(ADVENTURE_NONE, 0.59),
+      },
+      thresholds,
+    );
     expect(composition).toEqual({
       band: "act",
       method: "choice",
@@ -302,11 +505,15 @@ describe("single-group composition ignores the aggregate choice", () => {
   });
 
   it("ignores an undeclared aggregate id as well", () => {
-    const composition = composeAdventureSelection(potions, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.91),
-      [relevanceKey]: score(2.76),
-      [ADVENTURE_BEST_KEY]: choice("invented:teleport", 0.99),
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      potions,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.91),
+        [relevanceKey]: score(2.76),
+        [ADVENTURE_BEST_KEY]: choice("invented:teleport", 0.99),
+      },
+      thresholds,
+    );
     expect(composition).toMatchObject({
       band: "act",
       method: "choice",
@@ -315,29 +522,41 @@ describe("single-group composition ignores the aggregate choice", () => {
   });
 
   it("defers on weak relevance even when supported is high", () => {
-    const composition = composeAdventureSelection(potions, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.95),
-      [relevanceKey]: score(1), // 1/3 ≈ 0.33, below the review threshold
-      [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      potions,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.95),
+        [relevanceKey]: score(1), // 1/3 ≈ 0.33, below the review threshold
+        [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
+      },
+      thresholds,
+    );
     expect(composition).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: 1 / 3 });
   });
 
   it("defers on weak supported even when relevance is high", () => {
-    const composition = composeAdventureSelection(potions, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.2),
-      [relevanceKey]: score(3),
-      [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      potions,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.2),
+        [relevanceKey]: score(3),
+        [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
+      },
+      thresholds,
+    );
     expect(composition).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: 0.2 });
   });
 
   it("selects the deterministic representative for interchangeable duplicates", () => {
-    const composition = composeAdventureSelection(potions, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
-      [relevanceKey]: score(3),
-      [ADVENTURE_BEST_KEY]: choice("consumable:potion-b", 0.99), // a non-representative member
-    }, thresholds);
+    const composition = composeAdventureSelection(
+      potions,
+      {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+        [relevanceKey]: score(3),
+        [ADVENTURE_BEST_KEY]: choice("consumable:potion-b", 0.99), // a non-representative member
+      },
+      thresholds,
+    );
     expect(composition).toEqual({
       band: "act",
       method: "choice",
@@ -347,35 +566,63 @@ describe("single-group composition ignores the aggregate choice", () => {
   });
 
   it("fails closed when relevance is missing or malformed, or supported is not a finite noul", () => {
-    expect(composeAdventureSelection(potions, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
-      [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
-    }, thresholds)).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
+    expect(
+      composeAdventureSelection(
+        potions,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+          [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
+        },
+        thresholds,
+      ),
+    ).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
 
-    expect(composeAdventureSelection(potions, {
-      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
-      [relevanceKey]: noul(0.99), // wrong answer type for a score question
-      [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
-    }, thresholds)).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
+    expect(
+      composeAdventureSelection(
+        potions,
+        {
+          [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+          [relevanceKey]: noul(0.99), // wrong answer type for a score question
+          [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
+        },
+        thresholds,
+      ),
+    ).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
 
     for (const supported of [
       { type: "noul", noul: Number.NaN } as SystemOneAnswer,
       { type: "noul", noul: Number.POSITIVE_INFINITY } as SystemOneAnswer,
       { type: "choice", choice: representative.candidateId, confidence: 0.99, probabilities: {} } as SystemOneAnswer,
     ]) {
-      expect(composeAdventureSelection(potions, {
-        [ADVENTURE_SUPPORTED_KEY]: supported,
-        [relevanceKey]: score(3),
-        [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
-      }, thresholds)).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
+      expect(
+        composeAdventureSelection(
+          potions,
+          {
+            [ADVENTURE_SUPPORTED_KEY]: supported,
+            [relevanceKey]: score(3),
+            [ADVENTURE_BEST_KEY]: choice(representative.candidateId, 0.99),
+          },
+          thresholds,
+        ),
+      ).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
     }
   });
 });
 
 describe("multi-group composition stays choice-driven", () => {
   const mixed: AdventureSelectionCandidate[] = [
-    { candidateId: "travel:mill", digest: "a".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
-    { candidateId: "check:climb", digest: "b".repeat(64), kind: "exact_srd_check.select", label: "Climb the mill wall" },
+    {
+      candidateId: "travel:mill",
+      digest: "a".repeat(64),
+      kind: "exact_actor_travel.select",
+      label: "Travel to the mill",
+    },
+    {
+      candidateId: "check:climb",
+      digest: "b".repeat(64),
+      kind: "exact_srd_check.select",
+      label: "Climb the mill wall",
+    },
   ];
   const answers = (best: SystemOneAnswer): Record<string, SystemOneAnswer> => ({
     [ADVENTURE_SUPPORTED_KEY]: noul(0.95),
@@ -387,27 +634,33 @@ describe("multi-group composition stays choice-driven", () => {
   });
 
   it("still defers on none_of_these and undeclared ids despite perfect relevance", () => {
-    expect(composeAdventureSelection(mixed, answers(choice(ADVENTURE_NONE, 0.99)), thresholds))
-      .toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
-    expect(composeAdventureSelection(mixed, answers(choice("invented:teleport", 0.99)), thresholds))
-      .toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
+    expect(composeAdventureSelection(mixed, answers(choice(ADVENTURE_NONE, 0.99)), thresholds)).toEqual({
+      band: "fallback",
+      method: "defer",
+      selection: null,
+      topSignal: null,
+    });
+    expect(composeAdventureSelection(mixed, answers(choice("invented:teleport", 0.99)), thresholds)).toEqual({
+      band: "fallback",
+      method: "defer",
+      selection: null,
+      topSignal: null,
+    });
   });
 
   it("selects the named group's representative and gates on the option's own probability", () => {
-    expect(composeAdventureSelection(mixed, answers(choice("check:climb", 0.9)), thresholds))
-      .toEqual({
-        band: "act",
-        method: "choice",
-        selection: { candidateId: "check:climb", digest: "b".repeat(64) },
-        topSignal: 0.9,
-      });
+    expect(composeAdventureSelection(mixed, answers(choice("check:climb", 0.9)), thresholds)).toEqual({
+      band: "act",
+      method: "choice",
+      selection: { candidateId: "check:climb", digest: "b".repeat(64) },
+      topSignal: 0.9,
+    });
     // 0.6 choice probability with 0.95 supported lands in confirm, not act, even at relevance 1.
-    expect(composeAdventureSelection(mixed, answers(choice("check:climb", 0.6)), thresholds))
-      .toEqual({
-        band: "confirm",
-        method: "choice",
-        selection: { candidateId: "check:climb", digest: "b".repeat(64) },
-        topSignal: 0.6,
-      });
+    expect(composeAdventureSelection(mixed, answers(choice("check:climb", 0.6)), thresholds)).toEqual({
+      band: "confirm",
+      method: "choice",
+      selection: { candidateId: "check:climb", digest: "b".repeat(64) },
+      topSignal: 0.6,
+    });
   });
 });

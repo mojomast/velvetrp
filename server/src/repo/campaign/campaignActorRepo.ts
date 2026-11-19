@@ -7,28 +7,64 @@ import type {
 } from "./campaignTypes.js";
 
 interface CampaignActorOperations {
-  getCampaignCharacterCreationOptions(actorPrincipalId: string, campaignId: string): CampaignCharacterCreationOptionsResponse | null;
+  getCampaignCharacterCreationOptions(
+    actorPrincipalId: string,
+    campaignId: string,
+  ): CampaignCharacterCreationOptionsResponse | null;
   getCampaignCharacterRoster(actorPrincipalId: string, campaignId: string): CampaignCharacterRosterSnapshot | null;
-  getCampaignCharacterWorkspace(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterWorkspaceSnapshot | null;
-  getCampaignCharacterSheetSnapshot(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterSheetSnapshot | null;
+  getCampaignCharacterWorkspace(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterWorkspaceSnapshot | null;
+  getCampaignCharacterSheetSnapshot(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterSheetSnapshot | null;
   listCampaignCharacters(actorPrincipalId: string, campaignId: string): CampaignCharacterRead[];
-  getCampaignCharacter(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterRead | null;
-  getCampaignCharacterByActorId(actorPrincipalId: string, campaignId: string, actorId: string): CampaignCharacterRead | null;
+  getCampaignCharacter(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterRead | null;
+  getCampaignCharacterByActorId(
+    actorPrincipalId: string,
+    campaignId: string,
+    actorId: string,
+  ): CampaignCharacterRead | null;
 }
 
 /** Safe, actor-authorized campaign character projections. */
 export interface CampaignActorRepository {
-  getCampaignCharacterCreationOptions(actorPrincipalId: string, campaignId: string): CampaignCharacterCreationOptionsResponse | null;
+  getCampaignCharacterCreationOptions(
+    actorPrincipalId: string,
+    campaignId: string,
+  ): CampaignCharacterCreationOptionsResponse | null;
   getCampaignCharacterRoster(actorPrincipalId: string, campaignId: string): CampaignCharacterRosterSnapshot | null;
-  getCampaignCharacterWorkspace(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterWorkspaceSnapshot | null;
-  getCampaignCharacterSheetSnapshot(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterSheetSnapshot | null;
+  getCampaignCharacterWorkspace(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterWorkspaceSnapshot | null;
+  getCampaignCharacterSheetSnapshot(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterSheetSnapshot | null;
   listCampaignCharacters(actorPrincipalId: string, campaignId: string): CampaignCharacterRead[];
-  getCampaignCharacter(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterRead | null;
-  getCampaignCharacterByActorId(actorPrincipalId: string, campaignId: string, actorId: string): CampaignCharacterRead | null;
+  getCampaignCharacter(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterRead | null;
+  getCampaignCharacterByActorId(
+    actorPrincipalId: string,
+    campaignId: string,
+    actorId: string,
+  ): CampaignCharacterRead | null;
 }
 
-export function createCampaignActorRepository(
-  operations: CampaignActorOperations,
-): CampaignActorRepository {
+export function createCampaignActorRepository(operations: CampaignActorOperations): CampaignActorRepository {
   return operations;
 }

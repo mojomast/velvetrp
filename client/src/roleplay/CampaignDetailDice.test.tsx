@@ -1,11 +1,19 @@
 import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, listCampaignCharacters, listCampaignRooms, rollCampaignDice } from "../api";
+import {
+  ApiError,
+  getCampaignCharacterCreationOptions,
+  getCampaignDetail,
+  getCampaignDiceHistory,
+  listCampaignCharacters,
+  listCampaignRooms,
+  rollCampaignDice,
+} from "../api";
 import { CampaignDetailPage, resetCampaignDetailPageModuleStateForTests } from "./CampaignDetailPage";
 
 vi.mock("../api", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../api")>(),
+  ...(await importOriginal<typeof import("../api")>()),
   getCampaignDetail: vi.fn(),
   getCampaignDiceHistory: vi.fn(),
   rollCampaignDice: vi.fn(),
@@ -15,23 +23,39 @@ vi.mock("../api", async (importOriginal) => ({
 }));
 
 const campaign = {
-  id: "campaign-private-id", name: "Visible campaign", actorRole: "owner" as const,
-  createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-02T00:00:00.000Z",
+  id: "campaign-private-id",
+  name: "Visible campaign",
+  actorRole: "owner" as const,
+  createdAt: "2030-01-01T00:00:00.000Z",
+  updatedAt: "2030-01-02T00:00:00.000Z",
   content: { status: "unconfigured" as const },
 };
-const characters = [{ position: 1, name: "Shared name" }, { position: 2, name: "Shared name" }];
+const characters = [
+  { position: 1, name: "Shared name" },
+  { position: 2, name: "Shared name" },
+];
 const roll = {
-  character: characters[1]!, occurredAt: "2030-01-03T04:05:06.000Z",
+  character: characters[1]!,
+  occurredAt: "2030-01-03T04:05:06.000Z",
   result: {
-    expression: "4d6kh3+2", normalized: { count: 4, sides: 6, selection: { type: "keep_highest" as const, count: 3 }, modifier: 2 },
-    terms: [{ value: 6, kept: true }, { value: 4, kept: true }, { value: 3, kept: true }, { value: 1, kept: false }],
-    modifier: 2, total: 15,
+    expression: "4d6kh3+2",
+    normalized: { count: 4, sides: 6, selection: { type: "keep_highest" as const, count: 3 }, modifier: 2 },
+    terms: [
+      { value: 6, kept: true },
+      { value: 4, kept: true },
+      { value: 3, kept: true },
+      { value: 1, kept: false },
+    ],
+    modifier: 2,
+    total: 15,
   },
 };
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => { resolve = done; });
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
   return { promise, resolve };
 }
 
@@ -65,21 +89,29 @@ afterEach(() => {
 
 describe("campaign detail dice", () => {
   it("is feature-and-role gated while its independent StrictMode history read is reused", async () => {
-    const hidden = render(<CampaignDetailPage campaignId={campaign.id} mechanicsEnabled={false} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const hidden = render(
+      <CampaignDetailPage campaignId={campaign.id} mechanicsEnabled={false} onBack={vi.fn()} onUnavailable={vi.fn()} />,
+    );
     await screen.findByRole("heading", { name: campaign.name });
     expect(screen.queryByRole("heading", { name: "Dice" })).toBeNull();
     expect(getCampaignDiceHistory).not.toHaveBeenCalled();
     hidden.unmount();
 
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: { ...campaign, actorRole: "player" } });
-    const player = render(<CampaignDetailPage campaignId={campaign.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const player = render(
+      <CampaignDetailPage campaignId={campaign.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />,
+    );
     await screen.findByRole("heading", { name: campaign.name });
     expect(screen.queryByRole("heading", { name: "Dice" })).toBeNull();
     expect(getCampaignDiceHistory).not.toHaveBeenCalled();
     player.unmount();
 
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: { ...campaign, actorRole: "gm" } });
-    render(<StrictMode><CampaignDetailPage campaignId={campaign.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} /></StrictMode>);
+    render(
+      <StrictMode>
+        <CampaignDetailPage campaignId={campaign.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />
+      </StrictMode>,
+    );
     expect(await screen.findByRole("heading", { name: "Dice" })).toBeTruthy();
     await screen.findByText("No rolls yet.");
     expect(getCampaignDiceHistory).toHaveBeenCalledOnce();
@@ -91,7 +123,8 @@ describe("campaign detail dice", () => {
     await screen.findByRole("heading", { name: "Dice" });
     const options = (await screen.findByLabelText("Character")).querySelectorAll("option");
     expect(Array.from(options).map((option) => [option.value, option.textContent])).toEqual([
-      ["1", "Character 1 of 2 — Shared name"], ["2", "Character 2 of 2 — Shared name"],
+      ["1", "Character 1 of 2 — Shared name"],
+      ["2", "Character 2 of 2 — Shared name"],
     ]);
     expect(screen.getByText("6 (kept)")).toBeTruthy();
     expect(screen.getByText("1 (discarded)")).toBeTruthy();
@@ -99,7 +132,9 @@ describe("campaign detail dice", () => {
     expect(screen.getByText("15")).toBeTruthy();
     const html = document.body.outerHTML;
     expect(html).not.toContain(campaign.id);
-    expect(document.body.textContent).not.toMatch(/campaign-character|actor-|timeline-|revision|command-|event-|receipt-|idempotency/i);
+    expect(document.body.textContent).not.toMatch(
+      /campaign-character|actor-|timeline-|revision|command-|event-|receipt-|idempotency/i,
+    );
   });
 
   it("serializes one POST, blocks navigation, then confirms with exactly one fresh history GET", async () => {
@@ -127,7 +162,9 @@ describe("campaign detail dice", () => {
     expect(getCampaignDiceHistory).toHaveBeenCalledTimes(2);
     expect(screen.getByText("15")).toBeTruthy();
     expect(backButton.disabled).toBe(false);
-    expect(document.activeElement).toBe(screen.getByText("The server confirmed the roll was committed. Latest roll history was refreshed."));
+    expect(document.activeElement).toBe(
+      screen.getByText("The server confirmed the roll was committed. Latest roll history was refreshed."),
+    );
   });
 
   it("never attributes an identity-free matching roll to an ambiguous network attempt", async () => {
@@ -153,7 +190,9 @@ describe("campaign detail dice", () => {
       .mockResolvedValueOnce({ characters, rolls: [roll] });
     render(<CampaignDetailPage campaignId={campaign.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await issueRoll(false);
-    expect(await screen.findByText("The server confirmed the roll was committed. Latest roll history was refreshed.")).toBeTruthy();
+    expect(
+      await screen.findByText("The server confirmed the roll was committed. Latest roll history was refreshed."),
+    ).toBeTruthy();
     expect(screen.queryByText(/confirmed in|present in|not present in/i)).toBeNull();
     expect(getCampaignDiceHistory).toHaveBeenCalledTimes(2);
     expect(rollCampaignDice).toHaveBeenCalledOnce();
@@ -259,8 +298,14 @@ describe("campaign detail dice", () => {
     await pending.promise;
     await waitFor(() => expect(getCampaignDiceHistory).toHaveBeenCalledTimes(2));
 
-    render(<StrictMode><CampaignDetailPage {...props} /></StrictMode>);
-    const outcome = await screen.findByText("The server confirmed the roll was committed. Latest roll history was refreshed.");
+    render(
+      <StrictMode>
+        <CampaignDetailPage {...props} />
+      </StrictMode>,
+    );
+    const outcome = await screen.findByText(
+      "The server confirmed the roll was committed. Latest roll history was refreshed.",
+    );
     await waitFor(() => expect(document.activeElement).toBe(outcome));
     expect(screen.getByText("15")).toBeTruthy();
     expect(rollCampaignDice).toHaveBeenCalledOnce();
@@ -295,9 +340,7 @@ describe("campaign detail dice", () => {
 
   it("keeps peer dice completion authoritative when peer detail settles later without an extra GET", async () => {
     const peerDetail = deferred<{ campaign: typeof campaign }>();
-    vi.mocked(getCampaignDetail)
-      .mockResolvedValueOnce({ campaign })
-      .mockReturnValueOnce(peerDetail.promise);
+    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign }).mockReturnValueOnce(peerDetail.promise);
     vi.mocked(getCampaignDiceHistory)
       .mockResolvedValueOnce({ characters, rolls: [] })
       .mockResolvedValueOnce({ characters, rolls: [roll] })
@@ -346,7 +389,11 @@ describe("campaign detail dice", () => {
     peerDetail.resolve({ campaign });
     owner.unmount();
 
-    render(<StrictMode><CampaignDetailPage {...props} /></StrictMode>);
+    render(
+      <StrictMode>
+        <CampaignDetailPage {...props} />
+      </StrictMode>,
+    );
     expect(await screen.findByText(/server confirmed the roll was committed/i)).toBeTruthy();
     expect(screen.getByText("15")).toBeTruthy();
     expect(rollCampaignDice).toHaveBeenCalledOnce();
@@ -370,7 +417,7 @@ describe("campaign detail dice", () => {
   });
 
   it("synchronously locks rapid pointer and keyboard activation of history Retry", async () => {
-    const pending = deferred<{ characters: typeof characters; rolls: typeof roll[] }>();
+    const pending = deferred<{ characters: typeof characters; rolls: (typeof roll)[] }>();
     vi.mocked(getCampaignDiceHistory)
       .mockRejectedValueOnce(new Error("initial private read"))
       .mockReturnValueOnce(pending.promise);
@@ -388,7 +435,7 @@ describe("campaign detail dice", () => {
   });
 
   it("synchronously locks rapid pointer and keyboard activation of Refresh without affecting reconciliation GET", async () => {
-    const refreshPending = deferred<{ characters: typeof characters; rolls: typeof roll[] }>();
+    const refreshPending = deferred<{ characters: typeof characters; rolls: (typeof roll)[] }>();
     vi.mocked(rollCampaignDice).mockRejectedValue(new TypeError("network private"));
     vi.mocked(getCampaignDiceHistory)
       .mockResolvedValueOnce({ characters, rolls: [] })

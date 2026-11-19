@@ -6,16 +6,24 @@ import type DatabaseDriver from "better-sqlite3";
  * acting combatant is read back from the sealed receipt, so a new turn
  * naturally forgets the previous turn's once-per-turn riders.
  */
-export function readRiderUsageThisTurn(db: DatabaseDriver.Database, encounterId: string, combatantId: string): ReadonlySet<string> {
+export function readRiderUsageThisTurn(
+  db: DatabaseDriver.Database,
+  encounterId: string,
+  combatantId: string,
+): ReadonlySet<string> {
   const used = new Set<string>();
-  const economy = db.prepare("SELECT started_at FROM combat_turn_economy_v60 WHERE encounter_id=? AND ended_at IS NULL")
+  const economy = db
+    .prepare("SELECT started_at FROM combat_turn_economy_v60 WHERE encounter_id=? AND ended_at IS NULL")
     .get(encounterId) as { started_at: string } | undefined;
   if (!economy) return used;
-  const rows = db.prepare(`SELECT receipt.canonical_result_json json
+  const rows = db
+    .prepare(
+      `SELECT receipt.canonical_result_json json
     FROM combat_receipts_v27 receipt JOIN combat_commands_v27 command
       ON command.encounter_id=receipt.encounter_id AND command.command_id=receipt.command_id
     WHERE receipt.encounter_id=? AND receipt.occurred_at>=?
-      AND json_extract(receipt.canonical_result_json,'$.resolution.actingCombatantId')=?`)
+      AND json_extract(receipt.canonical_result_json,'$.resolution.actingCombatantId')=?`,
+    )
     .all(encounterId, economy.started_at, combatantId) as Array<{ json: string }>;
   for (const row of rows) {
     try {

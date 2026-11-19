@@ -1,44 +1,97 @@
 import { describe, expect, it } from "vitest";
 import {
-  adventureTurnConfirmRequestSchema, adventureTurnGetResponseSchema, adventureTurnInitialReconcileRequestSchema,
-  adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema, adventureTurnTranscriptRequestSchema,
+  adventureTurnConfirmRequestSchema,
+  adventureTurnGetResponseSchema,
+  adventureTurnInitialReconcileRequestSchema,
+  adventureTurnStreamEventSchema,
+  adventureTurnStreamRequestSchema,
+  adventureTurnTranscriptRequestSchema,
   adventureTurnTranscriptResponseSchema,
 } from "../src/adventure-turns-http.js";
 import { decideToolProposalsInputSchema } from "../src/adventure-turns.js";
 
 const at = "2035-01-01T00:00:00.000Z";
-const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", mode: "original", priorTurnId: null, declaration: "I listen",
-  state: "declared", revision: 0, createdAt: at, updatedAt: at };
+const turn = {
+  turnId: "turn",
+  campaignId: "campaign",
+  sessionId: "session",
+  actorId: "actor",
+  mode: "original",
+  priorTurnId: null,
+  declaration: "I listen",
+  state: "declared",
+  revision: 0,
+  createdAt: at,
+  updatedAt: at,
+};
 
 describe("M2.11 adventure turn HTTP contracts", () => {
   it("accepts only exact initial and resume stream variants", () => {
-    const initial = { campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen", expectedRevision: 0, idempotencyKey: "turn" };
+    const initial = {
+      campaignId: "campaign",
+      sessionId: "session",
+      actorId: "actor",
+      declaration: "I listen",
+      expectedRevision: 0,
+      idempotencyKey: "turn",
+    };
     expect(adventureTurnStreamRequestSchema.parse(initial)).toEqual(initial);
     expect(adventureTurnStreamRequestSchema.parse({ resumeToken: "v1.dHVybg.ZGVjaXNpb24" })).toBeTruthy();
-    const variant = { variant: "narration-retry", campaignId: "campaign", sessionId: "session", actorId: "actor",
-      priorTurnId: "turn", expectedRevision: 2, idempotencyKey: "retry" };
+    const variant = {
+      variant: "narration-retry",
+      campaignId: "campaign",
+      sessionId: "session",
+      actorId: "actor",
+      priorTurnId: "turn",
+      expectedRevision: 2,
+      idempotencyKey: "retry",
+    };
     expect(adventureTurnStreamRequestSchema.parse(variant)).toEqual(variant);
     expect(adventureTurnStreamRequestSchema.safeParse({ ...variant, declaration: "private" }).success).toBe(false);
-    expect(adventureTurnStreamRequestSchema.safeParse({ ...initial, resumeToken: "v1.dHVybg.ZGVjaXNpb24" }).success).toBe(false);
+    expect(
+      adventureTurnStreamRequestSchema.safeParse({ ...initial, resumeToken: "v1.dHVybg.ZGVjaXNpb24" }).success,
+    ).toBe(false);
   });
 
   it("keeps reconciliation locators exact and resume tokens role-safe", () => {
     const locator = { campaignId: "campaign", sessionId: "session", actorId: "actor", idempotencyKey: "initial" };
     expect(adventureTurnInitialReconcileRequestSchema.parse(locator)).toEqual(locator);
-    expect(adventureTurnInitialReconcileRequestSchema.safeParse({ ...locator, declaration: "secret" }).success).toBe(false);
-    expect(adventureTurnGetResponseSchema.parse({ turn, proposals: [], confirmation: { state: "none" }, receipts: [],
-      narrationStatus: { status: "completed", text: "Done", source: "provider-assisted" }, resumeToken: "v1.dHVybg.ZGlnZXN0" })).toBeTruthy();
+    expect(adventureTurnInitialReconcileRequestSchema.safeParse({ ...locator, declaration: "secret" }).success).toBe(
+      false,
+    );
+    expect(
+      adventureTurnGetResponseSchema.parse({
+        turn,
+        proposals: [],
+        confirmation: { state: "none" },
+        receipts: [],
+        narrationStatus: { status: "completed", text: "Done", source: "provider-assisted" },
+        resumeToken: "v1.dHVybg.ZGlnZXN0",
+      }),
+    ).toBeTruthy();
   });
 
   it("bounds a structurally role-safe room transcript", () => {
     const locator = { campaignId: "campaign", sessionId: "session" };
     expect(adventureTurnTranscriptRequestSchema.parse(locator)).toEqual(locator);
     expect(adventureTurnTranscriptRequestSchema.safeParse({ ...locator, limit: 100 }).success).toBe(false);
-    const entry = { turnId: "turn", actorId: "actor", declaration: "I listen", narration: "The ferryman answers.", completedAt: at };
+    const entry = {
+      turnId: "turn",
+      actorId: "actor",
+      declaration: "I listen",
+      narration: "The ferryman answers.",
+      completedAt: at,
+    };
     expect(adventureTurnTranscriptResponseSchema.parse({ ...locator, turns: [entry] }).turns).toEqual([entry]);
-    expect(adventureTurnTranscriptResponseSchema.safeParse({ ...locator, turns: [{ ...entry, providerCalls: [] }] }).success).toBe(false);
-    expect(adventureTurnTranscriptResponseSchema.safeParse({ ...locator,
-      turns: Array.from({ length: 33 }, (_, index) => ({ ...entry, turnId: `turn-${index}` })) }).success).toBe(false);
+    expect(
+      adventureTurnTranscriptResponseSchema.safeParse({ ...locator, turns: [{ ...entry, providerCalls: [] }] }).success,
+    ).toBe(false);
+    expect(
+      adventureTurnTranscriptResponseSchema.safeParse({
+        ...locator,
+        turns: Array.from({ length: 33 }, (_, index) => ({ ...entry, turnId: `turn-${index}` })),
+      }).success,
+    ).toBe(false);
   });
 
   it("closes and bounds the public SSE vocabulary", () => {
@@ -58,34 +111,94 @@ describe("M2.11 adventure turn HTTP contracts", () => {
     // A choice event always advertises at least one candidate.
     expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [] } }).success).toBe(false);
     // Only the closed family vocabulary and the exact affordance shape are accepted.
-    expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ ...choices[0], family: "teleport" }] } }).success).toBe(false);
-    expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ ...choices[0], extra: true }] } }).success).toBe(false);
+    expect(
+      adventureTurnStreamEventSchema.safeParse({
+        ...event,
+        payload: { choices: [{ ...choices[0], family: "teleport" }] },
+      }).success,
+    ).toBe(false);
+    expect(
+      adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ ...choices[0], extra: true }] } })
+        .success,
+    ).toBe(false);
     // A missing target is invalid.
-    expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ family: "travel", label: "Go" }] } }).success).toBe(false);
+    expect(
+      adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ family: "travel", label: "Go" }] } })
+        .success,
+    ).toBe(false);
     // A player-visible affordance must never carry a server-internal candidate id.
-    expect(adventureTurnStreamEventSchema.safeParse({ ...event, payload: { choices: [{ ...choices[0], candidateId: "candidate-1" }] } }).success).toBe(false);
+    expect(
+      adventureTurnStreamEventSchema.safeParse({
+        ...event,
+        payload: { choices: [{ ...choices[0], candidateId: "candidate-1" }] },
+      }).success,
+    ).toBe(false);
     // Legacy single-choice fixtures are not part of the affordance vocabulary.
-    expect(adventureTurnStreamEventSchema.safeParse({ type: "choice", sequence: 5, timestamp: at, payload: { choiceId: "choice", label: "Go" } }).success).toBe(false);
-    expect(adventureTurnStreamEventSchema.safeParse({ ...event,
-      payload: { choices: Array.from({ length: 13 }, (_, index) => ({ family: "travel", label: `Go ${index}`, target: null })) } }).success).toBe(false);
+    expect(
+      adventureTurnStreamEventSchema.safeParse({
+        type: "choice",
+        sequence: 5,
+        timestamp: at,
+        payload: { choiceId: "choice", label: "Go" },
+      }).success,
+    ).toBe(false);
+    expect(
+      adventureTurnStreamEventSchema.safeParse({
+        ...event,
+        payload: {
+          choices: Array.from({ length: 13 }, (_, index) => ({ family: "travel", label: `Go ${index}`, target: null })),
+        },
+      }).success,
+    ).toBe(false);
   });
 
   it("requires unique plural proposal IDs and exact decision names", () => {
-    const command = { proposalIds: ["one", "two"], decision: "approve", expectedRevision: 2, idempotencyKey: "confirm" };
+    const command = {
+      proposalIds: ["one", "two"],
+      decision: "approve",
+      expectedRevision: 2,
+      idempotencyKey: "confirm",
+    };
     expect(adventureTurnConfirmRequestSchema.parse(command)).toEqual(command);
-    expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, proposalIds: ["one", "one"] }).success).toBe(false);
+    expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, proposalIds: ["one", "one"] }).success).toBe(
+      false,
+    );
     expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, decision: "approved" }).success).toBe(false);
-    expect(adventureTurnConfirmRequestSchema.safeParse({ ...command,
-      proposalIds: Array.from({ length: 32 }, (_, index) => `proposal-${index}`) }).success).toBe(true);
-    expect(adventureTurnConfirmRequestSchema.safeParse({ ...command,
-      proposalIds: Array.from({ length: 33 }, (_, index) => `proposal-${index}`) }).success).toBe(false);
-    const repositoryCommand = { turnId: "turn", proposalIds: ["one", "two"], decision: "approved",
-      expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "confirm" };
+    expect(
+      adventureTurnConfirmRequestSchema.safeParse({
+        ...command,
+        proposalIds: Array.from({ length: 32 }, (_, index) => `proposal-${index}`),
+      }).success,
+    ).toBe(true);
+    expect(
+      adventureTurnConfirmRequestSchema.safeParse({
+        ...command,
+        proposalIds: Array.from({ length: 33 }, (_, index) => `proposal-${index}`),
+      }).success,
+    ).toBe(false);
+    const repositoryCommand = {
+      turnId: "turn",
+      proposalIds: ["one", "two"],
+      decision: "approved",
+      expectedTurnRevision: 2,
+      expectedCampaignRevision: 0,
+      idempotencyKey: "confirm",
+    };
     expect(decideToolProposalsInputSchema.parse(repositoryCommand)).toEqual(repositoryCommand);
-    expect(decideToolProposalsInputSchema.safeParse({ ...repositoryCommand, proposalIds: ["one", "one"] }).success).toBe(false);
-    expect(decideToolProposalsInputSchema.safeParse({ ...repositoryCommand,
-      proposalIds: Array.from({ length: 32 }, (_, index) => `proposal-${index}`) }).success).toBe(true);
-    expect(decideToolProposalsInputSchema.safeParse({ ...repositoryCommand,
-      proposalIds: Array.from({ length: 33 }, (_, index) => `proposal-${index}`) }).success).toBe(false);
+    expect(
+      decideToolProposalsInputSchema.safeParse({ ...repositoryCommand, proposalIds: ["one", "one"] }).success,
+    ).toBe(false);
+    expect(
+      decideToolProposalsInputSchema.safeParse({
+        ...repositoryCommand,
+        proposalIds: Array.from({ length: 32 }, (_, index) => `proposal-${index}`),
+      }).success,
+    ).toBe(true);
+    expect(
+      decideToolProposalsInputSchema.safeParse({
+        ...repositoryCommand,
+        proposalIds: Array.from({ length: 33 }, (_, index) => `proposal-${index}`),
+      }).success,
+    ).toBe(false);
   });
 });

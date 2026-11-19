@@ -136,7 +136,9 @@ describe("selectActionThreshold", () => {
   it("returns null with explanatory reasons when nothing qualifies", () => {
     const selection = selectActionThreshold(mixed, { minActed: 100, minAccuracy: 0.9 });
     expect(selection.selected).toBeNull();
-    expect(selection.reasons.join(" ")).toContain("no threshold reached actedAccuracy >= 0.9 with at least 100 acted decisions");
+    expect(selection.reasons.join(" ")).toContain(
+      "no threshold reached actedAccuracy >= 0.9 with at least 100 acted decisions",
+    );
   });
 
   it("explains which floors filtered points", () => {

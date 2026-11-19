@@ -18,25 +18,42 @@ describe("campaign DM readiness pure checks", () => {
     });
     expect(issue(result, "private-artifact", "private-node")).toBeDefined();
     expect(issue(result, "missing-public-rendering", "public-node")).toBeDefined();
-    expect(issue(result, "awaiting-play-evidence", "binding-1")).toMatchObject({ severity: "review", scope: "awaiting-play-evidence" });
+    expect(issue(result, "awaiting-play-evidence", "binding-1")).toMatchObject({
+      severity: "review",
+      scope: "awaiting-play-evidence",
+    });
     expect(issue(result, "unsupported-encounter-roster", "encounter-1")).toBeDefined();
   });
 
   it("uses threshold semantics and does not treat reverse-only routes as reachable", () => {
     const result = checkCampaignDmReadiness({
-      story: { nodes: [
-        { id: "predecessor", status: "revealed", revealThreshold: 0 },
-        { id: "target", status: "hidden", revealThreshold: 2 },
-        { id: "private-predecessor", status: "hidden", revealThreshold: 0, visibility: "private" },
-        { id: "private-companion", status: "hidden", revealThreshold: 5, visibility: "private", privateCompanion: true },
-      ], edges: [
-        { id: "requires-1", kind: "requires", fromId: "predecessor", toId: "target" },
-        { id: "requires-2", kind: "requires", fromId: "private-predecessor", toId: "target" },
-      ] },
-      connectivity: { startLocationId: "start", locations: [
-        { id: "start", visibility: "public" }, { id: "reverse-only", visibility: "public" },
-        { id: "optional", visibility: "public", optional: true },
-      ], connections: [{ id: "reverse", fromId: "reverse-only", toId: "start" }] },
+      story: {
+        nodes: [
+          { id: "predecessor", status: "revealed", revealThreshold: 0 },
+          { id: "target", status: "hidden", revealThreshold: 2 },
+          { id: "private-predecessor", status: "hidden", revealThreshold: 0, visibility: "private" },
+          {
+            id: "private-companion",
+            status: "hidden",
+            revealThreshold: 5,
+            visibility: "private",
+            privateCompanion: true,
+          },
+        ],
+        edges: [
+          { id: "requires-1", kind: "requires", fromId: "predecessor", toId: "target" },
+          { id: "requires-2", kind: "requires", fromId: "private-predecessor", toId: "target" },
+        ],
+      },
+      connectivity: {
+        startLocationId: "start",
+        locations: [
+          { id: "start", visibility: "public" },
+          { id: "reverse-only", visibility: "public" },
+          { id: "optional", visibility: "public", optional: true },
+        ],
+        connections: [{ id: "reverse", fromId: "reverse-only", toId: "start" }],
+      },
     });
     expect(issue(result, "room-obstacle", "target")).toBeDefined();
     expect(issue(result, "room-obstacle", "private-companion")).toBeUndefined();
@@ -48,32 +65,58 @@ describe("campaign DM readiness pure checks", () => {
   it("does not count a resolved predecessor without public rendering", () => {
     const result = checkCampaignDmReadiness({
       publicRendering: [{ id: "target", kind: "story-node", visibility: "public", rendered: true }],
-      story: { nodes: [
-        { id: "predecessor", status: "resolved", revealThreshold: 0 },
-        { id: "target", status: "hidden", revealThreshold: 1 },
-      ], edges: [{ id: "requires", kind: "requires", fromId: "predecessor", toId: "target" }] },
+      story: {
+        nodes: [
+          { id: "predecessor", status: "resolved", revealThreshold: 0 },
+          { id: "target", status: "hidden", revealThreshold: 1 },
+        ],
+        edges: [{ id: "requires", kind: "requires", fromId: "predecessor", toId: "target" }],
+      },
     });
     expect(issue(result, "room-obstacle", "target")).toBeDefined();
   });
 
   it("classifies later-location encounter and binding issues without treating them as current-room blockers", () => {
     const result = checkCampaignDmReadiness({
-      bindings: [{ id: "later-binding", targetKind: "encounter", targetId: "later-encounter", state: "missing", locationScope: "later-location" }],
-      encounters: [{ id: "later-encounter", bound: false, exactPinnedEnemyReferences: [], conceptOnly: true, unsupportedRoster: true, locationScope: "later-location" }],
+      bindings: [
+        {
+          id: "later-binding",
+          targetKind: "encounter",
+          targetId: "later-encounter",
+          state: "missing",
+          locationScope: "later-location",
+        },
+      ],
+      encounters: [
+        {
+          id: "later-encounter",
+          bound: false,
+          exactPinnedEnemyReferences: [],
+          conceptOnly: true,
+          unsupportedRoster: true,
+          locationScope: "later-location",
+        },
+      ],
     });
-    expect(result.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "missing-binding", scope: "later-location" }),
-      expect.objectContaining({ code: "unbound-encounter", scope: "later-location" }),
-      expect.objectContaining({ code: "unsupported-encounter-roster", scope: "later-location" }),
-    ]));
-    expect(result.issues.some(issue => issue.scope === "current-room")).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "missing-binding", scope: "later-location" }),
+        expect.objectContaining({ code: "unbound-encounter", scope: "later-location" }),
+        expect.objectContaining({ code: "unsupported-encounter-roster", scope: "later-location" }),
+      ]),
+    );
+    expect(result.issues.some((issue) => issue.scope === "current-room")).toBe(false);
   });
 
   it("returns stable order, deduplicates issues, and includes all manual reminders", () => {
-    const input = { bindings: [{ id: "b", targetKind: "encounter" as const, targetId: "e", state: "missing" as const }], encounters: [
-      { id: "e", bound: false, exactPinnedEnemyReferences: [], conceptOnly: true, unsupportedRoster: true },
-    ] };
-    const first = checkCampaignDmReadiness(input); const second = checkCampaignDmReadiness(input);
+    const input = {
+      bindings: [{ id: "b", targetKind: "encounter" as const, targetId: "e", state: "missing" as const }],
+      encounters: [
+        { id: "e", bound: false, exactPinnedEnemyReferences: [], conceptOnly: true, unsupportedRoster: true },
+      ],
+    };
+    const first = checkCampaignDmReadiness(input);
+    const second = checkCampaignDmReadiness(input);
     expect(first).toEqual(second);
     expect(first.issues).toHaveLength(3);
     expect(first.manualReviewLimitations).toHaveLength(4);

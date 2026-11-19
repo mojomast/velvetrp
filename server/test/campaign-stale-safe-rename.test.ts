@@ -1,11 +1,7 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import {
-  CampaignRenameStaleError,
-  CampaignRenameUnavailableError,
-  createRepository,
-} from "../src/repo/index.js";
+import { CampaignRenameStaleError, CampaignRenameUnavailableError, createRepository } from "../src/repo/index.js";
 import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -50,12 +46,18 @@ describe("factory stale-safe campaign rename", () => {
     const nextId = vi.fn(() => "unused");
     const rng = vi.fn(() => 1);
     const repository = createRepository({
-      dataDir: dataDir(), clock: { now: clockNow }, ids: { nextId }, rng: { integer: rng },
+      dataDir: dataDir(),
+      clock: { now: clockNow },
+      ids: { nextId },
+      rng: { integer: rng },
     });
 
-    expect(repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "  Renamed  ", expectedUpdatedAt: initialAt,
-    })).toEqual({
+    expect(
+      repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+        name: "  Renamed  ",
+        expectedUpdatedAt: initialAt,
+      }),
+    ).toEqual({
       id: "campaign-one",
       name: "Renamed",
       activeTimelineId: "timeline-one",
@@ -73,13 +75,17 @@ describe("factory stale-safe campaign rename", () => {
     seed();
     const repository = createRepository({ dataDir: dataDir(), clock: { now: () => new Date(initialAt) } });
     const renamed = repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: " Original ", expectedUpdatedAt: initialAt,
+      name: " Original ",
+      expectedUpdatedAt: initialAt,
     });
     expect(renamed.name).toBe("Original");
     expect(renamed.updatedAt).toBe("2030-04-05T06:07:08.010Z");
-    expect(() => repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "Original", expectedUpdatedAt: initialAt,
-    })).toThrow(CampaignRenameStaleError);
+    expect(() =>
+      repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+        name: "Original",
+        expectedUpdatedAt: initialAt,
+      }),
+    ).toThrow(CampaignRenameStaleError);
     repository.close();
   });
 
@@ -88,17 +94,20 @@ describe("factory stale-safe campaign rename", () => {
     const clockNow = vi.fn(() => new Date(initialAt));
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
     const first = repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "First", expectedUpdatedAt: initialAt,
+      name: "First",
+      expectedUpdatedAt: initialAt,
     });
     const second = repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "Second", expectedUpdatedAt: first.updatedAt,
+      name: "Second",
+      expectedUpdatedAt: first.updatedAt,
     });
-    expect([first.updatedAt, second.updatedAt]).toEqual([
-      "2030-04-05T06:07:08.010Z", "2030-04-05T06:07:08.011Z",
-    ]);
-    expect(() => repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "Stale", expectedUpdatedAt: first.updatedAt,
-    })).toThrow(CampaignRenameStaleError);
+    expect([first.updatedAt, second.updatedAt]).toEqual(["2030-04-05T06:07:08.010Z", "2030-04-05T06:07:08.011Z"]);
+    expect(() =>
+      repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+        name: "Stale",
+        expectedUpdatedAt: first.updatedAt,
+      }),
+    ).toThrow(CampaignRenameStaleError);
     expect(clockNow).toHaveBeenCalledTimes(2);
     repository.close();
   });
@@ -111,11 +120,15 @@ describe("factory stale-safe campaign rename", () => {
     const second = createRepository({ dataDir: dataDir(), clock: { now: secondClock } });
 
     first.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "First", expectedUpdatedAt: initialAt,
+      name: "First",
+      expectedUpdatedAt: initialAt,
     });
-    expect(() => second.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "Second", expectedUpdatedAt: initialAt,
-    })).toThrow(CampaignRenameStaleError);
+    expect(() =>
+      second.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+        name: "Second",
+        expectedUpdatedAt: initialAt,
+      }),
+    ).toThrow(CampaignRenameStaleError);
     expect(firstClock).toHaveBeenCalledOnce();
     expect(secondClock).not.toHaveBeenCalled();
     first.close();
@@ -127,53 +140,67 @@ describe("factory stale-safe campaign rename", () => {
     seed();
     const clockNow = vi.fn(() => new Date(firstRenameAt));
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
-    for (const [actor, campaign] of [["local-owner", "campaign-missing"], ["other-owner", "campaign-one"]]) {
-      expect(() => repository.renameCampaignIfUnchanged(actor!, campaign!, {
-        name: "Denied", expectedUpdatedAt: initialAt,
-      })).toThrow(CampaignRenameUnavailableError);
+    for (const [actor, campaign] of [
+      ["local-owner", "campaign-missing"],
+      ["other-owner", "campaign-one"],
+    ]) {
+      expect(() =>
+        repository.renameCampaignIfUnchanged(actor!, campaign!, {
+          name: "Denied",
+          expectedUpdatedAt: initialAt,
+        }),
+      ).toThrow(CampaignRenameUnavailableError);
     }
     expect(clockNow).not.toHaveBeenCalled();
     repository.close();
   });
 
-  it.each(["missing", "orphaned"] as const)("treats %s owner integrity as generic internal failure for the purported owner", (kind) => {
-    seed();
-    const db = new DatabaseDriver(dbPath());
-    db.pragma("foreign_keys = OFF");
-    if (kind === "missing") {
-      db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = 'campaign-one' AND role = 'owner'").run();
-    } else {
-      db.prepare("DELETE FROM principals WHERE id = 'local-owner'").run();
-    }
-    db.close();
-    const clockNow = vi.fn(() => new Date(firstRenameAt));
-    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
-    let failure: unknown;
-    try {
-      repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-        name: "No", expectedUpdatedAt: initialAt,
-      });
-    } catch (error) {
-      failure = error;
-    }
-    expect(failure).toBeInstanceOf(Error);
-    expect(failure).not.toBeInstanceOf(CampaignRenameUnavailableError);
-    expect(failure).not.toBeInstanceOf(CampaignRenameStaleError);
-    expect(clockNow).not.toHaveBeenCalled();
-    repository.close();
-  });
+  it.each(["missing", "orphaned"] as const)(
+    "treats %s owner integrity as generic internal failure for the purported owner",
+    (kind) => {
+      seed();
+      const db = new DatabaseDriver(dbPath());
+      db.pragma("foreign_keys = OFF");
+      if (kind === "missing") {
+        db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = 'campaign-one' AND role = 'owner'").run();
+      } else {
+        db.prepare("DELETE FROM principals WHERE id = 'local-owner'").run();
+      }
+      db.close();
+      const clockNow = vi.fn(() => new Date(firstRenameAt));
+      const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
+      let failure: unknown;
+      try {
+        repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+          name: "No",
+          expectedUpdatedAt: initialAt,
+        });
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(CampaignRenameUnavailableError);
+      expect(failure).not.toBeInstanceOf(CampaignRenameStaleError);
+      expect(clockNow).not.toHaveBeenCalled();
+      repository.close();
+    },
+  );
 
   it.each(["missing", "orphaned"] as const)("masks %s owner corruption from a denied actor", (kind) => {
     seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
-    if (kind === "missing") db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = 'campaign-one' AND role = 'owner'").run();
+    if (kind === "missing")
+      db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = 'campaign-one' AND role = 'owner'").run();
     else db.prepare("DELETE FROM principals WHERE id = 'local-owner'").run();
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
-    expect(() => repository.renameCampaignIfUnchanged("other-owner", "campaign-one", {
-      name: "Denied", expectedUpdatedAt: initialAt,
-    })).toThrow(CampaignRenameUnavailableError);
+    expect(() =>
+      repository.renameCampaignIfUnchanged("other-owner", "campaign-one", {
+        name: "Denied",
+        expectedUpdatedAt: initialAt,
+      }),
+    ).toThrow(CampaignRenameUnavailableError);
     repository.close();
   });
 
@@ -198,9 +225,12 @@ describe("factory stale-safe campaign rename", () => {
     seed();
     const backwardClock = vi.fn(() => new Date("2030-04-05T06:07:08.008Z"));
     const backward = createRepository({ dataDir: dataDir(), clock: { now: backwardClock } });
-    expect(backward.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "Forward", expectedUpdatedAt: initialAt,
-    }).updatedAt).toBe("2030-04-05T06:07:08.010Z");
+    expect(
+      backward.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+        name: "Forward",
+        expectedUpdatedAt: initialAt,
+      }).updatedAt,
+    ).toBe("2030-04-05T06:07:08.010Z");
     backward.close();
     expect(storedCampaign()).toMatchObject({ name: "Forward", updated_at: "2030-04-05T06:07:08.010Z" });
 
@@ -210,9 +240,12 @@ describe("factory stale-safe campaign rename", () => {
     db.close();
     const sqlClock = vi.fn(() => new Date(firstRenameAt));
     const failing = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: sqlClock } });
-    expect(() => failing.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "No", expectedUpdatedAt: "2030-04-05T06:07:08.010Z",
-    })).toThrow("rename rejected");
+    expect(() =>
+      failing.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+        name: "No",
+        expectedUpdatedAt: "2030-04-05T06:07:08.010Z",
+      }),
+    ).toThrow("rename rejected");
     expect(sqlClock).toHaveBeenCalledOnce();
     failing.close();
     expect(storedCampaign()).toMatchObject({ name: "Forward", updated_at: "2030-04-05T06:07:08.010Z" });
@@ -227,9 +260,12 @@ describe("factory stale-safe campaign rename", () => {
     db.close();
     const clockNow = vi.fn(() => new Date(firstRenameAt));
     const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
-    expect(() => repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-      name: "Lost", expectedUpdatedAt: initialAt,
-    })).toThrow(CampaignRenameStaleError);
+    expect(() =>
+      repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+        name: "Lost",
+        expectedUpdatedAt: initialAt,
+      }),
+    ).toThrow(CampaignRenameStaleError);
     expect(clockNow).toHaveBeenCalledOnce();
     repository.close();
     expect(storedCampaign()).toEqual(before);
@@ -241,9 +277,12 @@ describe("factory stale-safe campaign rename", () => {
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
     repository.transaction((unit) => {
       expect("renameCampaignIfUnchanged" in unit).toBe(false);
-      expect(() => repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
-        name: "Nested", expectedUpdatedAt: initialAt,
-      })).toThrow("cannot run inside a repository transaction");
+      expect(() =>
+        repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
+          name: "Nested",
+          expectedUpdatedAt: initialAt,
+        }),
+      ).toThrow("cannot run inside a repository transaction");
       return null;
     });
     expect(repository.renameCampaign("local-owner", "campaign-one", { name: "Legacy" }).name).toBe("Legacy");

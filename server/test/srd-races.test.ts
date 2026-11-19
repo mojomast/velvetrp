@@ -19,11 +19,25 @@ describe("SRD 5.1 races", () => {
   it("builds the complete nine-race SRD 5.1 list", () => {
     expect(races).toHaveLength(9);
     expect(races.map((race) => race.name)).toEqual([
-      "Human", "Dwarf", "Elf", "Halfling", "Dragonborn", "Gnome", "Half-Orc", "Half-Elf", "Tiefling",
+      "Human",
+      "Dwarf",
+      "Elf",
+      "Halfling",
+      "Dragonborn",
+      "Gnome",
+      "Half-Orc",
+      "Half-Elf",
+      "Tiefling",
     ]);
     expect(races.map((race) => race.reference.definitionId)).toEqual([
-      "srd-5.1:race:human", "srd-5.1:race:dwarf", "srd-5.1:race:elf", "srd-5.1:race:halfling",
-      "srd-5.1:race:dragonborn", "srd-5.1:race:gnome", "srd-5.1:race:half-orc", "srd-5.1:race:half-elf",
+      "srd-5.1:race:human",
+      "srd-5.1:race:dwarf",
+      "srd-5.1:race:elf",
+      "srd-5.1:race:halfling",
+      "srd-5.1:race:dragonborn",
+      "srd-5.1:race:gnome",
+      "srd-5.1:race:half-orc",
+      "srd-5.1:race:half-elf",
       "srd-5.1:race:tiefling",
     ]);
   });
@@ -71,17 +85,21 @@ describe("SRD 5.1 races", () => {
 
   it("registers the new Half-Elf and Tiefling trait abilities", () => {
     const abilityIds = new Set(abilities.map((ability) => ability.reference.definitionId));
-    expect([...abilityIds]).toEqual(expect.arrayContaining([
-      "srd-5.1:ability:half-elf-fey-ancestry",
-      "srd-5.1:ability:half-elf-skill-versatility",
-      "srd-5.1:ability:half-elf-darkvision",
-      "srd-5.1:ability:tiefling-hellish-resistance",
-      "srd-5.1:ability:tiefling-infernal-legacy",
-      "srd-5.1:ability:tiefling-darkvision",
-    ]));
+    expect([...abilityIds]).toEqual(
+      expect.arrayContaining([
+        "srd-5.1:ability:half-elf-fey-ancestry",
+        "srd-5.1:ability:half-elf-skill-versatility",
+        "srd-5.1:ability:half-elf-darkvision",
+        "srd-5.1:ability:tiefling-hellish-resistance",
+        "srd-5.1:ability:tiefling-infernal-legacy",
+        "srd-5.1:ability:tiefling-darkvision",
+      ]),
+    );
     const halfElf = races.find((race) => race.name === "Half-Elf")!;
     const tiefling = races.find((race) => race.name === "Tiefling")!;
-    const traitIds = [...halfElf.mechanics.abilityRefs, ...tiefling.mechanics.abilityRefs].map((trait) => trait.definitionId);
+    const traitIds = [...halfElf.mechanics.abilityRefs, ...tiefling.mechanics.abilityRefs].map(
+      (trait) => trait.definitionId,
+    );
     for (const definitionId of traitIds) {
       const ability = abilities.find((entry) => entry.reference.definitionId === definitionId);
       expect(ability, definitionId).toBeDefined();

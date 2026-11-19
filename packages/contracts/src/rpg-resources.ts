@@ -17,19 +17,19 @@ const actorResourceStateShape = {
 
 const currentDoesNotExceedMax = ({ current, max }: { current: number; max: number }) => current <= max;
 
-export const actorResourceStateSchema = z.object(actorResourceStateShape).strict().refine(
-  currentDoesNotExceedMax,
-  { message: "current must not exceed max", path: ["current"] },
-);
+export const actorResourceStateSchema = z
+  .object(actorResourceStateShape)
+  .strict()
+  .refine(currentDoesNotExceedMax, { message: "current must not exceed max", path: ["current"] });
 
-export const actorResourceSchema = z.object({
-  campaignId: campaignIdSchema,
-  actorId: actorIdSchema,
-  ...actorResourceStateShape,
-}).strict().refine(
-  currentDoesNotExceedMax,
-  { message: "current must not exceed max", path: ["current"] },
-);
+export const actorResourceSchema = z
+  .object({
+    campaignId: campaignIdSchema,
+    actorId: actorIdSchema,
+    ...actorResourceStateShape,
+  })
+  .strict()
+  .refine(currentDoesNotExceedMax, { message: "current must not exceed max", path: ["current"] });
 
 export type ActorResourceName = z.infer<typeof actorResourceNameSchema>;
 export type ActorResourceState = z.infer<typeof actorResourceStateSchema>;

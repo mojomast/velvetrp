@@ -1,14 +1,38 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  bootstrapAccuracyLowerBound,
-  wilsonLowerBound,
-} from "../src/agent/systemOneGateStatistics.js";
+import { bootstrapAccuracyLowerBound, wilsonLowerBound } from "../src/agent/systemOneGateStatistics.js";
 
 /** A 30-sample mixture with point accuracy 25/30 ≈ 0.8333 and a wide but not degenerate spread. */
 const mixedOutcomes: readonly boolean[] = [
-  true, true, true, true, true, true, true, false, true, false,
-  true, true, true, true, false, true, true, true, true, true,
-  false, true, true, true, false, true, true, true, true, true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  false,
+  true,
+  false,
+  true,
+  true,
+  true,
+  true,
+  false,
+  true,
+  true,
+  true,
+  true,
+  true,
+  false,
+  true,
+  true,
+  true,
+  false,
+  true,
+  true,
+  true,
+  true,
+  true,
 ];
 
 describe("wilsonLowerBound", () => {
@@ -17,7 +41,7 @@ describe("wilsonLowerBound", () => {
     expect(wilsonLowerBound(100, 100)).toBeLessThan(1);
     expect(wilsonLowerBound(9, 10)).toBeCloseTo(0.5958, 3);
     expect(wilsonLowerBound(9, 10)).toBeGreaterThan(0.59);
-    expect(wilsonLowerBound(9, 10)).toBeLessThan(0.60);
+    expect(wilsonLowerBound(9, 10)).toBeLessThan(0.6);
   });
 
   it("returns the point estimate's lower bound for a perfect 30/30 record", () => {

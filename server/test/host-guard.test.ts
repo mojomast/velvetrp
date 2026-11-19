@@ -4,7 +4,14 @@ import { hostGuardProblem, isAllowedHostname } from "../src/hostGuard.js";
 import { useTmpDataDir } from "./helpers.js";
 
 process.env.NODE_ENV = "test";
-for (const name of ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENROUTER_BASE_URL", "OPENAI_BASE_URL", "OPENROUTER_MODEL", "OPENAI_MODEL"]) {
+for (const name of [
+  "OPENROUTER_API_KEY",
+  "OPENAI_API_KEY",
+  "OPENROUTER_BASE_URL",
+  "OPENAI_BASE_URL",
+  "OPENROUTER_MODEL",
+  "OPENAI_MODEL",
+]) {
   delete process.env[name];
 }
 useTmpDataDir();
@@ -25,7 +32,8 @@ const preflight = (headers: Record<string, string>) => ({
 describe("host guard unit rules", () => {
   it("allows loopback hostnames on any port and nothing else by default", () => {
     for (const host of ["localhost", "127.0.0.1", "[::1]", "LOCALHOST"]) expect(isAllowedHostname(host, {})).toBe(true);
-    for (const host of ["evil.example", "localhost.evil.example", "127.0.0.1.nip.io", "0.0.0.0", ""]) expect(isAllowedHostname(host, {})).toBe(false);
+    for (const host of ["evil.example", "localhost.evil.example", "127.0.0.1.nip.io", "0.0.0.0", ""])
+      expect(isAllowedHostname(host, {})).toBe(false);
   });
 
   it("adds VELVET_ALLOWED_HOSTS entries, trimmed, with a leading dot meaning any subdomain", () => {
@@ -39,14 +47,23 @@ describe("host guard unit rules", () => {
 
   it("returns a problem for a bad host or a foreign write origin and null when allowed", () => {
     expect(hostGuardProblem("GET", { host: "localhost:8787" }, {})).toBeNull();
-    expect(hostGuardProblem("GET", { host: "evil.example" }, {})).toMatchObject({ statusCode: 403, code: "VELVET_HOST_NOT_ALLOWED" });
+    expect(hostGuardProblem("GET", { host: "evil.example" }, {})).toMatchObject({
+      statusCode: 403,
+      code: "VELVET_HOST_NOT_ALLOWED",
+    });
     expect(hostGuardProblem("GET", {}, {})).toMatchObject({ statusCode: 403, code: "VELVET_HOST_NOT_ALLOWED" });
-    expect(hostGuardProblem("POST", { host: "localhost:8787", origin: "https://evil.example" }, {}))
-      .toMatchObject({ statusCode: 403, code: "VELVET_ORIGIN_NOT_ALLOWED" });
-    expect(hostGuardProblem("POST", { host: "localhost:8787", origin: "null" }, {}))
-      .toMatchObject({ statusCode: 403, code: "VELVET_ORIGIN_NOT_ALLOWED" });
-    expect(hostGuardProblem("DELETE", { host: "localhost:8787", "sec-fetch-site": "cross-site" }, {}))
-      .toMatchObject({ statusCode: 403, code: "VELVET_ORIGIN_NOT_ALLOWED" });
+    expect(hostGuardProblem("POST", { host: "localhost:8787", origin: "https://evil.example" }, {})).toMatchObject({
+      statusCode: 403,
+      code: "VELVET_ORIGIN_NOT_ALLOWED",
+    });
+    expect(hostGuardProblem("POST", { host: "localhost:8787", origin: "null" }, {})).toMatchObject({
+      statusCode: 403,
+      code: "VELVET_ORIGIN_NOT_ALLOWED",
+    });
+    expect(hostGuardProblem("DELETE", { host: "localhost:8787", "sec-fetch-site": "cross-site" }, {})).toMatchObject({
+      statusCode: 403,
+      code: "VELVET_ORIGIN_NOT_ALLOWED",
+    });
     expect(hostGuardProblem("POST", { host: "localhost:8787", origin: "http://localhost:8787" }, {})).toBeNull();
     expect(hostGuardProblem("POST", { host: "127.0.0.1:8787", origin: "http://127.0.0.1:5173" }, {})).toBeNull();
     expect(hostGuardProblem("POST", { host: "localhost:8787" }, {})).toBeNull();
@@ -66,7 +83,11 @@ describe("host guard on the API", () => {
       const bad = await app.inject({ method: "GET", url: "/api/health", headers: { host: "evil.example" } });
       expect(bad.statusCode).toBe(403);
       expect(bad.json()).toMatchObject({ code: "VELVET_HOST_NOT_ALLOWED" });
-      const rebinding = await app.inject({ method: "GET", url: "/api/provider", headers: { host: "attacker.example:8787" } });
+      const rebinding = await app.inject({
+        method: "GET",
+        url: "/api/provider",
+        headers: { host: "attacker.example:8787" },
+      });
       expect(rebinding.statusCode).toBe(403);
       expect(rebinding.body).not.toMatch(/baseUrl|model/);
     } finally {
@@ -78,9 +99,15 @@ describe("host guard on the API", () => {
     process.env.VELVET_ALLOWED_HOSTS = "velvet.lan,.tail.example";
     const app = buildApp();
     try {
-      expect((await app.inject({ method: "GET", url: "/api/health", headers: { host: "velvet.lan:8787" } })).statusCode).toBe(200);
-      expect((await app.inject({ method: "GET", url: "/api/health", headers: { host: "box.tail.example" } })).statusCode).toBe(200);
-      expect((await app.inject({ method: "GET", url: "/api/health", headers: { host: "other.example" } })).statusCode).toBe(403);
+      expect(
+        (await app.inject({ method: "GET", url: "/api/health", headers: { host: "velvet.lan:8787" } })).statusCode,
+      ).toBe(200);
+      expect(
+        (await app.inject({ method: "GET", url: "/api/health", headers: { host: "box.tail.example" } })).statusCode,
+      ).toBe(200);
+      expect(
+        (await app.inject({ method: "GET", url: "/api/health", headers: { host: "other.example" } })).statusCode,
+      ).toBe(403);
     } finally {
       await app.close();
     }

@@ -14,7 +14,7 @@ const character: Character = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "keep it fictional",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
   isRealPerson: false,
   createdAt: new Date().toISOString(),
 };
@@ -71,7 +71,13 @@ describe("buildRequestBody", () => {
     provider.samplers.topP = 0.9;
     provider.samplers.stopStrings = ["halt"];
     const harness = { ...defaultHarnessSettings(), temperature: 0.7 };
-    const body = buildRequestBody(provider, harness, getPromptPreset("default"), [{ role: "user", content: "hi" }], true);
+    const body = buildRequestBody(
+      provider,
+      harness,
+      getPromptPreset("default"),
+      [{ role: "user", content: "hi" }],
+      true,
+    );
     expect(body).toMatchObject({
       model: "test-model",
       stream: true,
@@ -88,7 +94,13 @@ describe("buildRequestBody", () => {
   it("does not enable OpenRouter routing for an invalid base URL", () => {
     const provider = defaultProviderSettings();
     provider.baseUrl = "not a URL";
-    const body = buildRequestBody(provider, defaultHarnessSettings(), getPromptPreset("default"), [{ role: "user", content: "hi" }], false);
+    const body = buildRequestBody(
+      provider,
+      defaultHarnessSettings(),
+      getPromptPreset("default"),
+      [{ role: "user", content: "hi" }],
+      false,
+    );
     expect(body).not.toHaveProperty("provider");
   });
 });
@@ -97,10 +109,21 @@ describe("fallbackRoomSpeakers", () => {
   it("uses two speakers for a broad room address but one for a named address", () => {
     const second = { ...character, id: "c2", name: "Bex" };
     const third = { ...character, id: "c3", name: "Cy" };
-    expect(fallbackRoomSpeakers([character, second, third], character.id, "hey guys", 3)).toEqual([character.id, second.id]);
-    expect(fallbackRoomSpeakers([character, second, third], character.id, "Bex, what do you think?", 3)).toEqual([second.id]);
-    expect(fallbackRoomSpeakers([character, second, third], character.id, "you two should compare notes", 1)).toEqual([character.id]);
-    expect(fallbackRoomSpeakers([character, second, third], character.id, "remember your characters", 3)).toEqual([character.id, second.id, third.id]);
+    expect(fallbackRoomSpeakers([character, second, third], character.id, "hey guys", 3)).toEqual([
+      character.id,
+      second.id,
+    ]);
+    expect(fallbackRoomSpeakers([character, second, third], character.id, "Bex, what do you think?", 3)).toEqual([
+      second.id,
+    ]);
+    expect(fallbackRoomSpeakers([character, second, third], character.id, "you two should compare notes", 1)).toEqual([
+      character.id,
+    ]);
+    expect(fallbackRoomSpeakers([character, second, third], character.id, "remember your characters", 3)).toEqual([
+      character.id,
+      second.id,
+      third.id,
+    ]);
   });
 });
 
@@ -111,14 +134,24 @@ describe("streamReply", () => {
     const deltas: string[] = [];
     const result = await streamReply(makeArgs(provider), (delta) => deltas.push(delta));
     expect(result.text).toBe("The captain smiles and pours two glasses.");
-    expect(result.usage).toMatchObject({ promptTokens: 120, completionTokens: 24, totalTokens: 144, source: "provider" });
+    expect(result.usage).toMatchObject({
+      promptTokens: 120,
+      completionTokens: 24,
+      totalTokens: 144,
+      source: "provider",
+    });
     expect(deltas.length).toBeGreaterThan(3);
     expect(deltas.join("")).toBe(result.text);
   });
 
   it("preserves scoped loopback authorization in the legacy streaming path", async () => {
     fake = await startFakeProvider({ replyText: "Scoped legacy reply." });
-    const provider = { ...defaultProviderSettings(), baseUrl: fake.baseUrl, model: "fake-model", apiKey: "legacy-secret" };
+    const provider = {
+      ...defaultProviderSettings(),
+      baseUrl: fake.baseUrl,
+      model: "fake-model",
+      apiKey: "legacy-secret",
+    };
 
     await streamReply(makeArgs(provider), () => undefined);
 
@@ -130,26 +163,72 @@ describe("streamReply", () => {
     const provider = { ...defaultProviderSettings(), baseUrl: fake.baseUrl, model: "fake-model" };
     const args = makeArgs(provider);
     args.campaignContext = assembleCampaignAgentContext({
-      snapshot: { campaignId: "campaign", timelineId: "timeline", timelineRevision: 0, campaignRevision: 0, sessionId: session.id, audience: { kind: "player", actorId: "actor" },
-        authority: { role: "player", control: "controlled" }, speakerPersona: { characterId: character.id, displayName: character.name },
-        safetyControl: ["CAMPAIGN_SAFETY"], humanCanon: [],
-        committedMechanics: [], currentActorLocation:null,visibleWorld: [], visibleCast: [], visibleQuests: [], legalActions: [],
-        privateTargetFacts: [],attributeCandidates:[], synthesizedSummaryFacts: [], recap: [], encounter: null },
+      snapshot: {
+        campaignId: "campaign",
+        timelineId: "timeline",
+        timelineRevision: 0,
+        campaignRevision: 0,
+        sessionId: session.id,
+        audience: { kind: "player", actorId: "actor" },
+        authority: { role: "player", control: "controlled" },
+        speakerPersona: { characterId: character.id, displayName: character.name },
+        safetyControl: ["CAMPAIGN_SAFETY"],
+        humanCanon: [],
+        committedMechanics: [],
+        currentActorLocation: null,
+        visibleWorld: [],
+        visibleCast: [],
+        visibleQuests: [],
+        legalActions: [],
+        privateTargetFacts: [],
+        attributeCandidates: [],
+        synthesizedSummaryFacts: [],
+        recap: [],
+        encounter: null,
+      },
       declaration: "stale declaration",
       approvedMemory: ["CAMPAIGN_ONLY_MEMORY"],
     });
-    args.memories = [{ id: "legacy-memory", characterId: character.id, kind: "fact", content: "LEGACY_DUPLICATE_MEMORY",
-      sourceTurnId: "turn", createdAt: "", userApproved: true, forgottenAt: null }];
-    args.summary = { sessionId: session.id, summary: "LEGACY_DUPLICATE_SUMMARY", keyEvents: [], emotionalBeat: "", updatedAt: "" };
-    args.lore = [{ id: "legacy-lore", characterId: null, characterIds: [], keys: [], content: "LEGACY_DUPLICATE_LORE",
-      enabled: true, insertionOrder: 0, createdAt: "" }];
+    args.memories = [
+      {
+        id: "legacy-memory",
+        characterId: character.id,
+        kind: "fact",
+        content: "LEGACY_DUPLICATE_MEMORY",
+        sourceTurnId: "turn",
+        createdAt: "",
+        userApproved: true,
+        forgottenAt: null,
+      },
+    ];
+    args.summary = {
+      sessionId: session.id,
+      summary: "LEGACY_DUPLICATE_SUMMARY",
+      keyEvents: [],
+      emotionalBeat: "",
+      updatedAt: "",
+    };
+    args.lore = [
+      {
+        id: "legacy-lore",
+        characterId: null,
+        characterIds: [],
+        keys: [],
+        content: "LEGACY_DUPLICATE_LORE",
+        enabled: true,
+        insertionOrder: 0,
+        createdAt: "",
+      },
+    ];
     args.sharedContext = "LEGACY_DUPLICATE_SHARED";
     await streamReply(args, () => undefined);
     expect(fake.requests).toHaveLength(1);
     expect(fake.requests[0]?.systemContent).toContain("CAMPAIGN AGENT CONTEXT");
     expect(fake.requests[0]?.systemContent).toContain("CAMPAIGN_SAFETY");
     expect(fake.requests[0]?.systemContent).toContain("CAMPAIGN_ONLY_MEMORY");
-    expect(fake.requests[0]?.systemContent).not.toMatch(/stale declaration|LEGACY_DUPLICATE|TRIGGERED LORE|RETRIEVED MEMORY|SHARED CONTEXT BASKET/);
+    expect(fake.requests[0]?.systemContent).not.toMatch(
+      /stale declaration|LEGACY_DUPLICATE|TRIGGERED LORE|RETRIEVED MEMORY|SHARED CONTEXT BASKET/,
+    );
     expect(fake.requests[0]?.lastUserContent).toBe(args.userContent);
   });
 
@@ -227,31 +306,34 @@ describe("generateReply", () => {
   });
 });
 
-describe.skipIf(process.env.VELVET_E2E_LIVE !== "1" || !process.env.OPENROUTER_API_KEY)("OpenRouter live integration", () => {
-  it("completes a real OpenRouter request", async () => {
-    const provider = {
-      ...defaultProviderSettings(),
-      baseUrl: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
-      model: process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-chat-v4",
-      apiKey: process.env.OPENROUTER_API_KEY!,
-      streaming: false,
-      httpReferer: process.env.OPENROUTER_HTTP_REFERER ?? "http://localhost:5173",
-      appTitle: process.env.OPENROUTER_APP_TITLE ?? "Velvet integration test",
-      samplers: { ...defaultProviderSettings().samplers, maxTokens: 1600, topP: 0.95 },
-    };
-    const result = await generateReply(
-      character,
-      session,
-      [],
-      [],
-      null,
-      getPromptPreset("default"),
-      [],
-      defaultHarnessSettings(),
-      provider,
-      "Reply with exactly: live provider test passed",
-    );
-    expect(result.text.trim().length).toBeGreaterThan(0);
-    expect(result.usage).not.toBeNull();
-  }, 45_000);
-});
+describe.skipIf(process.env.VELVET_E2E_LIVE !== "1" || !process.env.OPENROUTER_API_KEY)(
+  "OpenRouter live integration",
+  () => {
+    it("completes a real OpenRouter request", async () => {
+      const provider = {
+        ...defaultProviderSettings(),
+        baseUrl: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+        model: process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-chat-v4",
+        apiKey: process.env.OPENROUTER_API_KEY!,
+        streaming: false,
+        httpReferer: process.env.OPENROUTER_HTTP_REFERER ?? "http://localhost:5173",
+        appTitle: process.env.OPENROUTER_APP_TITLE ?? "Velvet integration test",
+        samplers: { ...defaultProviderSettings().samplers, maxTokens: 1600, topP: 0.95 },
+      };
+      const result = await generateReply(
+        character,
+        session,
+        [],
+        [],
+        null,
+        getPromptPreset("default"),
+        [],
+        defaultHarnessSettings(),
+        provider,
+        "Reply with exactly: live provider test passed",
+      );
+      expect(result.text.trim().length).toBeGreaterThan(0);
+      expect(result.usage).not.toBeNull();
+    }, 45_000);
+  },
+);

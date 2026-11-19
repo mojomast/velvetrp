@@ -37,34 +37,49 @@ export interface CampaignStartupRepository {
   getCampaignStartupRead(principalId: string, campaignId: string, sessionId: string): CampaignStartupRead | null;
 }
 
-export function createCampaignStartupRepository(db: DatabaseDriver.Database, _deps: RepositoryDependencies,
-  guard: () => void): CampaignStartupRepository {
+export function createCampaignStartupRepository(
+  db: DatabaseDriver.Database,
+  _deps: RepositoryDependencies,
+  guard: () => void,
+): CampaignStartupRepository {
   return {
     getCampaignStartupRead(principalId, campaignId, sessionId) {
       guard();
       resourceIdSchema.parse(principalId);
       resourceIdSchema.parse(campaignId);
       resourceIdSchema.parse(sessionId);
-      const authority = db.prepare(`SELECT campaign.administration_revision, member.role
+      const authority = db
+        .prepare(
+          `SELECT campaign.administration_revision, member.role
         FROM campaigns campaign JOIN campaign_memberships member ON member.campaign_id=campaign.id
-        WHERE campaign.id=? AND member.principal_id=?`).get(campaignId, principalId) as
-        { administration_revision: number; role: string } | undefined;
+        WHERE campaign.id=? AND member.principal_id=?`,
+        )
+        .get(campaignId, principalId) as { administration_revision: number; role: string } | undefined;
       if (!authority || !["owner", "gm"].includes(authority.role)) return null;
-      const session = db.prepare(`SELECT session.state, session.stopped_at
+      const session = db
+        .prepare(
+          `SELECT session.state, session.stopped_at
         FROM campaign_sessions attached JOIN sessions session ON session.id=attached.session_id
-        WHERE attached.campaign_id=? AND attached.session_id=?`).get(campaignId, sessionId) as
-        { state: string; stopped_at: string | null } | undefined;
+        WHERE attached.campaign_id=? AND attached.session_id=?`,
+        )
+        .get(campaignId, sessionId) as { state: string; stopped_at: string | null } | undefined;
       if (!session) return null;
-      const start = db.prepare(`SELECT start.location_id
+      const start = db
+        .prepare(
+          `SELECT start.location_id
         FROM campaign_starting_locations_v51 start JOIN campaign_locations_v28 location
           ON location.campaign_id=start.campaign_id AND location.location_id=start.location_id
-        WHERE start.campaign_id=? AND location.visibility='public'`).get(campaignId) as
-        { location_id: string } | undefined;
-      const rows = db.prepare(`SELECT location_id, public_name, public_description
+        WHERE start.campaign_id=? AND location.visibility='public'`,
+        )
+        .get(campaignId) as { location_id: string } | undefined;
+      const rows = db
+        .prepare(
+          `SELECT location_id, public_name, public_description
         FROM campaign_locations_v28
         WHERE campaign_id=? AND visibility='public'
-        ORDER BY location_id`).all(campaignId) as
-        Array<{ location_id: string; public_name: string; public_description: string | null }>;
+        ORDER BY location_id`,
+        )
+        .all(campaignId) as Array<{ location_id: string; public_name: string; public_description: string | null }>;
       return {
         startingLocationId: start?.location_id ?? null,
         administrationRevision: authority.administration_revision,

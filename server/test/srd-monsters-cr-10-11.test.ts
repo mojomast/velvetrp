@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  contentCatalogDefinitionSchema,
-  enemyTemplateCatalogDefinitionSchema,
-} from "@velvet/contracts";
+import { contentCatalogDefinitionSchema, enemyTemplateCatalogDefinitionSchema } from "@velvet/contracts";
 import { cr10To11Band } from "../src/content/srdStarter/monsters/cr-10-11.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 

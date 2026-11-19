@@ -18,7 +18,15 @@ export function applyAttackRiderConditions(
 ): void {
   for (const rider of riders) {
     if (!rider.condition) continue;
-    applyCombatCondition(db, encounterId, targetCombatantId, rider.condition.condition,
-      sourceCombatantId, commandId, rider.condition.durationRounds ?? null, at);
+    applyCombatCondition(
+      db,
+      encounterId,
+      targetCombatantId,
+      rider.condition.condition,
+      sourceCombatantId,
+      commandId,
+      rider.condition.durationRounds ?? null,
+      at,
+    );
   }
 }

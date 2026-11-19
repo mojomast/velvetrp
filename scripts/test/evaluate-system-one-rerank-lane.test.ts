@@ -25,12 +25,17 @@ const recallHit = (sourceId: string, digest: string, text = "recalled text"): Ca
 });
 
 test("projects recall hits onto source-key candidates and dedupes repeated sources", () => {
-  const { candidates, keys } = toRerankCandidates(
-    { "promise:lantern": "id-1", "outcome:lantern": "id-2" },
-    [recallHit("id-1", "d1"), recallHit("id-2", "d2"), recallHit("id-1", "d1"), recallHit("id-9", "d9")],
-  );
+  const { candidates, keys } = toRerankCandidates({ "promise:lantern": "id-1", "outcome:lantern": "id-2" }, [
+    recallHit("id-1", "d1"),
+    recallHit("id-2", "d2"),
+    recallHit("id-1", "d1"),
+    recallHit("id-9", "d9"),
+  ]);
   assert.deepEqual(keys, ["promise:lantern", "outcome:lantern", "unknown:d9"]);
-  assert.deepEqual(candidates.map((candidate) => candidate.rank), [0, 1, 2]);
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.rank),
+    [0, 1, 2],
+  );
   assert.equal(candidates[0]?.candidateId, "promise:lantern");
   assert.equal(candidates[2]?.candidateId, "unknown:d9");
 });
@@ -50,7 +55,12 @@ const memoryCase = (id: string): MemoryEvalCase => ({
 const plan = (overrides: Partial<RerankCasePlan> = {}): RerankCasePlan => ({
   memoryCase: memoryCase("case"),
   holdout: false,
-  candidates: ["a", "b", "c", "d"].map((candidateId, rank) => ({ candidateId, label: "declaration", text: candidateId, rank })),
+  candidates: ["a", "b", "c", "d"].map((candidateId, rank) => ({
+    candidateId,
+    label: "declaration",
+    text: candidateId,
+    rank,
+  })),
   baselineKeys: ["a", "b", "c", "d"],
   expected: ["a"],
   forbidden: [],
@@ -77,7 +87,14 @@ test("grades the fused order against the case labels and the deterministic basel
   assert.equal(demoted.correct, false);
   assert.equal(demoted.baselineCorrect, true);
 
-  const unretrieved = toRerankSample(plan({ baselineKeys: ["b", "c", "d"], candidates: plan().candidates.slice(1) }), ["b", "c", "d"], 0.9, "act", 1, 4);
+  const unretrieved = toRerankSample(
+    plan({ baselineKeys: ["b", "c", "d"], candidates: plan().candidates.slice(1) }),
+    ["b", "c", "d"],
+    0.9,
+    "act",
+    1,
+    4,
+  );
   assert.equal(unretrieved.answerable, false);
   assert.equal(unretrieved.correct, false);
   assert.equal(unretrieved.baselineCorrect, false);
@@ -188,9 +205,22 @@ test("reports NOT READY and proposes no record when the sample gate is short", (
 });
 
 test("treats unanswerable and deferring calls as coverage, not gate samples", () => {
-  const unanswerable = sample({ id: "u", answerable: false, availableExpected: [], baselineCorrect: false, correct: false });
+  const unanswerable = sample({
+    id: "u",
+    answerable: false,
+    availableExpected: [],
+    baselineCorrect: false,
+    correct: false,
+  });
   const deferred = sample({ id: "f", band: "confirm", decisive: false });
-  const failedDeferred = sample({ id: "fd", correct: false, baselineCorrect: false, surfacedAfter: 0, band: "confirm", decisive: false });
+  const failedDeferred = sample({
+    id: "fd",
+    correct: false,
+    baselineCorrect: false,
+    surfacedAfter: 0,
+    band: "confirm",
+    decisive: false,
+  });
   const failedActed = sample({ id: "fa", correct: false, baselineCorrect: false, surfacedAfter: 0 });
   const evaluation = evaluateRerankBenchmark([unanswerable, deferred, failedDeferred, failedActed]);
   assert.equal(evaluation.calls, 4);
@@ -207,8 +237,29 @@ test("treats unanswerable and deferring calls as coverage, not gate samples", ()
 test("rolls up per-case counts, bands, and signals", () => {
   const samples = [
     sample({ id: "g1", repeat: 1, correct: true, decisive: true, band: "act", topSignal: 1 }),
-    sample({ id: "g1", repeat: 2, correct: false, decisive: true, band: "act", topSignal: 0.8, surfacedAfter: 0, bestRankAfter: 2 }),
-    sample({ id: "c1", category: "no-match", answerable: false, availableExpected: [], decisive: false, band: "fallback", topSignal: null, correct: false, baselineCorrect: false, bestRankBefore: null, bestRankAfter: null }),
+    sample({
+      id: "g1",
+      repeat: 2,
+      correct: false,
+      decisive: true,
+      band: "act",
+      topSignal: 0.8,
+      surfacedAfter: 0,
+      bestRankAfter: 2,
+    }),
+    sample({
+      id: "c1",
+      category: "no-match",
+      answerable: false,
+      availableExpected: [],
+      decisive: false,
+      band: "fallback",
+      topSignal: null,
+      correct: false,
+      baselineCorrect: false,
+      bestRankBefore: null,
+      bestRankAfter: null,
+    }),
   ];
   const summaries = summarizeRerankCases(samples, [{ id: "c1" }]);
   const g1 = summaries.find((entry) => entry.id === "g1")!;
@@ -228,5 +279,8 @@ test("rolls up per-case counts, bands, and signals", () => {
   assert.equal(c1.bestRankBefore, null);
   assert.equal(c1.bestRankAfter, null);
   // Corpus order is preserved even when samples arrive out of order.
-  assert.deepEqual(summaries.map((entry) => entry.id), ["g1", "c1"]);
+  assert.deepEqual(
+    summaries.map((entry) => entry.id),
+    ["g1", "c1"],
+  );
 });

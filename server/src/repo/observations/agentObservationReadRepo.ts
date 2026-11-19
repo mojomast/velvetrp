@@ -68,10 +68,16 @@ const MAX_TERM_BYTES = 64;
 
 /** Local mirror of the recall read path's normalization so lexical ranking stays consistent. */
 const normalize = (value: string) =>
-  value.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 
 const STOP_WORDS = new Set(
-  "a an and are as at be been did do does for from had has have how i in is it me my of on or our recall remember said say that the their them then there these they this to us was we were what when where which who why with you your happened about tell please before after".split(" "),
+  "a an and are as at be been did do does for from had has have how i in is it me my of on or our recall remember said say that the their them then there these they this to us was we were what when where which who why with you your happened about tell please before after".split(
+    " ",
+  ),
 );
 
 function retainedTerms(query: string | undefined): string[] {
@@ -94,8 +100,12 @@ function clampLimit(limit: number | undefined): number {
 }
 
 function requireMembership(db: DatabaseDriver.Database, principalId: string, campaignId: string): void {
-  const membership = db.prepare(`SELECT 1 FROM campaign_memberships
-    WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')`).get(campaignId, principalId);
+  const membership = db
+    .prepare(
+      `SELECT 1 FROM campaign_memberships
+    WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')`,
+    )
+    .get(campaignId, principalId);
   if (!membership) throw new AgentObservationUnavailableError();
 }
 
@@ -105,9 +115,7 @@ function requireMembership(db: DatabaseDriver.Database, principalId: string, cam
  * read; rows are scoped to the campaign's active timeline and the requested
  * agent. Disclosure is a classification flag, never a silent row filter.
  */
-export function createAgentObservationReadRepository(
-  db: DatabaseDriver.Database,
-): AgentObservationReadRepository {
+export function createAgentObservationReadRepository(db: DatabaseDriver.Database): AgentObservationReadRepository {
   let activeTerms: string[] = [];
   const scoreText = (value: unknown): number => {
     if (typeof value !== "string" || activeTerms.length === 0) return 0;
@@ -180,18 +188,24 @@ export function createAgentObservationReadRepository(
         activeTerms = terms;
         try {
           rows = selectRanked.all({
-            campaign: input.campaignId, kind: input.agentKind, agent: input.agentId, limit,
+            campaign: input.campaignId,
+            kind: input.agentKind,
+            agent: input.agentId,
+            limit,
           }) as AgentKnowledgeRow[];
         } finally {
           activeTerms = [];
         }
       } else {
         rows = selectRecent.all({
-          campaign: input.campaignId, kind: input.agentKind, agent: input.agentId, limit,
+          campaign: input.campaignId,
+          kind: input.agentKind,
+          agent: input.agentId,
+          limit,
         }) as AgentKnowledgeRow[];
       }
-      const listenerActorId = typeof input.listenerActorId === "string" && input.listenerActorId.length > 0
-        ? input.listenerActorId : null;
+      const listenerActorId =
+        typeof input.listenerActorId === "string" && input.listenerActorId.length > 0 ? input.listenerActorId : null;
       return rows.map((row) => toEntry(row, input.agentKind, listenerActorId));
     },
   };

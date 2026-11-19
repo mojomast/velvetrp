@@ -14,13 +14,18 @@ const EMOTIONAL_BEAT_KEYWORDS: Array<{ beat: "tense" | "tender" | "playful" | "s
 ];
 
 function cleanFact(text: string): string {
-  return text.replace(/^[\s"']+|[\s"']+$/g, "").replace(/\s+/g, " ").trim().slice(0, MAX_FACT_CHARS);
+  return text
+    .replace(/^[\s"']+|[\s"']+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_FACT_CHARS);
 }
 
 function isContextMemoryRequest(content: string): boolean {
-  return /\bremember\b/i.test(content) && (
-    /\b(?:your|their|our)\s+(?:characters?|backstor(?:y|ies)|details?|sheets?)\b/i.test(content)
-    || /\bremember\s+(?:this|that|it)(?:\s+please)?[.!?]*$/i.test(content.trim())
+  return (
+    /\bremember\b/i.test(content) &&
+    (/\b(?:your|their|our)\s+(?:characters?|backstor(?:y|ies)|details?|sheets?)\b/i.test(content) ||
+      /\bremember\s+(?:this|that|it)(?:\s+please)?[.!?]*$/i.test(content.trim()))
   );
 }
 
@@ -44,13 +49,21 @@ export function extractExplicitMemories(content: string, sourceTurnId: string): 
 
 export function extractImplicitMemories(content: string, sourceTurnId: string): NewMemoryFact[] {
   if (/\bremember\b/i.test(content)) return [];
-  const sentences = content.split(/[;\n]|(?<=[.!?])\s+/).map(cleanFact).filter(Boolean);
+  const sentences = content
+    .split(/[;\n]|(?<=[.!?])\s+/)
+    .map(cleanFact)
+    .filter(Boolean);
   const facts: NewMemoryFact[] = [];
   for (const sentence of sentences) {
     const name = /\b(?:my name is|call me)\s+(.+)/i.exec(sentence);
     const preference = /\bI\s+(?:really\s+)?(?:like|love|prefer|enjoy|dislike|hate)\s+(.+)/i.exec(sentence);
     if (name?.[1]) {
-      facts.push({ kind: "fact", content: cleanFact(`The user's name is ${name[1]}`), sourceTurnId, userApproved: false });
+      facts.push({
+        kind: "fact",
+        content: cleanFact(`The user's name is ${name[1]}`),
+        sourceTurnId,
+        userApproved: false,
+      });
     } else if (preference?.[0]) {
       facts.push({ kind: "preference", content: cleanFact(sentence), sourceTurnId, userApproved: false });
     }
@@ -66,19 +79,26 @@ export function extractContextualCharacterMemory(
   characterId: string,
 ): NewMemoryFact[] {
   if (!isContextMemoryRequest(content)) return [];
-  const recent = history.filter((message) => message.role === "character" && message.speakerCharacterId === characterId).slice(-6);
-  const candidates = recent.flatMap((message, messageIndex) => message.content
-    .replace(/\*[^*]*\*/g, " ")
-    .split(/\n+|(?<=[.!?])\s+/)
-    .map(cleanFact)
-    .filter((sentence) => sentence.length >= 8)
-    .map((sentence, sentenceIndex) => ({
-      sentence,
-      order: messageIndex * 100 + sentenceIndex,
-      score:
-        (/\b(?:name|class|bard|ranger|paladin|wizard|warlock|rogue|fighter|druid|cleric|character|backstory|oath|curse|familiar|companion)\b/i.test(sentence) ? 4 : 0)
-        + (/\b(?:I|I'm|I've|my|mine)\b/i.test(sentence) ? 2 : 0),
-    })));
+  const recent = history
+    .filter((message) => message.role === "character" && message.speakerCharacterId === characterId)
+    .slice(-6);
+  const candidates = recent.flatMap((message, messageIndex) =>
+    message.content
+      .replace(/\*[^*]*\*/g, " ")
+      .split(/\n+|(?<=[.!?])\s+/)
+      .map(cleanFact)
+      .filter((sentence) => sentence.length >= 8)
+      .map((sentence, sentenceIndex) => ({
+        sentence,
+        order: messageIndex * 100 + sentenceIndex,
+        score:
+          (/\b(?:name|class|bard|ranger|paladin|wizard|warlock|rogue|fighter|druid|cleric|character|backstory|oath|curse|familiar|companion)\b/i.test(
+            sentence,
+          )
+            ? 4
+            : 0) + (/\b(?:I|I'm|I've|my|mine)\b/i.test(sentence) ? 2 : 0),
+      })),
+  );
   const selected = candidates
     .filter((candidate) => candidate.score > 0)
     .sort((a, b) => b.score - a.score || b.order - a.order)
@@ -102,12 +122,14 @@ export function buildTurnMemories(
     ...extractContextualCharacterMemory(content, sourceTurnId, history, characterId),
   ];
   const seen = new Set<string>();
-  return facts.filter((fact) => {
-    const key = fact.content.toLocaleLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }).slice(0, MAX_FACTS_PER_TURN);
+  return facts
+    .filter((fact) => {
+      const key = fact.content.toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, MAX_FACTS_PER_TURN);
 }
 
 export function shouldUpdateSummary(messageCount: number): boolean {
@@ -117,7 +139,10 @@ export function shouldUpdateSummary(messageCount: number): boolean {
 function inferEmotionalBeat(messages: Message[]): "tense" | "tender" | "playful" | "solemn" | "steady" {
   const recentDialogue = messages.filter((message) => message.role !== "system").slice(-4);
   const content = recentDialogue.map((message) => message.content.toLowerCase()).join(" ");
-  return EMOTIONAL_BEAT_KEYWORDS.find(({ keywords }) => keywords.some((keyword) => content.includes(keyword)))?.beat ?? "steady";
+  return (
+    EMOTIONAL_BEAT_KEYWORDS.find(({ keywords }) => keywords.some((keyword) => content.includes(keyword)))?.beat ??
+    "steady"
+  );
 }
 
 export function buildEpisodeSummary(
@@ -128,7 +153,10 @@ export function buildEpisodeSummary(
   const dialogue = messages.filter((message) => message.role !== "system");
   const selected = dialogue.length <= 12 ? dialogue : [...dialogue.slice(0, 4), ...dialogue.slice(-8)];
   const keyEvents = selected
-    .map((m) => `${m.role === "character" ? (characterNames[m.speakerCharacterId ?? ""] ?? "character") : m.role}: ${m.content.replace(/\s+/g, " ").trim().slice(0, 90)}`)
+    .map(
+      (m) =>
+        `${m.role === "character" ? (characterNames[m.speakerCharacterId ?? ""] ?? "character") : m.role}: ${m.content.replace(/\s+/g, " ").trim().slice(0, 90)}`,
+    )
     .slice(0, 12);
   const summary = keyEvents.join(" | ").slice(0, maxChars);
   return {

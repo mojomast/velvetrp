@@ -9,7 +9,9 @@ import { useTmpDataDir } from "./helpers.js";
 process.env.NODE_ENV = "test";
 useTmpDataDir();
 const dirs: string[] = [];
-afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 function clientDist(): string {
   const dir = mkdtempSync(path.join(tmpdir(), "velvet-client-dist-"));
@@ -53,7 +55,12 @@ describe("serving the built client", () => {
       expect(missingAsset.statusCode).toBe(404);
       expect(missingAsset.body).not.toContain("velvet-test-index");
 
-      const post = await app.inject({ method: "POST", url: "/campaigns/x", headers: { "content-type": "application/json" }, payload: "{}" });
+      const post = await app.inject({
+        method: "POST",
+        url: "/campaigns/x",
+        headers: { "content-type": "application/json" },
+        payload: "{}",
+      });
       expect(post.statusCode).toBe(404);
     } finally {
       await app.close();

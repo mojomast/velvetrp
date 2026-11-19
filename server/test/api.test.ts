@@ -7,7 +7,9 @@ import { startFakeProvider, useTmpDataDir, type FakeProvider } from "./helpers.j
 process.env.NODE_ENV = "test";
 
 const ORIGINAL_PROVIDER_KEY_STORAGE = process.env.VELVET_PROVIDER_KEY_STORAGE;
-beforeAll(() => { process.env.VELVET_PROVIDER_KEY_STORAGE = "database"; });
+beforeAll(() => {
+  process.env.VELVET_PROVIDER_KEY_STORAGE = "database";
+});
 afterAll(() => {
   if (ORIGINAL_PROVIDER_KEY_STORAGE === undefined) delete process.env.VELVET_PROVIDER_KEY_STORAGE;
   else process.env.VELVET_PROVIDER_KEY_STORAGE = ORIGINAL_PROVIDER_KEY_STORAGE;
@@ -34,7 +36,7 @@ const validCharacter = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 };
 
 async function createCharacter(app: ReturnType<typeof buildApp>) {
@@ -95,7 +97,10 @@ describe("api", () => {
     };
     let logged = "";
     const loggerStream = new Writable({
-      write(chunk, _encoding, callback) { logged += chunk.toString(); callback(); },
+      write(chunk, _encoding, callback) {
+        logged += chunk.toString();
+        callback();
+      },
     });
     const app = buildApp({ loggerStream });
     try {
@@ -134,7 +139,11 @@ describe("api", () => {
     const accepted = await app.inject({ method: "GET", url: "/api/health", headers: { "x-request-id": "caller-1" } });
     expect(accepted.headers["x-request-id"]).toBe("caller-1");
     expect(accepted.json()).toEqual({ ok: true });
-    const replaced = await app.inject({ method: "GET", url: "/api/health", headers: { "x-request-id": "unsafe request id" } });
+    const replaced = await app.inject({
+      method: "GET",
+      url: "/api/health",
+      headers: { "x-request-id": "unsafe request id" },
+    });
     expect(replaced.headers["x-request-id"]).toBe("generated-1");
     expect(replaced.json()).toEqual({ ok: true });
     await app.close();
@@ -144,7 +153,11 @@ describe("api", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     process.env.FEATURE_RPG_MECHANICS = "TRUE";
     const app = buildApp();
-    const features = await app.inject({ method: "GET", url: "/api/rpg/v1/features", headers: { "x-request-id": "rpg-request" } });
+    const features = await app.inject({
+      method: "GET",
+      url: "/api/rpg/v1/features",
+      headers: { "x-request-id": "rpg-request" },
+    });
     expect(features.json()).toEqual({
       campaign: true,
       mechanics: false,
@@ -153,7 +166,11 @@ describe("api", () => {
       remoteAuthentication: false,
       systemOne: false,
     });
-    const missing = await app.inject({ method: "GET", url: "/api/rpg/v1/not-implemented", headers: { "x-request-id": "rpg-request" } });
+    const missing = await app.inject({
+      method: "GET",
+      url: "/api/rpg/v1/not-implemented",
+      headers: { "x-request-id": "rpg-request" },
+    });
     expect(missing.statusCode).toBe(404);
     expect(missing.headers["content-type"]).toContain("application/problem+json");
     expect(missing.json()).toMatchObject({
@@ -209,7 +226,11 @@ describe("api", () => {
   it("uses the current deliberately permissive message policy", async () => {
     const app = buildApp();
     const character = await createCharacter(app);
-    const sessionRes = await app.inject({ method: "POST", url: "/api/sessions", payload: { characterId: character.id } });
+    const sessionRes = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { characterId: character.id },
+    });
     const session = sessionRes.json() as { id: string };
     const res = await app.inject({
       method: "POST",
@@ -233,7 +254,9 @@ describe("api", () => {
 
     try {
       const character = await createCharacter(app);
-      const session = (await app.inject({ method: "POST", url: "/api/sessions", payload: { characterId: character.id } })).json() as { id: string };
+      const session = (
+        await app.inject({ method: "POST", url: "/api/sessions", payload: { characterId: character.id } })
+      ).json() as { id: string };
       const response = await app.inject({
         method: "POST",
         url: `/api/sessions/${session.id}/messages`,
@@ -257,14 +280,23 @@ describe("api", () => {
     const providerRes = await app.inject({
       method: "PUT",
       url: "/api/provider",
-      payload: { baseUrl: provider.baseUrl, model: "fake-model", apiKey: "test-key", pricing: { promptPerMillion: 2, completionPerMillion: 8 } },
+      payload: {
+        baseUrl: provider.baseUrl,
+        model: "fake-model",
+        apiKey: "test-key",
+        pricing: { promptPerMillion: 2, completionPerMillion: 8 },
+      },
     });
     expect(providerRes.statusCode).toBe(200);
     expect(providerRes.json().hasApiKey).toBe(true);
     expect(JSON.stringify(providerRes.json())).not.toContain("test-key");
 
     const character = await createCharacter(app);
-    const sessionRes = await app.inject({ method: "POST", url: "/api/sessions", payload: { characterId: character.id } });
+    const sessionRes = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { characterId: character.id },
+    });
     const session = sessionRes.json() as { id: string; state: string };
     expect(session.state).toBe("setup");
 
@@ -288,7 +320,16 @@ describe("api", () => {
     expect(provider.requests[0]?.systemContent).toContain("I prefer quiet evenings");
     const usageResponse = await app.inject({ method: "GET", url: "/api/usage" });
     expect(usageResponse.statusCode).toBe(200);
-    const usage = usageResponse.json().usage as { calls: number; promptTokens: number; completionTokens: number; totalTokens: number; providerMeasuredTokens: number; estimatedTokens: number; estimatedCostUsd: number; byKind: Array<{ kind: string }> };
+    const usage = usageResponse.json().usage as {
+      calls: number;
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+      providerMeasuredTokens: number;
+      estimatedTokens: number;
+      estimatedCostUsd: number;
+      byKind: Array<{ kind: string }>;
+    };
     expect(usage.calls).toBe(1);
     expect(usage.totalTokens).toBe(usage.promptTokens + usage.completionTokens);
     expect(usage.providerMeasuredTokens).toBe(usage.totalTokens);
@@ -320,5 +361,4 @@ describe("api", () => {
     expect(afterStop.statusCode).toBe(409);
     await app.close();
   });
-
 });

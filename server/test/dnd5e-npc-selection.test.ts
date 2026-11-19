@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DND_5E_NPC_SELECTION_CAPABILITIES,
-  selectDnd5eNpcStatBlocks,
-} from "../src/rulesets/dnd5e/npcSelection.js";
+import { DND_5E_NPC_SELECTION_CAPABILITIES, selectDnd5eNpcStatBlocks } from "../src/rulesets/dnd5e/npcSelection.js";
 
 const CANDIDATES = [
   { id: "goblin", challengeRating: 0.25, roles: ["skirmisher"], tags: ["humanoid"] },
@@ -16,9 +13,7 @@ const CANDIDATES = [
 
 describe("selectDnd5eNpcStatBlocks", () => {
   it("filters by role and inclusive CR band, then selects in deterministic order", () => {
-    expect(DND_5E_NPC_SELECTION_CAPABILITIES).toEqual([
-      { id: "npc-selection", version: "1.1.0", status: "supported" },
-    ]);
+    expect(DND_5E_NPC_SELECTION_CAPABILITIES).toEqual([{ id: "npc-selection", version: "1.1.0", status: "supported" }]);
 
     const result = selectDnd5eNpcStatBlocks({
       candidates: CANDIDATES,

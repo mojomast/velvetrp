@@ -9,19 +9,48 @@ interface Projectors {
   definitionProjection: string;
   definitionOrder: string;
   toRpgDefinition(row: RpgDefinitionRow): RpgDefinition;
-  verifyCatalogVisibilityProjection(input: { packId: string; packVersion: string; expectedCount: number; manifestDigest: string; publicationDigest: string; aggregateDigest: string; rows: PersistedCatalogVisibilityRow[] }): unknown[];
+  verifyCatalogVisibilityProjection(input: {
+    packId: string;
+    packVersion: string;
+    expectedCount: number;
+    manifestDigest: string;
+    publicationDigest: string;
+    aggregateDigest: string;
+    rows: PersistedCatalogVisibilityRow[];
+  }): unknown[];
 }
-type ReadRow = RpgDefinitionRow & { access_role: "owner" | "gm" | "player" | "observer"; validation_level: string | null; legacy_manifest_digest: string | null; definition_count: number | null; publication_digest: string | null; public_projection_digest: string | null; visibility_rows_json: string };
+type ReadRow = RpgDefinitionRow & {
+  access_role: "owner" | "gm" | "player" | "observer";
+  validation_level: string | null;
+  legacy_manifest_digest: string | null;
+  definition_count: number | null;
+  publication_digest: string | null;
+  public_projection_digest: string | null;
+  visibility_rows_json: string;
+};
 
 export function createCampaignContentDefinitionReadRepository(db: DatabaseDriver.Database, projectors: Projectors) {
-  const visibleDefinitions = (row: ReadRow, packId: string, packVersion: string): Set<string> => new Set(
-    projectors.verifyCatalogVisibilityProjection({ packId, packVersion, expectedCount: row.definition_count!, manifestDigest: row.legacy_manifest_digest!, publicationDigest: row.publication_digest!, aggregateDigest: row.public_projection_digest!, rows: JSON.parse(row.visibility_rows_json) as PersistedCatalogVisibilityRow[] })
-      .map((value) => {
-        const reference = (value as { reference: { kind: string; definitionId: string } }).reference;
-        return `${reference.kind === "enemy-template" ? "enemy" : reference.kind}\0${reference.definitionId}`;
-      }),
-  );
-  const select = (where: string, order = "") => `SELECT ${projectors.definitionProjection},cm.role access_role,publication.validation_level,
+  const visibleDefinitions = (row: ReadRow, packId: string, packVersion: string): Set<string> =>
+    new Set(
+      projectors
+        .verifyCatalogVisibilityProjection({
+          packId,
+          packVersion,
+          expectedCount: row.definition_count!,
+          manifestDigest: row.legacy_manifest_digest!,
+          publicationDigest: row.publication_digest!,
+          aggregateDigest: row.public_projection_digest!,
+          rows: JSON.parse(row.visibility_rows_json) as PersistedCatalogVisibilityRow[],
+        })
+        .map((value) => {
+          const reference = (value as { reference: { kind: string; definitionId: string } }).reference;
+          return `${reference.kind === "enemy-template" ? "enemy" : reference.kind}\0${reference.definitionId}`;
+        }),
+    );
+  const select = (
+    where: string,
+    order = "",
+  ) => `SELECT ${projectors.definitionProjection},cm.role access_role,publication.validation_level,
       publication.manifest_digest legacy_manifest_digest,attestation.definition_count,attestation.publication_digest,
       attestation.public_projection_digest,
       (SELECT json_group_array(json_object('kind',ordered.kind,'definition_id',ordered.definition_id,
@@ -42,20 +71,76 @@ export function createCampaignContentDefinitionReadRepository(db: DatabaseDriver
       AND attestation.pack_version=publication.pack_version
     WHERE cm.principal_id = ? AND cm.campaign_id = ?${order}`;
   return {
-    listCampaignContentPackDefinitions(actorPrincipalId: string, campaignId: string, identifier: ContentPackIdentifier): RpgDefinition[] {
-      const actorId = resourceIdSchema.parse(actorPrincipalId); const id = resourceIdSchema.parse(campaignId); const normalized = contentPackIdentifierSchema.parse(identifier);
-      const rows = db.prepare(select("", `\n    ORDER BY ${projectors.definitionOrder}`)).all(normalized.packId, normalized.packVersion, normalized.packId, normalized.packVersion, actorId, id) as ReadRow[];
+    listCampaignContentPackDefinitions(
+      actorPrincipalId: string,
+      campaignId: string,
+      identifier: ContentPackIdentifier,
+    ): RpgDefinition[] {
+      const actorId = resourceIdSchema.parse(actorPrincipalId);
+      const id = resourceIdSchema.parse(campaignId);
+      const normalized = contentPackIdentifierSchema.parse(identifier);
+      const rows = db
+        .prepare(select("", `\n    ORDER BY ${projectors.definitionOrder}`))
+        .all(
+          normalized.packId,
+          normalized.packVersion,
+          normalized.packId,
+          normalized.packVersion,
+          actorId,
+          id,
+        ) as ReadRow[];
       if (!rows.length) return [];
       const authority = rows[0]!;
       if (authority.validation_level !== "validated-v1") return rows.map(projectors.toRpgDefinition);
-      let visible: Set<string>; try { visible = visibleDefinitions(authority, normalized.packId, normalized.packVersion); } catch (error) { if (authority.access_role === "owner" || authority.access_role === "gm") throw error; return []; }
-      return (authority.access_role === "owner" || authority.access_role === "gm" ? rows : rows.filter((row) => visible.has(`${row.kind}\0${row.definition_id}`))).map(projectors.toRpgDefinition);
+      let visible: Set<string>;
+      try {
+        visible = visibleDefinitions(authority, normalized.packId, normalized.packVersion);
+      } catch (error) {
+        if (authority.access_role === "owner" || authority.access_role === "gm") throw error;
+        return [];
+      }
+      return (
+        authority.access_role === "owner" || authority.access_role === "gm"
+          ? rows
+          : rows.filter((row) => visible.has(`${row.kind}\0${row.definition_id}`))
+      ).map(projectors.toRpgDefinition);
     },
-    getCampaignContentPackDefinition(actorPrincipalId: string, campaignId: string, reference: DefinitionReference): RpgDefinition | null {
-      const actorId = resourceIdSchema.parse(actorPrincipalId); const id = resourceIdSchema.parse(campaignId); const normalized = definitionReferenceSchema.parse(reference);
-      const row = db.prepare(select("    AND d.kind = ? AND d.definition_id = ?")).get(normalized.packId, normalized.packVersion, normalized.packId, normalized.packVersion, normalized.kind, normalized.definitionId, actorId, id) as ReadRow | undefined;
+    getCampaignContentPackDefinition(
+      actorPrincipalId: string,
+      campaignId: string,
+      reference: DefinitionReference,
+    ): RpgDefinition | null {
+      const actorId = resourceIdSchema.parse(actorPrincipalId);
+      const id = resourceIdSchema.parse(campaignId);
+      const normalized = definitionReferenceSchema.parse(reference);
+      const row = db
+        .prepare(select("    AND d.kind = ? AND d.definition_id = ?"))
+        .get(
+          normalized.packId,
+          normalized.packVersion,
+          normalized.packId,
+          normalized.packVersion,
+          normalized.kind,
+          normalized.definitionId,
+          actorId,
+          id,
+        ) as ReadRow | undefined;
       if (!row) return null;
-      if (row.validation_level === "validated-v1") { let visible: Set<string>; try { visible = visibleDefinitions(row, normalized.packId, normalized.packVersion); } catch (error) { if (row.access_role === "owner" || row.access_role === "gm") throw error; return null; } if (row.access_role !== "owner" && row.access_role !== "gm" && !visible.has(`${normalized.kind}\0${normalized.definitionId}`)) return null; }
+      if (row.validation_level === "validated-v1") {
+        let visible: Set<string>;
+        try {
+          visible = visibleDefinitions(row, normalized.packId, normalized.packVersion);
+        } catch (error) {
+          if (row.access_role === "owner" || row.access_role === "gm") throw error;
+          return null;
+        }
+        if (
+          row.access_role !== "owner" &&
+          row.access_role !== "gm" &&
+          !visible.has(`${normalized.kind}\0${normalized.definitionId}`)
+        )
+          return null;
+      }
       return projectors.toRpgDefinition(row);
     },
   };

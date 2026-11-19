@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSystemOneShadowReport } from "../src/agent/systemOneReport.js";
-import type {
-  SystemOneDecisionRecord,
-  SystemOneDecisionSummary,
-} from "../src/repo/systemOneDecisionRepo.js";
+import type { SystemOneDecisionRecord, SystemOneDecisionSummary } from "../src/repo/systemOneDecisionRepo.js";
 
 function record(overrides: Partial<SystemOneDecisionRecord> = {}): SystemOneDecisionRecord {
   return {
@@ -56,10 +53,23 @@ const summary: SystemOneDecisionSummary = {
 describe("buildSystemOneShadowReport", () => {
   it("renders totals, tables, rates and tokens", () => {
     const output = buildSystemOneShadowReport(summary, [
-      record({ decisionId: "decision:1", lane: "speaker-routing", confidenceBand: "act", fallbackUsed: false, shadow: true,
-        committedByLane: true }),
-      record({ decisionId: "decision:2", lane: "guardrails", confidenceBand: "fallback", fallbackUsed: true, shadow: false,
-        committedByLane: false, latencyMs: 300 }),
+      record({
+        decisionId: "decision:1",
+        lane: "speaker-routing",
+        confidenceBand: "act",
+        fallbackUsed: false,
+        shadow: true,
+        committedByLane: true,
+      }),
+      record({
+        decisionId: "decision:2",
+        lane: "guardrails",
+        confidenceBand: "fallback",
+        fallbackUsed: true,
+        shadow: false,
+        committedByLane: false,
+        latencyMs: 300,
+      }),
     ]);
 
     expect(output).toContain("# System One shadow decision report");
@@ -73,8 +83,8 @@ describe("buildSystemOneShadowReport", () => {
     expect(output).toContain("Total output tokens: 35");
     // The report names the authoritative commit evidence: the execution row, not the decision row.
     expect(output).toContain(
-      "Lane commit evidence is the authoritative `adventure_check_executions_v54` row with `origin='lane'`"
-      + " linked by `system_one_decision_id`; a decision row with `shadow: true` was only recorded as advisory.",
+      "Lane commit evidence is the authoritative `adventure_check_executions_v54` row with `origin='lane'`" +
+        " linked by `system_one_decision_id`; a decision row with `shadow: true` was only recorded as advisory.",
     );
 
     expect(output).toContain("## Per-lane breakdown");
@@ -100,12 +110,7 @@ describe("buildSystemOneShadowReport", () => {
 
   it("never emits raw decision payloads", () => {
     const output = buildSystemOneShadowReport(summary, [record()]);
-    for (const marker of [
-      "RAW_REQUEST_PAYLOAD",
-      "RAW_QUESTIONS_PAYLOAD",
-      "RAW_STATE_PAYLOAD",
-      "RAW_ANSWERS_PAYLOAD",
-    ]) {
+    for (const marker of ["RAW_REQUEST_PAYLOAD", "RAW_QUESTIONS_PAYLOAD", "RAW_STATE_PAYLOAD", "RAW_ANSWERS_PAYLOAD"]) {
       expect(output).not.toContain(marker);
     }
     for (const key of ["state", "questions", "answers", "request"]) {

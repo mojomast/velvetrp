@@ -271,9 +271,7 @@ function toRankedCase(sample: RerankCaseSample, fused: boolean): RankedCase {
   };
 }
 
-function isDecisiveSample(
-  sample: RerankCaseSample,
-): sample is RerankCaseSample & { topSignal: number } {
+function isDecisiveSample(sample: RerankCaseSample): sample is RerankCaseSample & { topSignal: number } {
   return sample.decisive && sample.topSignal !== null && Number.isFinite(sample.topSignal);
 }
 
@@ -319,7 +317,9 @@ export function evaluateRerankBenchmark(samples: readonly RerankCaseSample[], k 
     expectedCalibrationError: allCalibrated.expectedCalibrationError,
   });
   const rankDelta = (sample: RerankCaseSample): number | null =>
-    sample.bestRankBefore === null || sample.bestRankAfter === null ? null : sample.bestRankBefore - sample.bestRankAfter;
+    sample.bestRankBefore === null || sample.bestRankAfter === null
+      ? null
+      : sample.bestRankBefore - sample.bestRankAfter;
   const eligibleTop1 = eligible.filter((sample) => sample.availableExpected.length > 0);
   return {
     fitted,
@@ -338,10 +338,22 @@ export function evaluateRerankBenchmark(samples: readonly RerankCaseSample[], k 
     eligibleFailures: eligible.filter((sample) => !sample.correct).length,
     deferredFailures: eligible.filter((sample) => !sample.correct && !sample.decisive).length,
     actedFailures: eligible.filter((sample) => !sample.correct && sample.decisive).length,
-    top1BeforeRate: rate(eligibleTop1.filter((sample) => sample.availableExpected.includes(sample.baseline[0] ?? "")).length, eligibleTop1.length),
-    top1AfterRate: rate(eligibleTop1.filter((sample) => sample.availableExpected.includes(sample.fused[0] ?? "")).length, eligibleTop1.length),
-    baseline: scoreCases(samples.map((sample) => toRankedCase(sample, false)), k),
-    fused: scoreCases(samples.map((sample) => toRankedCase(sample, true)), k),
+    top1BeforeRate: rate(
+      eligibleTop1.filter((sample) => sample.availableExpected.includes(sample.baseline[0] ?? "")).length,
+      eligibleTop1.length,
+    ),
+    top1AfterRate: rate(
+      eligibleTop1.filter((sample) => sample.availableExpected.includes(sample.fused[0] ?? "")).length,
+      eligibleTop1.length,
+    ),
+    baseline: scoreCases(
+      samples.map((sample) => toRankedCase(sample, false)),
+      k,
+    ),
+    fused: scoreCases(
+      samples.map((sample) => toRankedCase(sample, true)),
+      k,
+    ),
     holdout: {
       raw: metricsFor(holdoutSamples, fitted, false),
       calibrated: metricsFor(holdoutSamples, fitted, true),
@@ -473,7 +485,8 @@ export function renderRerankBenchmark(input: {
   evaluation: RerankBenchmarkEvaluation;
   proposedRecord: SystemOnePromotionRecord | null;
 }): string {
-  const { generatedAt, model, baseUrl, repeats, thresholds, plans, samples, failures, evaluation, proposedRecord } = input;
+  const { generatedAt, model, baseUrl, repeats, thresholds, plans, samples, failures, evaluation, proposedRecord } =
+    input;
   const summaries = summarizeRerankCases(samples, failures);
   const summaryById = new Map(summaries.map((summary) => [summary.id, summary]));
   const latencies = samples.map((sample) => sample.latencyMs);
@@ -483,35 +496,53 @@ export function renderRerankBenchmark(input: {
   const lines: string[] = [];
   lines.push("# System One (Jev) memory-reranking (L4) benchmark");
   lines.push("");
-  lines.push(`Generated ${generatedAt} by \`scripts/evaluate-system-one-rerank-lane.ts\` using the live System One adapter.`);
+  lines.push(
+    `Generated ${generatedAt} by \`scripts/evaluate-system-one-rerank-lane.ts\` using the live System One adapter.`,
+  );
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
-  lines.push("The L4 lane reorders an already-authorized, bounded recall shortlist. It never adds, drops, or authorizes a candidate: the Plan 3 provider-free memory oracle produces the same shortlist the runtime recall would, and the lane contributes one relevance `score` and one \"does this item answer the query?\" `noul` per candidate. `composeRerankOrder` fuses them with the deterministic rank (`0.5 * rankScore + 0.5 * relevance`), so an all-equal or malformed model response reproduces the deterministic order exactly.");
+  lines.push(
+    'The L4 lane reorders an already-authorized, bounded recall shortlist. It never adds, drops, or authorizes a candidate: the Plan 3 provider-free memory oracle produces the same shortlist the runtime recall would, and the lane contributes one relevance `score` and one "does this item answer the query?" `noul` per candidate. `composeRerankOrder` fuses them with the deterministic rank (`0.5 * rankScore + 0.5 * relevance`), so an all-equal or malformed model response reproduces the deterministic order exactly.',
+  );
   lines.push("");
-  lines.push("Because the lane's output is an order, the promotion gate is scored on a per-case success label restricted to calls where the shortlist actually retrieved a labelled required source: every available required source must remain in the fused top " + `${RERANK_K}` + " and no forbidden source may be present. A call with no retrieved required source is **unanswerable** — no reorder can recover it — and is reported as coverage, not as a decision. A sample is **decisive** only when the composed band is `act`; a deferral keeps the deterministic order.");
+  lines.push(
+    "Because the lane's output is an order, the promotion gate is scored on a per-case success label restricted to calls where the shortlist actually retrieved a labelled required source: every available required source must remain in the fused top " +
+      `${RERANK_K}` +
+      " and no forbidden source may be present. A call with no retrieved required source is **unanswerable** — no reorder can recover it — and is reported as coverage, not as a decision. A sample is **decisive** only when the composed band is `act`; a deferral keeps the deterministic order.",
+  );
   lines.push("");
-  lines.push("The benefit comparison reuses the Plan 3 scorer (`scoreCases`) over the same calls: the deterministic and fused orders are scored against the same labels, so recall@K, recall@8, MRR, and nDCG are directly comparable.");
+  lines.push(
+    "The benefit comparison reuses the Plan 3 scorer (`scoreCases`) over the same calls: the deterministic and fused orders are scored against the same labels, so recall@K, recall@8, MRR, and nDCG are directly comparable.",
+  );
   lines.push("");
   lines.push("| Setting | Value |");
   lines.push("| --- | --- |");
   lines.push(`| Model | ${model} |`);
   lines.push(`| Base URL | \`${baseUrl}\` |`);
-  lines.push(`| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`);
+  lines.push(
+    `| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`,
+  );
   lines.push(`| Fusion weights | 0.5 deterministic / 0.5 model |`);
   lines.push(`| Top-K | ${RERANK_K} |`);
   lines.push(`| Repeats | ${repeats} |`);
-  lines.push(`| Corpus | ${plans.length} cases (${emptyCases} with an empty shortlist) x ${repeats} repeats = ${samples.length} calls |`);
+  lines.push(
+    `| Corpus | ${plans.length} cases (${emptyCases} with an empty shortlist) x ${repeats} repeats = ${samples.length} calls |`,
+  );
   lines.push("");
   lines.push("## Corpus and per-case results");
   lines.push("");
   const rankText = (value: number | null): string => (value === null ? "—" : value.toFixed(2));
-  lines.push("| Case | Category | Split | Candidates | Calls | Answerable | Decisive | Correct/decisive | Baseline correct/decisive | Surfaced before→after | Best rank before→after | Mean signal | Bands (act/confirm/fallback) | Errors |");
+  lines.push(
+    "| Case | Category | Split | Candidates | Calls | Answerable | Decisive | Correct/decisive | Baseline correct/decisive | Surfaced before→after | Best rank before→after | Mean signal | Bands (act/confirm/fallback) | Errors |",
+  );
   lines.push("| --- | --- | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |");
   for (const plan of plans) {
     const summary = summaryById.get(plan.memoryCase.id);
     if (!summary) {
-      lines.push(`| ${plan.memoryCase.id} | ${plan.memoryCase.category} | ${plan.holdout ? "holdout" : "dev"} | ${plan.candidates.length} | 0 | 0 | 0 | 0/0 | 0/0 | — | — | n/a | — | 0 |`);
+      lines.push(
+        `| ${plan.memoryCase.id} | ${plan.memoryCase.category} | ${plan.holdout ? "holdout" : "dev"} | ${plan.candidates.length} | 0 | 0 | 0 | 0/0 | 0/0 | — | — | n/a | — | 0 |`,
+      );
       continue;
     }
     lines.push(
@@ -521,7 +552,8 @@ export function renderRerankBenchmark(input: {
   lines.push("");
   if (failures.length > 0) {
     lines.push(`Adapter failures: ${failures.length}.`);
-    for (const failure of failures.slice(0, 10)) lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
+    for (const failure of failures.slice(0, 10))
+      lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
     lines.push("");
   }
   lines.push("## Ranking benefit versus the deterministic baseline");
@@ -533,22 +565,38 @@ export function renderRerankBenchmark(input: {
   lines.push(metricRow(`deterministic baseline (${samples.length} calls)`, evaluation.baseline));
   lines.push(metricRow(`fused rerank (${samples.length} calls)`, evaluation.fused));
   lines.push("");
-  lines.push(`Top-1 is a labelled required source on ${pct(evaluation.top1BeforeRate)} of answerable calls before and ${pct(evaluation.top1AfterRate)} after reranking; the fused order improved the best required-source position on ${evaluation.improvedCalls} eligible call(s), demoted it on ${evaluation.demotedCalls}, and left the rest unchanged. Case-label pass rate over eligible calls moved from ${pct(evaluation.baselinePassRate)} to ${pct(evaluation.fusedPassRate)}.`);
+  lines.push(
+    `Top-1 is a labelled required source on ${pct(evaluation.top1BeforeRate)} of answerable calls before and ${pct(evaluation.top1AfterRate)} after reranking; the fused order improved the best required-source position on ${evaluation.improvedCalls} eligible call(s), demoted it on ${evaluation.demotedCalls}, and left the rest unchanged. Case-label pass rate over eligible calls moved from ${pct(evaluation.baselinePassRate)} to ${pct(evaluation.fusedPassRate)}.`,
+  );
   lines.push("");
   lines.push("## Calibration (fit on development, scored on holdout)");
   lines.push("");
-  lines.push(`Fitted a monotonic Platt map on ${evaluation.devSamples} decisive development call(s); the calibrated signal is the model's strongest "answers the query?" probability.`);
+  lines.push(
+    `Fitted a monotonic Platt map on ${evaluation.devSamples} decisive development call(s); the calibrated signal is the model's strongest "answers the query?" probability.`,
+  );
   lines.push("");
   lines.push("| Split | Signal | Brier | ECE |");
   lines.push("| --- | --- | ---: | ---: |");
-  lines.push(`| held-out decisive (${evaluation.holdoutSamples}) | raw | ${evaluation.holdout.raw.brier.toFixed(4)} | ${evaluation.holdout.raw.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| held-out decisive (${evaluation.holdoutSamples}) | calibrated | ${evaluation.holdout.calibrated.brier.toFixed(4)} | ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| all decisive (${evaluation.decisiveCalls}) | raw | ${evaluation.all.raw.brier.toFixed(4)} | ${evaluation.all.raw.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| all decisive (${evaluation.decisiveCalls}) | calibrated | ${evaluation.all.calibrated.brier.toFixed(4)} | ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(
+    `| held-out decisive (${evaluation.holdoutSamples}) | raw | ${evaluation.holdout.raw.brier.toFixed(4)} | ${evaluation.holdout.raw.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| held-out decisive (${evaluation.holdoutSamples}) | calibrated | ${evaluation.holdout.calibrated.brier.toFixed(4)} | ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| all decisive (${evaluation.decisiveCalls}) | raw | ${evaluation.all.raw.brier.toFixed(4)} | ${evaluation.all.raw.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| all decisive (${evaluation.decisiveCalls}) | calibrated | ${evaluation.all.calibrated.brier.toFixed(4)} | ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)} |`,
+  );
   lines.push("");
-  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${evaluation.fitted.a.toFixed(4)}, b = ${evaluation.fitted.b.toFixed(4)}. The held-out rows are the unbiased estimate; the gate scores the calibrated map over every decisive call, which is the map the lane would ship with.`);
+  lines.push(
+    `Map: \`sigmoid(a * logit(p) + b)\` with a = ${evaluation.fitted.a.toFixed(4)}, b = ${evaluation.fitted.b.toFixed(4)}. The held-out rows are the unbiased estimate; the gate scores the calibrated map over every decisive call, which is the map the lane would ship with.`,
+  );
   lines.push("");
-  lines.push(`Decisive case accuracy ${pct(evaluation.accuracy)} over ${evaluation.decisiveCalls} decisive gate-eligible call(s). Mean transport latency ${meanLatency.toFixed(0)} ms.`);
+  lines.push(
+    `Decisive case accuracy ${pct(evaluation.accuracy)} over ${evaluation.decisiveCalls} decisive gate-eligible call(s). Mean transport latency ${meanLatency.toFixed(0)} ms.`,
+  );
   lines.push("");
   lines.push(`## Promotion gate — \`${PROMOTION_LANE}\``);
   lines.push("");
@@ -557,7 +605,9 @@ export function renderRerankBenchmark(input: {
   if (evaluation.gate.reasons.length === 0) lines.push("All gates passed.");
   else for (const reason of evaluation.gate.reasons) lines.push(`- ${reason}`);
   lines.push("");
-  lines.push(`Gate: samples ${evaluation.gate.gates.minSamples}+, accuracy ${pct(evaluation.gate.gates.minAccuracy)}+, Brier <= ${evaluation.gate.gates.maxBrier}, ECE <= ${evaluation.gate.gates.maxExpectedCalibrationError}.`);
+  lines.push(
+    `Gate: samples ${evaluation.gate.gates.minSamples}+, accuracy ${pct(evaluation.gate.gates.minAccuracy)}+, Brier <= ${evaluation.gate.gates.maxBrier}, ECE <= ${evaluation.gate.gates.maxExpectedCalibrationError}.`,
+  );
   lines.push("");
   if (proposedRecord) {
     lines.push("Proposed promotion record:");
@@ -566,20 +616,34 @@ export function renderRerankBenchmark(input: {
     lines.push(JSON.stringify(proposedRecord, null, 2));
     lines.push("```");
   } else {
-    lines.push("No promotion record is proposed: the gate did not pass, so the lane keeps its record-only shadow behavior.");
+    lines.push(
+      "No promotion record is proposed: the gate did not pass, so the lane keeps its record-only shadow behavior.",
+    );
   }
   lines.push("");
   lines.push("## Observations");
   lines.push("");
-  lines.push(`- **Coverage.** ${evaluation.eligibleCalls} of ${evaluation.calls} call(s) were gate-eligible (the shortlist retrieved a labelled required source); ${unanswerable} call(s) were unanswerable, including cases whose baseline recall miss cannot be repaired by reordering. ${plans.filter((plan) => plan.candidates.length === 0).length} case(s) produced an empty shortlist and were never called.`);
-  lines.push(`- **Assertions.** ${evaluation.misassertedCalls} decisive call(s) landed on an unanswerable shortlist; those are excluded from the gate label and reported here so an over-eager assertion is visible.`);
+  lines.push(
+    `- **Coverage.** ${evaluation.eligibleCalls} of ${evaluation.calls} call(s) were gate-eligible (the shortlist retrieved a labelled required source); ${unanswerable} call(s) were unanswerable, including cases whose baseline recall miss cannot be repaired by reordering. ${plans.filter((plan) => plan.candidates.length === 0).length} case(s) produced an empty shortlist and were never called.`,
+  );
+  lines.push(
+    `- **Assertions.** ${evaluation.misassertedCalls} decisive call(s) landed on an unanswerable shortlist; those are excluded from the gate label and reported here so an over-eager assertion is visible.`,
+  );
   const fused = evaluation.fused;
   const baseline = evaluation.baseline;
   const signed = (value: number): string => `${value >= 0 ? "+" : ""}${value.toFixed(4)}`;
-  lines.push(`- **Ranking.** Aggregate Recall@K ${signed(fused.recallAtK - baseline.recallAtK)}, MRR ${signed(fused.mrr - baseline.mrr)}, and nDCG ${signed(fused.ndcg - baseline.ndcg)} are unchanged over the deterministic baseline: every supported-case required source was already inside the top K, and the Plan 3 scorer excludes expected-miss alias/pronoun rows from MRR/nDCG. The rerank's position movement is visible in the per-case table (best rank before→after) and the improved/demoted counts: ${evaluation.improvedCalls} improved, ${evaluation.demotedCalls} demoted, ${evaluation.eligibleCalls - evaluation.improvedCalls - evaluation.demotedCalls} unchanged. Negative (forbidden-source) pass rate stayed ${fused.negativePassRate.toFixed(4)}.`);
-  lines.push(`- **Gate label.** ${evaluation.eligibleFailures} of ${evaluation.eligibleCalls} eligible call(s) did not satisfy the case label (${pct(evaluation.fusedPassRate)} pass rate). The lane deferred on ${evaluation.deferredFailures} of them and acted on ${evaluation.actedFailures}, so the decisive accuracy above is an asserted-subset figure, not the corpus-wide pass rate. A deferral leaves the deterministic order in place.`);
-  lines.push(`- **Honesty.** The gate label only asks whether the lane keeps every retrieved required source inside the top K; it cannot reward a source the shortlist never retrieved, and a decisive subset with no observed errors cannot test the calibration's error tail. The corpus is small and provider-free, and the fixture is the same one Plan 3 uses, so a passing gate is a promotion candidate, not proof.`);
-  lines.push("- **No active path.** The lane has no runtime wiring. A promotion record is evidence only: recall authorization, caps, and the deterministic order fallback are unchanged.");
+  lines.push(
+    `- **Ranking.** Aggregate Recall@K ${signed(fused.recallAtK - baseline.recallAtK)}, MRR ${signed(fused.mrr - baseline.mrr)}, and nDCG ${signed(fused.ndcg - baseline.ndcg)} are unchanged over the deterministic baseline: every supported-case required source was already inside the top K, and the Plan 3 scorer excludes expected-miss alias/pronoun rows from MRR/nDCG. The rerank's position movement is visible in the per-case table (best rank before→after) and the improved/demoted counts: ${evaluation.improvedCalls} improved, ${evaluation.demotedCalls} demoted, ${evaluation.eligibleCalls - evaluation.improvedCalls - evaluation.demotedCalls} unchanged. Negative (forbidden-source) pass rate stayed ${fused.negativePassRate.toFixed(4)}.`,
+  );
+  lines.push(
+    `- **Gate label.** ${evaluation.eligibleFailures} of ${evaluation.eligibleCalls} eligible call(s) did not satisfy the case label (${pct(evaluation.fusedPassRate)} pass rate). The lane deferred on ${evaluation.deferredFailures} of them and acted on ${evaluation.actedFailures}, so the decisive accuracy above is an asserted-subset figure, not the corpus-wide pass rate. A deferral leaves the deterministic order in place.`,
+  );
+  lines.push(
+    `- **Honesty.** The gate label only asks whether the lane keeps every retrieved required source inside the top K; it cannot reward a source the shortlist never retrieved, and a decisive subset with no observed errors cannot test the calibration's error tail. The corpus is small and provider-free, and the fixture is the same one Plan 3 uses, so a passing gate is a promotion candidate, not proof.`,
+  );
+  lines.push(
+    "- **No active path.** The lane has no runtime wiring. A promotion record is evidence only: recall authorization, caps, and the deterministic order fallback are unchanged.",
+  );
   lines.push("");
   lines.push("## Reproduce");
   lines.push("");
@@ -644,7 +708,16 @@ async function main(): Promise<void> {
           );
           const topSignal = composition.topSignal;
           const band = composition.band;
-          samples.push(toRerankSample(plan, composition.order, topSignal, band, repeat, Math.max(0, Math.round(performance.now() - startedAt))));
+          samples.push(
+            toRerankSample(
+              plan,
+              composition.order,
+              topSignal,
+              band,
+              repeat,
+              Math.max(0, Math.round(performance.now() - startedAt)),
+            ),
+          );
         } catch (error) {
           failures.push({
             id: plan.memoryCase.id,
@@ -675,17 +748,43 @@ async function main(): Promise<void> {
     await writeFile(
       outPath.replace(/\.md$/, ".json"),
       `${JSON.stringify(
-        { model, repeats, thresholds, k: RERANK_K, plans: plans.map((plan) => ({ id: plan.memoryCase.id, category: plan.memoryCase.category, holdout: plan.holdout, candidateCount: plan.candidates.length, baseline: plan.baselineKeys, expected: plan.expected, forbidden: plan.forbidden })), failures, samples, evaluation, proposedRecord },
+        {
+          model,
+          repeats,
+          thresholds,
+          k: RERANK_K,
+          plans: plans.map((plan) => ({
+            id: plan.memoryCase.id,
+            category: plan.memoryCase.category,
+            holdout: plan.holdout,
+            candidateCount: plan.candidates.length,
+            baseline: plan.baselineKeys,
+            expected: plan.expected,
+            forbidden: plan.forbidden,
+          })),
+          failures,
+          samples,
+          evaluation,
+          proposedRecord,
+        },
         null,
         2,
       )}\n`,
       "utf8",
     );
     fixture.repo.close();
-    console.log(`calls: ${evaluation.calls} (${evaluation.eligibleCalls} eligible, ${evaluation.decisiveCalls} decisive), accuracy ${pct(evaluation.accuracy)}`);
-    console.log(`recall@K: ${evaluation.baseline.recallAtK.toFixed(4)} -> ${evaluation.fused.recallAtK.toFixed(4)}; mrr ${evaluation.baseline.mrr.toFixed(4)} -> ${evaluation.fused.mrr.toFixed(4)}; ndcg ${evaluation.baseline.ndcg.toFixed(4)} -> ${evaluation.fused.ndcg.toFixed(4)}`);
-    console.log(`brier: raw ${evaluation.all.raw.brier.toFixed(4)} -> calibrated ${evaluation.all.calibrated.brier.toFixed(4)}; ece: raw ${evaluation.all.raw.expectedCalibrationError.toFixed(4)} -> calibrated ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}`);
-    console.log(`gate: ${evaluation.gate.promoted ? "PROMOTE" : "NOT READY"}${evaluation.gate.reasons.length ? ` (${evaluation.gate.reasons.join("; ")})` : ""}`);
+    console.log(
+      `calls: ${evaluation.calls} (${evaluation.eligibleCalls} eligible, ${evaluation.decisiveCalls} decisive), accuracy ${pct(evaluation.accuracy)}`,
+    );
+    console.log(
+      `recall@K: ${evaluation.baseline.recallAtK.toFixed(4)} -> ${evaluation.fused.recallAtK.toFixed(4)}; mrr ${evaluation.baseline.mrr.toFixed(4)} -> ${evaluation.fused.mrr.toFixed(4)}; ndcg ${evaluation.baseline.ndcg.toFixed(4)} -> ${evaluation.fused.ndcg.toFixed(4)}`,
+    );
+    console.log(
+      `brier: raw ${evaluation.all.raw.brier.toFixed(4)} -> calibrated ${evaluation.all.calibrated.brier.toFixed(4)}; ece: raw ${evaluation.all.raw.expectedCalibrationError.toFixed(4)} -> calibrated ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}`,
+    );
+    console.log(
+      `gate: ${evaluation.gate.promoted ? "PROMOTE" : "NOT READY"}${evaluation.gate.reasons.length ? ` (${evaluation.gate.reasons.join("; ")})` : ""}`,
+    );
     console.log(`wrote ${path.relative(ROOT, outPath)}`);
   } finally {
     closeRepo();

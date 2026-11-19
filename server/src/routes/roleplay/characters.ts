@@ -1,13 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { personaProfileSchema } from "@velvet/contracts";
 import { checkCharacter } from "../../policy.js";
-import {
-  createCharacter,
-  deleteCharacter,
-  getCharacter,
-  listCharacters,
-  updateCharacter,
-} from "../../repo/index.js";
+import { createCharacter, deleteCharacter, getCharacter, listCharacters, updateCharacter } from "../../repo/index.js";
 import type { Character, CreateCharacterInput } from "../../types.js";
 
 type ParsedCharacter = { ok: true; value: CreateCharacterInput } | { ok: false; error: string };
@@ -104,7 +98,8 @@ export const roleplayCharacterRoutes: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: { id: string } }>("/characters/:id", async (request, reply) => {
     const result = await deleteCharacter(request.params.id);
     if (result === "not-found") return reply.code(404).send({ error: "character not found" });
-    if (result === "in-use") return reply.code(409).send({ error: "character is used by a session; delete the session history first" });
+    if (result === "in-use")
+      return reply.code(409).send({ error: "character is used by a session; delete the session history first" });
     return { ok: true };
   });
 

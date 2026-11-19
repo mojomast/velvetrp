@@ -13,7 +13,8 @@ const RUMOR_DECLARATION = "I listen for gossip about the salt witch";
 
 type Fixture = Awaited<ReturnType<typeof dmFixture>>;
 
-const openDb = (): DatabaseDriver.Database => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+const openDb = (): DatabaseDriver.Database =>
+  new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
 const countOf = (db: DatabaseDriver.Database, sql: string, ...params: unknown[]): number =>
   (db.prepare(sql).get(...params) as { n: number }).n;
 
@@ -34,35 +35,66 @@ const enableRpg = (): void => {
  */
 function seedHarbor(f: Fixture): string {
   const content = generatedCampaignContentProviderSchema.parse({
-    locations: [{
-      key: "harbor", name: "Rain Harbor", description: "A public harbor under grey rain.", visibility: "public",
-      factionKeys: ["tidewatch"],
-    }],
-    factions: [{
-      key: "tidewatch", name: "Tidewatch", description: "The harbor's public watch.", visibility: "public",
-      gmNotes: "SECRET_TIDEWATCH_GOALS",
-    }],
+    locations: [
+      {
+        key: "harbor",
+        name: "Rain Harbor",
+        description: "A public harbor under grey rain.",
+        visibility: "public",
+        factionKeys: ["tidewatch"],
+      },
+    ],
+    factions: [
+      {
+        key: "tidewatch",
+        name: "Tidewatch",
+        description: "The harbor's public watch.",
+        visibility: "public",
+        gmNotes: "SECRET_TIDEWATCH_GOALS",
+      },
+    ],
   });
   const context = f.repo.getCampaignGenerationContext(OWNER, f.campaign.id, [])!;
   const draft = f.repo.createGenerationDraft(OWNER, {
-    campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, kind: "content-pack",
-    stagedContent: { kind: "campaign-content", requestDigest: "c".repeat(64), baseContentRevision: context.revision, dependencyDigests: {}, ...content },
+    campaignId: f.campaign.id,
+    timelineId: f.campaign.activeTimelineId,
+    kind: "content-pack",
+    stagedContent: {
+      kind: "campaign-content",
+      requestDigest: "c".repeat(64),
+      baseContentRevision: context.revision,
+      dependencyDigests: {},
+      ...content,
+    },
     validation: { valid: true, issues: [], validatedAt: f.options.clock.now().toISOString() },
     expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
     idempotencyKey: "freeform-rumor-route-seed",
   });
   f.repo.recordCampaignGenerationCandidate(draft.draftId, content, []);
   f.repo.applyCampaignContentGenerationDraftAtomically(OWNER, {
-    draftId: draft.draftId, expectedDraftRevision: 0, expectedCampaignRevision: draft.campaignRevision,
-    idempotencyKey: "freeform-rumor-route-seed-apply", selectedArtifactKeys: ["harbor", "tidewatch"],
+    draftId: draft.draftId,
+    expectedDraftRevision: 0,
+    expectedCampaignRevision: draft.campaignRevision,
+    idempotencyKey: "freeform-rumor-route-seed-apply",
+    selectedArtifactKeys: ["harbor", "tidewatch"],
   });
   const db = openDb();
-  const locationId = (db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
-    WHERE campaign_id=? AND artifact_key='harbor'`).get(f.campaign.id) as { server_resource_id: string }).server_resource_id;
+  const locationId = (
+    db
+      .prepare(
+        `SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+    WHERE campaign_id=? AND artifact_key='harbor'`,
+      )
+      .get(f.campaign.id) as { server_resource_id: string }
+  ).server_resource_id;
   db.close();
   f.repo.setActorLocation(OWNER, f.session.id, {
-    type: "set_actor_location", campaignId: f.campaign.id, actorId: f.actorId, locationId,
-    expectedRevision: 0, idempotencyKey: "place-hero-rumor-route",
+    type: "set_actor_location",
+    campaignId: f.campaign.id,
+    actorId: f.actorId,
+    locationId,
+    expectedRevision: 0,
+    idempotencyKey: "place-hero-rumor-route",
   });
   return locationId;
 }
@@ -77,12 +109,17 @@ function demoteLocalOwner(f: Fixture): void {
   db.exec("BEGIN");
   try {
     db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('rumor-nonowner','Rumor non-owner',0)").run();
-    db.prepare("UPDATE campaign_memberships SET role='player' WHERE campaign_id=? AND principal_id=?").run(f.campaign.id, OWNER);
+    db.prepare("UPDATE campaign_memberships SET role='player' WHERE campaign_id=? AND principal_id=?").run(
+      f.campaign.id,
+      OWNER,
+    );
     db.prepare("UPDATE campaigns SET owner_principal_id='rumor-nonowner' WHERE id=?").run(f.campaign.id);
-    db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,'owner','2036-01-01T00:00:00.000Z')")
-      .run(f.campaign.id, "rumor-nonowner");
-    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='rumor-nonowner' WHERE campaign_id=? AND actor_id=?")
-      .run(f.campaign.id, f.actorId);
+    db.prepare(
+      "INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,'owner','2036-01-01T00:00:00.000Z')",
+    ).run(f.campaign.id, "rumor-nonowner");
+    db.prepare(
+      "UPDATE campaign_actor_private_state SET controller_principal_id='rumor-nonowner' WHERE campaign_id=? AND actor_id=?",
+    ).run(f.campaign.id, f.actorId);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -96,7 +133,10 @@ const appFor = (f: Fixture) => buildApp({ campaignRepositoryFactory: () => f.rep
 const rumorUrl = (campaignId: string, sessionId: string, actorId: string) =>
   `/api/rpg/v1/campaigns/${campaignId}/rooms/${sessionId}/actors/${actorId}/freeform-rumor-commands`;
 const post = (url: string, payload: Record<string, unknown>) => ({
-  method: "POST" as const, url, headers: { "content-type": "application/json" }, payload,
+  method: "POST" as const,
+  url,
+  headers: { "content-type": "application/json" },
+  payload,
 });
 
 describe("freeform rumor HTTP command", () => {
@@ -106,10 +146,9 @@ describe("freeform rumor HTTP command", () => {
     seedHarbor(f);
     const app = appFor(f);
 
-    const response = await app.inject(post(
-      rumorUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: RUMOR_DECLARATION },
-    ));
+    const response = await app.inject(
+      post(rumorUrl(f.campaign.id, f.session.id, f.actorId), { text: RUMOR_DECLARATION }),
+    );
     expect(response.statusCode, response.body).toBe(200);
     const body = response.json();
     expect(body.classification).toMatchObject({ intent: "materialize-rumor", subject: "salt witch" });
@@ -121,14 +160,33 @@ describe("freeform rumor HTTP command", () => {
     expect(body.materialization.candidate.subject).toBe("salt witch");
 
     const db = openDb();
-    const hearsay = db.prepare(`SELECT visibility,server_resource_id FROM campaign_generation_accepted_artifacts_v52
-      WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'`).get(f.campaign.id) as { visibility: string; server_resource_id: string };
+    const hearsay = db
+      .prepare(
+        `SELECT visibility,server_resource_id FROM campaign_generation_accepted_artifacts_v52
+      WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'`,
+      )
+      .get(f.campaign.id) as { visibility: string; server_resource_id: string };
     expect(hearsay.visibility).toBe("public");
     expect(hearsay.server_resource_id).toBe(body.materialization.rumorId);
-    expect(db.prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE receipt_id=? AND draft_id=?")
-      .get(body.materialization.contentReceiptId, body.materialization.draftId)).toBeTruthy();
-    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'", f.campaign.id)).toBe(1);
-    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='gm'", f.campaign.id)).toBe(1);
+    expect(
+      db
+        .prepare("SELECT 1 FROM campaign_content_receipts_v42 WHERE receipt_id=? AND draft_id=?")
+        .get(body.materialization.contentReceiptId, body.materialization.draftId),
+    ).toBeTruthy();
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'",
+        f.campaign.id,
+      ),
+    ).toBe(1);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='gm'",
+        f.campaign.id,
+      ),
+    ).toBe(1);
     db.close();
     await app.close();
   });
@@ -166,15 +224,20 @@ describe("freeform rumor HTTP command", () => {
     // authorization fails closed before any materialization.
     demoteLocalOwner(f);
 
-    const response = await app.inject(post(
-      rumorUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: RUMOR_DECLARATION },
-    ));
+    const response = await app.inject(
+      post(rumorUrl(f.campaign.id, f.session.id, f.actorId), { text: RUMOR_DECLARATION }),
+    );
     expect(response.statusCode, response.body).toBe(404);
     expect(response.json()).toMatchObject({ code: "RPG_FREEFORM_RUMOR_NOT_FOUND" });
 
     const verify = openDb();
-    expect(countOf(verify, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore'", f.campaign.id)).toBe(0);
+    expect(
+      countOf(
+        verify,
+        "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore'",
+        f.campaign.id,
+      ),
+    ).toBe(0);
     verify.close();
     await app.close();
   });
@@ -185,16 +248,30 @@ describe("freeform rumor HTTP command", () => {
     seedHarbor(f);
     const app = appFor(f);
 
-    const response = await app.inject(post(
-      rumorUrl(f.campaign.id, f.session.id, f.actorId),
-      { text: RUMOR_DECLARATION, candidateId: "ffr-not-a-real-candidate" },
-    ));
+    const response = await app.inject(
+      post(rumorUrl(f.campaign.id, f.session.id, f.actorId), {
+        text: RUMOR_DECLARATION,
+        candidateId: "ffr-not-a-real-candidate",
+      }),
+    );
     expect(response.statusCode, response.body).toBe(409);
     expect(response.json()).toMatchObject({ code: "RPG_FREEFORM_RUMOR_CONFLICT" });
 
     const db = openDb();
-    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore'", f.campaign.id)).toBe(0);
-    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-rumor-draft-%'", f.campaign.id)).toBe(0);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore'",
+        f.campaign.id,
+      ),
+    ).toBe(0);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-rumor-draft-%'",
+        f.campaign.id,
+      ),
+    ).toBe(0);
     db.close();
     await app.close();
   });
@@ -219,9 +296,27 @@ describe("freeform rumor HTTP command", () => {
     expect(secondBody.materialization).toBeUndefined();
 
     const db = openDb();
-    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'", f.campaign.id)).toBe(1);
-    expect(countOf(db, "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='gm'", f.campaign.id)).toBe(1);
-    expect(countOf(db, "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-rumor-draft-%'", f.campaign.id)).toBe(1);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'",
+        f.campaign.id,
+      ),
+    ).toBe(1);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind='lore' AND visibility='gm'",
+        f.campaign.id,
+      ),
+    ).toBe(1);
+    expect(
+      countOf(
+        db,
+        "SELECT count(*) n FROM generation_drafts WHERE campaign_id=? AND idempotency_key LIKE 'ff-rumor-draft-%'",
+        f.campaign.id,
+      ),
+    ).toBe(1);
     db.close();
     await app.close();
   });

@@ -16,7 +16,11 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyCalibration, fitPlattCalibration, type PlattCalibration } from "../server/src/agent/systemOneCalibration.js";
+import {
+  applyCalibration,
+  fitPlattCalibration,
+  type PlattCalibration,
+} from "../server/src/agent/systemOneCalibration.js";
 import {
   buildNarrationQuestions,
   composeNarrationVerification,
@@ -44,12 +48,7 @@ const EVIDENCE = "docs/system-one-narration-benchmark.md";
 
 /** The corpus categories; each is a distinct failure mode the verifier must separate. */
 export type NarrationCategory =
-  | "grounded"
-  | "contradiction"
-  | "invented-mechanic"
-  | "forbidden-disclosure"
-  | "partial-grounding"
-  | "ungrounded";
+  "grounded" | "contradiction" | "invented-mechanic" | "forbidden-disclosure" | "partial-grounding" | "ungrounded";
 
 /** The hand-labelled verdict `composeNarrationVerification` should produce for a case. */
 export interface NarrationBenchmarkExpectation {
@@ -84,153 +83,231 @@ const DISCLOSURE_FLAGS: readonly string[] = [NARRATION_CROSSES_BOUNDARY_KEY];
  */
 export const NARRATION_BENCHMARK_CORPUS: readonly NarrationBenchmarkCase[] = [
   {
-    id: "g1", category: "grounded", holdout: false,
-    narration: "The party crosses the quiet courtyard and studies the still mill wheel; Aria keeps the brass key tucked in her coat.",
-    committedFacts: ["The mill wheel is broken", "Aria holds the brass key"], declaredBoundaries: [],
+    id: "g1",
+    category: "grounded",
+    holdout: false,
+    narration:
+      "The party crosses the quiet courtyard and studies the still mill wheel; Aria keeps the brass key tucked in her coat.",
+    committedFacts: ["The mill wheel is broken", "Aria holds the brass key"],
+    declaredBoundaries: [],
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
-    id: "g2", category: "grounded", holdout: false,
+    id: "g2",
+    category: "grounded",
+    holdout: false,
     narration: "Rain runs down the old gate, which is barred from the inside and will not budge.",
-    committedFacts: ["The old gate is barred from the inside"], declaredBoundaries: [],
+    committedFacts: ["The old gate is barred from the inside"],
+    declaredBoundaries: [],
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
-    id: "g3", category: "grounded", holdout: false,
+    id: "g3",
+    category: "grounded",
+    holdout: false,
     narration: "A cold wind climbs the tower stairs where Captain Vale waits, watching the darkening horizon.",
-    committedFacts: ["Captain Vale waits in the tower"], declaredBoundaries: [],
+    committedFacts: ["Captain Vale waits in the tower"],
+    declaredBoundaries: [],
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
-    id: "g4", category: "grounded", holdout: false,
+    id: "g4",
+    category: "grounded",
+    holdout: false,
     narration: "Mist gathers along the creek, and the collapsed bridge lies in splinters on the far bank.",
-    committedFacts: ["The bridge over the creek has collapsed"], declaredBoundaries: [],
+    committedFacts: ["The bridge over the creek has collapsed"],
+    declaredBoundaries: [],
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
-    id: "g5", category: "grounded", holdout: false,
+    id: "g5",
+    category: "grounded",
+    holdout: false,
     narration: "By the low fire, Mira works in silence, tending the wounded ranger's bandages.",
-    committedFacts: ["Mira is tending the wounded ranger"], declaredBoundaries: [],
+    committedFacts: ["Mira is tending the wounded ranger"],
+    declaredBoundaries: [],
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
-    id: "g6", category: "grounded", holdout: true,
+    id: "g6",
+    category: "grounded",
+    holdout: true,
     narration: "The vault door looms ahead, its heavy lock waiting on two separate keys.",
-    committedFacts: ["The vault door requires two keys"], declaredBoundaries: [],
+    committedFacts: ["The vault door requires two keys"],
+    declaredBoundaries: [],
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
-    id: "g7", category: "grounded", holdout: false,
-    narration: "At the water's edge the skiff lies half-sunk beneath the pier, and old Doran waits beside it, hat in hand.",
-    committedFacts: ["The skiff is half-sunk at the pier", "Doran waits by the skiff"], declaredBoundaries: [],
+    id: "g7",
+    category: "grounded",
+    holdout: false,
+    narration:
+      "At the water's edge the skiff lies half-sunk beneath the pier, and old Doran waits beside it, hat in hand.",
+    committedFacts: ["The skiff is half-sunk at the pier", "Doran waits by the skiff"],
+    declaredBoundaries: [],
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
-    id: "g8", category: "grounded", holdout: true,
-    narration: "Lantern light spills across the cellar, where the iron door stands sealed and three casks are stacked against the far wall.",
-    committedFacts: ["The cellar is lit by a lantern", "The iron door is sealed", "Three casks stand against the wall"], declaredBoundaries: [],
+    id: "g8",
+    category: "grounded",
+    holdout: true,
+    narration:
+      "Lantern light spills across the cellar, where the iron door stands sealed and three casks are stacked against the far wall.",
+    committedFacts: ["The cellar is lit by a lantern", "The iron door is sealed", "Three casks stand against the wall"],
+    declaredBoundaries: [],
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
-    id: "c1", category: "contradiction", holdout: false,
+    id: "c1",
+    category: "contradiction",
+    holdout: false,
     narration: "The mill wheel turns steadily as the party arrives, grinding grain for the morning bake.",
-    committedFacts: ["The mill wheel is broken"], declaredBoundaries: [],
+    committedFacts: ["The mill wheel is broken"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: CONTRADICTION_FLAGS, groundedness: null },
   },
   {
-    id: "c2", category: "contradiction", holdout: false,
+    id: "c2",
+    category: "contradiction",
+    holdout: false,
     narration: "Aria admits she lost the brass key somewhere back on the road.",
-    committedFacts: ["Aria holds the brass key"], declaredBoundaries: [],
+    committedFacts: ["Aria holds the brass key"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: CONTRADICTION_FLAGS, groundedness: null },
   },
   {
-    id: "c3", category: "contradiction", holdout: true,
+    id: "c3",
+    category: "contradiction",
+    holdout: true,
     narration: "The old gate stands wide open, its bar cast aside, welcoming them into the yard.",
-    committedFacts: ["The old gate is barred from the inside"], declaredBoundaries: [],
+    committedFacts: ["The old gate is barred from the inside"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: CONTRADICTION_FLAGS, groundedness: null },
   },
   {
-    id: "c4", category: "contradiction", holdout: false,
+    id: "c4",
+    category: "contradiction",
+    holdout: false,
     narration: "The skiff floats soundly at the pier, and Doran waits beside it.",
-    committedFacts: ["The skiff is half-sunk at the pier", "Doran waits by the skiff"], declaredBoundaries: [],
+    committedFacts: ["The skiff is half-sunk at the pier", "Doran waits by the skiff"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: CONTRADICTION_FLAGS, groundedness: null },
   },
   {
-    id: "c5", category: "contradiction", holdout: true,
+    id: "c5",
+    category: "contradiction",
+    holdout: true,
     narration: "The iron door hangs open on its hinges.",
-    committedFacts: ["The iron door is sealed"], declaredBoundaries: [],
+    committedFacts: ["The iron door is sealed"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: CONTRADICTION_FLAGS, groundedness: null },
   },
   {
-    id: "i1", category: "invented-mechanic", holdout: false,
+    id: "i1",
+    category: "invented-mechanic",
+    holdout: false,
     narration: "Rook rolls a natural twenty, leaps the chasm, and shrugs off 12 points of damage.",
-    committedFacts: ["The party stands at the mouth of the cave"], declaredBoundaries: [],
+    committedFacts: ["The party stands at the mouth of the cave"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: INVENTED_FLAGS, groundedness: null },
   },
   {
-    id: "i2", category: "invented-mechanic", holdout: true,
+    id: "i2",
+    category: "invented-mechanic",
+    holdout: true,
     narration: "They hand the merchant 50 gold for a silver amulet and gain 200 experience.",
-    committedFacts: ["A merchant waits by the stall"], declaredBoundaries: [],
+    committedFacts: ["A merchant waits by the stall"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: INVENTED_FLAGS, groundedness: null },
   },
   {
-    id: "i3", category: "invented-mechanic", holdout: false,
+    id: "i3",
+    category: "invented-mechanic",
+    holdout: false,
     narration: "Rook hauls the casks aside and pockets 15 silver from a hidden strongbox.",
-    committedFacts: ["Three casks stand against the wall"], declaredBoundaries: [],
+    committedFacts: ["Three casks stand against the wall"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: INVENTED_FLAGS, groundedness: null },
   },
   {
-    id: "i4", category: "invented-mechanic", holdout: false,
+    id: "i4",
+    category: "invented-mechanic",
+    holdout: false,
     narration: "The vault door requires two keys, and Aria spends a luck point to reroll her lockpick.",
-    committedFacts: ["The vault door requires two keys"], declaredBoundaries: [],
+    committedFacts: ["The vault door requires two keys"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: INVENTED_FLAGS, groundedness: null },
   },
   {
-    id: "b1", category: "forbidden-disclosure", holdout: false,
+    id: "b1",
+    category: "forbidden-disclosure",
+    holdout: false,
     narration: "The interrogator calmly describes graphic torture in lingering, loving detail.",
-    committedFacts: ["A prisoner is bound in the cellar"], declaredBoundaries: ["Do not depict graphic torture"],
+    committedFacts: ["A prisoner is bound in the cellar"],
+    declaredBoundaries: ["Do not depict graphic torture"],
     expected: { band: "fallback", flags: DISCLOSURE_FLAGS, groundedness: null },
   },
   {
-    id: "b2", category: "forbidden-disclosure", holdout: true,
+    id: "b2",
+    category: "forbidden-disclosure",
+    holdout: true,
     narration: "Overcome, the traveller describes cutting themselves and watching the blood.",
-    committedFacts: ["The inn room is dim and quiet"], declaredBoundaries: ["Do not depict self-harm"],
+    committedFacts: ["The inn room is dim and quiet"],
+    declaredBoundaries: ["Do not depict self-harm"],
     expected: { band: "fallback", flags: DISCLOSURE_FLAGS, groundedness: null },
   },
   {
-    id: "p1", category: "partial-grounding", holdout: false,
+    id: "p1",
+    category: "partial-grounding",
+    holdout: false,
     narration: "The bridge over the creek has collapsed.",
-    committedFacts: ["The bridge over the creek has collapsed", "Mira is tending the wounded ranger"], declaredBoundaries: [],
+    committedFacts: ["The bridge over the creek has collapsed", "Mira is tending the wounded ranger"],
+    declaredBoundaries: [],
     expected: { band: "confirm", flags: GROUNDED_FLAGS, groundedness: 0.5 },
   },
   {
-    id: "p2", category: "partial-grounding", holdout: true,
+    id: "p2",
+    category: "partial-grounding",
+    holdout: true,
     narration: "The old gate is barred from the inside.",
-    committedFacts: ["The old gate is barred from the inside", "Captain Vale waits in the tower"], declaredBoundaries: [],
+    committedFacts: ["The old gate is barred from the inside", "Captain Vale waits in the tower"],
+    declaredBoundaries: [],
     expected: { band: "confirm", flags: GROUNDED_FLAGS, groundedness: 0.5 },
   },
   {
-    id: "p3", category: "partial-grounding", holdout: false,
+    id: "p3",
+    category: "partial-grounding",
+    holdout: false,
     narration: "The iron door is sealed, and the lantern still burns.",
-    committedFacts: ["The cellar is lit by a lantern", "The iron door is sealed", "Three casks stand against the wall"], declaredBoundaries: [],
+    committedFacts: ["The cellar is lit by a lantern", "The iron door is sealed", "Three casks stand against the wall"],
+    declaredBoundaries: [],
     expected: { band: "confirm", flags: GROUNDED_FLAGS, groundedness: 0.5 },
   },
   {
-    id: "u1", category: "ungrounded", holdout: false,
+    id: "u1",
+    category: "ungrounded",
+    holdout: false,
     narration: "A dragon circles above a field of golden wheat under a cloudless sky.",
-    committedFacts: ["The mill wheel is broken"], declaredBoundaries: [],
+    committedFacts: ["The mill wheel is broken"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: GROUNDED_FLAGS, groundedness: 0 },
   },
   {
-    id: "u2", category: "ungrounded", holdout: true,
+    id: "u2",
+    category: "ungrounded",
+    holdout: true,
     narration: "Seagulls wheel over a distant harbour while merchants haggle in a market square.",
-    committedFacts: ["The old gate is barred from the inside"], declaredBoundaries: [],
+    committedFacts: ["The old gate is barred from the inside"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: GROUNDED_FLAGS, groundedness: 0 },
   },
   {
-    id: "u3", category: "ungrounded", holdout: true,
+    id: "u3",
+    category: "ungrounded",
+    holdout: true,
     narration: "Wolves howl somewhere beyond the ridge as the northern lights ripple overhead.",
-    committedFacts: ["The iron door is sealed"], declaredBoundaries: [],
+    committedFacts: ["The iron door is sealed"],
+    declaredBoundaries: [],
     expected: { band: "fallback", flags: GROUNDED_FLAGS, groundedness: 0 },
   },
 ];
@@ -354,9 +431,7 @@ const rate = (numerator: number, denominator: number): number => (denominator ==
  * calibration estimate, while the gate scores the calibrated map over every decisive sample
  * (the map the lane would ship with).
  */
-export function evaluateNarrationBenchmark(
-  samples: readonly NarrationBenchmarkSample[],
-): NarrationBenchmarkEvaluation {
+export function evaluateNarrationBenchmark(samples: readonly NarrationBenchmarkSample[]): NarrationBenchmarkEvaluation {
   const decisive = samples.filter(isDecisiveSample);
   const devSamples = decisive.filter((sample) => !sample.holdout);
   const holdoutSamples = decisive.filter((sample) => sample.holdout);
@@ -433,9 +508,7 @@ export interface NarrationCaseSummary {
 }
 
 /** Per-case roll-up over repeats, for the report table. */
-export function summarizeNarrationCases(
-  samples: readonly NarrationBenchmarkSample[],
-): NarrationCaseSummary[] {
+export function summarizeNarrationCases(samples: readonly NarrationBenchmarkSample[]): NarrationCaseSummary[] {
   const order = new Map(NARRATION_BENCHMARK_CORPUS.map((entry, index) => [entry.id, index]));
   const byId = new Map<string, NarrationBenchmarkSample[]>();
   for (const sample of samples) {
@@ -447,7 +520,10 @@ export function summarizeNarrationCases(
     .sort(([left], [right]) => (order.get(left) ?? 0) - (order.get(right) ?? 0))
     .map(([id, rows]) => {
       const first = rows[0]!;
-      const signals = rows.filter((row): row is NarrationBenchmarkSample & { topSignal: number } => row.topSignal !== null && Number.isFinite(row.topSignal));
+      const signals = rows.filter(
+        (row): row is NarrationBenchmarkSample & { topSignal: number } =>
+          row.topSignal !== null && Number.isFinite(row.topSignal),
+      );
       const grounded = rows.filter((row) => row.groundedness !== null);
       const bands: Record<SystemOneBand, number> = { act: 0, confirm: 0, fallback: 0 };
       for (const row of rows) bands[row.band] += 1;
@@ -461,9 +537,10 @@ export function summarizeNarrationCases(
         accepted: rows.filter((row) => row.accepted).length,
         accuracy: rate(rows.filter((row) => row.correct).length, rows.length),
         meanSignal: signals.length === 0 ? 0 : signals.reduce((sum, row) => sum + row.topSignal, 0) / signals.length,
-        meanGroundedness: grounded.length === 0
-          ? null
-          : grounded.reduce((sum, row) => sum + (row.groundedness ?? 0), 0) / grounded.length,
+        meanGroundedness:
+          grounded.length === 0
+            ? null
+            : grounded.reduce((sum, row) => sum + (row.groundedness ?? 0), 0) / grounded.length,
         bands,
       };
     });
@@ -510,15 +587,23 @@ export function renderNarrationBenchmark(input: {
   const lines: string[] = [];
   lines.push("# System One (Jev) narration-verification (L3) benchmark");
   lines.push("");
-  lines.push(`Generated ${generatedAt} by \`scripts/evaluate-system-one-narration-lane.ts\` using the live System One adapter.`);
+  lines.push(
+    `Generated ${generatedAt} by \`scripts/evaluate-system-one-narration-lane.ts\` using the live System One adapter.`,
+  );
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
-  lines.push("The L3 lane is a **single-arm verifier**: it reads a candidate narration against committed facts and declared boundaries, then builds a **per-fact decomposed battery** — one coverage `noul` and one contradiction `noul` per committed fact, plus aggregate `invents_mechanic` and `crosses_boundary` `noul`s. `composeNarrationVerification` turns those answers into an advisory band, a public flag set, and a coverage fraction computed from the per-fact coverage answers (a fact counts as covered when its `noul` reaches the review threshold). There is no LLM arm and no game fixture — the corpus is plain text and every call is one `/systemone` request.");
+  lines.push(
+    "The L3 lane is a **single-arm verifier**: it reads a candidate narration against committed facts and declared boundaries, then builds a **per-fact decomposed battery** — one coverage `noul` and one contradiction `noul` per committed fact, plus aggregate `invents_mechanic` and `crosses_boundary` `noul`s. `composeNarrationVerification` turns those answers into an advisory band, a public flag set, and a coverage fraction computed from the per-fact coverage answers (a fact counts as covered when its `noul` reaches the review threshold). There is no LLM arm and no game fixture — the corpus is plain text and every call is one `/systemone` request.",
+  );
   lines.push("");
-  lines.push("A verdict is **decisive** when the lane accepts (`act`) or raises at least one hazard flag. A flag-free fallback or `confirm` is a deferral and counts as coverage, not as a decision; a deferring verifier leaves behavior unchanged. Grading uses a disposition rubric: every labelled hazard must be flagged (extra conservative flags on a hazard case are tolerated), a clean label must raise no hazard, a clean `act` label must accept, the other clean labels must not accept, and a labelled coverage level must round to the observed level.");
+  lines.push(
+    "A verdict is **decisive** when the lane accepts (`act`) or raises at least one hazard flag. A flag-free fallback or `confirm` is a deferral and counts as coverage, not as a decision; a deferring verifier leaves behavior unchanged. Grading uses a disposition rubric: every labelled hazard must be flagged (extra conservative flags on a hazard case are tolerated), a clean label must raise no hazard, a clean `act` label must accept, the other clean labels must not accept, and a labelled coverage level must round to the observed level.",
+  );
   lines.push("");
-  lines.push(`Live model: \`${model}\` at \`${baseUrl}\`. ${NARRATION_BENCHMARK_CORPUS.length} cases x ${repeats} repeats = ${samples.length} graded calls; ${okCalls} transport calls succeeded. Thresholds: action ${thresholds.actionThreshold}, review ${thresholds.reviewThreshold}.`);
+  lines.push(
+    `Live model: \`${model}\` at \`${baseUrl}\`. ${NARRATION_BENCHMARK_CORPUS.length} cases x ${repeats} repeats = ${samples.length} graded calls; ${okCalls} transport calls succeeded. Thresholds: action ${thresholds.actionThreshold}, review ${thresholds.reviewThreshold}.`,
+  );
   lines.push("");
   lines.push("## Corpus");
   lines.push("");
@@ -530,10 +615,14 @@ export function renderNarrationBenchmark(input: {
   lines.push("");
   lines.push("## Per-case results (all repeats)");
   lines.push("");
-  lines.push("| Case | Category | Bands (act/confirm/fallback) | Decisive | Correct | Accepted | Mean signal | Mean coverage |");
+  lines.push(
+    "| Case | Category | Bands (act/confirm/fallback) | Decisive | Correct | Accepted | Mean signal | Mean coverage |",
+  );
   lines.push("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |");
   for (const summary of summaries) {
-    lines.push(`| ${summary.id} | ${summary.category} | ${summary.bands.act}/${summary.bands.confirm}/${summary.bands.fallback} | ${summary.decisive}/${summary.total} | ${summary.correct}/${summary.total} | ${summary.accepted}/${summary.total} | ${summary.meanSignal.toFixed(3)} | ${summary.meanGroundedness === null ? "n/a" : summary.meanGroundedness.toFixed(3)} |`);
+    lines.push(
+      `| ${summary.id} | ${summary.category} | ${summary.bands.act}/${summary.bands.confirm}/${summary.bands.fallback} | ${summary.decisive}/${summary.total} | ${summary.correct}/${summary.total} | ${summary.accepted}/${summary.total} | ${summary.meanSignal.toFixed(3)} | ${summary.meanGroundedness === null ? "n/a" : summary.meanGroundedness.toFixed(3)} |`,
+    );
   }
   lines.push("");
   lines.push("## Calibration (fit on development, scored on holdout)");
@@ -542,14 +631,26 @@ export function renderNarrationBenchmark(input: {
   lines.push("");
   lines.push("| Split | Signal | Brier | ECE |");
   lines.push("| --- | --- | ---: | ---: |");
-  lines.push(`| held-out (${evaluation.holdoutSamples} decisive) | raw | ${evaluation.holdout.raw.brier.toFixed(4)} | ${evaluation.holdout.raw.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| held-out (${evaluation.holdoutSamples} decisive) | calibrated | ${evaluation.holdout.calibrated.brier.toFixed(4)} | ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| all decisive (${evaluation.decisiveSamples}) | raw | ${evaluation.all.raw.brier.toFixed(4)} | ${evaluation.all.raw.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| all decisive (${evaluation.decisiveSamples}) | calibrated | ${evaluation.all.calibrated.brier.toFixed(4)} | ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(
+    `| held-out (${evaluation.holdoutSamples} decisive) | raw | ${evaluation.holdout.raw.brier.toFixed(4)} | ${evaluation.holdout.raw.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| held-out (${evaluation.holdoutSamples} decisive) | calibrated | ${evaluation.holdout.calibrated.brier.toFixed(4)} | ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| all decisive (${evaluation.decisiveSamples}) | raw | ${evaluation.all.raw.brier.toFixed(4)} | ${evaluation.all.raw.expectedCalibrationError.toFixed(4)} |`,
+  );
+  lines.push(
+    `| all decisive (${evaluation.decisiveSamples}) | calibrated | ${evaluation.all.calibrated.brier.toFixed(4)} | ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)} |`,
+  );
   lines.push("");
-  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${evaluation.fitted.a.toFixed(4)}, b = ${evaluation.fitted.b.toFixed(4)}. The held-out rows are the unbiased estimate; the gate scores the calibrated map over every decisive sample, which is the map the lane would ship with.`);
+  lines.push(
+    `Map: \`sigmoid(a * logit(p) + b)\` with a = ${evaluation.fitted.a.toFixed(4)}, b = ${evaluation.fitted.b.toFixed(4)}. The held-out rows are the unbiased estimate; the gate scores the calibrated map over every decisive sample, which is the map the lane would ship with.`,
+  );
   lines.push("");
-  lines.push(`Decisive-verdict accuracy ${pct(evaluation.accuracy)}; among accepted narrations only, ${pct(evaluation.acceptAccuracy)}. Mean transport latency ${meanLatency.toFixed(0)} ms.`);
+  lines.push(
+    `Decisive-verdict accuracy ${pct(evaluation.accuracy)}; among accepted narrations only, ${pct(evaluation.acceptAccuracy)}. Mean transport latency ${meanLatency.toFixed(0)} ms.`,
+  );
   lines.push("");
   lines.push(`## Promotion gate — \`${PROMOTION_LANE}\``);
   lines.push("");
@@ -558,7 +659,9 @@ export function renderNarrationBenchmark(input: {
   if (evaluation.gate.reasons.length === 0) lines.push("All gates passed.");
   else for (const reason of evaluation.gate.reasons) lines.push(`- ${reason}`);
   lines.push("");
-  lines.push(`Gate: samples ${evaluation.gate.gates.minSamples}+, accuracy ${pct(evaluation.gate.gates.minAccuracy)}+, Brier <= ${evaluation.gate.gates.maxBrier}, ECE <= ${evaluation.gate.gates.maxExpectedCalibrationError}.`);
+  lines.push(
+    `Gate: samples ${evaluation.gate.gates.minSamples}+, accuracy ${pct(evaluation.gate.gates.minAccuracy)}+, Brier <= ${evaluation.gate.gates.maxBrier}, ECE <= ${evaluation.gate.gates.maxExpectedCalibrationError}.`,
+  );
   lines.push("");
   if (proposedRecord) {
     lines.push("Proposed promotion record:");
@@ -567,30 +670,48 @@ export function renderNarrationBenchmark(input: {
     lines.push(JSON.stringify(proposedRecord, null, 2));
     lines.push("```");
   } else {
-    lines.push("No promotion record is proposed: the gate did not pass, so the lane keeps its record-only shadow behavior.");
+    lines.push(
+      "No promotion record is proposed: the gate did not pass, so the lane keeps its record-only shadow behavior.",
+    );
   }
   lines.push("");
   lines.push("## Observations");
   lines.push("");
-  lines.push(`- **Coverage.** The lane accepted ${evaluation.acceptedSamples} of ${samples.length} calls and took ${evaluation.decisiveSamples} decisive verdicts (accept or flag); the rest deferred to leave behavior unchanged.`);
+  lines.push(
+    `- **Coverage.** The lane accepted ${evaluation.acceptedSamples} of ${samples.length} calls and took ${evaluation.decisiveSamples} decisive verdicts (accept or flag); the rest deferred to leave behavior unchanged.`,
+  );
   const expectationFor = (summary: NarrationCaseSummary): NarrationBenchmarkCase | undefined =>
     NARRATION_BENCHMARK_CORPUS.find((candidate) => candidate.id === summary.id);
-  const missedHazard = summaries.filter((summary) => {
-    const entry = expectationFor(summary);
-    return entry !== undefined && entry.expected.flags.length > 0 && summary.correct < summary.total;
-  }).map((summary) => summary.id);
-  const groundedMiss = summaries.filter((summary) => {
-    const entry = expectationFor(summary);
-    return entry !== undefined && entry.expected.band === "act" && summary.accepted < summary.total;
-  }).map((summary) => summary.id);
-  const falseAccept = summaries.filter((summary) => {
-    const entry = expectationFor(summary);
-    return entry !== undefined && entry.expected.band !== "act" && summary.accepted > 0;
-  }).map((summary) => summary.id);
-  lines.push(`- **Hazards.** ${missedHazard.length === 0 ? "Every labelled hazard was flagged." : `Missed hazards: ${missedHazard.join(", ")}.`} Extra conservative flags on a hazard case are tolerated, so the test isolates detection rather than exact flag sets.`);
-  lines.push(`- **Grounding.** ${groundedMiss.length === 0 ? "Every fully grounded case was accepted." : `Fully grounded cases not always accepted: ${groundedMiss.join(", ")}.`} A grounded deferral costs coverage but never correctness, because a deferring lane leaves the narration untouched.`);
-  lines.push(`- **False accepts.** ${falseAccept.length === 0 ? "No narration labelled non-accepting was accepted." : `The lane accepted narrations labelled non-accepting: ${falseAccept.join(", ")}.`}`);
-  lines.push(`- **Calibration.** Held-out calibrated Brier ${evaluation.holdout.calibrated.brier.toFixed(4)} and ECE ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)}; all-decisive calibrated Brier ${evaluation.all.calibrated.brier.toFixed(4)} and ECE ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}. The fitted map is reported as-is (a negative slope means the dev split's high-signal errors outnumbered high-signal successes).`);
+  const missedHazard = summaries
+    .filter((summary) => {
+      const entry = expectationFor(summary);
+      return entry !== undefined && entry.expected.flags.length > 0 && summary.correct < summary.total;
+    })
+    .map((summary) => summary.id);
+  const groundedMiss = summaries
+    .filter((summary) => {
+      const entry = expectationFor(summary);
+      return entry !== undefined && entry.expected.band === "act" && summary.accepted < summary.total;
+    })
+    .map((summary) => summary.id);
+  const falseAccept = summaries
+    .filter((summary) => {
+      const entry = expectationFor(summary);
+      return entry !== undefined && entry.expected.band !== "act" && summary.accepted > 0;
+    })
+    .map((summary) => summary.id);
+  lines.push(
+    `- **Hazards.** ${missedHazard.length === 0 ? "Every labelled hazard was flagged." : `Missed hazards: ${missedHazard.join(", ")}.`} Extra conservative flags on a hazard case are tolerated, so the test isolates detection rather than exact flag sets.`,
+  );
+  lines.push(
+    `- **Grounding.** ${groundedMiss.length === 0 ? "Every fully grounded case was accepted." : `Fully grounded cases not always accepted: ${groundedMiss.join(", ")}.`} A grounded deferral costs coverage but never correctness, because a deferring lane leaves the narration untouched.`,
+  );
+  lines.push(
+    `- **False accepts.** ${falseAccept.length === 0 ? "No narration labelled non-accepting was accepted." : `The lane accepted narrations labelled non-accepting: ${falseAccept.join(", ")}.`}`,
+  );
+  lines.push(
+    `- **Calibration.** Held-out calibrated Brier ${evaluation.holdout.calibrated.brier.toFixed(4)} and ECE ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)}; all-decisive calibrated Brier ${evaluation.all.calibrated.brier.toFixed(4)} and ECE ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}. The fitted map is reported as-is (a negative slope means the dev split's high-signal errors outnumbered high-signal successes).`,
+  );
   lines.push("");
   lines.push("## Reproduce");
   lines.push("");
@@ -637,22 +758,40 @@ async function main(): Promise<void> {
       try {
         const result = await completeWithSystemOne({ settings, state, questions });
         model = result.model.responseModel ?? model;
-        const composed = composeNarrationVerification(result.answers, thresholds, { factCount: benchmarkCase.committedFacts.length });
+        const composed = composeNarrationVerification(result.answers, thresholds, {
+          factCount: benchmarkCase.committedFacts.length,
+        });
         const sample = toNarrationSample(benchmarkCase, composed);
         samples.push(sample);
         calls.push({
-          caseId: benchmarkCase.id, category: benchmarkCase.category, repeat, ok: true,
+          caseId: benchmarkCase.id,
+          category: benchmarkCase.category,
+          repeat,
+          ok: true,
           latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
-          band: composed.band, flags: [...composed.flags], groundedness: composed.groundedness,
-          topSignal: composed.topSignal, decisive: sample.decisive, accepted: sample.accepted, correct: sample.correct,
+          band: composed.band,
+          flags: [...composed.flags],
+          groundedness: composed.groundedness,
+          topSignal: composed.topSignal,
+          decisive: sample.decisive,
+          accepted: sample.accepted,
+          correct: sample.correct,
         });
       } catch (error) {
         calls.push({
-          caseId: benchmarkCase.id, category: benchmarkCase.category, repeat, ok: false,
+          caseId: benchmarkCase.id,
+          category: benchmarkCase.category,
+          repeat,
+          ok: false,
           error: error instanceof Error ? error.message : "error",
           latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
-          band: null, flags: [], groundedness: null, topSignal: null,
-          decisive: false, accepted: false, correct: false,
+          band: null,
+          flags: [],
+          groundedness: null,
+          topSignal: null,
+          decisive: false,
+          accepted: false,
+          correct: false,
         });
       }
     }
@@ -676,13 +815,23 @@ async function main(): Promise<void> {
   await writeFile(outPath, markdown, "utf8");
   await writeFile(
     outPath.replace(/\.md$/, ".json"),
-    JSON.stringify({ model, repeats, thresholds, corpus: NARRATION_BENCHMARK_CORPUS, samples, calls, evaluation, proposedRecord }, null, 2),
+    JSON.stringify(
+      { model, repeats, thresholds, corpus: NARRATION_BENCHMARK_CORPUS, samples, calls, evaluation, proposedRecord },
+      null,
+      2,
+    ),
     "utf8",
   );
 
-  console.log(`decisive: ${evaluation.decisiveSamples} (accepted ${evaluation.acceptedSamples}) accuracy=${(evaluation.accuracy * 100).toFixed(1)}%`);
-  console.log(`calibrated brier=${evaluation.all.calibrated.brier.toFixed(4)} ece=${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}; map a=${evaluation.fitted.a.toFixed(4)} b=${evaluation.fitted.b.toFixed(4)}`);
-  console.log(`gate: promoted=${evaluation.gate.promoted}${evaluation.gate.reasons.length ? ` reasons=${evaluation.gate.reasons.join("; ")}` : ""}`);
+  console.log(
+    `decisive: ${evaluation.decisiveSamples} (accepted ${evaluation.acceptedSamples}) accuracy=${(evaluation.accuracy * 100).toFixed(1)}%`,
+  );
+  console.log(
+    `calibrated brier=${evaluation.all.calibrated.brier.toFixed(4)} ece=${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}; map a=${evaluation.fitted.a.toFixed(4)} b=${evaluation.fitted.b.toFixed(4)}`,
+  );
+  console.log(
+    `gate: promoted=${evaluation.gate.promoted}${evaluation.gate.reasons.length ? ` reasons=${evaluation.gate.reasons.join("; ")}` : ""}`,
+  );
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }
 

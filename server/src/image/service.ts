@@ -94,14 +94,7 @@ export interface SceneImageAuthorizerHandle extends SceneImageAuthorizer {
 }
 
 export type SceneImageJobStatus =
-  | "queued"
-  | "submitted"
-  | "running"
-  | "done"
-  | "failed"
-  | "uncertain"
-  | "cancelled"
-  | "stale";
+  "queued" | "submitted" | "running" | "done" | "failed" | "uncertain" | "cancelled" | "stale";
 
 export type SceneImageJobKind = "single" | "batch";
 
@@ -440,14 +433,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function requireIdentity(value: unknown, name: string): string {
   if (typeof value !== "string" || !IDENTITY_PATTERN.test(value)) {
-    throw new SceneImageError(400, `${name} must be 1-128 characters of letters, digits, dot, underscore, colon, or dash`);
+    throw new SceneImageError(
+      400,
+      `${name} must be 1-128 characters of letters, digits, dot, underscore, colon, or dash`,
+    );
   }
   return value;
 }
 
 function requireSceneId(value: unknown, name: string): string {
   if (typeof value !== "string" || !SCENE_ID_PATTERN.test(value)) {
-    throw new SceneImageError(400, `${name} must be 1-200 characters of letters, digits, dot, underscore, colon, or dash`);
+    throw new SceneImageError(
+      400,
+      `${name} must be 1-200 characters of letters, digits, dot, underscore, colon, or dash`,
+    );
   }
   return value;
 }
@@ -654,13 +653,15 @@ function normalizeEnqueueInput(input: unknown): NormalizedEnqueueInput {
   const sessionId = requireSceneId(input.sessionId, "sessionId");
   const sceneKey = requireSceneId(input.sceneKey, "sceneKey");
   const sceneRevision = requireRevision(input.sceneRevision, "sceneRevision");
-  const narrationEventId = input.narrationEventId === undefined || input.narrationEventId === null
-    ? null
-    : requireSceneId(input.narrationEventId, "narrationEventId");
+  const narrationEventId =
+    input.narrationEventId === undefined || input.narrationEventId === null
+      ? null
+      : requireSceneId(input.narrationEventId, "narrationEventId");
   const prompt = requirePrompt(input.prompt);
-  const seed = input.seed === undefined || input.seed === null
-    ? null
-    : requireInteger(input.seed, "seed", SCENE_IMAGE_MIN_SEED, SCENE_IMAGE_MAX_SEED);
+  const seed =
+    input.seed === undefined || input.seed === null
+      ? null
+      : requireInteger(input.seed, "seed", SCENE_IMAGE_MIN_SEED, SCENE_IMAGE_MAX_SEED);
   const steps = requireInteger(input.steps, "steps", SCENE_IMAGE_STEPS_MIN, SCENE_IMAGE_STEPS_MAX);
   const guidance = requireNumber(input.guidance, "guidance", SCENE_IMAGE_GUIDANCE_MIN, SCENE_IMAGE_GUIDANCE_MAX);
   const kind = input.kind;
@@ -814,8 +815,12 @@ export class SceneImageService {
   }
 
   private requireMember(principalId: string, campaignId: string): SceneImageRole {
-    if (typeof principalId !== "string" || typeof campaignId !== "string"
-      || !IDENTITY_PATTERN.test(principalId) || !IDENTITY_PATTERN.test(campaignId)) {
+    if (
+      typeof principalId !== "string" ||
+      typeof campaignId !== "string" ||
+      !IDENTITY_PATTERN.test(principalId) ||
+      !IDENTITY_PATTERN.test(campaignId)
+    ) {
       throw new SceneImageError(400, "Invalid principal or campaign identity");
     }
     const role = this.authorizer.role(principalId, campaignId);
@@ -832,15 +837,13 @@ export class SceneImageService {
   }
 
   private settingsRow(campaignId: string): SettingsRow | undefined {
-    return this.db
-      .prepare("SELECT * FROM scene_image_settings WHERE campaign_id=?")
-      .get(campaignId) as SettingsRow | undefined;
+    return this.db.prepare("SELECT * FROM scene_image_settings WHERE campaign_id=?").get(campaignId) as
+      SettingsRow | undefined;
   }
 
   private jobRow(campaignId: string, jobId: string): JobRow | undefined {
-    return this.db
-      .prepare("SELECT * FROM scene_image_jobs WHERE campaign_id=? AND job_id=?")
-      .get(campaignId, jobId) as JobRow | undefined;
+    return this.db.prepare("SELECT * FROM scene_image_jobs WHERE campaign_id=? AND job_id=?").get(campaignId, jobId) as
+      JobRow | undefined;
   }
 
   private assetRow(campaignId: string, assetId: string): AssetRow | undefined {
@@ -874,8 +877,10 @@ export class SceneImageService {
     requestDigest: string,
   ): ReceiptRow | null {
     const row = this.db
-      .prepare(`SELECT * FROM scene_image_receipts
-        WHERE principal_id=? AND campaign_id=? AND operation=? AND idempotency_key=?`)
+      .prepare(
+        `SELECT * FROM scene_image_receipts
+        WHERE principal_id=? AND campaign_id=? AND operation=? AND idempotency_key=?`,
+      )
       .get(principalId, campaignId, operation, idempotencyKey) as ReceiptRow | undefined;
     if (!row) return null;
     if (row.request_digest !== requestDigest) {
@@ -893,9 +898,11 @@ export class SceneImageService {
     response: unknown,
   ): void {
     this.db
-      .prepare(`INSERT INTO scene_image_receipts
+      .prepare(
+        `INSERT INTO scene_image_receipts
         (principal_id,campaign_id,operation,idempotency_key,request_digest,response_json,created_at)
-        VALUES(?,?,?,?,?,?,?)`)
+        VALUES(?,?,?,?,?,?,?)`,
+      )
       .run(principalId, campaignId, operation, idempotencyKey, requestDigest, JSON.stringify(response), this.now());
   }
 
@@ -909,11 +916,7 @@ export class SceneImageService {
     return { settings: parseSettingsJson(row.settings_json), revision: row.revision };
   }
 
-  updateSettings(
-    principalId: string,
-    campaignId: string,
-    input: SceneImageSettingsInput,
-  ): SceneImageSettingsUpdate {
+  updateSettings(principalId: string, campaignId: string, input: SceneImageSettingsInput): SceneImageSettingsUpdate {
     this.ensureOpen();
     this.requireDm(principalId, campaignId);
     if (!isRecord(input)) throw new SceneImageError(400, "Scene image settings input must be an object");
@@ -934,7 +937,10 @@ export class SceneImageService {
     }
     let merged: SceneImageSettings;
     try {
-      merged = mergeSceneImageSettings(current ? parseSettingsJson(current.settings_json) : DEFAULT_SCENE_IMAGE_SETTINGS, patch);
+      merged = mergeSceneImageSettings(
+        current ? parseSettingsJson(current.settings_json) : DEFAULT_SCENE_IMAGE_SETTINGS,
+        patch,
+      );
     } catch (error) {
       if (error instanceof SceneImageSettingsValidationError) {
         throw new SceneImageError(400, `Invalid scene image settings: ${error.issues.join("; ")}`);
@@ -952,12 +958,14 @@ export class SceneImageService {
     const response: SceneImageSettingsUpdate = { settings: merged, revision: revision + 1, receipt };
     this.db.transaction(() => {
       this.db
-        .prepare(`INSERT INTO scene_image_settings(campaign_id,settings_json,revision,updated_at)
+        .prepare(
+          `INSERT INTO scene_image_settings(campaign_id,settings_json,revision,updated_at)
           VALUES(?,?,?,?)
           ON CONFLICT(campaign_id) DO UPDATE SET
             settings_json=excluded.settings_json,
             revision=excluded.revision,
-            updated_at=excluded.updated_at`)
+            updated_at=excluded.updated_at`,
+        )
         .run(campaignId, JSON.stringify(merged), revision + 1, occurredAt);
       this.saveReceipt("update-settings", principalId, campaignId, idempotencyKey, digest, response);
     })();
@@ -966,8 +974,10 @@ export class SceneImageService {
 
   private usage(campaignId: string, sessionId: string): SceneImageUsageState {
     const row = this.db
-      .prepare(`SELECT COUNT(*) AS images, MAX(completed_at) AS last FROM scene_image_jobs
-        WHERE campaign_id=? AND session_id=? AND status IN ${COUNTED_SQL}`)
+      .prepare(
+        `SELECT COUNT(*) AS images, MAX(completed_at) AS last FROM scene_image_jobs
+        WHERE campaign_id=? AND session_id=? AND status IN ${COUNTED_SQL}`,
+      )
       .get(campaignId, sessionId) as { images: number; last: string | null };
     return { imagesThisSession: row.images, lastGeneratedAt: row.last };
   }
@@ -1014,12 +1024,14 @@ export class SceneImageService {
     if (seed + normalized.count - 1 > SCENE_IMAGE_MAX_SEED) {
       throw new SceneImageError(400, "Scene image seed range exceeds the supported maximum");
     }
-    const cacheKeys = Array.from({ length: normalized.count }, (_unused, index) => sceneImageCacheKey({
-      prompt: normalized.prompt,
-      seed: seed + index,
-      steps: normalized.steps,
-      guidance: normalized.guidance,
-    }));
+    const cacheKeys = Array.from({ length: normalized.count }, (_unused, index) =>
+      sceneImageCacheKey({
+        prompt: normalized.prompt,
+        seed: seed + index,
+        steps: normalized.steps,
+        guidance: normalized.guidance,
+      }),
+    );
     const cachedAssets: AssetRow[] = [];
     let allCached = true;
     for (const cacheKey of cacheKeys) {
@@ -1030,10 +1042,12 @@ export class SceneImageService {
     const jobId = this.ids.nextId();
     const createdAt = this.now();
     this.db
-      .prepare(`INSERT INTO scene_image_jobs
+      .prepare(
+        `INSERT INTO scene_image_jobs
         (job_id,campaign_id,session_id,scene_key,scene_revision,narration_event_id,prompt,seed,steps,guidance,kind,count,
          service_batch_id,service_job_ids_json,status,attempts,error_code,created_at,updated_at,submitted_at,completed_at,asset_id)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,'queued',0,NULL,?,?,NULL,NULL,NULL)`)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,'queued',0,NULL,?,?,NULL,NULL,NULL)`,
+      )
       .run(
         jobId,
         campaignId,
@@ -1055,7 +1069,10 @@ export class SceneImageService {
     let deduped = false;
     if (allCached) {
       // Cache hit: link the existing asset(s) and complete without a submit.
-      this.finishWithAssets(row, cachedAssets.map((asset) => asset.asset_id));
+      this.finishWithAssets(
+        row,
+        cachedAssets.map((asset) => asset.asset_id),
+      );
       deduped = true;
     }
     const job = this.jobRow(campaignId, jobId);
@@ -1072,15 +1089,18 @@ export class SceneImageService {
     this.ensureOpen();
     const role = this.requireMember(principalId, campaignId);
     const sessionId = query.sessionId === undefined ? null : requireSceneId(query.sessionId, "sessionId");
-    const limit = query.limit === undefined
-      ? SCENE_IMAGE_DEFAULT_LIMIT
-      : requireInteger(query.limit, "limit", 1, SCENE_IMAGE_MAX_LIMIT);
+    const limit =
+      query.limit === undefined
+        ? SCENE_IMAGE_DEFAULT_LIMIT
+        : requireInteger(query.limit, "limit", 1, SCENE_IMAGE_MAX_LIMIT);
     if (role === "owner" || role === "gm") {
       const assets = this.db
-        .prepare(`SELECT * FROM scene_image_assets WHERE campaign_id=? AND (
+        .prepare(
+          `SELECT * FROM scene_image_assets WHERE campaign_id=? AND (
           asset_id IN (SELECT asset_id FROM scene_image_assets WHERE campaign_id=? ORDER BY created_at DESC, asset_id DESC LIMIT ?)
           OR asset_id IN (SELECT asset_id FROM scene_image_selections WHERE campaign_id=? AND (? IS NULL OR session_id=?)))
-          ORDER BY created_at DESC, asset_id DESC`)
+          ORDER BY created_at DESC, asset_id DESC`,
+        )
         .all(campaignId, campaignId, limit, campaignId, sessionId, sessionId) as AssetRow[];
       const selections = this.db
         .prepare("SELECT asset_id, session_id, scene_key, revision FROM scene_image_selections WHERE campaign_id=?")
@@ -1091,24 +1111,35 @@ export class SceneImageService {
       const jobs = this.db
         .prepare("SELECT * FROM scene_image_jobs WHERE campaign_id=? ORDER BY created_at DESC, job_id DESC LIMIT ?")
         .all(campaignId, limit) as JobRow[];
-      return { images: assets.map((row) => ({ ...mapGalleryImage(row, selected.has(row.asset_id)), selections: selections.filter((selection) => selection.asset_id === row.asset_id && selection.session_id === sessionId).map((selection) => ({ sceneKey: selection.scene_key, revision: selection.revision })) })), jobs: jobs.map(mapJob) };
+      return {
+        images: assets.map((row) => ({
+          ...mapGalleryImage(row, selected.has(row.asset_id)),
+          selections: selections
+            .filter((selection) => selection.asset_id === row.asset_id && selection.session_id === sessionId)
+            .map((selection) => ({ sceneKey: selection.scene_key, revision: selection.revision })),
+        })),
+        jobs: jobs.map(mapJob),
+      };
     }
     if (role !== "player") throw new SceneImageError(403, "Scene image gallery is unavailable");
     if (sessionId === null) throw new SceneImageError(400, "Player scene image gallery requires a sessionId");
     const assets = this.db
-      .prepare(`SELECT asset.*, selection.scene_key, selection.revision FROM scene_image_selections selection
+      .prepare(
+        `SELECT asset.*, selection.scene_key, selection.revision FROM scene_image_selections selection
         JOIN scene_image_assets asset ON asset.asset_id=selection.asset_id AND asset.campaign_id=selection.campaign_id
         WHERE selection.campaign_id=? AND selection.session_id=?
-        ORDER BY selection.updated_at DESC, asset.asset_id DESC LIMIT ?`)
+        ORDER BY selection.updated_at DESC, asset.asset_id DESC LIMIT ?`,
+      )
       .all(campaignId, sessionId, limit) as (AssetRow & { scene_key: string; revision: number })[];
-    return { images: assets.map((row) => ({ ...mapGalleryImage(row, true), selections: [{ sceneKey: row.scene_key, revision: row.revision }] })) };
+    return {
+      images: assets.map((row) => ({
+        ...mapGalleryImage(row, true),
+        selections: [{ sceneKey: row.scene_key, revision: row.revision }],
+      })),
+    };
   }
 
-  selectImage(
-    principalId: string,
-    campaignId: string,
-    input: SceneImageSelectInput,
-  ): SceneImageSelectionResult {
+  selectImage(principalId: string, campaignId: string, input: SceneImageSelectInput): SceneImageSelectionResult {
     this.ensureOpen();
     this.requireDm(principalId, campaignId);
     if (!isRecord(input)) throw new SceneImageError(400, "Scene image selection input must be an object");
@@ -1117,7 +1148,15 @@ export class SceneImageService {
     const assetId = requireSceneId(input.assetId, "assetId");
     const expectedRevision = requireRevision(input.expectedRevision, "expectedRevision");
     const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
-    const digest = digestOf({ operation: "select-image", principalId, campaignId, sessionId, sceneKey, assetId, expectedRevision });
+    const digest = digestOf({
+      operation: "select-image",
+      principalId,
+      campaignId,
+      sessionId,
+      sceneKey,
+      assetId,
+      expectedRevision,
+    });
     const replay = this.findReceipt("select-image", principalId, campaignId, idempotencyKey, digest);
     if (replay) {
       const stored = JSON.parse(replay.response_json) as SceneImageSelectionResult;
@@ -1126,38 +1165,40 @@ export class SceneImageService {
     const asset = this.assetRow(campaignId, assetId);
     if (!asset) throw new SceneImageError(404, "Scene image asset is unavailable");
     return this.db.transaction(() => {
-    const current = this.selectionRow(campaignId, sessionId, sceneKey);
-    const revision = current?.revision ?? 0;
-    if (revision !== expectedRevision) {
-      throw new SceneImageError(409, "Scene image selection changed; refresh first");
-    }
-    const updatedAt = this.now();
-    this.db.transaction(() => {
-      this.db
-        .prepare(`INSERT INTO scene_image_selections(campaign_id,session_id,scene_key,asset_id,revision,updated_at)
+      const current = this.selectionRow(campaignId, sessionId, sceneKey);
+      const revision = current?.revision ?? 0;
+      if (revision !== expectedRevision) {
+        throw new SceneImageError(409, "Scene image selection changed; refresh first");
+      }
+      const updatedAt = this.now();
+      this.db.transaction(() => {
+        this.db
+          .prepare(
+            `INSERT INTO scene_image_selections(campaign_id,session_id,scene_key,asset_id,revision,updated_at)
           VALUES(?,?,?,?,?,?)
           ON CONFLICT(campaign_id,session_id,scene_key) DO UPDATE SET
             asset_id=excluded.asset_id,
             revision=excluded.revision,
-            updated_at=excluded.updated_at`)
-        .run(campaignId, sessionId, sceneKey, assetId, expectedRevision + 1, updatedAt);
-      this.touchAsset(assetId, updatedAt);
-    })();
-    const saved = this.selectionRow(campaignId, sessionId, sceneKey);
-    const result: SceneImageSelectionResult = {
-      selection: saved
-        ? mapSelection(saved)
-        : { campaignId, sessionId, sceneKey, assetId, revision: expectedRevision + 1, updatedAt },
-      receipt: {
-        idempotencyKey,
-        revisionBefore: revision,
-        revisionAfter: expectedRevision + 1,
-        occurredAt: updatedAt,
-        replayed: false,
-      },
-    };
-    this.saveReceipt("select-image", principalId, campaignId, idempotencyKey, digest, result);
-    return result;
+            updated_at=excluded.updated_at`,
+          )
+          .run(campaignId, sessionId, sceneKey, assetId, expectedRevision + 1, updatedAt);
+        this.touchAsset(assetId, updatedAt);
+      })();
+      const saved = this.selectionRow(campaignId, sessionId, sceneKey);
+      const result: SceneImageSelectionResult = {
+        selection: saved
+          ? mapSelection(saved)
+          : { campaignId, sessionId, sceneKey, assetId, revision: expectedRevision + 1, updatedAt },
+        receipt: {
+          idempotencyKey,
+          revisionBefore: revision,
+          revisionAfter: expectedRevision + 1,
+          occurredAt: updatedAt,
+          replayed: false,
+        },
+      };
+      this.saveReceipt("select-image", principalId, campaignId, idempotencyKey, digest, result);
+      return result;
     })();
   }
 
@@ -1200,40 +1241,51 @@ export class SceneImageService {
   }
 
   private markStatus(jobId: string, status: SceneImageJobStatus): void {
-    this.db
-      .prepare("UPDATE scene_image_jobs SET status=?, updated_at=? WHERE job_id=?")
-      .run(status, this.now(), jobId);
+    this.db.prepare("UPDATE scene_image_jobs SET status=?, updated_at=? WHERE job_id=?").run(status, this.now(), jobId);
   }
 
   private markSubmitted(jobId: string, serviceBatchId: string, serviceJobIds: readonly string[]): void {
     const at = this.now();
     this.db
-      .prepare(`UPDATE scene_image_jobs SET status='submitted', service_batch_id=?, service_job_ids_json=?,
-        submitted_at=?, error_code=NULL, updated_at=? WHERE job_id=?`)
+      .prepare(
+        `UPDATE scene_image_jobs SET status='submitted', service_batch_id=?, service_job_ids_json=?,
+        submitted_at=?, error_code=NULL, updated_at=? WHERE job_id=?`,
+      )
       .run(serviceBatchId, JSON.stringify(serviceJobIds), at, at, jobId);
   }
 
   private markUncertain(jobId: string, errorCode: string): void {
     const at = this.now();
     this.db
-      .prepare(`UPDATE scene_image_jobs SET status='uncertain', error_code=?,
-        completed_at=?, updated_at=? WHERE job_id=?`)
+      .prepare(
+        `UPDATE scene_image_jobs SET status='uncertain', error_code=?,
+        completed_at=?, updated_at=? WHERE job_id=?`,
+      )
       .run(errorCode, at, at, jobId);
   }
 
   private markFailed(jobId: string, errorCode: string): void {
     const at = this.now();
     this.db
-      .prepare(`UPDATE scene_image_jobs SET status='failed', error_code=?,
-        completed_at=?, updated_at=? WHERE job_id=?`)
+      .prepare(
+        `UPDATE scene_image_jobs SET status='failed', error_code=?,
+        completed_at=?, updated_at=? WHERE job_id=?`,
+      )
       .run(errorCode, at, at, jobId);
   }
 
-  private finishTerminal(row: JobRow, status: "failed" | "cancelled", errorCode: string, persisted: readonly string[]): void {
+  private finishTerminal(
+    row: JobRow,
+    status: "failed" | "cancelled",
+    errorCode: string,
+    persisted: readonly string[],
+  ): void {
     const at = this.now();
     this.db
-      .prepare(`UPDATE scene_image_jobs SET status=?, error_code=?, asset_id=?, completed_at=?, updated_at=? WHERE job_id=?`)
-      .run(status, errorCode, persisted.length > 0 ? persisted[0] ?? null : row.asset_id, at, at, row.job_id);
+      .prepare(
+        `UPDATE scene_image_jobs SET status=?, error_code=?, asset_id=?, completed_at=?, updated_at=? WHERE job_id=?`,
+      )
+      .run(status, errorCode, persisted.length > 0 ? (persisted[0] ?? null) : row.asset_id, at, at, row.job_id);
   }
 
   /**
@@ -1242,16 +1294,17 @@ export class SceneImageService {
    */
   private finishWithAssets(row: JobRow, assetIds: readonly string[]): void {
     const at = this.now();
-    const primary = assetIds.length > 0 ? assetIds[0] ?? null : null;
+    const primary = assetIds.length > 0 ? (assetIds[0] ?? null) : null;
     // Completion creates candidates only. Publication always requires an explicit
     // DM selection; scene content revisions and selection revisions are unrelated.
     const status: SceneImageJobStatus = "done";
     this.db.transaction(() => {
       this.db
-        .prepare("UPDATE scene_image_jobs SET status=?, asset_id=?, error_code=?, completed_at=?, updated_at=? WHERE job_id=?")
+        .prepare(
+          "UPDATE scene_image_jobs SET status=?, asset_id=?, error_code=?, completed_at=?, updated_at=? WHERE job_id=?",
+        )
         .run(status, primary, null, at, at, row.job_id);
       if (primary) this.touchAsset(primary, at);
-
     })();
   }
 
@@ -1377,9 +1430,11 @@ export class SceneImageService {
       const bytes = Buffer.from(downloaded.bytes);
       const assetId = this.ids.nextId();
       this.db
-        .prepare(`INSERT INTO scene_image_assets
+        .prepare(
+          `INSERT INTO scene_image_assets
           (asset_id,campaign_id,cache_key,prompt,seed,steps,guidance,content_type,width,height,bytes,byte_size,created_at,last_used_at)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        )
         .run(
           assetId,
           row.campaign_id,
@@ -1494,9 +1549,11 @@ export class SceneImageService {
       // Selected assets are never evicted, so an installation can temporarily
       // exceed its asset quota rather than lose a displayed image.
       const candidate = this.db
-        .prepare(`SELECT asset_id FROM scene_image_assets
+        .prepare(
+          `SELECT asset_id FROM scene_image_assets
           WHERE asset_id NOT IN (SELECT asset_id FROM scene_image_selections)
-          ORDER BY last_used_at ASC, created_at ASC, asset_id ASC LIMIT 1`)
+          ORDER BY last_used_at ASC, created_at ASC, asset_id ASC LIMIT 1`,
+        )
         .get() as { asset_id: string } | undefined;
       if (!candidate) break;
       this.db.transaction(() => {
@@ -1514,18 +1571,18 @@ export class SceneImageService {
       .get() as { count: number };
     const historyAllowance = Math.max(0, this.worker.historyLimit - active.count);
     const deleted = this.db
-      .prepare(`DELETE FROM scene_image_jobs WHERE job_id IN (
+      .prepare(
+        `DELETE FROM scene_image_jobs WHERE job_id IN (
         SELECT job_id FROM scene_image_jobs WHERE status IN ${SETTLED_SQL}
-        ORDER BY created_at DESC, job_id DESC LIMIT -1 OFFSET ?)`)
+        ORDER BY created_at DESC, job_id DESC LIMIT -1 OFFSET ?)`,
+      )
       .run(historyAllowance);
     return deleted.changes;
   }
 
   private pruneReceipts(): number {
     const cutoff = new Date(this.clock.now().getTime() - SCENE_IMAGE_RECEIPT_RETENTION_MS).toISOString();
-    const deleted = this.db
-      .prepare("DELETE FROM scene_image_receipts WHERE created_at < ?")
-      .run(cutoff);
+    const deleted = this.db.prepare("DELETE FROM scene_image_receipts WHERE created_at < ?").run(cutoff);
     return deleted.changes;
   }
 

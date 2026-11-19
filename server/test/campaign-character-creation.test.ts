@@ -26,7 +26,10 @@ const input: CreateCampaignCharacterInput = {
     { class: { packId: "core", packVersion: "1.0.0", kind: "class", definitionId: "wizard" }, level: 2 },
     { class: { packId: "core", packVersion: "1.0.0", kind: "class", definitionId: "fighter" }, level: 1 },
   ],
-  attributes: [{ attributeId: "wisdom", value: 14 }, { attributeId: "strength", value: 9 }],
+  attributes: [
+    { attributeId: "wisdom", value: 14 },
+    { attributeId: "strength", value: 9 },
+  ],
   proficiencies: [
     { category: "language", proficiencyId: "draconic" },
     { category: "skill", proficiencyId: "history" },
@@ -46,37 +49,54 @@ function seed(dir = process.env.VELVET_DATA_DIR as string): void {
   initial.close();
   const db = new DatabaseDriver(dbPath(dir));
   db.pragma("foreign_keys = ON");
-  for (const [id, role] of [["gm", "gm"], ["player", "player"], ["observer", "observer"]] as const) {
+  for (const [id, role] of [
+    ["gm", "gm"],
+    ["player", "player"],
+    ["observer", "observer"],
+  ] as const) {
     db.prepare("INSERT INTO principals VALUES (?, ?, 0)").run(id, id);
     void role;
   }
   db.prepare("INSERT INTO principals VALUES ('application-only', 'Application only', 0)").run();
   db.prepare("UPDATE application_owner SET principal_id = 'application-only' WHERE singleton = 1").run();
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
       VALUES ('campaign-one', 'One', 'timeline-one', 'local-owner', ?, ?),
-             ('campaign-two', 'Two', 'timeline-two', 'local-owner', ?, ?)`).run(AT, AT, AT, AT);
-    db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at)
-      VALUES ('timeline-one', 'campaign-one', ?), ('timeline-two', 'campaign-two', ?)`)
-      .run(AT, AT);
-    db.prepare(`INSERT INTO campaign_memberships VALUES
+             ('campaign-two', 'Two', 'timeline-two', 'local-owner', ?, ?)`,
+    ).run(AT, AT, AT, AT);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id, campaign_id, created_at)
+      VALUES ('timeline-one', 'campaign-one', ?), ('timeline-two', 'campaign-two', ?)`,
+    ).run(AT, AT);
+    db.prepare(
+      `INSERT INTO campaign_memberships VALUES
       ('campaign-one', 'local-owner', 'owner', ?), ('campaign-one', 'gm', 'gm', ?),
       ('campaign-one', 'player', 'player', ?), ('campaign-one', 'observer', 'observer', ?),
-      ('campaign-two', 'local-owner', 'owner', ?), ('campaign-two', 'player', 'player', ?)`)
-      .run(AT, AT, AT, AT, AT, AT);
+      ('campaign-two', 'local-owner', 'owner', ?), ('campaign-two', 'player', 'player', ?)`,
+    ).run(AT, AT, AT, AT, AT, AT);
   })();
-  db.prepare(`INSERT INTO characters VALUES
+  db.prepare(
+    `INSERT INTO characters VALUES
     (?, 'Opaque', 30, 'hero', 'fictional', 1, 0, ?),
     ('persona-two', 'Two', 31, 'hero', 'fictional', 1, 0, ?),
-    ('persona-three', 'Three', 32, 'hero', 'fictional', 1, 0, ?)`).run(input.characterId, AT, AT, AT);
+    ('persona-three', 'Three', 32, 'hero', 'fictional', 1, 0, ?)`,
+  ).run(input.characterId, AT, AT, AT);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Profile description', '[]')").run();
-  db.prepare("INSERT INTO rpg_content_packs VALUES ('core', '1.0.0', 'profile', 'Core', 'Core description', '[]', 0)").run();
+  db.prepare(
+    "INSERT INTO rpg_content_packs VALUES ('core', '1.0.0', 'profile', 'Core', 'Core description', '[]', 0)",
+  ).run();
   const definition = db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1.0.0', ?, ?, ?, 'Description', '[]')");
   for (const [kind, id] of [
-    ["race", "human"], ["background", "sage"], ["class", "wizard"], ["class", "fighter"],
-    ["item", "rope"], ["spell", "light"],
-  ]) definition.run(kind, id, id);
+    ["race", "human"],
+    ["background", "sage"],
+    ["class", "wizard"],
+    ["class", "fighter"],
+    ["item", "rope"],
+    ["spell", "light"],
+  ])
+    definition.run(kind, id, id);
   db.prepare("UPDATE rpg_content_packs SET sealed = 1").run();
   for (const campaignId of ["campaign-one", "campaign-two"]) {
     db.prepare("INSERT INTO campaign_rules_profiles VALUES (?, 'profile')").run(campaignId);
@@ -88,15 +108,21 @@ function seed(dir = process.env.VELVET_DATA_DIR as string): void {
 function factory(options: { dir?: string; ids?: string[]; at?: string } = {}) {
   const ids = options.ids ?? ["campaign-character", "sheet", "actor"];
   return createRepository({
-    dataDir: options.dir ?? process.env.VELVET_DATA_DIR as string,
+    dataDir: options.dir ?? (process.env.VELVET_DATA_DIR as string),
     ids: { nextId: vi.fn(() => ids.shift()!) },
     clock: { now: vi.fn(() => new Date(options.at ?? AT)) },
   });
 }
 
 const tables = [
-  "campaign_characters", "rpg_campaign_sheets", "rpg_character_classes", "rpg_character_attributes",
-  "rpg_character_proficiencies", "rpg_character_choices", "campaign_actors", "campaign_actor_private_state",
+  "campaign_characters",
+  "rpg_campaign_sheets",
+  "rpg_character_classes",
+  "rpg_character_attributes",
+  "rpg_character_proficiencies",
+  "rpg_character_choices",
+  "campaign_actors",
+  "campaign_actor_private_state",
 ] as const;
 
 describe("campaign-character creation", () => {
@@ -105,15 +131,38 @@ describe("campaign-character creation", () => {
     const repository = factory();
     const created = repository.createCampaignCharacter("local-owner", input);
     expect(created).toEqual({
-      campaignCharacter: { id: "campaign-character", campaignId: "campaign-one", characterId: input.characterId, createdAt: AT, updatedAt: AT },
-      sheet: {
-        id: "sheet", campaignId: "campaign-one", campaignCharacterId: "campaign-character",
-        race: input.race, background: input.background, classes: input.classes, attributes: input.attributes,
-        proficiencies: input.proficiencies, choices: input.choices, createdAt: AT, updatedAt: AT,
+      campaignCharacter: {
+        id: "campaign-character",
+        campaignId: "campaign-one",
+        characterId: input.characterId,
+        createdAt: AT,
+        updatedAt: AT,
       },
-      actor: { id: "actor", campaignId: "campaign-one", campaignCharacterId: "campaign-character", sheetId: "sheet",
-        kind: "player-character", control: "principal", controllerPrincipalId: "player", privateNotes: null,
-        createdAt: AT, updatedAt: AT },
+      sheet: {
+        id: "sheet",
+        campaignId: "campaign-one",
+        campaignCharacterId: "campaign-character",
+        race: input.race,
+        background: input.background,
+        classes: input.classes,
+        attributes: input.attributes,
+        proficiencies: input.proficiencies,
+        choices: input.choices,
+        createdAt: AT,
+        updatedAt: AT,
+      },
+      actor: {
+        id: "actor",
+        campaignId: "campaign-one",
+        campaignCharacterId: "campaign-character",
+        sheetId: "sheet",
+        kind: "player-character",
+        control: "principal",
+        controllerPrincipalId: "player",
+        privateNotes: null,
+        createdAt: AT,
+        updatedAt: AT,
+      },
     });
     expect(created.sheet).not.toHaveProperty("characterId");
     expect(created.sheet).not.toHaveProperty("controllerPrincipalId");
@@ -121,17 +170,35 @@ describe("campaign-character creation", () => {
     repository.close();
 
     const db = new DatabaseDriver(dbPath(), { readonly: true });
-    expect((db.prepare("SELECT definition_id, level, position FROM rpg_character_classes ORDER BY position").all()))
-      .toEqual([{ definition_id: "wizard", level: 2, position: 0 }, { definition_id: "fighter", level: 1, position: 1 }]);
-    expect(db.prepare("SELECT attribute_id, position FROM rpg_character_attributes ORDER BY position").all())
-      .toEqual([{ attribute_id: "wisdom", position: 0 }, { attribute_id: "strength", position: 1 }]);
-    expect(db.prepare("SELECT category, proficiency_id, position FROM rpg_character_proficiencies ORDER BY position").all())
-      .toEqual([{ category: "language", proficiency_id: "draconic", position: 0 }, { category: "skill", proficiency_id: "history", position: 1 }]);
-    expect(db.prepare("SELECT choice_id, definition_id, position FROM rpg_character_choices ORDER BY position").all())
-      .toEqual([{ choice_id: "gear", definition_id: "rope", position: 0 }, { choice_id: "cantrip", definition_id: "light", position: 1 }]);
-    expect(db.prepare("SELECT controller_principal_id, private_notes FROM campaign_actor_private_state").get())
-      .toEqual({ controller_principal_id: "player", private_notes: null });
-    expect((db.prepare("SELECT updated_at FROM campaigns WHERE id = 'campaign-one'").get() as { updated_at: string }).updated_at).toBe(AT);
+    expect(
+      db.prepare("SELECT definition_id, level, position FROM rpg_character_classes ORDER BY position").all(),
+    ).toEqual([
+      { definition_id: "wizard", level: 2, position: 0 },
+      { definition_id: "fighter", level: 1, position: 1 },
+    ]);
+    expect(db.prepare("SELECT attribute_id, position FROM rpg_character_attributes ORDER BY position").all()).toEqual([
+      { attribute_id: "wisdom", position: 0 },
+      { attribute_id: "strength", position: 1 },
+    ]);
+    expect(
+      db.prepare("SELECT category, proficiency_id, position FROM rpg_character_proficiencies ORDER BY position").all(),
+    ).toEqual([
+      { category: "language", proficiency_id: "draconic", position: 0 },
+      { category: "skill", proficiency_id: "history", position: 1 },
+    ]);
+    expect(
+      db.prepare("SELECT choice_id, definition_id, position FROM rpg_character_choices ORDER BY position").all(),
+    ).toEqual([
+      { choice_id: "gear", definition_id: "rope", position: 0 },
+      { choice_id: "cantrip", definition_id: "light", position: 1 },
+    ]);
+    expect(db.prepare("SELECT controller_principal_id, private_notes FROM campaign_actor_private_state").get()).toEqual(
+      { controller_principal_id: "player", private_notes: null },
+    );
+    expect(
+      (db.prepare("SELECT updated_at FROM campaigns WHERE id = 'campaign-one'").get() as { updated_at: string })
+        .updated_at,
+    ).toBe(AT);
     expect(db.pragma("foreign_key_check")).toEqual([]);
     db.close();
   });
@@ -143,23 +210,33 @@ describe("campaign-character creation", () => {
     repository.close();
   });
 
-  it.each(["player", "observer", "application-only", "missing-principal"])("denies %s without disclosure or dependencies", (actor) => {
-    seed();
-    const nextId = vi.fn(() => "unused");
-    const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => repository.createCampaignCharacter(actor, input)).toThrow("campaign character creation unavailable");
-    expect(() => repository.createCampaignCharacter(actor, { ...input, campaignId: "missing-campaign" })).toThrow("campaign character creation unavailable");
-    expect(nextId).not.toHaveBeenCalled();
-    expect(now).not.toHaveBeenCalled();
-    repository.close();
-  });
+  it.each(["player", "observer", "application-only", "missing-principal"])(
+    "denies %s without disclosure or dependencies",
+    (actor) => {
+      seed();
+      const nextId = vi.fn(() => "unused");
+      const now = vi.fn(() => new Date(AT));
+      const repository = createRepository({
+        dataDir: process.env.VELVET_DATA_DIR as string,
+        ids: { nextId },
+        clock: { now },
+      });
+      expect(() => repository.createCampaignCharacter(actor, input)).toThrow("campaign character creation unavailable");
+      expect(() => repository.createCampaignCharacter(actor, { ...input, campaignId: "missing-campaign" })).toThrow(
+        "campaign character creation unavailable",
+      );
+      expect(nextId).not.toHaveBeenCalled();
+      expect(now).not.toHaveBeenCalled();
+      repository.close();
+    },
+  );
 
   it("uses only the narrow unavailable type for masked authority denial", () => {
     seed();
     const repository = factory();
-    expect(() => repository.createCampaignCharacter("player", input))
-      .toThrow(CampaignCharacterCreationUnavailableError);
+    expect(() => repository.createCampaignCharacter("player", input)).toThrow(
+      CampaignCharacterCreationUnavailableError,
+    );
     repository.close();
   });
 
@@ -171,54 +248,69 @@ describe("campaign-character creation", () => {
     db.prepare("UPDATE campaigns SET owner_role = 'gm' WHERE id = 'campaign-one'").run();
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
-    expect(() => repository.createCampaignCharacter("player", input))
-      .toThrow(CampaignCharacterCreationUnavailableError);
-    expect(() => repository.createCampaignCharacter("gm", input))
-      .toThrow("campaign character creation campaign authority is malformed");
+    expect(() => repository.createCampaignCharacter("player", input)).toThrow(
+      CampaignCharacterCreationUnavailableError,
+    );
+    expect(() => repository.createCampaignCharacter("gm", input)).toThrow(
+      "campaign character creation campaign authority is malformed",
+    );
     repository.close();
   });
 
   it.each(["local-owner", "gm", "player"])("allows %s as controller", (controllerPrincipalId) => {
     seed();
     const repository = factory();
-    expect(repository.createCampaignCharacter("gm", { ...input, controllerPrincipalId }).actor.controllerPrincipalId)
-      .toBe(controllerPrincipalId);
+    expect(
+      repository.createCampaignCharacter("gm", { ...input, controllerPrincipalId }).actor.controllerPrincipalId,
+    ).toBe(controllerPrincipalId);
     repository.close();
   });
 
-  it.each(["observer", "application-only", "missing-principal"])("rejects %s as controller generically", (controllerPrincipalId) => {
-    seed();
-    const repository = factory();
-    expect(() => repository.createCampaignCharacter("local-owner", { ...input, controllerPrincipalId }))
-      .toThrow("campaign character creation unavailable");
-    repository.close();
-  });
+  it.each(["observer", "application-only", "missing-principal"])(
+    "rejects %s as controller generically",
+    (controllerPrincipalId) => {
+      seed();
+      const repository = factory();
+      expect(() => repository.createCampaignCharacter("local-owner", { ...input, controllerPrincipalId })).toThrow(
+        "campaign character creation unavailable",
+      );
+      repository.close();
+    },
+  );
 
   it("uses exact opaque persona lookup, persists notes verbatim, and treats omitted notes as null", () => {
     seed();
     const repository = factory();
     const notes = "  private %_' notes  ";
-    expect(repository.createCampaignCharacter("local-owner", { ...input, privateNotes: notes }).actor.privateNotes).toBe(notes);
+    expect(
+      repository.createCampaignCharacter("local-owner", { ...input, privateNotes: notes }).actor.privateNotes,
+    ).toBe(notes);
     repository.close();
     const db = new DatabaseDriver(dbPath(), { readonly: true });
-    expect(db.prepare("SELECT character_id FROM campaign_characters").get()).toEqual({ character_id: input.characterId });
-    expect(db.prepare("SELECT private_notes FROM campaign_actor_private_state").get()).toEqual({ private_notes: notes });
+    expect(db.prepare("SELECT character_id FROM campaign_characters").get()).toEqual({
+      character_id: input.characterId,
+    });
+    expect(db.prepare("SELECT private_notes FROM campaign_actor_private_state").get()).toEqual({
+      private_notes: notes,
+    });
     db.close();
   });
 
   it("distinguishes missing/ineligible personas from malformed persona state", () => {
     seed();
     const repository = factory();
-    expect(() => repository.createCampaignCharacter("local-owner", { ...input, characterId: "missing" }))
-      .toThrow(CampaignCharacterPersonaUnavailableError);
+    expect(() => repository.createCampaignCharacter("local-owner", { ...input, characterId: "missing" })).toThrow(
+      CampaignCharacterPersonaUnavailableError,
+    );
     repository.close();
 
     const db = new DatabaseDriver(dbPath());
     db.prepare("UPDATE characters SET fictional_confirmed = 0 WHERE id = ?").run(input.characterId);
     db.close();
     const ineligible = factory();
-    expect(() => ineligible.createCampaignCharacter("local-owner", input))
-      .toThrow(CampaignCharacterPersonaUnavailableError);
+    expect(() => ineligible.createCampaignCharacter("local-owner", input)).toThrow(
+      CampaignCharacterPersonaUnavailableError,
+    );
     ineligible.close();
 
     const corrupt = new DatabaseDriver(dbPath());
@@ -226,10 +318,12 @@ describe("campaign-character creation", () => {
     corrupt.prepare("UPDATE characters SET fictional_confirmed = 2 WHERE id = ?").run(input.characterId);
     corrupt.close();
     const malformed = factory();
-    expect(() => malformed.createCampaignCharacter("local-owner", input))
-      .toThrow("campaign character creation persona is malformed");
-    expect(() => malformed.createCampaignCharacter("local-owner", input))
-      .not.toThrow(CampaignCharacterPersonaUnavailableError);
+    expect(() => malformed.createCampaignCharacter("local-owner", input)).toThrow(
+      "campaign character creation persona is malformed",
+    );
+    expect(() => malformed.createCampaignCharacter("local-owner", input)).not.toThrow(
+      CampaignCharacterPersonaUnavailableError,
+    );
     malformed.close();
   });
 
@@ -240,14 +334,16 @@ describe("campaign-character creation", () => {
     const rejected = astral.repeat(MAX_PRIVATE_NOTES_LENGTH + 1);
     const repository = factory();
 
-    expect(repository.createCampaignCharacter("local-owner", { ...input, privateNotes: accepted }).actor.privateNotes)
-      .toBe(accepted);
+    expect(
+      repository.createCampaignCharacter("local-owner", { ...input, privateNotes: accepted }).actor.privateNotes,
+    ).toBe(accepted);
     expect(() => repository.createCampaignCharacter("local-owner", { ...input, privateNotes: rejected })).toThrow();
     repository.close();
 
     const db = new DatabaseDriver(dbPath(), { readonly: true });
-    expect(db.prepare("SELECT length(private_notes) AS length FROM campaign_actor_private_state").get())
-      .toEqual({ length: MAX_PRIVATE_NOTES_LENGTH });
+    expect(db.prepare("SELECT length(private_notes) AS length FROM campaign_actor_private_state").get()).toEqual({
+      length: MAX_PRIVATE_NOTES_LENGTH,
+    });
     expect((db.prepare("SELECT COUNT(*) AS count FROM campaign_characters").get() as { count: number }).count).toBe(1);
     db.close();
   });
@@ -278,15 +374,28 @@ describe("campaign-character creation", () => {
   it.each([
     ["race", { race: { ...input.race, definitionId: "missing" } }],
     ["background", { background: { ...input.background, packVersion: "2.0.0" } }],
-    ["class", { classes: [{ class: { ...input.classes[0]!.class, kind: "class" as const, definitionId: "missing" }, level: 1 }] }],
-    ["choice", { choices: [{ choiceId: "x", selection: { ...input.choices[0]!.selection, definitionId: "missing" } }] }],
+    [
+      "class",
+      {
+        classes: [{ class: { ...input.classes[0]!.class, kind: "class" as const, definitionId: "missing" }, level: 1 }],
+      },
+    ],
+    [
+      "choice",
+      { choices: [{ choiceId: "x", selection: { ...input.choices[0]!.selection, definitionId: "missing" } }] },
+    ],
   ])("rejects unavailable %s content before dependencies", (_label, patch) => {
     seed();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => repository.createCampaignCharacter("local-owner", { ...input, ...patch } as CreateCampaignCharacterInput))
-      .toThrow("campaign character creation unavailable");
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
+    expect(() =>
+      repository.createCampaignCharacter("local-owner", { ...input, ...patch } as CreateCampaignCharacterInput),
+    ).toThrow("campaign character creation unavailable");
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
     repository.close();
@@ -304,9 +413,14 @@ describe("campaign-character creation", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => repository.createCampaignCharacter("local-owner", input))
-      .toThrow("campaign character creation content graph is malformed");
+    const repository = createCorruptionTestRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
+    expect(() => repository.createCampaignCharacter("local-owner", input)).toThrow(
+      "campaign character creation content graph is malformed",
+    );
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
     repository.close();
@@ -324,9 +438,14 @@ describe("campaign-character creation", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => repository.createCampaignCharacter("local-owner", input))
-      .toThrow("campaign character creation content graph is malformed");
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
+    expect(() => repository.createCampaignCharacter("local-owner", input)).toThrow(
+      "campaign character creation content graph is malformed",
+    );
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
     repository.close();
@@ -338,9 +457,13 @@ describe("campaign-character creation", () => {
     first.createCampaignCharacter("local-owner", input);
     first.close();
     const duplicate = factory({ ids: ["unused", "unused", "unused"] });
-    expect(() => duplicate.createCampaignCharacter("local-owner", input)).toThrow(CampaignCharacterCreationConflictError);
-    expect(duplicate.createCampaignCharacter("local-owner", { ...input, campaignId: "campaign-two" }).campaignCharacter.characterId)
-      .toBe(input.characterId);
+    expect(() => duplicate.createCampaignCharacter("local-owner", input)).toThrow(
+      CampaignCharacterCreationConflictError,
+    );
+    expect(
+      duplicate.createCampaignCharacter("local-owner", { ...input, campaignId: "campaign-two" }).campaignCharacter
+        .characterId,
+    ).toBe(input.characterId);
     duplicate.close();
   });
 
@@ -354,10 +477,12 @@ describe("campaign-character creation", () => {
     db.prepare("DELETE FROM campaign_actors WHERE id = 'actor'").run();
     db.close();
     const duplicate = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
-    expect(() => duplicate.createCampaignCharacter("local-owner", input))
-      .toThrow("campaign character aggregate is incomplete");
-    expect(() => duplicate.createCampaignCharacter("local-owner", input))
-      .not.toThrow(CampaignCharacterCreationConflictError);
+    expect(() => duplicate.createCampaignCharacter("local-owner", input)).toThrow(
+      "campaign character aggregate is incomplete",
+    );
+    expect(() => duplicate.createCampaignCharacter("local-owner", input)).not.toThrow(
+      CampaignCharacterCreationConflictError,
+    );
     duplicate.close();
   });
 
@@ -368,11 +493,17 @@ describe("campaign-character creation", () => {
     first.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const duplicate = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => duplicate.createCampaignCharacter("local-owner", {
-      ...input,
-      race: { ...input.race, definitionId: "missing" },
-    })).toThrow(CampaignCharacterCreationUnavailableError);
+    const duplicate = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
+    expect(() =>
+      duplicate.createCampaignCharacter("local-owner", {
+        ...input,
+        race: { ...input.race, definitionId: "missing" },
+      }),
+    ).toThrow(CampaignCharacterCreationUnavailableError);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
     duplicate.close();
@@ -390,9 +521,15 @@ describe("campaign-character creation", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const duplicate = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const duplicate = createCorruptionTestRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
     expect(() => duplicate.createCampaignCharacter("local-owner", input)).toThrow();
-    expect(() => duplicate.createCampaignCharacter("local-owner", input)).not.toThrow(CampaignCharacterCreationConflictError);
+    expect(() => duplicate.createCampaignCharacter("local-owner", input)).not.toThrow(
+      CampaignCharacterCreationConflictError,
+    );
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
     duplicate.close();
@@ -404,8 +541,18 @@ describe("campaign-character creation", () => {
     const ids = ["cc", "sheet", "actor"];
     const repository = createRepository({
       dataDir: process.env.VELVET_DATA_DIR as string,
-      ids: { nextId: () => { calls.push("id"); return ids.shift()!; } },
-      clock: { now: () => { calls.push("clock"); return new Date(AT); } },
+      ids: {
+        nextId: () => {
+          calls.push("id");
+          return ids.shift()!;
+        },
+      },
+      clock: {
+        now: () => {
+          calls.push("clock");
+          return new Date(AT);
+        },
+      },
     });
     repository.createCampaignCharacter("local-owner", input);
     expect(calls).toEqual(["id", "id", "id", "clock"]);
@@ -416,14 +563,20 @@ describe("campaign-character creation", () => {
     seed();
     const nextId = vi.fn().mockReturnValueOnce("cc").mockReturnValueOnce("sheet").mockReturnValueOnce("actor");
     const now = vi.fn(() => new Date("2030-04-05T06:07:08.008Z"));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => repository.createCampaignCharacter("local-owner", input))
-      .toThrow("campaign character timestamp cannot precede campaign updated_at");
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now },
+    });
+    expect(() => repository.createCampaignCharacter("local-owner", input)).toThrow(
+      "campaign character timestamp cannot precede campaign updated_at",
+    );
     expect(nextId).toHaveBeenCalledTimes(3);
     expect(now).toHaveBeenCalledOnce();
     repository.close();
     const db = new DatabaseDriver(dbPath(), { readonly: true });
-    for (const table of tables) expect((db.prepare(`SELECT COUNT(*) count FROM ${table}`).get() as { count: number }).count).toBe(0);
+    for (const table of tables)
+      expect((db.prepare(`SELECT COUNT(*) count FROM ${table}`).get() as { count: number }).count).toBe(0);
     db.close();
   });
 
@@ -434,7 +587,13 @@ describe("campaign-character creation", () => {
     db.close();
     const repository = createCorruptionTestRepository({
       dataDir: process.env.VELVET_DATA_DIR as string,
-      ids: { nextId: vi.fn().mockReturnValueOnce("campaign-character").mockReturnValueOnce("sheet").mockReturnValueOnce("actor") },
+      ids: {
+        nextId: vi
+          .fn()
+          .mockReturnValueOnce("campaign-character")
+          .mockReturnValueOnce("sheet")
+          .mockReturnValueOnce("actor"),
+      },
       clock: { now: () => new Date(AT) },
     });
     expect(() => repository.createCampaignCharacter("local-owner", input)).toThrow("group rejected");
@@ -452,10 +611,13 @@ describe("campaign-character creation", () => {
     const repository = factory();
     expect(repository.transaction((unit) => "createCampaignCharacter" in unit)).toBe(false);
     expect(repository.transaction((unit) => "createOriginalStarterCampaignCharacter" in unit)).toBe(false);
-    expect(() => repository.transaction(() => repository.createCampaignCharacter("local-owner", input)))
-      .toThrow("campaign character creation cannot run inside a repository transaction");
+    expect(() => repository.transaction(() => repository.createCampaignCharacter("local-owner", input))).toThrow(
+      "campaign character creation cannot run inside a repository transaction",
+    );
     repository.close();
-    expect(() => repository.createCampaignCharacter("invalid actor", {} as CreateCampaignCharacterInput)).toThrow("repository is closed");
+    expect(() => repository.createCampaignCharacter("invalid actor", {} as CreateCampaignCharacterInput)).toThrow(
+      "repository is closed",
+    );
   });
 
   it("does not retry ID collisions or use random mechanics", () => {
@@ -465,7 +627,11 @@ describe("campaign-character creation", () => {
     first.close();
     const ids = ["campaign-character", "other-sheet", "other-actor", "retry"];
     const nextId = vi.fn(() => ids.shift()!);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now: () => new Date(AT) } });
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId },
+      clock: { now: () => new Date(AT) },
+    });
     expect(() => repository.createCampaignCharacter("local-owner", { ...input, campaignId: "campaign-two" })).toThrow();
     expect(nextId).toHaveBeenCalledTimes(3);
     repository.close();
@@ -474,9 +640,15 @@ describe("campaign-character creation", () => {
   it("waits for real write contention and commits after release", async () => {
     const dir = makeTmpDataDir();
     seed(dir);
-    const lock = await startLockedWrite(dbPath(dir), [{
-      sql: "UPDATE campaigns SET name = name WHERE id = 'campaign-one'",
-    }], 2_000);
+    const lock = await startLockedWrite(
+      dbPath(dir),
+      [
+        {
+          sql: "UPDATE campaigns SET name = name WHERE id = 'campaign-one'",
+        },
+      ],
+      2_000,
+    );
     const repository = factory({ dir });
     expect(lock.isReleased()).toBe(false);
     expect(repository.createCampaignCharacter("local-owner", input).campaignCharacter.id).toBe("campaign-character");

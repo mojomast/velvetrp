@@ -22,9 +22,10 @@ export function isSystemOneLaneMode(value: unknown): value is SystemOneLaneMode 
 }
 
 export function defaultSystemOneLaneModes(): Record<SystemOneLane, SystemOneLaneMode> {
-  return Object.fromEntries(
-    SYSTEM_ONE_LANES.map((lane) => [lane, DEFAULT_SYSTEM_ONE_LANE_MODE]),
-  ) as Record<SystemOneLane, SystemOneLaneMode>;
+  return Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [lane, DEFAULT_SYSTEM_ONE_LANE_MODE])) as Record<
+    SystemOneLane,
+    SystemOneLaneMode
+  >;
 }
 
 /** The effective mode for a lane, defaulting to shadow for any missing or malformed value. */
@@ -127,21 +128,26 @@ export function defaultProviderSettings(updatedAt = now()): ProviderSettings {
 }
 
 /** Conservative starting thresholds; every lane begins at confirm-or-fallback. */
-export const DEFAULT_SYSTEM_ONE_THRESHOLDS: SystemOneConfidenceThresholds = { actionThreshold: 0.75, reviewThreshold: 0.5 };
+export const DEFAULT_SYSTEM_ONE_THRESHOLDS: SystemOneConfidenceThresholds = {
+  actionThreshold: 0.75,
+  reviewThreshold: 0.5,
+};
 
 export function defaultSystemOneConfidencePolicy(): Record<SystemOneLane, SystemOneConfidenceThresholds> {
-  return Object.fromEntries(
-    SYSTEM_ONE_LANES.map((lane) => [lane, { ...DEFAULT_SYSTEM_ONE_THRESHOLDS }]),
-  ) as Record<SystemOneLane, SystemOneConfidenceThresholds>;
+  return Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [lane, { ...DEFAULT_SYSTEM_ONE_THRESHOLDS }])) as Record<
+    SystemOneLane,
+    SystemOneConfidenceThresholds
+  >;
 }
 
 /** The identity calibration: a lane reports its raw confidence until a fitted map is applied. */
 export const DEFAULT_SYSTEM_ONE_CALIBRATION: SystemOneCalibration = { a: 1, b: 0 };
 
 export function defaultSystemOneConfidenceCalibration(): Record<SystemOneLane, SystemOneCalibration> {
-  return Object.fromEntries(
-    SYSTEM_ONE_LANES.map((lane) => [lane, { ...DEFAULT_SYSTEM_ONE_CALIBRATION }]),
-  ) as Record<SystemOneLane, SystemOneCalibration>;
+  return Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [lane, { ...DEFAULT_SYSTEM_ONE_CALIBRATION }])) as Record<
+    SystemOneLane,
+    SystemOneCalibration
+  >;
 }
 
 export function defaultSystemOneSettings(updatedAt = now()): SystemOneSettings {
@@ -202,11 +208,12 @@ export function clampText(value: string, max: number): string {
 
 export function toPublicProvider(provider: ProviderSettings): PublicProviderSettings {
   const environmentKey = providerEnvironmentApiKey();
-  const apiKeySource: PublicProviderSettings["apiKeySource"] = provider.apiKey.length === 0
-    ? "none"
-    : environmentKey !== "" && provider.apiKey === environmentKey
-      ? "environment"
-      : "database";
+  const apiKeySource: PublicProviderSettings["apiKeySource"] =
+    provider.apiKey.length === 0
+      ? "none"
+      : environmentKey !== "" && provider.apiKey === environmentKey
+        ? "environment"
+        : "database";
   return {
     id: "provider",
     providerType: provider.providerType,

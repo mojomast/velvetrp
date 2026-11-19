@@ -30,12 +30,12 @@ export type MagicAttunementReceipt = Readonly<{
 export type MagicAttunementResult = Readonly<
   | { ok: true; state: MagicAttunementState; receipt: MagicAttunementReceipt }
   | {
-    ok: false;
-    code: "invalid-key" | "not-attunable" | "prerequisite-missing" | "capacity-exceeded" | "key-conflict";
-    message: string;
-    state: MagicAttunementState;
-    receipt: MagicAttunementReceipt;
-  }
+      ok: false;
+      code: "invalid-key" | "not-attunable" | "prerequisite-missing" | "capacity-exceeded" | "key-conflict";
+      message: string;
+      state: MagicAttunementState;
+      receipt: MagicAttunementReceipt;
+    }
 >;
 
 export type AttuneItemInput = Readonly<{
@@ -65,7 +65,9 @@ export function isAttuned(state: MagicAttunementState, key: string): boolean {
 }
 
 function sameReference(left: MagicItemReference, right: MagicItemReference): boolean {
-  return left.packId === right.packId && left.packVersion === right.packVersion && left.definitionId === right.definitionId;
+  return (
+    left.packId === right.packId && left.packVersion === right.packVersion && left.definitionId === right.definitionId
+  );
 }
 
 function receipt(values: {
@@ -101,23 +103,44 @@ function reject(
     code,
     message,
     state: values.state,
-    receipt: receipt({ operation: "attune", key: values.key, changed: false, prerequisiteSatisfied, before, after: before, occurredAt: values.occurredAt }),
+    receipt: receipt({
+      operation: "attune",
+      key: values.key,
+      changed: false,
+      prerequisiteSatisfied,
+      before,
+      after: before,
+      occurredAt: values.occurredAt,
+    }),
   });
 }
 
 /** Attunes an item when its prerequisite rest and the 3-item capacity allow it. */
 export function attuneItem(input: AttuneItemInput): MagicAttunementResult {
-  if (typeof input.key !== "string" || input.key.length === 0) return reject(input, "invalid-key", "attunement key must be non-empty", null);
+  if (typeof input.key !== "string" || input.key.length === 0)
+    return reject(input, "invalid-key", "attunement key must be non-empty", null);
   const existing = input.state.entries.find((entry) => entry.key === input.key);
   if (existing) {
     if (!sameReference(existing.definition, input.definition.reference)) {
       return reject(input, "key-conflict", "attunement key is already bound to another definition", null);
     }
     const count = input.state.entries.length;
-    return Object.freeze({ ok: true, state: input.state,
-      receipt: receipt({ operation: "attune", key: input.key, changed: false, prerequisiteSatisfied: null, before: count, after: count, occurredAt: input.occurredAt }) });
+    return Object.freeze({
+      ok: true,
+      state: input.state,
+      receipt: receipt({
+        operation: "attune",
+        key: input.key,
+        changed: false,
+        prerequisiteSatisfied: null,
+        before: count,
+        after: count,
+        occurredAt: input.occurredAt,
+      }),
+    });
   }
-  if (input.definition.attunement === null) return reject(input, "not-attunable", "item does not require attunement", null);
+  if (input.definition.attunement === null)
+    return reject(input, "not-attunable", "item does not require attunement", null);
   const required = input.definition.attunement.prerequisite;
   const satisfied = input.prerequisite.satisfiedRest;
   const meetsPrerequisite = satisfied !== null && REST_RANK[satisfied] >= REST_RANK[required];
@@ -126,36 +149,100 @@ export function attuneItem(input: AttuneItemInput): MagicAttunementResult {
   }
   const before = input.state.entries.length;
   if (before >= MAGIC_ITEM_ATTUNEMENT_LIMIT) {
-    return reject(input, "capacity-exceeded", `an actor may attune to at most ${MAGIC_ITEM_ATTUNEMENT_LIMIT} items`, satisfied);
+    return reject(
+      input,
+      "capacity-exceeded",
+      `an actor may attune to at most ${MAGIC_ITEM_ATTUNEMENT_LIMIT} items`,
+      satisfied,
+    );
   }
-  const entry = Object.freeze({ key: input.key, definition: Object.freeze({ ...input.definition.reference }), attunedAt: input.occurredAt });
-  const state = Object.freeze({ actorId: input.state.actorId, entries: Object.freeze([...input.state.entries, entry]) });
-  return Object.freeze({ ok: true, state,
-    receipt: receipt({ operation: "attune", key: input.key, changed: true, prerequisiteSatisfied: satisfied, before, after: before + 1, occurredAt: input.occurredAt }) });
+  const entry = Object.freeze({
+    key: input.key,
+    definition: Object.freeze({ ...input.definition.reference }),
+    attunedAt: input.occurredAt,
+  });
+  const state = Object.freeze({
+    actorId: input.state.actorId,
+    entries: Object.freeze([...input.state.entries, entry]),
+  });
+  return Object.freeze({
+    ok: true,
+    state,
+    receipt: receipt({
+      operation: "attune",
+      key: input.key,
+      changed: true,
+      prerequisiteSatisfied: satisfied,
+      before,
+      after: before + 1,
+      occurredAt: input.occurredAt,
+    }),
+  });
 }
 
 /** Drops an attunement; dropping an unattuned key is an idempotent no-op. */
 export function dropAttunement(input: DropAttunementInput): MagicAttunementResult {
   if (typeof input.key !== "string" || input.key.length === 0) {
     const before = input.state.entries.length;
-    return Object.freeze({ ok: true, state: input.state,
-      receipt: receipt({ operation: "drop", key: String(input.key ?? ""), changed: false, prerequisiteSatisfied: null, before, after: before, occurredAt: input.occurredAt }) });
+    return Object.freeze({
+      ok: true,
+      state: input.state,
+      receipt: receipt({
+        operation: "drop",
+        key: String(input.key ?? ""),
+        changed: false,
+        prerequisiteSatisfied: null,
+        before,
+        after: before,
+        occurredAt: input.occurredAt,
+      }),
+    });
   }
   const before = input.state.entries.length;
   const entries = input.state.entries.filter((entry) => entry.key !== input.key);
   if (entries.length === before) {
-    return Object.freeze({ ok: true, state: input.state,
-      receipt: receipt({ operation: "drop", key: input.key, changed: false, prerequisiteSatisfied: null, before, after: before, occurredAt: input.occurredAt }) });
+    return Object.freeze({
+      ok: true,
+      state: input.state,
+      receipt: receipt({
+        operation: "drop",
+        key: input.key,
+        changed: false,
+        prerequisiteSatisfied: null,
+        before,
+        after: before,
+        occurredAt: input.occurredAt,
+      }),
+    });
   }
   const state = Object.freeze({ actorId: input.state.actorId, entries: Object.freeze(entries) });
-  return Object.freeze({ ok: true, state,
-    receipt: receipt({ operation: "drop", key: input.key, changed: true, prerequisiteSatisfied: null, before, after: entries.length, occurredAt: input.occurredAt }) });
+  return Object.freeze({
+    ok: true,
+    state,
+    receipt: receipt({
+      operation: "drop",
+      key: input.key,
+      changed: true,
+      prerequisiteSatisfied: null,
+      before,
+      after: entries.length,
+      occurredAt: input.occurredAt,
+    }),
+  });
 }
 
 /** Deterministic serialization of an attunement set for storage or transport. */
 export function serializeAttunementState(state: MagicAttunementState): string {
   const entries = [...state.entries]
     .sort((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0))
-    .map((entry) => ({ key: entry.key, definition: { packId: entry.definition.packId, packVersion: entry.definition.packVersion, definitionId: entry.definition.definitionId }, attunedAt: entry.attunedAt }));
+    .map((entry) => ({
+      key: entry.key,
+      definition: {
+        packId: entry.definition.packId,
+        packVersion: entry.definition.packVersion,
+        definitionId: entry.definition.definitionId,
+      },
+      attunedAt: entry.attunedAt,
+    }));
   return stableKey({ actorId: state.actorId, entries });
 }

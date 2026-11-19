@@ -10,8 +10,14 @@ import {
 import type { Character } from "../src/types.js";
 
 const character: Character = {
-  id: "c1", name: "Aria", age: 29, archetype: "captain", boundaries: "none",
-  fictionalConfirmed: true, isRealPerson: false, createdAt: new Date().toISOString(),
+  id: "c1",
+  name: "Aria",
+  age: 29,
+  archetype: "captain",
+  boundaries: "none",
+  fictionalConfirmed: true,
+  isRealPerson: false,
+  createdAt: new Date().toISOString(),
 };
 
 describe("policy", () => {
@@ -49,5 +55,4 @@ describe("policy", () => {
       violations: ["boundary-or-refusal-bypass"],
     });
   });
-
 });

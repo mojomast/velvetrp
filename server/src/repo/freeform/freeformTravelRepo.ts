@@ -55,14 +55,19 @@ import { appendSentences, pickVariation, type VariationPool } from "./freeformVa
 /** Maximum length of the player-supplied destination phrase. */
 export const MAX_FREEFORM_DESTINATION_LENGTH = 200;
 
-const canonical = (value: unknown): string => JSON.stringify(value, (_key, item) =>
-  item && typeof item === "object" && !Array.isArray(item)
-    ? Object.fromEntries(Object.entries(item as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)))
-    : item);
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, item) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)),
+        )
+      : item,
+  );
 const sha256 = (value: string): string => createHash("sha256").update(value).digest("hex");
 
 /** A travel declaration names a destination after one of these verbs plus a preposition. */
-const TRAVEL_PATTERN = /\b(?:go|goes|going|head|heads|heading|walk|walks|walking|travel|travels|travelling|traveling|move|moves|moving|journey|ride|rides|run|runs|venture|ventures)\s+(?:to|towards?|into|for)\s+(.+)$/i;
+const TRAVEL_PATTERN =
+  /\b(?:go|goes|going|head|heads|heading|walk|walks|walking|travel|travels|travelling|traveling|move|moves|moving|journey|ride|rides|run|runs|venture|ventures)\s+(?:to|towards?|into|for)\s+(.+)$/i;
 const LEADING_ARTICLE = /^(?:the|a|an|my|our|your)\s+/i;
 
 /** Fail-closed reasons a declaration does not produce a materialization candidate. */
@@ -120,17 +125,17 @@ export interface FreeformTravelMaterializedCandidate {
 export type FreeformTravelMaterialization =
   | { status: "declined"; reason: FreeformTravelNoneReason }
   | {
-    status: "materialized";
-    candidate: FreeformTravelMaterializedCandidate;
-    locationId: string;
-    connectionId: string;
-    draftId: string;
-    /** Durable `campaign_content_receipts_v42` receipt for the location materialization. */
-    contentReceiptId: string | null;
-    /** Durable world receipt for the actor movement. */
-    world: { commandId: string; revisionBefore: number; revisionAfter: number; occurredAt: string };
-    discoveries: Array<{ actorId: string; locationId: string; discoveredAt: string }>;
-  };
+      status: "materialized";
+      candidate: FreeformTravelMaterializedCandidate;
+      locationId: string;
+      connectionId: string;
+      draftId: string;
+      /** Durable `campaign_content_receipts_v42` receipt for the location materialization. */
+      contentReceiptId: string | null;
+      /** Durable world receipt for the actor movement. */
+      world: { commandId: string; revisionBefore: number; revisionAfter: number; occurredAt: string };
+      discoveries: Array<{ actorId: string; locationId: string; discoveredAt: string }>;
+    };
 
 export class FreeformTravelAuthorizationError extends Error {}
 export class FreeformTravelConflictError extends Error {}
@@ -139,19 +144,33 @@ export class FreeformTravelUnavailableError extends Error {}
 /** Parses the bounded destination phrase out of a free-form declaration. */
 export function parseFreeformTravelDestination(text: string):
   | { ok: true; name: string; normalized: string }
-  | { ok: false; reason: Extract<FreeformTravelNoneReason, "no-travel-intent" | "empty-destination" | "destination-too-long"> } {
+  | {
+      ok: false;
+      reason: Extract<FreeformTravelNoneReason, "no-travel-intent" | "empty-destination" | "destination-too-long">;
+    } {
   const match = TRAVEL_PATTERN.exec(text.trim());
   if (!match) return { ok: false, reason: "no-travel-intent" };
   const firstSentence = (match[1] ?? "").split(/[.!?;]/, 1)[0] ?? "";
-  const cleaned = firstSentence.replace(/^["'`]+|["'`]+$/g, "").replace(/\s+/g, " ").trim();
-  const name = cleaned.replace(LEADING_ARTICLE, "").replace(/[.,;:!?]+$/g, "").trim();
+  const cleaned = firstSentence
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const name = cleaned
+    .replace(LEADING_ARTICLE, "")
+    .replace(/[.,;:!?]+$/g, "")
+    .trim();
   if (!name) return { ok: false, reason: "empty-destination" };
   if (name.length > MAX_FREEFORM_DESTINATION_LENGTH) return { ok: false, reason: "destination-too-long" };
   return { ok: true, name, normalized: normalizeLocationName(name) };
 }
 
 function normalizeLocationName(value: string): string {
-  return value.toLowerCase().replace(LEADING_ARTICLE, "").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(LEADING_ARTICLE, "")
+    .replace(/[^a-z0-9' ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -171,43 +190,76 @@ export interface FreeformTravelSeedTemplate {
 
 export const FREEFORM_TRAVEL_SEEDS: readonly FreeformTravelSeedTemplate[] = Object.freeze([
   Object.freeze({
-    id: "waterside", keywords: ["dock", "docks", "quay", "quays", "harbor", "harbour", "pier", "wharf", "waterfront", "river", "canal", "port", "shipyard"],
-    description: "The waterside of {name}, reached from {from}, where gulls wheel over wet stone and the air tastes of brine.",
+    id: "waterside",
+    keywords: [
+      "dock",
+      "docks",
+      "quay",
+      "quays",
+      "harbor",
+      "harbour",
+      "pier",
+      "wharf",
+      "waterfront",
+      "river",
+      "canal",
+      "port",
+      "shipyard",
+    ],
+    description:
+      "The waterside of {name}, reached from {from}, where gulls wheel over wet stone and the air tastes of brine.",
   }),
   Object.freeze({
-    id: "market", keywords: ["market", "marketplace", "bazaar", "fair", "exchange", "shops", "trade"],
-    description: "The market of {name}, reached from {from}, loud with hawkers, hand-carts and the press of a bargaining crowd.",
+    id: "market",
+    keywords: ["market", "marketplace", "bazaar", "fair", "exchange", "shops", "trade"],
+    description:
+      "The market of {name}, reached from {from}, loud with hawkers, hand-carts and the press of a bargaining crowd.",
   }),
   Object.freeze({
-    id: "sacred", keywords: ["temple", "church", "shrine", "chapel", "abbey", "monastery", "cathedral", "sanctuary"],
-    description: "A sacred place called {name}, reached from {from}, where voices drop without being asked and the stone holds the cold.",
+    id: "sacred",
+    keywords: ["temple", "church", "shrine", "chapel", "abbey", "monastery", "cathedral", "sanctuary"],
+    description:
+      "A sacred place called {name}, reached from {from}, where voices drop without being asked and the stone holds the cold.",
   }),
   Object.freeze({
-    id: "gate", keywords: ["gate", "gates", "wall", "walls", "rampart", "barracks", "watchtower", "bastion", "checkpoint"],
-    description: "The gate-ground of {name}, reached from {from}, all trampled earth and banners that have seen better weather.",
+    id: "gate",
+    keywords: ["gate", "gates", "wall", "walls", "rampart", "barracks", "watchtower", "bastion", "checkpoint"],
+    description:
+      "The gate-ground of {name}, reached from {from}, all trampled earth and banners that have seen better weather.",
   }),
   Object.freeze({
-    id: "garden", keywords: ["garden", "gardens", "grove", "park", "orchard", "meadow", "green", "arbor"],
-    description: "A green and growing place called {name}, reached from {from}, where the town's noise thins among the leaves.",
+    id: "garden",
+    keywords: ["garden", "gardens", "grove", "park", "orchard", "meadow", "green", "arbor"],
+    description:
+      "A green and growing place called {name}, reached from {from}, where the town's noise thins among the leaves.",
   }),
   Object.freeze({
-    id: "alley", keywords: ["alley", "alleys", "lane", "lanes", "warren", "warrens", "gutter", "backstreet", "slum", "rookery"],
-    description: "The narrow ways of {name}, reached from {from}, where washing lines cross overhead and every turn looks like the last.",
+    id: "alley",
+    keywords: ["alley", "alleys", "lane", "lanes", "warren", "warrens", "gutter", "backstreet", "slum", "rookery"],
+    description:
+      "The narrow ways of {name}, reached from {from}, where washing lines cross overhead and every turn looks like the last.",
   }),
   Object.freeze({
-    id: "fortified", keywords: ["keep", "citadel", "castle", "tower", "fort", "fortress", "palace", "manor", "hall"],
-    description: "The fortified seat of {name}, reached from {from}, its walls speaking of a time when they were needed.",
+    id: "fortified",
+    keywords: ["keep", "citadel", "castle", "tower", "fort", "fortress", "palace", "manor", "hall"],
+    description:
+      "The fortified seat of {name}, reached from {from}, its walls speaking of a time when they were needed.",
   }),
   Object.freeze({
-    id: "underground", keywords: ["mine", "mines", "quarry", "cave", "caves", "cavern", "tunnel", "crypt", "cellar", "undercity"],
-    description: "The deep places of {name}, reached from {from}, where the light falls away and the air turns cool and still.",
+    id: "underground",
+    keywords: ["mine", "mines", "quarry", "cave", "caves", "cavern", "tunnel", "crypt", "cellar", "undercity"],
+    description:
+      "The deep places of {name}, reached from {from}, where the light falls away and the air turns cool and still.",
   }),
   Object.freeze({
-    id: "roadside", keywords: ["road", "roads", "trail", "path", "highway", "bridge", "crossing", "waystation"],
-    description: "The road-place of {name}, reached from {from}, a stop for those arriving rather than a place to stay.",
+    id: "roadside",
+    keywords: ["road", "roads", "trail", "path", "highway", "bridge", "crossing", "waystation"],
+    description:
+      "The road-place of {name}, reached from {from}, a stop for those arriving rather than a place to stay.",
   }),
   Object.freeze({
-    id: "district", keywords: [],
+    id: "district",
+    keywords: [],
     description: "A part of the settlement called {name}, reached from {from}, taking shape around you as you arrive.",
   }),
 ]);
@@ -241,7 +293,11 @@ export const FREEFORM_LOCATION_FEATURES: VariationPool<string> = Object.freeze([
 
 /** Selects the first server-authored seed whose keyword matches a destination token; falls back to `district`. */
 export function selectFreeformTravelSeed(name: string): FreeformTravelSeedTemplate {
-  const tokens = new Set(normalizeLocationName(name).split(/[^a-z0-9]+/).filter(Boolean));
+  const tokens = new Set(
+    normalizeLocationName(name)
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean),
+  );
   for (const template of FREEFORM_TRAVEL_SEEDS) {
     if (template.keywords.some((keyword) => tokens.has(keyword))) return template;
   }
@@ -302,16 +358,31 @@ export interface FreeformTravelPorts {
   createDraft(principalId: string, input: CreateGenerationDraftInput): PrivateGenerationDraft;
   getContentRevision(principalId: string, campaignId: string): number | null;
   recordCandidate(draftId: string, content: GeneratedCampaignContentProvider): void;
-  applyDraft(principalId: string, input: DraftMutationInput & { selectedArtifactKeys: string[] }): PrivateGenerationDraft;
+  applyDraft(
+    principalId: string,
+    input: DraftMutationInput & { selectedArtifactKeys: string[] },
+  ): PrivateGenerationDraft;
   travelActor(principalId: string, actorId: string, input: ActorTravelCommandRequest): ActorTravelResult;
 }
 
 export interface FreeformTravelRepository {
   /** Classifies one declaration; throws only for unauthorized principals. */
-  classifyFreeformTravelIntent(principalId: string, campaignId: string, sessionId: string, actorId: string, text: string): FreeformTravelClassification;
+  classifyFreeformTravelIntent(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+  ): FreeformTravelClassification;
   /** Applies the exact server-authored candidate and moves the actor atomically. */
-  materializeFreeformTravel(principalId: string, campaignId: string, sessionId: string, actorId: string, text: string,
-    options?: { candidateId?: string }): FreeformTravelMaterialization;
+  materializeFreeformTravel(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+    options?: { candidateId?: string },
+  ): FreeformTravelMaterialization;
 }
 
 type PlacementRow = { location_id: string; public_name: string; visibility: "public" | "discovered" | "gm" };
@@ -326,57 +397,108 @@ export function createFreeformTravelRepository(
   const now = (): string => deps.clock.now().toISOString();
 
   function authorize(principalId: string, campaignId: string, actorId: string): void {
-    const member = db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+    const member = db
+      .prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
       .get(campaignId, principalId) as { role: string } | undefined;
-    if (!member || member.role === "observer") throw new FreeformTravelAuthorizationError("campaign membership is required");
+    if (!member || member.role === "observer")
+      throw new FreeformTravelAuthorizationError("campaign membership is required");
     if (member.role === "owner" || member.role === "gm") return;
-    if (!db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?")
-      .get(campaignId, actorId, principalId)) throw new FreeformTravelAuthorizationError("principal cannot act for the actor");
+    if (
+      !db
+        .prepare(
+          "SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?",
+        )
+        .get(campaignId, actorId, principalId)
+    )
+      throw new FreeformTravelAuthorizationError("principal cannot act for the actor");
   }
 
   /** Resolves GM materialization authority exactly as `initiateCombat` does. */
   function gmAuthorityPrincipal(principalId: string, campaignId: string): string | null {
-    if (db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')")
-      .get(campaignId, principalId)) return principalId;
-    const row = db.prepare(`SELECT membership.principal_id principal_id FROM campaign_memberships membership
+    if (
+      db
+        .prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')")
+        .get(campaignId, principalId)
+    )
+      return principalId;
+    const row = db
+      .prepare(
+        `SELECT membership.principal_id principal_id FROM campaign_memberships membership
       JOIN campaigns campaign ON campaign.id=membership.campaign_id
       WHERE membership.campaign_id=? AND membership.role IN ('owner','gm')
       ORDER BY CASE WHEN membership.principal_id=campaign.owner_principal_id THEN 0 ELSE 1 END,membership.principal_id
-      LIMIT 1`).get(campaignId) as { principal_id: string } | undefined;
+      LIMIT 1`,
+      )
+      .get(campaignId) as { principal_id: string } | undefined;
     return row?.principal_id ?? null;
   }
 
-  function readCurrentLocation(campaignId: string, sessionId: string, actorId: string): FreeformTravelLocationContext | null {
-    const row = db.prepare(`SELECT placement.location_id,location.public_name,location.visibility
+  function readCurrentLocation(
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+  ): FreeformTravelLocationContext | null {
+    const row = db
+      .prepare(
+        `SELECT placement.location_id,location.public_name,location.visibility
       FROM campaign_actor_locations_v28 placement
       JOIN campaign_locations_v28 location ON location.campaign_id=placement.campaign_id AND location.location_id=placement.location_id
-      WHERE placement.campaign_id=? AND placement.actor_id=? AND placement.session_id=?`)
+      WHERE placement.campaign_id=? AND placement.actor_id=? AND placement.session_id=?`,
+      )
       .get(campaignId, actorId, sessionId) as PlacementRow | undefined;
     if (!row) return null;
-    const artifact = db.prepare(`SELECT artifact_key FROM campaign_generation_accepted_artifacts_v52
-      WHERE campaign_id=? AND server_resource_id=? AND artifact_kind='location' AND visibility='public' LIMIT 1`)
+    const artifact = db
+      .prepare(
+        `SELECT artifact_key FROM campaign_generation_accepted_artifacts_v52
+      WHERE campaign_id=? AND server_resource_id=? AND artifact_kind='location' AND visibility='public' LIMIT 1`,
+      )
       .get(campaignId, row.location_id) as { artifact_key: string } | undefined;
-    return { locationId: row.location_id, name: row.public_name, visibility: row.visibility, artifactKey: artifact?.artifact_key ?? null };
+    return {
+      locationId: row.location_id,
+      name: row.public_name,
+      visibility: row.visibility,
+      artifactKey: artifact?.artifact_key ?? null,
+    };
   }
 
   function readLocations(campaignId: string): FreeformTravelLocationContext[] {
-    return (db.prepare("SELECT location_id,public_name,visibility FROM campaign_locations_v28 WHERE campaign_id=? ORDER BY location_id")
-      .all(campaignId) as LocationRow[]).map((row) => ({
-        locationId: row.location_id, name: row.public_name, visibility: row.visibility, artifactKey: null,
-      }));
+    return (
+      db
+        .prepare(
+          "SELECT location_id,public_name,visibility FROM campaign_locations_v28 WHERE campaign_id=? ORDER BY location_id",
+        )
+        .all(campaignId) as LocationRow[]
+    ).map((row) => ({
+      locationId: row.location_id,
+      name: row.public_name,
+      visibility: row.visibility,
+      artifactKey: null,
+    }));
   }
 
-  function classifyWithContext(identity: string, campaignId: string, sessionId: string, actorId: string, text: string): FreeformTravelClassification {
+  function classifyWithContext(
+    identity: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    text: string,
+  ): FreeformTravelClassification {
     return classifyFreeformTravel({
-      identity, text,
+      identity,
+      text,
       currentLocation: readCurrentLocation(campaignId, sessionId, actorId),
       locations: readLocations(campaignId),
     });
   }
 
   function worldRevision(campaignId: string, sessionId: string): number {
-    return (db.prepare("SELECT revision FROM world_mutation_revisions_v28 WHERE campaign_id=? AND session_id=?")
-      .get(campaignId, sessionId) as { revision: number } | undefined)?.revision ?? 0;
+    return (
+      (
+        db
+          .prepare("SELECT revision FROM world_mutation_revisions_v28 WHERE campaign_id=? AND session_id=?")
+          .get(campaignId, sessionId) as { revision: number } | undefined
+      )?.revision ?? 0
+    );
   }
 
   /**
@@ -386,55 +508,95 @@ export function createFreeformTravelRepository(
    * command rather than re-issued, so replay does not depend on the actor still
    * being adjacent to the source connection.
    */
-  function replayMaterialization(principalId: string, campaignId: string, sessionId: string, actorId: string,
-    identity: string, normalized: string, travelKey: string): FreeformTravelMaterialization {
-    const existing = ports.getDraftByIdempotencyKey(gmAuthorityPrincipal(principalId, campaignId)!, campaignId,
-      idempotencyKeySchema.parse(`ff-draft-${sha256(`${identity}:${normalized}`).slice(0, 48)}`));
+  function replayMaterialization(
+    principalId: string,
+    campaignId: string,
+    sessionId: string,
+    actorId: string,
+    identity: string,
+    normalized: string,
+    travelKey: string,
+  ): FreeformTravelMaterialization {
+    const existing = ports.getDraftByIdempotencyKey(
+      gmAuthorityPrincipal(principalId, campaignId)!,
+      campaignId,
+      idempotencyKeySchema.parse(`ff-draft-${sha256(`${identity}:${normalized}`).slice(0, 48)}`),
+    );
     if (!existing) throw new FreeformTravelConflictError("materialization replay is unavailable");
     const draft = privateGenerationDraftSchema.parse(existing);
-    const location = db.prepare(`SELECT artifact_key,server_resource_id,canonical_json FROM campaign_generation_accepted_artifacts_v52
-      WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='location' LIMIT 1`)
-      .get(campaignId, draft.draftId) as { artifact_key: string; server_resource_id: string | null; canonical_json: string } | undefined;
-    const connection = db.prepare(`SELECT artifact_key,server_resource_id FROM campaign_generation_accepted_artifacts_v52
-      WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='connection' LIMIT 1`)
+    const location = db
+      .prepare(
+        `SELECT artifact_key,server_resource_id,canonical_json FROM campaign_generation_accepted_artifacts_v52
+      WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='location' LIMIT 1`,
+      )
+      .get(campaignId, draft.draftId) as
+      { artifact_key: string; server_resource_id: string | null; canonical_json: string } | undefined;
+    const connection = db
+      .prepare(
+        `SELECT artifact_key,server_resource_id FROM campaign_generation_accepted_artifacts_v52
+      WHERE campaign_id=? AND source_draft_id=? AND artifact_kind='connection' LIMIT 1`,
+      )
       .get(campaignId, draft.draftId) as { artifact_key: string; server_resource_id: string | null } | undefined;
     if (!location?.server_resource_id || !connection?.server_resource_id) {
       throw new FreeformTravelConflictError("materialized location or connection is unavailable");
     }
-    const receipt = db.prepare("SELECT receipt_id FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?")
+    const receipt = db
+      .prepare("SELECT receipt_id FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?")
       .get(campaignId, draft.draftId) as { receipt_id: string } | undefined;
-    const stored = db.prepare(`SELECT receipt.canonical_result_json FROM world_commands_v28 command
+    const stored = db
+      .prepare(
+        `SELECT receipt.canonical_result_json FROM world_commands_v28 command
       JOIN world_receipts_v28 receipt USING(campaign_id,session_id,command_id)
-      WHERE command.campaign_id=? AND command.session_id=? AND command.actor_id=? AND command.idempotency_key=? AND command.command_type='travel'`)
+      WHERE command.campaign_id=? AND command.session_id=? AND command.actor_id=? AND command.idempotency_key=? AND command.command_type='travel'`,
+      )
       .get(campaignId, sessionId, actorId, travelKey) as { canonical_result_json: string } | undefined;
     if (!stored) throw new FreeformTravelConflictError("materialization replay is unavailable");
     const travel = JSON.parse(stored.canonical_result_json) as ActorTravelResult;
     const value = JSON.parse(location.canonical_json) as { name?: string };
     return {
       status: "materialized",
-      candidate: { candidateId: `ffc-${sha256(`${identity}:${normalized}`).slice(0, 40)}`, locationKey: location.artifact_key,
-        connectionKey: connection.artifact_key, name: typeof value.name === "string" ? value.name : normalized, visibility: "public" },
+      candidate: {
+        candidateId: `ffc-${sha256(`${identity}:${normalized}`).slice(0, 40)}`,
+        locationKey: location.artifact_key,
+        connectionKey: connection.artifact_key,
+        name: typeof value.name === "string" ? value.name : normalized,
+        visibility: "public",
+      },
       locationId: location.server_resource_id,
       connectionId: connection.server_resource_id,
       draftId: draft.draftId,
       contentReceiptId: receipt?.receipt_id ?? null,
-      world: { commandId: travel.receipt.commandId, revisionBefore: travel.receipt.revisionBefore,
-        revisionAfter: travel.receipt.revisionAfter, occurredAt: travel.receipt.occurredAt },
-      discoveries: travel.discoveries.map((discovery) => ({ actorId: discovery.actorId, locationId: discovery.locationId, discoveredAt: discovery.discoveredAt })),
+      world: {
+        commandId: travel.receipt.commandId,
+        revisionBefore: travel.receipt.revisionBefore,
+        revisionAfter: travel.receipt.revisionAfter,
+        occurredAt: travel.receipt.occurredAt,
+      },
+      discoveries: travel.discoveries.map((discovery) => ({
+        actorId: discovery.actorId,
+        locationId: discovery.locationId,
+        discoveredAt: discovery.discoveredAt,
+      })),
     };
   }
 
   return {
     classifyFreeformTravelIntent(principalId, campaignId, sessionId, actorId, text) {
       guard();
-      resourceIdSchema.parse(principalId); resourceIdSchema.parse(campaignId); resourceIdSchema.parse(sessionId); resourceIdSchema.parse(actorId);
+      resourceIdSchema.parse(principalId);
+      resourceIdSchema.parse(campaignId);
+      resourceIdSchema.parse(sessionId);
+      resourceIdSchema.parse(actorId);
       authorize(principalId, campaignId, actorId);
       return classifyWithContext(`${campaignId}:${sessionId}:${actorId}`, campaignId, sessionId, actorId, text);
     },
 
     materializeFreeformTravel(principalId, campaignId, sessionId, actorId, text, options) {
       guard();
-      resourceIdSchema.parse(principalId); resourceIdSchema.parse(campaignId); resourceIdSchema.parse(sessionId); resourceIdSchema.parse(actorId);
+      resourceIdSchema.parse(principalId);
+      resourceIdSchema.parse(campaignId);
+      resourceIdSchema.parse(sessionId);
+      resourceIdSchema.parse(actorId);
       authorize(principalId, campaignId, actorId);
 
       const parsed = parseFreeformTravelDestination(text);
@@ -449,75 +611,141 @@ export function createFreeformTravelRepository(
         throw new FreeformTravelConflictError("the chosen candidate is not in the server-authored set");
       }
       const authority = gmAuthorityPrincipal(principalId, campaignId);
-      if (!authority) throw new FreeformTravelUnavailableError("campaign has no GM authority to materialize a location");
+      if (!authority)
+        throw new FreeformTravelUnavailableError("campaign has no GM authority to materialize a location");
 
-      return db.transaction(() => {
-        if (ports.getDraftByIdempotencyKey(authority, campaignId, draftKey)) {
-          return replayMaterialization(principalId, campaignId, sessionId, actorId, identity, parsed.normalized, travelKey);
-        }
+      return db
+        .transaction(() => {
+          if (ports.getDraftByIdempotencyKey(authority, campaignId, draftKey)) {
+            return replayMaterialization(
+              principalId,
+              campaignId,
+              sessionId,
+              actorId,
+              identity,
+              parsed.normalized,
+              travelKey,
+            );
+          }
 
-        // Freshness re-check: only materialize a location the classifier still authorizes.
-        const classification = classifyWithContext(identity, campaignId, sessionId, actorId, text);
-        if (classification.intent === "none") return { status: "declined" as const, reason: classification.reason };
-        const candidate = classification.candidates.find((value) => value.candidateId === candidateId);
-        if (!candidate) throw new FreeformTravelConflictError("the chosen candidate is no longer available");
+          // Freshness re-check: only materialize a location the classifier still authorizes.
+          const classification = classifyWithContext(identity, campaignId, sessionId, actorId, text);
+          if (classification.intent === "none") return { status: "declined" as const, reason: classification.reason };
+          const candidate = classification.candidates.find((value) => value.candidateId === candidateId);
+          if (!candidate) throw new FreeformTravelConflictError("the chosen candidate is no longer available");
 
-        const campaign = db.prepare("SELECT active_timeline_id,administration_revision FROM campaigns WHERE id=?")
-          .get(campaignId) as { active_timeline_id: string; administration_revision: number } | undefined;
-        if (!campaign) throw new FreeformTravelUnavailableError("campaign is unavailable");
+          const campaign = db
+            .prepare("SELECT active_timeline_id,administration_revision FROM campaigns WHERE id=?")
+            .get(campaignId) as { active_timeline_id: string; administration_revision: number } | undefined;
+          if (!campaign) throw new FreeformTravelUnavailableError("campaign is unavailable");
 
-        const content = generatedCampaignContentProviderSchema.parse({
-          locations: [{ key: candidate.locationKey, name: candidate.name, description: candidate.description, visibility: "public" }],
-          connections: [{ key: candidate.connectionKey, fromLocationKey: candidate.fromLocationKey, toLocationKey: candidate.locationKey,
-            description: candidate.description, visibility: "public" }],
-        });
-        const requestDigest = sha256(canonical({ kind: "freeform-materialize-location", campaignId, sessionId, actorId, candidate }));
+          const content = generatedCampaignContentProviderSchema.parse({
+            locations: [
+              {
+                key: candidate.locationKey,
+                name: candidate.name,
+                description: candidate.description,
+                visibility: "public",
+              },
+            ],
+            connections: [
+              {
+                key: candidate.connectionKey,
+                fromLocationKey: candidate.fromLocationKey,
+                toLocationKey: candidate.locationKey,
+                description: candidate.description,
+                visibility: "public",
+              },
+            ],
+          });
+          const requestDigest = sha256(
+            canonical({ kind: "freeform-materialize-location", campaignId, sessionId, actorId, candidate }),
+          );
 
-        const baseRevision = ports.getContentRevision(authority, campaignId);
-        if (baseRevision === null) throw new FreeformTravelUnavailableError("generation context is unavailable");
-        const draft = ports.createDraft(authority, {
-          campaignId, timelineId: campaign.active_timeline_id, sessionId, kind: "content-pack",
-          stagedContent: stagedCampaignContentGenerationSchema.parse({
-            kind: "campaign-content", requestDigest, baseContentRevision: baseRevision, dependencyDigests: {}, ...content,
-          }),
-          validation: { valid: true, issues: [], validatedAt: now() },
-          expectedCampaignRevision: campaign.administration_revision,
-          idempotencyKey: draftKey,
-        });
-        if (!db.prepare("SELECT 1 FROM campaign_generation_candidate_artifacts_v52 WHERE draft_id=? LIMIT 1").get(draft.draftId)) {
-          ports.recordCandidate(draft.draftId, content);
-        }
-        const applied = ports.applyDraft(authority, {
-          draftId: draft.draftId, expectedDraftRevision: draft.revision, expectedCampaignRevision: draft.campaignRevision,
-          idempotencyKey: applyKey, selectedArtifactKeys: [candidate.locationKey, candidate.connectionKey],
-        });
+          const baseRevision = ports.getContentRevision(authority, campaignId);
+          if (baseRevision === null) throw new FreeformTravelUnavailableError("generation context is unavailable");
+          const draft = ports.createDraft(authority, {
+            campaignId,
+            timelineId: campaign.active_timeline_id,
+            sessionId,
+            kind: "content-pack",
+            stagedContent: stagedCampaignContentGenerationSchema.parse({
+              kind: "campaign-content",
+              requestDigest,
+              baseContentRevision: baseRevision,
+              dependencyDigests: {},
+              ...content,
+            }),
+            validation: { valid: true, issues: [], validatedAt: now() },
+            expectedCampaignRevision: campaign.administration_revision,
+            idempotencyKey: draftKey,
+          });
+          if (
+            !db
+              .prepare("SELECT 1 FROM campaign_generation_candidate_artifacts_v52 WHERE draft_id=? LIMIT 1")
+              .get(draft.draftId)
+          ) {
+            ports.recordCandidate(draft.draftId, content);
+          }
+          const applied = ports.applyDraft(authority, {
+            draftId: draft.draftId,
+            expectedDraftRevision: draft.revision,
+            expectedCampaignRevision: draft.campaignRevision,
+            idempotencyKey: applyKey,
+            selectedArtifactKeys: [candidate.locationKey, candidate.connectionKey],
+          });
 
-        const location = db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
-          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='location'`).get(campaignId, candidate.locationKey) as { server_resource_id: string | null } | undefined;
-        const connection = db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
-          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='connection'`).get(campaignId, candidate.connectionKey) as { server_resource_id: string | null } | undefined;
-        if (!location?.server_resource_id || !connection?.server_resource_id) {
-          throw new FreeformTravelConflictError("materialized location or connection is unavailable");
-        }
-        const receipt = db.prepare("SELECT receipt_id FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?")
-          .get(campaignId, draft.draftId) as { receipt_id: string } | undefined;
-        const travel = ports.travelActor(principalId, actorId, {
-          connectionId: connection.server_resource_id, partyActorIds: [actorId],
-          expectedRevision: worldRevision(campaignId, sessionId), idempotencyKey: travelKey,
-        });
-        return {
-          status: "materialized" as const,
-          candidate: { candidateId, locationKey: candidate.locationKey, connectionKey: candidate.connectionKey,
-            name: candidate.name, visibility: "public" as const },
-          locationId: location.server_resource_id,
-          connectionId: connection.server_resource_id,
-          draftId: applied.draftId,
-          contentReceiptId: receipt?.receipt_id ?? null,
-          world: { commandId: travel.receipt.commandId, revisionBefore: travel.receipt.revisionBefore,
-            revisionAfter: travel.receipt.revisionAfter, occurredAt: travel.receipt.occurredAt },
-          discoveries: travel.discoveries.map((discovery) => ({ actorId: discovery.actorId, locationId: discovery.locationId, discoveredAt: discovery.discoveredAt })),
-        };
-      }).immediate();
+          const location = db
+            .prepare(
+              `SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='location'`,
+            )
+            .get(campaignId, candidate.locationKey) as { server_resource_id: string | null } | undefined;
+          const connection = db
+            .prepare(
+              `SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='connection'`,
+            )
+            .get(campaignId, candidate.connectionKey) as { server_resource_id: string | null } | undefined;
+          if (!location?.server_resource_id || !connection?.server_resource_id) {
+            throw new FreeformTravelConflictError("materialized location or connection is unavailable");
+          }
+          const receipt = db
+            .prepare("SELECT receipt_id FROM campaign_content_receipts_v42 WHERE campaign_id=? AND draft_id=?")
+            .get(campaignId, draft.draftId) as { receipt_id: string } | undefined;
+          const travel = ports.travelActor(principalId, actorId, {
+            connectionId: connection.server_resource_id,
+            partyActorIds: [actorId],
+            expectedRevision: worldRevision(campaignId, sessionId),
+            idempotencyKey: travelKey,
+          });
+          return {
+            status: "materialized" as const,
+            candidate: {
+              candidateId,
+              locationKey: candidate.locationKey,
+              connectionKey: candidate.connectionKey,
+              name: candidate.name,
+              visibility: "public" as const,
+            },
+            locationId: location.server_resource_id,
+            connectionId: connection.server_resource_id,
+            draftId: applied.draftId,
+            contentReceiptId: receipt?.receipt_id ?? null,
+            world: {
+              commandId: travel.receipt.commandId,
+              revisionBefore: travel.receipt.revisionBefore,
+              revisionAfter: travel.receipt.revisionAfter,
+              occurredAt: travel.receipt.occurredAt,
+            },
+            discoveries: travel.discoveries.map((discovery) => ({
+              actorId: discovery.actorId,
+              locationId: discovery.locationId,
+              discoveredAt: discovery.discoveredAt,
+            })),
+          };
+        })
+        .immediate();
     },
   };
 }

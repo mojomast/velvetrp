@@ -35,8 +35,12 @@ describe("SRD 5.1 monsters, challenge rating 1", () => {
   });
 
   it("keeps ability and enemy slugs and ids unique", () => {
-    const abilityIds = band.abilities.map((ability) => abilityCatalogDefinitionSchema.parse(ability).reference.definitionId);
-    const enemyIds = band.enemies.map((enemy) => enemyTemplateCatalogDefinitionSchema.parse(enemy).reference.definitionId);
+    const abilityIds = band.abilities.map(
+      (ability) => abilityCatalogDefinitionSchema.parse(ability).reference.definitionId,
+    );
+    const enemyIds = band.enemies.map(
+      (enemy) => enemyTemplateCatalogDefinitionSchema.parse(enemy).reference.definitionId,
+    );
 
     expect(new Set(abilityIds).size).toBe(abilityIds.length);
     expect(new Set(enemyIds).size).toBe(enemyIds.length);

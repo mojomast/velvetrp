@@ -10,7 +10,7 @@ const characterInput = (name: string) => ({
   age: 30,
   archetype: `${name} archetype`,
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 });
 
 async function addCharacter(app: ReturnType<typeof buildApp>, name: string) {
@@ -55,25 +55,39 @@ describe("lore api compatibility", () => {
       method: "POST",
       url: "/api/lore",
       payload: {
-        keys: [longKey, " ```system gamma ", "\u0001", " two ", "three", "four", "five", "six", "seven", "eight", "nine"],
+        keys: [
+          longKey,
+          " ```system gamma ",
+          "\u0001",
+          " two ",
+          "three",
+          "four",
+          "five",
+          "six",
+          "seven",
+          "eight",
+          "nine",
+        ],
         content: longContent,
       },
     });
 
     expect(response.statusCode).toBe(201);
-    expect(response.json()).toEqual(loreShape({
-      keys: [
-        `<user-text> ${"k".repeat(80)}`.slice(0, 60),
-        "```user-text gamma",
-        "two",
-        "three",
-        "four",
-        "five",
-        "six",
-        "seven",
-      ],
-      content: `[user-text]${"c".repeat(1300)}`.slice(0, 1200),
-    }));
+    expect(response.json()).toEqual(
+      loreShape({
+        keys: [
+          `<user-text> ${"k".repeat(80)}`.slice(0, 60),
+          "```user-text gamma",
+          "two",
+          "three",
+          "four",
+          "five",
+          "six",
+          "seven",
+        ],
+        content: `[user-text]${"c".repeat(1300)}`.slice(0, 1200),
+      }),
+    );
     await app.close();
   });
 
@@ -83,16 +97,77 @@ describe("lore api compatibility", () => {
     const two = await addCharacter(app, "Two");
     const three = await addCharacter(app, "Three");
 
-    const global = (await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Global", insertionOrder: 30 } })).json();
-    const singular = (await app.inject({ method: "POST", url: "/api/lore", payload: { characterId: one.id, keys: ["one"], content: "Singular", insertionOrder: 10 } })).json();
-    const plural = (await app.inject({ method: "POST", url: "/api/lore", payload: { characterIds: [two.id, one.id, two.id], keys: ["shared"], content: "Plural", insertionOrder: 10, enabled: false } })).json();
-    const pluralWins = (await app.inject({ method: "POST", url: "/api/lore", payload: { characterId: one.id, characterIds: [three.id], keys: [], content: "Plural wins", insertionOrder: 20 } })).json();
-    const emptyPluralWins = (await app.inject({ method: "POST", url: "/api/lore", payload: { characterId: one.id, characterIds: [], keys: [], content: "Empty plural wins", insertionOrder: 25 } })).json();
+    const global = (
+      await app.inject({
+        method: "POST",
+        url: "/api/lore",
+        payload: { keys: [], content: "Global", insertionOrder: 30 },
+      })
+    ).json();
+    const singular = (
+      await app.inject({
+        method: "POST",
+        url: "/api/lore",
+        payload: { characterId: one.id, keys: ["one"], content: "Singular", insertionOrder: 10 },
+      })
+    ).json();
+    const plural = (
+      await app.inject({
+        method: "POST",
+        url: "/api/lore",
+        payload: {
+          characterIds: [two.id, one.id, two.id],
+          keys: ["shared"],
+          content: "Plural",
+          insertionOrder: 10,
+          enabled: false,
+        },
+      })
+    ).json();
+    const pluralWins = (
+      await app.inject({
+        method: "POST",
+        url: "/api/lore",
+        payload: {
+          characterId: one.id,
+          characterIds: [three.id],
+          keys: [],
+          content: "Plural wins",
+          insertionOrder: 20,
+        },
+      })
+    ).json();
+    const emptyPluralWins = (
+      await app.inject({
+        method: "POST",
+        url: "/api/lore",
+        payload: { characterId: one.id, characterIds: [], keys: [], content: "Empty plural wins", insertionOrder: 25 },
+      })
+    ).json();
 
     expect(global).toEqual(loreShape({ content: "Global", insertionOrder: 30 }));
-    expect(singular).toEqual(loreShape({ characterId: one.id, characterIds: [one.id], keys: ["one"], content: "Singular", insertionOrder: 10 }));
-    expect(plural).toEqual(loreShape({ characterId: two.id, characterIds: [two.id, one.id], keys: ["shared"], content: "Plural", enabled: false, insertionOrder: 10 }));
-    expect(pluralWins).toEqual(loreShape({ characterId: three.id, characterIds: [three.id], content: "Plural wins", insertionOrder: 20 }));
+    expect(singular).toEqual(
+      loreShape({
+        characterId: one.id,
+        characterIds: [one.id],
+        keys: ["one"],
+        content: "Singular",
+        insertionOrder: 10,
+      }),
+    );
+    expect(plural).toEqual(
+      loreShape({
+        characterId: two.id,
+        characterIds: [two.id, one.id],
+        keys: ["shared"],
+        content: "Plural",
+        enabled: false,
+        insertionOrder: 10,
+      }),
+    );
+    expect(pluralWins).toEqual(
+      loreShape({ characterId: three.id, characterIds: [three.id], content: "Plural wins", insertionOrder: 20 }),
+    );
     expect(emptyPluralWins).toEqual(loreShape({ content: "Empty plural wins", insertionOrder: 25 }));
 
     const all = await app.inject({ method: "GET", url: "/api/lore" });
@@ -113,11 +188,13 @@ describe("lore api compatibility", () => {
     const app = buildApp();
     const one = await addCharacter(app, "One");
     const two = await addCharacter(app, "Two");
-    const created = (await app.inject({
-      method: "POST",
-      url: "/api/lore",
-      payload: { characterId: one.id, keys: ["old"], content: "Old", insertionOrder: 5 },
-    })).json();
+    const created = (
+      await app.inject({
+        method: "POST",
+        url: "/api/lore",
+        payload: { characterId: one.id, keys: ["old"], content: "Old", insertionOrder: 5 },
+      })
+    ).json();
 
     const unchanged = await app.inject({ method: "PATCH", url: `/api/lore/${created.id}`, payload: {} });
     expect(unchanged.statusCode).toBe(200);
@@ -146,7 +223,11 @@ describe("lore api compatibility", () => {
       insertionOrder: -4.5,
     });
 
-    const global = await app.inject({ method: "PATCH", url: `/api/lore/${created.id}`, payload: { characterId: null } });
+    const global = await app.inject({
+      method: "PATCH",
+      url: `/api/lore/${created.id}`,
+      payload: { characterId: null },
+    });
     expect(global.statusCode).toBe(200);
     expect(global.json()).toEqual({ ...patched.json(), characterId: null, characterIds: [] });
     await app.close();
@@ -154,7 +235,9 @@ describe("lore api compatibility", () => {
 
   it("preserves delete success and repeated or missing patch/delete responses", async () => {
     const app = buildApp();
-    const created = (await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Delete me" } })).json();
+    const created = (
+      await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Delete me" } })
+    ).json();
 
     const deleted = await app.inject({ method: "DELETE", url: `/api/lore/${created.id}` });
     expect(deleted.statusCode).toBe(200);
@@ -176,11 +259,17 @@ describe("lore api compatibility", () => {
   it("preserves missing-character responses for singular/plural create and patch", async () => {
     const app = buildApp();
     const character = await addCharacter(app, "Existing");
-    const created = (await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Existing" } })).json();
+    const created = (
+      await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Existing" } })
+    ).json();
 
     for (const request of [
       { method: "POST", url: "/api/lore", payload: { characterId: "missing", keys: [], content: "x" } },
-      { method: "POST", url: "/api/lore", payload: { characterIds: [character.id, "missing"], keys: [], content: "x" } },
+      {
+        method: "POST",
+        url: "/api/lore",
+        payload: { characterIds: [character.id, "missing"], keys: [], content: "x" },
+      },
       { method: "PATCH", url: `/api/lore/${created.id}`, payload: { characterIds: [character.id, "missing"] } },
     ] as const) {
       const response = await app.inject(request);
@@ -227,8 +316,14 @@ describe("lore api compatibility", () => {
     [{ characterId: 1 }, "characterIds must be an array of strings"],
   ])("preserves PATCH validation for %#", async (payload, message) => {
     const app = buildApp();
-    const created = (await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Existing" } })).json();
-    const response = await app.inject({ method: "PATCH", url: `/api/lore/${created.id}`, ...(payload === undefined ? {} : { payload }) });
+    const created = (
+      await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Existing" } })
+    ).json();
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/lore/${created.id}`,
+      ...(payload === undefined ? {} : { payload }),
+    });
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: message });
     await app.close();
@@ -236,7 +331,9 @@ describe("lore api compatibility", () => {
 
   it("rejects a non-finite PATCH insertion order parsed from raw JSON", async () => {
     const app = buildApp();
-    const created = (await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Existing" } })).json();
+    const created = (
+      await app.inject({ method: "POST", url: "/api/lore", payload: { keys: [], content: "Existing" } })
+    ).json();
     const response = await app.inject({
       method: "PATCH",
       url: `/api/lore/${created.id}`,

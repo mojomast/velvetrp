@@ -18,7 +18,8 @@ export {
   type WorldReceipt,
   type WorldWriteContext,
   type WorldWriteRepository,
-  type ActorTravelResult, type ActorCampResult,
+  type ActorTravelResult,
+  type ActorCampResult,
   type CreateNpcResult,
   type NpcRelationshipResult,
   type CreateFactionResult,
@@ -28,7 +29,4 @@ export {
   type ActorFactionMembershipResult,
   type NpcFactionMembershipResult,
 } from "./worldWriteRepo.js";
-export {
-  createNpcPresenceRepository,
-  type NpcPresenceRepository,
-} from "./npcPresenceRepo.js";
+export { createNpcPresenceRepository, type NpcPresenceRepository } from "./npcPresenceRepo.js";

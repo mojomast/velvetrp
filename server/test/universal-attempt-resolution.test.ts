@@ -7,7 +7,11 @@ import {
   declarationCheckCandidateLabel,
   mapDeclarationToCheck,
 } from "../src/agent/declarationCheckMap.js";
-import { orchestrateAdventureTurn, relevantCheckCandidates, type AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
+import {
+  orchestrateAdventureTurn,
+  relevantCheckCandidates,
+  type AdventureAgentDependencies,
+} from "../src/agent/adventureOrchestrator.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { listSystemOneDecisionsByLane } from "../src/repo/index.js";
 import type { ProviderCompletionResult } from "../src/provider/index.js";
@@ -17,7 +21,10 @@ import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const OWNER = "local-owner";
-afterEach(() => { delete process.env.FEATURE_RPG_CAMPAIGN; delete process.env.FEATURE_RPG_MECHANICS; });
+afterEach(() => {
+  delete process.env.FEATURE_RPG_CAMPAIGN;
+  delete process.env.FEATURE_RPG_MECHANICS;
+});
 
 const STRONG_CASES: Array<[string, string, string]> = [
   ["I listen for faint footsteps.", "Wisdom", "Perception"],
@@ -83,23 +90,42 @@ describe("declaration-to-check mapping", () => {
   });
 
   it("requires director adjudication for hazardous context", () => {
-    expect(mapDeclarationToCheck("I climb the sheer icy cliff")).toMatchObject({ skill: "Athletics", confidence: "weak" });
+    expect(mapDeclarationToCheck("I climb the sheer icy cliff")).toMatchObject({
+      skill: "Athletics",
+      confidence: "weak",
+    });
   });
   it.each(["I look around the room.", "I give Mara a long look.", "I listen to Mara.", "I watch the sunset."])(
-    "does not automatically roll for ordinary observation: %s", (declaration) => {
+    "does not automatically roll for ordinary observation: %s",
+    (declaration) => {
       expect(mapDeclarationToCheck(declaration)).toMatchObject({ skill: "Perception", confidence: "weak" });
-    });
+    },
+  );
   it("returns unsupported leanings as weak, never strong", () => {
-    expect(mapDeclarationToCheck("I check the door.")).toMatchObject({ ability: "Intelligence", skill: "Investigation", confidence: "weak" });
-    expect(mapDeclarationToCheck("I scan the room.")).toMatchObject({ ability: "Wisdom", skill: "Perception", confidence: "weak" });
+    expect(mapDeclarationToCheck("I check the door.")).toMatchObject({
+      ability: "Intelligence",
+      skill: "Investigation",
+      confidence: "weak",
+    });
+    expect(mapDeclarationToCheck("I scan the room.")).toMatchObject({
+      ability: "Wisdom",
+      skill: "Perception",
+      confidence: "weak",
+    });
   });
 
   it("covers all 18 SRD skill labels with at least one strong entry", () => {
     expect(DECLARATION_CHECK_SKILL_LABELS).toHaveLength(18);
     for (const [ability, skill] of DECLARATION_CHECK_SKILL_LABELS) {
-      expect(DECLARATION_CHECK_VERBS.some((value) => value.ability === ability && value.skill === skill && value.confidence === "strong"),
-        `${ability} ${skill}`).toBe(true);
-      expect(declarationCheckCandidateLabel({ ability, skill })).toBe(`${skill} (${ability}), Medium difficulty, normal`);
+      expect(
+        DECLARATION_CHECK_VERBS.some(
+          (value) => value.ability === ability && value.skill === skill && value.confidence === "strong",
+        ),
+        `${ability} ${skill}`,
+      ).toBe(true);
+      expect(declarationCheckCandidateLabel({ ability, skill })).toBe(
+        `${skill} (${ability}), Medium difficulty, normal`,
+      );
     }
   });
 
@@ -120,18 +146,28 @@ describe("declaration-to-check mapping", () => {
 
   it("withholds check candidates only for narrowly recognized routine observation", () => {
     const candidates = [{ label: "Perception (Wisdom), Medium difficulty, normal" }];
-    expect(relevantCheckCandidates(candidates,
-      "I take a slow look around the market square and take stock of who and what is here.")).toEqual([]);
+    expect(
+      relevantCheckCandidates(
+        candidates,
+        "I take a slow look around the market square and take stock of who and what is here.",
+      ),
+    ).toEqual([]);
     expect(relevantCheckCandidates(candidates, "I look around.")).toEqual([]);
-    for (const declaration of ["I look for hidden doors.", "I look around with a Perception check.",
-      "I look around and then search the crates."]) {
+    for (const declaration of [
+      "I look for hidden doors.",
+      "I look around with a Perception check.",
+      "I look around and then search the crates.",
+    ]) {
       expect(relevantCheckCandidates(candidates, declaration), declaration).toEqual(candidates);
     }
   });
 });
 
-const holdCompletion = (): ProviderCompletionResult => ({ message: { role: "assistant", content: "The room waits; nothing is decided yet." },
-  usage: null, model: { requestedModel: "fake-dm", responseModel: "fake-dm" } });
+const holdCompletion = (): ProviderCompletionResult => ({
+  message: { role: "assistant", content: "The room waits; nothing is decided yet." },
+  usage: null,
+  model: { requestedModel: "fake-dm", responseModel: "fake-dm" },
+});
 
 describe("deterministic held-attempt resolution", () => {
   it("cannot execute a provider-selected check or raw dice roll for routine observation", async () => {
@@ -139,24 +175,46 @@ describe("deterministic held-attempt resolution", () => {
     try {
       const declaration = "I take a slow look around the market square and take stock of who and what is here.";
       for (const toolName of ["exact_srd_check.select", "actor_dice.roll"]) {
-        const created = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
-          sessionId: f.session.id, actorId: f.actorId, declaration,
+        const created = f.repo.createAdventureTurn(OWNER, {
+          campaignId: f.campaign.id,
+          timelineId: f.campaign.activeTimelineId,
+          sessionId: f.session.id,
+          actorId: f.actorId,
+          declaration,
           expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
-          idempotencyKey: `routine-observation-${toolName}` });
+          idempotencyKey: `routine-observation-${toolName}`,
+        });
         // Even a real server-issued candidate may not be used when this turn did not advertise it.
-        const candidate = f.repo.generateAdventureCheckCandidates(OWNER, created.turnId)
-          .find(row => row.label === "Perception (Wisdom), Medium difficulty, normal")!;
+        const candidate = f.repo
+          .generateAdventureCheckCandidates(OWNER, created.turnId)
+          .find((row) => row.label === "Perception (Wisdom), Medium difficulty, normal")!;
         expect(candidate).toBeDefined();
         let advertised: string[] | undefined;
         const result = await orchestrateAdventureTurn(f.repo, created.turnId, {
           getProvider: async () => ({ ...defaultProviderSettings(), model: "fake-dm" }),
-          getHarness: async () => defaultHarnessSettings(), now: f.options.clock.now,
-          complete: async input => {
-            advertised = input.tools?.map(tool => tool.name) ?? [];
-            return { message: { role: "assistant", content: null, toolCalls: [{ id: "unadvertised-observation-check",
-              name: toolName, arguments: JSON.stringify(toolName === "exact_srd_check.select"
-                ? { candidateId: candidate.candidateId, digest: candidate.digest } : { expression: "1d20" }) }] },
-              usage: null, model: { requestedModel: "fake-dm", responseModel: "fake-dm" } };
+          getHarness: async () => defaultHarnessSettings(),
+          now: f.options.clock.now,
+          complete: async (input) => {
+            advertised = input.tools?.map((tool) => tool.name) ?? [];
+            return {
+              message: {
+                role: "assistant",
+                content: null,
+                toolCalls: [
+                  {
+                    id: "unadvertised-observation-check",
+                    name: toolName,
+                    arguments: JSON.stringify(
+                      toolName === "exact_srd_check.select"
+                        ? { candidateId: candidate.candidateId, digest: candidate.digest }
+                        : { expression: "1d20" },
+                    ),
+                  },
+                ],
+              },
+              usage: null,
+              model: { requestedModel: "fake-dm", responseModel: "fake-dm" },
+            };
           },
         });
         expect(advertised).toBeDefined();
@@ -165,35 +223,55 @@ describe("deterministic held-attempt resolution", () => {
         expect(result.turn.receiptLinks).toEqual([]);
         expect(result.turn.toolCalls).toEqual([]);
       }
-      for (const [index, declaration] of ["I look for hidden doors.", "I look around with a Perception check."].entries()) {
-        const created = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
-          sessionId: f.session.id, actorId: f.actorId, declaration,
+      for (const [index, declaration] of [
+        "I look for hidden doors.",
+        "I look around with a Perception check.",
+      ].entries()) {
+        const created = f.repo.createAdventureTurn(OWNER, {
+          campaignId: f.campaign.id,
+          timelineId: f.campaign.activeTimelineId,
+          sessionId: f.session.id,
+          actorId: f.actorId,
+          declaration,
           expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
-          idempotencyKey: `requested-observation-check-${index}` });
+          idempotencyKey: `requested-observation-check-${index}`,
+        });
         let advertised: string[] | undefined;
         await orchestrateAdventureTurn(f.repo, created.turnId, {
           getProvider: async () => ({ ...defaultProviderSettings(), model: "fake-dm" }),
-          getHarness: async () => defaultHarnessSettings(), now: f.options.clock.now,
-          complete: async input => {
-            advertised = input.tools?.map(tool => tool.name) ?? [];
+          getHarness: async () => defaultHarnessSettings(),
+          now: f.options.clock.now,
+          complete: async (input) => {
+            advertised = input.tools?.map((tool) => tool.name) ?? [];
             return holdCompletion();
           },
         });
         expect(advertised).toContain("exact_srd_check.select");
         expect(advertised).toContain("actor_dice.roll");
       }
-    } finally { f.repo.close(); }
+    } finally {
+      f.repo.close();
+    }
   });
   it("commits the mapped Medium check when the provider holds and keeps a greeting held", async () => {
     const f = await dmFixture(true);
     try {
       const declaration = "I search the room for clues.";
-      const created = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
-        sessionId: f.session.id, actorId: f.actorId, declaration,
-        expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: "universal-attempt" });
+      const created = f.repo.createAdventureTurn(OWNER, {
+        campaignId: f.campaign.id,
+        timelineId: f.campaign.activeTimelineId,
+        sessionId: f.session.id,
+        actorId: f.actorId,
+        declaration,
+        expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
+        idempotencyKey: "universal-attempt",
+      });
       let calls = 0;
       const dependencies: AdventureAgentDependencies = {
-        complete: async () => { calls += 1; return holdCompletion(); },
+        complete: async () => {
+          calls += 1;
+          return holdCompletion();
+        },
         getProvider: async () => ({ ...defaultProviderSettings(), model: "fake-dm" }),
         getHarness: async () => defaultHarnessSettings(),
         now: f.options.clock.now,
@@ -203,48 +281,109 @@ describe("deterministic held-attempt resolution", () => {
       expect(committed.outcome).toBe("mechanics-committed");
       expect(calls).toBe(1);
       expect(committed.turn.receiptLinks).toHaveLength(1);
-      const receipt = f.repo.getAdventureCheckNarrationReceipt(OWNER, created.turnId, committed.turn.receiptLinks[0]!.commandId);
-      expect(receipt).toMatchObject({ checkKind: "skill", ability: "Intelligence", skill: "Investigation",
-        mode: "normal", difficulty: "Medium", dc: 15 });
+      const receipt = f.repo.getAdventureCheckNarrationReceipt(
+        OWNER,
+        created.turnId,
+        committed.turn.receiptLinks[0]!.commandId,
+      );
+      expect(receipt).toMatchObject({
+        checkKind: "skill",
+        ability: "Intelligence",
+        skill: "Investigation",
+        mode: "normal",
+        difficulty: "Medium",
+        dc: 15,
+      });
 
       // The deterministic commit records an advisory-first decision row with explicit server-fallback
       // provenance, then the lane-origin execution row linked by its decision id is the evidence.
       const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
       expect(decisions).toHaveLength(1);
-      expect(decisions[0]).toMatchObject({ lane: "adventure-selection", provider: "server-fallback", model: "declaration-check-map-v1",
-        shadow: true, fallbackUsed: true, confidenceBand: "act", turnId: created.turnId, campaignId: f.campaign.id, sessionId: f.session.id });
-      expect(decisions[0]!.selection as Record<string, unknown>).toMatchObject({ method: "server-fallback", rationale: expect.stringContaining("Investigation") });
+      expect(decisions[0]).toMatchObject({
+        lane: "adventure-selection",
+        provider: "server-fallback",
+        model: "declaration-check-map-v1",
+        shadow: true,
+        fallbackUsed: true,
+        confidenceBand: "act",
+        turnId: created.turnId,
+        campaignId: f.campaign.id,
+        sessionId: f.session.id,
+      });
+      expect(decisions[0]!.selection as Record<string, unknown>).toMatchObject({
+        method: "server-fallback",
+        rationale: expect.stringContaining("Investigation"),
+      });
       const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
-      const execution = db.prepare("SELECT * FROM adventure_check_executions_v54 WHERE turn_id=?").get(created.turnId) as Record<string, unknown> | undefined;
+      const execution = db
+        .prepare("SELECT * FROM adventure_check_executions_v54 WHERE turn_id=?")
+        .get(created.turnId) as Record<string, unknown> | undefined;
       db.close();
-      expect(execution).toMatchObject({ origin: "lane", system_one_decision_id: decisions[0]!.decisionId,
-        provider_call_id: null, provider_tool_call_id: null, round_number: null });
+      expect(execution).toMatchObject({
+        origin: "lane",
+        system_one_decision_id: decisions[0]!.decisionId,
+        provider_call_id: null,
+        provider_tool_call_id: null,
+        round_number: null,
+      });
 
       // The deterministic receipt, not the empty hold line, grounds the turn's narration.
       expect(narrationFallback(declaration, [])).toContain("The scene holds");
-      expect(narrationFallback(declaration, [{ kind: "check", checkKind: receipt!.checkKind, ability: receipt!.ability, skill: receipt!.skill,
-        mode: receipt!.mode, difficulty: receipt!.difficulty, rolls: receipt!.rolls, abilityModifier: receipt!.abilityModifier,
-        proficiencyBonus: receipt!.proficiencyBonus, modifier: receipt!.modifier, total: receipt!.total, dc: receipt!.dc,
-        outcome: receipt!.outcome }])).toContain("Investigation check");
+      expect(
+        narrationFallback(declaration, [
+          {
+            kind: "check",
+            checkKind: receipt!.checkKind,
+            ability: receipt!.ability,
+            skill: receipt!.skill,
+            mode: receipt!.mode,
+            difficulty: receipt!.difficulty,
+            rolls: receipt!.rolls,
+            abilityModifier: receipt!.abilityModifier,
+            proficiencyBonus: receipt!.proficiencyBonus,
+            modifier: receipt!.modifier,
+            total: receipt!.total,
+            dc: receipt!.dc,
+            outcome: receipt!.outcome,
+          },
+        ]),
+      ).toContain("Investigation check");
 
-      const greeting = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
-        sessionId: f.session.id, actorId: f.actorId, declaration: "Hello there, friend.",
-        expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: "universal-greeting" });
+      const greeting = f.repo.createAdventureTurn(OWNER, {
+        campaignId: f.campaign.id,
+        timelineId: f.campaign.activeTimelineId,
+        sessionId: f.session.id,
+        actorId: f.actorId,
+        declaration: "Hello there, friend.",
+        expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
+        idempotencyKey: "universal-greeting",
+      });
       const held = await orchestrateAdventureTurn(f.repo, greeting.turnId, dependencies);
       expect(held.outcome).toBe("completed");
       expect(held.turn.receiptLinks).toEqual([]);
       expect(listSystemOneDecisionsByLane("adventure-selection", 10)).toHaveLength(1);
-      for (const [index, declaration] of ['"Search the room," I whisper to Mara.',
-        "I buy a lantern and then search the room.", "I didn't search the room.", "I look around the room."].entries()) {
-        const rejected = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
-          sessionId: f.session.id, actorId: f.actorId, declaration,
+      for (const [index, declaration] of [
+        '"Search the room," I whisper to Mara.',
+        "I buy a lantern and then search the room.",
+        "I didn't search the room.",
+        "I look around the room.",
+      ].entries()) {
+        const rejected = f.repo.createAdventureTurn(OWNER, {
+          campaignId: f.campaign.id,
+          timelineId: f.campaign.activeTimelineId,
+          sessionId: f.session.id,
+          actorId: f.actorId,
+          declaration,
           expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
-          idempotencyKey: `universal-not-an-attempt-${index}` });
+          idempotencyKey: `universal-not-an-attempt-${index}`,
+        });
         const result = await orchestrateAdventureTurn(f.repo, rejected.turnId, dependencies);
         expect(result.turn.receiptLinks, declaration).toEqual([]);
         expect(result.turn.toolCalls, declaration).toEqual([]);
       }
       expect(listSystemOneDecisionsByLane("adventure-selection", 10)).toHaveLength(1);
-    } finally { f.repo.close(); }
+    } finally {
+      f.repo.close();
+    }
   });
 });

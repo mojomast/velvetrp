@@ -16,7 +16,12 @@ export const DND_5E_SPECIAL_COMBAT_CAPABILITIES: readonly RulesetCapability[] = 
 export type Dnd5eCreatureSize = "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
 
 const SIZE_RANK: Readonly<Record<Dnd5eCreatureSize, number>> = Object.freeze({
-  tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gargantuan: 5,
+  tiny: 0,
+  small: 1,
+  medium: 2,
+  large: 3,
+  huge: 4,
+  gargantuan: 5,
 });
 
 /** SRD 5.1: a mount must be willing, at least one size larger, and anatomically suitable. */
@@ -50,7 +55,8 @@ export function planDnd5eMount(input: Dnd5eMountInput): Dnd5eMountPlan {
   requireNonNegativeInteger(input.speed, "speed");
   const reasons: string[] = [];
   if (!input.willing) reasons.push("a mount must be willing");
-  if (SIZE_RANK[input.mountSize] <= SIZE_RANK[input.riderSize]) reasons.push("a mount must be at least one size larger than the rider");
+  if (SIZE_RANK[input.mountSize] <= SIZE_RANK[input.riderSize])
+    reasons.push("a mount must be at least one size larger than the rider");
   if (!input.suitableAnatomy) reasons.push("the mount lacks suitable anatomy");
   const costFeet = Math.floor(input.speed / 2);
   return Object.freeze({
@@ -65,14 +71,15 @@ export function planDnd5eMount(input: Dnd5eMountInput): Dnd5eMountPlan {
  * SRD 5.1: while mounted, you have advantage on melee attack rolls against any
  * unmounted creature smaller than your mount.
  */
-export function mountedMeleeAdvantage(input: Readonly<{
-  attackerMounted: boolean;
-  targetMounted: boolean;
-  targetSize: Dnd5eCreatureSize;
-  mountSize: Dnd5eCreatureSize;
-}>): boolean {
-  return input.attackerMounted && !input.targetMounted
-    && SIZE_RANK[input.targetSize] < SIZE_RANK[input.mountSize];
+export function mountedMeleeAdvantage(
+  input: Readonly<{
+    attackerMounted: boolean;
+    targetMounted: boolean;
+    targetSize: Dnd5eCreatureSize;
+    mountSize: Dnd5eCreatureSize;
+  }>,
+): boolean {
+  return input.attackerMounted && !input.targetMounted && SIZE_RANK[input.targetSize] < SIZE_RANK[input.mountSize];
 }
 
 export type Dnd5eMountSaveResolution = Readonly<{
@@ -90,11 +97,13 @@ export type Dnd5eMountSaveResolution = Readonly<{
  * succeed on a DC 10 Dexterity saving throw or fall off, landing prone within 5
  * feet of the mount. The saving throw roll is caller-supplied.
  */
-export function resolveDnd5eMountForcedMovement(input: Readonly<{
-  dexterityScore: number;
-  /** The forced-movement saving throw d20 face. */
-  roll: number;
-}>): Dnd5eMountSaveResolution {
+export function resolveDnd5eMountForcedMovement(
+  input: Readonly<{
+    dexterityScore: number;
+    /** The forced-movement saving throw d20 face. */
+    roll: number;
+  }>,
+): Dnd5eMountSaveResolution {
   requireInteger(input.roll, "mount save roll");
   if (input.roll < 1 || input.roll > 20) throw new RangeError("mount save roll must be between 1 and 20");
   const dc = 10;
@@ -116,7 +125,9 @@ export type Dnd5eMountKnockdownResolution = Readonly<{
  * it as it falls and land on your feet. Otherwise you are dismounted and fall
  * prone within 5 feet of it.
  */
-export function resolveDnd5eMountKnockdown(input: Readonly<{ reactionAvailable: boolean }>): Dnd5eMountKnockdownResolution {
+export function resolveDnd5eMountKnockdown(
+  input: Readonly<{ reactionAvailable: boolean }>,
+): Dnd5eMountKnockdownResolution {
   return Object.freeze({
     usedReaction: input.reactionAvailable,
     mounted: false,
@@ -126,12 +137,21 @@ export function resolveDnd5eMountKnockdown(input: Readonly<{ reactionAvailable: 
 
 /** SRD 5.1 underwater melee weapons that ignore the no-swim-speed penalty. */
 export const DND_5E_UNDERWATER_MELEE_EXCEPTIONS: readonly string[] = Object.freeze([
-  "dagger", "javelin", "shortsword", "spear", "trident",
+  "dagger",
+  "javelin",
+  "shortsword",
+  "spear",
+  "trident",
 ]);
 
 /** SRD 5.1 underwater ranged weapons/thrown weapons that ignore the penalty. */
 export const DND_5E_UNDERWATER_RANGED_EXCEPTIONS: readonly string[] = Object.freeze([
-  "crossbow", "net", "javelin", "spear", "trident", "dart",
+  "crossbow",
+  "net",
+  "javelin",
+  "spear",
+  "trident",
+  "dart",
 ]);
 
 export type Dnd5eUnderwaterAttackInput = Readonly<{
@@ -161,10 +181,14 @@ export type Dnd5eUnderwaterAttackPlan = Readonly<{
  */
 export function planDnd5eUnderwaterAttack(input: Dnd5eUnderwaterAttackInput): Dnd5eUnderwaterAttackPlan {
   const reasons: string[] = [];
-  if (input.hasSwimSpeed) return Object.freeze({ disadvantage: false, automaticMiss: false, reasons: frozenList(reasons) });
+  if (input.hasSwimSpeed)
+    return Object.freeze({ disadvantage: false, automaticMiss: false, reasons: frozenList(reasons) });
   if (input.kind === "melee") {
     const exempt = DND_5E_UNDERWATER_MELEE_EXCEPTIONS.includes(input.weapon);
-    if (!exempt) reasons.push("melee attack without a swim speed has disadvantage unless the weapon is a dagger, javelin, shortsword, spear, or trident");
+    if (!exempt)
+      reasons.push(
+        "melee attack without a swim speed has disadvantage unless the weapon is a dagger, javelin, shortsword, spear, or trident",
+      );
     return Object.freeze({ disadvantage: !exempt, automaticMiss: false, reasons: frozenList(reasons) });
   }
   if (input.beyondNormalRange) {
@@ -172,7 +196,10 @@ export function planDnd5eUnderwaterAttack(input: Dnd5eUnderwaterAttackInput): Dn
     return Object.freeze({ disadvantage: false, automaticMiss: true, reasons: frozenList(reasons) });
   }
   const exempt = DND_5E_UNDERWATER_RANGED_EXCEPTIONS.includes(input.weapon);
-  if (!exempt) reasons.push("ranged attack without a swim speed has disadvantage unless the weapon is a crossbow, a net, or a thrown weapon");
+  if (!exempt)
+    reasons.push(
+      "ranged attack without a swim speed has disadvantage unless the weapon is a crossbow, a net, or a thrown weapon",
+    );
   return Object.freeze({ disadvantage: !exempt, automaticMiss: false, reasons: frozenList(reasons) });
 }
 

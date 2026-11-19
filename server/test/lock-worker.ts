@@ -10,13 +10,10 @@ interface LockedWrite {
   isReleased(): boolean;
 }
 
-export function startLockedWrite(
-  databasePath: string,
-  statements: SqlStatement[],
-  holdMs = 150,
-): Promise<LockedWrite> {
+export function startLockedWrite(databasePath: string, statements: SqlStatement[], holdMs = 150): Promise<LockedWrite> {
   const releaseState = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
-  const worker = new Worker(`
+  const worker = new Worker(
+    `
     const { parentPort, workerData } = require("node:worker_threads");
     const Database = require("better-sqlite3");
     const releaseState = new Int32Array(workerData.releaseState);
@@ -42,10 +39,12 @@ export function startLockedWrite(
     } catch (error) {
       parentPort.postMessage({ error: String(error && error.stack || error) });
     }
-  `, {
-    eval: true,
-    workerData: { databasePath, statements, holdMs, releaseState: releaseState.buffer },
-  });
+  `,
+    {
+      eval: true,
+      workerData: { databasePath, statements, holdMs, releaseState: releaseState.buffer },
+    },
+  );
 
   return new Promise((resolve, reject) => {
     let locked = false;

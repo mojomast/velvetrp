@@ -35,11 +35,7 @@ export interface DiceRepository {
     envelope: CommandEnvelope,
     binding: CampaignDiceVisibleCharacterBinding,
   ): CommandReceipt;
-  listRecentCampaignDiceEvents(
-    actorPrincipalId: string,
-    campaignId: string,
-    timelineId: string,
-  ): CampaignDiceEvent[];
+  listRecentCampaignDiceEvents(actorPrincipalId: string, campaignId: string, timelineId: string): CampaignDiceEvent[];
   getCommandReceipt(actorPrincipalId: string, campaignId: string, commandId: string): CommandReceipt | null;
 }
 

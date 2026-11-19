@@ -1,16 +1,78 @@
-.campaign-replay { display: grid; gap: .75rem; }
-.campaign-replay-controls { display: grid; gap: .5rem; padding: .75rem 1rem; border: 1px solid #73664a; border-radius: 6px; }
-.campaign-replay-controls .button-row { flex-wrap: wrap; }
-.campaign-replay-seek { display: flex; align-items: center; gap: .65rem; font-size: .85rem; }
-.campaign-replay-seek input[type="range"] { flex: 1; min-width: 6rem; accent-color: #b98746; }
-.campaign-replay-log { max-height: min(60vh, 34rem); overflow-y: auto; }
-.campaign-replay-log .conversation-turn { border-left: 2px solid #b98746; padding-left: 1rem; }
-.replay-kicker { text-transform: uppercase; letter-spacing: .06em; font-size: .7rem; opacity: .7; margin: 0; }
-.replay-mechanics { margin: .4rem 0 .6rem; padding-left: 1rem; border-left: 2px solid #4f745d; }
-.replay-mechanics .mechanic-receipts-compact { display: grid; gap: .15rem; }
-.replay-mechanics .mechanic-receipts-compact h2 { margin: 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; opacity: .72; }
-.replay-mechanics .mechanic-receipt-line { margin: 0; font-size: .82rem; line-height: 1.35; opacity: .92; }
-.replay-mechanics [data-outcome="success"] { color: #6fcf97; font-weight: 600; }
-.replay-mechanics [data-outcome="failure"] { color: #e08a8a; font-weight: 600; }
-.replay-receipt { display: block; opacity: .8; }
-.replay-blocker { display: block; color: #b98746; }
+.campaign-replay {
+  display: grid;
+  gap: 0.75rem;
+}
+.campaign-replay-controls {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #73664a;
+  border-radius: 6px;
+}
+.campaign-replay-controls .button-row {
+  flex-wrap: wrap;
+}
+.campaign-replay-seek {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.85rem;
+}
+.campaign-replay-seek input[type="range"] {
+  flex: 1;
+  min-width: 6rem;
+  accent-color: #b98746;
+}
+.campaign-replay-log {
+  max-height: min(60vh, 34rem);
+  overflow-y: auto;
+}
+.campaign-replay-log .conversation-turn {
+  border-left: 2px solid #b98746;
+  padding-left: 1rem;
+}
+.replay-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin: 0;
+}
+.replay-mechanics {
+  margin: 0.4rem 0 0.6rem;
+  padding-left: 1rem;
+  border-left: 2px solid #4f745d;
+}
+.replay-mechanics .mechanic-receipts-compact {
+  display: grid;
+  gap: 0.15rem;
+}
+.replay-mechanics .mechanic-receipts-compact h2 {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.72;
+}
+.replay-mechanics .mechanic-receipt-line {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  opacity: 0.92;
+}
+.replay-mechanics [data-outcome="success"] {
+  color: #6fcf97;
+  font-weight: 600;
+}
+.replay-mechanics [data-outcome="failure"] {
+  color: #e08a8a;
+  font-weight: 600;
+}
+.replay-receipt {
+  display: block;
+  opacity: 0.8;
+}
+.replay-blocker {
+  display: block;
+  color: #b98746;
+}

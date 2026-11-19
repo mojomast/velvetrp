@@ -24,7 +24,7 @@ const characterInput = (name: string) => ({
   age: 30,
   archetype: `${name} archetype`,
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 });
 
 async function createCharacter(app: ReturnType<typeof buildApp>, name: string): Promise<Character> {
@@ -188,9 +188,8 @@ describe("session context api characterization", () => {
     const session = await createSession(app, [character]);
     await addMessage(session.id, "system", "Never projected");
     for (let index = 0; index < 11; index += 1) {
-      const content = index >= 6
-        ? `Question ${index}? ${"x".repeat(index === 10 ? 180 : 12)}`
-        : `Event ${index} **with**   spacing`;
+      const content =
+        index >= 6 ? `Question ${index}? ${"x".repeat(index === 10 ? 180 : 12)}` : `Event ${index} **with**   spacing`;
       await addMessage(session.id, "user", content);
     }
 
@@ -201,7 +200,10 @@ describe("session context api characterization", () => {
     expect(context.recentEvents.at(-1)).toMatch(/…$/);
     expect(context.openThreads).toHaveLength(4);
     expect(context.openThreads.map((thread) => thread.slice(0, 10))).toEqual([
-      "Question 7", "Question 8", "Question 9", "Question 1",
+      "Question 7",
+      "Question 8",
+      "Question 9",
+      "Question 1",
     ]);
     expect(context.openThreads.at(-1)).toHaveLength(140);
     expect(context.openThreads.at(-1)).toMatch(/…$/);
@@ -218,12 +220,17 @@ describe("session context api characterization", () => {
       const forgotten = await createMemory(app, character.id, `${character.name} forgotten`);
       await app.inject({ method: "DELETE", url: `/api/memories/${forgotten.id}` });
       await createMemory(app, character.id, `${character.name} pending`, false);
-      for (let index = 1; index <= 3; index += 1) await createMemory(app, character.id, `${character.name} newest ${index}`);
+      for (let index = 1; index <= 3; index += 1)
+        await createMemory(app, character.id, `${character.name} newest ${index}`);
     }
 
     expect((await getContext(app, session.id)).rememberedFacts).toEqual([
-      "Two: Two newest 3", "Two: Two newest 2", "Two: Two newest 1",
-      "One: One newest 3", "One: One newest 2", "One: One newest 1",
+      "Two: Two newest 3",
+      "Two: Two newest 2",
+      "Two: Two newest 1",
+      "One: One newest 3",
+      "One: One newest 2",
+      "One: One newest 1",
     ]);
     await app.close();
   });
@@ -253,18 +260,19 @@ describe("session context api characterization", () => {
     await addMessage(session.id, "user", "The moon gate opens.");
     await app.inject({ method: "PUT", url: "/api/harness", payload: { loreChars: 200 } });
     await createLore(app, { keys: [], content: `Global ${"g".repeat(143)}`, insertionOrder: 20 });
-    await createLore(app, { characterId: active.id, keys: ["moon"], content: `Scoped ${"s".repeat(93)}`, insertionOrder: 30 });
+    await createLore(app, {
+      characterId: active.id,
+      keys: ["moon"],
+      content: `Scoped ${"s".repeat(93)}`,
+      insertionOrder: 30,
+    });
     await createLore(app, { characterId: active.id, keys: [], content: "Scoped keyless", insertionOrder: 10 });
     await createLore(app, { keys: ["sun"], content: "Untriggered", insertionOrder: 1 });
     await createLore(app, { keys: ["moon"], content: "Disabled", enabled: false, insertionOrder: 2 });
     await createLore(app, { characterId: other.id, keys: [], content: "Unrelated scope", insertionOrder: 3 });
 
     const lore = (await getContext(app, session.id)).activeLore;
-    expect(lore).toEqual([
-      "Scoped keyless",
-      `Global ${"g".repeat(143)}`,
-      `Scoped ${"s".repeat(28)}…`,
-    ]);
+    expect(lore).toEqual(["Scoped keyless", `Global ${"g".repeat(143)}`, `Scoped ${"s".repeat(28)}…`]);
     expect(lore.join("\n")).not.toMatch(/Untriggered|Disabled|Unrelated/);
     expect(lore.reduce((sum, entry) => sum + entry.length, 0)).toBe(200);
     await app.close();
@@ -294,13 +302,20 @@ describe("session context api characterization", () => {
     await app.close();
   });
 
-  it.each([undefined, null, {}, { sourceOfTruth: null }, { sourceOfTruth: 1 }, { sourceOfTruth: false }, { sourceOfTruth: [] }])(
-    "rejects invalid PUT body %# with the exact legacy error",
-    async (payload) => {
-      const app = buildApp();
-      const character = await createCharacter(app, "Invalid");
-      const session = await createSession(app, [character]);
-      const response = payload === undefined
+  it.each([
+    undefined,
+    null,
+    {},
+    { sourceOfTruth: null },
+    { sourceOfTruth: 1 },
+    { sourceOfTruth: false },
+    { sourceOfTruth: [] },
+  ])("rejects invalid PUT body %# with the exact legacy error", async (payload) => {
+    const app = buildApp();
+    const character = await createCharacter(app, "Invalid");
+    const session = await createSession(app, [character]);
+    const response =
+      payload === undefined
         ? await app.inject({ method: "PUT", url: `/api/sessions/${session.id}/context` })
         : await app.inject({
             method: "PUT",
@@ -308,24 +323,27 @@ describe("session context api characterization", () => {
             payload: JSON.stringify(payload),
             headers: { "content-type": "application/json" },
           });
-      expect(response.statusCode).toBe(400);
-      expect(response.headers["content-type"]).not.toContain("application/problem+json");
-      expect(response.json()).toEqual({ error: "sourceOfTruth must be a string" });
-      await app.close();
-    },
-  );
+    expect(response.statusCode).toBe(400);
+    expect(response.headers["content-type"]).not.toContain("application/problem+json");
+    expect(response.json()).toEqual({ error: "sourceOfTruth must be a string" });
+    await app.close();
+  });
 
   it("trims, clears, ignores unknown fields, and enforces the 8000 UTF-16-code-unit limit after trim", async () => {
     const app = buildApp();
     const character = await createCharacter(app, "Limits");
     const session = await createSession(app, [character]);
-    const put = (sourceOfTruth: string, extra: Record<string, unknown> = {}) => app.inject({
-      method: "PUT",
-      url: `/api/sessions/${session.id}/context`,
-      payload: { sourceOfTruth, ...extra },
-    });
+    const put = (sourceOfTruth: string, extra: Record<string, unknown> = {}) =>
+      app.inject({
+        method: "PUT",
+        url: `/api/sessions/${session.id}/context`,
+        payload: { sourceOfTruth, ...extra },
+      });
 
-    expect((await put("  kept  ", { unknown: "ignored" })).json().source).toMatchObject({ sourceOfTruth: "kept", updatedAt: expect.any(String) });
+    expect((await put("  kept  ", { unknown: "ignored" })).json().source).toMatchObject({
+      sourceOfTruth: "kept",
+      updatedAt: expect.any(String),
+    });
     expect((await put(" \n\t ")).json().source).toMatchObject({ sourceOfTruth: "", updatedAt: expect.any(String) });
     expect((await put(` ${"a".repeat(8000)} `)).statusCode).toBe(200);
     const tooLong = await put(` ${"a".repeat(8001)} `);
@@ -363,7 +381,11 @@ describe("session context api characterization", () => {
     });
     const secondRead = await getContext(app, session.id);
     expect(firstRead.state).toBe("closed");
-    expect(secondRead).toMatchObject({ state: "closed", editableSource: "Closed canon", synthesizedSource: "Repository synthesis" });
+    expect(secondRead).toMatchObject({
+      state: "closed",
+      editableSource: "Closed canon",
+      synthesizedSource: "Repository synthesis",
+    });
     expect(await getSessionContextSource(session.id)).toEqual(after);
     expect(provider.requests).toEqual([]);
     expect(provider.sceneRequests).toEqual([]);

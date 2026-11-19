@@ -109,20 +109,28 @@ describe("Supra2 image configuration", () => {
 
   it("stays disabled unless the flag is exact-true and the base URL is valid", () => {
     expect(readSupra2ImageConfig({}).enabled).toBe(false);
-    expect(readSupra2ImageConfig({ VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363" }).enabled).toBe(false);
-    expect(readSupra2ImageConfig({
-      VELVET_SCENE_IMAGES_ENABLED: "TRUE",
-      VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363",
-    }).enabled).toBe(false);
-    expect(readSupra2ImageConfig({
-      VELVET_SCENE_IMAGES_ENABLED: "true",
-      VELVET_SCENE_IMAGES_BASE_URL: "http://images.example.com",
-    }).enabled).toBe(false);
+    expect(readSupra2ImageConfig({ VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363" }).enabled).toBe(
+      false,
+    );
+    expect(
+      readSupra2ImageConfig({
+        VELVET_SCENE_IMAGES_ENABLED: "TRUE",
+        VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363",
+      }).enabled,
+    ).toBe(false);
+    expect(
+      readSupra2ImageConfig({
+        VELVET_SCENE_IMAGES_ENABLED: "true",
+        VELVET_SCENE_IMAGES_BASE_URL: "http://images.example.com",
+      }).enabled,
+    ).toBe(false);
     expect(readSupra2ImageConfig({ VELVET_SCENE_IMAGES_ENABLED: "true" }).enabled).toBe(false);
-    expect(readSupra2ImageConfig({
-      VELVET_SCENE_IMAGES_ENABLED: "true",
-      VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363/",
-    })).toEqual({
+    expect(
+      readSupra2ImageConfig({
+        VELVET_SCENE_IMAGES_ENABLED: "true",
+        VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363/",
+      }),
+    ).toEqual({
       enabled: true,
       baseUrl: "https://kimi.tailec998.ts.net:4363",
       origin: "https://kimi.tailec998.ts.net:4363",
@@ -155,17 +163,26 @@ describe("Supra2 image configuration", () => {
     for (const value of ["0", "1023", "67108865", "abc", "1.5"]) {
       expect(() => readSupra2ImageConfig({ VELVET_SCENE_IMAGES_MAX_BYTES: value }), value).toThrow();
     }
-    expect(readSupra2ImageConfig({ VELVET_SCENE_IMAGES_TIMEOUT_MS: "1000", VELVET_SCENE_IMAGES_MAX_BYTES: "1024" }))
-      .toMatchObject({ enabled: false, timeoutMs: 1_000, maxBytes: 1_024 });
+    expect(
+      readSupra2ImageConfig({ VELVET_SCENE_IMAGES_TIMEOUT_MS: "1000", VELVET_SCENE_IMAGES_MAX_BYTES: "1024" }),
+    ).toMatchObject({ enabled: false, timeoutMs: 1_000, maxBytes: 1_024 });
   });
 });
 
 describe("Supra2 request validation", () => {
   it("trims prompts and applies adapter defaults", () => {
-    expect(parseSupra2GenerateRequest({ prompt: "  a moonlit harbor  " }))
-      .toEqual({ prompt: "a moonlit harbor", seed: 0, steps: 50, cfg: 3 });
-    expect(parseSupra2BatchRequest({ prompt: "  a brass bell  " }))
-      .toEqual({ prompt: "a brass bell", count: 1, steps: [50], guidance: [3] });
+    expect(parseSupra2GenerateRequest({ prompt: "  a moonlit harbor  " })).toEqual({
+      prompt: "a moonlit harbor",
+      seed: 0,
+      steps: 50,
+      cfg: 3,
+    });
+    expect(parseSupra2BatchRequest({ prompt: "  a brass bell  " })).toEqual({
+      prompt: "a brass bell",
+      count: 1,
+      steps: [50],
+      guidance: [3],
+    });
   });
 
   it("rejects generate requests outside the service bounds", () => {
@@ -185,10 +202,16 @@ describe("Supra2 request validation", () => {
       { prompt: "x", cfg: Number.POSITIVE_INFINITY },
       { prompt: "x", cfg: Number.NaN },
     ]) {
-      expect(() => parseSupra2GenerateRequest(request), JSON.stringify(request).slice(0, 60)).toThrow(Supra2ImageConfigurationError);
+      expect(() => parseSupra2GenerateRequest(request), JSON.stringify(request).slice(0, 60)).toThrow(
+        Supra2ImageConfigurationError,
+      );
     }
-    expect(parseSupra2GenerateRequest({ prompt: "x", seed: 2_147_483_647, steps: 100, cfg: 10 }))
-      .toEqual({ prompt: "x", seed: 2_147_483_647, steps: 100, cfg: 10 });
+    expect(parseSupra2GenerateRequest({ prompt: "x", seed: 2_147_483_647, steps: 100, cfg: 10 })).toEqual({
+      prompt: "x",
+      seed: 2_147_483_647,
+      steps: 100,
+      cfg: 10,
+    });
   });
 
   it("rejects batch requests outside count, array, and total bounds", () => {
@@ -209,8 +232,12 @@ describe("Supra2 request validation", () => {
     ]) {
       expect(() => parseSupra2BatchRequest(request)).toThrow(Supra2ImageConfigurationError);
     }
-    expect(parseSupra2BatchRequest({ prompt: "x", count: 32, steps: [10], guidance: [1, 2, 3, 4] }))
-      .toEqual({ prompt: "x", count: 32, steps: [10], guidance: [1, 2, 3, 4] });
+    expect(parseSupra2BatchRequest({ prompt: "x", count: 32, steps: [10], guidance: [1, 2, 3, 4] })).toEqual({
+      prompt: "x",
+      count: 32,
+      steps: [10],
+      guidance: [1, 2, 3, 4],
+    });
   });
 
   it("rejects invalid submissions before any fetch", async () => {
@@ -232,7 +259,8 @@ describe("Supra2 request validation", () => {
 describe("Supra2 submissions", () => {
   it("posts an exact generate body with required headers and accepts the 202", async () => {
     const { calls, fetchImpl } = recordingFetch(async () =>
-      Response.json({ id: "job-7", batch: "batch-2" }, { status: 202 }));
+      Response.json({ id: "job-7", batch: "batch-2" }, { status: 202 }),
+    );
     const client = createSupra2ImageClient({ config: config(), fetch: fetchImpl });
 
     const result = await client.generate({ prompt: "  a quiet harbor  ", seed: 7, steps: 30, cfg: 4.5 });
@@ -243,35 +271,35 @@ describe("Supra2 submissions", () => {
     const headers = new Headers(calls[0]!.init.headers);
     expect(headers.get("content-type")).toBe("application/json");
     expect(headers.get("origin")).toBe(LOCAL_ORIGIN);
-    expect(JSON.parse(String(calls[0]!.init.body)))
-      .toEqual({ prompt: "a quiet harbor", seed: 7, steps: 30, cfg: 4.5 });
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ prompt: "a quiet harbor", seed: 7, steps: 30, cfg: 4.5 });
   });
 
   it("posts an exact batch body and returns every accepted id", async () => {
     const { calls, fetchImpl } = recordingFetch(async () =>
-      Response.json({ id: "batch-9", batch: "batch-9", ids: ["img-a", "img-b", "img-c"] }, { status: 202 }));
+      Response.json({ id: "batch-9", batch: "batch-9", ids: ["img-a", "img-b", "img-c"] }, { status: 202 }),
+    );
     const client = createSupra2ImageClient({ config: config(), fetch: fetchImpl });
 
     const result = await client.batch({ prompt: " p ", count: 3, steps: [10, 20], guidance: [2] });
     expect(result).toEqual({ outcome: "accepted", id: "batch-9", batch: "batch-9", ids: ["img-a", "img-b", "img-c"] });
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe("http://127.0.0.1:4363/api/batch");
-    expect(JSON.parse(String(calls[0]!.init.body)))
-      .toEqual({ prompt: "p", count: 3, steps: [10, 20], guidance: [2] });
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ prompt: "p", count: 3, steps: [10, 20], guidance: [2] });
   });
 
   it("reports an unreadable 202 acceptance as uncertain without retrying", async () => {
     const { calls, fetchImpl } = recordingFetch(async () => new Response("not json", { status: 202 }));
     const client = createSupra2ImageClient({ config: config(), fetch: fetchImpl });
 
-    await expect(client.generate({ prompt: "x" }))
-      .resolves.toEqual({ outcome: "uncertain", reason: "unreadable-acceptance" });
+    await expect(client.generate({ prompt: "x" })).resolves.toEqual({
+      outcome: "uncertain",
+      reason: "unreadable-acceptance",
+    });
     expect(calls).toHaveLength(1);
   });
 
   it.each([400, 500, 503])("classifies HTTP %i without retrying", async (status) => {
-    const { calls, fetchImpl } = recordingFetch(async () =>
-      Response.json({ detail: "rejected" }, { status }));
+    const { calls, fetchImpl } = recordingFetch(async () => Response.json({ detail: "rejected" }, { status }));
     const client = createSupra2ImageClient({ config: config(), fetch: fetchImpl });
 
     await expect(client.generate({ prompt: "x" })).rejects.toBeInstanceOf(Supra2ImageHttpError);
@@ -280,12 +308,15 @@ describe("Supra2 submissions", () => {
 
   it("retries a busy lane with bounded jittered backoff, then surfaces the rate limit", async () => {
     const { calls, fetchImpl } = recordingFetch(async () =>
-      Response.json({ detail: "busy" }, { status: 429, headers: { "retry-after": "2" } }));
+      Response.json({ detail: "busy" }, { status: 429, headers: { "retry-after": "2" } }),
+    );
     const sleeps: number[] = [];
     const client = createSupra2ImageClient({
       config: config(),
       fetch: fetchImpl,
-      sleep: async (ms) => { sleeps.push(ms); },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
       random: () => 0,
       maxSubmitAttempts: 3,
     });
@@ -295,20 +326,23 @@ describe("Supra2 submissions", () => {
     expect((error as Supra2ImageRateLimitError).retryAfter).toBe("2");
     expect(calls).toHaveLength(3);
     expect(sleeps).toEqual([250, 500]);
-    expect(sleeps.reduce((total, ms) => total + ms, 0))
-      .toBeLessThanOrEqual(SUPRA2_IMAGE_RATE_LIMIT_MAX_DELAY_MS * 2);
+    expect(sleeps.reduce((total, ms) => total + ms, 0)).toBeLessThanOrEqual(SUPRA2_IMAGE_RATE_LIMIT_MAX_DELAY_MS * 2);
   });
 
   it("accepts a second attempt after one 429", async () => {
     let attempt = 0;
-    const { calls, fetchImpl } = recordingFetch(async () => attempt++ === 0
-      ? new Response(null, { status: 429 })
-      : Response.json({ id: "job-1", batch: "b" }, { status: 202 }));
+    const { calls, fetchImpl } = recordingFetch(async () =>
+      attempt++ === 0
+        ? new Response(null, { status: 429 })
+        : Response.json({ id: "job-1", batch: "b" }, { status: 202 }),
+    );
     const sleeps: number[] = [];
     const client = createSupra2ImageClient({
       config: config(),
       fetch: fetchImpl,
-      sleep: async (ms) => { sleeps.push(ms); },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
       random: () => 0,
     });
 
@@ -319,14 +353,19 @@ describe("Supra2 submissions", () => {
 
   it("reports a submission timeout as uncertain and calls fetch exactly once", async () => {
     let observedSignal: AbortSignal | undefined;
-    const { calls, fetchImpl } = recordingFetch((_url, init) => new Promise<Response>((_resolve, reject) => {
-      observedSignal = init.signal ?? undefined;
-      init.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
-    }));
+    const { calls, fetchImpl } = recordingFetch(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          observedSignal = init.signal ?? undefined;
+          init.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        }),
+    );
     const client = createSupra2ImageClient({ config: config({ timeoutMs: 25 }), fetch: fetchImpl });
 
-    await expect(client.generate({ prompt: "a lighthouse" }))
-      .resolves.toEqual({ outcome: "uncertain", reason: "timeout" });
+    await expect(client.generate({ prompt: "a lighthouse" })).resolves.toEqual({
+      outcome: "uncertain",
+      reason: "timeout",
+    });
     expect(calls).toHaveLength(1);
     expect(observedSignal?.aborted).toBe(true);
   });
@@ -337,8 +376,7 @@ describe("Supra2 submissions", () => {
     });
     const client = createSupra2ImageClient({ config: config(), fetch: fetchImpl });
 
-    await expect(client.batch({ prompt: "x" }))
-      .resolves.toEqual({ outcome: "uncertain", reason: "transport" });
+    await expect(client.batch({ prompt: "x" })).resolves.toEqual({ outcome: "uncertain", reason: "transport" });
     expect(calls).toHaveLength(1);
   });
 
@@ -381,21 +419,20 @@ describe("Supra2 status and polling", () => {
     expect(status.worker).toEqual({ loaded: true, threads: 8, idleUnloadSeconds: 300 });
     expect(status.jobs.map((job) => job.id)).toEqual(["ours-1", "foreign-1"]);
     expect(selectJobsByIds(status.jobs, ["ours-1"])).toEqual([{ ...sampleJob(), status: "running" }]);
-    expect(selectJobsByIds(status.jobs, ["ours-1", "ghost", "ours-1"]).map((job) => job.id))
-      .toEqual(["ours-1"]);
+    expect(selectJobsByIds(status.jobs, ["ours-1", "ghost", "ours-1"]).map((job) => job.id)).toEqual(["ours-1"]);
   });
 
   it("returns selected jobs in requested order", () => {
     const first = sampleJob();
     const second = sampleJob({ id: "ours-2" });
-    expect(selectJobsByIds([first, second], ["ours-2", "ours-1"]).map((job) => job.id))
-      .toEqual(["ours-2", "ours-1"]);
+    expect(selectJobsByIds([first, second], ["ours-2", "ours-1"]).map((job) => job.id)).toEqual(["ours-2", "ours-1"]);
   });
 
   it("rejects malformed status bodies", async () => {
     const badJob = createSupra2ImageClient({
       config: config(),
-      fetch: recordingFetch(async () => Response.json(statusPayload([{ ...sampleJob(), status: "sleeping" }]))).fetchImpl,
+      fetch: recordingFetch(async () => Response.json(statusPayload([{ ...sampleJob(), status: "sleeping" }])))
+        .fetchImpl,
     });
     await expect(badJob.status()).rejects.toBeInstanceOf(Supra2ImageProtocolError);
     const badShape = createSupra2ImageClient({
@@ -407,7 +444,8 @@ describe("Supra2 status and polling", () => {
 
   it("bounds the shared job history", async () => {
     const jobs = Array.from({ length: SUPRA2_IMAGE_STATUS_JOB_LIMIT + 1 }, (_value, index) =>
-      sampleJob({ id: `job-${index}` }));
+      sampleJob({ id: `job-${index}` }),
+    );
     const client = createSupra2ImageClient({
       config: config(),
       fetch: recordingFetch(async () => Response.json(statusPayload(jobs))).fetchImpl,
@@ -418,15 +456,21 @@ describe("Supra2 status and polling", () => {
   it("polls our jobs until terminal and ignores foreign history", async () => {
     const states = ["queued", "running", "done"] as const;
     let attempt = 0;
-    const { calls, fetchImpl } = recordingFetch(async () => Response.json(statusPayload([
-      sampleJob({ status: states[Math.min(attempt++, states.length - 1)]! }),
-      sampleJob({ id: "foreign-1", status: "done" }),
-    ])));
+    const { calls, fetchImpl } = recordingFetch(async () =>
+      Response.json(
+        statusPayload([
+          sampleJob({ status: states[Math.min(attempt++, states.length - 1)]! }),
+          sampleJob({ id: "foreign-1", status: "done" }),
+        ]),
+      ),
+    );
     const sleeps: number[] = [];
     const client = createSupra2ImageClient({
       config: config(),
       fetch: fetchImpl,
-      sleep: async (ms) => { sleeps.push(ms); },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
     });
 
     const result = await client.pollJobs(["ours-1"], { intervalMs: 5, deadlineMs: 60_000, maxAttempts: 10 });
@@ -443,7 +487,9 @@ describe("Supra2 status and polling", () => {
     const client = createSupra2ImageClient({
       config: config(),
       fetch: fetchImpl,
-      sleep: async (ms) => { sleeps.push(ms); },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
     });
 
     const result = await client.pollJobs(["ours-1", "ghost"], { intervalMs: 5, maxAttempts: 2, deadlineMs: 60_000 });
@@ -457,12 +503,14 @@ describe("Supra2 status and polling", () => {
   it("stops at the poll deadline", async () => {
     let clock = 0;
     const sleeps: number[] = [];
-    const { fetchImpl } = recordingFetch(async () =>
-      Response.json(statusPayload([sampleJob({ status: "running" })])));
+    const { fetchImpl } = recordingFetch(async () => Response.json(statusPayload([sampleJob({ status: "running" })])));
     const client = createSupra2ImageClient({
       config: config(),
       fetch: fetchImpl,
-      sleep: async (ms) => { sleeps.push(ms); clock += ms; },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        clock += ms;
+      },
       now: () => clock,
     });
 
@@ -475,14 +523,16 @@ describe("Supra2 status and polling", () => {
 
   it("backs off a rate-limited poll with jitter, then succeeds", async () => {
     let attempt = 0;
-    const { calls, fetchImpl } = recordingFetch(async () => attempt++ === 0
-      ? new Response(null, { status: 429 })
-      : Response.json(statusPayload([sampleJob()])));
+    const { calls, fetchImpl } = recordingFetch(async () =>
+      attempt++ === 0 ? new Response(null, { status: 429 }) : Response.json(statusPayload([sampleJob()])),
+    );
     const sleeps: number[] = [];
     const client = createSupra2ImageClient({
       config: config(),
       fetch: fetchImpl,
-      sleep: async (ms) => { sleeps.push(ms); },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
       random: () => 1,
       now: () => 0,
     });
@@ -506,8 +556,9 @@ describe("Supra2 status and polling", () => {
 describe("Supra2 downloads", () => {
   it("downloads a PNG and returns bytes with a validated content type", async () => {
     const bytes = pngBytes();
-    const { calls, fetchImpl } = recordingFetch(async () =>
-      new Response(bytes, { status: 200, headers: { "content-type": "image/png" } }));
+    const { calls, fetchImpl } = recordingFetch(
+      async () => new Response(bytes, { status: 200, headers: { "content-type": "image/png" } }),
+    );
     const client = createSupra2ImageClient({ config: config(), fetch: fetchImpl });
 
     const result = await client.downloadImage("/images/abc-123.png");
@@ -559,8 +610,13 @@ describe("Supra2 downloads", () => {
   it("rejects a download whose bytes are not a PNG", async () => {
     const client = createSupra2ImageClient({
       config: config(),
-      fetch: recordingFetch(async () =>
-        new Response(new TextEncoder().encode("definitely not a png"), { status: 200, headers: { "content-type": "image/png" } })).fetchImpl,
+      fetch: recordingFetch(
+        async () =>
+          new Response(new TextEncoder().encode("definitely not a png"), {
+            status: 200,
+            headers: { "content-type": "image/png" },
+          }),
+      ).fetchImpl,
     });
     await expect(client.downloadImage("/images/a.png")).rejects.toBeInstanceOf(Supra2ImageProtocolError);
   });
@@ -568,8 +624,9 @@ describe("Supra2 downloads", () => {
   it("rejects a download whose content type is not a PNG", async () => {
     const client = createSupra2ImageClient({
       config: config(),
-      fetch: recordingFetch(async () =>
-        new Response(pngBytes(), { status: 200, headers: { "content-type": "image/jpeg" } })).fetchImpl,
+      fetch: recordingFetch(
+        async () => new Response(pngBytes(), { status: 200, headers: { "content-type": "image/jpeg" } }),
+      ).fetchImpl,
     });
     await expect(client.downloadImage("/images/a.png")).rejects.toBeInstanceOf(Supra2ImageProtocolError);
   });
@@ -577,14 +634,18 @@ describe("Supra2 downloads", () => {
   it("enforces the byte budget for declared and streamed sizes", async () => {
     const declared = createSupra2ImageClient({
       config: config({ maxBytes: 1_024 }),
-      fetch: recordingFetch(async () =>
-        new Response(pngBytes(), { status: 200, headers: { "content-type": "image/png", "content-length": "4096" } })).fetchImpl,
+      fetch: recordingFetch(
+        async () =>
+          new Response(pngBytes(), { status: 200, headers: { "content-type": "image/png", "content-length": "4096" } }),
+      ).fetchImpl,
     });
     await expect(declared.downloadImage("/images/a.png")).rejects.toBeInstanceOf(Supra2ImagePayloadTooLargeError);
     const streamed = createSupra2ImageClient({
       config: config({ maxBytes: 8 }),
-      fetch: recordingFetch(async () =>
-        new Response(pngBytes("longer than eight bytes"), { status: 200, headers: { "content-type": "image/png" } })).fetchImpl,
+      fetch: recordingFetch(
+        async () =>
+          new Response(pngBytes("longer than eight bytes"), { status: 200, headers: { "content-type": "image/png" } }),
+      ).fetchImpl,
     });
     await expect(streamed.downloadImage("/images/a.png")).rejects.toBeInstanceOf(Supra2ImagePayloadTooLargeError);
   });
@@ -594,8 +655,10 @@ describe("Supra2 downloads", () => {
       config: config(),
       fetch: recordingFetch(async () => new Response("missing", { status: 404 })).fetchImpl,
     });
-    await expect(client.downloadImage("/images/a.png"))
-      .rejects.toMatchObject({ name: "Supra2ImageHttpError", status: 404 });
+    await expect(client.downloadImage("/images/a.png")).rejects.toMatchObject({
+      name: "Supra2ImageHttpError",
+      status: 404,
+    });
   });
 });
 
@@ -638,14 +701,16 @@ describe("Supra2 cancelAll", () => {
 
   it("retries a rate-limited cancel with bounded backoff", async () => {
     let attempt = 0;
-    const { calls, fetchImpl } = recordingFetch(async () => attempt++ === 0
-      ? new Response(null, { status: 429 })
-      : new Response(null, { status: 204 }));
+    const { calls, fetchImpl } = recordingFetch(async () =>
+      attempt++ === 0 ? new Response(null, { status: 429 }) : new Response(null, { status: 204 }),
+    );
     const sleeps: number[] = [];
     const client = createSupra2ImageClient({
       config: config(),
       fetch: fetchImpl,
-      sleep: async (ms) => { sleeps.push(ms); },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
       random: () => 0,
     });
 

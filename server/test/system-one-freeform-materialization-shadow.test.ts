@@ -47,12 +47,14 @@ function laneSettings(overrides: Partial<SystemOneSettings> = {}): SystemOneSett
 }
 
 /** Deterministic free-form answers: two `noul` gates plus the aggregate `choice`. */
-function freeformAnswers(options: {
-  needsContent?: number;
-  legal?: number;
-  choice?: string;
-  choiceProbability?: number;
-} = {}): Record<string, SystemOneAnswer> {
+function freeformAnswers(
+  options: {
+    needsContent?: number;
+    legal?: number;
+    choice?: string;
+    choiceProbability?: number;
+  } = {},
+): Record<string, SystemOneAnswer> {
   const choice = options.choice ?? CANDIDATES[0]!.candidateId;
   const probability = options.choiceProbability ?? 0.95;
   return {
@@ -130,8 +132,12 @@ describe("recordFreeformMaterializationShadowDecision", () => {
     // The battery is exactly the two gates plus the closed candidate choice.
     const questionKeys = Object.keys(row.questions as Record<string, unknown>);
     expect(questionKeys).toEqual([FREEFORM_NEEDS_CONTENT_KEY, FREEFORM_LEGAL_KEY, FREEFORM_CANDIDATE_KEY]);
-    const criteria = (row.questions as Record<string, { criteria: Record<string, unknown> }>)[FREEFORM_CANDIDATE_KEY]!.criteria;
-    expect(Object.keys(criteria)).toEqual([...CANDIDATES.map((candidate) => candidate.candidateId), FREEFORM_MATERIALIZATION_NONE]);
+    const criteria = (row.questions as Record<string, { criteria: Record<string, unknown> }>)[FREEFORM_CANDIDATE_KEY]!
+      .criteria;
+    expect(Object.keys(criteria)).toEqual([
+      ...CANDIDATES.map((candidate) => candidate.candidateId),
+      FREEFORM_MATERIALIZATION_NONE,
+    ]);
   });
 
   it("fails closed when the choice names a candidate outside the server-authored set", async () => {
@@ -140,7 +146,12 @@ describe("recordFreeformMaterializationShadowDecision", () => {
       freeformAnswers({ choice: "materialize:forbidden", choiceProbability: 0.99 }),
       defaultSystemOneSettings().confidencePolicy["freeform-materialization"],
     );
-    expect(composed).toMatchObject({ band: "fallback", candidateId: null, kind: null, reason: "missing_or_invalid_answers" });
+    expect(composed).toMatchObject({
+      band: "fallback",
+      candidateId: null,
+      kind: null,
+      reason: "missing_or_invalid_answers",
+    });
     expect(composed.signals.candidate).toBeNull();
 
     const caller = createFakeSystemOneCaller({
@@ -162,7 +173,11 @@ describe("recordFreeformMaterializationShadowDecision", () => {
 
     const row = listSystemOneDecisionsByLane("freeform-materialization", 10)[0]!;
     expect(row.confidenceBand).toBe("fallback");
-    expect(selectionOf(row)).toMatchObject({ candidateId: null, needsContent: false, reason: "narration_or_hold_sufficient" });
+    expect(selectionOf(row)).toMatchObject({
+      candidateId: null,
+      needsContent: false,
+      reason: "narration_or_hold_sufficient",
+    });
   });
 
   it("fails closed to no action when the legality gate denies the attempt", async () => {
@@ -209,19 +224,23 @@ describe("recordFreeformMaterializationShadowDecision", () => {
     // Strict state schema: no extra fields, a non-empty bounded closed candidate set, known kinds.
     expect(freeformMaterializationStateSchema.safeParse({ ...INPUT, extra: true }).success).toBe(false);
     expect(freeformMaterializationStateSchema.safeParse({ ...INPUT, candidates: [] }).success).toBe(false);
-    expect(freeformMaterializationStateSchema.safeParse({
-      ...INPUT,
-      candidates: [{ candidateId: "x", kind: "invented-kind", label: "x" }],
-    }).success).toBe(false);
+    expect(
+      freeformMaterializationStateSchema.safeParse({
+        ...INPUT,
+        candidates: [{ candidateId: "x", kind: "invented-kind", label: "x" }],
+      }).success,
+    ).toBe(false);
     expect(freeformMaterializationStateSchema.safeParse({ ...INPUT, attempt: "x".repeat(4_001) }).success).toBe(false);
-    expect(freeformMaterializationStateSchema.safeParse({
-      ...INPUT,
-      candidates: Array.from({ length: FREEFORM_MATERIALIZATION_CANDIDATE_CAP + 1 }, (_value, index) => ({
-        candidateId: `candidate:${index}`,
-        kind: "new-clue",
-        label: `clue ${index}`,
-      })),
-    }).success).toBe(false);
+    expect(
+      freeformMaterializationStateSchema.safeParse({
+        ...INPUT,
+        candidates: Array.from({ length: FREEFORM_MATERIALIZATION_CANDIDATE_CAP + 1 }, (_value, index) => ({
+          candidateId: `candidate:${index}`,
+          kind: "new-clue",
+          label: `clue ${index}`,
+        })),
+      }).success,
+    ).toBe(false);
     expect(freeformMaterializationStateSchema.safeParse(INPUT).success).toBe(true);
 
     // Strict selection schema: the recorded top signal and kind stay in bounds.
@@ -236,7 +255,9 @@ describe("recordFreeformMaterializationShadowDecision", () => {
     };
     expect(freeformMaterializationSelectionSchema.safeParse(validSelection).success).toBe(true);
     expect(freeformMaterializationSelectionSchema.safeParse({ ...validSelection, topSignal: 1.5 }).success).toBe(false);
-    expect(freeformMaterializationSelectionSchema.safeParse({ ...validSelection, kind: "invented-kind" }).success).toBe(false);
+    expect(freeformMaterializationSelectionSchema.safeParse({ ...validSelection, kind: "invented-kind" }).success).toBe(
+      false,
+    );
 
     const caller = createFakeSystemOneCaller();
     await recordFreeformMaterializationShadowDecision(laneSettings(), caller, { ...INPUT, candidates: [] });
@@ -249,10 +270,15 @@ describe("buildFreeformMaterializationQuestions", () => {
   it("embeds the bounded attempt and the closed authored candidate set", () => {
     const questions = buildFreeformMaterializationQuestions({ ...INPUT, candidates: CANDIDATES });
     expect(Object.keys(questions)).toEqual([FREEFORM_NEEDS_CONTENT_KEY, FREEFORM_LEGAL_KEY, FREEFORM_CANDIDATE_KEY]);
-    expect(String((questions[FREEFORM_NEEDS_CONTENT_KEY] as { instructions: unknown }).instructions)).toContain(INPUT.attempt);
+    expect(String((questions[FREEFORM_NEEDS_CONTENT_KEY] as { instructions: unknown }).instructions)).toContain(
+      INPUT.attempt,
+    );
     expect(String((questions[FREEFORM_LEGAL_KEY] as { instructions: unknown }).instructions)).toContain(INPUT.attempt);
     const criteria = (questions[FREEFORM_CANDIDATE_KEY] as { criteria: Record<string, unknown> }).criteria;
-    expect(Object.keys(criteria)).toEqual([...CANDIDATES.map((candidate) => candidate.candidateId), FREEFORM_MATERIALIZATION_NONE]);
+    expect(Object.keys(criteria)).toEqual([
+      ...CANDIDATES.map((candidate) => candidate.candidateId),
+      FREEFORM_MATERIALIZATION_NONE,
+    ]);
     expect(criteria[FREEFORM_MATERIALIZATION_NONE]).toBeTruthy();
   });
 });

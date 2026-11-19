@@ -48,22 +48,37 @@ export const ATTACK_RIDER_CATALOG: Readonly<Record<string, AttackRider>> = Objec
  * its immutable known-power grants. Unknown abilities contribute no rider.
  */
 export function buildAttackRiderPlans(
-  db: DatabaseDriver.Database, campaignId: string, actorId: string,
+  db: DatabaseDriver.Database,
+  campaignId: string,
+  actorId: string,
 ): readonly AttackRider[] {
-  const rows = db.prepare(`SELECT power.pack_id,power.pack_version,power.definition_id
+  const rows = db
+    .prepare(
+      `SELECT power.pack_id,power.pack_version,power.definition_id
     FROM campaign_actors actor JOIN character_known_powers_v23 power
       ON power.campaign_character_id=actor.campaign_character_id
-    WHERE actor.campaign_id=? AND actor.id=? ORDER BY power.definition_id`).all(campaignId, actorId) as Array<{
-      pack_id: string; pack_version: string; definition_id: string;
-    }>;
+    WHERE actor.campaign_id=? AND actor.id=? ORDER BY power.definition_id`,
+    )
+    .all(campaignId, actorId) as Array<{
+    pack_id: string;
+    pack_version: string;
+    definition_id: string;
+  }>;
   const riders: AttackRider[] = [];
   for (const row of rows) {
     const template = ATTACK_RIDER_CATALOG[row.definition_id];
     if (!template) continue;
-    riders.push(Object.freeze({
-      ...template,
-      source: Object.freeze({ kind: "ability", packId: row.pack_id, packVersion: row.pack_version, definitionId: row.definition_id }),
-    }));
+    riders.push(
+      Object.freeze({
+        ...template,
+        source: Object.freeze({
+          kind: "ability",
+          packId: row.pack_id,
+          packVersion: row.pack_version,
+          definitionId: row.definition_id,
+        }),
+      }),
+    );
   }
   return Object.freeze(riders);
 }

@@ -91,31 +91,56 @@ describe("v11 campaign-character contracts", () => {
     for (const field of ["campaignId", "controllerPrincipalId"] as const) {
       expect(createCampaignCharacterInputSchema.safeParse({ ...input, [field]: "invalid id" }).success).toBe(false);
     }
-    expect(publicCampaignCharacterProjectionSchema.safeParse({
-      campaignCharacter: { ...campaignCharacter, id: "bad/id" }, sheet, actor: publicActor,
-    }).success).toBe(false);
-    expect(publicCampaignCharacterProjectionSchema.safeParse({
-      campaignCharacter: { ...campaignCharacter, createdAt: "2030-04-05T06:07:08Z" }, sheet, actor: publicActor,
-    }).success).toBe(false);
+    expect(
+      publicCampaignCharacterProjectionSchema.safeParse({
+        campaignCharacter: { ...campaignCharacter, id: "bad/id" },
+        sheet,
+        actor: publicActor,
+      }).success,
+    ).toBe(false);
+    expect(
+      publicCampaignCharacterProjectionSchema.safeParse({
+        campaignCharacter: { ...campaignCharacter, createdAt: "2030-04-05T06:07:08Z" },
+        sheet,
+        actor: publicActor,
+      }).success,
+    ).toBe(false);
   });
 
   it("requires exact race, background, class, and resolved-choice references", () => {
     expect(createCampaignCharacterInputSchema.parse(input)).toEqual(input);
-    expect(createCampaignCharacterInputSchema.safeParse({ ...input, race: reference("background") }).success).toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({ ...input, background: reference("race") }).success).toBe(false);
+    expect(createCampaignCharacterInputSchema.safeParse({ ...input, race: reference("background") }).success).toBe(
+      false,
+    );
+    expect(createCampaignCharacterInputSchema.safeParse({ ...input, background: reference("race") }).success).toBe(
+      false,
+    );
     expect(campaignCharacterClassSchema.safeParse({ class: reference("race"), level: 1 }).success).toBe(false);
-    expect(resolvedCharacterChoiceSchema.safeParse({
-      choiceId: "choice-one", selection: { ...reference("ability"), packVersion: undefined },
-    }).success).toBe(false);
-    expect(resolvedCharacterChoiceSchema.safeParse({
-      choiceId: "choice-one", selection: { ...reference("ability"), versionRange: "^1.0.0" },
-    }).success).toBe(false);
+    expect(
+      resolvedCharacterChoiceSchema.safeParse({
+        choiceId: "choice-one",
+        selection: { ...reference("ability"), packVersion: undefined },
+      }).success,
+    ).toBe(false);
+    expect(
+      resolvedCharacterChoiceSchema.safeParse({
+        choiceId: "choice-one",
+        selection: { ...reference("ability"), versionRange: "^1.0.0" },
+      }).success,
+    ).toBe(false);
   });
 
   it("requires a complete strict creation payload while allowing optional private notes", () => {
     for (const field of [
-      "campaignId", "characterId", "controllerPrincipalId", "race", "background", "classes", "attributes",
-      "proficiencies", "choices",
+      "campaignId",
+      "characterId",
+      "controllerPrincipalId",
+      "race",
+      "background",
+      "classes",
+      "attributes",
+      "proficiencies",
+      "choices",
     ] as const) {
       const incomplete: Record<string, unknown> = { ...input };
       delete incomplete[field];
@@ -125,8 +150,10 @@ describe("v11 campaign-character contracts", () => {
     expect(createCampaignCharacterInputSchema.parse(withoutNotes)).toEqual(withoutNotes);
     expect(createCampaignCharacterInputSchema.safeParse({ ...input, unknown: true }).success).toBe(false);
     expect(createCampaignCharacterInputSchema.safeParse({ ...input, privateNotes: "" }).success).toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({ ...input, privateNotes: "x".repeat(MAX_PRIVATE_NOTES_LENGTH + 1) }).success)
-      .toBe(false);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({ ...input, privateNotes: "x".repeat(MAX_PRIVATE_NOTES_LENGTH + 1) })
+        .success,
+    ).toBe(false);
   });
 
   it("counts private-note maxima in Unicode code points for creation and privileged reads", () => {
@@ -143,92 +170,128 @@ describe("v11 campaign-character contracts", () => {
     expect(createCampaignCharacterInputSchema.safeParse({ ...input, privateNotes: accepted }).success).toBe(true);
     expect(createCampaignCharacterInputSchema.safeParse({ ...input, privateNotes: rejected }).success).toBe(false);
     expect(campaignCharacterReadSchema.safeParse(privilegedRead).success).toBe(true);
-    expect(campaignCharacterReadSchema.safeParse({
-      ...privilegedRead,
-      projection: { ...privilegedRead.projection, actor: { ...privilegedRead.projection.actor, privateNotes: rejected } },
-    }).success).toBe(false);
+    expect(
+      campaignCharacterReadSchema.safeParse({
+        ...privilegedRead,
+        projection: {
+          ...privilegedRead.projection,
+          actor: { ...privilegedRead.projection.actor, privateNotes: rejected },
+        },
+      }).success,
+    ).toBe(false);
     expect(privilegedCampaignActorSchema.safeParse({ ...privilegedActor, privateNotes: null }).success).toBe(true);
   });
 
-  it.each([
-    "\ud800",
-    "\udc00",
-    "before\ud800after",
-    "before\udc00after",
-    "\ud800\ud800",
-    "\udc00\udc00",
-  ])("rejects malformed UTF-16 private notes %#", (privateNotes) => {
-    expect(createCampaignCharacterInputSchema.safeParse({ ...input, privateNotes }).success).toBe(false);
-    expect(privilegedCampaignActorSchema.safeParse({ ...privilegedActor, privateNotes }).success).toBe(false);
-  });
+  it.each(["\ud800", "\udc00", "before\ud800after", "before\udc00after", "\ud800\ud800", "\udc00\udc00"])(
+    "rejects malformed UTF-16 private notes %#",
+    (privateNotes) => {
+      expect(createCampaignCharacterInputSchema.safeParse({ ...input, privateNotes }).success).toBe(false);
+      expect(privilegedCampaignActorSchema.safeParse({ ...privilegedActor, privateNotes }).success).toBe(false);
+    },
+  );
 
   it("enforces class levels, entry bounds, categories, and array maxima", () => {
     expect(campaignCharacterClassSchema.safeParse({ class: reference("class"), level: 0 }).success).toBe(false);
-    expect(campaignCharacterClassSchema.safeParse({ class: reference("class"), level: MAX_CHARACTER_LEVEL + 1 }).success)
-      .toBe(false);
+    expect(
+      campaignCharacterClassSchema.safeParse({ class: reference("class"), level: MAX_CHARACTER_LEVEL + 1 }).success,
+    ).toBe(false);
     expect(campaignCharacterAttributeSchema.safeParse({ attributeId: "resolve", value: 1_001 }).success).toBe(false);
     expect(campaignCharacterAttributeSchema.safeParse({ attributeId: "resolve", value: 1.5 }).success).toBe(false);
-    expect(campaignCharacterProficiencySchema.safeParse({ category: "unknown", proficiencyId: "resolve" }).success)
-      .toBe(false);
-    expect(proficiencyCategorySchema.options).toEqual([
-      "skill", "saving-throw", "tool", "weapon", "armor", "language",
-    ]);
+    expect(
+      campaignCharacterProficiencySchema.safeParse({ category: "unknown", proficiencyId: "resolve" }).success,
+    ).toBe(false);
+    expect(proficiencyCategorySchema.options).toEqual(["skill", "saving-throw", "tool", "weapon", "armor", "language"]);
 
-    const many = (count: number, make: (index: number) => unknown) => Array.from({ length: count }, (_, index) => make(index));
-    expect(createCampaignCharacterInputSchema.safeParse({
-      ...input,
-      classes: many(MAX_CHARACTER_CLASSES, (index) => ({
-        class: { ...reference("class"), definitionId: `class-${index}` }, level: 1,
-      })),
-      attributes: many(MAX_CHARACTER_ATTRIBUTES, (index) => ({ attributeId: `attribute-${index}`, value: 1 })),
-      proficiencies: many(MAX_CHARACTER_PROFICIENCIES, (index) => ({ category: "skill", proficiencyId: `skill-${index}` })),
-      choices: many(MAX_CHARACTER_CHOICES, (index) => ({
-        choiceId: `choice-${index}`,
-        selection: { ...reference("ability"), definitionId: `ability-${index}` },
-      })),
-    }).success).toBe(true);
-    expect(createCampaignCharacterInputSchema.safeParse({
-      ...input,
-      classes: many(MAX_CHARACTER_CLASSES + 1, (index) => ({
-        class: { ...reference("class"), definitionId: `class-${index}` }, level: 1,
-      })),
-    }).success).toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({
-      ...input, attributes: many(MAX_CHARACTER_ATTRIBUTES + 1, (index) => ({ attributeId: `attribute-${index}`, value: 1 })),
-    }).success).toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({
-      ...input,
-      proficiencies: many(MAX_CHARACTER_PROFICIENCIES + 1, (index) => ({ category: "skill", proficiencyId: `skill-${index}` })),
-    }).success).toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({
-      ...input,
-      choices: many(MAX_CHARACTER_CHOICES + 1, (index) => ({ choiceId: `choice-${index}`, selection: reference("ability") })),
-    }).success).toBe(false);
+    const many = (count: number, make: (index: number) => unknown) =>
+      Array.from({ length: count }, (_, index) => make(index));
+    expect(
+      createCampaignCharacterInputSchema.safeParse({
+        ...input,
+        classes: many(MAX_CHARACTER_CLASSES, (index) => ({
+          class: { ...reference("class"), definitionId: `class-${index}` },
+          level: 1,
+        })),
+        attributes: many(MAX_CHARACTER_ATTRIBUTES, (index) => ({ attributeId: `attribute-${index}`, value: 1 })),
+        proficiencies: many(MAX_CHARACTER_PROFICIENCIES, (index) => ({
+          category: "skill",
+          proficiencyId: `skill-${index}`,
+        })),
+        choices: many(MAX_CHARACTER_CHOICES, (index) => ({
+          choiceId: `choice-${index}`,
+          selection: { ...reference("ability"), definitionId: `ability-${index}` },
+        })),
+      }).success,
+    ).toBe(true);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({
+        ...input,
+        classes: many(MAX_CHARACTER_CLASSES + 1, (index) => ({
+          class: { ...reference("class"), definitionId: `class-${index}` },
+          level: 1,
+        })),
+      }).success,
+    ).toBe(false);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({
+        ...input,
+        attributes: many(MAX_CHARACTER_ATTRIBUTES + 1, (index) => ({ attributeId: `attribute-${index}`, value: 1 })),
+      }).success,
+    ).toBe(false);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({
+        ...input,
+        proficiencies: many(MAX_CHARACTER_PROFICIENCIES + 1, (index) => ({
+          category: "skill",
+          proficiencyId: `skill-${index}`,
+        })),
+      }).success,
+    ).toBe(false);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({
+        ...input,
+        choices: many(MAX_CHARACTER_CHOICES + 1, (index) => ({
+          choiceId: `choice-${index}`,
+          selection: reference("ability"),
+        })),
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects duplicate identities but permits multi-class entries without totaling levels", () => {
-    expect(createCampaignCharacterInputSchema.safeParse({ ...input, classes: [...input.classes, ...input.classes] }).success)
-      .toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({ ...input, attributes: [...input.attributes, ...input.attributes] }).success)
-      .toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({ ...input, proficiencies: [...input.proficiencies, ...input.proficiencies] }).success)
-      .toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({ ...input, choices: [...input.choices, ...input.choices] }).success)
-      .toBe(false);
-    expect(createCampaignCharacterInputSchema.safeParse({
-      ...input,
-      classes: [
-        { class: reference("class"), level: MAX_CHARACTER_LEVEL },
-        { class: { ...reference("class"), definitionId: "class-two" }, level: MAX_CHARACTER_LEVEL },
-      ],
-    }).success).toBe(true);
-    expect(createCampaignCharacterInputSchema.safeParse({
-      ...input,
-      proficiencies: [
-        { category: "skill", proficiencyId: "common" },
-        { category: "language", proficiencyId: "common" },
-      ],
-    }).success).toBe(true);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({ ...input, classes: [...input.classes, ...input.classes] }).success,
+    ).toBe(false);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({ ...input, attributes: [...input.attributes, ...input.attributes] })
+        .success,
+    ).toBe(false);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({
+        ...input,
+        proficiencies: [...input.proficiencies, ...input.proficiencies],
+      }).success,
+    ).toBe(false);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({ ...input, choices: [...input.choices, ...input.choices] }).success,
+    ).toBe(false);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({
+        ...input,
+        classes: [
+          { class: reference("class"), level: MAX_CHARACTER_LEVEL },
+          { class: { ...reference("class"), definitionId: "class-two" }, level: MAX_CHARACTER_LEVEL },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(
+      createCampaignCharacterInputSchema.safeParse({
+        ...input,
+        proficiencies: [
+          { category: "skill", proficiencyId: "common" },
+          { category: "language", proficiencyId: "common" },
+        ],
+      }).success,
+    ).toBe(true);
   });
 
   it("defines only the first principal-controlled player-character actor", () => {
@@ -253,7 +316,8 @@ describe("v11 campaign-character contracts", () => {
   it("wraps public and privileged reads with a strict access discriminator", () => {
     const publicRead = { access: "public", projection: { campaignCharacter, sheet, actor: publicActor } } as const;
     const privilegedRead = {
-      access: "privileged", projection: { campaignCharacter, sheet, actor: privilegedActor },
+      access: "privileged",
+      projection: { campaignCharacter, sheet, actor: privilegedActor },
     } as const;
     expect(campaignCharacterReadSchema.parse(publicRead)).toEqual(publicRead);
     expect(campaignCharacterReadSchema.parse(privilegedRead)).toEqual(privilegedRead);
@@ -264,23 +328,46 @@ describe("v11 campaign-character contracts", () => {
 
   it("requires actor, sheet, campaign character, and campaign links to agree", () => {
     const projection = { campaignCharacter, sheet, actor: publicActor };
-    expect(publicCampaignCharacterProjectionSchema.safeParse({
-      ...projection, actor: { ...publicActor, sheetId: "sheet-two" },
-    }).success).toBe(false);
-    expect(publicCampaignCharacterProjectionSchema.safeParse({
-      ...projection, actor: { ...publicActor, campaignCharacterId: "campaign-character-two" },
-    }).success).toBe(false);
-    expect(publicCampaignCharacterProjectionSchema.safeParse({
-      ...projection, sheet: { ...sheet, campaignId: "campaign-two" },
-    }).success).toBe(false);
+    expect(
+      publicCampaignCharacterProjectionSchema.safeParse({
+        ...projection,
+        actor: { ...publicActor, sheetId: "sheet-two" },
+      }).success,
+    ).toBe(false);
+    expect(
+      publicCampaignCharacterProjectionSchema.safeParse({
+        ...projection,
+        actor: { ...publicActor, campaignCharacterId: "campaign-character-two" },
+      }).success,
+    ).toBe(false);
+    expect(
+      publicCampaignCharacterProjectionSchema.safeParse({
+        ...projection,
+        sheet: { ...sheet, campaignId: "campaign-two" },
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects persona editing and unrequested mechanics everywhere", () => {
-    for (const field of ["name", "archetype", "boundaries", "hp", "inventory", "xp", "resources", "draft", "allocationMode"] as const) {
+    for (const field of [
+      "name",
+      "archetype",
+      "boundaries",
+      "hp",
+      "inventory",
+      "xp",
+      "resources",
+      "draft",
+      "allocationMode",
+    ] as const) {
       expect(createCampaignCharacterInputSchema.safeParse({ ...input, [field]: field }).success).toBe(false);
-      expect(publicCampaignCharacterProjectionSchema.safeParse({
-        campaignCharacter: { ...campaignCharacter, [field]: field }, sheet, actor: publicActor,
-      }).success).toBe(false);
+      expect(
+        publicCampaignCharacterProjectionSchema.safeParse({
+          campaignCharacter: { ...campaignCharacter, [field]: field },
+          sheet,
+          actor: publicActor,
+        }).success,
+      ).toBe(false);
     }
   });
 });

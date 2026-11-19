@@ -7,9 +7,25 @@ import { campaignIdSchema, principalIdSchema } from "./rpg-characters.js";
 /** Maximum validation issues retained for one generated draft. */
 export const MAX_GENERATION_VALIDATION_ISSUES = 256;
 /** Closed kinds of content that may be staged for human review. */
-export const generationDraftKindSchema = z.enum(["encounter", "location", "npc", "faction", "quest", "storyline", "content-pack", "campaign-content"]);
+export const generationDraftKindSchema = z.enum([
+  "encounter",
+  "location",
+  "npc",
+  "faction",
+  "quest",
+  "storyline",
+  "content-pack",
+  "campaign-content",
+]);
 /** Guarded generation-draft lifecycle. */
-export const generationDraftStateSchema = z.enum(["staged", "in-review", "approved", "rejected", "applied", "cancelled"]);
+export const generationDraftStateSchema = z.enum([
+  "staged",
+  "in-review",
+  "approved",
+  "rejected",
+  "applied",
+  "cancelled",
+]);
 /** Review status exposed independently from mutable staged content. */
 export const generationDraftReviewStateSchema = z.enum(["pending", "approved", "rejected"]);
 /** Apply status proving that approval and command application are distinct. */
@@ -20,86 +36,155 @@ export const reviewDecisionKindSchema = z.enum(["approved", "rejected"]);
 export const generationValidationSeveritySchema = z.enum(["error", "warning"]);
 
 /** One bounded validation issue for staged generated content. */
-export const generationValidationIssueSchema = z.object({
-  path: z.array(z.union([z.string().max(128), z.number().int().min(0).max(1_000_000)])).max(32),
-  code: resourceIdSchema,
-  severity: generationValidationSeveritySchema,
-  message: z.string().trim().min(1).max(1_000),
-}).strict();
+export const generationValidationIssueSchema = z
+  .object({
+    path: z.array(z.union([z.string().max(128), z.number().int().min(0).max(1_000_000)])).max(32),
+    code: resourceIdSchema,
+    severity: generationValidationSeveritySchema,
+    message: z.string().trim().min(1).max(1_000),
+  })
+  .strict();
 
 /** Validation result stored alongside the exact staged revision. */
-export const generationDraftValidationSchema = z.object({
-  valid: z.boolean(),
-  issues: z.array(generationValidationIssueSchema).max(MAX_GENERATION_VALIDATION_ISSUES),
-  validatedAt: utcIsoTimestampSchema.nullable(),
-}).strict().superRefine((value, context) => {
-  const hasError = value.issues.some((issue) => issue.severity === "error");
-  if (value.valid === hasError) context.addIssue({ code: "custom", path: ["valid"], message: "valid must be the inverse of validation errors" });
-});
+export const generationDraftValidationSchema = z
+  .object({
+    valid: z.boolean(),
+    issues: z.array(generationValidationIssueSchema).max(MAX_GENERATION_VALIDATION_ISSUES),
+    validatedAt: utcIsoTimestampSchema.nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const hasError = value.issues.some((issue) => issue.severity === "error");
+    if (value.valid === hasError)
+      context.addIssue({ code: "custom", path: ["valid"], message: "valid must be the inverse of validation errors" });
+  });
 
 /** Staged generated content is an object, never an executable command. */
 export const stagedGenerationContentSchema = z.record(z.string().min(1).max(128), z.unknown());
 
 /** Immutable owner/GM review decision for one exact draft revision. */
-export const generationReviewDecisionSchema = z.object({
-  decisionId: resourceIdSchema,
-  principalId: principalIdSchema,
-  decision: reviewDecisionKindSchema,
-  notes: z.string().max(4_000).nullable(),
-  expectedDraftRevision: revisionSchema,
-  idempotencyKey: idempotencyKeySchema,
-  decidedAt: utcIsoTimestampSchema,
-}).strict();
+export const generationReviewDecisionSchema = z
+  .object({
+    decisionId: resourceIdSchema,
+    principalId: principalIdSchema,
+    decision: reviewDecisionKindSchema,
+    notes: z.string().max(4_000).nullable(),
+    expectedDraftRevision: revisionSchema,
+    idempotencyKey: idempotencyKeySchema,
+    decidedAt: utcIsoTimestampSchema,
+  })
+  .strict();
 
 /** Immutable receipt produced specifically by applying one reviewed draft. */
-export const generationDraftApplyReceiptSchema = z.object({ receiptId: resourceIdSchema, draftId: resourceIdSchema,
-  reviewDecisionId: resourceIdSchema, principalId: principalIdSchema, result: z.record(z.string(), z.unknown()), appliedAt: utcIsoTimestampSchema }).strict();
+export const generationDraftApplyReceiptSchema = z
+  .object({
+    receiptId: resourceIdSchema,
+    draftId: resourceIdSchema,
+    reviewDecisionId: resourceIdSchema,
+    principalId: principalIdSchema,
+    result: z.record(z.string(), z.unknown()),
+    appliedAt: utcIsoTimestampSchema,
+  })
+  .strict();
 
 const draftBase = {
-  draftId: resourceIdSchema, campaignId: campaignIdSchema, timelineId: resourceIdSchema, sessionId: resourceIdSchema.nullable(),
-  kind: generationDraftKindSchema, state: generationDraftStateSchema, reviewState: generationDraftReviewStateSchema,
-  applyState: generationDraftApplyStateSchema, revision: revisionSchema, campaignRevision: revisionSchema,
-  createdAt: utcIsoTimestampSchema, updatedAt: utcIsoTimestampSchema,
+  draftId: resourceIdSchema,
+  campaignId: campaignIdSchema,
+  timelineId: resourceIdSchema,
+  sessionId: resourceIdSchema.nullable(),
+  kind: generationDraftKindSchema,
+  state: generationDraftStateSchema,
+  reviewState: generationDraftReviewStateSchema,
+  applyState: generationDraftApplyStateSchema,
+  revision: revisionSchema,
+  campaignRevision: revisionSchema,
+  createdAt: utcIsoTimestampSchema,
+  updatedAt: utcIsoTimestampSchema,
 };
 
 /** Role-safe draft projection that structurally excludes generated content and review notes. */
-export const roleSafeGenerationDraftSchema = z.object({
-  ...draftBase,
-  validationSummary: z.object({ valid: z.boolean(), errorCount: z.number().int().min(0).max(MAX_GENERATION_VALIDATION_ISSUES),
-    warningCount: z.number().int().min(0).max(MAX_GENERATION_VALIDATION_ISSUES) }).strict(),
-  receiptLinks: z.array(finalReceiptLinkSchema).max(256),
-  applyReceiptId: resourceIdSchema.nullable(),
-}).strict().superRefine((value, context) => {
-  if ((value.state === "applied") !== (value.applyState === "applied" && value.applyReceiptId !== null)) context.addIssue({ code: "custom", path: ["applyState"], message: "applied state requires a draft-specific receipt" });
-  if ((value.reviewState === "approved") !== (value.state === "approved" || value.state === "applied")) context.addIssue({ code: "custom", path: ["reviewState"], message: "review and lifecycle state are inconsistent" });
-});
+export const roleSafeGenerationDraftSchema = z
+  .object({
+    ...draftBase,
+    validationSummary: z
+      .object({
+        valid: z.boolean(),
+        errorCount: z.number().int().min(0).max(MAX_GENERATION_VALIDATION_ISSUES),
+        warningCount: z.number().int().min(0).max(MAX_GENERATION_VALIDATION_ISSUES),
+      })
+      .strict(),
+    receiptLinks: z.array(finalReceiptLinkSchema).max(256),
+    applyReceiptId: resourceIdSchema.nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.state === "applied") !== (value.applyState === "applied" && value.applyReceiptId !== null))
+      context.addIssue({
+        code: "custom",
+        path: ["applyState"],
+        message: "applied state requires a draft-specific receipt",
+      });
+    if ((value.reviewState === "approved") !== (value.state === "approved" || value.state === "applied"))
+      context.addIssue({
+        code: "custom",
+        path: ["reviewState"],
+        message: "review and lifecycle state are inconsistent",
+      });
+  });
 
 /** Authorized owner/GM projection with staged content, validation, review, and apply receipts. */
-export const privateGenerationDraftSchema = z.object({
-  ...draftBase,
-  principalId: principalIdSchema,
-  stagedContent: stagedGenerationContentSchema,
-  validation: generationDraftValidationSchema,
-  reviewDecision: generationReviewDecisionSchema.nullable(),
-  receiptLinks: z.array(finalReceiptLinkSchema).max(256),
-  applyReceipt: generationDraftApplyReceiptSchema.nullable(),
-}).strict().superRefine((value, context) => {
-  if ((value.state === "applied") !== (value.applyState === "applied" && value.applyReceipt !== null)) context.addIssue({ code: "custom", path: ["applyState"], message: "applied state requires a draft-specific receipt" });
-  if (value.applyReceipt && value.reviewDecision?.decision !== "approved") context.addIssue({ code: "custom", path: ["applyReceipt"], message: "only an approved review can be applied" });
-});
+export const privateGenerationDraftSchema = z
+  .object({
+    ...draftBase,
+    principalId: principalIdSchema,
+    stagedContent: stagedGenerationContentSchema,
+    validation: generationDraftValidationSchema,
+    reviewDecision: generationReviewDecisionSchema.nullable(),
+    receiptLinks: z.array(finalReceiptLinkSchema).max(256),
+    applyReceipt: generationDraftApplyReceiptSchema.nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.state === "applied") !== (value.applyState === "applied" && value.applyReceipt !== null))
+      context.addIssue({
+        code: "custom",
+        path: ["applyState"],
+        message: "applied state requires a draft-specific receipt",
+      });
+    if (value.applyReceipt && value.reviewDecision?.decision !== "approved")
+      context.addIssue({ code: "custom", path: ["applyReceipt"], message: "only an approved review can be applied" });
+  });
 
 /** Strict input for creating a generated-content draft. */
-export const createGenerationDraftInputSchema = z.object({ campaignId: campaignIdSchema, timelineId: resourceIdSchema,
-  sessionId: resourceIdSchema.nullable().optional(), kind: generationDraftKindSchema, stagedContent: stagedGenerationContentSchema,
-  validation: generationDraftValidationSchema, expectedCampaignRevision: revisionSchema, idempotencyKey: idempotencyKeySchema }).strict();
+export const createGenerationDraftInputSchema = z
+  .object({
+    campaignId: campaignIdSchema,
+    timelineId: resourceIdSchema,
+    sessionId: resourceIdSchema.nullable().optional(),
+    kind: generationDraftKindSchema,
+    stagedContent: stagedGenerationContentSchema,
+    validation: generationDraftValidationSchema,
+    expectedCampaignRevision: revisionSchema,
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .strict();
 /** Strict optimistic envelope for a draft mutation. */
-export const draftMutationInputSchema = z.object({ draftId: resourceIdSchema, expectedDraftRevision: revisionSchema.max(Number.MAX_SAFE_INTEGER - 1),
-  expectedCampaignRevision: revisionSchema, idempotencyKey: idempotencyKeySchema }).strict();
+export const draftMutationInputSchema = z
+  .object({
+    draftId: resourceIdSchema,
+    expectedDraftRevision: revisionSchema.max(Number.MAX_SAFE_INTEGER - 1),
+    expectedCampaignRevision: revisionSchema,
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .strict();
 /** Strict human review input. */
-export const reviewGenerationDraftInputSchema = draftMutationInputSchema.extend({ decision: reviewDecisionKindSchema,
-  notes: z.string().max(4_000).nullable().optional() }).strict();
+export const reviewGenerationDraftInputSchema = draftMutationInputSchema
+  .extend({ decision: reviewDecisionKindSchema, notes: z.string().max(4_000).nullable().optional() })
+  .strict();
 /** Strict draft-specific apply input; it never accepts an unrelated campaign command receipt. */
-export const applyGenerationDraftInputSchema = draftMutationInputSchema.extend({ result: z.record(z.string(), z.unknown()) }).strict();
+export const applyGenerationDraftInputSchema = draftMutationInputSchema
+  .extend({ result: z.record(z.string(), z.unknown()) })
+  .strict();
 
 /** Generated draft content kind. */
 export type GenerationDraftKind = z.infer<typeof generationDraftKindSchema>;

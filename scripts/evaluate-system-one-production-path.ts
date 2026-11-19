@@ -48,11 +48,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import {
-  MECHANIC_FAMILIES,
-  resolveMechanicFamily,
-  type MechanicFamily,
-} from "./synthetic-player-harness.js";
+import { MECHANIC_FAMILIES, resolveMechanicFamily, type MechanicFamily } from "./synthetic-player-harness.js";
 
 const SCRIPT = "scripts/evaluate-system-one-production-path.ts";
 
@@ -106,9 +102,9 @@ export function familyKeyForProductionKind(kind: string | null | undefined): Pro
 
 /** How the report describes the family resolution; shared by the markdown and JSON sidecar. */
 export const PRODUCTION_FAMILY_SOURCE =
-  "candidate kinds through `resolveMechanicFamily` (`MECHANIC_FAMILIES` / `KIND_TO_FAMILY` in"
-  + " scripts/synthetic-player-harness.ts); v56 action kinds and the v54 `check` kind through"
-  + " `PRODUCTION_ACTION_KIND_FAMILIES`; anything unresolved is reported as `unknown`";
+  "candidate kinds through `resolveMechanicFamily` (`MECHANIC_FAMILIES` / `KIND_TO_FAMILY` in" +
+  " scripts/synthetic-player-harness.ts); v56 action kinds and the v54 `check` kind through" +
+  " `PRODUCTION_ACTION_KIND_FAMILIES`; anything unresolved is reported as `unknown`";
 
 // -------------------------------------------------------------------------------------------------
 // Tolerant parsers for the two JSON documents a decision carries
@@ -437,12 +433,7 @@ export function toLaneProposal(world: string, row: RawLaneProposal): LaneProposa
 }
 
 /** The provider surfaces a candidate-naming call can come from, in comparison precedence order. */
-export const PROVIDER_PICK_SOURCES = [
-  "tool-call",
-  "decision-round",
-  "provider-response",
-  "provider-binding",
-] as const;
+export const PROVIDER_PICK_SOURCES = ["tool-call", "decision-round", "provider-response", "provider-binding"] as const;
 export type ProviderPickSource = (typeof PROVIDER_PICK_SOURCES)[number];
 
 export interface ProviderCandidateCall {
@@ -477,10 +468,12 @@ function providerSourceRank(source: ProviderPickSource): number {
  * within a source. Later calls are counted in `additionalCalls`.
  */
 export function buildProviderPicks(world: string, calls: readonly ProviderCandidateCall[]): ProviderCandidatePick[] {
-  const ordered = [...calls].sort((left, right) =>
-    left.turnId.localeCompare(right.turnId)
-    || providerSourceRank(left.source) - providerSourceRank(right.source)
-    || left.order - right.order);
+  const ordered = [...calls].sort(
+    (left, right) =>
+      left.turnId.localeCompare(right.turnId) ||
+      providerSourceRank(left.source) - providerSourceRank(right.source) ||
+      left.order - right.order,
+  );
   const byTurn = new Map<string, ProviderCandidateCall[]>();
   for (const call of ordered) {
     const list = byTurn.get(call.turnId) ?? [];
@@ -716,9 +709,7 @@ function medianOf(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1
-    ? sorted[middle]!
-    : (sorted[middle - 1]! + sorted[middle]!) / 2;
+  return sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
 export interface FamilyMetricsInput {
@@ -816,7 +807,9 @@ function countMismatches(
   decisions: readonly ProductionDecision[],
   items: readonly { decisionId: string | null; candidateId: string | null }[],
 ): number {
-  const decisionById = new Map(decisions.map((decision): [string, ProductionDecision] => [decision.decisionId, decision]));
+  const decisionById = new Map(
+    decisions.map((decision): [string, ProductionDecision] => [decision.decisionId, decision]),
+  );
   let mismatches = 0;
   for (const item of items) {
     if (item.decisionId === null || item.candidateId === null) continue;
@@ -908,27 +901,42 @@ export function productionAnomalies(input: {
 }): string[] {
   const anomalies: string[] = [];
   const unjoined = input.decisions.filter((decision) => !decision.turnJoined).map((decision) => decision.decisionId);
-  if (unjoined.length > 0) anomalies.push(`${unjoined.length} decision(s) have no joined adventure_turns row: ${boundedList(unjoined)}`);
-  const malformedState = input.decisions.filter((decision) => decision.stateMalformed).map((decision) => decision.decisionId);
-  if (malformedState.length > 0) anomalies.push(`${malformedState.length} decision(s) have a malformed state_json: ${boundedList(malformedState)}`);
-  const malformedSelection = input.decisions.filter(
-    (decision) => decision.selectionMalformed,
-  ).map((decision) => decision.decisionId);
+  if (unjoined.length > 0)
+    anomalies.push(`${unjoined.length} decision(s) have no joined adventure_turns row: ${boundedList(unjoined)}`);
+  const malformedState = input.decisions
+    .filter((decision) => decision.stateMalformed)
+    .map((decision) => decision.decisionId);
+  if (malformedState.length > 0)
+    anomalies.push(`${malformedState.length} decision(s) have a malformed state_json: ${boundedList(malformedState)}`);
+  const malformedSelection = input.decisions
+    .filter((decision) => decision.selectionMalformed)
+    .map((decision) => decision.decisionId);
   if (malformedSelection.length > 0) {
-    anomalies.push(`${malformedSelection.length} decision(s) have a malformed selection_json: ${boundedList(malformedSelection)}`);
+    anomalies.push(
+      `${malformedSelection.length} decision(s) have a malformed selection_json: ${boundedList(malformedSelection)}`,
+    );
   }
-  const missingPicks = input.decisions.filter(
-    (decision) => decision.pick !== null && decision.pick.resolution === "missing-from-shortlist",
-  ).map((decision) => `${decision.decisionId}:${decision.pick!.candidateId}`);
+  const missingPicks = input.decisions
+    .filter((decision) => decision.pick !== null && decision.pick.resolution === "missing-from-shortlist")
+    .map((decision) => `${decision.decisionId}:${decision.pick!.candidateId}`);
   if (missingPicks.length > 0) {
-    anomalies.push(`${missingPicks.length} pick(s) named a candidate that the shortlist did not advertise: ${boundedList(missingPicks)}`);
+    anomalies.push(
+      `${missingPicks.length} pick(s) named a candidate that the shortlist did not advertise: ${boundedList(missingPicks)}`,
+    );
   }
-  const unmapped = [...new Set(input.decisions.flatMap((decision) =>
-    decision.pick !== null && decision.pick.resolution === "unmapped-kind" && decision.pick.kind !== null
-      ? [decision.pick.kind]
-      : []))];
+  const unmapped = [
+    ...new Set(
+      input.decisions.flatMap((decision) =>
+        decision.pick !== null && decision.pick.resolution === "unmapped-kind" && decision.pick.kind !== null
+          ? [decision.pick.kind]
+          : [],
+      ),
+    ),
+  ];
   if (unmapped.length > 0) anomalies.push(`pick kind(s) with no canonical family: ${boundedList(unmapped)}`);
-  const decisionById = new Map(input.decisions.map((decision): [string, ProductionDecision] => [decision.decisionId, decision]));
+  const decisionById = new Map(
+    input.decisions.map((decision): [string, ProductionDecision] => [decision.decisionId, decision]),
+  );
   const proposalMismatches: string[] = [];
   for (const proposal of input.laneProposals) {
     if (proposal.decisionId === null || proposal.candidateId === null) continue;
@@ -937,7 +945,9 @@ export function productionAnomalies(input: {
     if (decision.pick.candidateId !== proposal.candidateId) proposalMismatches.push(proposal.proposalId);
   }
   if (proposalMismatches.length > 0) {
-    anomalies.push(`${proposalMismatches.length} lane proposal(s) name a candidate other than the decision's pick: ${boundedList(proposalMismatches)}`);
+    anomalies.push(
+      `${proposalMismatches.length} lane proposal(s) name a candidate other than the decision's pick: ${boundedList(proposalMismatches)}`,
+    );
   }
   const executionMismatches: string[] = [];
   for (const execution of input.laneExecutions) {
@@ -949,11 +959,15 @@ export function productionAnomalies(input: {
     }
   }
   if (executionMismatches.length > 0) {
-    anomalies.push(`${executionMismatches.length} lane execution(s) name a candidate other than the decision's pick: ${boundedList(executionMismatches)}`);
+    anomalies.push(
+      `${executionMismatches.length} lane execution(s) name a candidate other than the decision's pick: ${boundedList(executionMismatches)}`,
+    );
   }
   const unknownProvider = input.providerPicks.filter((pick) => pick.family === PRODUCTION_FAMILY_UNKNOWN);
   if (unknownProvider.length > 0) {
-    anomalies.push(`${unknownProvider.length} provider pick turn(s) have a candidate id with no canonical family: ${boundedList(unknownProvider.map((pick) => pick.turnId))}`);
+    anomalies.push(
+      `${unknownProvider.length} provider pick turn(s) have a candidate id with no canonical family: ${boundedList(unknownProvider.map((pick) => pick.turnId))}`,
+    );
   }
   return anomalies;
 }
@@ -1013,13 +1027,13 @@ export const PRODUCTION_PATH_HONESTY_NOTES: readonly string[] = Object.freeze([
 ]);
 
 export const PRODUCTION_PATH_PROVIDER_SOURCE_NOTE =
-  "Provider picks are read from the recorded provider surfaces per turn, in precedence order:"
-  + " `agent_tool_calls_v38.arguments_json.candidateId`, `agent_decision_rounds_v38.response_json.calls[].arguments.candidateId`,"
-  + " `agent_provider_responses_v39.response_json.calls[].arguments.candidateId`, then provider-origin"
-  + " `adventure_exact_action_proposal_bindings_v56.candidate_id`. The first candidate-naming call is the pick;"
-  + " extra calls on the same turn are counted (`providerExtraCalls`), never dropped. In the worlds inspected so far"
-  + " only the v39 response documents carry candidate selections; the v38 surfaces are read first as specified and are"
-  + " empty there.";
+  "Provider picks are read from the recorded provider surfaces per turn, in precedence order:" +
+  " `agent_tool_calls_v38.arguments_json.candidateId`, `agent_decision_rounds_v38.response_json.calls[].arguments.candidateId`," +
+  " `agent_provider_responses_v39.response_json.calls[].arguments.candidateId`, then provider-origin" +
+  " `adventure_exact_action_proposal_bindings_v56.candidate_id`. The first candidate-naming call is the pick;" +
+  " extra calls on the same turn are counted (`providerExtraCalls`), never dropped. In the worlds inspected so far" +
+  " only the v39 response documents carry candidate selections; the v38 surfaces are read first as specified and are" +
+  " empty there.";
 
 function buildWorldReport(dataset: ProductionWorldDataset): ProductionPathWorldReport {
   return {
@@ -1085,28 +1099,30 @@ function signal(value: number | null): string {
 }
 
 function alignmentSummaryLine(label: string, counts: AlignmentCounts): string {
-  return `${label}: compared ${counts.compared}; same id ${counts.sameId} (${percent(counts.sameId, counts.compared)});`
-    + ` same family ${counts.sameFamily} (${percent(counts.sameFamily, counts.compared)});`
-    + ` divergent ${counts.divergent} (${percent(counts.divergent, counts.compared)});`
-    + ` family unknown ${counts.unknownFamily} (${percent(counts.unknownFamily, counts.compared)})`;
+  return (
+    `${label}: compared ${counts.compared}; same id ${counts.sameId} (${percent(counts.sameId, counts.compared)});` +
+    ` same family ${counts.sameFamily} (${percent(counts.sameFamily, counts.compared)});` +
+    ` divergent ${counts.divergent} (${percent(counts.divergent, counts.compared)});` +
+    ` family unknown ${counts.unknownFamily} (${percent(counts.unknownFamily, counts.compared)})`
+  );
 }
 
 const FAMILY_TABLE_HEADER =
-  "| Family | Advertised | Reach | Act | Confirm | Fallback | Defer | Defer rate | Picks | Signal mean | Signal median"
-  + " | Committed | Advisory act | Awaiting confirm | Other uncommitted | Lane proposals | Lane executions"
-  + " | Approved | Rejected | Pending | Approved not executed | Provider compared | Same id | Same family | Divergent | Alignment unknown |";
+  "| Family | Advertised | Reach | Act | Confirm | Fallback | Defer | Defer rate | Picks | Signal mean | Signal median" +
+  " | Committed | Advisory act | Awaiting confirm | Other uncommitted | Lane proposals | Lane executions" +
+  " | Approved | Rejected | Pending | Approved not executed | Provider compared | Same id | Same family | Divergent | Alignment unknown |";
 
 function familyTableLines(families: readonly FamilyProductionRow[]): string[] {
   const lines: string[] = [FAMILY_TABLE_HEADER, `| ---${" | ---:".repeat(25)} |`];
   for (const row of families) {
     lines.push(
-      `| ${row.family} | ${row.advertised} | ${percent(row.advertised, row.decisionsTotal)} `
-      + `| ${row.act} | ${row.confirm} | ${row.fallback} | ${row.defer} | ${percent(row.defer, row.advertised)} `
-      + `| ${row.picks} | ${signal(row.signalMean)} | ${signal(row.signalMedian)} `
-      + `| ${row.committed} | ${row.advisoryAct} | ${row.awaitingConfirm} | ${row.otherUncommitted} `
-      + `| ${row.laneProposals} | ${row.laneExecutions} `
-      + `| ${row.confirmations.approved} | ${row.confirmations.rejected} | ${row.confirmations.pending} | ${row.confirmations.approvedNotExecuted} `
-      + `| ${row.alignment.compared} | ${row.alignment.sameId} | ${row.alignment.sameFamily} | ${row.alignment.divergent} | ${row.alignment.unknownFamily} |`,
+      `| ${row.family} | ${row.advertised} | ${percent(row.advertised, row.decisionsTotal)} ` +
+        `| ${row.act} | ${row.confirm} | ${row.fallback} | ${row.defer} | ${percent(row.defer, row.advertised)} ` +
+        `| ${row.picks} | ${signal(row.signalMean)} | ${signal(row.signalMedian)} ` +
+        `| ${row.committed} | ${row.advisoryAct} | ${row.awaitingConfirm} | ${row.otherUncommitted} ` +
+        `| ${row.laneProposals} | ${row.laneExecutions} ` +
+        `| ${row.confirmations.approved} | ${row.confirmations.rejected} | ${row.confirmations.pending} | ${row.confirmations.approvedNotExecuted} ` +
+        `| ${row.alignment.compared} | ${row.alignment.sameId} | ${row.alignment.sameFamily} | ${row.alignment.divergent} | ${row.alignment.unknownFamily} |`,
     );
   }
   return lines;
@@ -1128,11 +1144,23 @@ function totalsTableLines(summary: ProductionPathSummary): string[] {
     ["Picks resolved as unknown family", count(totals.picksUnknownFamily)],
     ["Picks missing from the shortlist", count(totals.picksMissingFromShortlist)],
     ["Lane proposals / executions", `${totals.laneProposals} / ${totals.laneExecutions}`],
-    ["Proposal / execution candidate mismatches", `${totals.proposalCandidateMismatches} / ${totals.executionCandidateMismatches}`],
+    [
+      "Proposal / execution candidate mismatches",
+      `${totals.proposalCandidateMismatches} / ${totals.executionCandidateMismatches}`,
+    ],
     ["Provider pick turns / extra calls", `${totals.providerPickTurns} / ${totals.providerExtraCalls}`],
-    ["Alignment compared / same id / same family / divergent / unknown", `${totals.alignment.compared} / ${totals.alignment.sameId} / ${totals.alignment.sameFamily} / ${totals.alignment.divergent} / ${totals.alignment.unknownFamily}`],
-    ["Confirmations approved / rejected / pending", `${totals.confirmations.approved} / ${totals.confirmations.rejected} / ${totals.confirmations.pending}`],
-    ["Confirmations other / not required / unknown", `${totals.confirmations.other} / ${totals.confirmations.notRequired} / ${totals.confirmations.unknown}`],
+    [
+      "Alignment compared / same id / same family / divergent / unknown",
+      `${totals.alignment.compared} / ${totals.alignment.sameId} / ${totals.alignment.sameFamily} / ${totals.alignment.divergent} / ${totals.alignment.unknownFamily}`,
+    ],
+    [
+      "Confirmations approved / rejected / pending",
+      `${totals.confirmations.approved} / ${totals.confirmations.rejected} / ${totals.confirmations.pending}`,
+    ],
+    [
+      "Confirmations other / not required / unknown",
+      `${totals.confirmations.other} / ${totals.confirmations.notRequired} / ${totals.confirmations.unknown}`,
+    ],
     ["Approved but not executed", count(totals.confirmations.approvedNotExecuted)],
   ];
   const lines = ["| Metric | Value |", "| --- | --- |"];
@@ -1152,12 +1180,12 @@ export function renderProductionPathMarkdown(report: ProductionPathReport): stri
   lines.push("## What this measures");
   lines.push("");
   lines.push(
-    "The curated adventure benchmark grades projected candidate sets; this report measures what the"
-    + " lane actually did on live worlds. Each decision's `state_json.candidates` is the production"
-    + " shortlist the live orchestrator built for that turn and each `selection_json` is the lane's own"
-    + " composition. There are no correctness labels here, so the tables report reach, band/defer"
-    + " distribution, pick commit classification, provider alignment, and confirmation outcomes —"
-    + " counts with descriptive rates, never accuracy.",
+    "The curated adventure benchmark grades projected candidate sets; this report measures what the" +
+      " lane actually did on live worlds. Each decision's `state_json.candidates` is the production" +
+      " shortlist the live orchestrator built for that turn and each `selection_json` is the lane's own" +
+      " composition. There are no correctness labels here, so the tables report reach, band/defer" +
+      " distribution, pick commit classification, provider alignment, and confirmation outcomes —" +
+      " counts with descriptive rates, never accuracy.",
   );
   lines.push("");
   lines.push("## Definitions");
@@ -1173,7 +1201,12 @@ export function renderProductionPathMarkdown(report: ProductionPathReport): stri
   for (const note of report.honestyNotes) lines.push(`- ${note}`);
   lines.push("");
 
-  const sections: Array<{ title: string; summary: ProductionPathSummary; anomalies: string[]; notices?: readonly string[] }> = [
+  const sections: Array<{
+    title: string;
+    summary: ProductionPathSummary;
+    anomalies: string[];
+    notices?: readonly string[];
+  }> = [
     {
       title: "Aggregate (all worlds)",
       summary: report.aggregate,
@@ -1237,12 +1270,12 @@ export interface ProductionPathCliOptions {
 }
 
 export const PRODUCTION_PATH_USAGE =
-  "usage: evaluate-system-one-production-path.ts --world <path> [--world <path>]..."
-  + " [--out <path>] [--json <path>]\n"
-  + "\n"
-  + "Reads each world's velvet.sqlite read-only and evaluates the recorded adventure-selection"
-  + " decisions, lane-origin proposals/executions, and provider candidate calls.\n"
-  + `--out defaults to ${DEFAULT_PRODUCTION_PATH_OUT}; --json defaults to the same path with .json\n`;
+  "usage: evaluate-system-one-production-path.ts --world <path> [--world <path>]..." +
+  " [--out <path>] [--json <path>]\n" +
+  "\n" +
+  "Reads each world's velvet.sqlite read-only and evaluates the recorded adventure-selection" +
+  " decisions, lane-origin proposals/executions, and provider candidate calls.\n" +
+  `--out defaults to ${DEFAULT_PRODUCTION_PATH_OUT}; --json defaults to the same path with .json\n`;
 
 /** The JSON sidecar path alongside a markdown report. */
 export function defaultProductionJsonPath(out: string): string {
@@ -1257,15 +1290,15 @@ export function parseProductionPathArgs(argv: readonly string[]): ProductionPath
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]!;
     if (arg === "--world" || arg.startsWith("--world=")) {
-      const value = arg === "--world" ? argv[index += 1] : arg.slice("--world=".length);
+      const value = arg === "--world" ? argv[(index += 1)] : arg.slice("--world=".length);
       if (value === undefined || value.trim() === "") throw new Error("--world requires a path");
       worlds.push(value);
     } else if (arg === "--out" || arg.startsWith("--out=")) {
-      const value = arg === "--out" ? argv[index += 1] : arg.slice("--out=".length);
+      const value = arg === "--out" ? argv[(index += 1)] : arg.slice("--out=".length);
       if (value === undefined || value.trim() === "") throw new Error("--out requires a path");
       out = value;
     } else if (arg === "--json" || arg.startsWith("--json=")) {
-      const value = arg === "--json" ? argv[index += 1] : arg.slice("--json=".length);
+      const value = arg === "--json" ? argv[(index += 1)] : arg.slice("--json=".length);
       if (value === undefined || value.trim() === "") throw new Error("--json requires a path");
       json = value;
     } else if (arg === "--help" || arg === "-h") {
@@ -1333,8 +1366,12 @@ interface ProviderCallParse {
 function parseProviderCallEntry(value: unknown): ProviderCallParse {
   if (!isRecord(value)) return { toolName: null, candidateId: null };
   const toolName = asString(value["toolName"]) ?? asString(value["tool_name"]);
-  const args = isRecord(value["arguments"]) ? value["arguments"] : isRecord(value["arguments_json"]) ? value["arguments_json"] : null;
-  const rawCandidate = args === null ? null : asString(args["candidateId"]) ?? asString(args["candidate_id"]);
+  const args = isRecord(value["arguments"])
+    ? value["arguments"]
+    : isRecord(value["arguments_json"])
+      ? value["arguments_json"]
+      : null;
+  const rawCandidate = args === null ? null : (asString(args["candidateId"]) ?? asString(args["candidate_id"]));
   if (rawCandidate === null || rawCandidate === "") return { toolName, candidateId: null };
   return { toolName, candidateId: rawCandidate };
 }
@@ -1396,21 +1433,29 @@ export function loadProductionPathWorld(databasePath: string, world: string): Pr
       const decisionId = asString(row["decision_id"]);
       if (decisionId === null) continue;
       const turnId = asString(row["turn_id"]);
-      const turnRow = turnId === null ? null : turnById.get(turnId) ?? null;
-      decisions.push(toProductionDecision(world, {
-        decisionId,
-        turnId,
-        band: asString(row["confidence_band"]),
-        selectionJson: asString(row["selection_json"]),
-        stateJson: asString(row["state_json"]),
-        shadow: asBoolean(row["shadow"]),
-        fallbackUsed: asBoolean(row["fallback_used"]),
-        createdAt: asString(row["created_at"]) ?? "",
-      }, turnRow === null ? null : {
-        declaration: asString(turnRow["declaration"]),
-        state: asString(turnRow["state"]),
-        mode: asString(turnRow["mode"]),
-      }));
+      const turnRow = turnId === null ? null : (turnById.get(turnId) ?? null);
+      decisions.push(
+        toProductionDecision(
+          world,
+          {
+            decisionId,
+            turnId,
+            band: asString(row["confidence_band"]),
+            selectionJson: asString(row["selection_json"]),
+            stateJson: asString(row["state_json"]),
+            shadow: asBoolean(row["shadow"]),
+            fallbackUsed: asBoolean(row["fallback_used"]),
+            createdAt: asString(row["created_at"]) ?? "",
+          },
+          turnRow === null
+            ? null
+            : {
+                declaration: asString(turnRow["declaration"]),
+                state: asString(turnRow["state"]),
+                mode: asString(turnRow["mode"]),
+              },
+        ),
+      );
     }
 
     const proposalRows = readTable(db, "tool_proposals", notices);
@@ -1436,26 +1481,30 @@ export function loadProductionPathWorld(databasePath: string, world: string): Pr
     const laneExecutions: LaneExecution[] = [];
     for (const row of executionRows) {
       if (asString(row["origin"]) !== "lane") continue;
-      laneExecutions.push(toLaneExecution(world, "exact-action", {
-        turnId: asString(row["turn_id"]),
-        decisionId: asString(row["system_one_decision_id"]),
-        actionKind: asString(row["action_kind"]),
-        candidateId: asString(row["candidate_id"]),
-        commandId: asString(row["command_id"]),
-        occurredAt: asString(row["occurred_at"]),
-      }));
+      laneExecutions.push(
+        toLaneExecution(world, "exact-action", {
+          turnId: asString(row["turn_id"]),
+          decisionId: asString(row["system_one_decision_id"]),
+          actionKind: asString(row["action_kind"]),
+          candidateId: asString(row["candidate_id"]),
+          commandId: asString(row["command_id"]),
+          occurredAt: asString(row["occurred_at"]),
+        }),
+      );
     }
     const checkRows = readTable(db, "adventure_check_executions_v54", notices);
     for (const row of checkRows) {
       if (asString(row["origin"]) !== "lane") continue;
-      laneExecutions.push(toLaneExecution(world, "check", {
-        turnId: asString(row["turn_id"]),
-        decisionId: asString(row["system_one_decision_id"]),
-        actionKind: "check",
-        candidateId: asString(row["candidate_id"]),
-        commandId: asString(row["command_id"]),
-        occurredAt: asString(row["occurred_at"]),
-      }));
+      laneExecutions.push(
+        toLaneExecution(world, "check", {
+          turnId: asString(row["turn_id"]),
+          decisionId: asString(row["system_one_decision_id"]),
+          actionKind: "check",
+          candidateId: asString(row["candidate_id"]),
+          commandId: asString(row["command_id"]),
+          occurredAt: asString(row["occurred_at"]),
+        }),
+      );
     }
 
     const laneProposals: LaneProposal[] = [];
@@ -1464,18 +1513,20 @@ export function loadProductionPathWorld(databasePath: string, world: string): Pr
       const proposalId = asString(row["proposal_id"]);
       if (proposalId === null) continue;
       const proposal = proposalsById.get(proposalId) ?? null;
-      laneProposals.push(toLaneProposal(world, {
-        proposalId,
-        turnId: asString(row["turn_id"]),
-        decisionId: asString(row["system_one_decision_id"]),
-        actionKind: asString(row["action_kind"]),
-        candidateId: asString(row["candidate_id"]),
-        requiresConfirmation: proposal === null ? null : asBoolean(proposal["requires_confirmation"]),
-        toolName: proposal === null ? null : asString(proposal["tool_name"]),
-        confirmation: confirmationByProposal.get(proposalId) ?? null,
-        executed: executedProposalIds.has(proposalId),
-        boundAt: asString(row["bound_at"]),
-      }));
+      laneProposals.push(
+        toLaneProposal(world, {
+          proposalId,
+          turnId: asString(row["turn_id"]),
+          decisionId: asString(row["system_one_decision_id"]),
+          actionKind: asString(row["action_kind"]),
+          candidateId: asString(row["candidate_id"]),
+          requiresConfirmation: proposal === null ? null : asBoolean(proposal["requires_confirmation"]),
+          toolName: proposal === null ? null : asString(proposal["tool_name"]),
+          confirmation: confirmationByProposal.get(proposalId) ?? null,
+          executed: executedProposalIds.has(proposalId),
+          boundAt: asString(row["bound_at"]),
+        }),
+      );
     }
 
     // Provider candidate calls, in the documented source precedence order.
@@ -1488,7 +1539,13 @@ export function loadProductionPathWorld(databasePath: string, world: string): Pr
       const turnId = asString(row["turn_id"]);
       const candidateId = parseArgumentsCandidateId(asString(row["arguments_json"]));
       if (turnId === null || candidateId === null) continue;
-      providerCalls.push({ turnId, candidateId, toolName: asString(row["tool_name"]), source: "tool-call", order: index });
+      providerCalls.push({
+        turnId,
+        candidateId,
+        toolName: asString(row["tool_name"]),
+        source: "tool-call",
+        order: index,
+      });
     }
     for (const [index, row] of sortRows(
       readTable(db, "agent_decision_rounds_v38", notices),
@@ -1497,7 +1554,13 @@ export function loadProductionPathWorld(databasePath: string, world: string): Pr
       const turnId = asString(row["turn_id"]);
       if (turnId === null) continue;
       for (const call of parseProviderResponseCalls(asString(row["response_json"]))) {
-        providerCalls.push({ turnId, candidateId: call.candidateId!, toolName: call.toolName, source: "decision-round", order: index });
+        providerCalls.push({
+          turnId,
+          candidateId: call.candidateId!,
+          toolName: call.toolName,
+          source: "decision-round",
+          order: index,
+        });
       }
     }
     for (const [index, row] of sortRows(
@@ -1508,7 +1571,13 @@ export function loadProductionPathWorld(databasePath: string, world: string): Pr
       const turnId = asString(row["turn_id"]);
       if (turnId === null) continue;
       for (const call of parseProviderResponseCalls(asString(row["response_json"]))) {
-        providerCalls.push({ turnId, candidateId: call.candidateId!, toolName: call.toolName, source: "provider-response", order: index });
+        providerCalls.push({
+          turnId,
+          candidateId: call.candidateId!,
+          toolName: call.toolName,
+          source: "provider-response",
+          order: index,
+        });
       }
     }
     for (const [index, row] of readTable(db, "adventure_exact_action_proposal_bindings_v56", notices).entries()) {
@@ -1553,12 +1622,14 @@ export function loadProductionPathWorld(databasePath: string, world: string): Pr
 function renderConsoleSummary(report: ProductionPathReport): string {
   const totals = report.aggregate.totals;
   const alignment = report.aggregate.totals.alignment;
-  return [
-    `System One production-path evaluation — ${report.worlds.length} world(s)`,
-    `Decisions ${totals.decisions} · picks ${totals.picks} · lane proposals ${totals.laneProposals} · lane executions ${totals.laneExecutions}`,
-    alignmentSummaryLine("Provider alignment", alignment),
-    `Confirmations approved ${totals.confirmations.approved} / rejected ${totals.confirmations.rejected} / pending ${totals.confirmations.pending}`,
-  ].join("\n") + "\n";
+  return (
+    [
+      `System One production-path evaluation — ${report.worlds.length} world(s)`,
+      `Decisions ${totals.decisions} · picks ${totals.picks} · lane proposals ${totals.laneProposals} · lane executions ${totals.laneExecutions}`,
+      alignmentSummaryLine("Provider alignment", alignment),
+      `Confirmations approved ${totals.confirmations.approved} / rejected ${totals.confirmations.rejected} / pending ${totals.confirmations.pending}`,
+    ].join("\n") + "\n"
+  );
 }
 
 async function main(): Promise<void> {

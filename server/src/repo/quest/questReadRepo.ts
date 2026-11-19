@@ -130,15 +130,58 @@ export interface QuestReadRepository {
   listObjectiveCompletions(campaignId: string, questId: string): Promise<QuestObjectiveCompletion[]>;
 }
 
-const storyline = (row: any): Storyline => ({ id: row.id, campaignId: row.campaign_id, title: row.title, description: row.description, status: row.status, createdAt: row.created_at });
-const quest = (row: any): Quest => ({ id: row.id, storylineId: row.storyline_id, campaignId: row.campaign_id, title: row.title, description: row.description, status: row.status, sortOrder: row.sort_order, createdAt: row.created_at, updatedAt: row.updated_at });
-const clue = (row: any): QuestClue => ({ id: row.id, questId: row.quest_id, campaignId: row.campaign_id, content: row.content, discoveredByCharacterId: row.discovered_by_character_id, discoveredAt: row.discovered_at, createdAt: row.created_at });
-const reward = (row: any): QuestReward => ({ id: row.id, questId: row.quest_id, campaignId: row.campaign_id, kind: row.kind, amount: row.amount, label: row.label, grantedToCharacterId: row.granted_to_character_id, grantedAt: row.granted_at, createdAt: row.created_at });
-const completion = (row: any): QuestObjectiveCompletion => ({ id: row.id, questId: row.quest_id, description: row.description, completedByCharacterId: row.completed_by_character_id, completedAt: row.completed_at });
+const storyline = (row: any): Storyline => ({
+  id: row.id,
+  campaignId: row.campaign_id,
+  title: row.title,
+  description: row.description,
+  status: row.status,
+  createdAt: row.created_at,
+});
+const quest = (row: any): Quest => ({
+  id: row.id,
+  storylineId: row.storyline_id,
+  campaignId: row.campaign_id,
+  title: row.title,
+  description: row.description,
+  status: row.status,
+  sortOrder: row.sort_order,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+const clue = (row: any): QuestClue => ({
+  id: row.id,
+  questId: row.quest_id,
+  campaignId: row.campaign_id,
+  content: row.content,
+  discoveredByCharacterId: row.discovered_by_character_id,
+  discoveredAt: row.discovered_at,
+  createdAt: row.created_at,
+});
+const reward = (row: any): QuestReward => ({
+  id: row.id,
+  questId: row.quest_id,
+  campaignId: row.campaign_id,
+  kind: row.kind,
+  amount: row.amount,
+  label: row.label,
+  grantedToCharacterId: row.granted_to_character_id,
+  grantedAt: row.granted_at,
+  createdAt: row.created_at,
+});
+const completion = (row: any): QuestObjectiveCompletion => ({
+  id: row.id,
+  questId: row.quest_id,
+  description: row.description,
+  completedByCharacterId: row.completed_by_character_id,
+  completedAt: row.completed_at,
+});
 
 /** Low-level storyline listing retained for trusted database callers. */
 export async function listStorylines(db: Database, campaignId: string): Promise<Storyline[]> {
-  return (db.prepare("SELECT * FROM quest_storylines WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]).map(storyline);
+  return (
+    db.prepare("SELECT * FROM quest_storylines WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]
+  ).map(storyline);
 }
 
 /** Low-level storyline lookup retained for trusted database callers. */
@@ -149,9 +192,12 @@ export async function getStoryline(db: Database, storylineId: string): Promise<S
 
 /** Low-level quest listing retained for trusted database callers. */
 export async function listQuests(db: Database, campaignId: string, storylineId?: string): Promise<Quest[]> {
-  const rows = storylineId === undefined
-    ? db.prepare("SELECT * FROM quests WHERE campaign_id=? ORDER BY sort_order,id").all(campaignId)
-    : db.prepare("SELECT * FROM quests WHERE campaign_id=? AND storyline_id=? ORDER BY sort_order,id").all(campaignId, storylineId);
+  const rows =
+    storylineId === undefined
+      ? db.prepare("SELECT * FROM quests WHERE campaign_id=? ORDER BY sort_order,id").all(campaignId)
+      : db
+          .prepare("SELECT * FROM quests WHERE campaign_id=? AND storyline_id=? ORDER BY sort_order,id")
+          .all(campaignId, storylineId);
   return (rows as any[]).map(quest);
 }
 
@@ -163,40 +209,48 @@ export async function getQuest(db: Database, questId: string): Promise<Quest | n
 
 /** Low-level clue listing retained for trusted database callers. */
 export async function listClues(db: Database, questId: string): Promise<QuestClue[]> {
-  return (db.prepare("SELECT * FROM quest_clues WHERE quest_id=? ORDER BY created_at,id").all(questId) as any[]).map(clue);
+  return (db.prepare("SELECT * FROM quest_clues WHERE quest_id=? ORDER BY created_at,id").all(questId) as any[]).map(
+    clue,
+  );
 }
 
 /** Low-level reward listing retained for trusted database callers. */
 export async function listRewards(db: Database, questId: string): Promise<QuestReward[]> {
-  return (db.prepare("SELECT * FROM quest_rewards WHERE quest_id=? ORDER BY created_at,id").all(questId) as any[]).map(reward);
+  return (db.prepare("SELECT * FROM quest_rewards WHERE quest_id=? ORDER BY created_at,id").all(questId) as any[]).map(
+    reward,
+  );
 }
 
 /** Low-level objective completion listing retained for trusted database callers. */
 export async function listObjectiveCompletions(db: Database, questId: string): Promise<QuestObjectiveCompletion[]> {
-  return (db.prepare("SELECT * FROM quest_objective_completions WHERE quest_id=? ORDER BY completed_at,id").all(questId) as any[]).map(completion);
+  return (
+    db
+      .prepare("SELECT * FROM quest_objective_completions WHERE quest_id=? ORDER BY completed_at,id")
+      .all(questId) as any[]
+  ).map(completion);
 }
 
 /** Creates principal-scoped, non-mutating quest projections. */
-export function createQuestReadRepository(
-  db: Database,
-  principalId: string,
-): QuestReadRepository {
-  const campaignRole = (campaignId: string) => (db.prepare(
-    "SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?",
-  ).get(campaignId, principalId) as { role: string } | undefined)?.role;
+export function createQuestReadRepository(db: Database, principalId: string): QuestReadRepository {
+  const campaignRole = (campaignId: string) =>
+    (
+      db
+        .prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+        .get(campaignId, principalId) as { role: string } | undefined
+    )?.role;
   const hasCampaignAccess = (campaignId: string) => campaignRole(campaignId) !== undefined;
   const requireCampaign = (campaignId: string) => {
     if (!hasCampaignAccess(campaignId)) throw new QuestUnavailableError();
   };
   const requireGmCampaign = (campaignId: string) => {
-    const role = campaignRole(campaignId); if (role !== "owner" && role !== "gm") throw new QuestUnavailableError();
+    const role = campaignRole(campaignId);
+    if (role !== "owner" && role !== "gm") throw new QuestUnavailableError();
   };
-  const scopedStoryline = (campaignId: string, storylineId: string) => db.prepare(
-    "SELECT * FROM quest_storylines WHERE id=? AND campaign_id=?",
-  ).get(storylineId, campaignId) as any | undefined;
-  const scopedQuest = (campaignId: string, questId: string) => db.prepare(
-    "SELECT * FROM quests WHERE id=? AND campaign_id=?",
-  ).get(questId, campaignId) as any | undefined;
+  const scopedStoryline = (campaignId: string, storylineId: string) =>
+    db.prepare("SELECT * FROM quest_storylines WHERE id=? AND campaign_id=?").get(storylineId, campaignId) as
+      any | undefined;
+  const scopedQuest = (campaignId: string, questId: string) =>
+    db.prepare("SELECT * FROM quests WHERE id=? AND campaign_id=?").get(questId, campaignId) as any | undefined;
   const requireStoryline = (campaignId: string, storylineId: string) => {
     const row = scopedStoryline(campaignId, storylineId);
     if (!row) throw new QuestUnavailableError();
@@ -207,43 +261,104 @@ export function createQuestReadRepository(
     if (!row) throw new QuestUnavailableError();
     return row;
   };
-  const scopedClue = (campaignId: string, questId: string, clueId: string) => db.prepare(
-    "SELECT * FROM quest_clues WHERE id=? AND quest_id=? AND campaign_id=?",
-  ).get(clueId, questId, campaignId) as any | undefined;
-  const scopedReward = (campaignId: string, questId: string, rewardId: string) => db.prepare(
-    "SELECT * FROM quest_rewards WHERE id=? AND quest_id=? AND campaign_id=?",
-  ).get(rewardId, questId, campaignId) as any | undefined;
+  const scopedClue = (campaignId: string, questId: string, clueId: string) =>
+    db
+      .prepare("SELECT * FROM quest_clues WHERE id=? AND quest_id=? AND campaign_id=?")
+      .get(clueId, questId, campaignId) as any | undefined;
+  const scopedReward = (campaignId: string, questId: string, rewardId: string) =>
+    db
+      .prepare("SELECT * FROM quest_rewards WHERE id=? AND quest_id=? AND campaign_id=?")
+      .get(rewardId, questId, campaignId) as any | undefined;
 
   return {
     async listStorylines(campaignId) {
       requireGmCampaign(campaignId);
-      return (db.prepare("SELECT * FROM quest_storylines WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]).map(storyline);
+      return (
+        db.prepare("SELECT * FROM quest_storylines WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]
+      ).map(storyline);
     },
     async getStoryline(campaignId, storylineId) {
-      requireGmCampaign(campaignId); const row = scopedStoryline(campaignId, storylineId);
+      requireGmCampaign(campaignId);
+      const row = scopedStoryline(campaignId, storylineId);
       return row ? storyline(row) : null;
     },
     async listQuests(campaignId, storylineId) {
       requireCampaign(campaignId);
       if (storylineId !== undefined) requireStoryline(campaignId, storylineId);
-      const rows = storylineId === undefined
-        ? db.prepare("SELECT * FROM quests WHERE campaign_id=? ORDER BY sort_order,id").all(campaignId)
-        : db.prepare("SELECT * FROM quests WHERE campaign_id=? AND storyline_id=? ORDER BY sort_order,id").all(campaignId, storylineId);
+      const rows =
+        storylineId === undefined
+          ? db.prepare("SELECT * FROM quests WHERE campaign_id=? ORDER BY sort_order,id").all(campaignId)
+          : db
+              .prepare("SELECT * FROM quests WHERE campaign_id=? AND storyline_id=? ORDER BY sort_order,id")
+              .all(campaignId, storylineId);
       return (rows as any[]).map(quest);
     },
     async getQuest(campaignId, questId) {
-      requireCampaign(campaignId); const row = scopedQuest(campaignId, questId);
+      requireCampaign(campaignId);
+      const row = scopedQuest(campaignId, questId);
       return row ? quest(row) : null;
     },
     async getQuestDetail(campaignId, questId) {
-      requireCampaign(campaignId); const row = scopedQuest(campaignId, questId);
+      requireCampaign(campaignId);
+      const row = scopedQuest(campaignId, questId);
       if (!row) return null;
-      return { quest: quest(row), clues: (db.prepare("SELECT * FROM quest_clues WHERE quest_id=? AND campaign_id=? ORDER BY created_at,id").all(questId, campaignId) as any[]).map(clue), rewards: (db.prepare("SELECT * FROM quest_rewards WHERE quest_id=? AND campaign_id=? ORDER BY created_at,id").all(questId, campaignId) as any[]).map(reward), objectiveCompletions: (db.prepare("SELECT * FROM quest_objective_completions WHERE quest_id=? ORDER BY completed_at,id").all(questId) as any[]).map(completion) };
+      return {
+        quest: quest(row),
+        clues: (
+          db
+            .prepare("SELECT * FROM quest_clues WHERE quest_id=? AND campaign_id=? ORDER BY created_at,id")
+            .all(questId, campaignId) as any[]
+        ).map(clue),
+        rewards: (
+          db
+            .prepare("SELECT * FROM quest_rewards WHERE quest_id=? AND campaign_id=? ORDER BY created_at,id")
+            .all(questId, campaignId) as any[]
+        ).map(reward),
+        objectiveCompletions: (
+          db
+            .prepare("SELECT * FROM quest_objective_completions WHERE quest_id=? ORDER BY completed_at,id")
+            .all(questId) as any[]
+        ).map(completion),
+      };
     },
-    async listClues(campaignId, questId) { requireCampaign(campaignId); requireQuest(campaignId, questId); return (db.prepare("SELECT * FROM quest_clues WHERE quest_id=? AND campaign_id=? ORDER BY created_at,id").all(questId, campaignId) as any[]).map(clue); },
-    async getClue(campaignId, questId, clueId) { requireCampaign(campaignId); requireQuest(campaignId, questId); const row = scopedClue(campaignId, questId, clueId); return row ? clue(row) : null; },
-    async listRewards(campaignId, questId) { requireCampaign(campaignId); requireQuest(campaignId, questId); return (db.prepare("SELECT * FROM quest_rewards WHERE quest_id=? AND campaign_id=? ORDER BY created_at,id").all(questId, campaignId) as any[]).map(reward); },
-    async getReward(campaignId, questId, rewardId) { requireCampaign(campaignId); requireQuest(campaignId, questId); const row = scopedReward(campaignId, questId, rewardId); return row ? reward(row) : null; },
-    async listObjectiveCompletions(campaignId, questId) { requireCampaign(campaignId); requireQuest(campaignId, questId); return (db.prepare("SELECT * FROM quest_objective_completions WHERE quest_id=? ORDER BY completed_at,id").all(questId) as any[]).map(completion); },
+    async listClues(campaignId, questId) {
+      requireCampaign(campaignId);
+      requireQuest(campaignId, questId);
+      return (
+        db
+          .prepare("SELECT * FROM quest_clues WHERE quest_id=? AND campaign_id=? ORDER BY created_at,id")
+          .all(questId, campaignId) as any[]
+      ).map(clue);
+    },
+    async getClue(campaignId, questId, clueId) {
+      requireCampaign(campaignId);
+      requireQuest(campaignId, questId);
+      const row = scopedClue(campaignId, questId, clueId);
+      return row ? clue(row) : null;
+    },
+    async listRewards(campaignId, questId) {
+      requireCampaign(campaignId);
+      requireQuest(campaignId, questId);
+      return (
+        db
+          .prepare("SELECT * FROM quest_rewards WHERE quest_id=? AND campaign_id=? ORDER BY created_at,id")
+          .all(questId, campaignId) as any[]
+      ).map(reward);
+    },
+    async getReward(campaignId, questId, rewardId) {
+      requireCampaign(campaignId);
+      requireQuest(campaignId, questId);
+      const row = scopedReward(campaignId, questId, rewardId);
+      return row ? reward(row) : null;
+    },
+    async listObjectiveCompletions(campaignId, questId) {
+      requireCampaign(campaignId);
+      requireQuest(campaignId, questId);
+      return (
+        db
+          .prepare("SELECT * FROM quest_objective_completions WHERE quest_id=? ORDER BY completed_at,id")
+          .all(questId) as any[]
+      ).map(completion);
+    },
   };
 }

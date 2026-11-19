@@ -40,13 +40,13 @@ export const AUDIT_FLAG_CLASSES = [
 export type AuditFlagClass = (typeof AUDIT_FLAG_CLASSES)[number];
 
 export const AUDIT_HEADER_NOTE =
-  "Lexical flags are review signals, not verdicts. A missing receipt can be legitimate ambient"
-  + " narration: a turn may describe scenery, intent, or consequences that are not tracked by any"
-  + " receipt family. Confirm every flag against the turn declaration, proposals, and receipts"
-  + " before treating it as a divergence. `receipt-without-claim` and the confirmation wait and"
-  + " shadow (advisory) no-commit states of `lane-act-uncommitted` are informational by design:"
-  + " a shadow decision is recorded advisory-only, so it cannot commit until the lane is promoted;"
-  + " only a non-shadow act pick with no execution and no proposal binding is a missing commit.";
+  "Lexical flags are review signals, not verdicts. A missing receipt can be legitimate ambient" +
+  " narration: a turn may describe scenery, intent, or consequences that are not tracked by any" +
+  " receipt family. Confirm every flag against the turn declaration, proposals, and receipts" +
+  " before treating it as a divergence. `receipt-without-claim` and the confirmation wait and" +
+  " shadow (advisory) no-commit states of `lane-act-uncommitted` are informational by design:" +
+  " a shadow decision is recorded advisory-only, so it cannot commit until the lane is promoted;" +
+  " only a non-shadow act pick with no execution and no proposal binding is a missing commit.";
 
 export type AuditSeverity = "actionable" | "informational";
 
@@ -277,12 +277,7 @@ const NEGATION_WINDOW = 24;
  * assertion shape (`isMovementAssertionMatch`): directives such as "walk the hill track" after
  * "asks of you:" and hypotheticals such as "you might travel" are not claims.
  */
-export function isGuardedClaimMatch(
-  family: ClaimFamily,
-  text: string,
-  index: number,
-  token: string,
-): boolean {
+export function isGuardedClaimMatch(family: ClaimFamily, text: string, index: number, token: string): boolean {
   const before = text.slice(Math.max(0, index - NEGATION_WINDOW), index);
   const after = text.slice(index + token.length, index + token.length + NEGATION_WINDOW);
   if (NEGATION_RE.test(before)) return true;
@@ -310,8 +305,10 @@ export function isMovementAssertionMatch(text: string, index: number, token: str
   if (/^made for$/i.test(token) && PASSIVE_AUX_RE.test(before)) return false;
   if (/^headed$/i.test(token) && /^\s+by\b/i.test(after)) return false;
   if (/^reached$/i.test(token) && /^\s+for\b/i.test(after)) return false;
-  if (/^arrived$/i.test(token)
-    && /^\s+at\s+(?:an?|the)\s+(?:decision|conclusion|agreement|compromise|verdict|answer|understanding)\b/i.test(after)) {
+  if (
+    /^arrived$/i.test(token) &&
+    /^\s+at\s+(?:an?|the)\s+(?:decision|conclusion|agreement|compromise|verdict|answer|understanding)\b/i.test(after)
+  ) {
     return false;
   }
   if (MOVEMENT_COMPLETED_RE.test(token)) return true;
@@ -381,9 +378,7 @@ export function analyzeClaimReceipts(input: {
   const proposals = new Set(input.proposalFamilies);
   const contentBacked = new Set(input.contentBackedFamilies ?? []);
   const claimWithoutReceipt = claims.filter(
-    (claim) => !receipts.has(claim.family)
-      && !contentBacked.has(claim.family)
-      && !proposals.has(claim.family),
+    (claim) => !receipts.has(claim.family) && !contentBacked.has(claim.family) && !proposals.has(claim.family),
   );
   const seenReceipts = new Set<ClaimFamily>();
   const receiptWithoutClaim: ClaimFamily[] = [];
@@ -598,14 +593,7 @@ export const COMBAT_CLAIM_LEXICON = {
   ],
 } as const;
 
-export const INCAPACITATED_COMBAT_STATUSES = [
-  "unconscious",
-  "stable",
-  "dead",
-  "defeated",
-  "fled",
-  "removed",
-] as const;
+export const INCAPACITATED_COMBAT_STATUSES = ["unconscious", "stable", "dead", "defeated", "fled", "removed"] as const;
 export const DEFEATED_COMBAT_STATUSES = ["dead", "defeated", "fled", "removed"] as const;
 
 function matchesAny(patterns: readonly RegExp[], text: string): string | null {
@@ -633,9 +621,7 @@ export interface CombatOutcomeInput {
 }
 
 export type CombatOutcomeVerdictKind =
-  | "damage-claimed-miss"
-  | "damage-claimed-without-damage"
-  | "defeat-claimed-target-active";
+  "damage-claimed-miss" | "damage-claimed-without-damage" | "defeat-claimed-target-active";
 
 export interface CombatOutcomeVerdict {
   kind: CombatOutcomeVerdictKind;
@@ -669,11 +655,10 @@ export function classifyCombatOutcomeMismatch(input: CombatOutcomeInput): Combat
   if (defeatClaim !== null && input.targets.length > 0) {
     const incapacitated = new Set<string>(INCAPACITATED_COMBAT_STATUSES);
     const defeatStatuses = new Set<string>(DEFEATED_COMBAT_STATUSES);
-    const stillStanding = input.targets.filter(
-      (target) => !incapacitated.has(target.status) && target.hitPoints > 0,
-    );
-    const alreadyDown = input.targets.some((target) => incapacitated.has(target.status))
-      || input.receiptStatuses.some((status) => defeatStatuses.has(status));
+    const stillStanding = input.targets.filter((target) => !incapacitated.has(target.status) && target.hitPoints > 0);
+    const alreadyDown =
+      input.targets.some((target) => incapacitated.has(target.status)) ||
+      input.receiptStatuses.some((status) => defeatStatuses.has(status));
     if (stillStanding.length > 0 && !alreadyDown) {
       const names = stillStanding
         .slice(0, 3)
@@ -815,8 +800,8 @@ export function auditTurn(input: TurnAuditInput): AuditFlag[] {
       ...base,
       class: "claim-without-receipt",
       evidence: appendContext(
-        `narration claims ${claim.family} (matched "${claim.match}") but the turn has no`
-        + ` ${claim.family} receipt or proposal; receipts=[${receipts}]; proposals=[${proposals}]`,
+        `narration claims ${claim.family} (matched "${claim.match}") but the turn has no` +
+          ` ${claim.family} receipt or proposal; receipts=[${receipts}]; proposals=[${proposals}]`,
         input.context,
       ),
       severity: familyHasReceiptSource(claim.family) ? "actionable" : "informational",
@@ -828,9 +813,9 @@ export function auditTurn(input: TurnAuditInput): AuditFlag[] {
       ...base,
       class: "receipt-without-claim",
       evidence: appendContext(
-        `a ${family} receipt exists but the narration never mentions the ${family} lexicon`
-        + ` (informational; the narration may summarize the outcome elsewhere);`
-        + ` receipts=[${input.receiptEvidence.join(", ") || "unlisted"}]`,
+        `a ${family} receipt exists but the narration never mentions the ${family} lexicon` +
+          ` (informational; the narration may summarize the outcome elsewhere);` +
+          ` receipts=[${input.receiptEvidence.join(", ") || "unlisted"}]`,
         input.context,
       ),
       severity: "informational",
@@ -850,20 +835,23 @@ export function auditTurn(input: TurnAuditInput): AuditFlag[] {
       const cancelled = input.state === "cancelled" || input.state === "failed";
       let evidence: string;
       if (verdict === "missing") {
-        evidence = `adventure-selection band act picked ${pick}`
-          + ` (method ${input.lane.method ?? "unknown"}) for decision ${input.lane.decisionId}`
-          + ` but no execution and no proposal binding is attached to that decision`;
+        evidence =
+          `adventure-selection band act picked ${pick}` +
+          ` (method ${input.lane.method ?? "unknown"}) for decision ${input.lane.decisionId}` +
+          ` but no execution and no proposal binding is attached to that decision`;
       } else if (verdict === "shadow-no-commit") {
-        evidence = `adventure-selection band act picked ${pick}`
-          + ` (method ${input.lane.method ?? "unknown"}) for decision ${input.lane.decisionId}`
-          + ` but no execution and no proposal binding is attached to that decision;`
-          + ` the decision is shadow (advisory), so it cannot commit by design`;
+        evidence =
+          `adventure-selection band act picked ${pick}` +
+          ` (method ${input.lane.method ?? "unknown"}) for decision ${input.lane.decisionId}` +
+          ` but no execution and no proposal binding is attached to that decision;` +
+          ` the decision is shadow (advisory), so it cannot commit by design`;
       } else {
-        evidence = `adventure-selection band act picked ${pick} for decision ${input.lane.decisionId};`
-          + ` binding(s)=[${input.laneBindingEvidence.join(", ") || "unlisted"}]`
-          + ` exist without an execution`
-          + `${input.confirmationEvidence ? `; confirmation: ${input.confirmationEvidence}` : ""}`
-          + " (expected confirmation flow)";
+        evidence =
+          `adventure-selection band act picked ${pick} for decision ${input.lane.decisionId};` +
+          ` binding(s)=[${input.laneBindingEvidence.join(", ") || "unlisted"}]` +
+          ` exist without an execution` +
+          `${input.confirmationEvidence ? `; confirmation: ${input.confirmationEvidence}` : ""}` +
+          " (expected confirmation flow)";
       }
       flags.push({
         ...base,
@@ -886,17 +874,19 @@ export function auditTurn(input: TurnAuditInput): AuditFlag[] {
     }
   }
 
-  if (classifyNarrationMissing({
-    state: input.state,
-    narrationStatus: input.narrationStatus,
-    narration: input.narration,
-  })) {
+  if (
+    classifyNarrationMissing({
+      state: input.state,
+      narrationStatus: input.narrationStatus,
+      narration: input.narration,
+    })
+  ) {
     flags.push({
       ...base,
       class: "narration-missing",
       evidence: appendContext(
-        `turn state=${input.state} narration_status=${input.narrationStatus}`
-        + " but adventure_narration_dispatches_v60 holds no settled narration text",
+        `turn state=${input.state} narration_status=${input.narrationStatus}` +
+          " but adventure_narration_dispatches_v60 holds no settled narration text",
         input.context,
       ),
       severity: "actionable",
@@ -920,16 +910,16 @@ export interface AuditCliOptions {
 }
 
 export const USAGE =
-  "usage: audit-adventure-consistency.ts --world <path> [--json <path>] [--md <path>]"
-  + " [--fail-on <class>[,<class>...]]...\n"
-  + "\n"
-  + "Reads <world>/velvet.sqlite read-only and joins declaration, lane pick, provider calls,\n"
-  + "proposals/confirmations, receipts, and narration per turn.\n"
-  + `flag classes: ${AUDIT_FLAG_CLASSES.join(", ")}\n`
-  + "--json writes the machine-readable report; --md writes a Markdown report\n"
-  + "--fail-on may repeat and accepts comma-separated classes; exit code becomes 1 when a\n"
-  + "  matching flag is emitted (the expected confirmation wait and the shadow advisory\n"
-  + "  no-commit of lane-act-uncommitted never fail)\n";
+  "usage: audit-adventure-consistency.ts --world <path> [--json <path>] [--md <path>]" +
+  " [--fail-on <class>[,<class>...]]...\n" +
+  "\n" +
+  "Reads <world>/velvet.sqlite read-only and joins declaration, lane pick, provider calls,\n" +
+  "proposals/confirmations, receipts, and narration per turn.\n" +
+  `flag classes: ${AUDIT_FLAG_CLASSES.join(", ")}\n` +
+  "--json writes the machine-readable report; --md writes a Markdown report\n" +
+  "--fail-on may repeat and accepts comma-separated classes; exit code becomes 1 when a\n" +
+  "  matching flag is emitted (the expected confirmation wait and the shadow advisory\n" +
+  "  no-commit of lane-act-uncommitted never fail)\n";
 
 export function isAuditFlagClass(value: string): value is AuditFlagClass {
   return (AUDIT_FLAG_CLASSES as readonly string[]).includes(value);
@@ -944,19 +934,19 @@ export function parseAuditArgs(argv: readonly string[]): AuditCliOptions {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]!;
     if (arg === "--world" || arg.startsWith("--world=")) {
-      const value = arg === "--world" ? argv[index += 1] : arg.slice("--world=".length);
+      const value = arg === "--world" ? argv[(index += 1)] : arg.slice("--world=".length);
       if (value === undefined || value.trim() === "") throw new Error("--world requires a path");
       world = value;
     } else if (arg === "--json" || arg.startsWith("--json=")) {
-      const value = arg === "--json" ? argv[index += 1] : arg.slice("--json=".length);
+      const value = arg === "--json" ? argv[(index += 1)] : arg.slice("--json=".length);
       if (value === undefined || value.trim() === "") throw new Error("--json requires a path");
       json = path.resolve(value);
     } else if (arg === "--md" || arg.startsWith("--md=")) {
-      const value = arg === "--md" ? argv[index += 1] : arg.slice("--md=".length);
+      const value = arg === "--md" ? argv[(index += 1)] : arg.slice("--md=".length);
       if (value === undefined || value.trim() === "") throw new Error("--md requires a path");
       md = path.resolve(value);
     } else if (arg === "--fail-on" || arg.startsWith("--fail-on=")) {
-      const value = arg === "--fail-on" ? argv[index += 1] : arg.slice("--fail-on=".length);
+      const value = arg === "--fail-on" ? argv[(index += 1)] : arg.slice("--fail-on=".length);
       if (value === undefined || value.trim() === "") throw new Error("--fail-on requires a flag class");
       for (const rawClass of value.split(",")) {
         const candidate = rawClass.trim();
@@ -1033,10 +1023,7 @@ export interface CombatReceiptSummary {
 }
 
 /** Tolerant parse of one `combat_receipts_v27.canonical_result_json` document. */
-export function parseCombatReceipt(
-  commandId: string,
-  canonicalResultJson: string,
-): CombatReceiptSummary | null {
+export function parseCombatReceipt(commandId: string, canonicalResultJson: string): CombatReceiptSummary | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(canonicalResultJson) as unknown;
@@ -1089,15 +1076,12 @@ export interface AdventureAuditDataset {
   notices: string[];
 }
 
-function buildTurnInputs(
-  db: DatabaseSync,
-  notices: string[],
-): TurnAuditInput[] {
+function buildTurnInputs(db: DatabaseSync, notices: string[]): TurnAuditInput[] {
   const turnRows = readTable(
     db,
     "adventure_turns",
-    "SELECT id, declaration, state, narration_status, created_at FROM adventure_turns"
-    + " ORDER BY created_at ASC, id ASC",
+    "SELECT id, declaration, state, narration_status, created_at FROM adventure_turns" +
+      " ORDER BY created_at ASC, id ASC",
     notices,
   );
 
@@ -1106,8 +1090,8 @@ function buildTurnInputs(
   for (const row of readTable(
     db,
     "adventure_narration_dispatches_v60",
-    "SELECT turn_id, narration, claimed_at FROM adventure_narration_dispatches_v60"
-    + " WHERE status = 'settled' AND narration IS NOT NULL ORDER BY claimed_at ASC, rowid ASC",
+    "SELECT turn_id, narration, claimed_at FROM adventure_narration_dispatches_v60" +
+      " WHERE status = 'settled' AND narration IS NOT NULL ORDER BY claimed_at ASC, rowid ASC",
     notices,
   )) {
     const turnId = asString(row["turn_id"]);
@@ -1120,20 +1104,23 @@ function buildTurnInputs(
   for (const row of readTable(
     db,
     "system_one_decisions_v1",
-    "SELECT decision_id, turn_id, confidence_band, shadow, selection_json FROM system_one_decisions_v1"
-    + " WHERE lane = 'adventure-selection' ORDER BY created_at ASC, rowid ASC",
+    "SELECT decision_id, turn_id, confidence_band, shadow, selection_json FROM system_one_decisions_v1" +
+      " WHERE lane = 'adventure-selection' ORDER BY created_at ASC, rowid ASC",
     notices,
   )) {
     const turnId = asString(row["turn_id"]);
     const decisionId = asString(row["decision_id"]);
     if (turnId === null || decisionId === null) continue;
-    laneByTurn.set(turnId, parseLaneSelection({
-      decisionId,
-      confidenceBand: asString(row["confidence_band"]),
-      selectionJson: asString(row["selection_json"]),
-      // Legacy rows without the flag fall back to non-shadow: fail toward `missing`, not silence.
-      shadow: (asNumber(row["shadow"]) ?? 0) === 1,
-    }));
+    laneByTurn.set(
+      turnId,
+      parseLaneSelection({
+        decisionId,
+        confidenceBand: asString(row["confidence_band"]),
+        selectionJson: asString(row["selection_json"]),
+        // Legacy rows without the flag fall back to non-shadow: fail toward `missing`, not silence.
+        shadow: (asNumber(row["shadow"]) ?? 0) === 1,
+      }),
+    );
   }
 
   // Exact action executions/bindings (v56) link a lane decision id to its commit or its wait.
@@ -1141,8 +1128,8 @@ function buildTurnInputs(
   for (const row of readTable(
     db,
     "adventure_exact_action_executions_v56",
-    "SELECT turn_id, action_kind, origin, command_id, system_one_decision_id"
-    + " FROM adventure_exact_action_executions_v56",
+    "SELECT turn_id, action_kind, origin, command_id, system_one_decision_id" +
+      " FROM adventure_exact_action_executions_v56",
     notices,
   )) {
     const decisionId = asString(row["system_one_decision_id"]);
@@ -1161,8 +1148,8 @@ function buildTurnInputs(
   for (const row of readTable(
     db,
     "adventure_exact_action_proposal_bindings_v56",
-    "SELECT proposal_id, turn_id, action_kind, origin, system_one_decision_id"
-    + " FROM adventure_exact_action_proposal_bindings_v56",
+    "SELECT proposal_id, turn_id, action_kind, origin, system_one_decision_id" +
+      " FROM adventure_exact_action_proposal_bindings_v56",
     notices,
   )) {
     const decisionId = asString(row["system_one_decision_id"]);
@@ -1233,7 +1220,10 @@ function buildTurnInputs(
     const commandId = asString(row["command_id"]);
     if (turnId !== null && commandId !== null) addCommandLink(turnId, commandId);
   }
-  const exactByTurn = new Map<string, { actionKind: string | null; commandId: string | null; publicResultJson: string | null }>();
+  const exactByTurn = new Map<
+    string,
+    { actionKind: string | null; commandId: string | null; publicResultJson: string | null }
+  >();
   for (const row of readTable(
     db,
     "adventure_exact_action_executions_v56",
@@ -1311,7 +1301,11 @@ function buildTurnInputs(
     notices,
   )) {
     const commandId = asString(row["command_id"]);
-    if (commandId !== null) m16FamilyByCommand.set(commandId, `${asString(row["command_family"]) ?? ""}:${asString(row["command_type"]) ?? ""}`);
+    if (commandId !== null)
+      m16FamilyByCommand.set(
+        commandId,
+        `${asString(row["command_family"]) ?? ""}:${asString(row["command_type"]) ?? ""}`,
+      );
   }
   const m16ResultByCommand = new Map<string, string>();
   for (const row of readTable(
@@ -1325,12 +1319,7 @@ function buildTurnInputs(
     if (commandId !== null && result !== null) m16ResultByCommand.set(commandId, result);
   }
   const restCommands = new Set<string>();
-  for (const row of readTable(
-    db,
-    "rpg_rest_receipts_v25",
-    "SELECT command_id FROM rpg_rest_receipts_v25",
-    notices,
-  )) {
+  for (const row of readTable(db, "rpg_rest_receipts_v25", "SELECT command_id FROM rpg_rest_receipts_v25", notices)) {
     const commandId = asString(row["command_id"]);
     if (commandId !== null) restCommands.add(commandId);
   }
@@ -1398,12 +1387,7 @@ function buildTurnInputs(
   const commandFamilyHints = new Map<string, ClaimFamily[]>();
   for (const table of ["world_receipts_v28", "quest_domain_receipts_v33"] as const) {
     const family: ClaimFamily = table === "world_receipts_v28" ? "movement" : "quest";
-    for (const row of readTable(
-      db,
-      table,
-      `SELECT command_id FROM ${table}`,
-      notices,
-    )) {
+    for (const row of readTable(db, table, `SELECT command_id FROM ${table}`, notices)) {
       const commandId = asString(row["command_id"]);
       if (commandId === null) continue;
       const list = commandFamilyHints.get(commandId) ?? [];
@@ -1439,19 +1423,20 @@ function buildTurnInputs(
       const exact = exactByTurn.get(turnId);
       const exactKind = exact !== undefined && exact.commandId === commandId ? exact.actionKind : null;
       if (exactKind !== null) {
-        addReceiptFamily(
-          familyForExactActionKind(exactKind),
-          `adventure_exact_action_executions_v56:${exactKind}`,
-        );
+        addReceiptFamily(familyForExactActionKind(exactKind), `adventure_exact_action_executions_v56:${exactKind}`);
       }
       // A combat-power (or any other exact action) whose result JSON carries a healing outcome
       // backs a healing claim even though its action family is `power`.
-      if (exact !== undefined && exact.commandId === commandId
-        && exact.publicResultJson !== null && jsonHasHealingEvidence(exact.publicResultJson)) {
+      if (
+        exact !== undefined &&
+        exact.commandId === commandId &&
+        exact.publicResultJson !== null &&
+        jsonHasHealingEvidence(exact.publicResultJson)
+      ) {
         addReceiptContent(
           "healing",
-          `adventure_exact_action_executions_v56:${exactKind ?? "unknown"} healing outcome`
-          + ` (${commandId.slice(0, 12)})`,
+          `adventure_exact_action_executions_v56:${exactKind ?? "unknown"} healing outcome` +
+            ` (${commandId.slice(0, 12)})`,
         );
       }
       const combat = combatByCommand.get(commandId);
@@ -1465,10 +1450,10 @@ function buildTurnInputs(
         for (const family of combatFamilies) {
           addReceiptFamily(
             family,
-            `combat_receipts_v27:${combat.resolutionKind ?? "unknown"}`
-            + `${combat.damageDealt > 0 ? ` damage=${combat.damageDealt}` : ""}`
-            + `${combat.healApplied > 0 ? ` heal=${combat.healApplied}` : ""}`
-            + ` (${commandId.slice(0, 12)})`,
+            `combat_receipts_v27:${combat.resolutionKind ?? "unknown"}` +
+              `${combat.damageDealt > 0 ? ` damage=${combat.damageDealt}` : ""}` +
+              `${combat.healApplied > 0 ? ` heal=${combat.healApplied}` : ""}` +
+              ` (${commandId.slice(0, 12)})`,
           );
         }
         if (combat.healingEvidence) {
@@ -1505,7 +1490,11 @@ function buildTurnInputs(
       }
       const hints = commandFamilyHints.get(commandId);
       if (hints !== undefined) {
-        for (const family of hints) addReceiptFamily(family, `${family === "movement" ? "world_receipts_v28" : "quest_domain_receipts_v33"} (${commandId.slice(0, 12)})`);
+        for (const family of hints)
+          addReceiptFamily(
+            family,
+            `${family === "movement" ? "world_receipts_v28" : "quest_domain_receipts_v33"} (${commandId.slice(0, 12)})`,
+          );
       }
     }
 
@@ -1525,14 +1514,15 @@ function buildTurnInputs(
       if (receiptFamilies.includes(family)) proposalFamilies.splice(index, 1);
     }
 
-    const confirmationEvidence: string | null = proposals.length === 0
-      ? null
-      : proposals
-        .map((proposal) => {
-          const decision = confirmationByProposal.get(proposal.proposalId) ?? "pending";
-          return `${proposal.proposalId.slice(0, 12)}=${decision}`;
-        })
-        .join(", ");
+    const confirmationEvidence: string | null =
+      proposals.length === 0
+        ? null
+        : proposals
+            .map((proposal) => {
+              const decision = confirmationByProposal.get(proposal.proposalId) ?? "pending";
+              return `${proposal.proposalId.slice(0, 12)}=${decision}`;
+            })
+            .join(", ");
 
     let combatOutcome: CombatOutcomeInput | null = null;
     if (combatCommandIds.length > 0) {
@@ -1557,7 +1547,7 @@ function buildTurnInputs(
 
     const laneExecution = lane !== null && laneExecutedDecisions.has(lane.decisionId);
     const laneProposalBinding = lane !== null && laneBoundDecisions.has(lane.decisionId);
-    const laneBindingEvidence = lane === null ? [] : laneBoundDecisions.get(lane.decisionId) ?? [];
+    const laneBindingEvidence = lane === null ? [] : (laneBoundDecisions.get(lane.decisionId) ?? []);
     const toolNames = toolCallsByTurn.get(turnId) ?? [];
     const providerCalls = providerCallsByTurn.get(turnId) ?? 0;
     const contextParts = [
@@ -1624,7 +1614,10 @@ export interface AuditReportDocument {
 }
 
 export function countFlagsByClass(flags: readonly AuditFlag[]): Record<AuditFlagClass, number> {
-  const counts = Object.fromEntries(AUDIT_FLAG_CLASSES.map((flagClass) => [flagClass, 0])) as Record<AuditFlagClass, number>;
+  const counts = Object.fromEntries(AUDIT_FLAG_CLASSES.map((flagClass) => [flagClass, 0])) as Record<
+    AuditFlagClass,
+    number
+  >;
   for (const flag of flags) counts[flag.class] += 1;
   return counts;
 }
@@ -1679,14 +1672,17 @@ export function renderAuditSummary(input: AuditSummaryInput): string {
   lines.push("");
   lines.push(`Flags: ${sorted.length} (actionable ${sorted.length - informational}, informational ${informational})`);
   const classWidth = Math.max("Class".length, ...AUDIT_FLAG_CLASSES.map((flagClass) => flagClass.length));
-  const countWidth = Math.max("Flags".length, ...AUDIT_FLAG_CLASSES.map((flagClass) => String(counts[flagClass]).length));
+  const countWidth = Math.max(
+    "Flags".length,
+    ...AUDIT_FLAG_CLASSES.map((flagClass) => String(counts[flagClass]).length),
+  );
   lines.push(`${"Class".padEnd(classWidth)}  ${"Flags".padStart(countWidth)}  Informational`);
   lines.push(`${"-".repeat(classWidth)}  ${"-".repeat(countWidth)}  -------------`);
   for (const flagClass of AUDIT_FLAG_CLASSES) {
-    const info = sorted.filter(
-      (flag) => flag.class === flagClass && flag.severity === "informational",
-    ).length;
-    lines.push(`${flagClass.padEnd(classWidth)}  ${String(counts[flagClass]).padStart(countWidth)}  ${info === 0 ? "-" : String(info)}`);
+    const info = sorted.filter((flag) => flag.class === flagClass && flag.severity === "informational").length;
+    lines.push(
+      `${flagClass.padEnd(classWidth)}  ${String(counts[flagClass]).padStart(countWidth)}  ${info === 0 ? "-" : String(info)}`,
+    );
   }
   lines.push("");
   const exampleLimit = input.exampleLimit ?? 5;
@@ -1723,9 +1719,7 @@ export function renderAuditMarkdown(document: AuditReportDocument): string {
   lines.push("| Class | Flags | Informational |");
   lines.push("| --- | ---: | ---: |");
   for (const flagClass of AUDIT_FLAG_CLASSES) {
-    const info = document.flags.filter(
-      (flag) => flag.class === flagClass && flag.severity === "informational",
-    ).length;
+    const info = document.flags.filter((flag) => flag.class === flagClass && flag.severity === "informational").length;
     lines.push(`| ${flagClass} | ${document.counts[flagClass]} | ${info} |`);
   }
   lines.push("");
@@ -1763,10 +1757,7 @@ export function renderAuditMarkdown(document: AuditReportDocument): string {
  * `lane-act-uncommitted` — a confirmation wait and a shadow (advisory) pick that cannot commit
  * by design — which are never failures.
  */
-export function flagsTriggeringFailure(
-  flags: readonly AuditFlag[],
-  failOn: readonly AuditFlagClass[],
-): AuditFlag[] {
+export function flagsTriggeringFailure(flags: readonly AuditFlag[], failOn: readonly AuditFlagClass[]): AuditFlag[] {
   if (failOn.length === 0) return [];
   return flags.filter((flag) => {
     if (!failOn.includes(flag.class)) return false;
@@ -1802,14 +1793,16 @@ async function main(): Promise<void> {
     generatedAt,
   });
 
-  process.stdout.write(renderAuditSummary({
-    world: dataset.world,
-    databasePath: dataset.databasePath,
-    turnsRead: dataset.turns.length,
-    flags,
-    notices: dataset.notices,
-    generatedAt,
-  }));
+  process.stdout.write(
+    renderAuditSummary({
+      world: dataset.world,
+      databasePath: dataset.databasePath,
+      turnsRead: dataset.turns.length,
+      flags,
+      notices: dataset.notices,
+      generatedAt,
+    }),
+  );
 
   if (options.json !== null) {
     mkdirSync(path.dirname(options.json), { recursive: true });

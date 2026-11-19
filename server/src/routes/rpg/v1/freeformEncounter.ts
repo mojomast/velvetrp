@@ -41,62 +41,79 @@ const MAX_CANDIDATES = 1;
 
 type Params = { campaignId: string; sessionId: string; actorId: string };
 
-const noneReasonSchema = z.enum([
-  "no-hostile-intent",
-  "no-compatible-enemy",
-] satisfies [FreeformEncounterNoneReason, ...FreeformEncounterNoneReason[]]);
+const noneReasonSchema = z.enum(["no-hostile-intent", "no-compatible-enemy"] satisfies [
+  FreeformEncounterNoneReason,
+  ...FreeformEncounterNoneReason[],
+]);
 
 const boundingText = (max: number) => z.string().min(1).max(max);
 
-const candidateSchema = z.object({
-  candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  encounterName: boundingText(MAX_NAME_LENGTH),
-  actorId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  enemies: z.array(enemyTemplateCatalogReferenceSchema).min(MIN_FREEFORM_ENCOUNTER_ENEMIES).max(MAX_FREEFORM_ENCOUNTER_ENEMIES),
-  visibility: z.literal("public"),
-}).strict();
+const candidateSchema = z
+  .object({
+    candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    encounterName: boundingText(MAX_NAME_LENGTH),
+    actorId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    enemies: z
+      .array(enemyTemplateCatalogReferenceSchema)
+      .min(MIN_FREEFORM_ENCOUNTER_ENEMIES)
+      .max(MAX_FREEFORM_ENCOUNTER_ENEMIES),
+    visibility: z.literal("public"),
+  })
+  .strict();
 
-const receiptSchema = z.object({
-  commandId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  idempotencyKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-  revisionBefore: z.number().int().min(0),
-  revisionAfter: z.number().int().min(0),
-  occurredAt: boundingText(64),
-}).strict();
+const receiptSchema = z
+  .object({
+    commandId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    idempotencyKey: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+    revisionBefore: z.number().int().min(0),
+    revisionAfter: z.number().int().min(0),
+    occurredAt: boundingText(64),
+  })
+  .strict();
 
 const classificationSchema = z.discriminatedUnion("intent", [
-  z.object({
-    intent: z.literal("none"),
-    reason: noneReasonSchema,
-  }).strict(),
-  z.object({
-    intent: z.literal("materialize-encounter"),
-    candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
-  }).strict(),
+  z
+    .object({
+      intent: z.literal("none"),
+      reason: noneReasonSchema,
+    })
+    .strict(),
+  z
+    .object({
+      intent: z.literal("materialize-encounter"),
+      candidates: z.array(candidateSchema).min(1).max(MAX_CANDIDATES),
+    })
+    .strict(),
 ]);
 
 const materializationSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("declined"), reason: noneReasonSchema }).strict(),
-  z.object({
-    status: z.literal("materialized"),
-    candidate: candidateSchema,
-    encounterId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-    combatId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-    tacticalMapId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
-    createReceipt: receiptSchema,
-    startReceipt: receiptSchema,
-  }).strict(),
+  z
+    .object({
+      status: z.literal("materialized"),
+      candidate: candidateSchema,
+      encounterId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+      combatId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+      tacticalMapId: boundingText(MAX_ARTIFACT_KEY_LENGTH),
+      createReceipt: receiptSchema,
+      startReceipt: receiptSchema,
+    })
+    .strict(),
 ]);
 
-const requestSchema = z.object({
-  text: boundingText(MAX_TEXT_LENGTH),
-  candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH).optional(),
-}).strict();
+const requestSchema = z
+  .object({
+    text: boundingText(MAX_TEXT_LENGTH),
+    candidateId: boundingText(MAX_ARTIFACT_KEY_LENGTH).optional(),
+  })
+  .strict();
 
-const responseSchema = z.object({
-  classification: classificationSchema,
-  materialization: materializationSchema.optional(),
-}).strict();
+const responseSchema = z
+  .object({
+    classification: classificationSchema,
+    materialization: materializationSchema.optional(),
+  })
+  .strict();
 
 export interface FreeformEncounterHttpOptions {
   repositoryAccessor: () => FreeformEncounterRepository;
@@ -108,7 +125,13 @@ function rpgEnabled(): boolean {
 }
 
 function unavailable(request: FastifyRequest, reply: FastifyReply): FastifyReply {
-  return sendApiProblem(request, reply, 404, "RPG_FREEFORM_ENCOUNTER_NOT_FOUND", "Freeform encounter resource unavailable");
+  return sendApiProblem(
+    request,
+    reply,
+    404,
+    "RPG_FREEFORM_ENCOUNTER_NOT_FOUND",
+    "Freeform encounter resource unavailable",
+  );
 }
 
 function failure(error: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply {
@@ -119,13 +142,25 @@ function failure(error: unknown, request: FastifyRequest, reply: FastifyReply): 
     return unavailable(request, reply);
   }
   if (error instanceof FreeformEncounterConflictError) {
-    return sendApiProblem(request, reply, 409, "RPG_FREEFORM_ENCOUNTER_CONFLICT",
-      "Freeform encounter conflicts with current state; refresh before retrying");
+    return sendApiProblem(
+      request,
+      reply,
+      409,
+      "RPG_FREEFORM_ENCOUNTER_CONFLICT",
+      "Freeform encounter conflicts with current state; refresh before retrying",
+    );
   }
-  request.log.error({ operation: "freeform-encounter", method: request.method, route: request.routeOptions.url },
-    "freeform encounter command failed");
-  return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR",
-    "Freeform encounter outcome may be unknown; reconcile before retrying");
+  request.log.error(
+    { operation: "freeform-encounter", method: request.method, route: request.routeOptions.url },
+    "freeform encounter command failed",
+  );
+  return sendApiProblem(
+    request,
+    reply,
+    500,
+    "RPG_INTERNAL_ERROR",
+    "Freeform encounter outcome may be unknown; reconcile before retrying",
+  );
 }
 
 export const freeformEncounterHttpRoutes: FastifyPluginAsync<FreeformEncounterHttpOptions> = async (app, options) => {
@@ -139,8 +174,17 @@ export const freeformEncounterHttpRoutes: FastifyPluginAsync<FreeformEncounterHt
           await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
           return;
         }
-        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0) {
-          await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Freeform encounter does not accept query parameters");
+        if (
+          (request.raw.url ?? request.url).includes("?") ||
+          Object.keys(request.query as Record<string, unknown>).length > 0
+        ) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Freeform encounter does not accept query parameters",
+          );
           return;
         }
         if (Object.values(request.params).some((value) => !resourceIdSchema.safeParse(value).success)) {
@@ -149,7 +193,13 @@ export const freeformEncounterHttpRoutes: FastifyPluginAsync<FreeformEncounterHt
         }
         const contentType = request.headers["content-type"];
         if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
-          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Freeform encounter requires application/json");
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Freeform encounter requires application/json",
+          );
         }
       },
       errorHandler: (_error, request, reply) =>
@@ -163,12 +213,24 @@ export const freeformEncounterHttpRoutes: FastifyPluginAsync<FreeformEncounterHt
       try {
         const repository = options.repositoryAccessor();
         const { campaignId, sessionId, actorId } = request.params;
-        const classification = repository.classifyFreeformEncounterIntent(PRINCIPAL, campaignId, sessionId, actorId, body.data.text);
+        const classification = repository.classifyFreeformEncounterIntent(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.text,
+        );
         if (classification.intent === "none") {
           return reply.code(200).send(responseSchema.parse({ classification }));
         }
-        const materialization = repository.materializeFreeformEncounter(PRINCIPAL, campaignId, sessionId, actorId, body.data.text,
-          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {});
+        const materialization = repository.materializeFreeformEncounter(
+          PRINCIPAL,
+          campaignId,
+          sessionId,
+          actorId,
+          body.data.text,
+          body.data.candidateId !== undefined ? { candidateId: body.data.candidateId } : {},
+        );
         return reply.code(200).send(responseSchema.parse({ classification, materialization }));
       } catch (error) {
         return failure(error, request, reply);

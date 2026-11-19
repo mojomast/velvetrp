@@ -53,7 +53,10 @@ export interface PreparePlayableCampaignResult {
   campaignCharacterIds: string[];
 }
 
-type ParsedArgs = Required<Pick<PreparePlayableCampaignOptions, "dataDir" | "campaignId" | "campaignName" | "starter">> & Pick<PreparePlayableCampaignOptions, "roomTitle">;
+type ParsedArgs = Required<
+  Pick<PreparePlayableCampaignOptions, "dataDir" | "campaignId" | "campaignName" | "starter">
+> &
+  Pick<PreparePlayableCampaignOptions, "roomTitle">;
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args: Record<string, string> = {};
@@ -63,7 +66,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     args[key.slice(2)] = argv[++index] ?? "";
   }
   if (!args["data-dir"] || !args["campaign-id"]) {
-    throw new Error("usage: --data-dir DIR --campaign-id ID [--campaign-name NAME] [--starter mechanics|srd-5.1] [--room-title TITLE]");
+    throw new Error(
+      "usage: --data-dir DIR --campaign-id ID [--campaign-name NAME] [--starter mechanics|srd-5.1] [--room-title TITLE]",
+    );
   }
   const starter = args["starter"] ?? "mechanics";
   if (starter !== "mechanics" && starter !== "srd-5.1") {
@@ -96,7 +101,9 @@ function starterReference(starter: PlayableStarter, kind: "race" | "background" 
   return reference;
 }
 
-export async function preparePlayableCampaign(options: PreparePlayableCampaignOptions): Promise<PreparePlayableCampaignResult> {
+export async function preparePlayableCampaign(
+  options: PreparePlayableCampaignOptions,
+): Promise<PreparePlayableCampaignResult> {
   const starter = options.starter ?? "mechanics";
   const campaignName = options.campaignName ?? "Campaign";
   process.env.VELVET_DATA_DIR = options.dataDir;
@@ -105,11 +112,15 @@ export async function preparePlayableCampaign(options: PreparePlayableCampaignOp
     const scores = attributeScores(starter);
     const finalizeActor = (personaId: string, key: string) => {
       const draft = repository.createCharacterDraft(OWNER, options.campaignId, {
-        personaId, controllerPrincipalId: OWNER, durability: "durable",
-        allocation: { method: "standard-array", scores }, idempotencyKey: `play.${key}.draft`,
+        personaId,
+        controllerPrincipalId: OWNER,
+        durability: "durable",
+        allocation: { method: "standard-array", scores },
+        idempotencyKey: `play.${key}.draft`,
       });
       const selected = repository.updateCharacterDraft(OWNER, draft.draft.id, {
-        expectedRevision: draft.draft.revision, idempotencyKey: `play.${key}.selections`,
+        expectedRevision: draft.draft.revision,
+        idempotencyKey: `play.${key}.selections`,
         selections: {
           race: starterReference(starter, "race"),
           background: starterReference(starter, "background"),
@@ -118,9 +129,14 @@ export async function preparePlayableCampaign(options: PreparePlayableCampaignOp
         },
       } as never);
       const finalized = repository.finalizeCharacterDraft(OWNER, draft.draft.id, {
-        expectedRevision: selected.draft.revision, idempotencyKey: `play.${key}.finalize`,
+        expectedRevision: selected.draft.revision,
+        idempotencyKey: `play.${key}.finalize`,
       });
-      return { actorId: finalized.receipt.actorId, campaignCharacterId: finalized.receipt.campaignCharacterId, personaId };
+      return {
+        actorId: finalized.receipt.actorId,
+        campaignCharacterId: finalized.receipt.campaignCharacterId,
+        personaId,
+      };
     };
 
     const existingCharacters = await listCharacters();
@@ -133,8 +149,11 @@ export async function preparePlayableCampaign(options: PreparePlayableCampaignOp
         continue;
       }
       const created = repository.createCharacter({
-        name, age: 32 + index, archetype: persona.archetype,
-        boundaries: "Fictional adults. No sexual violence, harm to children, or demeaning portrayals of real communities.",
+        name,
+        age: 32 + index,
+        archetype: persona.archetype,
+        boundaries:
+          "Fictional adults. No sexual violence, harm to children, or demeaning portrayals of real communities.",
         fictionalConfirmed: true,
       });
       personaIds.push(created.id);
@@ -145,10 +164,17 @@ export async function preparePlayableCampaign(options: PreparePlayableCampaignOp
     const attachments = repository.listCampaignSessionAttachments(OWNER, options.campaignId);
     const attachedSessionIds = new Set(attachments.map((attachment) => attachment.sessionId));
     const sessions = await listSessions();
-    const existingRoom = sessions.find((candidate) => candidate.title === roomTitle && attachedSessionIds.has(candidate.id));
-    const session = existingRoom ?? (await createSession({
-      characterIds: personaIds, primaryCharacterId: personaIds[0]!, title: roomTitle, presetId: "default",
-    }));
+    const existingRoom = sessions.find(
+      (candidate) => candidate.title === roomTitle && attachedSessionIds.has(candidate.id),
+    );
+    const session =
+      existingRoom ??
+      (await createSession({
+        characterIds: personaIds,
+        primaryCharacterId: personaIds[0]!,
+        title: roomTitle,
+        presetId: "default",
+      }));
     repository.transitionSession(session.id, "active", "Prepared for local play");
     if (!attachedSessionIds.has(session.id)) {
       repository.attachCampaignSession(OWNER, { campaignId: options.campaignId, sessionId: session.id });
@@ -157,7 +183,9 @@ export async function preparePlayableCampaign(options: PreparePlayableCampaignOp
     const administration = repository.getCampaignAdministration(OWNER, options.campaignId);
     if (administration && administration.status !== "published" && administration.status !== "completed") {
       repository.updateCampaignAdministration(OWNER, options.campaignId, {
-        expectedRevision: administration.revision, status: "published", idempotencyKey: "play.publish",
+        expectedRevision: administration.revision,
+        status: "published",
+        idempotencyKey: "play.publish",
       });
     }
 

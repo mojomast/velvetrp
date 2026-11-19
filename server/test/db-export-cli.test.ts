@@ -10,7 +10,9 @@ import { afterEach, describe, expect, it } from "vitest";
 const serverDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const script = path.join(serverDir, "scripts", "export-db.mjs");
 const dirs: string[] = [];
-afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 function tempDir(prefix: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), prefix));
@@ -37,7 +39,10 @@ describe("db:export command", () => {
     const databasePath = seed(dataDir);
     const before = sha256(databasePath);
 
-    const result = spawnSync(process.execPath, [script, "--data-dir", dataDir, "--out", outDir], { encoding: "utf8", timeout: 60_000 });
+    const result = spawnSync(process.execPath, [script, "--data-dir", dataDir, "--out", outDir], {
+      encoding: "utf8",
+      timeout: 60_000,
+    });
     expect(result.status, result.stderr).toBe(0);
     expect(sha256(databasePath)).toBe(before);
 
@@ -49,7 +54,10 @@ describe("db:export command", () => {
 
     const backup = new DatabaseDriver(path.join(outDir, backups[0]!), { readonly: true });
     try {
-      expect(backup.prepare("SELECT id,name FROM legacy_campaigns ORDER BY id").all()).toEqual([{ id: "c1", name: "First" }, { id: "c2", name: "Second" }]);
+      expect(backup.prepare("SELECT id,name FROM legacy_campaigns ORDER BY id").all()).toEqual([
+        { id: "c1", name: "First" },
+        { id: "c2", name: "Second" },
+      ]);
       expect(backup.prepare("PRAGMA quick_check").pluck().get()).toBe("ok");
     } finally {
       backup.close();
@@ -69,7 +77,10 @@ describe("db:export command", () => {
   it("fails clearly when there is no database and creates nothing", () => {
     const dataDir = tempDir("velvet-export-empty-");
     const outDir = path.join(tempDir("velvet-export-out-"), "nested");
-    const result = spawnSync(process.execPath, [script, "--data-dir", dataDir, "--out", outDir], { encoding: "utf8", timeout: 60_000 });
+    const result = spawnSync(process.execPath, [script, "--data-dir", dataDir, "--out", outDir], {
+      encoding: "utf8",
+      timeout: 60_000,
+    });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/velvet\.sqlite/);
     expect(readdirSync(dataDir)).toEqual([]);

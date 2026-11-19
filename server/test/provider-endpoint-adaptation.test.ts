@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { adaptCompletionBodyForKnownEndpoint, completeWithProvider, rejectsToolResultReplay } from "../src/provider/openAiCompatibleCompletion.js";
+import {
+  adaptCompletionBodyForKnownEndpoint,
+  completeWithProvider,
+  rejectsToolResultReplay,
+} from "../src/provider/openAiCompatibleCompletion.js";
 import { isAuthorizedHttpProviderBaseUrl } from "../src/provider/providerTransport.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { getPromptPreset } from "../src/presets.js";
@@ -25,9 +29,14 @@ function forcedRequest(baseUrl: string, model?: string) {
 }
 
 function stubFetch(content = "Held for a player choice.") {
-  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-    choices: [{ finish_reason: "stop", message: { role: "assistant", content } }],
-  }), { status: 200, headers: { "content-type": "application/json" } }));
+  const fetchMock = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        choices: [{ finish_reason: "stop", message: { role: "assistant", content } }],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    ),
+  );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
@@ -37,8 +46,12 @@ function sentBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> 
 }
 
 function body(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { model: "deepseek-v4-flash", tool_choice: { type: "function", function: { name: "select_dm_beat" } },
-    reasoning_effort: "none", ...overrides };
+  return {
+    model: "deepseek-v4-flash",
+    tool_choice: { type: "function", function: { name: "select_dm_beat" } },
+    reasoning_effort: "none",
+    ...overrides,
+  };
 }
 
 describe("authorized live-validation endpoint detection", () => {
@@ -126,10 +139,23 @@ describe("completeWithProvider on the known thinking endpoint", () => {
   });
 
   it("keeps the forced named choice for any other endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ finish_reason: "tool_calls", message: { role: "assistant", content: null,
-        tool_calls: [{ id: "c1", type: "function", function: { name: "select_dm_beat", arguments: "{}" } }] } }],
-    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              finish_reason: "tool_calls",
+              message: {
+                role: "assistant",
+                content: null,
+                tool_calls: [{ id: "c1", type: "function", function: { name: "select_dm_beat", arguments: "{}" } }],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const result = await completeWithProvider(forcedRequest(LOOPBACK, "deepseek-v4-flash"));
     expect(sentBody(fetchMock).tool_choice).toEqual({ type: "function", function: { name: "select_dm_beat" } });

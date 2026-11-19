@@ -112,7 +112,15 @@ export const ADVENTURE_DEFAULT_ACTION_THRESHOLD = DEFAULT_SYSTEM_ONE_THRESHOLDS.
  * actually named, so the sweep never re-asks the model, and the gate floors stay the lane's own.
  */
 export const ADVENTURE_THRESHOLD_GRID: readonly number[] = [
-  0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, ADVENTURE_DEFAULT_ACTION_THRESHOLD,
+  0.35,
+  0.4,
+  0.45,
+  0.5,
+  0.55,
+  0.6,
+  0.65,
+  0.7,
+  ADVENTURE_DEFAULT_ACTION_THRESHOLD,
 ];
 
 /** One graded live composition: the composed outcome plus its label comparison. */
@@ -179,7 +187,7 @@ export function gradeAdventureCase(
   composition: AdventureSelectionComposition,
   answers: Record<string, SystemOneAnswer> = {},
 ): AdventureReadout {
-  const selected = composition.band === "act" ? composition.selection?.candidateId ?? null : null;
+  const selected = composition.band === "act" ? (composition.selection?.candidateId ?? null) : null;
   const candidateId = namedAdventureCandidate(testCase.candidates, composition, answers);
   const deferred = composition.band !== "act";
   const selectedCorrect = selected === testCase.expected.preferred;
@@ -245,7 +253,10 @@ export function actedAdventureSignalPoints(readouts: readonly AdventureReadout[]
 }
 
 /** Aggregates accuracy, Brier, and ECE over calibration points. Pure. */
-export function aggregateAdventureMetrics(points: readonly AdventureSignalPoint[], bins = 10): AdventureCalibrationMetrics {
+export function aggregateAdventureMetrics(
+  points: readonly AdventureSignalPoint[],
+  bins = 10,
+): AdventureCalibrationMetrics {
   const graded = gradeCalibration(points, bins);
   const accuracy = points.length === 0 ? 0 : points.filter((point) => point.correct).length / points.length;
   return {
@@ -480,11 +491,16 @@ export function evaluateAdventureReadouts(
     minAccuracy: LANE_GATE.minAccuracy,
     minActed: LANE_GATE.minSamples,
   });
-  const recommendedVerdict = selection.selected === null
-    ? null
-    : thresholdVerdict(gated, selection.selected.threshold, promotedAt);
-  const devSamples = adventureThresholdSamples(gated.filter((readout) => !readout.holdout), ADVENTURE_THRESHOLD_GRID);
-  const holdoutSamples = adventureThresholdSamples(gated.filter((readout) => readout.holdout), ADVENTURE_THRESHOLD_GRID);
+  const recommendedVerdict =
+    selection.selected === null ? null : thresholdVerdict(gated, selection.selected.threshold, promotedAt);
+  const devSamples = adventureThresholdSamples(
+    gated.filter((readout) => !readout.holdout),
+    ADVENTURE_THRESHOLD_GRID,
+  );
+  const holdoutSamples = adventureThresholdSamples(
+    gated.filter((readout) => readout.holdout),
+    ADVENTURE_THRESHOLD_GRID,
+  );
 
   return {
     readouts: [...gated],
@@ -642,11 +658,18 @@ function harvestedCandidates(value: unknown): AdventureSelectionCandidate[] | nu
   const candidates: AdventureSelectionCandidate[] = [];
   for (const entry of value) {
     const record = isRecord(entry) ? entry : null;
-    if (!record
-      || typeof record.candidateId !== "string" || !record.candidateId.trim()
-      || typeof record.digest !== "string" || !record.digest.trim()
-      || typeof record.kind !== "string" || !record.kind.trim()
-      || typeof record.label !== "string" || !record.label.trim()) return null;
+    if (
+      !record ||
+      typeof record.candidateId !== "string" ||
+      !record.candidateId.trim() ||
+      typeof record.digest !== "string" ||
+      !record.digest.trim() ||
+      typeof record.kind !== "string" ||
+      !record.kind.trim() ||
+      typeof record.label !== "string" ||
+      !record.label.trim()
+    )
+      return null;
     candidates.push({ candidateId: record.candidateId, digest: record.digest, kind: record.kind, label: record.label });
   }
   return candidates;
@@ -748,7 +771,9 @@ export function parseHarvestedAdventureCases(text: string): HarvestedAdventureCa
  * with no warning; any other read or parse failure is reported as a warning and skipped so the
  * live benchmark never fails because of the fixture.
  */
-export async function loadHarvestedAdventureCases(filePath: string = HARVEST_FIXTURE_PATH): Promise<HarvestedAdventureCases> {
+export async function loadHarvestedAdventureCases(
+  filePath: string = HARVEST_FIXTURE_PATH,
+): Promise<HarvestedAdventureCases> {
   let text: string;
   try {
     text = await readFile(filePath, "utf8");
@@ -915,7 +940,9 @@ function metricRow(label: string, metrics: AdventureCalibrationMetrics): string 
 function thresholdTable(points: readonly ThresholdPoint[]): string[] {
   const lines = ["| Action threshold | Acted | Coverage | Acted accuracy |", "| ---: | ---: | ---: | ---: |"];
   for (const point of points) {
-    lines.push(`| ${point.threshold.toFixed(2)} | ${point.acted}/${point.total} | ${(point.coverage * 100).toFixed(1)}% | ${point.acted === 0 ? "n/a" : pct(point.actedAccuracy)} |`);
+    lines.push(
+      `| ${point.threshold.toFixed(2)} | ${point.acted}/${point.total} | ${(point.coverage * 100).toFixed(1)}% | ${point.acted === 0 ? "n/a" : pct(point.actedAccuracy)} |`,
+    );
   }
   return lines;
 }
@@ -942,7 +969,8 @@ export function renderAdventureBenchmark(input: {
   /** Confirmed-harvest provenance for the report; omit when no fixture was considered. */
   harvest?: AdventureHarvestReport;
 }): string {
-  const { generatedAt, model, baseUrl, repeats, thresholds, readouts, failures, evaluation, proposedRecord, out } = input;
+  const { generatedAt, model, baseUrl, repeats, thresholds, readouts, failures, evaluation, proposedRecord, out } =
+    input;
   const cases = input.cases ?? ADVENTURE_EVAL_CASES;
   const harvest = input.harvest ?? EMPTY_HARVEST;
   const { calibration, gate, sweep } = evaluation;
@@ -970,28 +998,35 @@ export function renderAdventureBenchmark(input: {
   const namedDeferred = namedReadouts.filter((readout) => readout.deferred);
   const namedDeferredAcceptable = namedDeferred.filter((readout) => readout.acceptable.includes(readout.candidateId));
   const namedSignals = namedDeferred.map((readout) => readout.topSignal);
-  const namedSignalRange = namedSignals.length === 0
-    ? "n/a"
-    : `${Math.min(...namedSignals).toFixed(2)}–${Math.max(...namedSignals).toFixed(2)}`;
+  const namedSignalRange =
+    namedSignals.length === 0
+      ? "n/a"
+      : `${Math.min(...namedSignals).toFixed(2)}–${Math.max(...namedSignals).toFixed(2)}`;
   const recommended = sweep.recommendedVerdict;
   const defaultThresholdText = sweep.defaultVerdict.threshold.toFixed(2);
   const lines: string[] = [];
 
   lines.push("# System One (Jev) L2 adventure-selection benchmark");
   lines.push("");
-  lines.push(`Generated ${generatedAt} by \`scripts/evaluate-system-one-adventure-lane.ts\` using the live System One adapter.`);
+  lines.push(
+    `Generated ${generatedAt} by \`scripts/evaluate-system-one-adventure-lane.ts\` using the live System One adapter.`,
+  );
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
-  lines.push("The L2 lane is an **advisory exact-candidate selector, wired in shadow (record-only)**. `buildAdventureSelectionQuestions`");
+  lines.push(
+    "The L2 lane is an **advisory exact-candidate selector, wired in shadow (record-only)**. `buildAdventureSelectionQuestions`",
+  );
   lines.push("builds one fusion-free single battery over the union of the turn's advertised candidates: a");
-  lines.push("`supported` noul (\"does the declaration clearly describe committing exactly one advertised");
-  lines.push("candidate?\"), one per-candidate relevance `score`, and one aggregate `best_candidate`");
+  lines.push('`supported` noul ("does the declaration clearly describe committing exactly one advertised');
+  lines.push('candidate?"), one per-candidate relevance `score`, and one aggregate `best_candidate`');
   lines.push("`choice` over the exact candidate ids with the fail-closed `none_of_these` option.");
   lines.push("`composeAdventureSelection` requires the aggregate choice to name an advertised candidate and");
   lines.push("combines the chosen option's probability with the `supported` noul as the minimum of the two");
   lines.push("independent claims; `act` selects, `confirm` records a lower-confidence selection, and anything");
-  lines.push("below defers. The lane is **wired in shadow (record-only)** behind the `FEATURE_SYSTEM_ONE` feature flag,");
+  lines.push(
+    "below defers. The lane is **wired in shadow (record-only)** behind the `FEATURE_SYSTEM_ONE` feature flag,",
+  );
   lines.push("the enabled setting, a usable key, and a non-`off` lane mode: it records one immutable shadow decision");
   lines.push("per fresh adventure turn that advertises candidates and never selects, orders, or commits anything. An");
   lines.push("`active` lane mode is still record-only because no promoted active path exists.");
@@ -1018,14 +1053,22 @@ export function renderAdventureBenchmark(input: {
   lines.push(`| Model | ${model} |`);
   lines.push(`| Base URL | ${baseUrl} |`);
   lines.push(`| Lane | \`${PROMOTION_LANE}\` (advisory, shadow-wired record-only; no promoted active path) |`);
-  lines.push(`| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`);
+  lines.push(
+    `| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`,
+  );
   lines.push(`| Action-threshold sweep grid | ${sweep.grid.map((value) => value.toFixed(2)).join(", ")} |`);
-  lines.push("| Battery | single fusion-free battery: 1 `supported` noul + 1 `relevance:<candidateId>` score per candidate + 1 `best_candidate` choice |");
+  lines.push(
+    "| Battery | single fusion-free battery: 1 `supported` noul + 1 `relevance:<candidateId>` score per candidate + 1 `best_candidate` choice |",
+  );
   lines.push(`| Repeats | ${repeats} |`);
   lines.push(`| Corpus | ${cases.length} declarations x ${repeats} repeats = ${totalCalls} calls |`);
   lines.push(`| Holdout | ${holdout} case(s) held out of the Platt fit (${cases.length - holdout} development) |`);
-  lines.push(`| Harvested cases | ${harvest.cases} merged (${harvest.humanCases} human-confirmed + ${harvest.agentCases} agent-reviewed), ${harvest.skipped} skipped — ${harvest.present ? `\`${harvest.fixture}\`` : "fixture absent"} |`);
-  lines.push(`| Gate scope | frozen corpus + ${harvest.humanCases} human-confirmed harvested case(s); ${harvest.agentCases} agent-reviewed harvested case(s) are scored but not gated |`);
+  lines.push(
+    `| Harvested cases | ${harvest.cases} merged (${harvest.humanCases} human-confirmed + ${harvest.agentCases} agent-reviewed), ${harvest.skipped} skipped — ${harvest.present ? `\`${harvest.fixture}\`` : "fixture absent"} |`,
+  );
+  lines.push(
+    `| Gate scope | frozen corpus + ${harvest.humanCases} human-confirmed harvested case(s); ${harvest.agentCases} agent-reviewed harvested case(s) are scored but not gated |`,
+  );
   lines.push("");
   if (harvest.warning) {
     lines.push(`> **Harvest warning:** ${harvest.warning} Those proposals are skipped; the run continues.`);
@@ -1034,34 +1077,47 @@ export function renderAdventureBenchmark(input: {
   lines.push("## Corpus and per-case results");
   lines.push("");
   if (harvest.cases > 0 || harvest.confirmed > 0) {
-    lines.push(`${harvest.cases} of ${cases.length} case(s) are **harvested** rows: status-confirmed live-derived labels from`);
-    lines.push(`\`${harvest.fixture}\` (${harvest.skipped} confirmed proposal(s) skipped). The review split is ${harvest.humanCases}`);
-    lines.push(`human-confirmed (\`review-annotated\`, gate-eligible) versus ${harvest.agentCases} agent-reviewed (\`agent-review\`). All of them`);
+    lines.push(
+      `${harvest.cases} of ${cases.length} case(s) are **harvested** rows: status-confirmed live-derived labels from`,
+    );
+    lines.push(
+      `\`${harvest.fixture}\` (${harvest.skipped} confirmed proposal(s) skipped). The review split is ${harvest.humanCases}`,
+    );
+    lines.push(
+      `human-confirmed (\`review-annotated\`, gate-eligible) versus ${harvest.agentCases} agent-reviewed (\`agent-review\`). All of them`,
+    );
     lines.push("run through the same composition and appear in the per-case table, but the agent-reviewed rows are");
     lines.push("**not promotion evidence**: calibration, the dev/holdout split, the threshold sweep, the gate, and");
     lines.push("any proposed record cover only the frozen corpus plus the human-confirmed rows, and the");
     lines.push("agent-reviewed rows are summarized separately below.");
     lines.push("");
   }
-  lines.push("| Case | Category | Split | Provenance | Expected | Calls | Acted | Exact | Correct | Errors | Effective outcomes |");
+  lines.push(
+    "| Case | Category | Split | Provenance | Expected | Calls | Acted | Exact | Correct | Errors | Effective outcomes |",
+  );
   lines.push("| --- | --- | :---: | :---: | --- | ---: | ---: | ---: | ---: | ---: | --- |");
   for (const summary of summaries) {
     const outcomes = Object.entries(summary.selections)
       .sort(([left], [right]) => (left === "defer" ? -1 : right === "defer" ? 1 : left.localeCompare(right)))
       .map(([outcome, count]) => `${outcome} ${count}`)
       .join(", ");
-    lines.push(`| ${summary.id} | ${summary.category} | ${summary.holdout ? "holdout" : "dev"} | ${provenanceText(summary.provenance)} | ${summary.expected ?? "defer"} | ${summary.calls} | ${summary.acted} | ${summary.exact}/${summary.calls} | ${summary.correct}/${summary.calls} | ${summary.failed} | ${outcomes || "—"} |`);
+    lines.push(
+      `| ${summary.id} | ${summary.category} | ${summary.holdout ? "holdout" : "dev"} | ${provenanceText(summary.provenance)} | ${summary.expected ?? "defer"} | ${summary.calls} | ${summary.acted} | ${summary.exact}/${summary.calls} | ${summary.correct}/${summary.calls} | ${summary.failed} | ${outcomes || "—"} |`,
+    );
   }
   lines.push("");
   if (failures.length > 0) {
     lines.push(`Adapter failures: ${failures.length}.`);
-    for (const failure of failures.slice(0, 10)) lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
+    for (const failure of failures.slice(0, 10))
+      lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
     lines.push("");
   }
   if (agentSummary.cases > 0) {
     lines.push("### Agent-reviewed harvested cases (not gated)");
     lines.push("");
-    lines.push(`${agentSummary.cases} merged case(s) came from **agent review** (\`agent-review\` provenance), not a human`);
+    lines.push(
+      `${agentSummary.cases} merged case(s) came from **agent review** (\`agent-review\` provenance), not a human`,
+    );
     lines.push("verdict. They ran through the same composition and are scored in the per-case table above");
     lines.push("(provenance `harvested (agent)`), but they are **not promotion evidence**: the project rule is that");
     lines.push("promotion records re-derive only from human-confirmed labels, so the calibration fit, the");
@@ -1075,7 +1131,9 @@ export function renderAdventureBenchmark(input: {
     lines.push(`| Graded calls | ${agentSummary.calls} |`);
     lines.push(`| Acted calls | ${agentSummary.acted} |`);
     lines.push(`| Acted accuracy | ${agentSummary.acted === 0 ? "n/a" : pct(agentSummary.actedAccuracy)} |`);
-    lines.push(`| Exact preferred | ${agentSummary.calls === 0 ? "n/a" : `${agentSummary.exact}/${agentSummary.calls}`} |`);
+    lines.push(
+      `| Exact preferred | ${agentSummary.calls === 0 ? "n/a" : `${agentSummary.exact}/${agentSummary.calls}`} |`,
+    );
     lines.push(`| Asserted-subset correctness | ${agentSummary.calls === 0 ? "n/a" : pct(agentSummary.accuracy)} |`);
     lines.push("");
   }
@@ -1092,7 +1150,9 @@ export function renderAdventureBenchmark(input: {
   lines.push("| Metric | Value |");
   lines.push("| --- | ---: |");
   lines.push(`| Mean agreement | ${stability.cases.length === 0 ? "n/a" : pct(stability.meanAgreement)} |`);
-  lines.push(`| Conflict cases | ${stability.conflictCases} of ${stability.cases.length} (${pct(stability.conflictRate)}) |`);
+  lines.push(
+    `| Conflict cases | ${stability.conflictCases} of ${stability.cases.length} (${pct(stability.conflictRate)}) |`,
+  );
   lines.push(`| Mean signal std dev | ${stdText(stability.meanSignalStdDev)} |`);
   lines.push(`| Max signal std dev | ${stdText(stability.maxSignalStdDev)} |`);
   lines.push("");
@@ -1108,13 +1168,19 @@ export function renderAdventureBenchmark(input: {
   lines.push("");
   lines.push("## Threshold sweep");
   lines.push("");
-  lines.push(`The lane composes at the server default action threshold **${defaultThresholdText}**. The sweep re-scores the`);
+  lines.push(
+    `The lane composes at the server default action threshold **${defaultThresholdText}**. The sweep re-scores the`,
+  );
   lines.push("candidate each call named — the composed pick, or for a deferral the raw `best_candidate` recovered");
   lines.push("from the answers — against that case's acceptable set at every grid threshold, without re-asking");
   lines.push(`the model. Selection takes the greatest-coverage threshold whose acted count and acted accuracy clear`);
-  lines.push(`the lane gate floors (>= ${LANE_GATE.minAccuracy} accuracy over >= ${LANE_GATE.minSamples} acted) over every labeled sample;`);
+  lines.push(
+    `the lane gate floors (>= ${LANE_GATE.minAccuracy} accuracy over >= ${LANE_GATE.minSamples} acted) over every labeled sample;`,
+  );
   lines.push("the Platt map is still fit on development acted decisions only, so the recommended verdict is");
-  lines.push(`descriptive rather than held out. The server default remains **${defaultThresholdText}** until configured.`);
+  lines.push(
+    `descriptive rather than held out. The server default remains **${defaultThresholdText}** until configured.`,
+  );
   lines.push("");
   lines.push("Rows count only calls that named a candidate: a call that named nothing cannot act at any threshold,");
   lines.push("so `Acted` and `Coverage` are over named calls, not over every graded call.");
@@ -1122,12 +1188,16 @@ export function renderAdventureBenchmark(input: {
   lines.push("| Action threshold | Acted | Coverage | Acted accuracy |");
   lines.push("| ---: | ---: | ---: | ---: |");
   for (const point of sweep.points) {
-    lines.push(`| ${point.threshold.toFixed(2)} | ${point.acted}/${point.total} | ${(point.coverage * 100).toFixed(1)}% | ${point.acted === 0 ? "n/a" : pct(point.actedAccuracy)} |`);
+    lines.push(
+      `| ${point.threshold.toFixed(2)} | ${point.acted}/${point.total} | ${(point.coverage * 100).toFixed(1)}% | ${point.acted === 0 ? "n/a" : pct(point.actedAccuracy)} |`,
+    );
   }
   lines.push("");
   if (sweep.selection.selected) {
     const selected = sweep.selection.selected;
-    lines.push(`Selected recommended action threshold: **${selected.threshold.toFixed(2)}** (coverage ${(selected.coverage * 100).toFixed(1)}%, acted accuracy ${pct(selected.actedAccuracy)} over ${selected.acted} acted).`);
+    lines.push(
+      `Selected recommended action threshold: **${selected.threshold.toFixed(2)}** (coverage ${(selected.coverage * 100).toFixed(1)}%, acted accuracy ${pct(selected.actedAccuracy)} over ${selected.acted} acted).`,
+    );
   } else {
     lines.push("No threshold qualified: every grid point failed the acted-count or acted-accuracy floor.");
   }
@@ -1146,10 +1216,14 @@ export function renderAdventureBenchmark(input: {
   lines.push("");
   lines.push("## Calibration");
   lines.push("");
-  lines.push(`Fit the monotonic Platt map on the acted development decisions at the server default threshold (${defaultThresholdText}) and scored it out of sample on the held-out cases. The recommended-threshold calibration is in the sweep above and the JSON sidecar.`);
+  lines.push(
+    `Fit the monotonic Platt map on the acted development decisions at the server default threshold (${defaultThresholdText}) and scored it out of sample on the held-out cases. The recommended-threshold calibration is in the sweep above and the JSON sidecar.`,
+  );
   if (agentSummary.cases > 0) {
     lines.push("");
-    lines.push(`Gate scope: these rows cover the frozen corpus plus human-confirmed harvested cases only. The ${agentSummary.cases} agent-reviewed harvested case(s) are summarized separately and excluded from the fit and the scores.`);
+    lines.push(
+      `Gate scope: these rows cover the frozen corpus plus human-confirmed harvested cases only. The ${agentSummary.cases} agent-reviewed harvested case(s) are summarized separately and excluded from the fit and the scores.`,
+    );
   }
   lines.push("");
   lines.push("| Split / signal | Accuracy | Brier | ECE |");
@@ -1159,22 +1233,30 @@ export function renderAdventureBenchmark(input: {
   lines.push(metricRow("held-out acted, raw", calibration.holdoutRaw));
   lines.push(metricRow("held-out acted, calibrated", calibration.holdoutCalibrated));
   lines.push("");
-  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)} (fit on ${calibration.devSamples} development acted decision(s); held out ${calibration.holdoutSamples}).`);
+  lines.push(
+    `Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)} (fit on ${calibration.devSamples} development acted decision(s); held out ${calibration.holdoutSamples}).`,
+  );
   lines.push("");
   lines.push(`## Promotion gate — \`${PROMOTION_LANE}\``);
   lines.push("");
-  lines.push(`The server default action threshold remains **${defaultThresholdText}**; a recommended threshold is an evaluation`);
+  lines.push(
+    `The server default action threshold remains **${defaultThresholdText}**; a recommended threshold is an evaluation`,
+  );
   lines.push("finding for the parent to configure, not an automatic change. The record below is proposed from the");
   lines.push("recommended-threshold verdict, because that is the configuration the evidence supports.");
   if (agentSummary.cases > 0) {
-    lines.push(`Gate scope: frozen corpus plus human-confirmed harvested cases only. The ${agentSummary.cases} agent-reviewed`);
+    lines.push(
+      `Gate scope: frozen corpus plus human-confirmed harvested cases only. The ${agentSummary.cases} agent-reviewed`,
+    );
     lines.push("harvested case(s) never enter these verdicts or the proposed record.");
   }
   lines.push("");
   if (recommended) {
     lines.push(`### Recommended-threshold verdict (${recommended.threshold.toFixed(2)})`);
     lines.push("");
-    lines.push(`Metrics scored on the calibrated acted signal at this threshold: samples ${recommended.calibration.allCalibrated.samples}, accuracy ${recommended.calibration.allCalibrated.samples === 0 ? "n/a" : pct(recommended.calibration.allCalibrated.accuracy)}, Brier ${recommended.calibration.allCalibrated.brier.toFixed(4)}, ECE ${recommended.calibration.allCalibrated.expectedCalibrationError.toFixed(4)}.`);
+    lines.push(
+      `Metrics scored on the calibrated acted signal at this threshold: samples ${recommended.calibration.allCalibrated.samples}, accuracy ${recommended.calibration.allCalibrated.samples === 0 ? "n/a" : pct(recommended.calibration.allCalibrated.accuracy)}, Brier ${recommended.calibration.allCalibrated.brier.toFixed(4)}, ECE ${recommended.calibration.allCalibrated.expectedCalibrationError.toFixed(4)}.`,
+    );
     lines.push("");
     lines.push(`**${recommended.gate.promoted ? "PROMOTE" : "NOT READY"}**`);
     lines.push("");
@@ -1187,7 +1269,9 @@ export function renderAdventureBenchmark(input: {
   }
   lines.push(`### Server-default verdict (${defaultThresholdText})`);
   lines.push("");
-  lines.push(`Metrics scored on the calibrated acted signal at the composed default threshold: samples ${calibration.allCalibrated.samples}, accuracy ${calibration.allCalibrated.samples === 0 ? "n/a" : pct(calibration.allCalibrated.accuracy)}, Brier ${calibration.allCalibrated.brier.toFixed(4)}, ECE ${calibration.allCalibrated.expectedCalibrationError.toFixed(4)}.`);
+  lines.push(
+    `Metrics scored on the calibrated acted signal at the composed default threshold: samples ${calibration.allCalibrated.samples}, accuracy ${calibration.allCalibrated.samples === 0 ? "n/a" : pct(calibration.allCalibrated.accuracy)}, Brier ${calibration.allCalibrated.brier.toFixed(4)}, ECE ${calibration.allCalibrated.expectedCalibrationError.toFixed(4)}.`,
+  );
   lines.push("");
   lines.push(`**${gate.promoted ? "PROMOTE" : "NOT READY"}**`);
   lines.push("");
@@ -1208,22 +1292,42 @@ export function renderAdventureBenchmark(input: {
   lines.push("");
   lines.push("## Observations");
   lines.push("");
-  lines.push(`- **Coverage.** ${acted.length} of ${readouts.length} graded calls acted (${bands.act} act / ${bands.confirm} confirm / ${bands.fallback} fallback); the rest deferred. ${deferralsAcceptable} of ${deferrals.length} deferral(s) were in the acceptable set.`);
-  lines.push(`- **Decisive accuracy.** Among acted decisions, ${actedCorrect}/${acted.length} (${acted.length === 0 ? "n/a" : pct(actedCorrect / acted.length)}) were in the acceptable set and ${actedExact}/${acted.length} (${acted.length === 0 ? "n/a" : pct(actedExact / acted.length)}) matched the single preferred call.`);
+  lines.push(
+    `- **Coverage.** ${acted.length} of ${readouts.length} graded calls acted (${bands.act} act / ${bands.confirm} confirm / ${bands.fallback} fallback); the rest deferred. ${deferralsAcceptable} of ${deferrals.length} deferral(s) were in the acceptable set.`,
+  );
+  lines.push(
+    `- **Decisive accuracy.** Among acted decisions, ${actedCorrect}/${acted.length} (${acted.length === 0 ? "n/a" : pct(actedCorrect / acted.length)}) were in the acceptable set and ${actedExact}/${acted.length} (${acted.length === 0 ? "n/a" : pct(actedExact / acted.length)}) matched the single preferred call.`,
+  );
   if (namedDeferred.length > 0) {
-    lines.push(`- **Under-confidence.** ${namedReadouts.length} readout(s) named a candidate; ${namedDeferred.length} named one but deferred, with signals ${namedSignalRange}, and ${namedDeferredAcceptable.length} of those named picks were acceptable. The raw model is right but under the ${defaultThresholdText} bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays ${defaultThresholdText}.`);
+    lines.push(
+      `- **Under-confidence.** ${namedReadouts.length} readout(s) named a candidate; ${namedDeferred.length} named one but deferred, with signals ${namedSignalRange}, and ${namedDeferredAcceptable.length} of those named picks were acceptable. The raw model is right but under the ${defaultThresholdText} bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays ${defaultThresholdText}.`,
+    );
   } else {
-    lines.push(`- **Under-confidence.** No live call named a candidate and then deferred, so this run does not exercise the under-confidence path.`);
+    lines.push(
+      `- **Under-confidence.** No live call named a candidate and then deferred, so this run does not exercise the under-confidence path.`,
+    );
   }
   if (actedMisses.length === 0) {
     lines.push("- **Acted errors.** No acted decision fell outside its case's acceptable set.");
   } else {
-    lines.push(`- **Acted errors.** ${actedMisses.length} acted decision(s) fell outside the acceptable set: ${actedMisses.slice(0, 8).map((readout) => `\`${readout.id}\` (${readout.reason})`).join("; ")}${actedMisses.length > 8 ? "; …" : ""}.`);
+    lines.push(
+      `- **Acted errors.** ${actedMisses.length} acted decision(s) fell outside the acceptable set: ${actedMisses
+        .slice(0, 8)
+        .map((readout) => `\`${readout.id}\` (${readout.reason})`)
+        .join("; ")}${actedMisses.length > 8 ? "; …" : ""}.`,
+    );
   }
   if (actedAlternatives.length > 0) {
-    lines.push(`- **Acceptable alternatives.** ${actedAlternatives.length} acted decision(s) chose a defensible candidate that was not the single preferred call: ${actedAlternatives.slice(0, 8).map((readout) => `\`${readout.id}\` (${readout.selected})`).join(", ")}.`);
+    lines.push(
+      `- **Acceptable alternatives.** ${actedAlternatives.length} acted decision(s) chose a defensible candidate that was not the single preferred call: ${actedAlternatives
+        .slice(0, 8)
+        .map((readout) => `\`${readout.id}\` (${readout.selected})`)
+        .join(", ")}.`,
+    );
   }
-  lines.push(`- **Calibration.** Held-out calibrated Brier ${calibration.holdoutCalibrated.brier.toFixed(4)} and ECE ${calibration.holdoutCalibrated.expectedCalibrationError.toFixed(4)}; all-acted calibrated Brier ${calibration.allCalibrated.brier.toFixed(4)} and ECE ${calibration.allCalibrated.expectedCalibrationError.toFixed(4)}. ${acted.length === 0 ? "No acted decisions, so there is nothing to calibrate." : actedMisses.length === 0 ? "The acted subset has no observed errors, so the calibration tail is untested." : ""}`);
+  lines.push(
+    `- **Calibration.** Held-out calibrated Brier ${calibration.holdoutCalibrated.brier.toFixed(4)} and ECE ${calibration.holdoutCalibrated.expectedCalibrationError.toFixed(4)}; all-acted calibrated Brier ${calibration.allCalibrated.brier.toFixed(4)} and ECE ${calibration.allCalibrated.expectedCalibrationError.toFixed(4)}. ${acted.length === 0 ? "No acted decisions, so there is nothing to calibrate." : actedMisses.length === 0 ? "The acted subset has no observed errors, so the calibration tail is untested." : ""}`,
+  );
   lines.push("");
   lines.push("## Honesty notes");
   lines.push("");
@@ -1243,7 +1347,9 @@ export function renderAdventureBenchmark(input: {
   lines.push("- **Decision stability is repeatability, not accuracy**: a consistently deferred case is stable and");
   lines.push("  still a coverage miss. Harvested rows are live-derived labels and are flagged as such in the");
   lines.push("  corpus table so a reviewer can see the gate includes them.");
-  lines.push(`- The \`${PROMOTION_LANE}\` gate is the base lane gate (accuracy >= ${LANE_GATE.minAccuracy}, Brier/ECE <= ${LANE_GATE.maxBrier}). The verdict above is reported as measured, including any failures.`);
+  lines.push(
+    `- The \`${PROMOTION_LANE}\` gate is the base lane gate (accuracy >= ${LANE_GATE.minAccuracy}, Brier/ECE <= ${LANE_GATE.maxBrier}). The verdict above is reported as measured, including any failures.`,
+  );
   lines.push("- Only schema-valid calls produce compositions; transport failures are reported separately and");
   lines.push("  never counted as acted samples.");
   lines.push("");
@@ -1273,9 +1379,10 @@ function parseFlag(args: readonly string[], name: string): string | null {
  * gate runs must mirror the production request, and the vendor decorrelator is reserved for
  * dedicated stability probes (see the Decision stability section of the report).
  */
-export function adventureRequestState(
-  testCase: Pick<AdventureEvalCase, "declaration" | "candidates">,
-): { declaration: string; candidateCount: number } {
+export function adventureRequestState(testCase: Pick<AdventureEvalCase, "declaration" | "candidates">): {
+  declaration: string;
+  candidateCount: number;
+} {
   return { declaration: testCase.declaration, candidateCount: testCase.candidates.length };
 }
 
@@ -1288,7 +1395,8 @@ export function parseAdventureArgs(args: readonly string[]): { repeats: number; 
 
 export function parseAdventureVariant(args: readonly string[]): "legacy" | "shared-context" {
   const variant = parseFlag(args, "--payload") ?? (args.includes("--payload") ? "" : "legacy");
-  if (variant !== "legacy" && variant !== "shared-context") throw new Error("--payload must be legacy or shared-context");
+  if (variant !== "legacy" && variant !== "shared-context")
+    throw new Error("--payload must be legacy or shared-context");
   return variant;
 }
 
@@ -1298,7 +1406,10 @@ export function buildAdventureBenchmarkRequest(
 ) {
   return variant === "shared-context"
     ? buildAdventureSharedContextRequest(testCase.declaration, testCase.candidates)
-    : { state: adventureRequestState(testCase), questions: buildAdventureSelectionQuestions(testCase.declaration, testCase.candidates) };
+    : {
+        state: adventureRequestState(testCase),
+        questions: buildAdventureSelectionQuestions(testCase.declaration, testCase.candidates),
+      };
 }
 
 async function main(): Promise<void> {
@@ -1312,7 +1423,9 @@ async function main(): Promise<void> {
   const payloadVariant = parseAdventureVariant(args);
   const parsed = parseAdventureArgs(args);
   const repeats = parsed.repeats;
-  const out = parseFlag(args, "--out") ?? (payloadVariant === "legacy" ? parsed.out : "docs/system-one-adventure-shared-context-benchmark.md");
+  const out =
+    parseFlag(args, "--out") ??
+    (payloadVariant === "legacy" ? parsed.out : "docs/system-one-adventure-shared-context-benchmark.md");
   const outPath = path.resolve(ROOT, out);
   const settings = { ...defaultSystemOneSettings(), apiKey: key };
   const thresholds = settings.confidencePolicy[PROMOTION_LANE];
@@ -1336,8 +1449,12 @@ async function main(): Promise<void> {
   const readouts: AdventureReadout[] = [];
   const failures: AdventureBenchmarkFailure[] = [];
   let model = settings.model;
-  console.log(`evaluating ${cases.length} adventure declarations (${harvest.cases.length} harvested: ${harvest.humanCases} human-confirmed, ${harvest.agentCases} agent-reviewed) x ${repeats} repeats against ${settings.model}`);
-  console.log(`harvested cases: ${harvest.cases.length} (${harvest.humanCases} human-confirmed gated, ${harvest.agentCases} agent-reviewed not gated)${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`);
+  console.log(
+    `evaluating ${cases.length} adventure declarations (${harvest.cases.length} harvested: ${harvest.humanCases} human-confirmed, ${harvest.agentCases} agent-reviewed) x ${repeats} repeats against ${settings.model}`,
+  );
+  console.log(
+    `harvested cases: ${harvest.cases.length} (${harvest.humanCases} human-confirmed gated, ${harvest.agentCases} agent-reviewed not gated)${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`,
+  );
 
   for (const testCase of cases) {
     const { questions, state } = buildAdventureBenchmarkRequest(testCase, payloadVariant);
@@ -1348,8 +1465,13 @@ async function main(): Promise<void> {
 
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
       const finishEvidence = beginAdventureEvidence({
-        settings, caseId: testCase.id, repeat, state, questions,
-        candidates: testCase.candidates, corpus: cases,
+        settings,
+        caseId: testCase.id,
+        repeat,
+        state,
+        questions,
+        candidates: testCase.candidates,
+        corpus: cases,
         ...(payloadVariant === "shared-context" ? { payloadVersions: ADVENTURE_SHARED_CONTEXT_VERSIONS } : {}),
       });
       try {
@@ -1359,11 +1481,14 @@ async function main(): Promise<void> {
           questions,
         });
         model = result.model.responseModel ?? model;
-        readouts.push({ ...gradeAdventureCase(
-          testCase,
-          composeAdventureSelection(testCase.candidates, result.answers, thresholds),
-          result.answers,
-        ), evidence: finishEvidence(result.model.responseModel) });
+        readouts.push({
+          ...gradeAdventureCase(
+            testCase,
+            composeAdventureSelection(testCase.candidates, result.answers, thresholds),
+            result.answers,
+          ),
+          evidence: finishEvidence(result.model.responseModel),
+        });
       } catch (error) {
         failures.push({ id: testCase.id, repeat, error: error instanceof Error ? error.message : "error" });
       }
@@ -1398,41 +1523,65 @@ async function main(): Promise<void> {
     cases,
     harvest: harvestReport,
   });
-  await writeFile(outPath, `> Payload variant: ${payloadVariant}. Reproduce with --payload ${payloadVariant}. Shared-context is experimental and does not mirror the production question/state payload.\n\n${report}\n> Binding scope: curated benchmark candidates, not production shortlist coverage. Per-call request-time bindings and input hashes are in the JSON readouts. Metrics-only proposed records do not authorize execution; fitted calibration and swept thresholds are not evaluated runtime bindings.\n`, "utf8");
-  await writeFile(outPath.replace(/\.md$/, ".json"), `${JSON.stringify({
-    model,
-    payloadVariant,
-    baseUrl: settings.baseUrl,
-    repeats,
-    thresholds,
-    corpus: cases,
-    samples: cases.length * repeats,
-    harvestedCases: harvest.cases.length,
-    harvestedHumanCases: harvest.humanCases,
-    agentHarvestedCases: harvest.agentCases,
-    agentHarvested: {
-      ...agentSummary,
-      note: "agent-reviewed harvested cases are scored and reported but excluded from the calibration fit, the dev/holdout split, the threshold sweep, the promotion gate, and the proposed record",
-    },
-    harvest: harvestReport,
-    failures,
-    readouts,
-    stability,
-    calibration: evaluation.calibration,
-    gate: evaluation.gate,
-    sweep: evaluation.sweep,
-    proposedRecord: evaluation.proposedRecord,
-  }, null, 2)}\n`, "utf8");
+  await writeFile(
+    outPath,
+    `> Payload variant: ${payloadVariant}. Reproduce with --payload ${payloadVariant}. Shared-context is experimental and does not mirror the production question/state payload.\n\n${report}\n> Binding scope: curated benchmark candidates, not production shortlist coverage. Per-call request-time bindings and input hashes are in the JSON readouts. Metrics-only proposed records do not authorize execution; fitted calibration and swept thresholds are not evaluated runtime bindings.\n`,
+    "utf8",
+  );
+  await writeFile(
+    outPath.replace(/\.md$/, ".json"),
+    `${JSON.stringify(
+      {
+        model,
+        payloadVariant,
+        baseUrl: settings.baseUrl,
+        repeats,
+        thresholds,
+        corpus: cases,
+        samples: cases.length * repeats,
+        harvestedCases: harvest.cases.length,
+        harvestedHumanCases: harvest.humanCases,
+        agentHarvestedCases: harvest.agentCases,
+        agentHarvested: {
+          ...agentSummary,
+          note: "agent-reviewed harvested cases are scored and reported but excluded from the calibration fit, the dev/holdout split, the threshold sweep, the promotion gate, and the proposed record",
+        },
+        harvest: harvestReport,
+        failures,
+        readouts,
+        stability,
+        calibration: evaluation.calibration,
+        gate: evaluation.gate,
+        sweep: evaluation.sweep,
+        proposedRecord: evaluation.proposedRecord,
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 
   const recommended = evaluation.sweep.recommendedVerdict;
-  console.log(`acted at default ${evaluation.sweep.defaultVerdict.threshold}: ${evaluation.calibration.allCalibrated.samples}, accuracy ${pct(evaluation.calibration.allCalibrated.accuracy)}`);
+  console.log(
+    `acted at default ${evaluation.sweep.defaultVerdict.threshold}: ${evaluation.calibration.allCalibrated.samples}, accuracy ${pct(evaluation.calibration.allCalibrated.accuracy)}`,
+  );
   console.log(`sweep recommended threshold: ${recommended ? recommended.threshold.toFixed(2) : "none"}`);
-  console.log(`gate default: ${evaluation.gate.promoted ? "PROMOTE" : "NOT READY"}${evaluation.gate.reasons.length ? ` (${evaluation.gate.reasons.join("; ")})` : ""}`);
-  console.log(`gate recommended: ${recommended ? `${recommended.gate.promoted ? "PROMOTE" : "NOT READY"}${recommended.gate.reasons.length ? ` (${recommended.gate.reasons.join("; ")})` : ""}` : "n/a"}`);
-  console.log(`brier: default ${evaluation.calibration.allCalibrated.brier.toFixed(4)}${recommended ? ` -> recommended ${recommended.calibration.allCalibrated.brier.toFixed(4)}` : ""}`);
-  console.log(`stability: mean agreement ${pct(stability.meanAgreement)}, ${stability.conflictCases}/${stability.cases.length} conflicted case(s)`);
+  console.log(
+    `gate default: ${evaluation.gate.promoted ? "PROMOTE" : "NOT READY"}${evaluation.gate.reasons.length ? ` (${evaluation.gate.reasons.join("; ")})` : ""}`,
+  );
+  console.log(
+    `gate recommended: ${recommended ? `${recommended.gate.promoted ? "PROMOTE" : "NOT READY"}${recommended.gate.reasons.length ? ` (${recommended.gate.reasons.join("; ")})` : ""}` : "n/a"}`,
+  );
+  console.log(
+    `brier: default ${evaluation.calibration.allCalibrated.brier.toFixed(4)}${recommended ? ` -> recommended ${recommended.calibration.allCalibrated.brier.toFixed(4)}` : ""}`,
+  );
+  console.log(
+    `stability: mean agreement ${pct(stability.meanAgreement)}, ${stability.conflictCases}/${stability.cases.length} conflicted case(s)`,
+  );
   if (agentSummary.cases > 0) {
-    console.log(`agent-reviewed harvested (not gated): ${agentSummary.cases} case(s), ${agentSummary.calls} call(s), ${agentSummary.acted} acted, acted accuracy ${agentSummary.acted === 0 ? "n/a" : pct(agentSummary.actedAccuracy)}`);
+    console.log(
+      `agent-reviewed harvested (not gated): ${agentSummary.cases} case(s), ${agentSummary.calls} call(s), ${agentSummary.acted} acted, acted accuracy ${agentSummary.acted === 0 ? "n/a" : pct(agentSummary.actedAccuracy)}`,
+    );
   }
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }

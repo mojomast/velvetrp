@@ -49,7 +49,13 @@ function featureDescription(level: number) {
 }
 
 function unsupportedLevel(refs: StarterReferences, level: number) {
-  const base = buildUnsupportedClassLevel(refs.barbarian, levelReference(refs, level), "Barbarian", level, BARBARIAN_HIT_DIE);
+  const base = buildUnsupportedClassLevel(
+    refs.barbarian,
+    levelReference(refs, level),
+    "Barbarian",
+    level,
+    BARBARIAN_HIT_DIE,
+  );
   return {
     ...base,
     description: featureDescription(level),
@@ -61,9 +67,15 @@ export function barbarianDefinition(refs: StarterReferences) {
   return {
     reference: refs.barbarian,
     name: "Barbarian",
-    description: "Bounded SRD 5.1 Barbarian progression covers levels 1-20 as metadata; rage, Unarmored Defense, and the Path of the Berserker execution remain unsupported at runtime.",
+    description:
+      "Bounded SRD 5.1 Barbarian progression covers levels 1-20 as metadata; rage, Unarmored Defense, and the Path of the Berserker execution remain unsupported at runtime.",
     tags: ["srd-5.1", "barbarian", UNSUPPORTED_TAG],
-    mechanics: { hitDie: BARBARIAN_HIT_DIE, primaryAttribute: "strength", savingAttributes: ["strength", "constitution"], levelRefs: BARBARIAN_LEVEL_NUMBERS.map((level) => levelReference(refs, level)) },
+    mechanics: {
+      hitDie: BARBARIAN_HIT_DIE,
+      primaryAttribute: "strength",
+      savingAttributes: ["strength", "constitution"],
+      levelRefs: BARBARIAN_LEVEL_NUMBERS.map((level) => levelReference(refs, level)),
+    },
   };
 }
 
@@ -71,19 +83,47 @@ export function barbarianLevels(refs: StarterReferences) {
   const berserker = pathOfTheBerserkerRef(refs);
   const levelThree = unsupportedLevel(refs, 3);
   return [
-    { reference: refs.barbarianOne, name: "Barbarian Level 1", description: featureDescription(1), tags: ["srd-5.1", UNSUPPORTED_TAG, "barbarian-1"], mechanics: { classRef: refs.barbarian, level: 1, proficiencyBonus: proficiencyBonusFor(1), hpGain: BARBARIAN_HIT_DIE, abilityRefs: [refs.rage], spellRefs: [], resourceGrants: [{ resourceId: "rage", maxIncrease: 2, currentIncrease: 2, recovery: "long-rest" }, { resourceId: "hit-dice-d12", maxIncrease: 1, currentIncrease: 1 }] } },
+    {
+      reference: refs.barbarianOne,
+      name: "Barbarian Level 1",
+      description: featureDescription(1),
+      tags: ["srd-5.1", UNSUPPORTED_TAG, "barbarian-1"],
+      mechanics: {
+        classRef: refs.barbarian,
+        level: 1,
+        proficiencyBonus: proficiencyBonusFor(1),
+        hpGain: BARBARIAN_HIT_DIE,
+        abilityRefs: [refs.rage],
+        spellRefs: [],
+        resourceGrants: [
+          { resourceId: "rage", maxIncrease: 2, currentIncrease: 2, recovery: "long-rest" },
+          { resourceId: "hit-dice-d12", maxIncrease: 1, currentIncrease: 1 },
+        ],
+      },
+    },
     unsupportedLevel(refs, 2),
-    { ...levelThree, mechanics: { ...levelThree.mechanics, progressionChoices: [{ choiceId: "barbarian-subclass", required: true, count: 1, kind: "subclass", options: [berserker] }] } },
+    {
+      ...levelThree,
+      mechanics: {
+        ...levelThree.mechanics,
+        progressionChoices: [
+          { choiceId: "barbarian-subclass", required: true, count: 1, kind: "subclass", options: [berserker] },
+        ],
+      },
+    },
     ...BARBARIAN_LEVEL_NUMBERS.slice(3).map((level) => unsupportedLevel(refs, level)),
   ];
 }
 
 export function barbarianSubclasses(refs: StarterReferences) {
-  return [{
-    reference: pathOfTheBerserkerRef(refs),
-    name: "Path of the Berserker",
-    description: "Bounded SRD 5.1 Path of the Berserker subclass metadata bound to the Barbarian class at level 3; its features remain unsupported at runtime.",
-    tags: ["srd-5.1", "subclass", "barbarian"],
-    mechanics: { classRef: refs.barbarian, level: 3, abilityRefs: [] },
-  }];
+  return [
+    {
+      reference: pathOfTheBerserkerRef(refs),
+      name: "Path of the Berserker",
+      description:
+        "Bounded SRD 5.1 Path of the Berserker subclass metadata bound to the Barbarian class at level 3; its features remain unsupported at runtime.",
+      tags: ["srd-5.1", "subclass", "barbarian"],
+      mechanics: { classRef: refs.barbarian, level: 3, abilityRefs: [] },
+    },
+  ];
 }

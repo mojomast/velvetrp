@@ -15,7 +15,9 @@ interface LoreRow {
 }
 
 function loreCharacterIds(db: DatabaseDriver.Database, loreId: string): string[] {
-  const rows = db.prepare("SELECT character_id FROM lore_characters WHERE lore_id = ? ORDER BY rowid ASC").all(loreId) as Array<{ character_id: string }>;
+  const rows = db
+    .prepare("SELECT character_id FROM lore_characters WHERE lore_id = ? ORDER BY rowid ASC")
+    .all(loreId) as Array<{ character_id: string }>;
   return rows.map((row) => row.character_id);
 }
 
@@ -41,13 +43,16 @@ function toLore(row: LoreRow, characterIds: string[] = row.character_id ? [row.c
 
 /** Keeps the legacy primary lore pointer coherent before character cascades remove associations. */
 export function repairLoreForCharacterDeletionSync(db: DatabaseDriver.Database, characterId: string): void {
-  db.prepare(`UPDATE lore SET character_id = (
+  db.prepare(
+    `UPDATE lore SET character_id = (
     SELECT lc.character_id FROM lore_characters lc WHERE lc.lore_id = lore.id AND lc.character_id <> ? LIMIT 1
   ) WHERE character_id = ? AND EXISTS (
     SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id AND lc.character_id <> ?
-  )`).run(characterId, characterId, characterId);
-  db.prepare("DELETE FROM lore WHERE character_id = ? AND NOT EXISTS (SELECT 1 FROM lore_characters WHERE lore_id = lore.id AND character_id <> ?)")
-    .run(characterId, characterId);
+  )`,
+  ).run(characterId, characterId, characterId);
+  db.prepare(
+    "DELETE FROM lore WHERE character_id = ? AND NOT EXISTS (SELECT 1 FROM lore_characters WHERE lore_id = lore.id AND character_id <> ?)",
+  ).run(characterId, characterId);
 }
 
 export function createLoreEntrySync(
@@ -60,7 +65,10 @@ export function createLoreEntrySync(
     id: dependencies.ids.nextId(),
     characterId: characterIds[0] ?? null,
     characterIds,
-    keys: input.keys.map((key) => key.trim()).filter((key) => key.length > 0).slice(0, 8),
+    keys: input.keys
+      .map((key) => key.trim())
+      .filter((key) => key.length > 0)
+      .slice(0, 8),
     content: input.content.trim().slice(0, 1200),
     enabled: input.enabled,
     insertionOrder: Number.isFinite(input.insertionOrder) ? input.insertionOrder : 100,
@@ -70,7 +78,15 @@ export function createLoreEntrySync(
     db.prepare(
       `INSERT INTO lore (id, character_id, keys, content, enabled, insertion_order, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(entry.id, entry.characterId, JSON.stringify(entry.keys), entry.content, entry.enabled ? 1 : 0, entry.insertionOrder, entry.createdAt);
+    ).run(
+      entry.id,
+      entry.characterId,
+      JSON.stringify(entry.keys),
+      entry.content,
+      entry.enabled ? 1 : 0,
+      entry.insertionOrder,
+      entry.createdAt,
+    );
     const insert = db.prepare("INSERT INTO lore_characters (lore_id, character_id) VALUES (?, ?)");
     entry.characterIds.forEach((id) => insert.run(entry.id, id));
   });
@@ -85,13 +101,21 @@ export async function listLoreEntries(characterId?: string | string[]): Promise<
   if (ids === null) {
     rows = db.prepare("SELECT * FROM lore ORDER BY insertion_order ASC, rowid ASC").all() as LoreRow[];
   } else if (ids.length === 0) {
-    rows = db.prepare("SELECT * FROM lore WHERE NOT EXISTS (SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id) ORDER BY insertion_order ASC, rowid ASC").all() as LoreRow[];
+    rows = db
+      .prepare(
+        "SELECT * FROM lore WHERE NOT EXISTS (SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id) ORDER BY insertion_order ASC, rowid ASC",
+      )
+      .all() as LoreRow[];
   } else {
     const placeholders = ids.map(() => "?").join(", ");
-    rows = db.prepare(`SELECT DISTINCT lore.* FROM lore WHERE
+    rows = db
+      .prepare(
+        `SELECT DISTINCT lore.* FROM lore WHERE
       NOT EXISTS (SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id)
       OR EXISTS (SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id AND lc.character_id IN (${placeholders}))
-      ORDER BY insertion_order ASC, rowid ASC`).all(...ids) as LoreRow[];
+      ORDER BY insertion_order ASC, rowid ASC`,
+      )
+      .all(...ids) as LoreRow[];
   }
   return rows.map((row) => toLore(row, loreCharacterIds(db, row.id)));
 }
@@ -111,12 +135,21 @@ export async function updateLoreEntry(id: string, input: NewLoreEntry): Promise<
   const existing = await getLoreEntry(id);
   if (!existing) return null;
   const ids = input.characterIds ?? (input.characterId ? [input.characterId] : []);
-  const keys = input.keys.map((key) => key.trim()).filter(Boolean).slice(0, 8);
+  const keys = input.keys
+    .map((key) => key.trim())
+    .filter(Boolean)
+    .slice(0, 8);
   const content = input.content.trim().slice(0, 1200);
   const run = db.transaction(() => {
-    db.prepare("UPDATE lore SET character_id = ?, keys = ?, content = ?, enabled = ?, insertion_order = ? WHERE id = ?").run(
-      ids[0] ?? null, JSON.stringify(keys), content, input.enabled ? 1 : 0,
-      Number.isFinite(input.insertionOrder) ? input.insertionOrder : 100, id,
+    db.prepare(
+      "UPDATE lore SET character_id = ?, keys = ?, content = ?, enabled = ?, insertion_order = ? WHERE id = ?",
+    ).run(
+      ids[0] ?? null,
+      JSON.stringify(keys),
+      content,
+      input.enabled ? 1 : 0,
+      Number.isFinite(input.insertionOrder) ? input.insertionOrder : 100,
+      id,
     );
     db.prepare("DELETE FROM lore_characters WHERE lore_id = ?").run(id);
     const insert = db.prepare("INSERT INTO lore_characters (lore_id, character_id) VALUES (?, ?)");

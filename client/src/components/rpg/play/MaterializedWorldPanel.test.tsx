@@ -23,11 +23,19 @@ const cast = {
   audience: "gm" as const,
   state: "running" as const,
   sessionRevision: 5,
-  presentCast: [{
-    npcId: "npc-mara", publicState: { name: "Mara" }, revision: 1, presentAt: at, updatedAt: at,
-    location: { locationId: "gate", label: "Old Gate" }, personaId: "persona-mara", principals: ["local-owner"],
-    privateState: { goals: "", gmNotes: "", merchantState: null },
-  }],
+  presentCast: [
+    {
+      npcId: "npc-mara",
+      publicState: { name: "Mara" },
+      revision: 1,
+      presentAt: at,
+      updatedAt: at,
+      location: { locationId: "gate", label: "Old Gate" },
+      personaId: "persona-mara",
+      principals: ["local-owner"],
+      privateState: { goals: "", gmNotes: "", merchantState: null },
+    },
+  ],
 };
 const association = { npcId: "npc-mara", vendorLabel: "Mara", shopId: "ff-shop-1", shopLabel: "Mara's wares" };
 const shop = {
@@ -37,27 +45,73 @@ const shop = {
 };
 const factions: CampaignFactionsHttpResponse = {
   factions: [
-    { factionId: "ff-faction-1", name: "Ashen Circle", publicState: { description: "A quiet order." },
-      privateState: { gmNotes: "secret", visibility: "public" }, createdAt: at },
-    { factionId: "ff-faction-gm", name: "Hidden Hand", publicState: { description: "Not public." },
-      privateState: { gmNotes: "secret", visibility: "gm" }, createdAt: at },
+    {
+      factionId: "ff-faction-1",
+      name: "Ashen Circle",
+      publicState: { description: "A quiet order." },
+      privateState: { gmNotes: "secret", visibility: "public" },
+      createdAt: at,
+    },
+    {
+      factionId: "ff-faction-gm",
+      name: "Hidden Hand",
+      publicState: { description: "Not public." },
+      privateState: { gmNotes: "secret", visibility: "gm" },
+      createdAt: at,
+    },
   ],
   standings: [],
   memberships: [],
   relations: [],
 };
 const quests: GmCampaignQuestsHttpResponse = {
-  quests: [{ questId: "ff-quest-1", campaignId: "campaign", storylineId: "story-1", title: "Dockside Work",
-    description: "Help the dockhands.", status: "offered", rewards: [], createdAt: at, updatedAt: at }],
-  objectives: [{ objectiveId: "obj-1", questId: "ff-quest-1", description: "Move the crates.", targetProgress: 3,
-    progress: 0, dependencyObjectiveIds: [], completedAt: null }],
+  quests: [
+    {
+      questId: "ff-quest-1",
+      campaignId: "campaign",
+      storylineId: "story-1",
+      title: "Dockside Work",
+      description: "Help the dockhands.",
+      status: "offered",
+      rewards: [],
+      createdAt: at,
+      updatedAt: at,
+    },
+  ],
+  objectives: [
+    {
+      objectiveId: "obj-1",
+      questId: "ff-quest-1",
+      description: "Move the crates.",
+      targetProgress: 3,
+      progress: 0,
+      dependencyObjectiveIds: [],
+      completedAt: null,
+    },
+  ],
   journal: [],
 };
 const planning: CampaignGeneratedPlanning = {
-  campaignId: "campaign", deliveryRevision: 0, encounters: [], questItems: [], monsterConcepts: [], deliverables: [],
-  lore: [{ artifactKey: "ff-rumor-hearsay-1", resourceId: "rumor-1", title: "Hearsay: the drowned bell",
-    visibility: "public", sourceDraftId: "draft-2", summary: "They say the bell tolls beneath the tide.",
-    details: [], locationIds: [], factionIds: [], storyNodeIds: [] }],
+  campaignId: "campaign",
+  deliveryRevision: 0,
+  encounters: [],
+  questItems: [],
+  monsterConcepts: [],
+  deliverables: [],
+  lore: [
+    {
+      artifactKey: "ff-rumor-hearsay-1",
+      resourceId: "rumor-1",
+      title: "Hearsay: the drowned bell",
+      visibility: "public",
+      sourceDraftId: "draft-2",
+      summary: "They say the bell tolls beneath the tide.",
+      details: [],
+      locationIds: [],
+      factionIds: [],
+      storyNodeIds: [],
+    },
+  ],
 };
 
 function apiMock(overrides: Partial<MaterializedWorldPanelApi> = {}): MaterializedWorldPanelApi {

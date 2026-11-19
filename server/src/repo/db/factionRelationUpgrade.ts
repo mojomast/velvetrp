@@ -1,6 +1,11 @@
 import type DatabaseDriver from "better-sqlite3";
 
-interface SchemaObject { type: string; name: string; tbl_name: string; sql: string }
+interface SchemaObject {
+  type: string;
+  name: string;
+  tbl_name: string;
+  sql: string;
+}
 
 /**
  * The exact narrative command/event CHECKs published before faction relations and
@@ -35,13 +40,18 @@ export function upgradeFactionRelationsSchema(
   const commandsTable = "world_narrative_commands_v32";
   const eventsTable = "world_narrative_events_v32";
   const relationsTable = "campaign_faction_relations_v32";
-  const predecessor = expected.filter((object) => object.name !== relationsTable).map((object) => {
-    if (object.type !== "table" || object.name === commandsTable) {
-      return object.name === commandsTable ? { ...object, sql: object.sql.replace(FACTION_COMMAND_KINDS_CHECK, FACTION_COMMAND_KINDS_PREDECESSOR_CHECK) } : object;
-    }
-    if (object.name === eventsTable) return { ...object, sql: object.sql.replace(FACTION_EVENT_KINDS_CHECK, FACTION_EVENT_KINDS_PREDECESSOR_CHECK) };
-    return object;
-  });
+  const predecessor = expected
+    .filter((object) => object.name !== relationsTable)
+    .map((object) => {
+      if (object.type !== "table" || object.name === commandsTable) {
+        return object.name === commandsTable
+          ? { ...object, sql: object.sql.replace(FACTION_COMMAND_KINDS_CHECK, FACTION_COMMAND_KINDS_PREDECESSOR_CHECK) }
+          : object;
+      }
+      if (object.name === eventsTable)
+        return { ...object, sql: object.sql.replace(FACTION_EVENT_KINDS_CHECK, FACTION_EVENT_KINDS_PREDECESSOR_CHECK) };
+      return object;
+    });
   if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
   if (db.inTransaction) throw new Error("faction membership and relation upgrade requires an independent transaction");
   const commandsDefinition = expected.find((object) => object.type === "table" && object.name === commandsTable)!;
@@ -65,7 +75,8 @@ export function upgradeFactionRelationsSchema(
         for (const object of objects) db.exec(object.sql);
       }
       db.exec(relationsDefinition.sql);
-      if (db.prepare("PRAGMA foreign_key_check").get()) throw new Error("faction membership and relation upgrade violates foreign keys");
+      if (db.prepare("PRAGMA foreign_key_check").get())
+        throw new Error("faction membership and relation upgrade violates foreign keys");
       validate();
     }).immediate();
     return true;

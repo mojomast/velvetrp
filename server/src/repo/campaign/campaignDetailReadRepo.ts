@@ -1,17 +1,10 @@
 // Part of db.ts refactor — see server/src/repo/db/schema.ts for migration order
 import { campaignDetailSchema } from "@velvet/contracts";
-import type {
-  CampaignAccess,
-  CampaignContentConfiguration,
-  CampaignDetail,
-} from "../../types.js";
+import type { CampaignAccess, CampaignContentConfiguration, CampaignDetail } from "../../types.js";
 
 interface CampaignDetailReadDependencies {
   getCampaign(actorPrincipalId: string, campaignId: string): CampaignAccess | null;
-  getCampaignContentConfiguration(
-    actorPrincipalId: string,
-    campaignId: string,
-  ): CampaignContentConfiguration | null;
+  getCampaignContentConfiguration(actorPrincipalId: string, campaignId: string): CampaignContentConfiguration | null;
 }
 
 export interface CampaignDetailReadRepository {
@@ -34,10 +27,10 @@ export function createCampaignDetailReadRepository(
         updatedAt: campaign.updatedAt,
         content: configuration
           ? {
-            status: "configured",
-            rulesProfileId: configuration.rulesProfileId,
-            contentPacks: configuration.contentPacks,
-          }
+              status: "configured",
+              rulesProfileId: configuration.rulesProfileId,
+              contentPacks: configuration.contentPacks,
+            }
           : { status: "unconfigured" },
       });
     },

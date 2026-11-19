@@ -13,12 +13,24 @@ import { evaluateDiceExpression } from "../dice.js";
 import { runM16Mutation, type M16Dependencies, type M16Result } from "./effectRepo.js";
 import { DND_5E_SKILL_ABILITIES, resolveCampaignRuleset, type AbilityId, type SkillId } from "../rulesets/index.js";
 
-export class CheckUnavailableError extends Error { readonly code = "CHECK_UNAVAILABLE"; }
-export class ActorCheckNotFoundError extends Error { readonly code = "ACTOR_CHECK_NOT_FOUND"; }
+export class CheckUnavailableError extends Error {
+  readonly code = "CHECK_UNAVAILABLE";
+}
+export class ActorCheckNotFoundError extends Error {
+  readonly code = "ACTOR_CHECK_NOT_FOUND";
+}
 
 const SUPPORTED_KEYS = new Set([
-  "might", "agility", "resolve", "insight", "presence", "craft",
-  "melee", "ranged", "spell", "defense",
+  "might",
+  "agility",
+  "resolve",
+  "insight",
+  "presence",
+  "craft",
+  "melee",
+  "ranged",
+  "spell",
+  "defense",
 ]);
 
 /** Deliberately closed: HTTP callers select a name, never a numeric DC. */
@@ -32,7 +44,11 @@ const DIFFICULTY_REFS = new Set(Object.keys(DIFFICULTY_CLASSES));
 
 export interface CheckRepository {
   resolveCheck(principal: string, command: CheckCommand): M16Result<{ resolution: CheckResolution }>;
-  resolveActorCheck(principal: string, actorId: string, input: ActorCheckCommandRequest): M16Result<{ resolution: CheckResolution }>;
+  resolveActorCheck(
+    principal: string,
+    actorId: string,
+    input: ActorCheckCommandRequest,
+  ): M16Result<{ resolution: CheckResolution }>;
 }
 
 export function createCheckRepository(
@@ -57,55 +73,90 @@ export function createCheckRepository(
       request,
       eventType: "check_resolved",
       build: (after, now, commandId) => {
-        const key = command.kind === "ability" || command.kind === "save"
-          ? command.abilityId
-          : command.kind === "skill"
-            ? command.skillId
-            : command.kind === "attack"
-              ? command.attackId
-              : command.skillId ?? "insight";
+        const key =
+          command.kind === "ability" || command.kind === "save"
+            ? command.abilityId
+            : command.kind === "skill"
+              ? command.skillId
+              : command.kind === "attack"
+                ? command.attackId
+                : (command.skillId ?? "insight");
         let binding: ReturnType<typeof resolveCampaignRuleset>;
-        try { binding = resolveCampaignRuleset(db, command.campaignId); }
-        catch { throw new CheckUnavailableError("campaign ruleset binding is unavailable"); }
+        try {
+          binding = resolveCampaignRuleset(db, command.campaignId);
+        } catch {
+          throw new CheckUnavailableError("campaign ruleset binding is unavailable");
+        }
         const srd = binding.rulesetId === "dnd-5e";
-        const normalizedKey = key.toLowerCase().split(/[.:_-]+/u).filter(Boolean).at(-1)!;
-        const srdAbility = command.kind === "skill" || command.kind === "opposed"
-          ? DND_5E_SKILL_ABILITIES[normalizedKey as SkillId]
-          : command.kind === "attack" ? "strength" : normalizedKey as AbilityId;
-        if ((!srd && !SUPPORTED_KEYS.has(key)) || (srd && !binding.module.descriptor.abilities.some(({ id }) => id === srdAbility))) {
+        const normalizedKey = key
+          .toLowerCase()
+          .split(/[.:_-]+/u)
+          .filter(Boolean)
+          .at(-1)!;
+        const srdAbility =
+          command.kind === "skill" || command.kind === "opposed"
+            ? DND_5E_SKILL_ABILITIES[normalizedKey as SkillId]
+            : command.kind === "attack"
+              ? "strength"
+              : (normalizedKey as AbilityId);
+        if (
+          (!srd && !SUPPORTED_KEYS.has(key)) ||
+          (srd && !binding.module.descriptor.abilities.some(({ id }) => id === srdAbility))
+        ) {
           throw new CheckUnavailableError("check selection is unavailable");
         }
 
-        const targetActorId = command.kind === "opposed"
-          ? command.opponentActorId
-          : command.kind === "attack" ? command.targetActorId : undefined;
+        const targetActorId =
+          command.kind === "opposed"
+            ? command.opponentActorId
+            : command.kind === "attack"
+              ? command.targetActorId
+              : undefined;
         if (targetActorId !== undefined) {
-          const target = db.prepare("SELECT campaign_id FROM campaign_actors WHERE id=?").get(targetActorId) as { campaign_id: string } | undefined;
+          const target = db.prepare("SELECT campaign_id FROM campaign_actors WHERE id=?").get(targetActorId) as
+            { campaign_id: string } | undefined;
           if (!target || target.campaign_id !== command.campaignId || targetActorId === command.actorId) {
             throw new CheckUnavailableError("check target is unavailable");
           }
         }
 
-        const sheet = db.prepare("SELECT sheet_id FROM campaign_actors WHERE campaign_id=? AND id=?")
+        const sheet = db
+          .prepare("SELECT sheet_id FROM campaign_actors WHERE campaign_id=? AND id=?")
           .get(command.campaignId, command.actorId) as { sheet_id: string } | undefined;
         if (!sheet) throw new ActorCheckNotFoundError("actor check state is unavailable");
         const attributeKey = srd ? srdAbility : key;
-        const attribute = db.prepare("SELECT value FROM rpg_character_attributes WHERE campaign_id=? AND sheet_id=? AND attribute_id=?")
+        const attribute = db
+          .prepare("SELECT value FROM rpg_character_attributes WHERE campaign_id=? AND sheet_id=? AND attribute_id=?")
           .get(command.campaignId, sheet.sheet_id, attributeKey) as { value: number } | undefined;
         if (!attribute) throw new CheckUnavailableError("check ability is unavailable");
-        const proficiencyCategory = command.kind === "save" ? "saving-throw"
-          : command.kind === "skill" || (command.kind === "opposed" && command.skillId !== undefined) ? "skill"
-            : command.kind === "attack" ? "weapon" : "none";
-        const proficient = Boolean(db.prepare("SELECT 1 FROM rpg_character_proficiencies WHERE campaign_id=? AND sheet_id=? AND category=? AND proficiency_id=?")
-          .get(command.campaignId, sheet.sheet_id, proficiencyCategory, key));
-        const effects = (db.prepare(`SELECT command.canonical_request_json
+        const proficiencyCategory =
+          command.kind === "save"
+            ? "saving-throw"
+            : command.kind === "skill" || (command.kind === "opposed" && command.skillId !== undefined)
+              ? "skill"
+              : command.kind === "attack"
+                ? "weapon"
+                : "none";
+        const proficient = Boolean(
+          db
+            .prepare(
+              "SELECT 1 FROM rpg_character_proficiencies WHERE campaign_id=? AND sheet_id=? AND category=? AND proficiency_id=?",
+            )
+            .get(command.campaignId, sheet.sheet_id, proficiencyCategory, key),
+        );
+        const effects = (
+          db
+            .prepare(
+              `SELECT command.canonical_request_json
           FROM rpg_active_effects_v26 effect
           JOIN rpg_m16_commands_v26 command ON command.campaign_id=effect.campaign_id
             AND command.actor_id=effect.actor_id AND command.command_id=effect.command_id
           WHERE effect.campaign_id=? AND effect.actor_id=? AND effect.status='active'
             AND (effect.duration_kind<>'rounds' OR effect.remaining_rounds>0)
-            AND (effect.duration_kind<>'until_timestamp' OR effect.expires_at>?)`)
-          .all(command.campaignId, command.actorId, now) as Array<{ canonical_request_json: string }>)
+            AND (effect.duration_kind<>'until_timestamp' OR effect.expires_at>?)`,
+            )
+            .all(command.campaignId, command.actorId, now) as Array<{ canonical_request_json: string }>
+        )
           .flatMap((row) => JSON.parse(row.canonical_request_json).effect.modifiers)
           .filter((modifier: { appliesToId: string }) => modifier.appliesToId === key || modifier.appliesToId === "all")
           .map((modifier: { kind: string; amount?: number; bonus?: number }) => ({
@@ -114,38 +165,82 @@ export function createCheckRepository(
           }));
         const advantage = effects.some((effect) => effect.modifierKind === "advantage");
         const roll = evaluateDiceExpression(advantage ? "1d20adv" : "1d20", deps.rng);
-        const flat = (srd ? binding.module.abilityModifier(attribute.value) : attribute.value)
-          + effects.filter((effect) => effect.modifierKind === "flat").reduce((sum, effect) => sum + effect.amount, 0);
-        const level = srd ? (db.prepare("SELECT COALESCE(sum(level),0) level FROM rpg_character_classes WHERE campaign_id=? AND sheet_id=?")
-          .get(command.campaignId, sheet.sheet_id) as { level: number }).level : 1;
+        const flat =
+          (srd ? binding.module.abilityModifier(attribute.value) : attribute.value) +
+          effects.filter((effect) => effect.modifierKind === "flat").reduce((sum, effect) => sum + effect.amount, 0);
+        const level = srd
+          ? (
+              db
+                .prepare(
+                  "SELECT COALESCE(sum(level),0) level FROM rpg_character_classes WHERE campaign_id=? AND sheet_id=?",
+                )
+                .get(command.campaignId, sheet.sheet_id) as { level: number }
+            ).level
+          : 1;
         const proficiency = proficient
-          ? binding.module.proficiencyBonus(level) + effects.filter((effect) => effect.modifierKind === "proficiency").reduce((sum, effect) => sum + effect.amount, 0)
+          ? binding.module.proficiencyBonus(level) +
+            effects
+              .filter((effect) => effect.modifierKind === "proficiency")
+              .reduce((sum, effect) => sum + effect.amount, 0)
           : 0;
         const terms: Array<Record<string, unknown>> = [
           { kind: "roll", roll },
           { kind: "flat", sourceId: null, value: flat },
         ];
         if (proficiency) terms.push({ kind: "proficiency", sourceId: key, value: proficiency });
-        const total = terms.reduce((sum, term) => sum + (term.kind === "roll" ? roll.total : term.value as number), 0);
-        const target = command.kind === "opposed"
-          ? { kind: "opposed_total" as const, actorId: command.opponentActorId, value: 14 }
-          : { kind: "difficulty_class" as const, value: difficultyRef === undefined ? (srd ? 15 : 10)
-            : srd ? { easy: 10, standard: 15, hard: 20, "very-hard": 25 }[difficultyRef] : DIFFICULTY_CLASSES[difficultyRef] };
+        const total = terms.reduce(
+          (sum, term) => sum + (term.kind === "roll" ? roll.total : (term.value as number)),
+          0,
+        );
+        const target =
+          command.kind === "opposed"
+            ? { kind: "opposed_total" as const, actorId: command.opponentActorId, value: 14 }
+            : {
+                kind: "difficulty_class" as const,
+                value:
+                  difficultyRef === undefined
+                    ? srd
+                      ? 15
+                      : 10
+                    : srd
+                      ? { easy: 10, standard: 15, hard: 20, "very-hard": 25 }[difficultyRef]
+                      : DIFFICULTY_CLASSES[difficultyRef],
+              };
         if (target.value === undefined) throw new CheckUnavailableError("check difficulty is unavailable");
-        const outcome = !srd && roll.terms.some((term) => term.kept && term.value === 20) ? "critical_success"
-          : !srd && roll.terms.some((term) => term.kept && term.value === 1) ? "critical_failure"
-            : total >= target.value ? "success" : "failure";
+        const outcome =
+          !srd && roll.terms.some((term) => term.kept && term.value === 20)
+            ? "critical_success"
+            : !srd && roll.terms.some((term) => term.kept && term.value === 1)
+              ? "critical_failure"
+              : total >= target.value
+                ? "success"
+                : "failure";
         const resolution = checkResolutionSchema.parse({ terms, total, target, outcome });
         return {
           result: { resolution },
-          persist: () => db.prepare(`INSERT INTO rpg_check_results_v26(
+          persist: () =>
+            db
+              .prepare(
+                `INSERT INTO rpg_check_results_v26(
             check_id,campaign_id,actor_id,command_id,resulting_revision,check_kind,check_key,
             target_actor_id,difficulty,dice_json,result_json,total,resolved_at
-          ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-            resourceIdSchema.parse(deps.ids.nextId()), command.campaignId, command.actorId, commandId, after,
-            command.kind, key, targetActorId ?? null, target.value, JSON.stringify([roll]),
-            JSON.stringify(resolution), total, now,
-          ),
+          ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              )
+              .run(
+                resourceIdSchema.parse(deps.ids.nextId()),
+                command.campaignId,
+                command.actorId,
+                commandId,
+                after,
+                command.kind,
+                key,
+                targetActorId ?? null,
+                target.value,
+                JSON.stringify([roll]),
+                JSON.stringify(resolution),
+                total,
+                now,
+              ),
         };
       },
     });
@@ -157,16 +252,18 @@ export function createCheckRepository(
     },
     resolveActorCheck(principal, actorIdInput, input) {
       const actorId = resourceIdSchema.parse(actorIdInput);
-      const suppliedDifficulty = input && typeof input === "object" && "difficultyRef" in input
-        ? (input as { difficultyRef?: unknown }).difficultyRef
-        : undefined;
+      const suppliedDifficulty =
+        input && typeof input === "object" && "difficultyRef" in input
+          ? (input as { difficultyRef?: unknown }).difficultyRef
+          : undefined;
       if (typeof suppliedDifficulty === "string" && !DIFFICULTY_REFS.has(suppliedDifficulty)) {
         throw new CheckUnavailableError("check difficulty is unavailable");
       }
       const intent = actorCheckCommandRequestSchema.parse(input);
       // campaign_actors.id is globally unique; campaign identity never crosses
       // the HTTP trust boundary.
-      const actor = db.prepare("SELECT campaign_id FROM campaign_actors WHERE id=?").get(actorId) as { campaign_id: string } | undefined;
+      const actor = db.prepare("SELECT campaign_id FROM campaign_actors WHERE id=?").get(actorId) as
+        { campaign_id: string } | undefined;
       if (!actor) throw new ActorCheckNotFoundError("actor check state is unavailable");
       const common = {
         campaignId: actor.campaign_id,
@@ -174,16 +271,31 @@ export function createCheckRepository(
         expectedRevision: intent.expectedRevision,
         idempotencyKey: intent.idempotencyKey,
       };
-      const command: CheckCommand = intent.kind === "ability"
-        ? { ...common, kind: "ability", abilityId: intent.skillOrAttribute }
-        : intent.kind === "skill"
-          ? { ...common, kind: "skill", skillId: intent.skillOrAttribute }
-          : intent.kind === "save"
-            ? { ...common, kind: "save", abilityId: intent.skillOrAttribute }
-            : intent.kind === "attack"
-              ? { ...common, kind: "attack", attackId: intent.skillOrAttribute, ...(intent.targetActorId ? { targetActorId: intent.targetActorId } : {}) }
-              : { ...common, kind: "opposed", opponentActorId: intent.targetActorId, skillId: intent.skillOrAttribute };
-      return resolve(principal, checkCommandSchema.parse(command), intent.kind === "opposed" ? undefined : intent.difficultyRef);
+      const command: CheckCommand =
+        intent.kind === "ability"
+          ? { ...common, kind: "ability", abilityId: intent.skillOrAttribute }
+          : intent.kind === "skill"
+            ? { ...common, kind: "skill", skillId: intent.skillOrAttribute }
+            : intent.kind === "save"
+              ? { ...common, kind: "save", abilityId: intent.skillOrAttribute }
+              : intent.kind === "attack"
+                ? {
+                    ...common,
+                    kind: "attack",
+                    attackId: intent.skillOrAttribute,
+                    ...(intent.targetActorId ? { targetActorId: intent.targetActorId } : {}),
+                  }
+                : {
+                    ...common,
+                    kind: "opposed",
+                    opponentActorId: intent.targetActorId,
+                    skillId: intent.skillOrAttribute,
+                  };
+      return resolve(
+        principal,
+        checkCommandSchema.parse(command),
+        intent.kind === "opposed" ? undefined : intent.difficultyRef,
+      );
     },
   };
 }

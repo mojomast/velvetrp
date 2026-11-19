@@ -111,7 +111,9 @@ describe("System One promotion gate", () => {
     expect(rerankingGate.maxBrier).toBeGreaterThan(gate.maxBrier);
     expect(rerankingGate.maxExpectedCalibrationError).toBeGreaterThan(gate.maxExpectedCalibrationError);
     expect(rerankingGate.minAccuracyLowerBound).toBe(0.75);
-    expect(rerankingGate.minAccuracyLowerBound!).toBeLessThan(DEFAULT_SYSTEM_ONE_LANE_GATES["director-selection"].minAccuracyLowerBound!);
+    expect(rerankingGate.minAccuracyLowerBound!).toBeLessThan(
+      DEFAULT_SYSTEM_ONE_LANE_GATES["director-selection"].minAccuracyLowerBound!,
+    );
     const result = evaluatePromotionGate("memory-reranking", {
       samples: 20,
       accuracy: 1,
@@ -154,17 +156,33 @@ describe("System One promotion gate", () => {
 
   it("throws RangeError for invalid metrics", () => {
     expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, samples: -1 })).toThrow(RangeError);
-    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, samples: Number.NaN })).toThrow(RangeError);
-    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, samples: Number.POSITIVE_INFINITY })).toThrow(RangeError);
-    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, accuracy: 1.01 })).toThrow(RangeError);
-    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, accuracy: -0.01 })).toThrow(RangeError);
-    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, brier: Number.NaN })).toThrow(RangeError);
-    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, expectedCalibrationError: 2 })).toThrow(RangeError);
+    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, samples: Number.NaN })).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      evaluatePromotionGate("director-selection", { ...passingMetrics, samples: Number.POSITIVE_INFINITY }),
+    ).toThrow(RangeError);
+    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, accuracy: 1.01 })).toThrow(
+      RangeError,
+    );
+    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, accuracy: -0.01 })).toThrow(
+      RangeError,
+    );
+    expect(() => evaluatePromotionGate("director-selection", { ...passingMetrics, brier: Number.NaN })).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      evaluatePromotionGate("director-selection", { ...passingMetrics, expectedCalibrationError: 2 }),
+    ).toThrow(RangeError);
   });
 
   it("throws RangeError for an invalid gate override", () => {
-    expect(() => evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minSamples: -1 })).toThrow(RangeError);
-    expect(() => evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minAccuracy: 1.5 })).toThrow(RangeError);
+    expect(() => evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minSamples: -1 })).toThrow(
+      RangeError,
+    );
+    expect(() => evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minAccuracy: 1.5 })).toThrow(
+      RangeError,
+    );
   });
 
   it("records measured promotions that still clear their own gate", () => {
@@ -180,10 +198,16 @@ describe("System One promotion gate", () => {
   it("retains legacy evidence but does not promote unbound configurations", () => {
     expect(promotionRecord("speaker-routing")).toMatchObject({ evidence: "docs/system-one-benchmark.md" });
     expect(promotionRecord("cost-router")).toMatchObject({ evidence: "docs/system-one-router-benchmark.md" });
-    expect(promotionRecord("narration-verification")).toMatchObject({ evidence: "docs/system-one-narration-benchmark.md" });
-    expect(promotionRecord("director-selection")).toMatchObject({ evidence: "docs/system-one-director-calibration.md" });
+    expect(promotionRecord("narration-verification")).toMatchObject({
+      evidence: "docs/system-one-narration-benchmark.md",
+    });
+    expect(promotionRecord("director-selection")).toMatchObject({
+      evidence: "docs/system-one-director-calibration.md",
+    });
     expect(promotionRecord("memory-reranking")).toMatchObject({ evidence: "docs/system-one-rerank-benchmark.md" });
-    expect(promotionRecord("adventure-selection")).toMatchObject({ evidence: "docs/system-one-adventure-benchmark.md" });
+    expect(promotionRecord("adventure-selection")).toMatchObject({
+      evidence: "docs/system-one-adventure-benchmark.md",
+    });
     expect(promotionRecord("guardrails")).toMatchObject({ evidence: "docs/system-one-guardrails-benchmark.md" });
     const promoted = SYSTEM_ONE_LANES.filter((lane) => isLanePromoted(lane));
     expect(promoted).toEqual([]);
@@ -367,9 +391,9 @@ describe("System One promotion gate v2 criteria", () => {
     expect(() =>
       evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minAccuracyLowerBound: 1.5 }),
     ).toThrow(RangeError);
-    expect(() =>
-      evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minActedRate: -0.1 }),
-    ).toThrow(RangeError);
+    expect(() => evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minActedRate: -0.1 })).toThrow(
+      RangeError,
+    );
     expect(() =>
       evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minHazardousAccuracy: Number.NaN }),
     ).toThrow(RangeError);

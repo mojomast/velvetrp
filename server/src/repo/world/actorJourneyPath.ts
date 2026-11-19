@@ -63,9 +63,13 @@ export function resolveActorJourneyPath(
   const positions: ActorTravelPosition[] = [];
   let originLocationId: string | null = null;
   for (const partyActorId of input.partyActorIds) {
-    const position = db.prepare(`SELECT location_id,state_revision FROM campaign_actor_locations_v28
-      WHERE campaign_id=? AND session_id=? AND actor_id=?`)
-      .get(input.campaignId, input.sessionId, partyActorId) as { location_id: string; state_revision: number } | undefined;
+    const position = db
+      .prepare(
+        `SELECT location_id,state_revision FROM campaign_actor_locations_v28
+      WHERE campaign_id=? AND session_id=? AND actor_id=?`,
+      )
+      .get(input.campaignId, input.sessionId, partyActorId) as
+      { location_id: string; state_revision: number } | undefined;
     if (!position) return null;
     if (originLocationId === null) originLocationId = position.location_id;
     else if (position.location_id !== originLocationId) return null;
@@ -75,9 +79,16 @@ export function resolveActorJourneyPath(
   const origin = originLocationId;
   if (input.targetLocationId === origin) return null;
 
-  const edges = db.prepare(`SELECT connection_id,from_location_id,to_location_id FROM campaign_location_connections_v28
-    WHERE campaign_id=? ORDER BY connection_id COLLATE BINARY LIMIT ?`)
-    .all(input.campaignId, MAX_ACTOR_JOURNEY_EDGES + 1) as Array<{ connection_id: string; from_location_id: string; to_location_id: string }>;
+  const edges = db
+    .prepare(
+      `SELECT connection_id,from_location_id,to_location_id FROM campaign_location_connections_v28
+    WHERE campaign_id=? ORDER BY connection_id COLLATE BINARY LIMIT ?`,
+    )
+    .all(input.campaignId, MAX_ACTOR_JOURNEY_EDGES + 1) as Array<{
+    connection_id: string;
+    from_location_id: string;
+    to_location_id: string;
+  }>;
   if (edges.length > MAX_ACTOR_JOURNEY_EDGES) return null;
 
   // Edge rows are already ordered by connection id, so every adjacency list is

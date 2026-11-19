@@ -11,7 +11,7 @@ const characterInput = (name = "Memory Keeper") => ({
   age: 30,
   archetype: "careful archivist",
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 });
 
 async function addCharacter(app: ReturnType<typeof buildApp>, name?: string) {
@@ -20,11 +20,7 @@ async function addCharacter(app: ReturnType<typeof buildApp>, name?: string) {
   return response.json() as { id: string };
 }
 
-async function addMemory(
-  app: ReturnType<typeof buildApp>,
-  characterId: string,
-  payload: Record<string, unknown>,
-) {
+async function addMemory(app: ReturnType<typeof buildApp>, characterId: string, payload: Record<string, unknown>) {
   return app.inject({ method: "POST", url: `/api/characters/${characterId}/memories`, payload });
 }
 
@@ -59,12 +55,14 @@ describe("memory management api compatibility", () => {
       userApproved: false,
     });
     expect(pending.statusCode).toBe(201);
-    expect(pending.json()).toEqual(memoryShape({
-      characterId: character.id,
-      kind: "preference",
-      content: "prefers the east window",
-      userApproved: false,
-    }));
+    expect(pending.json()).toEqual(
+      memoryShape({
+        characterId: character.id,
+        kind: "preference",
+        content: "prefers the east window",
+        userApproved: false,
+      }),
+    );
 
     const forgotten = await app.inject({ method: "DELETE", url: `/api/memories/${approved.json().id as string}` });
     expect(forgotten.statusCode).toBe(200);
@@ -74,11 +72,7 @@ describe("memory management api compatibility", () => {
     const listed = await app.inject({ method: "GET", url: `/api/characters/${character.id}/memories` });
     expect(listed.statusCode).toBe(200);
     expect(listed.json()).toEqual({
-      memories: [
-        event.json(),
-        pending.json(),
-        { ...approved.json(), forgottenAt: forgotten.json().forgottenAt },
-      ],
+      memories: [event.json(), pending.json(), { ...approved.json(), forgottenAt: forgotten.json().forgottenAt }],
     });
     await app.close();
   });
@@ -160,11 +154,13 @@ describe("memory management api compatibility", () => {
   it("preserves patch retention, immutable provenance, and unknown-only success", async () => {
     const app = buildApp();
     const character = await addCharacter(app);
-    const created = (await addMemory(app, character.id, {
-      content: "original",
-      kind: "preference",
-      userApproved: false,
-    })).json() as MemoryFact;
+    const created = (
+      await addMemory(app, character.id, {
+        content: "original",
+        kind: "preference",
+        userApproved: false,
+      })
+    ).json() as MemoryFact;
 
     const patched = await app.inject({
       method: "PATCH",

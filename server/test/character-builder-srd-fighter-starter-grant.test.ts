@@ -7,25 +7,19 @@ import {
   SRD_5_1_STARTER_IDENTITY,
   type CharacterBuilderAttributeScores,
 } from "@velvet/contracts";
-import {
-  createRepository,
-  MECHANICS_STARTER_CATALOG,
-  SRD_5_1_STARTER_CATALOG,
-} from "../src/repo/index.js";
+import { createRepository, MECHANICS_STARTER_CATALOG, SRD_5_1_STARTER_CATALOG } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
 const srdScores = Object.fromEntries(
-  SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((id, index) => [
+  SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((id, index) => [id, CHARACTER_BUILDER_STANDARD_ARRAY[index]]),
+) as CharacterBuilderAttributeScores;
+const velvetScores = Object.fromEntries(
+  ["might", "agility", "resolve", "insight", "presence", "craft"].map((id, index) => [
     id,
     CHARACTER_BUILDER_STANDARD_ARRAY[index],
   ]),
-) as CharacterBuilderAttributeScores;
-const velvetScores = Object.fromEntries(
-  ["might", "agility", "resolve", "insight", "presence", "craft"].map(
-    (id, index) => [id, CHARACTER_BUILDER_STANDARD_ARRAY[index]],
-  ),
 ) as CharacterBuilderAttributeScores;
 
 function finalizeSrd(
@@ -80,13 +74,7 @@ describe("SRD Fighter starter grant finalization", () => {
       idempotencyKey: "fighter-pins",
     });
 
-    const { draft, selected, finalized } = finalizeSrd(
-      repo,
-      campaign.id,
-      "Fighter",
-      "srd-5.1:class:fighter",
-      "kit",
-    );
+    const { draft, selected, finalized } = finalizeSrd(repo, campaign.id, "Fighter", "srd-5.1:class:fighter", "kit");
     const longsword = {
       kind: "item",
       packId: SRD_5_1_STARTER_IDENTITY.packId,
@@ -103,25 +91,44 @@ describe("SRD Fighter starter grant finalization", () => {
     ]);
     expect(selected.draft.startingGrants).toEqual(finalized.receipt.startingGrants);
     expect(finalized.draft.startingGrants).toEqual(finalized.receipt.startingGrants);
-    expect(repo.finalizeCharacterDraft("local-owner", draft.draft.id, {
-      expectedRevision: 1,
-      idempotencyKey: "Fighter-final",
-    })).toEqual(finalized);
-    expect(repo.getActorInventorySnapshot("local-owner", campaign.id, finalized.receipt.actorId))
-      .toMatchObject({ revision: 0, equipment: [], inventory: { items: expect.arrayContaining([
-        expect.objectContaining({ kind: "instanced", item: longsword }),
-      ]) } });
+    expect(
+      repo.finalizeCharacterDraft("local-owner", draft.draft.id, {
+        expectedRevision: 1,
+        idempotencyKey: "Fighter-final",
+      }),
+    ).toEqual(finalized);
+    expect(repo.getActorInventorySnapshot("local-owner", campaign.id, finalized.receipt.actorId)).toMatchObject({
+      revision: 0,
+      equipment: [],
+      inventory: { items: expect.arrayContaining([expect.objectContaining({ kind: "instanced", item: longsword })]) },
+    });
 
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
-    expect(db.prepare(`SELECT position,source,pack_id,pack_version,definition_id FROM character_starting_grants_v19
-      WHERE draft_id=? ORDER BY position`).all(draft.draft.id)).toEqual([
+    expect(
+      db
+        .prepare(
+          `SELECT position,source,pack_id,pack_version,definition_id FROM character_starting_grants_v19
+      WHERE draft_id=? ORDER BY position`,
+        )
+        .all(draft.draft.id),
+    ).toEqual([
       expect.objectContaining({ position: 0, source: "background-kit" }),
-      { position: 1, source: "class-starter-kit", pack_id: longsword.packId,
-        pack_version: longsword.packVersion, definition_id: longsword.definitionId },
+      {
+        position: 1,
+        source: "class-starter-kit",
+        pack_id: longsword.packId,
+        pack_version: longsword.packVersion,
+        definition_id: longsword.definitionId,
+      },
     ]);
-    expect(db.prepare(`SELECT entry_mode,quantity,equipped FROM rpg_inventory_entries_v25
-      WHERE actor_id=? AND item_definition_id=?`).all(finalized.receipt.actorId, longsword.definitionId))
-      .toEqual([{ entry_mode: "instanced", quantity: 1, equipped: 0 }]);
+    expect(
+      db
+        .prepare(
+          `SELECT entry_mode,quantity,equipped FROM rpg_inventory_entries_v25
+      WHERE actor_id=? AND item_definition_id=?`,
+        )
+        .all(finalized.receipt.actorId, longsword.definitionId),
+    ).toEqual([{ entry_mode: "instanced", quantity: 1, equipped: 0 }]);
     db.close();
     repo.close();
   });
@@ -136,9 +143,7 @@ describe("SRD Fighter starter grant finalization", () => {
     });
     const barbarian = finalizeSrd(repo, srdCampaign.id, "Barbarian", "srd-5.1:class:barbarian", "kit");
     const currency = finalizeSrd(repo, srdCampaign.id, "Currency-Fighter", "srd-5.1:class:fighter", "currency");
-    expect(barbarian.finalized.receipt.startingGrants).toEqual([
-      expect.objectContaining({ source: "background-kit" }),
-    ]);
+    expect(barbarian.finalized.receipt.startingGrants).toEqual([expect.objectContaining({ source: "background-kit" })]);
     expect(currency.finalized.receipt.startingGrants).toEqual([
       expect.objectContaining({ source: "background-currency" }),
     ]);
@@ -149,23 +154,37 @@ describe("SRD Fighter starter grant finalization", () => {
       expectedRevision: 0,
       idempotencyKey: "exclusion-velvet-pins",
     });
-    const persona = repo.createCharacter({ name: "Velvet", age: 30, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
+    const persona = repo.createCharacter({
+      name: "Velvet",
+      age: 30,
+      archetype: "Warden",
+      boundaries: "",
+      fictionalConfirmed: true,
+    });
     const draft = repo.createCharacterDraft("local-owner", velvetCampaign.id, {
-      personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable",
-      allocation: { method: "standard-array", scores: velvetScores }, idempotencyKey: "velvet-draft",
+      personaId: persona.id,
+      controllerPrincipalId: "local-owner",
+      durability: "durable",
+      allocation: { method: "standard-array", scores: velvetScores },
+      idempotencyKey: "velvet-draft",
     });
     const definitions = MECHANICS_STARTER_CATALOG.definitions;
     const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, {
-      expectedRevision: 0, idempotencyKey: "velvet-select", selections: {
+      expectedRevision: 0,
+      idempotencyKey: "velvet-select",
+      selections: {
         race: definitions.find((value) => value.reference.kind === "race")!.reference,
         background: definitions.find((value) => value.reference.kind === "background")!.reference,
         class: definitions.find((value) => value.reference.kind === "class")!.reference,
         starterGrant: "kit",
       },
     } as never);
-    expect(repo.finalizeCharacterDraft("local-owner", draft.draft.id, {
-      expectedRevision: selected.draft.revision, idempotencyKey: "velvet-final",
-    }).receipt.startingGrants).toEqual([expect.objectContaining({ source: "background-kit" })]);
+    expect(
+      repo.finalizeCharacterDraft("local-owner", draft.draft.id, {
+        expectedRevision: selected.draft.revision,
+        idempotencyKey: "velvet-final",
+      }).receipt.startingGrants,
+    ).toEqual([expect.objectContaining({ source: "background-kit" })]);
     repo.close();
   });
 });

@@ -1,5 +1,12 @@
 import type {
-  DamageRollResolution, EncumbranceInput, EncumbrancePlan, InitiativeEntry, InitiativeResult, MovementInput, MovementPlan, RulesetCapability,
+  DamageRollResolution,
+  EncumbranceInput,
+  EncumbrancePlan,
+  InitiativeEntry,
+  InitiativeResult,
+  MovementInput,
+  MovementPlan,
+  RulesetCapability,
 } from "../types.js";
 import { resolveDnd5eDamageRoll } from "./damage.js";
 import { dnd5eAbilityModifier } from "./d20.js";
@@ -20,7 +27,13 @@ export function resolveDnd5eInitiative(entries: readonly InitiativeEntry[]): rea
     const dexterityModifier = dnd5eAbilityModifier(entry.dexterityScore);
     const bonus = entry.bonus ?? 0;
     requireInteger(bonus, "initiative bonus");
-    return Object.freeze({ id: entry.id, roll: entry.roll, dexterityModifier, bonus, total: entry.roll + dexterityModifier + bonus });
+    return Object.freeze({
+      id: entry.id,
+      roll: entry.roll,
+      dexterityModifier,
+      bonus,
+      total: entry.roll + dexterityModifier + bonus,
+    });
   });
   results.sort((a, b) => b.total - a.total || b.dexterityModifier - a.dexterityModifier || a.id.localeCompare(b.id));
   return frozenList(results);
@@ -35,7 +48,8 @@ export function resolveDnd5eInitiative(entries: readonly InitiativeEntry[]): rea
 export function planDnd5eEncumbrance(input: EncumbranceInput): EncumbrancePlan {
   requireNonNegativeInteger(input.carriedWeight, "carried weight");
   requireInteger(input.strengthScore, "strength score");
-  if (input.strengthScore < 1 || input.strengthScore > 30) throw new RangeError("strength score must be between 1 and 30");
+  if (input.strengthScore < 1 || input.strengthScore > 30)
+    throw new RangeError("strength score must be between 1 and 30");
   const heavily = input.carriedWeight > input.strengthScore * 10;
   const encumbered = input.carriedWeight > input.strengthScore * 5;
   return Object.freeze({
@@ -57,7 +71,14 @@ export function planDnd5eMovement(input: MovementInput): MovementPlan {
   const cost = input.distance * (modeCost + extraCost);
   const budget = (specialSpeed ?? input.speed) * (input.dash ? 2 : 1);
   const reasons = cost > budget ? ["movement cost exceeds available speed"] : [];
-  return Object.freeze({ distance: input.distance, cost, budget, remaining: Math.max(0, budget - cost), legal: reasons.length === 0, reasons: frozenList(reasons) });
+  return Object.freeze({
+    distance: input.distance,
+    cost,
+    budget,
+    remaining: Math.max(0, budget - cost),
+    legal: reasons.length === 0,
+    reasons: frozenList(reasons),
+  });
 }
 
 /**
@@ -86,7 +107,8 @@ export type JumpPlan = Readonly<{
 
 function planDnd5eJump(kind: "long" | "high", input: JumpInput, jumpFeet: number): JumpPlan {
   requireInteger(input.strengthScore, "strength score");
-  if (input.strengthScore < 1 || input.strengthScore > 30) throw new RangeError("strength score must be between 1 and 30");
+  if (input.strengthScore < 1 || input.strengthScore > 30)
+    throw new RangeError("strength score must be between 1 and 30");
   const runUpFeet = input.runUpFeet ?? 0;
   requireNonNegativeInteger(runUpFeet, "run-up distance");
   requireNonNegativeInteger(input.speed, "speed");
@@ -95,7 +117,16 @@ function planDnd5eJump(kind: "long" | "high", input: JumpInput, jumpFeet: number
   const cost = distanceFeet;
   const budget = input.speed;
   const reasons = cost > budget ? ["jump distance exceeds available movement"] : [];
-  return Object.freeze({ kind, runUp, distanceFeet, cost, budget, remaining: Math.max(0, budget - cost), legal: reasons.length === 0, reasons: frozenList(reasons) });
+  return Object.freeze({
+    kind,
+    runUp,
+    distanceFeet,
+    cost,
+    budget,
+    remaining: Math.max(0, budget - cost),
+    legal: reasons.length === 0,
+    reasons: frozenList(reasons),
+  });
 }
 
 /** SRD 5.1 long jump: Strength score feet with a 10-foot run-up, half otherwise. */
@@ -188,7 +219,8 @@ export type SpecialMovementPlan = Readonly<{
  * spent like any other speed and hovering is metadata.
  */
 export function planDnd5eSpecialMovement(input: SpecialMovementInput): SpecialMovementPlan {
-  if (!DND_5E_SPECIAL_MOVEMENT_MODES.includes(input.mode)) throw new Error(`unknown special movement mode: ${input.mode}`);
+  if (!DND_5E_SPECIAL_MOVEMENT_MODES.includes(input.mode))
+    throw new Error(`unknown special movement mode: ${input.mode}`);
   requireNonNegativeInteger(input.distance, "distance");
   requireNonNegativeInteger(input.speed, "speed");
   if (input.flySpeed !== undefined) requireNonNegativeInteger(input.flySpeed, "fly speed");
@@ -197,7 +229,7 @@ export function planDnd5eSpecialMovement(input: SpecialMovementInput): SpecialMo
   const baseCostPerFoot = input.mode === "fly" ? 1 : 2;
   const costPerFoot = doublesTerrain && input.difficultTerrain ? baseCostPerFoot * 2 : baseCostPerFoot;
   const cost = input.distance * costPerFoot;
-  const budget = input.mode === "fly" ? input.flySpeed ?? input.speed : input.speed;
+  const budget = input.mode === "fly" ? (input.flySpeed ?? input.speed) : input.speed;
   const reasons = cost > budget ? ["movement cost exceeds available speed"] : [];
   return Object.freeze({
     mode: input.mode,

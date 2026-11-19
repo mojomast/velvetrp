@@ -65,22 +65,21 @@ function messageRowsForSession(db: DatabaseDriver.Database, sessionId: string): 
 }
 
 export async function getMessage(sessionId: string, messageId: string): Promise<Message | null> {
-  const row = getRepositoryDatabase().prepare("SELECT * FROM messages WHERE session_id = ? AND id = ?").get(sessionId, messageId) as
-    | MessageRow
-    | undefined;
+  const row = getRepositoryDatabase()
+    .prepare("SELECT * FROM messages WHERE session_id = ? AND id = ?")
+    .get(sessionId, messageId) as MessageRow | undefined;
   return row ? toMessage(row) : null;
 }
 
 export async function getActiveLeaf(sessionId: string): Promise<Message | null> {
   const db = getRepositoryDatabase();
   const session = db.prepare("SELECT active_leaf_id FROM sessions WHERE id = ?").get(sessionId) as
-    | { active_leaf_id: string | null }
-    | undefined;
+    { active_leaf_id: string | null } | undefined;
   if (!session) return null;
   if (session.active_leaf_id) {
-    const row = db.prepare("SELECT * FROM messages WHERE id = ? AND session_id = ?").get(session.active_leaf_id, sessionId) as
-      | MessageRow
-      | undefined;
+    const row = db
+      .prepare("SELECT * FROM messages WHERE id = ? AND session_id = ?")
+      .get(session.active_leaf_id, sessionId) as MessageRow | undefined;
     if (row) return toMessage(row);
   }
   const fallback = db
@@ -107,8 +106,7 @@ export async function listBranchMessages(sessionId: string, leafId: string): Pro
 export async function listMessages(sessionId: string): Promise<Message[]> {
   const db = getRepositoryDatabase();
   const session = db.prepare("SELECT active_leaf_id FROM sessions WHERE id = ?").get(sessionId) as
-    | { active_leaf_id: string | null }
-    | undefined;
+    { active_leaf_id: string | null } | undefined;
   if (session?.active_leaf_id) return listBranchMessages(sessionId, session.active_leaf_id);
   return messageRowsForSession(db, sessionId).map(toMessage);
 }
@@ -126,7 +124,9 @@ export async function listBranchChildren(sessionId: string, parentId: string | n
 
 export async function nextSwipeIndex(sessionId: string, swipeGroupId: string): Promise<number> {
   const row = getRepositoryDatabase()
-    .prepare("SELECT COALESCE(MAX(swipe_index), -1) AS maxIndex FROM messages WHERE session_id = ? AND swipe_group_id = ?")
+    .prepare(
+      "SELECT COALESCE(MAX(swipe_index), -1) AS maxIndex FROM messages WHERE session_id = ? AND swipe_group_id = ?",
+    )
     .get(sessionId, swipeGroupId) as { maxIndex: number };
   return row.maxIndex + 1;
 }
@@ -134,8 +134,7 @@ export async function nextSwipeIndex(sessionId: string, swipeGroupId: string): P
 export async function setActiveBranch(sessionId: string, leafId: string): Promise<Session | null> {
   const db = getRepositoryDatabase();
   const message = db.prepare("SELECT id FROM messages WHERE id = ? AND session_id = ?").get(leafId, sessionId) as
-    | { id: string }
-    | undefined;
+    { id: string } | undefined;
   if (!message) return null;
   db.prepare("UPDATE sessions SET active_leaf_id = ? WHERE id = ?").run(leafId, sessionId);
   return getSession(sessionId);
@@ -150,7 +149,9 @@ export async function addMessage(
   const db = getRepositoryDatabase();
   const status = opts.status ?? "final";
   const parentId = opts.parentId !== undefined ? opts.parentId : ((await getActiveLeaf(sessionId))?.id ?? null);
-  const maxSeq = db.prepare("SELECT COALESCE(MAX(seq), -1) AS maxSeq FROM messages WHERE session_id = ?").get(sessionId) as {
+  const maxSeq = db
+    .prepare("SELECT COALESCE(MAX(seq), -1) AS maxSeq FROM messages WHERE session_id = ?")
+    .get(sessionId) as {
     maxSeq: number;
   };
   const message: Message = {
@@ -170,7 +171,7 @@ export async function addMessage(
   if (!message.swipeGroupId) message.swipeGroupId = message.id;
   const run = db.transaction(() => {
     db.prepare(
-       `INSERT INTO messages (id, session_id, role, speaker_character_id, content, parent_id, swipe_group_id, swipe_index, seq, status,
+      `INSERT INTO messages (id, session_id, role, speaker_character_id, content, parent_id, swipe_group_id, swipe_index, seq, status,
           prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
@@ -193,13 +194,23 @@ export async function addMessage(
     );
     // The active leaf and usage event commit with the message so session and
     // message domains cannot expose a partially-applied turn.
-    if (status === "final") db.prepare("UPDATE sessions SET active_leaf_id = ? WHERE id = ?").run(message.id, sessionId);
+    if (status === "final")
+      db.prepare("UPDATE sessions SET active_leaf_id = ? WHERE id = ?").run(message.id, sessionId);
     if (message.usage) {
-      db.prepare(`INSERT INTO usage_events (id, session_id, source_message_id, kind, prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model, created_at)
-        VALUES (?, ?, ?, 'character_reply', ?, ?, ?, ?, ?, ?)`).run(
-          randomUUID(), sessionId, message.id, message.usage.promptTokens, message.usage.completionTokens,
-          message.usage.totalTokens, message.usage.source, message.usage.model, message.createdAt,
-        );
+      db.prepare(
+        `INSERT INTO usage_events (id, session_id, source_message_id, kind, prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model, created_at)
+        VALUES (?, ?, ?, 'character_reply', ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        randomUUID(),
+        sessionId,
+        message.id,
+        message.usage.promptTokens,
+        message.usage.completionTokens,
+        message.usage.totalTokens,
+        message.usage.source,
+        message.usage.model,
+        message.createdAt,
+      );
     }
   });
   run();
@@ -207,10 +218,21 @@ export async function addMessage(
 }
 
 export async function recordUsageEvent(sessionId: string, kind: string, usage: TokenUsage): Promise<void> {
-  getRepositoryDatabase().prepare(`INSERT INTO usage_events (id, session_id, source_message_id, kind, prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model, created_at)
-    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`).run(
-      randomUUID(), sessionId, clampText(kind, 80), usage.promptTokens, usage.completionTokens,
-      usage.totalTokens, usage.source, usage.model, now(),
+  getRepositoryDatabase()
+    .prepare(
+      `INSERT INTO usage_events (id, session_id, source_message_id, kind, prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model, created_at)
+    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      randomUUID(),
+      sessionId,
+      clampText(kind, 80),
+      usage.promptTokens,
+      usage.completionTokens,
+      usage.totalTokens,
+      usage.source,
+      usage.model,
+      now(),
     );
 }
 
@@ -229,7 +251,9 @@ export async function getUsageSummary(pricing: ProviderPricing): Promise<UsageSu
   // Adventure calls are already immutable and exactly-once in provider metadata.
   // Project them directly instead of creating a second ledger write that could
   // double count retries, recovery, or process restarts.
-  const rows = db.prepare(`SELECT session_id,kind,prompt_tokens,completion_tokens,total_tokens,usage_source,usage_model FROM (
+  const rows = db
+    .prepare(
+      `SELECT session_id,kind,prompt_tokens,completion_tokens,total_tokens,usage_source,usage_model FROM (
     SELECT session_id,kind,prompt_tokens,completion_tokens,total_tokens,usage_source,usage_model,created_at
       FROM usage_events
     UNION ALL
@@ -245,14 +269,24 @@ export async function getUsageSummary(pricing: ProviderPricing): Promise<UsageSu
     FROM provider_call_metadata metadata
     JOIN adventure_turns turn ON turn.campaign_id=metadata.campaign_id AND turn.id=metadata.turn_id
     WHERE metadata.phase<>'started' AND metadata.prompt_tokens IS NOT NULL AND metadata.completion_tokens IS NOT NULL
-  ) ORDER BY created_at`).all() as UsageEventRow[];
-  const titles = new Map((db.prepare("SELECT id, title FROM sessions").all() as Array<{ id: string; title: string }>).map((row) => [row.id, row.title]));
+  ) ORDER BY created_at`,
+    )
+    .all() as UsageEventRow[];
+  const titles = new Map(
+    (db.prepare("SELECT id, title FROM sessions").all() as Array<{ id: string; title: string }>).map((row) => [
+      row.id,
+      row.title,
+    ]),
+  );
   const cost = (promptTokens: number, completionTokens: number) =>
     pricing.promptPerMillion === null || pricing.completionPerMillion === null
       ? null
       : (promptTokens * pricing.promptPerMillion + completionTokens * pricing.completionPerMillion) / 1_000_000;
   const group = (key: (row: UsageEventRow) => string) => {
-    const groups = new Map<string, { calls: number; promptTokens: number; completionTokens: number; totalTokens: number }>();
+    const groups = new Map<
+      string,
+      { calls: number; promptTokens: number; completionTokens: number; totalTokens: number }
+    >();
     for (const row of rows) {
       const id = key(row);
       const value = groups.get(id) ?? { calls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 };
@@ -264,19 +298,37 @@ export async function getUsageSummary(pricing: ProviderPricing): Promise<UsageSu
     }
     return groups;
   };
-  const totals = rows.reduce((value, row) => ({
-    promptTokens: value.promptTokens + row.prompt_tokens,
-    completionTokens: value.completionTokens + row.completion_tokens,
-    totalTokens: value.totalTokens + row.total_tokens,
-  }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
-  const byKind = [...group((row) => row.kind)].map(([kind, value]) => ({ kind, ...value, estimatedCostUsd: cost(value.promptTokens, value.completionTokens) })).sort((a, b) => b.totalTokens - a.totalTokens);
-  const byModel = [...group((row) => row.usage_model)].map(([model, value]) => ({ model, ...value, estimatedCostUsd: cost(value.promptTokens, value.completionTokens) })).sort((a, b) => b.totalTokens - a.totalTokens);
-  const bySession = [...group((row) => row.session_id)].map(([sessionId, value]) => ({ sessionId, title: titles.get(sessionId) || "Deleted session", ...value, estimatedCostUsd: cost(value.promptTokens, value.completionTokens) })).sort((a, b) => b.totalTokens - a.totalTokens);
+  const totals = rows.reduce(
+    (value, row) => ({
+      promptTokens: value.promptTokens + row.prompt_tokens,
+      completionTokens: value.completionTokens + row.completion_tokens,
+      totalTokens: value.totalTokens + row.total_tokens,
+    }),
+    { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+  );
+  const byKind = [...group((row) => row.kind)]
+    .map(([kind, value]) => ({ kind, ...value, estimatedCostUsd: cost(value.promptTokens, value.completionTokens) }))
+    .sort((a, b) => b.totalTokens - a.totalTokens);
+  const byModel = [...group((row) => row.usage_model)]
+    .map(([model, value]) => ({ model, ...value, estimatedCostUsd: cost(value.promptTokens, value.completionTokens) }))
+    .sort((a, b) => b.totalTokens - a.totalTokens);
+  const bySession = [...group((row) => row.session_id)]
+    .map(([sessionId, value]) => ({
+      sessionId,
+      title: titles.get(sessionId) || "Deleted session",
+      ...value,
+      estimatedCostUsd: cost(value.promptTokens, value.completionTokens),
+    }))
+    .sort((a, b) => b.totalTokens - a.totalTokens);
   return {
     calls: rows.length,
     ...totals,
-    providerMeasuredTokens: rows.filter((row) => row.usage_source === "provider").reduce((sum, row) => sum + row.total_tokens, 0),
-    estimatedTokens: rows.filter((row) => row.usage_source !== "provider").reduce((sum, row) => sum + row.total_tokens, 0),
+    providerMeasuredTokens: rows
+      .filter((row) => row.usage_source === "provider")
+      .reduce((sum, row) => sum + row.total_tokens, 0),
+    estimatedTokens: rows
+      .filter((row) => row.usage_source !== "provider")
+      .reduce((sum, row) => sum + row.total_tokens, 0),
     estimatedCostUsd: cost(totals.promptTokens, totals.completionTokens),
     pricing,
     byKind,

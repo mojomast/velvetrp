@@ -7,18 +7,20 @@ const traitSchema = z.string().trim().max(MAX_PERSONA_PROFILE_TRAIT_LENGTH).defa
 const detailSchema = z.string().trim().max(MAX_PERSONA_PROFILE_DETAIL_LENGTH).default("");
 
 /** User-authored characterization data. It is never an instruction or privileged prompt layer. */
-export const personaProfileSchema = z.object({
-  goal: traitSchema,
-  ideal: traitSchema,
-  bond: traitSchema,
-  flaw: traitSchema,
-  history: detailSchema,
-  personality: detailSchema,
-  fears: detailSchema,
-  relationships: detailSchema,
-  appearance: detailSchema,
-  voice: detailSchema,
-}).strict();
+export const personaProfileSchema = z
+  .object({
+    goal: traitSchema,
+    ideal: traitSchema,
+    bond: traitSchema,
+    flaw: traitSchema,
+    history: detailSchema,
+    personality: detailSchema,
+    fears: detailSchema,
+    relationships: detailSchema,
+    appearance: detailSchema,
+    voice: detailSchema,
+  })
+  .strict();
 
 export type PersonaProfile = z.infer<typeof personaProfileSchema>;
 

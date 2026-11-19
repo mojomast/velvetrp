@@ -1,5 +1,9 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { characterDraftHttpMutationResultSchema, characterDraftHttpViewSchema, SRD_5_1_STARTER_IDENTITY } from "../../packages/contracts/src/index.js";
+import {
+  characterDraftHttpMutationResultSchema,
+  characterDraftHttpViewSchema,
+  SRD_5_1_STARTER_IDENTITY,
+} from "../../packages/contracts/src/index.js";
 
 async function openInlineBuilder(page: Page, request: APIRequestContext, name: string) {
   const response = await request.post("/api/rpg/v1/campaigns", { data: { name } });
@@ -20,18 +24,35 @@ async function openInlineBuilder(page: Page, request: APIRequestContext, name: s
 async function fillPersona(page: Page, name: string) {
   await page.getByRole("textbox", { name: "Persona name", exact: true }).fill(name);
   await page.getByRole("spinbutton", { name: "Age (18+)", exact: true }).fill("30");
-  await page.getByRole("textbox", { name: "Adventurer concept", exact: true }).fill("A coastal scout searching for a missing expedition");
+  await page
+    .getByRole("textbox", { name: "Adventurer concept", exact: true })
+    .fill("A coastal scout searching for a missing expedition");
   await page.getByRole("textbox", { name: "Adventuring goal", exact: true }).fill("Bring the lost expedition home");
-  await page.getByRole("textbox", { name: "Boundaries and hard limits", exact: true }).fill("No torture or body horror");
-  await page.getByRole("checkbox", { name: "This character is fictional, 18 or older, and not based on a real person.", exact: true }).check();
+  await page
+    .getByRole("textbox", { name: "Boundaries and hard limits", exact: true })
+    .fill("No torture or body horror");
+  await page
+    .getByRole("checkbox", {
+      name: "This character is fictional, 18 or older, and not based on a real person.",
+      exact: true,
+    })
+    .check();
 }
 
-async function verifyDraftPersona(page: Page, request: APIRequestContext, campaignId: string, personaId: string, width: number) {
+async function verifyDraftPersona(
+  page: Page,
+  request: APIRequestContext,
+  campaignId: string,
+  personaId: string,
+  width: number,
+) {
   await expect(page.getByRole("combobox", { name: "Persona", exact: true })).toHaveValue(personaId);
   await page.getByRole("button", { name: "Next: Rules choices", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Allocate attributes", exact: true })).toBeVisible();
   const path = `/api/rpg/v1/campaigns/${campaignId}/character-drafts`;
-  const saved = page.waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === "POST");
+  const saved = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === path && response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Create draft with this allocation", exact: true }).click();
   const response = await saved;
   expect(response.status(), await response.text()).toBe(201);
@@ -39,7 +60,11 @@ async function verifyDraftPersona(page: Page, request: APIRequestContext, campai
   expect(draft.personaId).toBe(personaId);
   const authoritative = await request.get(`${path}/${draft.id}`);
   expect(authoritative.status()).toBe(200);
-  expect(characterDraftHttpViewSchema.parse(await authoritative.json())).toMatchObject({ id: draft.id, campaignId, personaId });
+  expect(characterDraftHttpViewSchema.parse(await authoritative.json())).toMatchObject({
+    id: draft.id,
+    campaignId,
+    personaId,
+  });
   await expect(page.getByRole("heading", { name: "Required choices", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 }
@@ -66,7 +91,7 @@ for (const width of [1440, 390]) {
     await preparation.getByLabel("Hard limits, one per line", { exact: true }).fill("No torture");
     await preparation.getByRole("checkbox", { name: /I reviewed the complete agreement/ }).check();
     const commands: string[] = [];
-    await page.route(`**${path}/session-zero-safety-commands`, async route => {
+    await page.route(`**${path}/session-zero-safety-commands`, async (route) => {
       commands.push(route.request().postData()!);
       const response = await route.fetch();
       expect(response.status()).toBe(200);
@@ -81,7 +106,9 @@ for (const width of [1440, 390]) {
     await expect(preparation.getByText(/Server response confirmed/)).toBeVisible();
     expect(commands).toHaveLength(2);
     expect(commands[1]).toBe(commands[0]);
-    expect((await (await request.get(`${path}/administration-integrations`)).json()).safety.hardLimits).toContain("No torture");
+    expect((await (await request.get(`${path}/administration-integrations`)).json()).safety.hardLimits).toContain(
+      "No torture",
+    );
     await preparation.getByRole("button", { name: "Read current preparation", exact: true }).click();
     await preparation.getByRole("button", { name: "Next: review publication", exact: true }).click();
     await expect(preparation.getByRole("button", { name: "Publish campaign", exact: true })).toBeDisabled();
@@ -90,7 +117,15 @@ for (const width of [1440, 390]) {
     await expect(preparation.getByText(/Server response confirmed/)).toBeVisible();
     expect((await (await request.get(`${path}/administration`)).json()).campaign.status).toBe("published");
 
-    const personaResponse = await request.post("/api/characters", { data: { name: `Warden ${width}`, age: 30, archetype: "Coastal warden", boundaries: "Fictional test", fictionalConfirmed: true } });
+    const personaResponse = await request.post("/api/characters", {
+      data: {
+        name: `Warden ${width}`,
+        age: 30,
+        archetype: "Coastal warden",
+        boundaries: "Fictional test",
+        fictionalConfirmed: true,
+      },
+    });
     expect(personaResponse.status()).toBe(201);
     const persona = await personaResponse.json();
     expect((await request.post(`${path}/characters`, { data: { characterId: persona.id } })).status()).toBe(201);
@@ -102,7 +137,7 @@ for (const width of [1440, 390]) {
     const create = preparation.locator("details");
     await create.getByRole("checkbox", { name: "I confirm the selected room operation.", exact: true }).check();
     let roomCreations = 0;
-    await page.route("**/api/sessions", async route => {
+    await page.route("**/api/sessions", async (route) => {
       if (route.request().method() !== "POST") return route.continue();
       roomCreations += 1;
       const response = await route.fetch();
@@ -114,7 +149,9 @@ for (const width of [1440, 390]) {
     expect((await (await request.get(`${path}/rooms`)).json()).attached).toHaveLength(0);
     await preparation.getByRole("button", { name: "Read current preparation", exact: true }).click();
     await expect(preparation.getByRole("button", { name: `Attach Crossing ${width}`, exact: true })).toBeDisabled();
-    await preparation.getByRole("button", { name: "I reviewed current state; allow a new decision", exact: true }).click();
+    await preparation
+      .getByRole("button", { name: "I reviewed current state; allow a new decision", exact: true })
+      .click();
     const attachment = preparation.getByRole("group", { name: "Attach an existing room", exact: true });
     await attachment.getByRole("checkbox", { name: "I confirm the selected room operation.", exact: true }).check();
     await attachment.getByRole("button", { name: `Attach Crossing ${width}`, exact: true }).click();
@@ -130,28 +167,40 @@ for (const width of [1440, 390]) {
     await expect(page.getByTestId("campaign-overview")).toBeVisible();
   });
 
-  test(`inline persona creation selects the returned identity and progresses at ${width}px`, async ({ page, request }) => {
+  test(`inline persona creation selects the returned identity and progresses at ${width}px`, async ({
+    page,
+    request,
+  }) => {
     await page.setViewportSize({ width, height: 900 });
     const campaignId = await openInlineBuilder(page, request, `Inline persona success ${width}`);
     const name = `Inline scout ${width}`;
     const posts: string[] = [];
-    page.on("request", event => {
-      if (new URL(event.url()).pathname === "/api/characters" && event.method() === "POST") posts.push(event.postData()!);
+    page.on("request", (event) => {
+      if (new URL(event.url()).pathname === "/api/characters" && event.method() === "POST")
+        posts.push(event.postData()!);
     });
     await fillPersona(page, name);
     const age = page.getByRole("spinbutton", { name: "Age (18+)", exact: true });
     await age.fill("17");
     await page.getByRole("button", { name: "Create persona once", exact: true }).click();
-    expect(await age.evaluate(element => (element as HTMLInputElement).validity.rangeUnderflow)).toBe(true);
+    expect(await age.evaluate((element) => (element as HTMLInputElement).validity.rangeUnderflow)).toBe(true);
     expect(posts).toHaveLength(0);
     await expect(page.getByRole("button", { name: "Next: Rules choices", exact: true })).toBeDisabled();
     await age.fill("30");
-    const created = page.waitForResponse(response => new URL(response.url()).pathname === "/api/characters" && response.request().method() === "POST");
+    const created = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/characters" && response.request().method() === "POST",
+    );
     await page.getByRole("button", { name: "Create persona once", exact: true }).click();
     const response = await created;
     expect(response.status(), await response.text()).toBe(201);
     const persona = await response.json();
-    expect(persona).toMatchObject({ name, age: 30, fictionalConfirmed: true, boundaries: "No torture or body horror", profile: { goal: "Bring the lost expedition home" } });
+    expect(persona).toMatchObject({
+      name,
+      age: 30,
+      fictionalConfirmed: true,
+      boundaries: "No torture or body horror",
+      profile: { goal: "Bring the lost expedition home" },
+    });
     const listed = await request.get("/api/characters");
     expect(listed.status()).toBe(200);
     expect((await listed.json()).characters.filter((entry: { id: string }) => entry.id === persona.id)).toHaveLength(1);
@@ -160,13 +209,16 @@ for (const width of [1440, 390]) {
     expect(JSON.parse(posts[0]!)).toMatchObject({ name, age: 30, fictionalConfirmed: true });
   });
 
-  test(`lost inline persona receipt stays locked across remount and recovers by identity at ${width}px`, async ({ page, request }) => {
+  test(`lost inline persona receipt stays locked across remount and recovers by identity at ${width}px`, async ({
+    page,
+    request,
+  }) => {
     await page.setViewportSize({ width, height: 900 });
     const campaignId = await openInlineBuilder(page, request, `Inline persona recovery ${width}`);
     const name = `Recovered scout ${width}`;
     let posts = 0;
     let personaId = "";
-    await page.route("**/api/characters", async route => {
+    await page.route("**/api/characters", async (route) => {
       if (route.request().method() !== "POST") return route.continue();
       posts += 1;
       const response = await route.fetch();

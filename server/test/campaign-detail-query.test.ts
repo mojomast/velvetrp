@@ -20,7 +20,10 @@ function seedCampaign(configured: boolean): void {
   });
   repository.createCampaign("local-owner", { name: "Detail campaign" });
   if (configured) {
-    for (const [packId, packVersion] of [["pack-z", "2"], ["pack-a", "1.0.0"]] as const) {
+    for (const [packId, packVersion] of [
+      ["pack-z", "2"],
+      ["pack-a", "1.0.0"],
+    ] as const) {
       repository.installContentPack("local-owner", {
         packId,
         packVersion,
@@ -29,7 +32,13 @@ function seedCampaign(configured: boolean): void {
         description: "Complete detail test pack",
         tags: [],
         rulesProfile: { name: "Detail rules", description: "Rules for detail tests", tags: [] },
-        classes: [], races: [], backgrounds: [], items: [], spells: [], abilities: [], enemies: [],
+        classes: [],
+        races: [],
+        backgrounds: [],
+        items: [],
+        spells: [],
+        abilities: [],
+        enemies: [],
       });
     }
     repository.configureCampaignContent("local-owner", "campaign-detail", {
@@ -50,17 +59,27 @@ function seedDetailReaders(includeStaleOwner = false): void {
     db.exec("DROP INDEX idx_campaign_memberships_one_owner");
   }
   for (const role of ["gm", "player", "observer"] as const) {
-    db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)")
-      .run(`detail-${role}`, `Detail ${role}`);
-    db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-      VALUES ('campaign-detail', ?, ?, '2030-01-02T00:00:00.000Z')`).run(`detail-${role}`, role);
+    db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(
+      `detail-${role}`,
+      `Detail ${role}`,
+    );
+    db.prepare(
+      `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+      VALUES ('campaign-detail', ?, ?, '2030-01-02T00:00:00.000Z')`,
+    ).run(`detail-${role}`, role);
   }
   if (includeStaleOwner) {
-    db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES ('detail-stale-owner', 'Stale owner', 0)").run();
-    db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-      VALUES ('campaign-detail', 'detail-stale-owner', 'owner', '2030-01-02T00:00:00.000Z')`).run();
-    db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-      VALUES ('campaign-detail', 'detail-orphan-reader', 'gm', '2030-01-02T00:00:00.000Z')`).run();
+    db.prepare(
+      "INSERT INTO principals (id, display_name, is_local) VALUES ('detail-stale-owner', 'Stale owner', 0)",
+    ).run();
+    db.prepare(
+      `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+      VALUES ('campaign-detail', 'detail-stale-owner', 'owner', '2030-01-02T00:00:00.000Z')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+      VALUES ('campaign-detail', 'detail-orphan-reader', 'gm', '2030-01-02T00:00:00.000Z')`,
+    ).run();
   }
   db.close();
 }
@@ -128,14 +147,17 @@ describe("campaign detail aggregate query", () => {
     seedDetailReaders(true);
     const db = new DatabaseDriver(path.join(dataDir(), "velvet.sqlite"));
     db.pragma("ignore_check_constraints = ON");
-    db.prepare(`UPDATE campaign_memberships SET created_at = 'not-canonical'
-      WHERE campaign_id = 'campaign-detail' AND principal_id = 'local-owner'`).run();
+    db.prepare(
+      `UPDATE campaign_memberships SET created_at = 'not-canonical'
+      WHERE campaign_id = 'campaign-detail' AND principal_id = 'local-owner'`,
+    ).run();
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     for (const role of ["gm", "player", "observer"] as const) {
-      expect(() => repository.getCampaignDetail(`detail-${role}`, "campaign-detail"))
-        .toThrow("campaign owner authorization is malformed");
+      expect(() => repository.getCampaignDetail(`detail-${role}`, "campaign-detail")).toThrow(
+        "campaign owner authorization is malformed",
+      );
     }
     expect(repository.getCampaignDetail("missing-principal", "campaign-detail")).toBeNull();
     expect(repository.getCampaignDetail("detail-stale-owner", "campaign-detail")).toBeNull();
@@ -152,8 +174,9 @@ describe("campaign detail aggregate query", () => {
     db.close();
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
-    expect(() => repository.getCampaignDetail("local-owner", "campaign-detail"))
-      .toThrow("campaign content configuration is malformed");
+    expect(() => repository.getCampaignDetail("local-owner", "campaign-detail")).toThrow(
+      "campaign content configuration is malformed",
+    );
     expect(repository.getCampaignDetail("missing-principal", "campaign-detail")).toBeNull();
     repository.close();
   });
@@ -165,8 +188,9 @@ describe("campaign detail aggregate query", () => {
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     let expired: RepositoryUnitOfWork | undefined;
     try {
-      expect(repository.getCampaignDetail("local-owner", "campaign-detail")?.content)
-        .toEqual({ status: "unconfigured" });
+      expect(repository.getCampaignDetail("local-owner", "campaign-detail")?.content).toEqual({
+        status: "unconfigured",
+      });
       expect(transaction).toHaveBeenCalledOnce();
       expect(prepare).toHaveBeenCalledTimes(2);
 
@@ -179,8 +203,9 @@ describe("campaign detail aggregate query", () => {
       expect(inside?.id).toBe("campaign-detail");
       expect(transaction).toHaveBeenCalledOnce();
       expect(prepare).toHaveBeenCalledTimes(2);
-      expect(() => expired!.getCampaignDetail("local-owner", "campaign-detail"))
-        .toThrow("transaction unit of work is no longer active");
+      expect(() => expired!.getCampaignDetail("local-owner", "campaign-detail")).toThrow(
+        "transaction unit of work is no longer active",
+      );
     } finally {
       transaction.mockRestore();
       prepare.mockRestore();

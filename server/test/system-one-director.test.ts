@@ -21,13 +21,37 @@ const candidates: DirectorCandidateProjection[] = [
 ];
 
 const pacingCandidates: DirectorCandidateProjection[] = [
-  { candidateId: "dm-candidate:ambient", digest: "d".repeat(64), action: "ambient-beat", label: "A moment of quiet", pacing: true },
-  { candidateId: "dm-candidate:drift", digest: "e".repeat(64), action: "advance-time", label: "Let time drift", pacing: true },
-  { candidateId: "dm-candidate:market", digest: "f".repeat(64), action: "ambient-beat", label: "Market noise", pacing: true },
+  {
+    candidateId: "dm-candidate:ambient",
+    digest: "d".repeat(64),
+    action: "ambient-beat",
+    label: "A moment of quiet",
+    pacing: true,
+  },
+  {
+    candidateId: "dm-candidate:drift",
+    digest: "e".repeat(64),
+    action: "advance-time",
+    label: "Let time drift",
+    pacing: true,
+  },
+  {
+    candidateId: "dm-candidate:market",
+    digest: "f".repeat(64),
+    action: "ambient-beat",
+    label: "Market noise",
+    pacing: true,
+  },
 ];
 
 const noul = (value: number): SystemOneAnswer => ({ type: "noul", noul: value });
-const priority = (score: number): SystemOneAnswer => ({ type: "score", score, confidence: 0.8, legend: { 0: "low", 1: "medium", 2: "high" }, probabilities: { 0: 0.1, 1: 0.2, 2: 0.7 } });
+const priority = (score: number): SystemOneAnswer => ({
+  type: "score",
+  score,
+  confidence: 0.8,
+  legend: { 0: "low", 1: "medium", 2: "high" },
+  probabilities: { 0: 0.1, 1: 0.2, 2: 0.7 },
+});
 const progress = (id: string, value: number) => [`${DIRECTOR_PROGRESS_PREFIX}${id}`, noul(value)] as const;
 const transition = (id: string, value: number) => [`${DIRECTOR_TRANSITION_PREFIX}${id}`, noul(value)] as const;
 const prio = (id: string, score: number) => [`${DIRECTOR_PRIORITY_PREFIX}${id}`, priority(score)] as const;
@@ -46,11 +70,22 @@ describe("System One Director selector", () => {
       [DIRECTOR_HOLD_KEY]: noul(0.9),
       ...Object.fromEntries(candidates.map((candidate) => progress(candidate.candidateId, 0.2))),
     };
-    expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({ band: "act", method: "hold", hold: true, selections: [] });
+    expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({
+      band: "act",
+      method: "hold",
+      hold: true,
+      selections: [],
+    });
   });
 
   it("forces a hold when there are no advertised candidates", () => {
-    expect(composeDirectorSelection([], {}, thresholds)).toMatchObject({ band: "act", method: "hold", hold: true, selections: [], topSignal: 1 });
+    expect(composeDirectorSelection([], {}, thresholds)).toMatchObject({
+      band: "act",
+      method: "hold",
+      hold: true,
+      selections: [],
+      topSignal: 1,
+    });
   });
 
   it("orders grounded candidates by priority and caps the beat", () => {
@@ -65,7 +100,10 @@ describe("System One Director selector", () => {
     };
     const composed = composeDirectorSelection(candidates, answers, thresholds, 2);
     expect(composed).toMatchObject({ band: "act", method: "candidates", hold: false });
-    expect(composed.selections.map((selection) => selection.candidateId)).toEqual([candidates[1]!.candidateId, candidates[2]!.candidateId]);
+    expect(composed.selections.map((selection) => selection.candidateId)).toEqual([
+      candidates[1]!.candidateId,
+      candidates[2]!.candidateId,
+    ]);
     expect(composed.selections[0]).toEqual({ candidateId: candidates[1]!.candidateId, digest: candidates[1]!.digest });
   });
 
@@ -73,19 +111,41 @@ describe("System One Director selector", () => {
     const answers: Record<string, SystemOneAnswer> = {
       [DIRECTOR_HOLD_KEY]: noul(0.9),
       ...Object.fromEntries(candidates.map((candidate) => progress(candidate.candidateId, 0.2))),
-      [DIRECTOR_BEST_KEY]: { type: "choice", choice: candidates[0]!.candidateId, confidence: 0.9, probabilities: { [candidates[0]!.candidateId]: 0.9, [DIRECTOR_NONE]: 0.1 } },
+      [DIRECTOR_BEST_KEY]: {
+        type: "choice",
+        choice: candidates[0]!.candidateId,
+        confidence: 0.9,
+        probabilities: { [candidates[0]!.candidateId]: 0.9, [DIRECTOR_NONE]: 0.1 },
+      },
     };
-    expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({ band: "act", method: "hold", hold: true, selections: [] });
+    expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({
+      band: "act",
+      method: "hold",
+      hold: true,
+      selections: [],
+    });
   });
 
   it("rescues a single candidate from the best choice when none are grounded", () => {
     const answers: Record<string, SystemOneAnswer> = {
       [DIRECTOR_HOLD_KEY]: noul(0.3),
       ...Object.fromEntries([progress(candidates[0]!.candidateId, 0.3)]),
-      [DIRECTOR_BEST_KEY]: { type: "choice", choice: candidates[0]!.candidateId, confidence: 0.8, probabilities: { [candidates[0]!.candidateId]: 0.8, [candidates[1]!.candidateId]: 0.12, [candidates[2]!.candidateId]: 0.04, [DIRECTOR_NONE]: 0.04 } },
+      [DIRECTOR_BEST_KEY]: {
+        type: "choice",
+        choice: candidates[0]!.candidateId,
+        confidence: 0.8,
+        probabilities: {
+          [candidates[0]!.candidateId]: 0.8,
+          [candidates[1]!.candidateId]: 0.12,
+          [candidates[2]!.candidateId]: 0.04,
+          [DIRECTOR_NONE]: 0.04,
+        },
+      },
     };
     expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({
-      band: "act", method: "best-pick", selections: [{ candidateId: candidates[0]!.candidateId, digest: candidates[0]!.digest }],
+      band: "act",
+      method: "best-pick",
+      selections: [{ candidateId: candidates[0]!.candidateId, digest: candidates[0]!.digest }],
     });
   });
 
@@ -93,7 +153,12 @@ describe("System One Director selector", () => {
     const answers: Record<string, SystemOneAnswer> = {
       [DIRECTOR_HOLD_KEY]: noul(0.4),
       ...Object.fromEntries([progress(candidates[0]!.candidateId, 0.45)]),
-      [DIRECTOR_BEST_KEY]: { type: "choice", choice: DIRECTOR_NONE, confidence: 0.3, probabilities: { [DIRECTOR_NONE]: 0.6, [candidates[0]!.candidateId]: 0.4 } },
+      [DIRECTOR_BEST_KEY]: {
+        type: "choice",
+        choice: DIRECTOR_NONE,
+        confidence: 0.3,
+        probabilities: { [DIRECTOR_NONE]: 0.6, [candidates[0]!.candidateId]: 0.4 },
+      },
     };
     const composed = composeDirectorSelection(candidates, answers, thresholds);
     expect(composed).toMatchObject({ band: "fallback", method: "defer", selections: [] });
@@ -102,7 +167,9 @@ describe("System One Director selector", () => {
   it("emits a transition noul only for a pacing candidate", () => {
     const mixed = [candidates[0]!, pacingCandidates[0]!];
     const questions = buildDirectorQuestions(mixed);
-    expect(questions[`${DIRECTOR_TRANSITION_PREFIX}${pacingCandidates[0]!.candidateId}`]).toMatchObject({ type: "noul" });
+    expect(questions[`${DIRECTOR_TRANSITION_PREFIX}${pacingCandidates[0]!.candidateId}`]).toMatchObject({
+      type: "noul",
+    });
     expect(questions[`${DIRECTOR_TRANSITION_PREFIX}${candidates[0]!.candidateId}`]).toBeUndefined();
   });
 
@@ -114,7 +181,9 @@ describe("System One Director selector", () => {
     };
     const composed = composeDirectorSelection(pacingCandidates, answers, thresholds);
     expect(composed).toMatchObject({ band: "act", method: "transition", hold: false });
-    expect(composed.selections).toEqual([{ candidateId: pacingCandidates[0]!.candidateId, digest: pacingCandidates[0]!.digest }]);
+    expect(composed.selections).toEqual([
+      { candidateId: pacingCandidates[0]!.candidateId, digest: pacingCandidates[0]!.digest },
+    ]);
     expect(composed.topSignal).toBe(0.9);
   });
 
@@ -164,7 +233,10 @@ describe("System One Director selector", () => {
       ...Object.fromEntries([transition(pacingCandidates[0]!.candidateId, 0.9)]),
     };
     expect(composeDirectorSelection(pacingCandidates, answers, thresholds)).toMatchObject({
-      band: "act", method: "hold", hold: true, selections: [],
+      band: "act",
+      method: "hold",
+      hold: true,
+      selections: [],
     });
   });
 

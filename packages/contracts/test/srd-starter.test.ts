@@ -20,7 +20,8 @@ describe("SRD 5.1 starter identity", () => {
     expect(SRD_5_1_STARTER_IDENTITY.rulesProfileId).toBe(SRD_5_1_STARTER_RULES_PROFILE_ID);
     expect(Object.isFrozen(SRD_5_1_STARTER_IDENTITY)).toBe(true);
     expect(srdStarterIdentitySchema.parse(SRD_5_1_STARTER_IDENTITY)).toEqual(SRD_5_1_STARTER_IDENTITY);
-    expect(campaignMechanicsStarterSetupRequestSchema.parse({ starterId: SRD_5_1_STARTER_ID }))
-      .toEqual({ starterId: SRD_5_1_STARTER_ID });
+    expect(campaignMechanicsStarterSetupRequestSchema.parse({ starterId: SRD_5_1_STARTER_ID })).toEqual({
+      starterId: SRD_5_1_STARTER_ID,
+    });
   });
 });

@@ -4,28 +4,56 @@ import * as api from "../../../api";
 import { ApiError } from "../../../api";
 import { CampaignStartupAction } from "./CampaignStartupAction";
 
-vi.mock("../../../api", async importOriginal => ({ ...await importOriginal<typeof api>(), campaignStartup: vi.fn() }));
+vi.mock("../../../api", async (importOriginal) => ({
+  ...(await importOriginal<typeof api>()),
+  campaignStartup: vi.fn(),
+}));
 
 const summary: Awaited<ReturnType<typeof api.campaignStartup>> = {
-  campaignId: "campaign-one", sessionId: "room-one", dmMode: "ai", dmModeRevision: 1, published: [],
-  beat: { runId: "run-one", state: "completed" }, imagesEnqueued: [], blockers: [],
+  campaignId: "campaign-one",
+  sessionId: "room-one",
+  dmMode: "ai",
+  dmModeRevision: 1,
+  published: [],
+  beat: { runId: "run-one", state: "completed" },
+  imagesEnqueued: [],
+  blockers: [],
 };
 
-function renderAction(role: "owner" | "gm" | "player" | "observer" = "owner", unstarted = true, canAct = true, loaded = true) {
-  return render(<CampaignStartupAction campaignId="campaign-one" sessionId="room-one" role={role} canAct={canAct} unstarted={unstarted} loaded={loaded} />);
+function renderAction(
+  role: "owner" | "gm" | "player" | "observer" = "owner",
+  unstarted = true,
+  canAct = true,
+  loaded = true,
+) {
+  return render(
+    <CampaignStartupAction
+      campaignId="campaign-one"
+      sessionId="room-one"
+      role={role}
+      canAct={canAct}
+      unstarted={unstarted}
+      loaded={loaded}
+    />,
+  );
 }
 
-beforeEach(() => { vi.mocked(api.campaignStartup).mockResolvedValue(summary); });
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+beforeEach(() => {
+  vi.mocked(api.campaignStartup).mockResolvedValue(summary);
+});
+afterEach(() => {
+  cleanup();
+  vi.resetAllMocks();
+});
 
 describe("CampaignStartupAction", () => {
-  it.each(["player", "observer"] as const)("is hidden from %s principals", role => {
+  it.each(["player", "observer"] as const)("is hidden from %s principals", (role) => {
     renderAction(role);
     expect(screen.queryByRole("button", { name: "Start campaign" })).toBeNull();
     expect(api.campaignStartup).not.toHaveBeenCalled();
   });
 
-  it.each(["owner", "gm"] as const)("shows %s an enabled control and never fires on mount", role => {
+  it.each(["owner", "gm"] as const)("shows %s an enabled control and never fires on mount", (role) => {
     renderAction(role);
     const button = screen.getByRole("button", { name: "Start campaign" }) as HTMLButtonElement;
     expect(button.disabled).toBe(false);
@@ -57,8 +85,11 @@ describe("CampaignStartupAction", () => {
   });
 
   it("surfaces startup blockers through the status notice without breaking the view", async () => {
-    vi.mocked(api.campaignStartup).mockResolvedValue({ ...summary, beat: { runId: null, state: "blocked" },
-      blockers: ["story-public-rendering-required", "scene-resolution-requires-gm-binding-or-human-adjudication"] });
+    vi.mocked(api.campaignStartup).mockResolvedValue({
+      ...summary,
+      beat: { runId: null, state: "blocked" },
+      blockers: ["story-public-rendering-required", "scene-resolution-requires-gm-binding-or-human-adjudication"],
+    });
     renderAction("owner");
     fireEvent.click(screen.getByRole("button", { name: "Start campaign" }));
     await screen.findByText(/did not open the campaign/);

@@ -14,15 +14,7 @@
 import type DatabaseDriver from "better-sqlite3";
 
 /** Combat role tiers used by the resolver. */
-export type NpcCombatTier =
-  | "commoner"
-  | "guard"
-  | "scout"
-  | "soldier"
-  | "adventurer"
-  | "mage"
-  | "priest"
-  | "leader";
+export type NpcCombatTier = "commoner" | "guard" | "scout" | "soldier" | "adventurer" | "mage" | "priest" | "leader";
 
 /** One row of the ordered tier table. */
 export interface NpcTierTemplateEntry {
@@ -92,67 +84,365 @@ const keywords = (...values: string[]): readonly string[] => Object.freeze(value
  */
 export const NPC_TIER_KEYWORDS: Readonly<Record<NpcCombatTier, readonly string[]>> = Object.freeze({
   leader: keywords(
-    "king", "queen", "lord", "lady", "baron", "baroness", "duke", "duchess", "count", "countess",
-    "earl", "marquess", "emperor", "empress", "prince", "princess", "chief", "chieftain", "captain",
-    "commander", "general", "admiral", "colonel", "major", "marshal", "sheriff", "mayor", "elder",
-    "matriarch", "patriarch", "warlord", "warchief", "overlord", "sovereign", "regent", "steward",
-    "guildmaster", "headmaster", "taskmaster", "harbormaster", "boss", "leader", "noble",
-    "nobleman", "noblewoman", "aristocrat",
+    "king",
+    "queen",
+    "lord",
+    "lady",
+    "baron",
+    "baroness",
+    "duke",
+    "duchess",
+    "count",
+    "countess",
+    "earl",
+    "marquess",
+    "emperor",
+    "empress",
+    "prince",
+    "princess",
+    "chief",
+    "chieftain",
+    "captain",
+    "commander",
+    "general",
+    "admiral",
+    "colonel",
+    "major",
+    "marshal",
+    "sheriff",
+    "mayor",
+    "elder",
+    "matriarch",
+    "patriarch",
+    "warlord",
+    "warchief",
+    "overlord",
+    "sovereign",
+    "regent",
+    "steward",
+    "guildmaster",
+    "headmaster",
+    "taskmaster",
+    "harbormaster",
+    "boss",
+    "leader",
+    "noble",
+    "nobleman",
+    "noblewoman",
+    "aristocrat",
   ),
   mage: keywords(
-    "mage", "wizard", "sorcerer", "sorceress", "warlock", "witch", "enchanter", "enchantress",
-    "conjurer", "necromancer", "illusionist", "evoker", "abjurer", "diviner", "transmuter",
-    "arcanist", "magus", "spellcaster", "spellweaver", "archmage",
+    "mage",
+    "wizard",
+    "sorcerer",
+    "sorceress",
+    "warlock",
+    "witch",
+    "enchanter",
+    "enchantress",
+    "conjurer",
+    "necromancer",
+    "illusionist",
+    "evoker",
+    "abjurer",
+    "diviner",
+    "transmuter",
+    "arcanist",
+    "magus",
+    "spellcaster",
+    "spellweaver",
+    "archmage",
   ),
   priest: keywords(
-    "priest", "priestess", "acolyte", "cleric", "bishop", "archbishop", "abbot", "abbess", "monk",
-    "friar", "nun", "chaplain", "deacon", "vicar", "curate", "pastor", "reverend", "oracle", "seer",
-    "prophet", "prophetess", "missionary", "inquisitor", "druid", "shaman",
+    "priest",
+    "priestess",
+    "acolyte",
+    "cleric",
+    "bishop",
+    "archbishop",
+    "abbot",
+    "abbess",
+    "monk",
+    "friar",
+    "nun",
+    "chaplain",
+    "deacon",
+    "vicar",
+    "curate",
+    "pastor",
+    "reverend",
+    "oracle",
+    "seer",
+    "prophet",
+    "prophetess",
+    "missionary",
+    "inquisitor",
+    "druid",
+    "shaman",
   ),
   adventurer: keywords(
-    "knight", "veteran", "champion", "gladiator", "paladin", "cavalier", "templar", "crusader",
-    "duelist", "swashbuckler", "blademaster", "swordmaster", "hero", "heroine", "adventurer",
-    "barbarian", "battlemaster",
+    "knight",
+    "veteran",
+    "champion",
+    "gladiator",
+    "paladin",
+    "cavalier",
+    "templar",
+    "crusader",
+    "duelist",
+    "swashbuckler",
+    "blademaster",
+    "swordmaster",
+    "hero",
+    "heroine",
+    "adventurer",
+    "barbarian",
+    "battlemaster",
   ),
   soldier: keywords(
-    "soldier", "warrior", "fighter", "mercenary", "sellsword", "legionary", "legionnaire",
-    "infantry", "infantryman", "marine", "sergeant", "corporal", "recruit", "conscript", "militia",
-    "bandit", "brigand", "raider", "marauder", "thug", "enforcer", "goon", "ruffian", "outlaw",
-    "highwayman", "cutthroat", "footpad", "pillager", "plunderer", "smuggler", "pirate", "corsair",
-    "buccaneer", "freebooter", "reaver", "deserter", "archer", "marksman", "bowman", "crossbowman",
-    "spearman", "swordsman", "axeman", "assassin",
+    "soldier",
+    "warrior",
+    "fighter",
+    "mercenary",
+    "sellsword",
+    "legionary",
+    "legionnaire",
+    "infantry",
+    "infantryman",
+    "marine",
+    "sergeant",
+    "corporal",
+    "recruit",
+    "conscript",
+    "militia",
+    "bandit",
+    "brigand",
+    "raider",
+    "marauder",
+    "thug",
+    "enforcer",
+    "goon",
+    "ruffian",
+    "outlaw",
+    "highwayman",
+    "cutthroat",
+    "footpad",
+    "pillager",
+    "plunderer",
+    "smuggler",
+    "pirate",
+    "corsair",
+    "buccaneer",
+    "freebooter",
+    "reaver",
+    "deserter",
+    "archer",
+    "marksman",
+    "bowman",
+    "crossbowman",
+    "spearman",
+    "swordsman",
+    "axeman",
+    "assassin",
   ),
   scout: keywords(
-    "scout", "ranger", "hunter", "huntress", "huntsman", "hunt", "tracker", "trapper", "outrider",
-    "pathfinder", "explorer", "guide", "spy", "sneak", "rogue", "thief", "burglar", "poacher",
-    "lookout", "woodsman", "woodswoman", "forester",
+    "scout",
+    "ranger",
+    "hunter",
+    "huntress",
+    "huntsman",
+    "hunt",
+    "tracker",
+    "trapper",
+    "outrider",
+    "pathfinder",
+    "explorer",
+    "guide",
+    "spy",
+    "sneak",
+    "rogue",
+    "thief",
+    "burglar",
+    "poacher",
+    "lookout",
+    "woodsman",
+    "woodswoman",
+    "forester",
   ),
   guard: keywords(
-    "guard", "guardian", "bodyguard", "watch", "watchman", "watchwoman", "guardsman", "guardswoman",
-    "sentinel", "sentry", "patrol", "gatekeeper", "jailer", "jailor", "warden", "constable",
-    "deputy", "bouncer", "turnkey",
+    "guard",
+    "guardian",
+    "bodyguard",
+    "watch",
+    "watchman",
+    "watchwoman",
+    "guardsman",
+    "guardswoman",
+    "sentinel",
+    "sentry",
+    "patrol",
+    "gatekeeper",
+    "jailer",
+    "jailor",
+    "warden",
+    "constable",
+    "deputy",
+    "bouncer",
+    "turnkey",
   ),
   commoner: keywords(
-    "ferryman", "ferrywoman", "boatman", "boatwoman", "waterman", "factor", "merchant",
-    "merchantman", "trader", "trade", "shopkeeper", "storekeeper", "shopkeep", "peddler", "hawker",
-    "vendor", "dealer", "broker", "banker", "moneylender", "innkeeper", "tavernkeep", "barkeep",
-    "barkeeper", "bartender", "publican", "vintner", "brewer", "farmer", "farm", "farmhand",
-    "farmwife", "peasant", "villager", "commoner", "townsfolk", "crofter", "tenant", "sharecropper",
-    "herder", "herdsman", "shepherd", "shepherdess", "goatherd", "swineherd", "cowherd",
-    "stablehand", "stableboy", "ostler", "hostler", "smith", "blacksmith", "goldsmith",
-    "silversmith", "coppersmith", "tinsmith", "wright", "cartwright", "wheelwright", "shipwright",
-    "cooper", "chandler", "fletcher", "bowyer", "tinker", "weaver", "tailor", "seamstress",
-    "cobbler", "tanner", "leatherworker", "potter", "mason", "carpenter", "joiner", "thatcher",
-    "roofer", "miller", "baker", "butcher", "cook", "chef", "servant", "maid", "housekeeper",
-    "butler", "footman", "valet", "scullion", "laundress", "fisher", "fisherman", "fishwife",
-    "sailor", "seaman", "deckhand", "dockhand", "docker", "longshoreman", "stevedore", "porter",
-    "carrier", "courier", "messenger", "runner", "crier", "herald", "clerk", "scribe", "bookkeeper",
-    "accountant", "notary", "tutor", "teacher", "scholar", "student", "librarian", "archivist",
-    "apothecary", "herbalist", "healer", "midwife", "nurse", "alchemist", "beggar", "vagrant",
-    "drunkard", "orphan", "urchin", "woodcutter", "lumberjack", "miner", "quarryman", "bard",
-    "minstrel", "musician", "actor", "performer", "juggler", "acrobat", "dancer", "singer",
-    "storyteller", "tradesman", "craftsman", "workman", "workwoman", "countryman", "countrywoman",
-    "fishmonger", "ironmonger", "grocer",
+    "ferryman",
+    "ferrywoman",
+    "boatman",
+    "boatwoman",
+    "waterman",
+    "factor",
+    "merchant",
+    "merchantman",
+    "trader",
+    "trade",
+    "shopkeeper",
+    "storekeeper",
+    "shopkeep",
+    "peddler",
+    "hawker",
+    "vendor",
+    "dealer",
+    "broker",
+    "banker",
+    "moneylender",
+    "innkeeper",
+    "tavernkeep",
+    "barkeep",
+    "barkeeper",
+    "bartender",
+    "publican",
+    "vintner",
+    "brewer",
+    "farmer",
+    "farm",
+    "farmhand",
+    "farmwife",
+    "peasant",
+    "villager",
+    "commoner",
+    "townsfolk",
+    "crofter",
+    "tenant",
+    "sharecropper",
+    "herder",
+    "herdsman",
+    "shepherd",
+    "shepherdess",
+    "goatherd",
+    "swineherd",
+    "cowherd",
+    "stablehand",
+    "stableboy",
+    "ostler",
+    "hostler",
+    "smith",
+    "blacksmith",
+    "goldsmith",
+    "silversmith",
+    "coppersmith",
+    "tinsmith",
+    "wright",
+    "cartwright",
+    "wheelwright",
+    "shipwright",
+    "cooper",
+    "chandler",
+    "fletcher",
+    "bowyer",
+    "tinker",
+    "weaver",
+    "tailor",
+    "seamstress",
+    "cobbler",
+    "tanner",
+    "leatherworker",
+    "potter",
+    "mason",
+    "carpenter",
+    "joiner",
+    "thatcher",
+    "roofer",
+    "miller",
+    "baker",
+    "butcher",
+    "cook",
+    "chef",
+    "servant",
+    "maid",
+    "housekeeper",
+    "butler",
+    "footman",
+    "valet",
+    "scullion",
+    "laundress",
+    "fisher",
+    "fisherman",
+    "fishwife",
+    "sailor",
+    "seaman",
+    "deckhand",
+    "dockhand",
+    "docker",
+    "longshoreman",
+    "stevedore",
+    "porter",
+    "carrier",
+    "courier",
+    "messenger",
+    "runner",
+    "crier",
+    "herald",
+    "clerk",
+    "scribe",
+    "bookkeeper",
+    "accountant",
+    "notary",
+    "tutor",
+    "teacher",
+    "scholar",
+    "student",
+    "librarian",
+    "archivist",
+    "apothecary",
+    "herbalist",
+    "healer",
+    "midwife",
+    "nurse",
+    "alchemist",
+    "beggar",
+    "vagrant",
+    "drunkard",
+    "orphan",
+    "urchin",
+    "woodcutter",
+    "lumberjack",
+    "miner",
+    "quarryman",
+    "bard",
+    "minstrel",
+    "musician",
+    "actor",
+    "performer",
+    "juggler",
+    "acrobat",
+    "dancer",
+    "singer",
+    "storyteller",
+    "tradesman",
+    "craftsman",
+    "workman",
+    "workwoman",
+    "countryman",
+    "countrywoman",
+    "fishmonger",
+    "ironmonger",
+    "grocer",
   ),
 });
 
@@ -161,7 +451,14 @@ export const NPC_TIER_KEYWORDS: Readonly<Record<NpcCombatTier, readonly string[]
  * rank-and-file roles, and the commoner default is checked last.
  */
 export const NPC_TIER_MATCH_ORDER: readonly NpcCombatTier[] = Object.freeze([
-  "leader", "mage", "priest", "adventurer", "soldier", "scout", "guard", "commoner",
+  "leader",
+  "mage",
+  "priest",
+  "adventurer",
+  "soldier",
+  "scout",
+  "guard",
+  "commoner",
 ]);
 
 /** Result of the pure, text-only tier heuristic. */
@@ -221,9 +518,7 @@ export function deriveNpcTier(text: string): NpcTierDerivation {
 
 /** Typed failure codes for {@link resolveNpcCombatProfile}. */
 export type NpcCombatProfileFailureCode =
-  | "NPC_PROFILE_FORBIDDEN"
-  | "NPC_PROFILE_NPC_NOT_FOUND"
-  | "NPC_PROFILE_TEMPLATE_UNAVAILABLE";
+  "NPC_PROFILE_FORBIDDEN" | "NPC_PROFILE_NPC_NOT_FOUND" | "NPC_PROFILE_TEMPLATE_UNAVAILABLE";
 
 /** Raised when an NPC combat profile cannot be resolved. */
 export class NpcCombatProfileError extends Error {
@@ -341,13 +636,19 @@ export function resolveNpcCombatProfile(
   campaignId: string,
   npcId: string,
 ): NpcCombatProfile {
-  const membership = db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+  const membership = db
+    .prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
     .get(campaignId, principalId);
   if (!membership) {
-    throw new NpcCombatProfileError("NPC_PROFILE_FORBIDDEN", "campaign membership is required to resolve an NPC combat profile");
+    throw new NpcCombatProfileError(
+      "NPC_PROFILE_FORBIDDEN",
+      "campaign membership is required to resolve an NPC combat profile",
+    );
   }
 
-  const row = db.prepare(`SELECT npc.npc_id,npc.public_name,metadata.public_state_json,
+  const row = db
+    .prepare(
+      `SELECT npc.npc_id,npc.public_name,metadata.public_state_json,
       persona.archetype persona_archetype,baseline.body,baseline.mind,baseline.presence,baseline.source
     FROM campaign_npcs_v28 npc
     JOIN characters persona ON persona.id=npc.persona_id
@@ -355,29 +656,39 @@ export function resolveNpcCombatProfile(
       ON metadata.campaign_id=npc.campaign_id AND metadata.npc_id=npc.npc_id
     LEFT JOIN campaign_npc_baseline_stats_v41 baseline
       ON baseline.campaign_id=npc.campaign_id AND baseline.npc_id=npc.npc_id
-    WHERE npc.campaign_id=? AND npc.npc_id=?`).get(campaignId, npcId) as NpcProfileRow | undefined;
+    WHERE npc.campaign_id=? AND npc.npc_id=?`,
+    )
+    .get(campaignId, npcId) as NpcProfileRow | undefined;
   if (!row) {
-    throw new NpcCombatProfileError("NPC_PROFILE_NPC_NOT_FOUND", `NPC ${npcId} does not exist in campaign ${campaignId}`);
+    throw new NpcCombatProfileError(
+      "NPC_PROFILE_NPC_NOT_FOUND",
+      `NPC ${npcId} does not exist in campaign ${campaignId}`,
+    );
   }
 
   const stateTexts = publicStateTexts(row.public_state_json);
   const derivation = deriveNpcTier(
-    [row.public_name, ...stateTexts, row.persona_archetype ?? ""]
-      .filter((text) => text.trim().length > 0)
-      .join("\n"),
+    [row.public_name, ...stateTexts, row.persona_archetype ?? ""].filter((text) => text.trim().length > 0).join("\n"),
   );
   const entry = TIER_TEMPLATES.find((candidate) => candidate.tier === derivation.tier);
   if (!entry) {
-    throw new NpcCombatProfileError("NPC_PROFILE_TEMPLATE_UNAVAILABLE", `no enemy template is configured for tier ${derivation.tier}`);
+    throw new NpcCombatProfileError(
+      "NPC_PROFILE_TEMPLATE_UNAVAILABLE",
+      `no enemy template is configured for tier ${derivation.tier}`,
+    );
   }
 
-  const pinned = db.prepare(`SELECT pin.pack_id,pin.pack_version,visibility.public_definition_json
+  const pinned = db
+    .prepare(
+      `SELECT pin.pack_id,pin.pack_version,visibility.public_definition_json
     FROM campaign_catalog_current_pins pin
     JOIN rpg_catalog_definition_visibility visibility
       ON visibility.pack_id=pin.pack_id AND visibility.pack_version=pin.pack_version
     WHERE pin.campaign_id=? AND visibility.kind='enemy-template'
       AND visibility.definition_id=? AND visibility.publicly_reachable=1
-    ORDER BY pin.pack_id,pin.pack_version LIMIT 1`).get(campaignId, entry.definitionId) as PinnedEnemyTemplateRow | undefined;
+    ORDER BY pin.pack_id,pin.pack_version LIMIT 1`,
+    )
+    .get(campaignId, entry.definitionId) as PinnedEnemyTemplateRow | undefined;
   if (!pinned) {
     throw new NpcCombatProfileError(
       "NPC_PROFILE_TEMPLATE_UNAVAILABLE",
@@ -392,9 +703,10 @@ export function resolveNpcCombatProfile(
     );
   }
 
-  const baselineStats = row.body === null || row.mind === null || row.presence === null || row.source === null
-    ? null
-    : { body: row.body, mind: row.mind, presence: row.presence, source: row.source };
+  const baselineStats =
+    row.body === null || row.mind === null || row.presence === null || row.source === null
+      ? null
+      : { body: row.body, mind: row.mind, presence: row.presence, source: row.source };
   const scanned = ["public name"];
   if (stateTexts.length > 0) scanned.push("public state");
   if (row.persona_archetype !== null && row.persona_archetype.trim().length > 0) scanned.push("persona archetype");

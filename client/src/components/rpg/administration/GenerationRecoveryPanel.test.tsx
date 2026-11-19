@@ -3,9 +3,30 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GenerationRecoveryPanel, type GenerationRecoveryApi } from "./GenerationRecoveryPanel";
 
 const api = (): GenerationRecoveryApi => ({ openDraft: vi.fn(), reconcileJob: vi.fn() });
-const failed = { jobId: "job-failed", state: "failed" as const, attempt: 2, requestDigest: "sha256:public-digest", updatedAt: "2030-01-01T00:00:00Z", draftId: null };
-const uncertain = { jobId: "job-unknown", state: "uncertain" as const, attempt: 1, requestDigest: "sha256:other", updatedAt: "2030-01-02T00:00:00Z", draftId: "draft-one" };
-const draft = { draftId: "draft-one", jobId: "job-unknown", state: "staged" as const, revision: 3, createdAt: "2030-01-01T00:00:00Z", artifactCount: 12 };
+const failed = {
+  jobId: "job-failed",
+  state: "failed" as const,
+  attempt: 2,
+  requestDigest: "sha256:public-digest",
+  updatedAt: "2030-01-01T00:00:00Z",
+  draftId: null,
+};
+const uncertain = {
+  jobId: "job-unknown",
+  state: "uncertain" as const,
+  attempt: 1,
+  requestDigest: "sha256:other",
+  updatedAt: "2030-01-02T00:00:00Z",
+  draftId: "draft-one",
+};
+const draft = {
+  draftId: "draft-one",
+  jobId: "job-unknown",
+  state: "staged" as const,
+  revision: 3,
+  createdAt: "2030-01-01T00:00:00Z",
+  artifactCount: 12,
+};
 
 afterEach(cleanup);
 

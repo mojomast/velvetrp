@@ -27,8 +27,11 @@ describe("CharacterForm persona profile", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Save to library" }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      profile: expect.objectContaining({ goal: "Find a home", voice: "Measured and quiet", history: "" }),
-    }), false);
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profile: expect.objectContaining({ goal: "Find a home", voice: "Measured and quiet", history: "" }),
+      }),
+      false,
+    );
   });
 });

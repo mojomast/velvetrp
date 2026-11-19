@@ -70,15 +70,20 @@ function normalizeState(state: unknown): unknown {
   }
 }
 
-const digest = (value: unknown): string => createHash("sha256").update(canonicalAgentJson(value as never)).digest("hex");
+const digest = (value: unknown): string =>
+  createHash("sha256")
+    .update(canonicalAgentJson(value as never))
+    .digest("hex");
 
 function objectOf(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function stringArray(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
-  return value.every((entry) => typeof entry === "string") ? [...value] as string[] : null;
+  return value.every((entry) => typeof entry === "string") ? ([...value] as string[]) : null;
 }
 
 /**
@@ -122,7 +127,8 @@ function annotatedExpected(lane: string, expected: unknown): unknown | null {
     return typeof value.candidateId === "string" ? { candidateId: value.candidateId } : null;
   }
   if (lane === "guardrails") {
-    return typeof value.disposition === "string" && GUARDRAIL_DISPOSITIONS.includes(value.disposition as GuardrailDisposition)
+    return typeof value.disposition === "string" &&
+      GUARDRAIL_DISPOSITIONS.includes(value.disposition as GuardrailDisposition)
       ? { disposition: value.disposition }
       : null;
   }
@@ -180,15 +186,17 @@ export function harvestProposal(
       state: normalizeState(record.state),
       expected,
       ...note,
-      reason: expected === null
-        ? `${reviewer} rejected the recorded ${lane} decision; the corrected answer is still needed`
-        : `${reviewer} rejected the recorded ${lane} decision and supplied the corrected answer`,
+      reason:
+        expected === null
+          ? `${reviewer} rejected the recorded ${lane} decision; the corrected answer is still needed`
+          : `${reviewer} rejected the recorded ${lane} decision and supplied the corrected answer`,
     };
   }
 
   // No annotation: only a Director disagreement with its authoritative composition is actionable.
   if (lane !== "director-selection" || authority === undefined) return null;
-  const expected = authority.authoritativeCandidateIds === null ? null : { selections: authority.authoritativeCandidateIds };
+  const expected =
+    authority.authoritativeCandidateIds === null ? null : { selections: authority.authoritativeCandidateIds };
   return {
     proposalId: proposalId(lane, record.stateDigest, expected, "provider-disagreement"),
     lane,
@@ -198,9 +206,10 @@ export function harvestProposal(
     status: "proposed",
     state: normalizeState(record.state),
     expected,
-    reason: expected === null
-      ? "the Director diverged from a held authoritative composition; review is needed"
-      : "the Director diverged from the authoritative composition; the provider selection is the proposed label",
+    reason:
+      expected === null
+        ? "the Director diverged from a held authoritative composition; review is needed"
+        : "the Director diverged from the authoritative composition; the provider selection is the proposed label",
   };
 }
 
@@ -220,7 +229,11 @@ export interface HarvestInput {
 export function buildHarvestProposals(input: HarvestInput): HarvestProposal[] {
   const proposals: HarvestProposal[] = [];
   for (const record of input.records) {
-    const proposal = harvestProposal(record, input.annotations?.[record.decisionId], input.authority?.[record.decisionId]);
+    const proposal = harvestProposal(
+      record,
+      input.annotations?.[record.decisionId],
+      input.authority?.[record.decisionId],
+    );
     if (proposal) proposals.push(proposal);
   }
   const byId = new Map<string, HarvestProposal>();
@@ -231,12 +244,19 @@ export function buildHarvestProposals(input: HarvestInput): HarvestProposal[] {
       continue;
     }
     const rank = (entry: HarvestProposal): number => (entry.status === "confirmed" ? 0 : 1);
-    if (rank(proposal) < rank(existing) || (rank(proposal) === rank(existing) && proposal.createdAt < existing.createdAt)) {
+    if (
+      rank(proposal) < rank(existing) ||
+      (rank(proposal) === rank(existing) && proposal.createdAt < existing.createdAt)
+    ) {
       byId.set(proposal.proposalId, proposal);
     }
   }
-  return [...byId.values()].sort((left, right) =>
-    left.lane.localeCompare(right.lane) || left.createdAt.localeCompare(right.createdAt) || left.proposalId.localeCompare(right.proposalId));
+  return [...byId.values()].sort(
+    (left, right) =>
+      left.lane.localeCompare(right.lane) ||
+      left.createdAt.localeCompare(right.createdAt) ||
+      left.proposalId.localeCompare(right.proposalId),
+  );
 }
 
 export interface HarvestSummary {
@@ -266,8 +286,11 @@ export function summarizeHarvest(proposals: readonly HarvestProposal[]): Harvest
     total: proposals.length,
     confirmed,
     proposed: proposals.length - confirmed,
-    byLane: [...lanes.entries()].map(([lane, counts]) => ({ lane, ...counts })).sort((left, right) => left.lane.localeCompare(right.lane)),
-    byProvenance: [...provenances.entries()].map(([provenance, count]) => ({ provenance, count }))
+    byLane: [...lanes.entries()]
+      .map(([lane, counts]) => ({ lane, ...counts }))
+      .sort((left, right) => left.lane.localeCompare(right.lane)),
+    byProvenance: [...provenances.entries()]
+      .map(([provenance, count]) => ({ provenance, count }))
       .sort((left, right) => left.provenance.localeCompare(right.provenance)),
   };
 }

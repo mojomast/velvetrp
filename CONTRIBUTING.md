@@ -55,6 +55,7 @@ It uses a temporary backup with the configured provider and may incur cost. Do n
 - Keep commits focused and describe the owning area, for example `feat(rpg): ...`, `fix(repo): ...`, or `docs: ...`.
 - Do not commit provider keys, `.env`, databases, traces, temporary directories, or unrelated workspace changes.
 - Run `git diff --check` before committing and report any intentionally skipped validation.
+- Run `npm run format` before committing; CI runs `npm run format:check`. Code (TypeScript, JavaScript, JSON, CSS, YAML) is formatted with Prettier; Markdown, SQL, generated docs and the lockfile are not. The one-time reformat commit is listed in `.git-blame-ignore-revs`; use it locally with `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 ## License
 

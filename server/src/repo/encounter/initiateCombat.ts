@@ -41,7 +41,12 @@ import {
   EncounterUnavailableError,
 } from "./encounterErrors.js";
 import type { EncounterCombatSnapshot } from "./encounterReadRepo.js";
-import { NpcCombatProfileError, resolveNpcCombatProfile, type NpcCombatProfile, type NpcCombatTier } from "./npcCombatProfile.js";
+import {
+  NpcCombatProfileError,
+  resolveNpcCombatProfile,
+  type NpcCombatProfile,
+  type NpcCombatTier,
+} from "./npcCombatProfile.js";
 import { mayActForConsumable } from "./useConsumableRuntime.js";
 
 /** Attackable target identity: a campaign NPC or another campaign actor. */
@@ -51,15 +56,17 @@ export const combatInitiationTargetSchema = z.discriminatedUnion("kind", [
 ]);
 export type CombatInitiationTarget = z.infer<typeof combatInitiationTargetSchema>;
 
-export const initiateCombatInputSchema = z.object({
-  principalId: resourceIdSchema,
-  campaignId: resourceIdSchema,
-  sessionId: resourceIdSchema,
-  actorId: resourceIdSchema,
-  target: combatInitiationTargetSchema,
-  /** Optional stable request identity; defaults to a value derived from the request. */
-  idempotencyKey: idempotencyKeySchema.optional(),
-}).strict();
+export const initiateCombatInputSchema = z
+  .object({
+    principalId: resourceIdSchema,
+    campaignId: resourceIdSchema,
+    sessionId: resourceIdSchema,
+    actorId: resourceIdSchema,
+    target: combatInitiationTargetSchema,
+    /** Optional stable request identity; defaults to a value derived from the request. */
+    idempotencyKey: idempotencyKeySchema.optional(),
+  })
+  .strict();
 export type InitiateCombatInput = z.infer<typeof initiateCombatInputSchema>;
 
 /** Typed failure codes for {@link initiateCombatFromTarget}. */
@@ -108,11 +115,15 @@ function digest(value: unknown): string {
 }
 
 function actorIdentity(db: DatabaseDriver.Database, campaignId: string, actorId: string): ActorIdentity | null {
-  const row = db.prepare(`SELECT actor.id actor_id,persona.name name
+  const row = db
+    .prepare(
+      `SELECT actor.id actor_id,persona.name name
     FROM campaign_actors actor
     JOIN campaign_characters character ON character.campaign_id=actor.campaign_id AND character.id=actor.campaign_character_id
     JOIN characters persona ON persona.id=character.character_id
-    WHERE actor.campaign_id=? AND actor.id=?`).get(campaignId, actorId) as { actor_id: string; name: string } | undefined;
+    WHERE actor.campaign_id=? AND actor.id=?`,
+    )
+    .get(campaignId, actorId) as { actor_id: string; name: string } | undefined;
   return row ? { actorId: row.actor_id, name: row.name } : null;
 }
 
@@ -124,14 +135,22 @@ function actorIdentity(db: DatabaseDriver.Database, campaignId: string, actorId:
  * lifecycle's GM gate and never widens what the initiator may do.
  */
 function gmAuthorityPrincipal(db: DatabaseDriver.Database, campaignId: string, principalId: string): string | null {
-  if (db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')")
-    .get(campaignId, principalId)) return principalId;
-  const row = db.prepare(`SELECT membership.principal_id principal_id
+  if (
+    db
+      .prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')")
+      .get(campaignId, principalId)
+  )
+    return principalId;
+  const row = db
+    .prepare(
+      `SELECT membership.principal_id principal_id
     FROM campaign_memberships membership
     JOIN campaigns campaign ON campaign.id=membership.campaign_id
     WHERE membership.campaign_id=? AND membership.role IN ('owner','gm')
     ORDER BY CASE WHEN membership.principal_id=campaign.owner_principal_id THEN 0 ELSE 1 END,membership.principal_id
-    LIMIT 1`).get(campaignId) as { principal_id: string } | undefined;
+    LIMIT 1`,
+    )
+    .get(campaignId) as { principal_id: string } | undefined;
   return row?.principal_id ?? null;
 }
 
@@ -181,7 +200,9 @@ function asInitiationError(error: unknown): CombatInitiationError | null {
     return new CombatInitiationError("COMBAT_INITIATION_CONFLICT", error.message);
   }
   if (error instanceof EncounterConflictError) {
-    if (/already has an open encounter|already in an active encounter|already has an active encounter/.test(error.message)) {
+    if (
+      /already has an open encounter|already in an active encounter|already has an active encounter/.test(error.message)
+    ) {
       return new CombatInitiationError("COMBAT_INITIATION_ACTIVE_ENCOUNTER", error.message);
     }
     return new CombatInitiationError("COMBAT_INITIATION_CONFLICT", error.message);
@@ -209,157 +230,225 @@ export function initiateCombatFromTarget(
   }
   const { principalId, campaignId, sessionId, actorId, target } = parsed.data;
 
-  return db.transaction(() => {
-    const campaign = db.prepare("SELECT id FROM campaigns WHERE id=?").get(campaignId);
-    if (!campaign) {
-      throw new CombatInitiationError("COMBAT_INITIATION_CAMPAIGN_NOT_FOUND", `campaign ${campaignId} is unavailable`);
-    }
-    if (!db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
-      .get(campaignId, principalId)) {
-      throw new CombatInitiationError("COMBAT_INITIATION_CAMPAIGN_NOT_FOUND", "campaign is not visible to the principal");
-    }
-    if (!db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?")
-      .get(campaignId, sessionId)) {
-      throw new CombatInitiationError("COMBAT_INITIATION_CAMPAIGN_NOT_FOUND", "session does not belong to campaign");
-    }
-
-    const initiator = actorIdentity(db, campaignId, actorId);
-    if (!initiator) {
-      throw new CombatInitiationError("COMBAT_INITIATION_ACTOR_NOT_FOUND", `actor ${actorId} is unavailable`);
-    }
-    // Mirrors the consumable policy: owner/GM authority or the controlling principal.
-    if (!mayActForConsumable(db, principalId, campaignId, actorId)) {
-      throw new CombatInitiationError("COMBAT_INITIATION_FORBIDDEN", "principal cannot act for the initiating actor");
-    }
-
-    let profile: NpcCombatProfile | null = null;
-    let targetName: string;
-    if (target.kind === "actor") {
-      if (target.actorId === actorId) {
-        throw new CombatInitiationError("COMBAT_INITIATION_CONFLICT", "an actor cannot initiate combat against itself");
+  return db
+    .transaction(() => {
+      const campaign = db.prepare("SELECT id FROM campaigns WHERE id=?").get(campaignId);
+      if (!campaign) {
+        throw new CombatInitiationError(
+          "COMBAT_INITIATION_CAMPAIGN_NOT_FOUND",
+          `campaign ${campaignId} is unavailable`,
+        );
       }
-      const targetActor = actorIdentity(db, campaignId, target.actorId);
-      if (!targetActor) {
-        throw new CombatInitiationError("COMBAT_INITIATION_TARGET_NOT_FOUND", `actor ${target.actorId} is unavailable`);
+      if (
+        !db
+          .prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+          .get(campaignId, principalId)
+      ) {
+        throw new CombatInitiationError(
+          "COMBAT_INITIATION_CAMPAIGN_NOT_FOUND",
+          "campaign is not visible to the principal",
+        );
       }
-      targetName = targetActor.name;
-    } else {
-      // Resolution preserves the tier derivation and rationale for the caller.
-      profile = profileFromTarget(db, principalId, campaignId, target);
-      if (!profile) {
-        throw new CombatInitiationError("COMBAT_INITIATION_NPC_UNRESOLVABLE", `NPC ${target.npcId} has no combat profile`);
+      if (
+        !db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?").get(campaignId, sessionId)
+      ) {
+        throw new CombatInitiationError("COMBAT_INITIATION_CAMPAIGN_NOT_FOUND", "session does not belong to campaign");
       }
-      targetName = profile.name;
-    }
 
-    const authority = gmAuthorityPrincipal(db, campaignId, principalId);
-    if (!authority) {
-      throw new CombatInitiationError("COMBAT_INITIATION_CONFLICT", "campaign has no GM authority to materialize combat");
-    }
+      const initiator = actorIdentity(db, campaignId, actorId);
+      if (!initiator) {
+        throw new CombatInitiationError("COMBAT_INITIATION_ACTOR_NOT_FOUND", `actor ${actorId} is unavailable`);
+      }
+      // Mirrors the consumable policy: owner/GM authority or the controlling principal.
+      if (!mayActForConsumable(db, principalId, campaignId, actorId)) {
+        throw new CombatInitiationError("COMBAT_INITIATION_FORBIDDEN", "principal cannot act for the initiating actor");
+      }
 
-    // An explicit key is the request identity (a reused key with a different
-    // request is a typed conflict); otherwise the whole request identifies it.
-    const requestDigest = digest(parsed.data.idempotencyKey === undefined
-      ? { campaignId, sessionId, actorId, target }
-      : { idempotencyKey: parsed.data.idempotencyKey }).slice(0, 40);
-    const createKey = `initiate-combat:create:${requestDigest}`;
-    const startKey = `initiate-combat:start:${requestDigest}`;
+      let profile: NpcCombatProfile | null = null;
+      let targetName: string;
+      if (target.kind === "actor") {
+        if (target.actorId === actorId) {
+          throw new CombatInitiationError(
+            "COMBAT_INITIATION_CONFLICT",
+            "an actor cannot initiate combat against itself",
+          );
+        }
+        const targetActor = actorIdentity(db, campaignId, target.actorId);
+        if (!targetActor) {
+          throw new CombatInitiationError(
+            "COMBAT_INITIATION_TARGET_NOT_FOUND",
+            `actor ${target.actorId} is unavailable`,
+          );
+        }
+        targetName = targetActor.name;
+      } else {
+        // Resolution preserves the tier derivation and rationale for the caller.
+        profile = profileFromTarget(db, principalId, campaignId, target);
+        if (!profile) {
+          throw new CombatInitiationError(
+            "COMBAT_INITIATION_NPC_UNRESOLVABLE",
+            `NPC ${target.npcId} has no combat profile`,
+          );
+        }
+        targetName = profile.name;
+      }
 
-    const combatants: EncounterCreateRequest["combatants"] = [{ kind: "actor", actorId, team: "allies" }];
-    // A scene encounter includes colocated campaign actors, not off-screen
-    // characters. Actor-v-actor encounters stay explicit duels; do not choose
-    // sides for uninvolved players. Adding initiative never transfers control.
-    if (target.kind === "npc") {
-      const nearby = db.prepare(`SELECT ally.actor_id FROM campaign_actor_locations_v28 origin
+      const authority = gmAuthorityPrincipal(db, campaignId, principalId);
+      if (!authority) {
+        throw new CombatInitiationError(
+          "COMBAT_INITIATION_CONFLICT",
+          "campaign has no GM authority to materialize combat",
+        );
+      }
+
+      // An explicit key is the request identity (a reused key with a different
+      // request is a typed conflict); otherwise the whole request identifies it.
+      const requestDigest = digest(
+        parsed.data.idempotencyKey === undefined
+          ? { campaignId, sessionId, actorId, target }
+          : { idempotencyKey: parsed.data.idempotencyKey },
+      ).slice(0, 40);
+      const createKey = `initiate-combat:create:${requestDigest}`;
+      const startKey = `initiate-combat:start:${requestDigest}`;
+
+      const combatants: EncounterCreateRequest["combatants"] = [{ kind: "actor", actorId, team: "allies" }];
+      // A scene encounter includes colocated campaign actors, not off-screen
+      // characters. Actor-v-actor encounters stay explicit duels; do not choose
+      // sides for uninvolved players. Adding initiative never transfers control.
+      if (target.kind === "npc") {
+        const nearby = db
+          .prepare(
+            `SELECT ally.actor_id FROM campaign_actor_locations_v28 origin
         JOIN campaign_actor_locations_v28 ally ON ally.campaign_id=origin.campaign_id
           AND ally.session_id=origin.session_id AND ally.location_id=origin.location_id
         WHERE origin.campaign_id=? AND origin.session_id=? AND origin.actor_id=? AND ally.actor_id<>?
-        ORDER BY ally.actor_id`).all(campaignId, sessionId, actorId, actorId) as { actor_id: string }[];
-      for (const ally of nearby) combatants.push({ kind: "actor", actorId: ally.actor_id, team: "allies" });
-    }
-    if (profile) combatants.push({ kind: "enemy", template: profile.template, team: "enemies" });
-    else if (target.kind === "actor") combatants.push({ kind: "actor", actorId: target.actorId, team: "enemies" });
-    let createRequest = encounterCreateRequestSchema.parse({
-      sessionId,
-      name: encounterName(initiator.name, targetName),
-      combatants,
-      idempotencyKey: createKey,
-    });
-
-    // Exact immutable replay precedes the open-encounter guards: repeating the
-    // same request converges on the stored encounter via lifecycle idempotency.
-    const replay = db.prepare(`SELECT encounter_id,canonical_create_request_json FROM encounter_lifecycle_v31
-      WHERE campaign_id=? AND create_idempotency_key=?`).get(campaignId, createKey) as
-      { encounter_id: string; canonical_create_request_json: string } | undefined;
-    if (replay) {
-      const stored = encounterCreateRequestSchema.parse(JSON.parse(replay.canonical_create_request_json));
-      const identity = (request: EncounterCreateRequest) => ({ ...request,
-        combatants: [request.combatants[0], request.combatants.at(-1)] });
-      if (canonical(identity(stored)) !== canonical(identity(createRequest))) {
-        throw new CombatInitiationError("COMBAT_INITIATION_CONFLICT", "idempotency key was reused for a different combat initiation");
+        ORDER BY ally.actor_id`,
+          )
+          .all(campaignId, sessionId, actorId, actorId) as { actor_id: string }[];
+        for (const ally of nearby) combatants.push({ kind: "actor", actorId: ally.actor_id, team: "allies" });
       }
-      // Colocated allies are a creation-time snapshot. Movement after creation
-      // must not change the meaning of an exact retry or reroll initiative.
-      createRequest = stored;
-    }
+      if (profile) combatants.push({ kind: "enemy", template: profile.template, team: "enemies" });
+      else if (target.kind === "actor") combatants.push({ kind: "actor", actorId: target.actorId, team: "enemies" });
+      let createRequest = encounterCreateRequestSchema.parse({
+        sessionId,
+        name: encounterName(initiator.name, targetName),
+        combatants,
+        idempotencyKey: createKey,
+      });
 
-    if (!replay) {
-      if (db.prepare("SELECT 1 FROM encounter WHERE session_id=? AND status IN ('preparing','active') LIMIT 1").get(sessionId)) {
-        throw new CombatInitiationError("COMBAT_INITIATION_ACTIVE_ENCOUNTER", "session already has an open encounter");
+      // Exact immutable replay precedes the open-encounter guards: repeating the
+      // same request converges on the stored encounter via lifecycle idempotency.
+      const replay = db
+        .prepare(
+          `SELECT encounter_id,canonical_create_request_json FROM encounter_lifecycle_v31
+      WHERE campaign_id=? AND create_idempotency_key=?`,
+        )
+        .get(campaignId, createKey) as { encounter_id: string; canonical_create_request_json: string } | undefined;
+      if (replay) {
+        const stored = encounterCreateRequestSchema.parse(JSON.parse(replay.canonical_create_request_json));
+        const identity = (request: EncounterCreateRequest) => ({
+          ...request,
+          combatants: [request.combatants[0], request.combatants.at(-1)],
+        });
+        if (canonical(identity(stored)) !== canonical(identity(createRequest))) {
+          throw new CombatInitiationError(
+            "COMBAT_INITIATION_CONFLICT",
+            "idempotency key was reused for a different combat initiation",
+          );
+        }
+        // Colocated allies are a creation-time snapshot. Movement after creation
+        // must not change the meaning of an exact retry or reroll initiative.
+        createRequest = stored;
       }
-      if (db.prepare(`SELECT 1 FROM combatant participant JOIN encounter combat USING(encounter_id)
-        WHERE participant.campaign_id=? AND participant.actor_id=? AND combat.status IN ('preparing','active') LIMIT 1`)
-        .get(campaignId, actorId)) {
-        throw new CombatInitiationError("COMBAT_INITIATION_ACTIVE_ENCOUNTER", "initiating actor is already in an open encounter");
-      }
-    }
 
-    let encounterId: string;
-    try {
-      const created = createCreateLifecycleEncounter(db, deps)(authority, campaignId, createRequest);
-      encounterId = created.encounter.encounterId;
-      // Label the materialized enemy with the NPC's public name before the
-      // start command generates the tactical map. The combat tracker and the
-      // map token then identify the specific NPC instead of the borrowed
-      // template. Only target-initiated NPC combat is labeled; GM-created
-      // encounters and actor targets keep their persona/template names.
-      if (profile) {
-        const enemy = db.prepare(`SELECT provenance.combatant_id FROM encounter_enemy_provenance_v31 provenance
+      if (!replay) {
+        if (
+          db
+            .prepare("SELECT 1 FROM encounter WHERE session_id=? AND status IN ('preparing','active') LIMIT 1")
+            .get(sessionId)
+        ) {
+          throw new CombatInitiationError(
+            "COMBAT_INITIATION_ACTIVE_ENCOUNTER",
+            "session already has an open encounter",
+          );
+        }
+        if (
+          db
+            .prepare(
+              `SELECT 1 FROM combatant participant JOIN encounter combat USING(encounter_id)
+        WHERE participant.campaign_id=? AND participant.actor_id=? AND combat.status IN ('preparing','active') LIMIT 1`,
+            )
+            .get(campaignId, actorId)
+        ) {
+          throw new CombatInitiationError(
+            "COMBAT_INITIATION_ACTIVE_ENCOUNTER",
+            "initiating actor is already in an open encounter",
+          );
+        }
+      }
+
+      let encounterId: string;
+      try {
+        const created = createCreateLifecycleEncounter(db, deps)(authority, campaignId, createRequest);
+        encounterId = created.encounter.encounterId;
+        // Label the materialized enemy with the NPC's public name before the
+        // start command generates the tactical map. The combat tracker and the
+        // map token then identify the specific NPC instead of the borrowed
+        // template. Only target-initiated NPC combat is labeled; GM-created
+        // encounters and actor targets keep their persona/template names.
+        if (profile) {
+          const enemy = db
+            .prepare(
+              `SELECT provenance.combatant_id FROM encounter_enemy_provenance_v31 provenance
           JOIN combatant participant ON participant.encounter_id=provenance.encounter_id
             AND participant.combatant_id=provenance.combatant_id
           WHERE provenance.encounter_id=? AND provenance.campaign_id=? AND provenance.pack_id=?
-            AND provenance.pack_version=? AND provenance.definition_id=? AND participant.combatant_kind='enemy'`)
-          .get(encounterId, campaignId, profile.template.packId, profile.template.packVersion,
-            profile.template.definitionId) as { combatant_id: string } | undefined;
-        if (enemy) {
-          db.prepare(`INSERT OR IGNORE INTO encounter_combatant_label_v67
-            (combatant_id,encounter_id,campaign_id,label,created_at) VALUES(?,?,?,?,?)`)
-            .run(enemy.combatant_id, encounterId, campaignId, profile.name,
-              utcIsoTimestampSchema.parse(deps.clock.now().toISOString()));
+            AND provenance.pack_version=? AND provenance.definition_id=? AND participant.combatant_kind='enemy'`,
+            )
+            .get(
+              encounterId,
+              campaignId,
+              profile.template.packId,
+              profile.template.packVersion,
+              profile.template.definitionId,
+            ) as { combatant_id: string } | undefined;
+          if (enemy) {
+            db.prepare(
+              `INSERT OR IGNORE INTO encounter_combatant_label_v67
+            (combatant_id,encounter_id,campaign_id,label,created_at) VALUES(?,?,?,?,?)`,
+            ).run(
+              enemy.combatant_id,
+              encounterId,
+              campaignId,
+              profile.name,
+              utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),
+            );
+          }
         }
+        const priorStart = db
+          .prepare("SELECT canonical_request_json FROM combat_commands_v27 WHERE encounter_id=? AND idempotency_key=?")
+          .get(encounterId, startKey) as { canonical_request_json: string } | undefined;
+        const startCommand = priorStart
+          ? encounterStartCommandRequestSchema.parse(JSON.parse(priorStart.canonical_request_json))
+          : { expectedRevision: 1, idempotencyKey: startKey };
+        createStartLifecycleEncounter(db, deps)(authority, encounterId, startCommand);
+      } catch (error) {
+        const mapped = asInitiationError(error);
+        if (mapped) throw mapped;
+        throw error;
       }
-      const priorStart = db.prepare("SELECT canonical_request_json FROM combat_commands_v27 WHERE encounter_id=? AND idempotency_key=?")
-        .get(encounterId, startKey) as { canonical_request_json: string } | undefined;
-      const startCommand = priorStart
-        ? encounterStartCommandRequestSchema.parse(JSON.parse(priorStart.canonical_request_json))
-        : { expectedRevision: 1, idempotencyKey: startKey };
-      createStartLifecycleEncounter(db, deps)(authority, encounterId, startCommand);
-    } catch (error) {
-      const mapped = asInitiationError(error);
-      if (mapped) throw mapped;
-      throw error;
-    }
 
-    const combat = deps.reads.getCombatState(principalId, encounterId);
-    if (!combat) {
-      throw new CombatInitiationError("COMBAT_INITIATION_CONFLICT", "started combat projection is unavailable");
-    }
-    return {
-      campaignId,
-      encounterId,
-      combatId: combat.combatId,
-      combat,
-      ...(profile ? { tier: profile.tier, template: profile.template, rationale: profile.rationale } : {}),
-    };
-  }).immediate();
+      const combat = deps.reads.getCombatState(principalId, encounterId);
+      if (!combat) {
+        throw new CombatInitiationError("COMBAT_INITIATION_CONFLICT", "started combat projection is unavailable");
+      }
+      return {
+        campaignId,
+        encounterId,
+        combatId: combat.combatId,
+        combat,
+        ...(profile ? { tier: profile.tier, template: profile.template, rationale: profile.rationale } : {}),
+      };
+    })
+    .immediate();
 }

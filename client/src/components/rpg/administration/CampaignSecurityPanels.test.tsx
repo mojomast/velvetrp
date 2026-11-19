@@ -5,7 +5,7 @@ import { getCampaignAdministrationIntegrations, updateCampaignSessionZeroSafety 
 import { CampaignSecurityPanels } from "./CampaignSecurityPanels";
 
 vi.mock("../../../api", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../../../api")>(),
+  ...(await importOriginal<typeof import("../../../api")>()),
   getCampaignAdministrationIntegrations: vi.fn(),
   selectCampaignRuleset: vi.fn(),
   updateCampaignSessionZeroSafety: vi.fn(),
@@ -13,12 +13,37 @@ vi.mock("../../../api", async (importOriginal) => ({
 }));
 
 const integrations = {
-  campaignId: "campaign", actorRole: "owner", revision: 7,
-  rulesets: { current: { rulesetId: "starter", name: "Starter Rules", version: "1.0.0", digest: "digest-one", migration: "none", capabilities: [{ capabilityId: "combat", label: "Combat", supported: true }] }, available: [], mechanicallyEmpty: true, selectionWarning: null },
-  safety: { revision: 6, hardLimits: ["Harm to children"], veils: ["Body horror"], pvpPolicy: "explicit-consent", romancePolicy: "fade-to-black", lethalityPolicy: "consent-required", paused: false },
+  campaignId: "campaign",
+  actorRole: "owner",
+  revision: 7,
+  rulesets: {
+    current: {
+      rulesetId: "starter",
+      name: "Starter Rules",
+      version: "1.0.0",
+      digest: "digest-one",
+      migration: "none",
+      capabilities: [{ capabilityId: "combat", label: "Combat", supported: true }],
+    },
+    available: [],
+    mechanicallyEmpty: true,
+    selectionWarning: null,
+  },
+  safety: {
+    revision: 6,
+    hardLimits: ["Harm to children"],
+    veils: ["Body horror"],
+    pvpPolicy: "explicit-consent",
+    romancePolicy: "fade-to-black",
+    lethalityPolicy: "consent-required",
+    paused: false,
+  },
 } as unknown as CampaignAdministrationIntegrations;
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("CampaignSecurityPanels", () => {
   it("renders the authoritative rules identity and editable safety agreement", async () => {

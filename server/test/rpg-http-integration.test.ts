@@ -19,11 +19,19 @@ describe("integrated RPG HTTP lanes", () => {
     const app = buildApp({ campaignRepositoryFactory: () => repository });
     const { idempotencyKey: _publicationKey, ...draft } = MECHANICS_STARTER_CATALOG;
 
-    const response = await app.inject({ method: "POST", url: "/api/rpg/v1/content-packs/validate",
-      headers: { "content-type": "application/json" }, payload: draft });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/rpg/v1/content-packs/validate",
+      headers: { "content-type": "application/json" },
+      payload: draft,
+    });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().report).toMatchObject({ valid: true, issues: [], normalizedSummary: { totalDefinitions: 17 } });
+    expect(response.json().report).toMatchObject({
+      valid: true,
+      issues: [],
+      normalizedSummary: { totalDefinitions: 17 },
+    });
     await app.close();
   });
 
@@ -31,45 +39,96 @@ describe("integrated RPG HTTP lanes", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     process.env.FEATURE_RPG_MECHANICS = "true";
     const repository = createRepository();
-    const persona = repository.createCharacter({ name: "HTTP Persona", age: 30, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
+    const persona = repository.createCharacter({
+      name: "HTTP Persona",
+      age: 30,
+      archetype: "Warden",
+      boundaries: "",
+      fictionalConfirmed: true,
+    });
     const campaign = repository.createCampaign("local-owner", { name: "HTTP RPG" });
     repository.installMechanicsStarterCatalog("local-owner");
-    repository.configureMechanicsStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "http-configure" });
+    repository.configureMechanicsStarterCatalog("local-owner", campaign.id, {
+      expectedRevision: 0,
+      idempotencyKey: "http-configure",
+    });
     const app = buildApp({ campaignRepositoryFactory: () => repository });
-    const scores = Object.fromEntries(["might", "agility", "resolve", "insight", "presence", "craft"]
-      .map((key, index) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[index]]));
+    const scores = Object.fromEntries(
+      ["might", "agility", "resolve", "insight", "presence", "craft"].map((key, index) => [
+        key,
+        CHARACTER_BUILDER_STANDARD_ARRAY[index],
+      ]),
+    );
 
-    const created = await app.inject({ method: "POST", url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts`,
-      headers: { "content-type": "application/json" }, payload: {
-        personaId: persona.id, durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: "http-draft",
-      } });
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts`,
+      headers: { "content-type": "application/json" },
+      payload: {
+        personaId: persona.id,
+        durability: "durable",
+        allocation: { method: "standard-array", scores },
+        idempotencyKey: "http-draft",
+      },
+    });
     expect(created.statusCode).toBe(201);
     const draft = created.json().draft;
-    const read = await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.id}` });
+    const read = await app.inject({
+      method: "GET",
+      url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.id}`,
+    });
     expect(read.statusCode).toBe(200);
     const race = MECHANICS_STARTER_CATALOG.definitions.find((value) => value.reference.kind === "race")!.reference;
-    const background = MECHANICS_STARTER_CATALOG.definitions.find((value) => value.reference.kind === "background")!.reference;
+    const background = MECHANICS_STARTER_CATALOG.definitions.find(
+      (value) => value.reference.kind === "background",
+    )!.reference;
     const klass = MECHANICS_STARTER_CATALOG.definitions.find((value) => value.reference.kind === "class")!.reference;
-    const updated = await app.inject({ method: "PATCH", url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.id}`,
-      headers: { "content-type": "application/json" }, payload: {
-        expectedRevision: 0, idempotencyKey: "http-draft-update", selections: { race, background, class: klass, starterGrant: "kit" },
-      } });
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.id}`,
+      headers: { "content-type": "application/json" },
+      payload: {
+        expectedRevision: 0,
+        idempotencyKey: "http-draft-update",
+        selections: { race, background, class: klass, starterGrant: "kit" },
+      },
+    });
     expect(updated.statusCode).toBe(200);
-    const finalized = await app.inject({ method: "POST", url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.id}/finalize`,
-      headers: { "content-type": "application/json" }, payload: { expectedRevision: 1, idempotencyKey: "http-finalize" } });
+    const finalized = await app.inject({
+      method: "POST",
+      url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.id}/finalize`,
+      headers: { "content-type": "application/json" },
+      payload: { expectedRevision: 1, idempotencyKey: "http-finalize" },
+    });
     expect(finalized.statusCode, finalized.body).toBe(201);
-    expect(finalized.body).not.toMatch(/controllerPrincipalId|commandId|eventId|actorId|campaignId|characterId|sheetId|draftId/);
+    expect(finalized.body).not.toMatch(
+      /controllerPrincipalId|commandId|eventId|actorId|campaignId|characterId|sheetId|draftId/,
+    );
     const characterId = finalized.json().character.id;
 
-    const progression = await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaign.id}/characters/${characterId}/progression` });
+    const progression = await app.inject({
+      method: "GET",
+      url: `/api/rpg/v1/campaigns/${campaign.id}/characters/${characterId}/progression`,
+    });
     expect(progression.statusCode).toBe(200);
-    const preview = await app.inject({ method: "POST", url: `/api/rpg/v1/campaigns/${campaign.id}/characters/${characterId}/progression/preview`,
-      headers: { "content-type": "application/json" }, payload: { selections: [] } });
+    const preview = await app.inject({
+      method: "POST",
+      url: `/api/rpg/v1/campaigns/${campaign.id}/characters/${characterId}/progression/preview`,
+      headers: { "content-type": "application/json" },
+      payload: { selections: [] },
+    });
     expect(preview.statusCode).toBe(200);
-    const administration = await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaign.id}/administration` });
+    const administration = await app.inject({
+      method: "GET",
+      url: `/api/rpg/v1/campaigns/${campaign.id}/administration`,
+    });
     expect(administration.statusCode).toBe(200);
-    const patched = await app.inject({ method: "PATCH", url: `/api/rpg/v1/campaigns/${campaign.id}/administration`,
-      headers: { "content-type": "application/json" }, payload: { expectedRevision: 1, idempotencyKey: "http-admin", status: "published" } });
+    const patched = await app.inject({
+      method: "PATCH",
+      url: `/api/rpg/v1/campaigns/${campaign.id}/administration`,
+      headers: { "content-type": "application/json" },
+      payload: { expectedRevision: 1, idempotencyKey: "http-admin", status: "published" },
+    });
     expect(patched.statusCode).toBe(200);
     await app.close();
   });

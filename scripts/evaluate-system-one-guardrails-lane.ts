@@ -90,10 +90,7 @@ const HAZARD_CATEGORIES: readonly GuardrailsEvalCategory[] = [
 const CONTROL_CATEGORIES: readonly GuardrailsEvalCategory[] = ["benign", "fiction"];
 
 /** The label subset `gradeGuardrailsCase` needs from a corpus case. */
-export type GuardrailsCaseLabel = Pick<
-  GuardrailsEvalCase,
-  "id" | "category" | "holdout" | "expected" | "acceptable"
->;
+export type GuardrailsCaseLabel = Pick<GuardrailsEvalCase, "id" | "category" | "holdout" | "expected" | "acceptable">;
 
 /** One graded observation: the composed guardrail recommendation for a case. */
 export interface GuardrailsReadout {
@@ -175,7 +172,10 @@ export function actedSignalPoints(readouts: readonly GuardrailsReadout[]): Guard
 }
 
 /** Aggregates accuracy, Brier, and ECE over calibration points. Pure. */
-export function aggregateGuardrailsMetrics(points: readonly GuardrailSignalPoint[], bins = 10): GuardrailsCalibrationMetrics {
+export function aggregateGuardrailsMetrics(
+  points: readonly GuardrailSignalPoint[],
+  bins = 10,
+): GuardrailsCalibrationMetrics {
   const graded = gradeCalibration(points, bins);
   const accuracy = points.length === 0 ? 0 : points.filter((point) => point.correct).length / points.length;
   return {
@@ -187,7 +187,10 @@ export function aggregateGuardrailsMetrics(points: readonly GuardrailSignalPoint
 }
 
 /** Applies a Platt map to every point. Pure. */
-export function calibratePoints(points: readonly GuardrailSignalPoint[], calibration: PlattCalibration): GuardrailSignalPoint[] {
+export function calibratePoints(
+  points: readonly GuardrailSignalPoint[],
+  calibration: PlattCalibration,
+): GuardrailSignalPoint[] {
   return points.map((point) => ({
     predictedProbability: applyCalibration(point.predictedProbability, calibration),
     correct: point.correct,
@@ -280,7 +283,8 @@ export function summarizeGuardrailsStability(readouts: readonly GuardrailsReadou
 /** How a corpus row entered this run: the frozen projection corpus or a confirmed live harvest. */
 export type GuardrailsCaseProvenance = "frozen" | "harvested";
 
-const provenanceOf = (id: string): GuardrailsCaseProvenance => (id.startsWith(HARVEST_ID_PREFIX) ? "harvested" : "frozen");
+const provenanceOf = (id: string): GuardrailsCaseProvenance =>
+  id.startsWith(HARVEST_ID_PREFIX) ? "harvested" : "frozen";
 
 /** The parent-owned confirmed-harvest fixture shape (`version: 1`). Proposals are validated defensively. */
 export interface GuardrailsHarvestFixture {
@@ -377,7 +381,8 @@ function guardrailsCaseFromHarvest(proposal: HarvestedProposalShape): Guardrails
   }
   const expected = isRecord(proposal.expected) ? proposal.expected : null;
   const disposition = expected?.disposition;
-  if (typeof disposition !== "string" || !(GUARDRAIL_DISPOSITIONS as readonly string[]).includes(disposition)) return null;
+  if (typeof disposition !== "string" || !(GUARDRAIL_DISPOSITIONS as readonly string[]).includes(disposition))
+    return null;
   const testCase: GuardrailsEvalCase = {
     id: `${HARVEST_ID_PREFIX}${proposal.proposalId.slice(0, 12)}`,
     category: "harvested",
@@ -449,7 +454,9 @@ export function parseHarvestedGuardrailsCases(text: string): HarvestedGuardrails
  * with no warning; any other read or parse failure is reported as a warning and skipped so the
  * live benchmark never fails because of the fixture.
  */
-export async function loadHarvestedGuardrailsCases(filePath: string = HARVEST_FIXTURE_PATH): Promise<HarvestedGuardrailsCases> {
+export async function loadHarvestedGuardrailsCases(
+  filePath: string = HARVEST_FIXTURE_PATH,
+): Promise<HarvestedGuardrailsCases> {
   let text: string;
   try {
     text = await readFile(filePath, "utf8");
@@ -531,12 +538,12 @@ export function summarizeGuardrailsCases(
         accuracy: rate(rows.filter((row) => row.correct).length, rows.length),
         dispositions,
         hazards: GUARDRAIL_HAZARDS.filter((hazard) => rows.some((row) => row.hazards.includes(hazard))),
-        meanSignal: signals.length === 0
-          ? 0
-          : signals.reduce((sum, row) => sum + (row.topSignal ?? 0), 0) / signals.length,
-        meanSeverity: severities.length === 0
-          ? null
-          : severities.reduce((sum, row) => sum + (row.severity ?? 0), 0) / severities.length,
+        meanSignal:
+          signals.length === 0 ? 0 : signals.reduce((sum, row) => sum + (row.topSignal ?? 0), 0) / signals.length,
+        meanSeverity:
+          severities.length === 0
+            ? null
+            : severities.reduce((sum, row) => sum + (row.severity ?? 0), 0) / severities.length,
       };
     });
   const labelById = new Map(corpus.map((entry) => [entry.id, entry.expected]));
@@ -596,7 +603,9 @@ export function renderGuardrailsBenchmark(input: {
 
   lines.push("# System One (Jev) L6 guardrails and boundaries lane benchmark");
   lines.push("");
-  lines.push(`Generated ${generatedAt} by \`scripts/evaluate-system-one-guardrails-lane.ts\` using the live System One adapter.`);
+  lines.push(
+    `Generated ${generatedAt} by \`scripts/evaluate-system-one-guardrails-lane.ts\` using the live System One adapter.`,
+  );
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
@@ -608,7 +617,9 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("rather than a block.");
   lines.push("");
   lines.push("The lane is **shadow-wired (record-only)** behind `FEATURE_SYSTEM_ONE`, the enabled setting, a usable");
-  lines.push("key, and a non-`off` lane mode: each `POST /api/sessions/:id/room-turn` records one immutable `guardrails`");
+  lines.push(
+    "key, and a non-`off` lane mode: each `POST /api/sessions/:id/room-turn` records one immutable `guardrails`",
+  );
   lines.push("decision over the raw user content (`state` and `flags` mirror the hazards for the review queue).");
   lines.push("It **never blocks, rewrites, sanitizes, or influences routing, generation, or fallbacks**, and the");
   lines.push("deterministic checks in `server/src/policy.ts` remain authoritative. An `active` lane mode is still");
@@ -624,11 +635,15 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("| --- | --- |");
   lines.push(`| Model | \`${model}\` |`);
   lines.push(`| Base URL | \`${baseUrl}\` |`);
-  lines.push(`| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`);
+  lines.push(
+    `| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`,
+  );
   lines.push(`| Repeats | ${repeats} |`);
   lines.push(`| Corpus | ${cases.length} messages x ${repeats} repeats = ${totalCalls} calls |`);
   lines.push(`| Holdout | ${holdoutCases} messages kept out of the Platt fit |`);
-  lines.push(`| Harvested cases | ${harvest.cases} confirmed merged, ${harvest.skipped} skipped — ${harvest.present ? `\`${harvest.fixture}\`` : "fixture absent"} |`);
+  lines.push(
+    `| Harvested cases | ${harvest.cases} confirmed merged, ${harvest.skipped} skipped — ${harvest.present ? `\`${harvest.fixture}\`` : "fixture absent"} |`,
+  );
   lines.push("| Deterministic policy | `server/src/policy.ts` remains authoritative |");
   lines.push("");
   if (harvest.warning) {
@@ -638,8 +653,12 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("## Corpus");
   lines.push("");
   if (harvest.cases > 0 || harvest.confirmed > 0) {
-    lines.push(`${harvest.cases} of ${cases.length} case(s) are **harvested** rows: confirmed live-derived labels from`);
-    lines.push(`\`${harvest.fixture}\` (${harvest.skipped} confirmed proposal(s) skipped). They run through the same composition,`);
+    lines.push(
+      `${harvest.cases} of ${cases.length} case(s) are **harvested** rows: confirmed live-derived labels from`,
+    );
+    lines.push(
+      `\`${harvest.fixture}\` (${harvest.skipped} confirmed proposal(s) skipped). They run through the same composition,`,
+    );
     lines.push("calibration, and gate logic as the frozen corpus, so the gate metrics below include them.");
     lines.push("");
   }
@@ -647,23 +666,30 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("| --- | --- | --- | --- | --- |");
   for (const entry of cases) {
     const also = (entry.acceptable ?? []).filter((disposition) => disposition !== entry.expected);
-    lines.push(`| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${provenanceOf(entry.id)} | ${entry.expected}${also.length === 0 ? "" : ` (also ${also.join(", ")})`} |`);
+    lines.push(
+      `| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${provenanceOf(entry.id)} | ${entry.expected}${also.length === 0 ? "" : ` (also ${also.join(", ")})`} |`,
+    );
   }
   lines.push("");
   lines.push("## Per-case results (all repeats)");
   lines.push("");
-  lines.push("| Case | Category | Provenance | Expected | Composed (pass/review/block/support) | Hazards | Acted | Correct | Mean signal | Mean severity |");
+  lines.push(
+    "| Case | Category | Provenance | Expected | Composed (pass/review/block/support) | Hazards | Acted | Correct | Mean signal | Mean severity |",
+  );
   lines.push("| --- | --- | :---: | --- | --- | --- | ---: | ---: | ---: | ---: |");
   for (const summary of summaries.cases) {
     const expected = expectedById.get(summary.id)?.expected ?? "—";
     const counts = summary.dispositions;
     const hazards = summary.hazards.length === 0 ? "—" : summary.hazards.join(", ");
-    lines.push(`| ${summary.id} | ${summary.category} | ${summary.provenance} | ${expected} | ${counts.pass}/${counts.review}/${counts.block}/${counts.support} | ${hazards} | ${summary.acted}/${summary.total} | ${summary.correct}/${summary.total} | ${summary.meanSignal.toFixed(3)} | ${summary.meanSeverity === null ? "n/a" : summary.meanSeverity.toFixed(3)} |`);
+    lines.push(
+      `| ${summary.id} | ${summary.category} | ${summary.provenance} | ${expected} | ${counts.pass}/${counts.review}/${counts.block}/${counts.support} | ${hazards} | ${summary.acted}/${summary.total} | ${summary.correct}/${summary.total} | ${summary.meanSignal.toFixed(3)} | ${summary.meanSeverity === null ? "n/a" : summary.meanSeverity.toFixed(3)} |`,
+    );
   }
   lines.push("");
   if (failures.length > 0) {
     lines.push(`Adapter failures: ${failures.length}.`);
-    for (const failure of failures.slice(0, 10)) lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
+    for (const failure of failures.slice(0, 10))
+      lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
     lines.push("");
   }
   lines.push("## Decision stability");
@@ -678,7 +704,9 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("| Metric | Value |");
   lines.push("| --- | ---: |");
   lines.push(`| Mean agreement | ${stability.cases.length === 0 ? "n/a" : pct(stability.meanAgreement)} |`);
-  lines.push(`| Conflict cases | ${stability.conflictCases} of ${stability.cases.length} (${pct(stability.conflictRate)}) |`);
+  lines.push(
+    `| Conflict cases | ${stability.conflictCases} of ${stability.cases.length} (${pct(stability.conflictRate)}) |`,
+  );
   lines.push(`| Mean signal std dev | ${stdText(stability.meanSignalStdDev)} |`);
   lines.push(`| Max signal std dev | ${stdText(stability.maxSignalStdDev)} |`);
   lines.push("");
@@ -689,14 +717,18 @@ export function renderGuardrailsBenchmark(input: {
     }
     lines.push("");
   }
-  lines.push("Honesty: stability is repeatability, not accuracy; a consistently deferred case is stable and still a coverage miss.");
+  lines.push(
+    "Honesty: stability is repeatability, not accuracy; a consistently deferred case is stable and still a coverage miss.",
+  );
   lines.push("");
   lines.push("## Confusion matrix — expected vs composed disposition");
   lines.push("");
   lines.push("| Expected \\ composed | pass | review | block | support | total |");
   lines.push("| --- | ---: | ---: | ---: | ---: | ---: |");
   for (const row of summaries.confusion) {
-    lines.push(`| ${row.expected} | ${row.composed.pass} | ${row.composed.review} | ${row.composed.block} | ${row.composed.support} | ${row.total} |`);
+    lines.push(
+      `| ${row.expected} | ${row.composed.pass} | ${row.composed.review} | ${row.composed.block} | ${row.composed.support} | ${row.total} |`,
+    );
   }
   lines.push("");
   lines.push("## Calibration");
@@ -711,7 +743,9 @@ export function renderGuardrailsBenchmark(input: {
   lines.push(metricRow("held-out acted, raw", calibration.holdoutRaw));
   lines.push(metricRow("held-out acted, calibrated", calibration.holdoutCalibrated));
   lines.push("");
-  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)} (fit on ${calibration.devSamples} development acted decision(s); held out ${calibration.holdoutSamples}).`);
+  lines.push(
+    `Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)} (fit on ${calibration.devSamples} development acted decision(s); held out ${calibration.holdoutSamples}).`,
+  );
   lines.push("");
   const coverage = DISPOSITION_ORDER.map((expected) => {
     const ids = new Set(cases.filter((entry) => entry.expected === expected).map((entry) => entry.id));
@@ -722,9 +756,13 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("");
   lines.push(`## Promotion gate — \`${PROMOTION_LANE}\``);
   lines.push("");
-  lines.push(`Metrics scored on the calibrated acted signal: samples ${calibration.allCalibrated.samples}, accuracy ${calibration.allCalibrated.samples === 0 ? "n/a" : pct(calibration.allCalibrated.accuracy)}, Brier ${calibration.allCalibrated.brier.toFixed(4)}, ECE ${calibration.allCalibrated.expectedCalibrationError.toFixed(4)}.`);
+  lines.push(
+    `Metrics scored on the calibrated acted signal: samples ${calibration.allCalibrated.samples}, accuracy ${calibration.allCalibrated.samples === 0 ? "n/a" : pct(calibration.allCalibrated.accuracy)}, Brier ${calibration.allCalibrated.brier.toFixed(4)}, ECE ${calibration.allCalibrated.expectedCalibrationError.toFixed(4)}.`,
+  );
   lines.push("");
-  lines.push(`Gate: minSamples ${gate.gates.minSamples}, minAccuracy ${gate.gates.minAccuracy}, maxBrier ${gate.gates.maxBrier}, maxECE ${gate.gates.maxExpectedCalibrationError}.`);
+  lines.push(
+    `Gate: minSamples ${gate.gates.minSamples}, minAccuracy ${gate.gates.minAccuracy}, maxBrier ${gate.gates.maxBrier}, maxECE ${gate.gates.maxExpectedCalibrationError}.`,
+  );
   lines.push("");
   lines.push(`**${gate.promoted ? "PROMOTE" : "NOT READY"}**`);
   lines.push("");
@@ -738,7 +776,9 @@ export function renderGuardrailsBenchmark(input: {
     lines.push(JSON.stringify(proposedRecord, null, 2));
     lines.push("```");
   } else {
-    lines.push("No promotion record is proposed: the lane stays shadow-wired (record-only) and keeps recording decisions that never influence behavior.");
+    lines.push(
+      "No promotion record is proposed: the lane stays shadow-wired (record-only) and keeps recording decisions that never influence behavior.",
+    );
   }
   lines.push("");
   lines.push("## Observations");
@@ -747,29 +787,45 @@ export function renderGuardrailsBenchmark(input: {
   const deferredCalls = readouts.filter((readout) => !readout.acted);
   const countDisposition = (rows: readonly GuardrailsReadout[], disposition: GuardrailDisposition): number =>
     rows.filter((readout) => readout.disposition === disposition).length;
-  lines.push(`- **Coverage.** The lane acted on ${actedCalls.length} of ${readouts.length} graded calls (${countDisposition(actedCalls, "block")} block, ${countDisposition(actedCalls, "support")} support) and deferred on ${deferredCalls.length} (${countDisposition(deferredCalls, "review")} review, ${countDisposition(deferredCalls, "pass")} pass, ${countDisposition(deferredCalls, "support")} low-confidence support). A deferral leaves the deterministic checks in charge and is coverage, not a decision.`);
+  lines.push(
+    `- **Coverage.** The lane acted on ${actedCalls.length} of ${readouts.length} graded calls (${countDisposition(actedCalls, "block")} block, ${countDisposition(actedCalls, "support")} support) and deferred on ${deferredCalls.length} (${countDisposition(deferredCalls, "review")} review, ${countDisposition(deferredCalls, "pass")} pass, ${countDisposition(deferredCalls, "support")} low-confidence support). A deferral leaves the deterministic checks in charge and is coverage, not a decision.`,
+  );
   const hazardReadouts = readouts.filter((readout) => HAZARD_CATEGORIES.includes(readout.category));
-  const hazardMisses = hazardReadouts.filter((readout) => readout.disposition !== "block" && readout.disposition !== "support");
+  const hazardMisses = hazardReadouts.filter(
+    (readout) => readout.disposition !== "block" && readout.disposition !== "support",
+  );
   const hazardMissIds = [...new Set(hazardMisses.map((readout) => readout.id))];
   if (hazardMisses.length === 0) {
     lines.push("- **False negatives.** Every hazard-category call reached block or support.");
   } else {
-    lines.push(`- **False negatives.** ${hazardMisses.length} of ${hazardReadouts.length} hazard-category calls stayed below block/support (expected block, or support for a crisis): ${hazardMissIds.join(", ")}. A hazard that only reviewed is a detection gap, not a pass: the lane refused to assert, and the deterministic checks remain the only enforcement.`);
+    lines.push(
+      `- **False negatives.** ${hazardMisses.length} of ${hazardReadouts.length} hazard-category calls stayed below block/support (expected block, or support for a crisis): ${hazardMissIds.join(", ")}. A hazard that only reviewed is a detection gap, not a pass: the lane refused to assert, and the deterministic checks remain the only enforcement.`,
+    );
   }
   const missedHazardReadouts = readouts.filter((readout) => readout.missedHazards.length > 0);
-  lines.push(`- **Hazard detection.** ${missedHazardReadouts.length === 0 ? "Every expected hazard cleared the review threshold." : `${missedHazardReadouts.length} readout(s) left an expected hazard below the review threshold, so the composed disposition cannot reflect it.`}`);
+  lines.push(
+    `- **Hazard detection.** ${missedHazardReadouts.length === 0 ? "Every expected hazard cleared the review threshold." : `${missedHazardReadouts.length} readout(s) left an expected hazard below the review threshold, so the composed disposition cannot reflect it.`}`,
+  );
   const controlReadouts = readouts.filter((readout) => CONTROL_CATEGORIES.includes(readout.category));
   const falsePositives = controlReadouts.filter((readout) => readout.disposition !== "pass");
-  const hardFalsePositives = falsePositives.filter((readout) => readout.disposition === "block" || readout.disposition === "support");
+  const hardFalsePositives = falsePositives.filter(
+    (readout) => readout.disposition === "block" || readout.disposition === "support",
+  );
   const falsePositiveIds = [...new Set(falsePositives.map((readout) => readout.id))];
   if (falsePositives.length === 0) {
     lines.push("- **False positives.** No benign or fiction call blocked or escalated.");
   } else {
-    lines.push(`- **False positives.** ${falsePositives.length} of ${controlReadouts.length} benign/fiction calls did not pass (${hardFalsePositives.length} blocked or supported): ${falsePositiveIds.join(", ")}. In-fiction violence, a character's self-harm, and in-character commands to NPCs are fiction, not user hazards; acting on them counts against the gate accuracy, and reviewing them costs coverage.`);
+    lines.push(
+      `- **False positives.** ${falsePositives.length} of ${controlReadouts.length} benign/fiction calls did not pass (${hardFalsePositives.length} blocked or supported): ${falsePositiveIds.join(", ")}. In-fiction violence, a character's self-harm, and in-character commands to NPCs are fiction, not user hazards; acting on them counts against the gate accuracy, and reviewing them costs coverage.`,
+    );
   }
-  lines.push(`- **Calibration.** Held-out calibrated Brier ${calibration.holdoutCalibrated.brier.toFixed(4)} and ECE ${calibration.holdoutCalibrated.expectedCalibrationError.toFixed(4)}; all-acted calibrated Brier ${calibration.allCalibrated.brier.toFixed(4)} and ECE ${calibration.allCalibrated.expectedCalibrationError.toFixed(4)}. The fitted map is reported as-is.`);
+  lines.push(
+    `- **Calibration.** Held-out calibrated Brier ${calibration.holdoutCalibrated.brier.toFixed(4)} and ECE ${calibration.holdoutCalibrated.expectedCalibrationError.toFixed(4)}; all-acted calibrated Brier ${calibration.allCalibrated.brier.toFixed(4)} and ECE ${calibration.allCalibrated.expectedCalibrationError.toFixed(4)}. The fitted map is reported as-is.`,
+  );
   if (calibration.allCalibrated.samples > 0 && calibration.allCalibrated.accuracy === 1) {
-    lines.push("- The corpus produced **no incorrect acted decisions**, so calibration cannot be stress-tested: the Platt fit is provisional until shadow data with negative examples exists.");
+    lines.push(
+      "- The corpus produced **no incorrect acted decisions**, so calibration cannot be stress-tested: the Platt fit is provisional until shadow data with negative examples exists.",
+    );
   }
   lines.push("");
   lines.push("## Honesty notes");
@@ -777,24 +833,34 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("- **Shadow-wired and record-only.** `POST /api/sessions/:id/room-turn` calls");
   lines.push("  `recordGuardrailShadowDecision` when `FEATURE_SYSTEM_ONE` is on, the System One setting is enabled, a");
   lines.push("  usable key is configured, and the `guardrails` lane mode is not `off`. It persists one immutable");
-  lines.push("  `guardrails` decision per turn over the raw user content, with `state` and `flags` mirroring the hazards");
+  lines.push(
+    "  `guardrails` decision per turn over the raw user content, with `state` and `flags` mirroring the hazards",
+  );
   lines.push("  for the review queue, and it never blocks, rewrites, sanitizes, or influences routing, generation,");
-  lines.push("  fallbacks, or the response. An `active` lane mode is still record-only because no promoted active path");
+  lines.push(
+    "  fallbacks, or the response. An `active` lane mode is still record-only because no promoted active path",
+  );
   lines.push("  exists. The deterministic checks in `server/src/policy.ts` remain authoritative, and they are a");
   lines.push("  permissive stub: they return allow/deny only (no review or support), `checkCharacter` always allows,");
   lines.push("  and on the HTTP routes sanitization runs before the check, so `prompt-injection-marker` rejection is");
   lines.push("  currently unreachable. The stub context is why a passing guardrails gate is a promotion candidate,");
   lines.push("  not a moderation or content-safety guarantee.");
-  lines.push(`- **Hand-labelled corpus.** The ${GUARDRAILS_EVAL_CORPUS.length} frozen messages and ${holdoutCases} held-out cases are hand-labelled;`);
-  lines.push("  \"expected\" is the labeller's judgment, borderline cases carry an explicit `acceptable` set, and the");
+  lines.push(
+    `- **Hand-labelled corpus.** The ${GUARDRAILS_EVAL_CORPUS.length} frozen messages and ${holdoutCases} held-out cases are hand-labelled;`,
+  );
+  lines.push('  "expected" is the labeller\'s judgment, borderline cases carry an explicit `acceptable` set, and the');
   lines.push("  corpus cannot cover the full tail of production messages.");
   lines.push("- **Decision stability is repeatability, not accuracy**: a consistently deferred case is stable and");
   lines.push("  still a coverage miss. Harvested rows are live-derived labels and are flagged as such in the tables");
   lines.push("  so a reviewer can see the gate includes them.");
   lines.push("- **Promotion candidate, not a guarantee.** The `guardrails` gate is the strict tier (accuracy >= 0.95,");
-  lines.push("  Brier/ECE <= 0.05, at least 30 acted samples). The verdict above is reported as measured, and a passing");
+  lines.push(
+    "  Brier/ECE <= 0.05, at least 30 acted samples). The verdict above is reported as measured, and a passing",
+  );
   lines.push("  gate is a promotion candidate, not a moderation guarantee.");
-  lines.push("- Only schema-valid calls produce decisions; transport failures are reported separately and never counted");
+  lines.push(
+    "- Only schema-valid calls produce decisions; transport failures are reported separately and never counted",
+  );
   lines.push("  as acted samples.");
   lines.push("");
   lines.push("## Reproduce");
@@ -824,9 +890,10 @@ function parseFlag(args: readonly string[], name: string): string | null {
  * gate runs must mirror the production request, and the vendor decorrelator is reserved for
  * dedicated stability probes (see the Decision stability section of the report).
  */
-export function guardrailsRequestState(
-  view: { message: string; declaredBoundaries?: readonly string[] },
-): { message: string; declaredBoundaries: string[] } {
+export function guardrailsRequestState(view: { message: string; declaredBoundaries?: readonly string[] }): {
+  message: string;
+  declaredBoundaries: string[];
+} {
   return { message: view.message, declaredBoundaries: [...(view.declaredBoundaries ?? [])] };
 }
 
@@ -866,8 +933,12 @@ async function main(): Promise<void> {
   const readouts: GuardrailsReadout[] = [];
   const failures: GuardrailsCallFailure[] = [];
   let model = settings.model;
-  console.log(`evaluating ${cases.length} guardrail messages (${harvest.cases.length} harvested) x ${repeats} repeats against ${settings.model}`);
-  console.log(`harvested cases: ${harvest.cases.length}${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`);
+  console.log(
+    `evaluating ${cases.length} guardrail messages (${harvest.cases.length} harvested) x ${repeats} repeats against ${settings.model}`,
+  );
+  console.log(
+    `harvested cases: ${harvest.cases.length}${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`,
+  );
 
   for (const testCase of cases) {
     const view = testCase.declaredBoundaries
@@ -918,28 +989,46 @@ async function main(): Promise<void> {
     harvest: harvestReport,
   });
   await writeFile(outPath, report, "utf8");
-  await writeFile(outPath.replace(/\.md$/, ".json"), `${JSON.stringify({
-    model,
-    baseUrl: settings.baseUrl,
-    repeats,
-    thresholds,
-    corpus: cases,
-    samples: cases.length * repeats,
-    harvestedCases: harvest.cases.length,
-    harvest: harvestReport,
-    failures,
-    readouts,
-    stability,
-    calibration: evaluation.calibration,
-    gate: evaluation.gate,
-    proposedRecord: evaluation.proposedRecord,
-  }, null, 2)}\n`, "utf8");
+  await writeFile(
+    outPath.replace(/\.md$/, ".json"),
+    `${JSON.stringify(
+      {
+        model,
+        baseUrl: settings.baseUrl,
+        repeats,
+        thresholds,
+        corpus: cases,
+        samples: cases.length * repeats,
+        harvestedCases: harvest.cases.length,
+        harvest: harvestReport,
+        failures,
+        readouts,
+        stability,
+        calibration: evaluation.calibration,
+        gate: evaluation.gate,
+        proposedRecord: evaluation.proposedRecord,
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 
-  console.log(`samples: ${evaluation.calibration.allCalibrated.samples} acted, accuracy ${pct(evaluation.calibration.allCalibrated.accuracy)}`);
-  console.log(`brier: raw ${evaluation.calibration.allRaw.brier.toFixed(4)} -> calibrated ${evaluation.calibration.allCalibrated.brier.toFixed(4)}`);
-  console.log(`ece: raw ${evaluation.calibration.allRaw.expectedCalibrationError.toFixed(4)} -> calibrated ${evaluation.calibration.allCalibrated.expectedCalibrationError.toFixed(4)}`);
-  console.log(`gate: ${evaluation.gate.promoted ? "PROMOTE" : "NOT READY"}${evaluation.gate.reasons.length ? ` (${evaluation.gate.reasons.join("; ")})` : ""}`);
-  console.log(`stability: mean agreement ${pct(stability.meanAgreement)}, ${stability.conflictCases}/${stability.cases.length} conflicted case(s)`);
+  console.log(
+    `samples: ${evaluation.calibration.allCalibrated.samples} acted, accuracy ${pct(evaluation.calibration.allCalibrated.accuracy)}`,
+  );
+  console.log(
+    `brier: raw ${evaluation.calibration.allRaw.brier.toFixed(4)} -> calibrated ${evaluation.calibration.allCalibrated.brier.toFixed(4)}`,
+  );
+  console.log(
+    `ece: raw ${evaluation.calibration.allRaw.expectedCalibrationError.toFixed(4)} -> calibrated ${evaluation.calibration.allCalibrated.expectedCalibrationError.toFixed(4)}`,
+  );
+  console.log(
+    `gate: ${evaluation.gate.promoted ? "PROMOTE" : "NOT READY"}${evaluation.gate.reasons.length ? ` (${evaluation.gate.reasons.join("; ")})` : ""}`,
+  );
+  console.log(
+    `stability: mean agreement ${pct(stability.meanAgreement)}, ${stability.conflictCases}/${stability.cases.length} conflicted case(s)`,
+  );
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }
 

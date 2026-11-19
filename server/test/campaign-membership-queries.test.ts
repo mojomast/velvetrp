@@ -39,11 +39,16 @@ function seed(): void {
       VALUES (?, ?, ?, ?, '2031-01-01T00:00:00.000Z', '2031-01-01T00:00:00.000Z')`);
     const insertTimeline = db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at)
       VALUES (?, ?, '2031-01-01T00:00:00.000Z')`);
-    for (const [campaignId, ownerId] of [[campaignA, ownerA], [campaignB, ownerB]] as const) {
+    for (const [campaignId, ownerId] of [
+      [campaignA, ownerA],
+      [campaignB, ownerB],
+    ] as const) {
       insertCampaign.run(campaignId, campaignId, `timeline-${campaignId}`, ownerId);
       insertTimeline.run(`timeline-${campaignId}`, campaignId);
-      db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
-        VALUES (?, ?, 'owner', '2031-01-01T00:00:00.000Z')`).run(campaignId, ownerId);
+      db.prepare(
+        `INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
+        VALUES (?, ?, 'owner', '2031-01-01T00:00:00.000Z')`,
+      ).run(campaignId, ownerId);
     }
     const insertMembership = db.prepare(`INSERT INTO campaign_memberships
       (campaign_id, principal_id, role, created_at) VALUES (?, ?, ?, ?)`);
@@ -96,12 +101,18 @@ describe("campaign membership queries", () => {
 
   it.each([
     ["owner disagreement", `UPDATE campaigns SET owner_principal_id = '${gm}' WHERE id = '${campaignA}'`],
-    ["non-owner actor row", `UPDATE campaign_memberships SET role = 'observer'
-      WHERE campaign_id = '${campaignA}' AND principal_id = '${ownerA}'`],
+    [
+      "non-owner actor row",
+      `UPDATE campaign_memberships SET role = 'observer'
+      WHERE campaign_id = '${campaignA}' AND principal_id = '${ownerA}'`,
+    ],
     ["missing actor principal", `DELETE FROM principals WHERE id = '${ownerA}'`],
-    ["more than one owner", `DROP INDEX idx_campaign_memberships_one_owner;
+    [
+      "more than one owner",
+      `DROP INDEX idx_campaign_memberships_one_owner;
       UPDATE campaign_memberships SET role = 'owner'
-      WHERE campaign_id = '${campaignA}' AND principal_id = '${gm}'`],
+      WHERE campaign_id = '${campaignA}' AND principal_id = '${gm}'`,
+    ],
   ])("denies a structurally invalid campaign-owner authority: %s", (_name, mutation) => {
     seed();
     corrupt(mutation);
@@ -145,14 +156,21 @@ describe("campaign membership queries", () => {
   it("validates inputs before querying and consumes no clock, ID, RNG, or writes", () => {
     seed();
     const beforeDb = new DatabaseDriver(databasePath(), { readonly: true });
-    const before = beforeDb.prepare(`SELECT campaign_id, principal_id, role, created_at
-      FROM campaign_memberships ORDER BY campaign_id, principal_id`).all();
+    const before = beforeDb
+      .prepare(
+        `SELECT campaign_id, principal_id, role, created_at
+      FROM campaign_memberships ORDER BY campaign_id, principal_id`,
+      )
+      .all();
     beforeDb.close();
     const now = vi.fn(() => new Date());
     const nextId = vi.fn(() => "unused");
     const integer = vi.fn(() => 0);
     const repository = createRepository({
-      dataDir: dataDir(), clock: { now }, ids: { nextId }, rng: { integer },
+      dataDir: dataDir(),
+      clock: { now },
+      ids: { nextId },
+      rng: { integer },
     });
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     expect(() => repository.listCampaignMemberships("bad actor", campaignA)).toThrow();
@@ -166,8 +184,12 @@ describe("campaign membership queries", () => {
     expect(integer).not.toHaveBeenCalled();
     repository.close();
     const afterDb = new DatabaseDriver(databasePath(), { readonly: true });
-    const after = afterDb.prepare(`SELECT campaign_id, principal_id, role, created_at
-      FROM campaign_memberships ORDER BY campaign_id, principal_id`).all();
+    const after = afterDb
+      .prepare(
+        `SELECT campaign_id, principal_id, role, created_at
+      FROM campaign_memberships ORDER BY campaign_id, principal_id`,
+      )
+      .all();
     afterDb.close();
     expect(after).toEqual(before);
   });
@@ -181,33 +203,43 @@ describe("campaign membership queries", () => {
       expect(unitOfWork.listCampaignMemberships(ownerA, campaignA)).toHaveLength(4);
       expect(unitOfWork.getCampaignMembership(ownerA, campaignA, observer)?.role).toBe("observer");
     });
-    expect(() => expired!.listCampaignMemberships("bad actor", "bad campaign"))
-      .toThrow("transaction unit of work is no longer active");
-    expect(() => expired!.getCampaignMembership("bad actor", "bad campaign", "bad target"))
-      .toThrow("transaction unit of work is no longer active");
+    expect(() => expired!.listCampaignMemberships("bad actor", "bad campaign")).toThrow(
+      "transaction unit of work is no longer active",
+    );
+    expect(() => expired!.getCampaignMembership("bad actor", "bad campaign", "bad target")).toThrow(
+      "transaction unit of work is no longer active",
+    );
     repository.close();
-    expect(() => repository.listCampaignMemberships("bad actor", "bad campaign"))
-      .toThrow("repository is closed");
-    expect(() => repository.getCampaignMembership("bad actor", "bad campaign", "bad target"))
-      .toThrow("repository is closed");
+    expect(() => repository.listCampaignMemberships("bad actor", "bad campaign")).toThrow("repository is closed");
+    expect(() => repository.getCampaignMembership("bad actor", "bad campaign", "bad target")).toThrow(
+      "repository is closed",
+    );
   });
 
   it.each([
-    ["unknown role", `UPDATE campaign_memberships SET role = 'admin'
-      WHERE campaign_id = '${campaignA}' AND principal_id = '${player}'`],
-    ["malformed timestamp", `UPDATE campaign_memberships SET created_at = 'not-a-time'
-      WHERE campaign_id = '${campaignA}' AND principal_id = '${player}'`],
-    ["malformed principal ID", `INSERT INTO principals (id, display_name, is_local)
+    [
+      "unknown role",
+      `UPDATE campaign_memberships SET role = 'admin'
+      WHERE campaign_id = '${campaignA}' AND principal_id = '${player}'`,
+    ],
+    [
+      "malformed timestamp",
+      `UPDATE campaign_memberships SET created_at = 'not-a-time'
+      WHERE campaign_id = '${campaignA}' AND principal_id = '${player}'`,
+    ],
+    [
+      "malformed principal ID",
+      `INSERT INTO principals (id, display_name, is_local)
         VALUES ('bad principal', 'Bad principal', 0);
       UPDATE campaign_memberships SET principal_id = 'bad principal'
-      WHERE campaign_id = '${campaignA}' AND principal_id = '${player}'`],
+      WHERE campaign_id = '${campaignA}' AND principal_id = '${player}'`,
+    ],
     ["missing target principal", `DELETE FROM principals WHERE id = '${player}'`],
   ])("fails loudly for authorized selected %s while masking outsiders", (_name, mutation) => {
     seed();
     corrupt(mutation);
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
-    expect(() => repository.listCampaignMemberships(ownerA, campaignA))
-      .toThrow("campaign membership is malformed");
+    expect(() => repository.listCampaignMemberships(ownerA, campaignA)).toThrow("campaign membership is malformed");
     expect(repository.listCampaignMemberships(applicationOwner, campaignA)).toEqual([]);
     expect(repository.getCampaignMembership(applicationOwner, campaignA, player)).toBeNull();
     repository.close();
@@ -218,8 +250,9 @@ describe("campaign membership queries", () => {
     corrupt(`UPDATE campaign_memberships SET created_at = 'invalid-owner-time'
       WHERE campaign_id = '${campaignA}' AND principal_id = '${ownerA}'`);
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
-    expect(() => repository.getCampaignMembership(ownerA, campaignA, player))
-      .toThrow("campaign membership is malformed");
+    expect(() => repository.getCampaignMembership(ownerA, campaignA, player)).toThrow(
+      "campaign membership is malformed",
+    );
     expect(repository.getCampaignMembership(applicationOwner, campaignA, player)).toBeNull();
     repository.close();
   });
@@ -231,8 +264,9 @@ describe("campaign membership queries", () => {
     const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(repository.listCampaignMemberships(ownerA, campaignA)).toHaveLength(4);
     expect(repository.getCampaignMembership(ownerA, campaignA, ownerA)?.role).toBe("owner");
-    expect(() => repository.getCampaignMembership(ownerB, campaignB, ownerB))
-      .toThrow("campaign membership is malformed");
+    expect(() => repository.getCampaignMembership(ownerB, campaignB, ownerB)).toThrow(
+      "campaign membership is malformed",
+    );
     expect(repository.listCampaignMemberships(ownerA, campaignB)).toEqual([]);
     expect(repository.getCampaignMembership(ownerA, campaignB, ownerB)).toBeNull();
     repository.close();

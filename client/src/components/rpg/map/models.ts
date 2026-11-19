@@ -11,4 +11,6 @@ export interface TacticalMapViewState {
 }
 
 export const INITIAL_MAP_VIEW: TacticalMapViewState = { pan: { x: 0, y: 0 }, zoom: 1, cursor: null, selected: null };
-export function tacticalPointKey(point: TacticalMapPoint): string { return `${point.x},${point.y}`; }
+export function tacticalPointKey(point: TacticalMapPoint): string {
+  return `${point.x},${point.y}`;
+}

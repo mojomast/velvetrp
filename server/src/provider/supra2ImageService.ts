@@ -168,11 +168,7 @@ export function readSupra2ImageConfig(env: NodeJS.ProcessEnv = process.env): Sup
   const validation = validateImageGenerationBaseUrl(rawBaseUrl);
   const baseUrl = validation.ok ? rawBaseUrl.replace(/\/+$/, "") : "";
   const rawOrigin = (env.VELVET_SCENE_IMAGES_ORIGIN ?? "").trim();
-  const origin = rawOrigin
-    ? normalizeSupra2Origin(rawOrigin)
-    : validation.ok
-    ? new URL(baseUrl).origin
-    : "";
+  const origin = rawOrigin ? normalizeSupra2Origin(rawOrigin) : validation.ok ? new URL(baseUrl).origin : "";
   return {
     enabled: requested && validation.ok,
     baseUrl,
@@ -428,13 +424,7 @@ function requireFiniteNumber(
   return value;
 }
 
-function requireInteger(
-  record: Record<string, unknown>,
-  key: string,
-  what: string,
-  min: number,
-  max: number,
-): number {
+function requireInteger(record: Record<string, unknown>, key: string, what: string, min: number, max: number): number {
   const value = record[key];
   if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) throw schemaError(what);
   return value;
@@ -625,15 +615,18 @@ export function parseSupra2GenerateRequest(input: Supra2GenerateRequestInput): S
   if (!isRecord(input)) throw new Supra2ImageConfigurationError("Supra2 image generate request is invalid");
   return {
     prompt: requirePrompt(input.prompt),
-    seed: input.seed === undefined
-      ? SUPRA2_IMAGE_DEFAULT_SEED
-      : requireRequestInteger(input.seed, "seed", 0, SUPRA2_IMAGE_MAX_SEED),
-    steps: input.steps === undefined
-      ? SUPRA2_IMAGE_DEFAULT_STEPS
-      : requireRequestInteger(input.steps, "steps", SUPRA2_IMAGE_MIN_STEPS, SUPRA2_IMAGE_MAX_STEPS),
-    cfg: input.cfg === undefined
-      ? SUPRA2_IMAGE_DEFAULT_CFG
-      : requireRequestNumber(input.cfg, "cfg", SUPRA2_IMAGE_MIN_CFG, SUPRA2_IMAGE_MAX_CFG),
+    seed:
+      input.seed === undefined
+        ? SUPRA2_IMAGE_DEFAULT_SEED
+        : requireRequestInteger(input.seed, "seed", 0, SUPRA2_IMAGE_MAX_SEED),
+    steps:
+      input.steps === undefined
+        ? SUPRA2_IMAGE_DEFAULT_STEPS
+        : requireRequestInteger(input.steps, "steps", SUPRA2_IMAGE_MIN_STEPS, SUPRA2_IMAGE_MAX_STEPS),
+    cfg:
+      input.cfg === undefined
+        ? SUPRA2_IMAGE_DEFAULT_CFG
+        : requireRequestNumber(input.cfg, "cfg", SUPRA2_IMAGE_MIN_CFG, SUPRA2_IMAGE_MAX_CFG),
   };
 }
 
@@ -641,15 +634,16 @@ export function parseSupra2GenerateRequest(input: Supra2GenerateRequestInput): S
 export function parseSupra2BatchRequest(input: Supra2BatchRequestInput): Supra2BatchRequest {
   if (!isRecord(input)) throw new Supra2ImageConfigurationError("Supra2 image batch request is invalid");
   const prompt = requirePrompt(input.prompt);
-  const count = input.count === undefined
-    ? 1
-    : requireRequestInteger(input.count, "count", 1, SUPRA2_IMAGE_MAX_BATCH_COUNT);
-  const steps = input.steps === undefined
-    ? [SUPRA2_IMAGE_DEFAULT_STEPS]
-    : requireVariantValues(input.steps, "steps", SUPRA2_IMAGE_MIN_STEPS, SUPRA2_IMAGE_MAX_STEPS, true);
-  const guidance = input.guidance === undefined
-    ? [SUPRA2_IMAGE_DEFAULT_CFG]
-    : requireVariantValues(input.guidance, "guidance", SUPRA2_IMAGE_MIN_CFG, SUPRA2_IMAGE_MAX_CFG, false);
+  const count =
+    input.count === undefined ? 1 : requireRequestInteger(input.count, "count", 1, SUPRA2_IMAGE_MAX_BATCH_COUNT);
+  const steps =
+    input.steps === undefined
+      ? [SUPRA2_IMAGE_DEFAULT_STEPS]
+      : requireVariantValues(input.steps, "steps", SUPRA2_IMAGE_MIN_STEPS, SUPRA2_IMAGE_MAX_STEPS, true);
+  const guidance =
+    input.guidance === undefined
+      ? [SUPRA2_IMAGE_DEFAULT_CFG]
+      : requireVariantValues(input.guidance, "guidance", SUPRA2_IMAGE_MIN_CFG, SUPRA2_IMAGE_MAX_CFG, false);
   if (count * steps.length * guidance.length > SUPRA2_IMAGE_MAX_BATCH_IMAGES) {
     throw new Supra2ImageConfigurationError(
       `Supra2 image batch must not exceed ${SUPRA2_IMAGE_MAX_BATCH_IMAGES} images`,
@@ -767,8 +761,16 @@ function pngContentType(response: Response, what: string): "image/png" {
 
 function hasPngMagic(bytes: Uint8Array): boolean {
   if (bytes.length < 8) return false;
-  return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
-    && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+  return (
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  );
 }
 
 function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -878,14 +880,17 @@ export function createSupra2ImageClient(options: Supra2ImageClientOptions): Supr
             await sleep(rateLimitDelayMs(attempt, random), controller.signal);
           } catch (error) {
             if (timedOut) {
-              throw new Supra2ImageTimeoutError("Supra2 image service submission timed out while waiting to retry", { cause: error });
+              throw new Supra2ImageTimeoutError("Supra2 image service submission timed out while waiting to retry", {
+                cause: error,
+              });
             }
             if (error instanceof Supra2ImageError) throw error;
             throw new Supra2ImageTransportError("Supra2 image service submission was interrupted", { cause: error });
           }
           continue;
         }
-        if (isRedirectStatus(response.status)) throw new Supra2ImageTransportError("Supra2 image service redirect refused");
+        if (isRedirectStatus(response.status))
+          throw new Supra2ImageTransportError("Supra2 image service redirect refused");
         if (response.status !== 202) throw httpError(response);
         try {
           return await accept(response);
@@ -937,7 +942,8 @@ export function createSupra2ImageClient(options: Supra2ImageClientOptions): Supr
           }
           continue;
         }
-        if (isRedirectStatus(response.status)) throw new Supra2ImageTransportError("Supra2 image service redirect refused");
+        if (isRedirectStatus(response.status))
+          throw new Supra2ImageTransportError("Supra2 image service redirect refused");
         if (!response.ok) throw httpError(response);
         return;
       }
@@ -1017,9 +1023,27 @@ export function createSupra2ImageClient(options: Supra2ImageClientOptions): Supr
     async pollJobs(ids: readonly string[], pollOptions: Supra2PollOptions = {}): Promise<Supra2JobPollResult> {
       requireEnabled(config, origin);
       const requested = normalizePollIds(ids);
-      const intervalMs = pollOption(pollOptions.intervalMs, SUPRA2_IMAGE_DEFAULT_POLL_INTERVAL_MS, "interval", 1, 600_000);
-      const deadlineMs = pollOption(pollOptions.deadlineMs, SUPRA2_IMAGE_DEFAULT_POLL_DEADLINE_MS, "deadline", 1, 86_400_000);
-      const maxAttempts = pollOption(pollOptions.maxAttempts, SUPRA2_IMAGE_DEFAULT_POLL_MAX_ATTEMPTS, "max attempts", 1, 10_000);
+      const intervalMs = pollOption(
+        pollOptions.intervalMs,
+        SUPRA2_IMAGE_DEFAULT_POLL_INTERVAL_MS,
+        "interval",
+        1,
+        600_000,
+      );
+      const deadlineMs = pollOption(
+        pollOptions.deadlineMs,
+        SUPRA2_IMAGE_DEFAULT_POLL_DEADLINE_MS,
+        "deadline",
+        1,
+        86_400_000,
+      );
+      const maxAttempts = pollOption(
+        pollOptions.maxAttempts,
+        SUPRA2_IMAGE_DEFAULT_POLL_MAX_ATTEMPTS,
+        "max attempts",
+        1,
+        10_000,
+      );
       const startedAt = now();
       const lastSeen = new Map<string, Supra2ImageJob>();
       let attempts = 0;
@@ -1072,9 +1096,7 @@ export function createSupra2ImageClient(options: Supra2ImageClientOptions): Supr
 
 function normalizePollIds(ids: readonly string[]): string[] {
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > SUPRA2_IMAGE_MAX_POLL_IDS) {
-    throw new Supra2ImageConfigurationError(
-      `Supra2 image poll must name 1\u2013${SUPRA2_IMAGE_MAX_POLL_IDS} job IDs`,
-    );
+    throw new Supra2ImageConfigurationError(`Supra2 image poll must name 1\u2013${SUPRA2_IMAGE_MAX_POLL_IDS} job IDs`);
   }
   const unique: string[] = [];
   const seen = new Set<string>();

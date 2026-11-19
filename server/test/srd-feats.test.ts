@@ -80,15 +80,27 @@ describe("SRD 5.1 feats", () => {
     const byId = new Map(feats.map((feat) => [feat.reference.definitionId, featCatalogDefinitionSchema.parse(feat)]));
     expect(byId.get("srd-5.1:feat:actor")!.mechanics.abilityBonuses).toEqual({ charisma: 1 });
     expect(byId.get("srd-5.1:feat:durable")!.mechanics.abilityBonuses).toEqual({ constitution: 1 });
-    expect(byId.get("srd-5.1:feat:tough")!.mechanics.modifiers).toEqual([{ type: "modifier", statistic: "max-hp", amount: 2, duration: "permanent" }]);
-    expect(byId.get("srd-5.1:feat:mobile")!.mechanics.modifiers).toEqual([{ type: "modifier", statistic: "speed", amount: 10, duration: "permanent" }]);
+    expect(byId.get("srd-5.1:feat:tough")!.mechanics.modifiers).toEqual([
+      { type: "modifier", statistic: "max-hp", amount: 2, duration: "permanent" },
+    ]);
+    expect(byId.get("srd-5.1:feat:mobile")!.mechanics.modifiers).toEqual([
+      { type: "modifier", statistic: "speed", amount: 10, duration: "permanent" },
+    ]);
   });
 
   it("records the expressible SRD prerequisites", () => {
     const byId = new Map(feats.map((feat) => [feat.reference.definitionId, featCatalogDefinitionSchema.parse(feat)]));
-    expect(byId.get("srd-5.1:feat:grappler")!.mechanics.prerequisites).toEqual({ minimumAttribute: { attribute: "strength", value: 13 } });
-    expect(byId.get("srd-5.1:feat:defensive-duelist")!.mechanics.prerequisites).toEqual({ minimumAttribute: { attribute: "dexterity", value: 13 } });
-    expect(byId.get("srd-5.1:feat:inspiring-leader")!.mechanics.prerequisites).toEqual({ minimumAttribute: { attribute: "charisma", value: 13 } });
-    expect(byId.get("srd-5.1:feat:ritual-caster")!.mechanics.prerequisites).toEqual({ minimumAttribute: { attribute: "intelligence", value: 13 } });
+    expect(byId.get("srd-5.1:feat:grappler")!.mechanics.prerequisites).toEqual({
+      minimumAttribute: { attribute: "strength", value: 13 },
+    });
+    expect(byId.get("srd-5.1:feat:defensive-duelist")!.mechanics.prerequisites).toEqual({
+      minimumAttribute: { attribute: "dexterity", value: 13 },
+    });
+    expect(byId.get("srd-5.1:feat:inspiring-leader")!.mechanics.prerequisites).toEqual({
+      minimumAttribute: { attribute: "charisma", value: 13 },
+    });
+    expect(byId.get("srd-5.1:feat:ritual-caster")!.mechanics.prerequisites).toEqual({
+      minimumAttribute: { attribute: "intelligence", value: 13 },
+    });
   });
 });

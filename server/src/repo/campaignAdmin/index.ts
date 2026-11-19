@@ -2,12 +2,8 @@
 export * from "./administrationCommandRepo.js";
 export * from "./administrationAccessRepo.js";
 export * from "./administrationEventRepo.js";
-export {
-  createAdministrationExportRepo as createAdministrationExportRepository,
-} from "./administrationExportRepo.js";
-export {
-  createAdministrationImportRepo as createAdministrationImportRepository,
-} from "./administrationImportRepo.js";
+export { createAdministrationExportRepo as createAdministrationExportRepository } from "./administrationExportRepo.js";
+export { createAdministrationImportRepo as createAdministrationImportRepository } from "./administrationImportRepo.js";
 export * from "./administrationReceiptRepo.js";
 export * from "./campaignCheckpointRepo.js";
 export * from "./campaignRecapRepo.js";

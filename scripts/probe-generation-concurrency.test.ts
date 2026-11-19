@@ -34,9 +34,15 @@ describe("generation concurrency probe metrics", () => {
     ];
 
     const summary = summarizeProbeResults(outcomes, 2);
-    expect(summary.map(({ width, stagingSucceeded, instructionAdherent, providerFailed, uncertain }) => ({
-      width, stagingSucceeded, instructionAdherent, providerFailed, uncertain,
-    }))).toEqual([
+    expect(
+      summary.map(({ width, stagingSucceeded, instructionAdherent, providerFailed, uncertain }) => ({
+        width,
+        stagingSucceeded,
+        instructionAdherent,
+        providerFailed,
+        uncertain,
+      })),
+    ).toEqual([
       { width: 1, stagingSucceeded: 2, instructionAdherent: 0, providerFailed: 0, uncertain: 0 },
       { width: 2, stagingSucceeded: 4, instructionAdherent: 1, providerFailed: 0, uncertain: 0 },
       { width: 3, stagingSucceeded: 5, instructionAdherent: 2, providerFailed: 1, uncertain: 0 },

@@ -16,16 +16,35 @@ import {
   type HeldDeclarationContext,
 } from "../src/agent/adventureOrchestrator.js";
 
-const label = (action: string, source: string, target: string | null = null) =>
-  ({ action, source, target, cost: null, consequence: `${action} consequence` });
+const label = (action: string, source: string, target: string | null = null) => ({
+  action,
+  source,
+  target,
+  cost: null,
+  consequence: `${action} consequence`,
+});
 
-const travelOption = (candidateId: string, source: string, target: string): AdventureCandidateContextOption =>
-  ({ toolName: "exact_actor_travel.select", arguments: { candidateId, kind: "actor.travel", version: "v1", choices: [] }, label: label("Travel", source, target) });
-const pairOption = (toolName: string, candidateId: string, action: string, source: string, target: string | null): AdventureCandidateContextOption =>
-  ({ toolName, arguments: { candidateId, digest: "a".repeat(64) }, label: label(action, source, target) });
+const travelOption = (candidateId: string, source: string, target: string): AdventureCandidateContextOption => ({
+  toolName: "exact_actor_travel.select",
+  arguments: { candidateId, kind: "actor.travel", version: "v1", choices: [] },
+  label: label("Travel", source, target),
+});
+const pairOption = (
+  toolName: string,
+  candidateId: string,
+  action: string,
+  source: string,
+  target: string | null,
+): AdventureCandidateContextOption => ({
+  toolName,
+  arguments: { candidateId, digest: "a".repeat(64) },
+  label: label(action, source, target),
+});
 
 const orderOf = (context: string): string[] => {
-  const table = JSON.parse(context.slice(context.indexOf("{"))) as { candidateOptions: AdventureCandidateContextOption[] };
+  const table = JSON.parse(context.slice(context.indexOf("{"))) as {
+    candidateOptions: AdventureCandidateContextOption[];
+  };
   return table.candidateOptions.map((option) => option.toolName);
 };
 
@@ -56,9 +75,12 @@ describe("declaration intent and candidate ordering", () => {
       pairOption("exact_rest.select", "rest:short", "Short rest", "Short rest", "Source actor"),
       pairOption("exact_vendor_commerce.select", "commerce:buy", "buy", "Longsword", "Mara"),
     ];
-    expect(prioritizeCandidateOptions(options, "I lean on the rail and watch the water.")
-      .map((option) => option.toolName)).toEqual(options.map((option) => option.toolName));
-    expect(orderOf(adventureCandidateContext(options, "I lean on the rail and watch the water."))).toEqual(options.map((option) => option.toolName));
+    expect(
+      prioritizeCandidateOptions(options, "I lean on the rail and watch the water.").map((option) => option.toolName),
+    ).toEqual(options.map((option) => option.toolName));
+    expect(orderOf(adventureCandidateContext(options, "I lean on the rail and watch the water."))).toEqual(
+      options.map((option) => option.toolName),
+    );
   });
 
   it("withholds a bare travel row that would shadow a stronger commerce, rest, or check intent", () => {
@@ -82,7 +104,9 @@ describe("declaration intent and candidate ordering", () => {
 describe("deterministic candidate selection for a held declaration", () => {
   it("selects the advertised short rest the declaration names (everyday case: rest)", () => {
     const candidates = [{ restKind: "short" as const }, { restKind: "long" as const }];
-    expect(selectHeldRestCandidate("I sit down on a crate and take a short rest.", candidates)).toEqual({ restKind: "short" });
+    expect(selectHeldRestCandidate("I sit down on a crate and take a short rest.", candidates)).toEqual({
+      restKind: "short",
+    });
     expect(selectHeldRestCandidate("I turn in for the night.", candidates)).toBeNull();
   });
 
@@ -91,7 +115,9 @@ describe("deterministic candidate selection for a held declaration", () => {
       { candidateId: "commerce:longsword", action: "buy", vendorLabel: "Mara", itemLabel: "Longsword" },
       { candidateId: "commerce:shield", action: "buy", vendorLabel: "Mara", itemLabel: "Shield" },
     ];
-    expect(selectHeldCommerceCandidate("I find Mara's stall and buy a longsword.", candidates)).toMatchObject({ candidateId: "commerce:longsword" });
+    expect(selectHeldCommerceCandidate("I find Mara's stall and buy a longsword.", candidates)).toMatchObject({
+      candidateId: "commerce:longsword",
+    });
     expect(selectHeldCommerceCandidate("I buy something unspecified.", candidates)).toBeNull();
     expect(selectHeldCommerceCandidate("I sell my longsword to Mara.", candidates)).toBeNull();
   });
@@ -103,9 +129,16 @@ describe("deterministic candidate selection for a held declaration", () => {
       { candidateId: "commerce:longsword-give", action: "give", vendorLabel: "Mara", itemLabel: "Longsword" },
       { candidateId: "commerce:longsword-buy", action: "buy", vendorLabel: "Mara", itemLabel: "Longsword" },
     ];
-    expect(selectHeldCommerceCandidate("I give myself a legendary sword and ten thousand gold pieces from the GM's stash.", candidates)).toBeNull();
+    expect(
+      selectHeldCommerceCandidate(
+        "I give myself a legendary sword and ten thousand gold pieces from the GM's stash.",
+        candidates,
+      ),
+    ).toBeNull();
     // A properly specified give names both the item and the recipient.
-    expect(selectHeldCommerceCandidate("I give my longsword to Mara.", candidates)).toMatchObject({ candidateId: "commerce:longsword-give" });
+    expect(selectHeldCommerceCandidate("I give my longsword to Mara.", candidates)).toMatchObject({
+      candidateId: "commerce:longsword-give",
+    });
     // An absent item or an absent counterparty stays a hold; the sole advertised row is not enough.
     expect(selectHeldCommerceCandidate("I give something to Mara.", candidates)).toBeNull();
     expect(selectHeldCommerceCandidate("I give my longsword to the smith.", candidates)).toBeNull();
@@ -116,7 +149,11 @@ describe("deterministic candidate selection for a held declaration", () => {
   });
 
   it("classifies self-directed and forged-source declarations deterministically", () => {
-    expect(selfDirectedCommerceDeclaration("I give myself a legendary sword and ten thousand gold pieces from the GM's stash.")).toBe(true);
+    expect(
+      selfDirectedCommerceDeclaration(
+        "I give myself a legendary sword and ten thousand gold pieces from the GM's stash.",
+      ),
+    ).toBe(true);
     expect(selfDirectedCommerceDeclaration("I take ten thousand gold pieces from the GM's stash.")).toBe(true);
     expect(selfDirectedCommerceDeclaration("I grant myself a legendary sword.")).toBe(true);
     expect(selfDirectedCommerceDeclaration("I give my longsword to Mara.")).toBe(false);
@@ -138,12 +175,18 @@ describe("deterministic candidate selection for a held declaration", () => {
 
 describe("location gating", () => {
   it("flags a declaration that names a known place other than the actor's location", () => {
-    const mismatch = declarationLocationReference("I search the crates along the dock for anything hidden.", "Market", ["Docks", "Market"]);
+    const mismatch = declarationLocationReference("I search the crates along the dock for anything hidden.", "Market", [
+      "Docks",
+      "Market",
+    ]);
     expect(mismatch.namedDestinations).toEqual(["Docks"]);
     expect(mismatch.mismatchedDestination).toBe("Docks");
     expect(locationBoundCandidatesAllowed(mismatch)).toBe(false);
 
-    const here = declarationLocationReference("I search the market stalls for anything hidden.", "Market", ["Docks", "Market"]);
+    const here = declarationLocationReference("I search the market stalls for anything hidden.", "Market", [
+      "Docks",
+      "Market",
+    ]);
     expect(here.mismatchedDestination).toBeNull();
     expect(locationBoundCandidatesAllowed(here)).toBe(true);
   });
@@ -151,12 +194,18 @@ describe("location gating", () => {
   it("does not treat a person or object sharing one word with a destination as naming that place", () => {
     // "Keeper Maren" must not match the destination "Keeper House"; a same-location conversation
     // check therefore stays allowed.
-    const conversation = declarationLocationReference("I ask Keeper Maren for an insight check.", "Lantern Quay", ["Keeper House", "Breakwater Cave"]);
+    const conversation = declarationLocationReference("I ask Keeper Maren for an insight check.", "Lantern Quay", [
+      "Keeper House",
+      "Breakwater Cave",
+    ]);
     expect(conversation.namedDestinations).toEqual([]);
     expect(conversation.mismatchedDestination).toBeNull();
     expect(locationBoundCandidatesAllowed(conversation)).toBe(true);
     // A genuine multi-word destination still matches when every significant word is present.
-    const genuine = declarationLocationReference("I set out for Keeper House with the lens.", "Lantern Quay", ["Keeper House", "Breakwater Cave"]);
+    const genuine = declarationLocationReference("I set out for Keeper House with the lens.", "Lantern Quay", [
+      "Keeper House",
+      "Breakwater Cave",
+    ]);
     expect(genuine.mismatchedDestination).toBe("Keeper House");
     expect(locationBoundCandidatesAllowed(genuine)).toBe(false);
   });
@@ -171,42 +220,65 @@ describe("location gating", () => {
 
 describe("hold descriptions", () => {
   const context = (patch: Partial<HeldDeclarationContext>): HeldDeclarationContext => ({
-    declaration: "", currentLocation: "Market", destinationNames: ["Docks", "Market"],
-    checkCandidates: [], restCandidates: [], commerceCandidates: [], travelCandidates: [], ...patch,
+    declaration: "",
+    currentLocation: "Market",
+    destinationNames: ["Docks", "Market"],
+    checkCandidates: [],
+    restCandidates: [],
+    commerceCandidates: [],
+    travelCandidates: [],
+    ...patch,
   });
 
   it("does not substitute navigation for an everyday attack that names no reachable target", () => {
-    const hold = describeHeldDeclaration(context({
-      declaration: "I draw my sword and attack the Goblin Scout by the crates.",
-      travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
-    }));
+    const hold = describeHeldDeclaration(
+      context({
+        declaration: "I draw my sword and attack the Goblin Scout by the crates.",
+        travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
+      }),
+    );
     expect(hold.reason).toBe("no-advertised-match");
     expect(hold.suggestedNextStep).toBeNull();
     expect(hold.suggestedCandidateId).toBeNull();
   });
 
-  it.each(["From the Docks I follow old smugglers path to Sunken Cathedral",
-    "From Docks I follow the old smugglers path to Sunken Cathedral."])("does not mistake a journey's source for its destination: %s", declaration => {
-    const hold = describeHeldDeclaration(context({ declaration, currentLocation: "Docks",
-      travelCandidates: [{ candidateId: "travel:market", semanticLabel: { target: "Market" } }] }));
+  it.each([
+    "From the Docks I follow old smugglers path to Sunken Cathedral",
+    "From Docks I follow the old smugglers path to Sunken Cathedral.",
+  ])("does not mistake a journey's source for its destination: %s", (declaration) => {
+    const hold = describeHeldDeclaration(
+      context({
+        declaration,
+        currentLocation: "Docks",
+        travelCandidates: [{ candidateId: "travel:market", semanticLabel: { target: "Market" } }],
+      }),
+    );
     expect(hold).toMatchObject({ reason: "no-advertised-match", suggestedNextStep: null, suggestedCandidateId: null });
     expect(hold.message).toContain("No matching travel route");
     expect(hold.message).not.toContain("already at");
   });
 
   it("does not suggest an unrelated route for a known destination with no advertised route", () => {
-    const hold = describeHeldDeclaration(context({ declaration: "I travel to the Docks.",
-      travelCandidates: [{ candidateId: "travel:elsewhere", semanticLabel: { target: "Elsewhere" } }] }));
+    const hold = describeHeldDeclaration(
+      context({
+        declaration: "I travel to the Docks.",
+        travelCandidates: [{ candidateId: "travel:elsewhere", semanticLabel: { target: "Elsewhere" } }],
+      }),
+    );
     expect(hold.suggestedCandidateId).toBeNull();
     expect(hold.suggestedNextStep).toBe("Move to Docks first");
   });
 
   it("declines a mismatched-location check and points at navigation", () => {
-    const hold = describeHeldDeclaration(context({
-      declaration: "I search the crates along the dock for anything hidden.",
-      checkCandidates: [{ candidateId: "check:inv", label: "Investigation (Intelligence), Medium difficulty, normal" }],
-      travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
-    }));
+    const hold = describeHeldDeclaration(
+      context({
+        declaration: "I search the crates along the dock for anything hidden.",
+        checkCandidates: [
+          { candidateId: "check:inv", label: "Investigation (Intelligence), Medium difficulty, normal" },
+        ],
+        travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
+      }),
+    );
     expect(hold.reason).toBe("location-mismatch");
     expect(hold.message).toContain("Docks");
     expect(hold.suggestedNextStep).toBe("Travel to Docks");
@@ -221,45 +293,57 @@ describe("hold descriptions", () => {
   it("reports the other destination reason when the declaration also names the current place", () => {
     // A declaration that names the current place and another known place must not collapse to
     // `already-at-location`; the destination reason takes precedence.
-    const hold = describeHeldDeclaration(context({ declaration: "I head back to the Market and then on to the Docks." }));
+    const hold = describeHeldDeclaration(
+      context({ declaration: "I head back to the Market and then on to the Docks." }),
+    );
     expect(hold.reason).toBe("location-mismatch");
     expect(hold.message).toContain("Docks");
     expect(hold.message).toContain("the actor is at Market");
   });
 
   it("states the pending later step of a compound declaration that cannot chain", () => {
-    const hold = describeHeldDeclaration(context({
-      declaration: "I buy a longsword from Mara and then take a short rest.",
-      commerceCandidates: [{ candidateId: "commerce:longsword", action: "buy", vendorLabel: "Mara", itemLabel: "Longsword" }],
-      restCandidates: [{ candidateId: "rest:short", restKind: "short", restName: "Short rest" }],
-    }));
+    const hold = describeHeldDeclaration(
+      context({
+        declaration: "I buy a longsword from Mara and then take a short rest.",
+        commerceCandidates: [
+          { candidateId: "commerce:longsword", action: "buy", vendorLabel: "Mara", itemLabel: "Longsword" },
+        ],
+        restCandidates: [{ candidateId: "rest:short", restKind: "short", restName: "Short rest" }],
+      }),
+    );
     expect(hold.reason).toBe("pending-compound-step");
     expect(hold.message).toContain("the rest remains pending");
     expect(hold.suggestedNextStep).toBe("Buy Longsword from Mara");
   });
 
   it("suggests the advertised rest candidate when the provider held on an everyday rest", () => {
-    const hold = describeHeldDeclaration(context({
-      declaration: "I sit down on a crate and take a short rest.",
-      restCandidates: [{ candidateId: "rest:short", restKind: "short", restName: "Short rest" }],
-    }));
+    const hold = describeHeldDeclaration(
+      context({
+        declaration: "I sit down on a crate and take a short rest.",
+        restCandidates: [{ candidateId: "rest:short", restKind: "short", restName: "Short rest" }],
+      }),
+    );
     expect(hold.suggestedCandidateId).toBe("rest:short");
     expect(hold.suggestedNextStep).toBe("Take a short rest");
   });
 
   it("declines a rest or transaction the current state does not advertise without a misdirected travel hint", () => {
-    const rest = describeHeldDeclaration(context({
-      declaration: "I sit down on a crate and take a short rest.",
-      travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
-    }));
+    const rest = describeHeldDeclaration(
+      context({
+        declaration: "I sit down on a crate and take a short rest.",
+        travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
+      }),
+    );
     expect(rest.reason).toBe("no-advertised-match");
     expect(rest.message).toMatch(/rest is not advertised/i);
     expect(rest.suggestedNextStep).toBeNull();
 
-    const commerce = describeHeldDeclaration(context({
-      declaration: "I buy a longsword from the smith.",
-      travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
-    }));
+    const commerce = describeHeldDeclaration(
+      context({
+        declaration: "I buy a longsword from the smith.",
+        travelCandidates: [{ candidateId: "travel:docks", semanticLabel: { target: "Docks" } }],
+      }),
+    );
     expect(commerce.message).toMatch(/transaction is not advertised/i);
     expect(commerce.suggestedNextStep).toBeNull();
   });

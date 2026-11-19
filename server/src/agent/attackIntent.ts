@@ -46,7 +46,21 @@ const MIN_NAME_REFERENCE_LENGTH = 3;
 
 /** Connector words inside public names never establish a single-name reference. */
 const NAME_TOKEN_STOPWORDS: ReadonlySet<string> = new Set([
-  "the", "and", "of", "at", "on", "in", "to", "a", "an", "for", "with", "from", "by", "or", "as",
+  "the",
+  "and",
+  "of",
+  "at",
+  "on",
+  "in",
+  "to",
+  "a",
+  "an",
+  "for",
+  "with",
+  "from",
+  "by",
+  "or",
+  "as",
 ]);
 
 const WORD_PATTERN = /[\p{L}\p{N}]+/gu;
@@ -90,10 +104,7 @@ function regularVerbHeadForms(head: string): string[] {
 function attackVerbForms(verb: string): string[] {
   const [head, ...tail] = verb.split(" ");
   const suffix = tail.length > 0 ? ` ${tail.join(" ")}` : "";
-  const heads = new Set<string>([
-    ...regularVerbHeadForms(head!),
-    ...(ATTACK_VERB_IRREGULAR_FORMS[head!] ?? []),
-  ]);
+  const heads = new Set<string>([...regularVerbHeadForms(head!), ...(ATTACK_VERB_IRREGULAR_FORMS[head!] ?? [])]);
   return [...heads].map((form) => `${form}${suffix}`);
 }
 
@@ -111,8 +122,14 @@ function candidateNameMatch(declaration: string, candidateName: string): 0 | 1 |
   if (name.length === 0) return 0;
   if (containsBoundedPhrase(declaration, name)) return 2;
   const tokens = [...new Set(name.match(WORD_PATTERN) ?? [])];
-  return tokens.some((token) => token.length >= MIN_NAME_REFERENCE_LENGTH && !NAME_TOKEN_STOPWORDS.has(token)
-    && containsBoundedPhrase(declaration, token)) ? 1 : 0;
+  return tokens.some(
+    (token) =>
+      token.length >= MIN_NAME_REFERENCE_LENGTH &&
+      !NAME_TOKEN_STOPWORDS.has(token) &&
+      containsBoundedPhrase(declaration, token),
+  )
+    ? 1
+    : 0;
 }
 
 /** Normalized name used for specificity ranking; keeps phrase length comparable. */
@@ -132,7 +149,12 @@ export function detectAttackTarget(
   if (typeof declaration !== "string" || declaration.trim().length === 0) return null;
   const normalized = normalize(declaration).replace(/\s+/gu, " ").trim();
   // Fail closed: dialogue, negation and hypothetical violence are not consent to combat.
-  if (/[?\u201c\u201d"]|\b(?:not|never|no|if|unless|would|could|might|ask|asks|say|says|said|who|whether|and|or)\b|\b(?:don['’]t|won['’]t|can['’]t)\b/u.test(normalized)) return null;
+  if (
+    /[?\u201c\u201d"]|\b(?:not|never|no|if|unless|would|could|might|ask|asks|say|says|said|who|whether|and|or)\b|\b(?:don['’]t|won['’]t|can['’]t)\b/u.test(
+      normalized,
+    )
+  )
+    return null;
   const verb = ATTACK_VERB_PATTERN.exec(normalized);
   if (!verb) return null;
   const prefix = normalized.slice(0, verb.index).trim();

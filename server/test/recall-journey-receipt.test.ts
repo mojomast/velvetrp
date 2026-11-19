@@ -14,15 +14,42 @@ describe("campaign recall of actor journey receipts", () => {
     fixture.repo.close();
     const repo = createRepository(fixture.options);
     try {
-      const recall = repo.getCampaignRecall("local-owner", { campaignId: fixture.campaign.id, sessionId: fixture.session.id,
-        audience: { kind: "player", actorId: fixture.actors.aster }, query: "memory destination", purpose: "public-narration" })!;
-      const hit = recall.hits.find(value => value.sourceId === journeyCommandId);
+      const recall = repo.getCampaignRecall("local-owner", {
+        campaignId: fixture.campaign.id,
+        sessionId: fixture.session.id,
+        audience: { kind: "player", actorId: fixture.actors.aster },
+        query: "memory destination",
+        purpose: "public-narration",
+      })!;
+      const hit = recall.hits.find((value) => value.sourceId === journeyCommandId);
       expect(hit).toMatchObject({ sourceKind: "travel-receipt", authority: "committed-outcome" });
       const receipt = JSON.parse(hit!.text) as Record<string, unknown>;
-      expect(Object.keys(receipt).sort()).toEqual(["currentLocation", "destination", "elapsedMinutes", "interruption", "kind", "legs", "status"]);
-      expect(receipt).toEqual({ kind: "journey", destination: "Memory Destination", currentLocation: "Memory Destination",
-        status: "completed", interruption: null, legs: 1, elapsedMinutes: 60 });
-      for (const leaked of ["memory-eval-origin", "memory-eval-destination", "memory-eval-route", "eventChecks", "revision", "journey-command"]) {
+      expect(Object.keys(receipt).sort()).toEqual([
+        "currentLocation",
+        "destination",
+        "elapsedMinutes",
+        "interruption",
+        "kind",
+        "legs",
+        "status",
+      ]);
+      expect(receipt).toEqual({
+        kind: "journey",
+        destination: "Memory Destination",
+        currentLocation: "Memory Destination",
+        status: "completed",
+        interruption: null,
+        legs: 1,
+        elapsedMinutes: 60,
+      });
+      for (const leaked of [
+        "memory-eval-origin",
+        "memory-eval-destination",
+        "memory-eval-route",
+        "eventChecks",
+        "revision",
+        "journey-command",
+      ]) {
         expect(hit!.text).not.toContain(leaked);
       }
     } finally {

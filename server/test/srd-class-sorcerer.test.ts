@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { sorcererDefinition, sorcererLevels, sorcererSubclasses } from "../src/content/srdStarter/classes/sorcerer.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -38,7 +42,9 @@ describe("SRD 5.1 Sorcerer class", () => {
 
   it("grants the d6 hit die at level one", () => {
     const parsed = classLevelCatalogDefinitionSchema.parse(levels[0]);
-    expect(parsed.mechanics.resourceGrants).toEqual(expect.arrayContaining([{ resourceId: "hit-dice-d6", maxIncrease: 1, currentIncrease: 1 }]));
+    expect(parsed.mechanics.resourceGrants).toEqual(
+      expect.arrayContaining([{ resourceId: "hit-dice-d6", maxIncrease: 1, currentIncrease: 1 }]),
+    );
   });
 
   it("offers the Draconic Bloodline subclass choice at level three", () => {

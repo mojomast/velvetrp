@@ -9,14 +9,19 @@ import {
 const item = { packId: "pack", packVersion: "1", definitionId: "rope", kind: "item" } as const;
 const inventory = {
   entries: [{ kind: "stackable" as const, entryId: "rope-stack", item, quantity: 2 }],
-  equipment: [], capacity: 5, revision: 4,
+  equipment: [],
+  capacity: 5,
+  revision: 4,
 };
 
 describe("inventory HTTP contracts", () => {
   it("returns a strict public inventory projection with its revision", () => {
     expect(inventoryHttpGetResponseSchema.parse(inventory)).toEqual(inventory);
     expect(inventoryHttpGetResponseSchema.safeParse({ ...inventory, actorId: "private" }).success).toBe(false);
-    expect(inventoryHttpGetResponseSchema.safeParse({ ...inventory, equipment: [{ slot: "hand", entryId: "missing" }] }).success).toBe(false);
+    expect(
+      inventoryHttpGetResponseSchema.safeParse({ ...inventory, equipment: [{ slot: "hand", entryId: "missing" }] })
+        .success,
+    ).toBe(false);
   });
 
   it("accepts only strict route-safe inventory command variants", () => {
@@ -36,8 +41,14 @@ describe("inventory HTTP contracts", () => {
 
   it("returns public, revision-advancing receipts", () => {
     const receipt = {
-      kind: "gift" as const, recipientActorId: "recipient", entryId: "rope-stack", item, quantity: 1,
-      idempotencyKey: "inventory-command-1", revisionBefore: 4, revisionAfter: 5,
+      kind: "gift" as const,
+      recipientActorId: "recipient",
+      entryId: "rope-stack",
+      item,
+      quantity: 1,
+      idempotencyKey: "inventory-command-1",
+      revisionBefore: 4,
+      revisionAfter: 5,
       occurredAt: "2030-01-01T00:00:00.000Z",
     };
     expect(inventoryHttpCommandReceiptSchema.parse(receipt)).toEqual(receipt);

@@ -7,32 +7,39 @@ import { locationIdSchema, MAX_WORLD_NAME_LENGTH, npcIdSchema } from "./world.js
 import { npcPrivateStateHttpSchema, npcPublicStateHttpSchema } from "./world-http.js";
 
 /** Exact body for a path-owned campaign/session/NPC presence mutation. */
-export const npcPresenceMutationHttpRequestSchema = z.object({
-  expectedRevision: expectedRevisionSchema,
-  idempotencyKey: idempotencyKeySchema,
-  mutation: npcPresenceMutationSchema,
-}).strict();
+export const npcPresenceMutationHttpRequestSchema = z
+  .object({
+    expectedRevision: expectedRevisionSchema,
+    idempotencyKey: idempotencyKeySchema,
+    mutation: npcPresenceMutationSchema,
+  })
+  .strict();
 
 /** Safe mutation acknowledgement without command, event, idempotency, or other internal IDs. */
-export const npcPresenceMutationReceiptHttpSchema = z.object({
-  kind: z.enum(["place", "move", "remove"]),
-  revisionBefore: revisionSchema,
-  revisionAfter: revisionSchema,
-  occurredAt: utcIsoTimestampSchema,
-}).strict().refine((receipt) => receipt.revisionAfter === receipt.revisionBefore + 1, {
-  message: "an NPC presence mutation advances the session revision exactly once",
-  path: ["revisionAfter"],
-});
+export const npcPresenceMutationReceiptHttpSchema = z
+  .object({
+    kind: z.enum(["place", "move", "remove"]),
+    revisionBefore: revisionSchema,
+    revisionAfter: revisionSchema,
+    occurredAt: utcIsoTimestampSchema,
+  })
+  .strict()
+  .refine((receipt) => receipt.revisionAfter === receipt.revisionBefore + 1, {
+    message: "an NPC presence mutation advances the session revision exactly once",
+    path: ["revisionAfter"],
+  });
 
 const presenceRevisionSchema = revisionSchema.min(1);
 const locationLabelSchema = z.string().trim().min(1).max(MAX_WORLD_NAME_LENGTH);
 
 /** Player locations deliberately have no slot in which an authoritative ID can leak. */
 export const playerNpcLocationHttpSchema = z.object({ label: locationLabelSchema }).strict();
-export const gmNpcLocationHttpSchema = z.object({
-  locationId: locationIdSchema,
-  label: locationLabelSchema,
-}).strict();
+export const gmNpcLocationHttpSchema = z
+  .object({
+    locationId: locationIdSchema,
+    label: locationLabelSchema,
+  })
+  .strict();
 
 const presentNpcBase = {
   npcId: npcIdSchema,
@@ -74,22 +81,28 @@ const requireUniqueNpcIds = (cast: readonly { npcId: string }[], path: string, c
 };
 
 /** GM-only member of the currently present cast. */
-export const gmPresentNpcHttpSchema = z.object({
-  ...presentNpcBase,
-  location: gmNpcLocationHttpSchema.nullable(),
-  personaId: resourceIdSchema,
-  principals: z.array(principalIdSchema).max(1_000),
-  privateState: npcPrivateStateHttpSchema,
-}).strict().superRefine((presence, context) => {
-  requirePresentTimestampOrder(presence, context);
-  requireUniquePrincipals(presence, context);
-});
+export const gmPresentNpcHttpSchema = z
+  .object({
+    ...presentNpcBase,
+    location: gmNpcLocationHttpSchema.nullable(),
+    personaId: resourceIdSchema,
+    principals: z.array(principalIdSchema).max(1_000),
+    privateState: npcPrivateStateHttpSchema,
+  })
+  .strict()
+  .superRefine((presence, context) => {
+    requirePresentTimestampOrder(presence, context);
+    requireUniquePrincipals(presence, context);
+  });
 
 /** Player-safe present NPC. A null location is the mandatory unauthorized representation. */
-export const playerPresentNpcHttpSchema = z.object({
-  ...presentNpcBase,
-  location: playerNpcLocationHttpSchema.nullable(),
-}).strict().superRefine(requirePresentTimestampOrder);
+export const playerPresentNpcHttpSchema = z
+  .object({
+    ...presentNpcBase,
+    location: playerNpcLocationHttpSchema.nullable(),
+  })
+  .strict()
+  .superRefine(requirePresentTimestampOrder);
 
 const historicalNpcBase = {
   npcId: npcIdSchema,
@@ -101,54 +114,72 @@ const historicalNpcBase = {
 };
 
 /** GM-only historical cast member captured when a session stops. */
-export const gmHistoricalNpcHttpSchema = z.object({
-  ...historicalNpcBase,
-  lastLocation: gmNpcLocationHttpSchema.nullable(),
-  personaId: resourceIdSchema,
-  principals: z.array(principalIdSchema).max(1_000),
-  privateState: npcPrivateStateHttpSchema,
-}).strict().superRefine((presence, context) => {
-  requireHistoricalTimestampOrder(presence, context);
-  requireUniquePrincipals(presence, context);
-});
+export const gmHistoricalNpcHttpSchema = z
+  .object({
+    ...historicalNpcBase,
+    lastLocation: gmNpcLocationHttpSchema.nullable(),
+    personaId: resourceIdSchema,
+    principals: z.array(principalIdSchema).max(1_000),
+    privateState: npcPrivateStateHttpSchema,
+  })
+  .strict()
+  .superRefine((presence, context) => {
+    requireHistoricalTimestampOrder(presence, context);
+    requireUniquePrincipals(presence, context);
+  });
 
 /** Player-safe historical cast member, structurally distinct from a running presence. */
-export const playerHistoricalNpcHttpSchema = z.object({
-  ...historicalNpcBase,
-  lastLocation: playerNpcLocationHttpSchema.nullable(),
-}).strict().superRefine(requireHistoricalTimestampOrder);
+export const playerHistoricalNpcHttpSchema = z
+  .object({
+    ...historicalNpcBase,
+    lastLocation: playerNpcLocationHttpSchema.nullable(),
+  })
+  .strict()
+  .superRefine(requireHistoricalTimestampOrder);
 
 /** Running-session GM projection. Left NPCs cannot be represented in presentCast. */
-export const gmRunningNpcCastHttpSchema = z.object({
-  audience: z.literal("gm"),
-  state: z.literal("running"),
-  sessionRevision: revisionSchema,
-  presentCast: z.array(gmPresentNpcHttpSchema).max(1_000),
-}).strict().superRefine((cast, context) => requireUniqueNpcIds(cast.presentCast, "presentCast", context));
+export const gmRunningNpcCastHttpSchema = z
+  .object({
+    audience: z.literal("gm"),
+    state: z.literal("running"),
+    sessionRevision: revisionSchema,
+    presentCast: z.array(gmPresentNpcHttpSchema).max(1_000),
+  })
+  .strict()
+  .superRefine((cast, context) => requireUniqueNpcIds(cast.presentCast, "presentCast", context));
 
 /** Running-session player projection. */
-export const playerRunningNpcCastHttpSchema = z.object({
-  audience: z.literal("player"),
-  state: z.literal("running"),
-  sessionRevision: revisionSchema,
-  presentCast: z.array(playerPresentNpcHttpSchema).max(1_000),
-}).strict().superRefine((cast, context) => requireUniqueNpcIds(cast.presentCast, "presentCast", context));
+export const playerRunningNpcCastHttpSchema = z
+  .object({
+    audience: z.literal("player"),
+    state: z.literal("running"),
+    sessionRevision: revisionSchema,
+    presentCast: z.array(playerPresentNpcHttpSchema).max(1_000),
+  })
+  .strict()
+  .superRefine((cast, context) => requireUniqueNpcIds(cast.presentCast, "presentCast", context));
 
 /** At-stop GM projection retained as history rather than current presence. */
-export const gmStoppedNpcCastHttpSchema = z.object({
-  audience: z.literal("gm"),
-  state: z.literal("stopped"),
-  sessionRevision: revisionSchema,
-  castHistory: z.array(gmHistoricalNpcHttpSchema).max(1_000),
-}).strict().superRefine((cast, context) => requireUniqueNpcIds(cast.castHistory, "castHistory", context));
+export const gmStoppedNpcCastHttpSchema = z
+  .object({
+    audience: z.literal("gm"),
+    state: z.literal("stopped"),
+    sessionRevision: revisionSchema,
+    castHistory: z.array(gmHistoricalNpcHttpSchema).max(1_000),
+  })
+  .strict()
+  .superRefine((cast, context) => requireUniqueNpcIds(cast.castHistory, "castHistory", context));
 
 /** At-stop player projection retained as a privacy-safe historical cast. */
-export const playerStoppedNpcCastHttpSchema = z.object({
-  audience: z.literal("player"),
-  state: z.literal("stopped"),
-  sessionRevision: revisionSchema,
-  castHistory: z.array(playerHistoricalNpcHttpSchema).max(1_000),
-}).strict().superRefine((cast, context) => requireUniqueNpcIds(cast.castHistory, "castHistory", context));
+export const playerStoppedNpcCastHttpSchema = z
+  .object({
+    audience: z.literal("player"),
+    state: z.literal("stopped"),
+    sessionRevision: revisionSchema,
+    castHistory: z.array(playerHistoricalNpcHttpSchema).max(1_000),
+  })
+  .strict()
+  .superRefine((cast, context) => requireUniqueNpcIds(cast.castHistory, "castHistory", context));
 
 /** Closed role and lifecycle projection vocabulary. */
 export const npcCastHttpSchema = z.union([
@@ -158,9 +189,11 @@ export const npcCastHttpSchema = z.union([
   playerStoppedNpcCastHttpSchema,
 ]);
 
-export const npcPresenceMutationHttpResponseSchema = z.object({
-  receipt: npcPresenceMutationReceiptHttpSchema,
-}).strict();
+export const npcPresenceMutationHttpResponseSchema = z
+  .object({
+    receipt: npcPresenceMutationReceiptHttpSchema,
+  })
+  .strict();
 
 export type NpcPresenceMutationHttpRequest = z.infer<typeof npcPresenceMutationHttpRequestSchema>;
 export type NpcPresenceMutationReceiptHttp = z.infer<typeof npcPresenceMutationReceiptHttpSchema>;

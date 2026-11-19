@@ -32,18 +32,20 @@ interface CliOptions {
 }
 
 function usage(): never {
-  throw new Error([
-    "usage: npx tsx scripts/playtest-world.ts --data-dir DIR [options]",
-    "",
-    "  --data-dir DIR    Target VELVET_DATA_DIR (required; use an empty directory)",
-    "  --host HOST       Server bind host (default 127.0.0.1)",
-    "  --port N          Server bind port (default 8787; pick a free port if busy)",
-    "  --no-serve        Materialize only; never start a server",
-    "  --validate-only   Read back the existing world without writing",
-    "",
-    "The world fixture is provider-free. Serving uses FEATURE_RPG_* and inherits",
-    "provider env (OPENROUTER_*) for live AI DM beats.",
-  ].join("\n"));
+  throw new Error(
+    [
+      "usage: npx tsx scripts/playtest-world.ts --data-dir DIR [options]",
+      "",
+      "  --data-dir DIR    Target VELVET_DATA_DIR (required; use an empty directory)",
+      "  --host HOST       Server bind host (default 127.0.0.1)",
+      "  --port N          Server bind port (default 8787; pick a free port if busy)",
+      "  --no-serve        Materialize only; never start a server",
+      "  --validate-only   Read back the existing world without writing",
+      "",
+      "The world fixture is provider-free. Serving uses FEATURE_RPG_* and inherits",
+      "provider env (OPENROUTER_*) for live AI DM beats.",
+    ].join("\n"),
+  );
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -85,26 +87,42 @@ async function main(): Promise<void> {
     ? summarizePlaytestWorld(options.dataDir, await discoverCampaignId(options.dataDir))
     : await buildPlaytestWorld({ dataDir: options.dataDir });
 
-  console.log(JSON.stringify({
-    ...result,
-    dmMode: PLAYTEST_WORLD_DM_MODE,
-    campaign: PLAYTEST_WORLD_CAMPAIGN_NAME,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ...result,
+        dmMode: PLAYTEST_WORLD_DM_MODE,
+        campaign: PLAYTEST_WORLD_CAMPAIGN_NAME,
+      },
+      null,
+      2,
+    ),
+  );
 
   if (!options.serve) return;
 
   console.log(`\nStarting Velvet server for the playtest world:
   VELVET_DATA_DIR=${options.dataDir}
   HOST=${options.host} PORT=${options.port}
-  ${Object.entries(FEATURE_ENV).map(([key, value]) => `${key}=${value}`).join(" ")}
+  ${Object.entries(FEATURE_ENV)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ")}
   provider env: inherited (OPENROUTER_* or a local key)\n`);
 
   const child = spawn("npm", ["run", "dev:server"], {
     cwd: REPO_ROOT,
     stdio: "inherit",
-    env: { ...process.env, VELVET_DATA_DIR: options.dataDir, HOST: options.host, PORT: String(options.port), ...FEATURE_ENV },
+    env: {
+      ...process.env,
+      VELVET_DATA_DIR: options.dataDir,
+      HOST: options.host,
+      PORT: String(options.port),
+      ...FEATURE_ENV,
+    },
   });
-  const forward = (signal: NodeJS.Signals) => () => { child.kill(signal); };
+  const forward = (signal: NodeJS.Signals) => () => {
+    child.kill(signal);
+  };
   process.on("SIGINT", forward("SIGINT"));
   process.on("SIGTERM", forward("SIGTERM"));
   const code = await new Promise<number>((resolveExit) => child.on("exit", (value) => resolveExit(value ?? 0)));
@@ -117,7 +135,8 @@ async function discoverCampaignId(dataDir: string): Promise<string> {
   const path = await import("node:path");
   const db = new DatabaseDriver(path.join(dataDir, "velvet.sqlite"), { readonly: true, fileMustExist: true });
   try {
-    const row = db.prepare("SELECT id FROM campaigns WHERE name=?").get(PLAYTEST_WORLD_CAMPAIGN_NAME) as { id: string } | undefined;
+    const row = db.prepare("SELECT id FROM campaigns WHERE name=?").get(PLAYTEST_WORLD_CAMPAIGN_NAME) as
+      { id: string } | undefined;
     if (!row) throw new Error(`playtest campaign is absent in ${dataDir}; run without --validate-only to build it`);
     return row.id;
   } finally {

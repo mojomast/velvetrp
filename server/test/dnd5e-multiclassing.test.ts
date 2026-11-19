@@ -58,8 +58,11 @@ describe("SRD 5.1 multiclass proficiency grants", () => {
   it("grants bounded proficiencies without duplicating existing ones", () => {
     const fighter = multiclassProficiencyGrants("fighter", []);
     expect(fighter).toEqual(["light-armor", "medium-armor", "shields", "simple-weapons", "martial-weapons"]);
-    expect(multiclassProficiencyGrants("fighter", ["light-armor", "shields"]))
-      .toEqual(["medium-armor", "simple-weapons", "martial-weapons"]);
+    expect(multiclassProficiencyGrants("fighter", ["light-armor", "shields"])).toEqual([
+      "medium-armor",
+      "simple-weapons",
+      "martial-weapons",
+    ]);
     expect(multiclassProficiencyGrants("wizard", [])).toEqual([]);
     expect(multiclassProficiencyGrants("barbarian", ["shields", "simple-weapons"])).toEqual(["martial-weapons"]);
     expect(Object.isFrozen(DND_5E_MULTICLASS_PROFICIENCY_GRANTS)).toBe(true);
@@ -68,7 +71,12 @@ describe("SRD 5.1 multiclass proficiency grants", () => {
 
   it("keeps each grant list unique and within the closed proficiency vocabulary", () => {
     const allowed = new Set<Dnd5eMulticlassProficiency>([
-      "light-armor", "medium-armor", "heavy-armor", "shields", "simple-weapons", "martial-weapons",
+      "light-armor",
+      "medium-armor",
+      "heavy-armor",
+      "shields",
+      "simple-weapons",
+      "martial-weapons",
     ]);
     for (const classId of DND_5E_MULTICLASS_CLASS_IDS) {
       const grants = DND_5E_MULTICLASS_PROFICIENCY_GRANTS[classId];
@@ -96,9 +104,24 @@ describe("SRD 5.1 combined multiclass spell slots", () => {
   });
 
   it("sums multiclass caster levels and caps the table lookup at twenty", () => {
-    expect(combinedMulticlassCasterLevel([{ classId: "wizard", level: 3 }, { classId: "paladin", level: 2 }])).toBe(4);
-    expect(combinedMulticlassCasterLevel([{ classId: "cleric", level: 5 }, { classId: "ranger", level: 4 }])).toBe(7);
-    expect(combinedMulticlassCasterLevel([{ classId: "fighter", level: 10 }, { classId: "rogue", level: 10 }])).toBe(0);
+    expect(
+      combinedMulticlassCasterLevel([
+        { classId: "wizard", level: 3 },
+        { classId: "paladin", level: 2 },
+      ]),
+    ).toBe(4);
+    expect(
+      combinedMulticlassCasterLevel([
+        { classId: "cleric", level: 5 },
+        { classId: "ranger", level: 4 },
+      ]),
+    ).toBe(7);
+    expect(
+      combinedMulticlassCasterLevel([
+        { classId: "fighter", level: 10 },
+        { classId: "rogue", level: 10 },
+      ]),
+    ).toBe(0);
     expect(() => combinedMulticlassCasterLevel([{ classId: "wizard", level: 0 }])).toThrow();
   });
 
@@ -118,9 +141,19 @@ describe("SRD 5.1 combined multiclass spell slots", () => {
     expect(multiclassSpellSlotsFor([{ classId: "paladin", level: 2 }])).toEqual({ 1: 2 });
     expect(multiclassSpellSlotsFor([{ classId: "paladin", level: 4 }])).toEqual({ 1: 3 });
     expect(multiclassSpellSlotsFor([{ classId: "ranger", level: 3 }])).toEqual({ 1: 2 });
-    expect(multiclassSpellSlotsFor([{ classId: "wizard", level: 3 }, { classId: "paladin", level: 2 }])).toEqual({ 1: 4, 2: 3 });
+    expect(
+      multiclassSpellSlotsFor([
+        { classId: "wizard", level: 3 },
+        { classId: "paladin", level: 2 },
+      ]),
+    ).toEqual({ 1: 4, 2: 3 });
     expect(multiclassSpellSlotsFor([{ classId: "barbarian", level: 5 }])).toEqual({});
-    expect(multiclassSpellSlotsFor([{ classId: "fighter", level: 3 }, { classId: "rogue", level: 3 }])).toEqual({});
+    expect(
+      multiclassSpellSlotsFor([
+        { classId: "fighter", level: 3 },
+        { classId: "rogue", level: 3 },
+      ]),
+    ).toEqual({});
     expect(() => multiclassSpellSlots(0)).toThrow();
     expect(() => multiclassSpellSlots(21)).toThrow();
   });

@@ -34,7 +34,11 @@ import {
   type SintermarkSummary,
 } from "../server/src/quickstart/sintermarkBuilder.js";
 
-export type { SintermarkCounts, SintermarkHeroSummary, SintermarkSummary } from "../server/src/quickstart/sintermarkBuilder.js";
+export type {
+  SintermarkCounts,
+  SintermarkHeroSummary,
+  SintermarkSummary,
+} from "../server/src/quickstart/sintermarkBuilder.js";
 
 const OWNER = "local-owner";
 const SEED_KEY = "sintermark-v1";
@@ -72,7 +76,9 @@ function detectTargetState(dataDir: string, campaignName: string): "absent" | "e
   try {
     const hasCampaigns = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='campaigns'").get();
     if (!hasCampaigns) return "empty";
-    const names = (db.prepare("SELECT name FROM campaigns ORDER BY name").all() as Array<{ name: string }>).map((row) => row.name);
+    const names = (db.prepare("SELECT name FROM campaigns ORDER BY name").all() as Array<{ name: string }>).map(
+      (row) => row.name,
+    );
     if (names.length === 0) return "empty";
     if (names.length === 1 && names[0] === campaignName) return "sentinel";
     return "foreign";
@@ -85,7 +91,8 @@ export async function hydrateSintermarkCampaign(dataDirInput: string): Promise<S
   const dataDir = resolve(dataDirInput);
   const recipe = readSintermarkRecipe();
   const state = detectTargetState(dataDir, recipe.name);
-  if (state === "foreign") fail(`target ${dataDir} already contains a different campaign; refusing to repair existing storage`);
+  if (state === "foreign")
+    fail(`target ${dataDir} already contains a different campaign; refusing to repair existing storage`);
   if (state === "sentinel") return validateInternal(dataDir, recipe, "existing");
 
   mkdirSync(dataDir, { recursive: true });
@@ -95,8 +102,16 @@ export async function hydrateSintermarkCampaign(dataDirInput: string): Promise<S
   try {
     const result = await createSintermarkWorld({ repository, ownerId: OWNER, keyPrefix: SEED_KEY, recipe });
     const summary = summarizeSintermarkCampaign(
-      repository, OWNER, dataDir, result.recipe, result.campaignId, result.sessionId,
-      result.appliedArtifactKeys, result.encounterIds, result.warnings, "created",
+      repository,
+      OWNER,
+      dataDir,
+      result.recipe,
+      result.campaignId,
+      result.sessionId,
+      result.appliedArtifactKeys,
+      result.encounterIds,
+      result.warnings,
+      "created",
     );
     assertSintermarkSummary(summary);
     writeReport(summary, result.recipe, result.appliedArtifactKeys, result.encounterIds, result.shops);
@@ -132,7 +147,11 @@ export async function validateSintermarkCampaign(dataDirInput: string): Promise<
   return validateInternal(dataDir, recipe, "validated");
 }
 
-async function validateInternal(dataDir: string, recipe: SintermarkRecipe, status: "existing" | "validated"): Promise<SintermarkSummary> {
+async function validateInternal(
+  dataDir: string,
+  recipe: SintermarkRecipe,
+  status: "existing" | "validated",
+): Promise<SintermarkSummary> {
   const state = detectTargetState(dataDir, recipe.name);
   if (state === "absent" || state === "empty") fail(`no Sintermark campaign is present in ${dataDir}`);
   if (state === "foreign") fail(`target ${dataDir} does not contain the Sintermark sentinel campaign`);
@@ -152,14 +171,24 @@ async function validateInternal(dataDir: string, recipe: SintermarkRecipe, statu
     const encounterIds = report?.encounterIds ?? [];
 
     const summary = summarizeSintermarkCampaign(
-      repository, OWNER, dataDir, prepared.recipe, campaign.id, sessionId,
-      appliedArtifactKeys, encounterIds, prepared.warnings, status,
+      repository,
+      OWNER,
+      dataDir,
+      prepared.recipe,
+      campaign.id,
+      sessionId,
+      appliedArtifactKeys,
+      encounterIds,
+      prepared.warnings,
+      status,
     );
     const integrity = readIntegrity(dataDir);
     if (integrity.quickCheck !== "ok") fail(`Sintermark integrity quick_check failed: ${integrity.quickCheck}`);
-    if (integrity.foreignKeyFindings !== 0) fail(`Sintermark has ${integrity.foreignKeyFindings} foreign-key finding(s)`);
+    if (integrity.foreignKeyFindings !== 0)
+      fail(`Sintermark has ${integrity.foreignKeyFindings} foreign-key finding(s)`);
     const configuration = repository.getCampaignContentConfiguration(OWNER, campaign.id);
-    if (configuration?.rulesProfileId !== SRD_5_1_STARTER_RULES_PROFILE_ID) fail("Sintermark campaign is not configured with the SRD 5.1 starter rules profile");
+    if (configuration?.rulesProfileId !== SRD_5_1_STARTER_RULES_PROFILE_ID)
+      fail("Sintermark campaign is not configured with the SRD 5.1 starter rules profile");
     const administration = repository.getCampaignAdministration(OWNER, campaign.id);
     if (administration?.status !== "published") fail("Sintermark campaign is not published");
     const readiness = repository.getCampaignRoomActivationReadiness(OWNER, campaign.id, sessionId);
@@ -186,7 +215,13 @@ function collectWaveKeys(content: Record<string, unknown>): string[] {
   return keys;
 }
 
-function writeReport(summary: SintermarkSummary, recipe: SintermarkRecipe, appliedArtifactKeys: string[], encounterIds: string[], shops: ShopLike[]): void {
+function writeReport(
+  summary: SintermarkSummary,
+  recipe: SintermarkRecipe,
+  appliedArtifactKeys: string[],
+  encounterIds: string[],
+  shops: ShopLike[],
+): void {
   const report = {
     version: recipe.version,
     seed: SEED_KEY,
@@ -207,14 +242,20 @@ function writeReport(summary: SintermarkSummary, recipe: SintermarkRecipe, appli
   writeFileSync(join(summary.dataDir, REPORT_FILE), `${JSON.stringify(report, null, 2)}\n`, "utf8");
 }
 
-interface CliOptions { dataDir: string; validateOnly: boolean }
+interface CliOptions {
+  dataDir: string;
+  validateOnly: boolean;
+}
 
 function parseArgs(argv: string[]): CliOptions {
   let dataDir = DEFAULT_DATA_DIR;
   let validateOnly = false;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]!;
-    if (argument === "--validate-only") { validateOnly = true; continue; }
+    if (argument === "--validate-only") {
+      validateOnly = true;
+      continue;
+    }
     if (argument === "--data-dir") {
       const value = argv[++index];
       if (!value) fail("--data-dir requires a path");
@@ -242,7 +283,7 @@ async function main(): Promise<void> {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+    console.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
     process.exitCode = 1;
   });
 }

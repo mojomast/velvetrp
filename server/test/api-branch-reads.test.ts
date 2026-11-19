@@ -2,12 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import {
-  addMessage,
-  createCharacter,
-  createSession,
-  stopSession,
-} from "../src/repo/index.js";
+import { addMessage, createCharacter, createSession, stopSession } from "../src/repo/index.js";
 import type { Message } from "../src/types.js";
 import { useTmpDataDir } from "./helpers.js";
 
@@ -20,7 +15,7 @@ const characterInput = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 };
 
 async function seedSession() {

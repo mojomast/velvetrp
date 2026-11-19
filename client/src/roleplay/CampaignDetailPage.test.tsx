@@ -3,12 +3,35 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 import type { CampaignAdministrationHttpRoomDetachResponse, CampaignAdministrationReceipt } from "@velvet/contracts";
 import { SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
-import { ApiError, ApiInputError, attachCampaignRoom, createOriginalStarterCampaignCharacter, detachCampaignRoom, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, updateCampaignAdministration } from "../api";
+import {
+  ApiError,
+  ApiInputError,
+  attachCampaignRoom,
+  createOriginalStarterCampaignCharacter,
+  detachCampaignRoom,
+  getCampaignAdministration,
+  getCampaignCharacterCreationOptions,
+  getCampaignDetail,
+  getCampaignPlayBootstrap,
+  listCampaignCharacters,
+  listCampaignCheckpoints,
+  listCampaignMemberships,
+  listCampaignRooms,
+  listCampaignTimelines,
+  renameCampaign,
+  setupMechanicsStarter,
+  setupOriginalStarter,
+  setupSrd51Starter,
+  updateCampaignAdministration,
+} from "../api";
 import { CampaignDetailPage, resetCampaignDetailPageModuleStateForTests } from "./CampaignDetailPage";
-import { CampaignAdministrationPage, resetCampaignAdministrationPageModuleStateForTests } from "../components/rpg/campaign/CampaignAdministrationPage";
+import {
+  CampaignAdministrationPage,
+  resetCampaignAdministrationPageModuleStateForTests,
+} from "../components/rpg/campaign/CampaignAdministrationPage";
 
 vi.mock("../api", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../api")>(),
+  ...(await importOriginal<typeof import("../api")>()),
   getCampaignDetail: vi.fn(),
   getCampaignCharacterCreationOptions: vi.fn(),
   listCampaignCharacters: vi.fn(),
@@ -28,32 +51,126 @@ vi.mock("../api", async (importOriginal) => ({
   updateCampaignAdministration: vi.fn(),
 }));
 
-const unconfigured = { id: "campaign-one", name: "The Long Road", actorRole: "gm" as const, createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-04-05T00:00:00.000Z", content: { status: "unconfigured" as const } };
-const configured = { ...unconfigured, id: "campaign-two", name: "Second Road", actorRole: "owner" as const, content: { status: "configured" as const, rulesProfileId: "rules.core", contentPacks: [{ packId: "pack.core", packVersion: "1.0" }] } };
-const ownerUnconfigured = { ...unconfigured, actorRole: "owner" as const };
-const starterConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "velvet:rules:original-narrative", contentPacks: [{ packId: "velvet:original-starter", packVersion: "1.0.0+d15042935818" }] } };
-const mechanicsConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "velvet:rules:starter-v1", contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }] } };
-const srdConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "srd-5.1:rules:starter-v1", contentPacks: [{ packId: "srd-5.1:starter", packVersion: SRD_5_1_STARTER_IDENTITY.packVersion }] } };
-const starter = {
-  rulesProfile: { rulesProfileId: "velvet:rules:original-narrative" as const, name: "Velvet Original Narrative" as const, description: "Metadata identity for Velvet's original narrative starter concepts." as const },
-  pack: { packId: "velvet:original-starter" as const, packVersion: "1.0.0+d15042935818" as const, rulesProfileId: "velvet:rules:original-narrative" as const, name: "Velvet Original Starter" as const, description: "A small original fantasy collection for future campaign setup." as const },
-  race: { reference: { packId: "velvet:original-starter" as const, packVersion: "1.0.0+d15042935818" as const, definitionId: "velvet:original-starter:race:avelune" as const, kind: "race" as const }, name: "Avelune" as const, description: "Avelune communities gather around drifting lights and preserve family stories in woven night banners." as const },
-  background: { reference: { packId: "velvet:original-starter" as const, packVersion: "1.0.0+d15042935818" as const, definitionId: "velvet:original-starter:background:rainledger" as const, kind: "background" as const }, name: "Rainledger" as const, description: "Rainledgers once recorded seasonal journeys, local customs, and promises exchanged between distant settlements." as const },
-  class: { reference: { packId: "velvet:original-starter" as const, packVersion: "1.0.0+d15042935818" as const, definitionId: "velvet:original-starter:class:pathmender" as const, kind: "class" as const }, name: "Pathmender" as const, description: "Pathmenders travel between isolated communities, carrying news and helping neighbors restore neglected meeting places." as const, level: 1 as const },
+const unconfigured = {
+  id: "campaign-one",
+  name: "The Long Road",
+  actorRole: "gm" as const,
+  createdAt: "2030-01-01T00:00:00.000Z",
+  updatedAt: "2030-04-05T00:00:00.000Z",
+  content: { status: "unconfigured" as const },
 };
-const creationOptions = { campaignId: starterConfigured.id, personas: [
-  { characterId: "persona-unused-secret", name: "Shared Persona", alreadyUsed: false },
-  { characterId: "persona-used-secret", name: "Shared Persona", alreadyUsed: true },
-], starter };
+const configured = {
+  ...unconfigured,
+  id: "campaign-two",
+  name: "Second Road",
+  actorRole: "owner" as const,
+  content: {
+    status: "configured" as const,
+    rulesProfileId: "rules.core",
+    contentPacks: [{ packId: "pack.core", packVersion: "1.0" }],
+  },
+};
+const ownerUnconfigured = { ...unconfigured, actorRole: "owner" as const };
+const starterConfigured = {
+  ...ownerUnconfigured,
+  updatedAt: "2030-04-06T00:00:00.000Z",
+  content: {
+    status: "configured" as const,
+    rulesProfileId: "velvet:rules:original-narrative",
+    contentPacks: [{ packId: "velvet:original-starter", packVersion: "1.0.0+d15042935818" }],
+  },
+};
+const mechanicsConfigured = {
+  ...ownerUnconfigured,
+  updatedAt: "2030-04-06T00:00:00.000Z",
+  content: {
+    status: "configured" as const,
+    rulesProfileId: "velvet:rules:starter-v1",
+    contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }],
+  },
+};
+const srdConfigured = {
+  ...ownerUnconfigured,
+  updatedAt: "2030-04-06T00:00:00.000Z",
+  content: {
+    status: "configured" as const,
+    rulesProfileId: "srd-5.1:rules:starter-v1",
+    contentPacks: [{ packId: "srd-5.1:starter", packVersion: SRD_5_1_STARTER_IDENTITY.packVersion }],
+  },
+};
+const starter = {
+  rulesProfile: {
+    rulesProfileId: "velvet:rules:original-narrative" as const,
+    name: "Velvet Original Narrative" as const,
+    description: "Metadata identity for Velvet's original narrative starter concepts." as const,
+  },
+  pack: {
+    packId: "velvet:original-starter" as const,
+    packVersion: "1.0.0+d15042935818" as const,
+    rulesProfileId: "velvet:rules:original-narrative" as const,
+    name: "Velvet Original Starter" as const,
+    description: "A small original fantasy collection for future campaign setup." as const,
+  },
+  race: {
+    reference: {
+      packId: "velvet:original-starter" as const,
+      packVersion: "1.0.0+d15042935818" as const,
+      definitionId: "velvet:original-starter:race:avelune" as const,
+      kind: "race" as const,
+    },
+    name: "Avelune" as const,
+    description:
+      "Avelune communities gather around drifting lights and preserve family stories in woven night banners." as const,
+  },
+  background: {
+    reference: {
+      packId: "velvet:original-starter" as const,
+      packVersion: "1.0.0+d15042935818" as const,
+      definitionId: "velvet:original-starter:background:rainledger" as const,
+      kind: "background" as const,
+    },
+    name: "Rainledger" as const,
+    description:
+      "Rainledgers once recorded seasonal journeys, local customs, and promises exchanged between distant settlements." as const,
+  },
+  class: {
+    reference: {
+      packId: "velvet:original-starter" as const,
+      packVersion: "1.0.0+d15042935818" as const,
+      definitionId: "velvet:original-starter:class:pathmender" as const,
+      kind: "class" as const,
+    },
+    name: "Pathmender" as const,
+    description:
+      "Pathmenders travel between isolated communities, carrying news and helping neighbors restore neglected meeting places." as const,
+    level: 1 as const,
+  },
+};
+const creationOptions = {
+  campaignId: starterConfigured.id,
+  personas: [
+    { characterId: "persona-unused-secret", name: "Shared Persona", alreadyUsed: false },
+    { characterId: "persona-used-secret", name: "Shared Persona", alreadyUsed: true },
+  ],
+  starter,
+};
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((onResolve, onReject) => { resolve = onResolve; reject = onReject; });
+  const promise = new Promise<T>((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
   return { promise, resolve, reject };
 }
 
-afterEach(() => { cleanup(); resetCampaignDetailPageModuleStateForTests(); resetCampaignAdministrationPageModuleStateForTests(); vi.resetAllMocks(); });
+afterEach(() => {
+  cleanup();
+  resetCampaignDetailPageModuleStateForTests();
+  resetCampaignAdministrationPageModuleStateForTests();
+  vi.resetAllMocks();
+});
 
 describe("CampaignDetailPage", () => {
   // Most legacy detail tests exercise servers from before the optional roster
@@ -62,17 +179,80 @@ describe("CampaignDetailPage", () => {
     vi.mocked(listCampaignRooms).mockResolvedValue({ attached: [], eligible: [] });
     vi.mocked(listCampaignCharacters).mockRejectedValue(new ApiError(404, "unsupported"));
     vi.mocked(getCampaignCharacterCreationOptions).mockRejectedValue(new ApiError(404, "unsupported"));
-    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: { id: unconfigured.id, actorRole: "gm", status: "draft", activeTimelineId: "timeline", revision: 0, updatedAt: unconfigured.updatedAt, settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members", gmNotes: "" } } });
-    vi.mocked(getCampaignPlayBootstrap).mockResolvedValue({ dm: { mode: "human", revision: 0 }, campaignId: mechanicsConfigured.id, sessionId: "room", expectedRevision: 4, session: { attached: true, attachedAt: unconfigured.updatedAt, active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, capabilities: { campaignDice: { canView: true, canRoll: true } }, playableActors: [{ actorId: "actor", name: "Aria" }] });
+    vi.mocked(getCampaignAdministration).mockResolvedValue({
+      campaign: {
+        id: unconfigured.id,
+        actorRole: "gm",
+        status: "draft",
+        activeTimelineId: "timeline",
+        revision: 0,
+        updatedAt: unconfigured.updatedAt,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: false,
+          safetyMode: "standard",
+          recapVisibility: "members",
+          gmNotes: "",
+        },
+      },
+    });
+    vi.mocked(getCampaignPlayBootstrap).mockResolvedValue({
+      dm: { mode: "human", revision: 0 },
+      campaignId: mechanicsConfigured.id,
+      sessionId: "room",
+      expectedRevision: 4,
+      session: { attached: true, attachedAt: unconfigured.updatedAt, active: true, adventureEligible: true },
+      principal: { role: "owner", control: "all" },
+      capabilities: { campaignDice: { canView: true, canRoll: true } },
+      playableActors: [{ actorId: "actor", name: "Aria" }],
+    });
   });
 
   it("leads with explicit campaign readiness and opens the first ready room", async () => {
     const open = vi.fn();
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: mechanicsConfigured });
-    vi.mocked(listCampaignCharacters).mockResolvedValue({ characters: [{ id: "campaign-character", characterId: "persona", name: "Aria" }] });
-    vi.mocked(listCampaignRooms).mockResolvedValue({ attached: [{ sessionId: "room", title: "Raincross", participantNames: ["Aria"], createdAt: unconfigured.createdAt, attachedAt: unconfigured.updatedAt, stopped: false }], eligible: [] });
-    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: { id: mechanicsConfigured.id, actorRole: "owner", status: "published", activeTimelineId: "timeline", revision: 4, updatedAt: mechanicsConfigured.updatedAt, settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members", gmNotes: "" } } });
-    render(<CampaignDetailPage campaignId={mechanicsConfigured.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} onOpenRoom={open} />);
+    vi.mocked(listCampaignCharacters).mockResolvedValue({
+      characters: [{ id: "campaign-character", characterId: "persona", name: "Aria" }],
+    });
+    vi.mocked(listCampaignRooms).mockResolvedValue({
+      attached: [
+        {
+          sessionId: "room",
+          title: "Raincross",
+          participantNames: ["Aria"],
+          createdAt: unconfigured.createdAt,
+          attachedAt: unconfigured.updatedAt,
+          stopped: false,
+        },
+      ],
+      eligible: [],
+    });
+    vi.mocked(getCampaignAdministration).mockResolvedValue({
+      campaign: {
+        id: mechanicsConfigured.id,
+        actorRole: "owner",
+        status: "published",
+        activeTimelineId: "timeline",
+        revision: 4,
+        updatedAt: mechanicsConfigured.updatedAt,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: false,
+          safetyMode: "standard",
+          recapVisibility: "members",
+          gmNotes: "",
+        },
+      },
+    });
+    render(
+      <CampaignDetailPage
+        campaignId={mechanicsConfigured.id}
+        mechanicsEnabled
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onOpenRoom={open}
+      />,
+    );
     await screen.findByRole("heading", { name: "Campaign ready" }, { timeout: 5_000 });
     expect(screen.getByText("Ready to play")).toBeTruthy();
     expect(screen.getByText("1 authorized actor is available in an attached room.")).toBeTruthy();
@@ -91,13 +271,22 @@ describe("CampaignDetailPage", () => {
     const openCharacter = vi.fn();
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: unconfigured });
     vi.mocked(listCampaignCharacters).mockResolvedValue({ characters });
-    render(<CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} onOpenCharacter={openCharacter} />);
+    render(
+      <CampaignDetailPage
+        campaignId={unconfigured.id}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onOpenCharacter={openCharacter}
+      />,
+    );
 
     const list = await screen.findByRole("list", { name: "Campaign characters" });
     expect(screen.getAllByText("Shared Name")).toHaveLength(2);
     expect(maximumName.length).toBe(200);
     expect(screen.getByText(maximumName)).toBeTruthy();
-    expect(Array.from(list.children).map((item) => item.textContent)).toEqual(characters.map(({ name }) => `${name}Open character`));
+    expect(Array.from(list.children).map((item) => item.textContent)).toEqual(
+      characters.map(({ name }) => `${name}Open character`),
+    );
     const rendered = document.body.outerHTML;
     for (const character of characters) {
       expect(rendered).not.toContain(character.id);
@@ -116,21 +305,46 @@ describe("CampaignDetailPage", () => {
   });
 
   it("renders duplicate safe rooms without opaque IDs and attaches once followed by exactly one fresh GET", async () => {
-    const eligible = { sessionId: "room-secret-eligible", title: "Shared room", participantNames: ["ليلى", "Aria"], createdAt: "2030-01-03T00:00:00.000Z" };
-    const attached = { ...eligible, sessionId: "room-secret-stopped", attachedAt: "2030-01-04T00:00:00.000Z", stopped: true };
-    const refreshed = { attached: [attached, { ...eligible, attachedAt: "2030-01-05T00:00:00.000Z", stopped: false }], eligible: [] };
+    const eligible = {
+      sessionId: "room-secret-eligible",
+      title: "Shared room",
+      participantNames: ["ليلى", "Aria"],
+      createdAt: "2030-01-03T00:00:00.000Z",
+    };
+    const attached = {
+      ...eligible,
+      sessionId: "room-secret-stopped",
+      attachedAt: "2030-01-04T00:00:00.000Z",
+      stopped: true,
+    };
+    const refreshed = {
+      attached: [attached, { ...eligible, attachedAt: "2030-01-05T00:00:00.000Z", stopped: false }],
+      eligible: [],
+    };
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: ownerUnconfigured });
-    vi.mocked(listCampaignRooms).mockResolvedValueOnce({ attached: [attached], eligible: [eligible] }).mockResolvedValueOnce(refreshed);
-    vi.mocked(attachCampaignRoom).mockResolvedValue({ attachment: { sessionId: eligible.sessionId, attachedAt: "2030-01-05T00:00:00.000Z" } });
+    vi.mocked(listCampaignRooms)
+      .mockResolvedValueOnce({ attached: [attached], eligible: [eligible] })
+      .mockResolvedValueOnce(refreshed);
+    vi.mocked(attachCampaignRoom).mockResolvedValue({
+      attachment: { sessionId: eligible.sessionId, attachedAt: "2030-01-05T00:00:00.000Z" },
+    });
     const open = vi.fn();
-    render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} onOpenRoom={open} />);
+    render(
+      <CampaignDetailPage
+        campaignId={ownerUnconfigured.id}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onOpenRoom={open}
+      />,
+    );
     await screen.findByRole("list", { name: "Eligible campaign rooms" });
     expect(screen.getAllByText("Shared room")).toHaveLength(2);
     expect(document.querySelectorAll(".campaign-room-list bdi").length).toBeGreaterThan(2);
     fireEvent.click(screen.getByRole("button", { name: "Open attached room 1 of 1" }));
     expect(open).toHaveBeenCalledWith(attached.sessionId);
     const attach = screen.getByRole("button", { name: "Attach eligible room 1 of 1" });
-    fireEvent.click(attach); fireEvent.click(attach);
+    fireEvent.click(attach);
+    fireEvent.click(attach);
     expect(attachCampaignRoom).toHaveBeenCalledOnce();
     await screen.findByText("Room attached. Latest campaign rooms were refreshed.");
     expect(listCampaignRooms).toHaveBeenCalledTimes(2);
@@ -145,15 +359,32 @@ describe("CampaignDetailPage", () => {
   });
 
   it("detaches one attached room once with the verified revision followed by exactly one fresh GET", async () => {
-    const attached = { sessionId: "room-detach", title: "Detach room", participantNames: ["Aria"], createdAt: "2030-01-03T00:00:00.000Z", attachedAt: "2030-01-04T00:00:00.000Z", stopped: false };
+    const attached = {
+      sessionId: "room-detach",
+      title: "Detach room",
+      participantNames: ["Aria"],
+      createdAt: "2030-01-03T00:00:00.000Z",
+      attachedAt: "2030-01-04T00:00:00.000Z",
+      stopped: false,
+    };
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: ownerUnconfigured });
-    vi.mocked(listCampaignRooms).mockResolvedValueOnce({ attached: [attached], eligible: [] }).mockResolvedValueOnce({ attached: [], eligible: [] });
-    vi.mocked(detachCampaignRoom).mockResolvedValue({ attachment: { sessionId: attached.sessionId, attachedAt: attached.attachedAt }, receipt: {} } as unknown as CampaignAdministrationHttpRoomDetachResponse);
+    vi.mocked(listCampaignRooms)
+      .mockResolvedValueOnce({ attached: [attached], eligible: [] })
+      .mockResolvedValueOnce({ attached: [], eligible: [] });
+    vi.mocked(detachCampaignRoom).mockResolvedValue({
+      attachment: { sessionId: attached.sessionId, attachedAt: attached.attachedAt },
+      receipt: {},
+    } as unknown as CampaignAdministrationHttpRoomDetachResponse);
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     const detach = await screen.findByRole("button", { name: "Detach attached room 1 of 1" });
-    fireEvent.click(detach); fireEvent.click(detach);
+    fireEvent.click(detach);
+    fireEvent.click(detach);
     expect(detachCampaignRoom).toHaveBeenCalledOnce();
-    expect(detachCampaignRoom).toHaveBeenCalledWith(ownerUnconfigured.id, attached.sessionId, expect.objectContaining({ expectedRevision: 0 }));
+    expect(detachCampaignRoom).toHaveBeenCalledWith(
+      ownerUnconfigured.id,
+      attached.sessionId,
+      expect.objectContaining({ expectedRevision: 0 }),
+    );
     await screen.findByText("Room detached. Latest campaign rooms were refreshed.");
     expect(listCampaignRooms).toHaveBeenCalledTimes(2);
     expect(screen.getByText("No rooms attached.")).toBeTruthy();
@@ -161,14 +392,19 @@ describe("CampaignDetailPage", () => {
   });
 
   it("disables attach acquisition while a manual rooms refresh is pending", async () => {
-    const eligible = { sessionId: "manual-refresh-room", title: "Refresh race", participantNames: ["Aria"], createdAt: "2030-01-03T00:00:00.000Z" };
+    const eligible = {
+      sessionId: "manual-refresh-room",
+      title: "Refresh race",
+      participantNames: ["Aria"],
+      createdAt: "2030-01-03T00:00:00.000Z",
+    };
     const refresh = deferred<{ attached: []; eligible: [typeof eligible] }>();
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: ownerUnconfigured });
     vi.mocked(listCampaignRooms)
       .mockResolvedValueOnce({ attached: [], eligible: [eligible] })
       .mockReturnValueOnce(refresh.promise);
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
-    const attach = await screen.findByRole("button", { name: "Attach eligible room 1 of 1" }) as HTMLButtonElement;
+    const attach = (await screen.findByRole("button", { name: "Attach eligible room 1 of 1" })) as HTMLButtonElement;
     fireEvent.click(screen.getByRole("button", { name: "Refresh rooms" }));
     expect(attach.disabled).toBe(true);
     fireEvent.click(attach);
@@ -179,11 +415,21 @@ describe("CampaignDetailPage", () => {
   });
 
   it("reopens during attach without starting a pre-reconciliation room GET", async () => {
-    const eligible = { sessionId: "reopen-room", title: "Reopen race", participantNames: ["Aria"], createdAt: "2030-01-03T00:00:00.000Z" };
+    const eligible = {
+      sessionId: "reopen-room",
+      title: "Reopen race",
+      participantNames: ["Aria"],
+      createdAt: "2030-01-03T00:00:00.000Z",
+    };
     const put = deferred<{ attachment: { sessionId: string; attachedAt: string } }>();
-    const reconciled = { attached: [{ ...eligible, attachedAt: "2030-01-04T00:00:00.000Z", stopped: false }], eligible: [] };
+    const reconciled = {
+      attached: [{ ...eligible, attachedAt: "2030-01-04T00:00:00.000Z", stopped: false }],
+      eligible: [],
+    };
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: ownerUnconfigured });
-    vi.mocked(listCampaignRooms).mockResolvedValueOnce({ attached: [], eligible: [eligible] }).mockResolvedValueOnce(reconciled);
+    vi.mocked(listCampaignRooms)
+      .mockResolvedValueOnce({ attached: [], eligible: [eligible] })
+      .mockResolvedValueOnce(reconciled);
     vi.mocked(attachCampaignRoom).mockReturnValue(put.promise);
     const props = { campaignId: ownerUnconfigured.id, onBack: vi.fn(), onUnavailable: vi.fn() };
     const first = render(<CampaignDetailPage {...props} />);
@@ -199,10 +445,18 @@ describe("CampaignDetailPage", () => {
   });
 
   it("broadcasts an attach reconciliation to every mounted same-campaign peer before cleanup", async () => {
-    const eligible = { sessionId: "peer-room", title: "Peer room", participantNames: ["Aria"], createdAt: "2030-01-03T00:00:00.000Z" };
+    const eligible = {
+      sessionId: "peer-room",
+      title: "Peer room",
+      participantNames: ["Aria"],
+      createdAt: "2030-01-03T00:00:00.000Z",
+    };
     const initial = deferred<{ attached: []; eligible: [typeof eligible] }>();
     const put = deferred<{ attachment: { sessionId: string; attachedAt: string } }>();
-    const reconciled = { attached: [{ ...eligible, attachedAt: "2030-01-04T00:00:00.000Z", stopped: false }], eligible: [] };
+    const reconciled = {
+      attached: [{ ...eligible, attachedAt: "2030-01-04T00:00:00.000Z", stopped: false }],
+      eligible: [],
+    };
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: ownerUnconfigured });
     vi.mocked(listCampaignRooms).mockReturnValueOnce(initial.promise).mockResolvedValueOnce(reconciled);
     vi.mocked(attachCampaignRoom).mockReturnValue(put.promise);
@@ -222,17 +476,32 @@ describe("CampaignDetailPage", () => {
     expect(listCampaignRooms).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["gm", "player", "observer"] as const)("shows attached rooms but no attach controls to %s", async (actorRole) => {
-    vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: { ...unconfigured, actorRole } });
-    vi.mocked(listCampaignRooms).mockResolvedValue({ attached: [{ sessionId: `private-${actorRole}`, title: null, participantNames: ["Visible participant"], createdAt: "2030-01-01T00:00:00.000Z", attachedAt: "2030-01-02T00:00:00.000Z", stopped: false }], eligible: [] });
-    const view = render(<CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
-    await screen.findByRole("button", { name: "Open attached room 1 of 1" });
-    expect(screen.queryByRole("heading", { name: "Attach a room" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Attach room/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Detach room/ })).toBeNull();
-    expect(document.body.outerHTML).not.toContain(`private-${actorRole}`);
-    view.unmount();
-  });
+  it.each(["gm", "player", "observer"] as const)(
+    "shows attached rooms but no attach controls to %s",
+    async (actorRole) => {
+      vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: { ...unconfigured, actorRole } });
+      vi.mocked(listCampaignRooms).mockResolvedValue({
+        attached: [
+          {
+            sessionId: `private-${actorRole}`,
+            title: null,
+            participantNames: ["Visible participant"],
+            createdAt: "2030-01-01T00:00:00.000Z",
+            attachedAt: "2030-01-02T00:00:00.000Z",
+            stopped: false,
+          },
+        ],
+        eligible: [],
+      });
+      const view = render(<CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+      await screen.findByRole("button", { name: "Open attached room 1 of 1" });
+      expect(screen.queryByRole("heading", { name: "Attach a room" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Attach room/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Detach room/ })).toBeNull();
+      expect(document.body.outerHTML).not.toContain(`private-${actorRole}`);
+      view.unmount();
+    },
+  );
 
   it("shows an accessible authorized empty roster for every role and configuration state", async () => {
     for (const [index, actorRole] of (["owner", "gm", "player", "observer"] as const).entries()) {
@@ -242,8 +511,9 @@ describe("CampaignDetailPage", () => {
       const view = render(<CampaignDetailPage campaignId={detail.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
       await screen.findByRole("heading", { name: "Characters" });
       expect(document.querySelector(".roster-status")?.textContent).toBe("No characters yet.");
-      expect(screen.getByRole("region", { name: "Characters" }).querySelector('[role="status"]')?.textContent)
-        .toBe("Character roster is empty.");
+      expect(screen.getByRole("region", { name: "Characters" }).querySelector('[role="status"]')?.textContent).toBe(
+        "Character roster is empty.",
+      );
       view.unmount();
     }
   });
@@ -264,7 +534,9 @@ describe("CampaignDetailPage", () => {
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: configured });
     vi.mocked(listCampaignCharacters)
       .mockRejectedValueOnce(new Error("private database detail"))
-      .mockResolvedValueOnce({ characters: [{ id: "entry-secret", characterId: "persona-secret", name: "Recovered" }] });
+      .mockResolvedValueOnce({
+        characters: [{ id: "entry-secret", characterId: "persona-secret", name: "Recovered" }],
+      });
     const unavailable = vi.fn();
     render(<CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={unavailable} />);
 
@@ -277,8 +549,9 @@ describe("CampaignDetailPage", () => {
     fireEvent.click(retry);
     await screen.findByText("Recovered");
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Characters" })));
-    expect(screen.getByRole("region", { name: "Characters" }).querySelector('[role="status"]')?.textContent)
-      .toBe("1 character loaded.");
+    expect(screen.getByRole("region", { name: "Characters" }).querySelector('[role="status"]')?.textContent).toBe(
+      "1 character loaded.",
+    );
     expect(listCampaignCharacters).toHaveBeenCalledTimes(2);
     expect(renameCampaign).not.toHaveBeenCalled();
     expect(setupOriginalStarter).not.toHaveBeenCalled();
@@ -300,11 +573,15 @@ describe("CampaignDetailPage", () => {
     const campaignA = { ...unconfigured, id: "roster-focus-pending-a", name: "Roster Pending A" };
     const campaignB = { ...configured, id: "roster-focus-pending-b", name: "Roster Pending B" };
     const retryA = deferred<{ characters: Array<{ id: string; characterId: string; name: string }> }>();
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : campaignB }));
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : campaignB,
+    }));
     vi.mocked(listCampaignCharacters)
       .mockRejectedValueOnce(new Error("A initial failure"))
       .mockReturnValueOnce(retryA.promise)
-      .mockResolvedValueOnce({ characters: [{ id: "b-entry", characterId: "b-persona", name: "Campaign B character" }] });
+      .mockResolvedValueOnce({
+        characters: [{ id: "b-entry", characterId: "b-persona", name: "Campaign B character" }],
+      });
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={campaignA.id} {...props} />);
 
@@ -325,11 +602,15 @@ describe("CampaignDetailPage", () => {
     const campaignA = { ...unconfigured, id: "roster-focus-404-a", name: "Roster 404 A" };
     const campaignB = { ...configured, id: "roster-focus-404-b", name: "Roster 404 B" };
     const retryA = deferred<{ characters: Array<{ id: string; characterId: string; name: string }> }>();
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : campaignB }));
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : campaignB,
+    }));
     vi.mocked(listCampaignCharacters)
       .mockRejectedValueOnce(new Error("A initial failure"))
       .mockReturnValueOnce(retryA.promise)
-      .mockResolvedValueOnce({ characters: [{ id: "b-404-entry", characterId: "b-404-persona", name: "Campaign B after 404" }] });
+      .mockResolvedValueOnce({
+        characters: [{ id: "b-404-entry", characterId: "b-404-persona", name: "Campaign B after 404" }],
+      });
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={campaignA.id} {...props} />);
 
@@ -350,16 +631,22 @@ describe("CampaignDetailPage", () => {
     const queueMicrotaskSpy = vi.spyOn(globalThis, "queueMicrotask").mockImplementation((callback) => {
       queuedCallbacks.push(callback);
     });
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : campaignB }));
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : campaignB,
+    }));
     vi.mocked(listCampaignCharacters)
       .mockRejectedValueOnce(new Error("A initial failure"))
       .mockReturnValueOnce(retryA.promise)
-      .mockResolvedValueOnce({ characters: [{ id: "b-queued-entry", characterId: "b-queued-persona", name: "Campaign B after queue" }] });
+      .mockResolvedValueOnce({
+        characters: [{ id: "b-queued-entry", characterId: "b-queued-persona", name: "Campaign B after queue" }],
+      });
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={campaignA.id} {...props} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Retry characters" }));
-    retryA.resolve({ characters: [{ id: "a-queued-entry", characterId: "a-queued-persona", name: "Campaign A completed" }] });
+    retryA.resolve({
+      characters: [{ id: "a-queued-entry", characterId: "a-queued-persona", name: "Campaign A completed" }],
+    });
     await screen.findByText("Campaign A completed");
     await waitFor(() => expect(queuedCallbacks).toHaveLength(1));
     view.rerender(<CampaignDetailPage campaignId={campaignB.id} {...props} />);
@@ -374,13 +661,19 @@ describe("CampaignDetailPage", () => {
     const rosterRead = deferred<{ characters: Array<{ id: string; characterId: string; name: string }> }>();
     vi.mocked(getCampaignDetail).mockReturnValue(detailRead.promise);
     vi.mocked(listCampaignCharacters).mockReturnValue(rosterRead.promise);
-    render(<StrictMode><CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} /></StrictMode>);
+    render(
+      <StrictMode>
+        <CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />
+      </StrictMode>,
+    );
 
     expect(getCampaignDetail).toHaveBeenCalledOnce();
     expect(listCampaignCharacters).toHaveBeenCalledOnce();
     expect(getCampaignCharacterCreationOptions).toHaveBeenCalledOnce();
     detailRead.resolve({ campaign: unconfigured });
-    rosterRead.resolve({ characters: [{ id: "strict-entry", characterId: "strict-persona", name: "Strict survivor" }] });
+    rosterRead.resolve({
+      characters: [{ id: "strict-entry", characterId: "strict-persona", name: "Strict survivor" }],
+    });
     await screen.findByRole("heading", { name: unconfigured.name });
     await screen.findByText("Strict survivor");
     expect(getCampaignDetail).toHaveBeenCalledOnce();
@@ -391,8 +684,12 @@ describe("CampaignDetailPage", () => {
   it("ignores stale roster switch and unmount completions using its own generation", async () => {
     const firstRoster = deferred<{ characters: Array<{ id: string; characterId: string; name: string }> }>();
     const secondRoster = deferred<{ characters: Array<{ id: string; characterId: string; name: string }> }>();
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: unconfigured }).mockResolvedValueOnce({ campaign: configured });
-    vi.mocked(listCampaignCharacters).mockReturnValueOnce(firstRoster.promise).mockReturnValueOnce(secondRoster.promise);
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: unconfigured })
+      .mockResolvedValueOnce({ campaign: configured });
+    vi.mocked(listCampaignCharacters)
+      .mockReturnValueOnce(firstRoster.promise)
+      .mockReturnValueOnce(secondRoster.promise);
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={unconfigured.id} {...props} />);
     view.rerender(<CampaignDetailPage campaignId={configured.id} {...props} />);
@@ -407,7 +704,9 @@ describe("CampaignDetailPage", () => {
     vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: unconfigured });
     vi.mocked(listCampaignCharacters).mockReturnValueOnce(unmountedRoster.promise);
     const unavailable = vi.fn();
-    const late = render(<CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={unavailable} />);
+    const late = render(
+      <CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={unavailable} />,
+    );
     late.unmount();
     unmountedRoster.reject(new ApiError(500, "late private"));
     await unmountedRoster.promise.catch(() => undefined);
@@ -419,11 +718,20 @@ describe("CampaignDetailPage", () => {
     const rosterRead = deferred<{ characters: Array<{ id: string; characterId: string; name: string }> }>();
     const renameWrite = deferred<{ campaign: { id: string; name: string; updatedAt: string } }>();
     const renamed = { ...configured, name: "Renamed", updatedAt: "2030-04-07T00:00:00.000Z" };
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: configured }).mockResolvedValueOnce({ campaign: renamed });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: configured })
+      .mockResolvedValueOnce({ campaign: renamed });
     vi.mocked(listCampaignCharacters).mockReturnValue(rosterRead.promise);
     vi.mocked(renameCampaign).mockReturnValue(renameWrite.promise);
     const openCharacter = vi.fn();
-    render(<CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={vi.fn()} onOpenCharacter={openCharacter} />);
+    render(
+      <CampaignDetailPage
+        campaignId={configured.id}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+        onOpenCharacter={openCharacter}
+      />,
+    );
     const input = await screen.findByRole("textbox", { name: "Campaign name" });
     fireEvent.change(input, { target: { value: renamed.name } });
     fireEvent.submit(input.closest("form")!);
@@ -431,9 +739,13 @@ describe("CampaignDetailPage", () => {
     expect(back.disabled).toBe(true);
     expect(screen.getByRole("button", { name: "Renaming…" })).toBeTruthy();
 
-    rosterRead.resolve({ characters: [{ id: "coexist-entry", characterId: "coexist-persona", name: "Visible during write" }] });
+    rosterRead.resolve({
+      characters: [{ id: "coexist-entry", characterId: "coexist-persona", name: "Visible during write" }],
+    });
     await screen.findByText("Visible during write");
-    const open = screen.getByRole("button", { name: "Open character Visible during write, character 1 of 1" }) as HTMLButtonElement;
+    const open = screen.getByRole("button", {
+      name: "Open character Visible during write, character 1 of 1",
+    }) as HTMLButtonElement;
     expect(open.disabled).toBe(true);
     expect(open.getAttribute("disabled")).not.toBeNull();
     fireEvent.click(open);
@@ -457,8 +769,10 @@ describe("CampaignDetailPage", () => {
     const renamedB = { ...campaignB, name: "Renamed B", updatedAt: "2030-05-02T00:00:00.000Z" };
     const writeA = deferred<{ campaign: { id: string; name: string; updatedAt: string } }>();
     const writeB = deferred<{ campaign: { id: string; name: string; updatedAt: string } }>();
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : renamedB }));
-    vi.mocked(renameCampaign).mockImplementation((id) => id === campaignA.id ? writeA.promise : writeB.promise);
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : renamedB,
+    }));
+    vi.mocked(renameCampaign).mockImplementation((id) => (id === campaignA.id ? writeA.promise : writeB.promise));
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={campaignA.id} {...props} />);
     let input = await screen.findByRole("textbox", { name: "Campaign name" });
@@ -478,7 +792,9 @@ describe("CampaignDetailPage", () => {
     expect(screen.getByRole("button", { name: "Renaming…" })).toBeTruthy();
     writeB.resolve({ campaign: { id: renamedB.id, name: renamedB.name, updatedAt: renamedB.updatedAt } });
     await screen.findByRole("heading", { name: renamedB.name });
-    await waitFor(() => expect((screen.getByRole("button", { name: "← Campaigns" }) as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect((screen.getByRole("button", { name: "← Campaigns" }) as HTMLButtonElement).disabled).toBe(false),
+    );
     expect(renameCampaign).toHaveBeenCalledTimes(2);
   });
 
@@ -487,7 +803,9 @@ describe("CampaignDetailPage", () => {
     const campaignB = { ...configured, id: "warning-b", name: "Warning B" };
     const renamedA = { ...campaignA, name: "Warning A renamed", updatedAt: "2030-05-03T00:00:00.000Z" };
     const writeA = deferred<{ campaign: { id: string; name: string; updatedAt: string } }>();
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : campaignB }));
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : campaignB,
+    }));
     vi.mocked(renameCampaign).mockReturnValue(writeA.promise);
     const unloadIsBlocked = () => {
       const event = new Event("beforeunload", { cancelable: true });
@@ -502,7 +820,7 @@ describe("CampaignDetailPage", () => {
     expect(unloadIsBlocked()).toBe(true);
 
     view.rerender(<CampaignDetailPage campaignId={campaignB.id} {...props} />);
-    const inputB = await screen.findByRole("textbox", { name: "Campaign name" }) as HTMLInputElement;
+    const inputB = (await screen.findByRole("textbox", { name: "Campaign name" })) as HTMLInputElement;
     expect(inputB.disabled).toBe(false);
     expect((screen.getByRole("button", { name: "Rename campaign" }) as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByRole("button", { name: "← Campaigns" }) as HTMLButtonElement).disabled).toBe(false);
@@ -524,10 +842,10 @@ describe("CampaignDetailPage", () => {
     const writeB = deferred<{ campaign: { id: string; name: string; updatedAt: string } }>();
     let aCompleted = false;
     let bCompleted = false;
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id
-      ? (aCompleted ? renamedA : campaignA)
-      : (bCompleted ? renamedB : campaignB) }));
-    vi.mocked(renameCampaign).mockImplementation((id) => id === campaignA.id ? writeA.promise : writeB.promise);
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? (aCompleted ? renamedA : campaignA) : bCompleted ? renamedB : campaignB,
+    }));
+    vi.mocked(renameCampaign).mockImplementation((id) => (id === campaignA.id ? writeA.promise : writeB.promise));
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={campaignA.id} {...props} />);
     let input = await screen.findByRole("textbox", { name: "Campaign name" });
@@ -567,7 +885,8 @@ describe("CampaignDetailPage", () => {
     expect(document.querySelector(`time[datetime="${unconfigured.createdAt}"]`)).toBeTruthy();
     expect(document.querySelector(`time[datetime="${unconfigured.updatedAt}"]`)).toBeTruthy();
     expect(document.body.textContent).not.toContain(unconfigured.id);
-    for (const privateText of ["Owner principal", "Active timeline", "Rename", "Delete", "Characters", "Setup"]) expect(screen.queryByText(privateText)).toBeNull();
+    for (const privateText of ["Owner principal", "Active timeline", "Rename", "Delete", "Characters", "Setup"])
+      expect(screen.queryByText(privateText)).toBeNull();
   });
 
   it("shows configured identifiers and no private campaign identities", async () => {
@@ -593,7 +912,13 @@ describe("CampaignDetailPage", () => {
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: ownerUnconfigured });
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: "Set up campaign metadata" });
-    for (const text of ["Velvet Original Narrative", "Velvet Original Starter", "Avelune", "Rainledger", "Pathmender"]) {
+    for (const text of [
+      "Velvet Original Narrative",
+      "Velvet Original Starter",
+      "Avelune",
+      "Rainledger",
+      "Pathmender",
+    ]) {
       expect(screen.getByText(text)).toBeTruthy();
     }
     expect(screen.getByText(/metadata scaffolding only/i)).toBeTruthy();
@@ -610,7 +935,13 @@ describe("CampaignDetailPage", () => {
     render(<CampaignDetailPage campaignId={starterConfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
     await screen.findByRole("heading", { name: "Finalize a character record" });
-    for (const text of ["Velvet Original Narrative", "Velvet Original Starter", "Avelune", "Rainledger", "Pathmender, level 1"]) {
+    for (const text of [
+      "Velvet Original Narrative",
+      "Velvet Original Starter",
+      "Avelune",
+      "Rainledger",
+      "Pathmender, level 1",
+    ]) {
       expect(screen.getByText(text)).toBeTruthy();
     }
     const radios = screen.getAllByRole("radio") as HTMLInputElement[];
@@ -618,14 +949,26 @@ describe("CampaignDetailPage", () => {
     expect(radios[0]?.disabled).toBe(false);
     expect(radios[1]?.disabled).toBe(true);
     expect(screen.getByRole("radio", { name: "Shared Persona Persona 1 of 2" })).toBe(radios[0]);
-    expect(screen.getByRole("radio", { name: "Shared Persona Persona 2 of 2 Already used — not selectable" })).toBe(radios[1]);
-    expect(radios.every((radio) => !radio.hasAttribute("value") && !radio.hasAttribute("aria-label") && !radio.hasAttribute("id"))).toBe(true);
+    expect(screen.getByRole("radio", { name: "Shared Persona Persona 2 of 2 Already used — not selectable" })).toBe(
+      radios[1],
+    );
+    expect(
+      radios.every(
+        (radio) => !radio.hasAttribute("value") && !radio.hasAttribute("aria-label") && !radio.hasAttribute("id"),
+      ),
+    ).toBe(true);
     expect(screen.getAllByText("Shared Persona")).toHaveLength(2);
-    expect((screen.getByRole("button", { name: "Finalize character record" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Finalize character record" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     const html = document.body.outerHTML;
     expect(html).not.toMatch(/persona-(?:unused|used)-secret/);
     expect(html).not.toMatch(/controller|private/i);
-    expect(screen.getByRole("checkbox", { name: "I confirm this record is finalized and currently has NO derived stats, rules validation, editing, deletion, rebuilding or reset, gameplay or mechanics, inventory, equipment, spells, powers, progression, or AI workflow." })).toBeTruthy();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "I confirm this record is finalized and currently has NO derived stats, rules validation, editing, deletion, rebuilding or reset, gameplay or mechanics, inventory, equipment, spells, powers, progression, or AI workflow.",
+      }),
+    ).toBeTruthy();
   });
 
   it("announces an options retry and focuses the creation heading only after guarded success", async () => {
@@ -648,7 +991,9 @@ describe("CampaignDetailPage", () => {
     const campaignA = { ...starterConfigured, id: "options-retry-a", name: "Options A" };
     const campaignB = { ...starterConfigured, id: "options-retry-b", name: "Options B" };
     const retryA = deferred<typeof creationOptions>();
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : campaignB }));
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : campaignB,
+    }));
     vi.mocked(getCampaignCharacterCreationOptions)
       .mockRejectedValueOnce(new Error("A initial"))
       .mockRejectedValueOnce(new Error("A retry failure"))
@@ -678,7 +1023,9 @@ describe("CampaignDetailPage", () => {
     const queueMicrotaskSpy = vi.spyOn(globalThis, "queueMicrotask").mockImplementation((callback) => {
       queuedCallbacks.push(callback);
     });
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : campaignB }));
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : campaignB,
+    }));
     vi.mocked(getCampaignCharacterCreationOptions)
       .mockRejectedValueOnce(new Error("A initial options failure"))
       .mockResolvedValueOnce({ ...creationOptions, campaignId: campaignA.id })
@@ -699,13 +1046,26 @@ describe("CampaignDetailPage", () => {
   });
 
   it("requires unused selection and single-use confirmation, POSTs once, then performs exactly one concurrent authoritative pair", async () => {
-    const freshOptions = { ...creationOptions, personas: creationOptions.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
-    const created = { id: "created-entry-secret", characterId: creationOptions.personas[0]!.characterId, name: creationOptions.personas[0]!.name };
+    const freshOptions = {
+      ...creationOptions,
+      personas: creationOptions.personas.map((persona, index) =>
+        index === 0 ? { ...persona, alreadyUsed: true } : persona,
+      ),
+    };
+    const created = {
+      id: "created-entry-secret",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: creationOptions.personas[0]!.name,
+    };
     const rosterRefresh = deferred<{ characters: Array<typeof created> }>();
     const optionsRefresh = deferred<typeof freshOptions>();
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: starterConfigured });
-    vi.mocked(listCampaignCharacters).mockResolvedValueOnce({ characters: [] }).mockReturnValueOnce(rosterRefresh.promise);
-    vi.mocked(getCampaignCharacterCreationOptions).mockResolvedValueOnce(creationOptions).mockReturnValueOnce(optionsRefresh.promise);
+    vi.mocked(listCampaignCharacters)
+      .mockResolvedValueOnce({ characters: [] })
+      .mockReturnValueOnce(rosterRefresh.promise);
+    vi.mocked(getCampaignCharacterCreationOptions)
+      .mockResolvedValueOnce(creationOptions)
+      .mockReturnValueOnce(optionsRefresh.promise);
     vi.mocked(createOriginalStarterCampaignCharacter).mockResolvedValue({ character: created });
     render(<CampaignDetailPage campaignId={starterConfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
@@ -718,7 +1078,9 @@ describe("CampaignDetailPage", () => {
     fireEvent.click(submit);
     fireEvent.click(submit);
     expect(createOriginalStarterCampaignCharacter).toHaveBeenCalledOnce();
-    expect(createOriginalStarterCampaignCharacter).toHaveBeenCalledWith(starterConfigured.id, { characterId: creationOptions.personas[0]!.characterId });
+    expect(createOriginalStarterCampaignCharacter).toHaveBeenCalledWith(starterConfigured.id, {
+      characterId: creationOptions.personas[0]!.characterId,
+    });
     await waitFor(() => {
       expect(listCampaignCharacters).toHaveBeenCalledTimes(2);
       expect(getCampaignCharacterCreationOptions).toHaveBeenCalledTimes(2);
@@ -735,14 +1097,27 @@ describe("CampaignDetailPage", () => {
   });
 
   it("broadcasts one create reconciliation to all mounted same-campaign peers", async () => {
-    const created = { id: "peer-created-entry", characterId: creationOptions.personas[0]!.characterId, name: creationOptions.personas[0]!.name };
-    const usedOptions = { ...creationOptions, personas: creationOptions.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
+    const created = {
+      id: "peer-created-entry",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: creationOptions.personas[0]!.name,
+    };
+    const usedOptions = {
+      ...creationOptions,
+      personas: creationOptions.personas.map((persona, index) =>
+        index === 0 ? { ...persona, alreadyUsed: true } : persona,
+      ),
+    };
     const initialRoster = deferred<{ characters: [] }>();
     const initialOptions = deferred<typeof creationOptions>();
     const post = deferred<{ character: typeof created }>();
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: starterConfigured });
-    vi.mocked(listCampaignCharacters).mockReturnValueOnce(initialRoster.promise).mockResolvedValueOnce({ characters: [created] });
-    vi.mocked(getCampaignCharacterCreationOptions).mockReturnValueOnce(initialOptions.promise).mockResolvedValueOnce(usedOptions);
+    vi.mocked(listCampaignCharacters)
+      .mockReturnValueOnce(initialRoster.promise)
+      .mockResolvedValueOnce({ characters: [created] });
+    vi.mocked(getCampaignCharacterCreationOptions)
+      .mockReturnValueOnce(initialOptions.promise)
+      .mockResolvedValueOnce(usedOptions);
     vi.mocked(createOriginalStarterCampaignCharacter).mockReturnValue(post.promise);
     const props = { campaignId: starterConfigured.id, onBack: vi.fn(), onUnavailable: vi.fn() };
     const first = render(<CampaignDetailPage {...props} />);
@@ -767,8 +1142,17 @@ describe("CampaignDetailPage", () => {
     const peerDetail = deferred<{ campaign: typeof starterConfigured }>();
     const stalePeerRoster = deferred<{ characters: [] }>();
     const stalePeerOptions = deferred<typeof creationOptions>();
-    const created = { id: "delayed-peer-created", characterId: creationOptions.personas[0]!.characterId, name: creationOptions.personas[0]!.name };
-    const usedOptions = { ...creationOptions, personas: creationOptions.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
+    const created = {
+      id: "delayed-peer-created",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: creationOptions.personas[0]!.name,
+    };
+    const usedOptions = {
+      ...creationOptions,
+      personas: creationOptions.personas.map((persona, index) =>
+        index === 0 ? { ...persona, alreadyUsed: true } : persona,
+      ),
+    };
     vi.mocked(getCampaignDetail)
       .mockResolvedValueOnce({ campaign: starterConfigured })
       .mockReturnValueOnce(peerDetail.promise);
@@ -804,43 +1188,69 @@ describe("CampaignDetailPage", () => {
   });
 
   it.each([
-    ["malformed success currently present", new Error("private malformed body"), "present", /currently present, but it cannot be attributed/i],
+    [
+      "malformed success currently present",
+      new Error("private malformed body"),
+      "present",
+      /currently present, but it cannot be attributed/i,
+    ],
     ["typed conflict", new ApiError(409, "private conflict"), "unused", /conflicts with current state/i],
-    ["typed unavailable", new ApiError(404, "private unavailable"), "unused", /unavailable for this campaign or persona/i],
+    [
+      "typed unavailable",
+      new ApiError(404, "private unavailable"),
+      "unused",
+      /unavailable for this campaign or persona/i,
+    ],
     ["network failure with partial reads", new Error("private network"), "partial", /only partial reconciliation/i],
-  ])("conservatively classifies %s after exactly one GET pair and no POST retry", async (_label, postError, readState, expected) => {
-    const usedOptions = { ...creationOptions, personas: creationOptions.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
-    const present = { id: "classification-entry-secret", characterId: creationOptions.personas[0]!.characterId, name: creationOptions.personas[0]!.name };
-    vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: starterConfigured });
-    vi.mocked(listCampaignCharacters).mockResolvedValueOnce({ characters: [] });
-    vi.mocked(getCampaignCharacterCreationOptions).mockResolvedValueOnce(creationOptions);
-    vi.mocked(createOriginalStarterCampaignCharacter).mockRejectedValueOnce(postError);
-    if (readState === "present") {
-      vi.mocked(listCampaignCharacters).mockResolvedValueOnce({ characters: [present] });
-      vi.mocked(getCampaignCharacterCreationOptions).mockResolvedValueOnce(usedOptions);
-    } else if (readState === "unused") {
+  ])(
+    "conservatively classifies %s after exactly one GET pair and no POST retry",
+    async (_label, postError, readState, expected) => {
+      const usedOptions = {
+        ...creationOptions,
+        personas: creationOptions.personas.map((persona, index) =>
+          index === 0 ? { ...persona, alreadyUsed: true } : persona,
+        ),
+      };
+      const present = {
+        id: "classification-entry-secret",
+        characterId: creationOptions.personas[0]!.characterId,
+        name: creationOptions.personas[0]!.name,
+      };
+      vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: starterConfigured });
       vi.mocked(listCampaignCharacters).mockResolvedValueOnce({ characters: [] });
       vi.mocked(getCampaignCharacterCreationOptions).mockResolvedValueOnce(creationOptions);
-    } else {
-      vi.mocked(listCampaignCharacters).mockRejectedValueOnce(new Error("private roster read"));
-      vi.mocked(getCampaignCharacterCreationOptions).mockResolvedValueOnce(creationOptions);
-    }
-    render(<CampaignDetailPage campaignId={starterConfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
-    fireEvent.click((await screen.findAllByRole("radio"))[0]!);
-    const confirmation = screen.getByRole("checkbox", { name: /currently has NO derived stats/i });
-    fireEvent.click(confirmation);
-    fireEvent.click(screen.getByRole("button", { name: "Finalize character record" }));
+      vi.mocked(createOriginalStarterCampaignCharacter).mockRejectedValueOnce(postError);
+      if (readState === "present") {
+        vi.mocked(listCampaignCharacters).mockResolvedValueOnce({ characters: [present] });
+        vi.mocked(getCampaignCharacterCreationOptions).mockResolvedValueOnce(usedOptions);
+      } else if (readState === "unused") {
+        vi.mocked(listCampaignCharacters).mockResolvedValueOnce({ characters: [] });
+        vi.mocked(getCampaignCharacterCreationOptions).mockResolvedValueOnce(creationOptions);
+      } else {
+        vi.mocked(listCampaignCharacters).mockRejectedValueOnce(new Error("private roster read"));
+        vi.mocked(getCampaignCharacterCreationOptions).mockResolvedValueOnce(creationOptions);
+      }
+      render(<CampaignDetailPage campaignId={starterConfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+      fireEvent.click((await screen.findAllByRole("radio"))[0]!);
+      const confirmation = screen.getByRole("checkbox", { name: /currently has NO derived stats/i });
+      fireEvent.click(confirmation);
+      fireEvent.click(screen.getByRole("button", { name: "Finalize character record" }));
 
-    expect(await screen.findByText(expected)).toBeTruthy();
-    expect(createOriginalStarterCampaignCharacter).toHaveBeenCalledOnce();
-    expect(listCampaignCharacters).toHaveBeenCalledTimes(2);
-    expect(getCampaignCharacterCreationOptions).toHaveBeenCalledTimes(2);
-    expect((confirmation as HTMLInputElement).checked).toBe(false);
-    expect(document.body.textContent).not.toMatch(/private (?:malformed|conflict|unavailable|network|roster)/);
-  });
+      expect(await screen.findByText(expected)).toBeTruthy();
+      expect(createOriginalStarterCampaignCharacter).toHaveBeenCalledOnce();
+      expect(listCampaignCharacters).toHaveBeenCalledTimes(2);
+      expect(getCampaignCharacterCreationOptions).toHaveBeenCalledTimes(2);
+      expect((confirmation as HTMLInputElement).checked).toBe(false);
+      expect(document.body.textContent).not.toMatch(/private (?:malformed|conflict|unavailable|network|roster)/);
+    },
+  );
 
   it("keeps a conservative create outcome and paired GET-only refresh outside a failed options form", async () => {
-    const created = { id: "persistent-entry-secret", characterId: creationOptions.personas[0]!.characterId, name: "Shared Persona" };
+    const created = {
+      id: "persistent-entry-secret",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: "Shared Persona",
+    };
     const refreshRoster = deferred<{ characters: Array<typeof created> }>();
     const refreshOptions = deferred<typeof creationOptions>();
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: starterConfigured });
@@ -885,12 +1295,21 @@ describe("CampaignDetailPage", () => {
     const campaignB = { ...starterConfigured, id: "create-switch-b", name: "Create B" };
     const optionsA = { ...creationOptions, campaignId: campaignA.id };
     const optionsB = { ...creationOptions, campaignId: campaignB.id };
-    const usedA = { ...optionsA, personas: optionsA.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
-    const createdA = { id: "switch-a-entry-secret", characterId: optionsA.personas[0]!.characterId, name: "A reconciled character" };
+    const usedA = {
+      ...optionsA,
+      personas: optionsA.personas.map((persona, index) => (index === 0 ? { ...persona, alreadyUsed: true } : persona)),
+    };
+    const createdA = {
+      id: "switch-a-entry-secret",
+      characterId: optionsA.personas[0]!.characterId,
+      name: "A reconciled character",
+    };
     const postA = deferred<{ character: typeof createdA }>();
     let aRosterReads = 0;
     let aOptionsReads = 0;
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : campaignB }));
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : campaignB,
+    }));
     vi.mocked(listCampaignCharacters).mockImplementation(async (id) => {
       if (id === campaignA.id) return ++aRosterReads === 1 ? { characters: [] } : { characters: [createdA] };
       return { characters: [{ id: "b-entry-secret", characterId: "b-persona-secret", name: "B remains current" }] };
@@ -926,10 +1345,26 @@ describe("CampaignDetailPage", () => {
   });
 
   it("hands a completed create snapshot to one reopen without overriding its fresh authoritative reads", async () => {
-    const created = { id: "handoff-old-entry", characterId: creationOptions.personas[0]!.characterId, name: "Completed snapshot character" };
-    const externallyNewer = { id: "handoff-new-entry", characterId: "newer-persona", name: "Externally newer character" };
-    const usedOptions = { ...creationOptions, personas: creationOptions.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
-    const newerOptions = { ...creationOptions, personas: [{ characterId: "newer-unused", name: "New authoritative option", alreadyUsed: false }] };
+    const created = {
+      id: "handoff-old-entry",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: "Completed snapshot character",
+    };
+    const externallyNewer = {
+      id: "handoff-new-entry",
+      characterId: "newer-persona",
+      name: "Externally newer character",
+    };
+    const usedOptions = {
+      ...creationOptions,
+      personas: creationOptions.personas.map((persona, index) =>
+        index === 0 ? { ...persona, alreadyUsed: true } : persona,
+      ),
+    };
+    const newerOptions = {
+      ...creationOptions,
+      personas: [{ characterId: "newer-unused", name: "New authoritative option", alreadyUsed: false }],
+    };
     const post = deferred<{ character: typeof created }>();
     const freshRoster = deferred<{ characters: Array<typeof externallyNewer> }>();
     const freshOptions = deferred<typeof newerOptions>();
@@ -977,8 +1412,17 @@ describe("CampaignDetailPage", () => {
   });
 
   it("rechecks the exact detail generation before queued reopen-handoff focus", async () => {
-    const created = { id: "generation-handoff-entry", characterId: creationOptions.personas[0]!.characterId, name: "Generation handoff character" };
-    const usedOptions = { ...creationOptions, personas: creationOptions.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
+    const created = {
+      id: "generation-handoff-entry",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: "Generation handoff character",
+    };
+    const usedOptions = {
+      ...creationOptions,
+      personas: creationOptions.personas.map((persona, index) =>
+        index === 0 ? { ...persona, alreadyUsed: true } : persona,
+      ),
+    };
     const post = deferred<{ character: typeof created }>();
     const pendingRename = deferred<never>();
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: starterConfigured });
@@ -1016,7 +1460,11 @@ describe("CampaignDetailPage", () => {
   });
 
   it("keeps a consumed handoff's conservative outcome when reopen reads fail", async () => {
-    const created = { id: "failed-reopen-entry", characterId: creationOptions.personas[0]!.characterId, name: "Partial snapshot" };
+    const created = {
+      id: "failed-reopen-entry",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: "Partial snapshot",
+    };
     const post = deferred<{ character: typeof created }>();
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: starterConfigured });
     vi.mocked(listCampaignCharacters)
@@ -1046,8 +1494,17 @@ describe("CampaignDetailPage", () => {
   });
 
   it("replaces a handed-off success with a conservative message when the fresh reopen pair fails", async () => {
-    const created = { id: "fresh-failure-entry", characterId: creationOptions.personas[0]!.characterId, name: "Previously confirmed" };
-    const usedOptions = { ...creationOptions, personas: creationOptions.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
+    const created = {
+      id: "fresh-failure-entry",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: "Previously confirmed",
+    };
+    const usedOptions = {
+      ...creationOptions,
+      personas: creationOptions.personas.map((persona, index) =>
+        index === 0 ? { ...persona, alreadyUsed: true } : persona,
+      ),
+    };
     const post = deferred<{ character: typeof created }>();
     const freshRoster = deferred<{ characters: Array<typeof created> }>();
     const freshOptions = deferred<typeof creationOptions>();
@@ -1086,7 +1543,10 @@ describe("CampaignDetailPage", () => {
     const campaignB = { ...starterConfigured, id: "create-refresh-b", name: "Refresh B" };
     const optionsA = { ...creationOptions, campaignId: campaignA.id };
     const optionsB = { ...creationOptions, campaignId: campaignB.id };
-    const used = (value: typeof creationOptions) => ({ ...value, personas: value.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) });
+    const used = (value: typeof creationOptions) => ({
+      ...value,
+      personas: value.personas.map((persona, index) => (index === 0 ? { ...persona, alreadyUsed: true } : persona)),
+    });
     const createdA = { id: "refresh-a-entry", characterId: optionsA.personas[0]!.characterId, name: "A character" };
     const createdB = { id: "refresh-b-entry", characterId: optionsB.personas[0]!.characterId, name: "B character" };
     const postA = deferred<{ character: typeof createdA }>();
@@ -1094,9 +1554,12 @@ describe("CampaignDetailPage", () => {
     let aOptionsReads = 0;
     let bRosterReads = 0;
     let bOptionsReads = 0;
-    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({ campaign: id === campaignA.id ? campaignA : campaignB }));
+    vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
+      campaign: id === campaignA.id ? campaignA : campaignB,
+    }));
     vi.mocked(listCampaignCharacters).mockImplementation((id) => {
-      if (id === campaignA.id) return Promise.resolve(++aRosterReads === 1 ? { characters: [] } : { characters: [createdA] });
+      if (id === campaignA.id)
+        return Promise.resolve(++aRosterReads === 1 ? { characters: [] } : { characters: [createdA] });
       bRosterReads += 1;
       if (bRosterReads === 1) return Promise.resolve({ characters: [] });
       return Promise.resolve({ characters: [createdB] });
@@ -1107,9 +1570,9 @@ describe("CampaignDetailPage", () => {
       if (bOptionsReads === 1) return Promise.resolve(optionsB);
       return Promise.resolve(used(optionsB));
     });
-    vi.mocked(createOriginalStarterCampaignCharacter).mockImplementation((id) => id === campaignA.id
-      ? postA.promise
-      : Promise.resolve({ character: createdB }));
+    vi.mocked(createOriginalStarterCampaignCharacter).mockImplementation((id) =>
+      id === campaignA.id ? postA.promise : Promise.resolve({ character: createdB }),
+    );
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={campaignB.id} {...props} />);
     fireEvent.click((await screen.findAllByRole("radio"))[0]!);
@@ -1136,9 +1599,18 @@ describe("CampaignDetailPage", () => {
   it("invalidates a pending pre-create roster across unmount/reopen so reconciliation wins", async () => {
     const preCreateRoster = deferred<{ characters: Array<{ id: string; characterId: string; name: string }> }>();
     const reopenedRoster = deferred<{ characters: Array<{ id: string; characterId: string; name: string }> }>();
-    const created = { id: "reopen-entry-secret", characterId: creationOptions.personas[0]!.characterId, name: "Fresh reconciliation winner" };
+    const created = {
+      id: "reopen-entry-secret",
+      characterId: creationOptions.personas[0]!.characterId,
+      name: "Fresh reconciliation winner",
+    };
     const post = deferred<{ character: typeof created }>();
-    const usedOptions = { ...creationOptions, personas: creationOptions.personas.map((persona, index) => index === 0 ? { ...persona, alreadyUsed: true } : persona) };
+    const usedOptions = {
+      ...creationOptions,
+      personas: creationOptions.personas.map((persona, index) =>
+        index === 0 ? { ...persona, alreadyUsed: true } : persona,
+      ),
+    };
     vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: starterConfigured });
     vi.mocked(listCampaignCharacters)
       .mockReturnValueOnce(preCreateRoster.promise)
@@ -1189,16 +1661,22 @@ describe("CampaignDetailPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Finalize character record" }));
     await waitFor(() => expect(form.getAttribute("aria-busy")).toBe("true"));
     expect(region.getAttribute("aria-busy")).toBe("false");
-    post.resolve({ character: { id: "busy-entry", characterId: creationOptions.personas[0]!.characterId, name: "Shared Persona" } });
+    post.resolve({
+      character: { id: "busy-entry", characterId: creationOptions.personas[0]!.characterId, name: "Shared Persona" },
+    });
     await screen.findByText(/only partial reconciliation or unavailable reads/i);
   });
 
   it("requires explicit confirmation, locks duplicate PUTs, reconciles success, and removes all setup mutation", async () => {
     const write = deferred<{ campaign: typeof starterConfigured }>();
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockResolvedValueOnce({ campaign: starterConfigured });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockResolvedValueOnce({ campaign: starterConfigured });
     vi.mocked(setupOriginalStarter).mockReturnValue(write.promise);
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
-    const confirmation = await screen.findByRole("checkbox", { name: /I understand this metadata-only setup is final/i });
+    const confirmation = await screen.findByRole("checkbox", {
+      name: /I understand this metadata-only setup is final/i,
+    });
     const setup = screen.getByRole("button", { name: "Set up original starter" });
     expect((setup as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(confirmation);
@@ -1216,7 +1694,9 @@ describe("CampaignDetailPage", () => {
     expect(screen.getByText(/Content configuration is read-only/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Set up original starter/i })).toBeNull();
     expect(screen.queryByRole("checkbox", { name: /metadata-only setup is final/i })).toBeNull();
-    expect(document.activeElement).toBe(screen.getByText(/Content configuration is read-only/i).closest(".configured-readonly"));
+    expect(document.activeElement).toBe(
+      screen.getByText(/Content configuration is read-only/i).closest(".configured-readonly"),
+    );
   });
 
   it("offers mutually exclusive fixed starters and reconciles one mechanics PUT with one detail GET", async () => {
@@ -1224,7 +1704,14 @@ describe("CampaignDetailPage", () => {
       .mockResolvedValueOnce({ campaign: ownerUnconfigured })
       .mockResolvedValueOnce({ campaign: mechanicsConfigured });
     vi.mocked(setupMechanicsStarter).mockResolvedValueOnce({ campaign: mechanicsConfigured });
-    render(<CampaignDetailPage campaignId={ownerUnconfigured.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    render(
+      <CampaignDetailPage
+        campaignId={ownerUnconfigured.id}
+        mechanicsEnabled
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
 
     const srd = await screen.findByRole("radio", { name: /SRD 5.1 starter.*recommended/i });
     const original = screen.getByRole("radio", { name: /Original metadata starter/i });
@@ -1237,7 +1724,9 @@ describe("CampaignDetailPage", () => {
     expect((original as HTMLInputElement).checked).toBe(false);
     expect(screen.getByText(/future builder and progression UI/i)).toBeTruthy();
     expect(screen.getByText(/cannot replace any configured content/i)).toBeTruthy();
-    const confirmation = screen.getByRole("checkbox", { name: /explicitly confirm Velvet mechanics starter activation/i });
+    const confirmation = screen.getByRole("checkbox", {
+      name: /explicitly confirm Velvet mechanics starter activation/i,
+    });
     fireEvent.click(confirmation);
     const activate = screen.getByRole("button", { name: "Activate Velvet mechanics starter" });
     fireEvent.click(activate);
@@ -1257,14 +1746,21 @@ describe("CampaignDetailPage", () => {
       .mockResolvedValueOnce({ campaign: ownerUnconfigured })
       .mockResolvedValueOnce({ campaign: srdConfigured });
     vi.mocked(setupSrd51Starter).mockResolvedValueOnce({ campaign: srdConfigured });
-    render(<CampaignDetailPage campaignId={ownerUnconfigured.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    render(
+      <CampaignDetailPage
+        campaignId={ownerUnconfigured.id}
+        mechanicsEnabled
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
 
     const srd = await screen.findByRole("radio", { name: /SRD 5.1 starter.*recommended/i });
     expect((srd as HTMLInputElement).checked).toBe(true);
     expect(screen.getByRole("radio", { name: /Original metadata starter/i })).toBeTruthy();
     expect(screen.getByRole("radio", { name: /Velvet mechanics starter/i })).toBeTruthy();
     expect(screen.getByText("srd-5.1:rules:starter-v1")).toBeTruthy();
-     expect(screen.getAllByText(SRD_5_1_STARTER_IDENTITY.starterId)).toHaveLength(2);
+    expect(screen.getAllByText(SRD_5_1_STARTER_IDENTITY.starterId)).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("radio", { name: /Original metadata starter/i }));
     expect((srd as HTMLInputElement).checked).toBe(false);
@@ -1327,7 +1823,9 @@ describe("CampaignDetailPage", () => {
       .mockRejectedValueOnce(new ApiError(404, "reopen pre-commit unavailable"))
       .mockResolvedValueOnce(creationOptions);
     vi.mocked(setupOriginalStarter).mockReturnValue(write.promise);
-    const first = render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const first = render(
+      <CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />,
+    );
     fireEvent.click(await screen.findByRole("checkbox", { name: /metadata-only setup is final/i }));
     fireEvent.click(screen.getByRole("button", { name: "Set up original starter" }));
     expect(setupOriginalStarter).toHaveBeenCalledOnce();
@@ -1354,9 +1852,11 @@ describe("CampaignDetailPage", () => {
     const write = deferred<{ campaign: typeof configuredA }>();
     let aDetailReads = 0;
     vi.mocked(getCampaignDetail).mockImplementation(async (id) => ({
-      campaign: id === campaignB.id ? campaignB : (++aDetailReads < 3 ? campaignA : configuredA),
+      campaign: id === campaignB.id ? campaignB : ++aDetailReads < 3 ? campaignA : configuredA,
     }));
-    vi.mocked(getCampaignCharacterCreationOptions).mockImplementation(async (id) => id === campaignB.id ? optionsB : optionsA);
+    vi.mocked(getCampaignCharacterCreationOptions).mockImplementation(async (id) =>
+      id === campaignB.id ? optionsB : optionsA,
+    );
     vi.mocked(setupOriginalStarter).mockReturnValue(write.promise);
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={campaignA.id} {...props} />);
@@ -1367,12 +1867,14 @@ describe("CampaignDetailPage", () => {
     view.rerender(<CampaignDetailPage campaignId={campaignA.id} {...props} />);
     await screen.findByRole("heading", { name: campaignA.name });
 
-    const beforeCommitOptions = vi.mocked(getCampaignCharacterCreationOptions).mock.calls
-      .filter(([id]) => id === campaignA.id).length;
+    const beforeCommitOptions = vi
+      .mocked(getCampaignCharacterCreationOptions)
+      .mock.calls.filter(([id]) => id === campaignA.id).length;
     write.resolve({ campaign: configuredA });
     await screen.findByRole("heading", { name: "Finalize a character record" });
-    expect(vi.mocked(getCampaignCharacterCreationOptions).mock.calls.filter(([id]) => id === campaignA.id).length)
-      .toBe(beforeCommitOptions + 1);
+    expect(vi.mocked(getCampaignCharacterCreationOptions).mock.calls.filter(([id]) => id === campaignA.id).length).toBe(
+      beforeCommitOptions + 1,
+    );
     expect(setupOriginalStarter).toHaveBeenCalledOnce();
   });
 
@@ -1402,8 +1904,12 @@ describe("CampaignDetailPage", () => {
   });
 
   it("treats a malformed successful PUT response as ambiguous and reconciles exact success", async () => {
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockResolvedValueOnce({ campaign: starterConfigured });
-    vi.mocked(setupOriginalStarter).mockRejectedValueOnce(new Error("Campaign starter setup response did not match the request"));
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockResolvedValueOnce({ campaign: starterConfigured });
+    vi.mocked(setupOriginalStarter).mockRejectedValueOnce(
+      new Error("Campaign starter setup response did not match the request"),
+    );
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     fireEvent.click(await screen.findByRole("checkbox", { name: /metadata-only setup is final/i }));
     fireEvent.click(screen.getByRole("button", { name: "Set up original starter" }));
@@ -1413,12 +1919,17 @@ describe("CampaignDetailPage", () => {
     expect(screen.queryByRole("button", { name: /Set up original starter/i })).toBeNull();
     expect(setupOriginalStarter).toHaveBeenCalledOnce();
     expect(getCampaignDetail).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(document.activeElement)
-      .toBe(screen.getByText(/Content configuration is read-only/i).closest(".configured-readonly")));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByText(/Content configuration is read-only/i).closest(".configured-readonly"),
+      ),
+    );
   });
 
   it("reconciles an ambiguous PUT failure to exact starter success without retrying", async () => {
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockResolvedValueOnce({ campaign: starterConfigured });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockResolvedValueOnce({ campaign: starterConfigured });
     vi.mocked(setupOriginalStarter).mockRejectedValueOnce(new Error("response lost"));
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     fireEvent.click(await screen.findByRole("checkbox", { name: /metadata-only setup is final/i }));
@@ -1428,12 +1939,17 @@ describe("CampaignDetailPage", () => {
     expect(screen.getByText("velvet:rules:original-narrative")).toBeTruthy();
     expect(setupOriginalStarter).toHaveBeenCalledOnce();
     expect(getCampaignDetail).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(document.activeElement)
-      .toBe(screen.getByText(/Content configuration is read-only/i).closest(".configured-readonly")));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByText(/Content configuration is read-only/i).closest(".configured-readonly"),
+      ),
+    );
   });
 
   it("keeps a 409 reconciliation unconfigured with a stable message and confirmation focus", async () => {
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockResolvedValueOnce({ campaign: ownerUnconfigured });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured });
     vi.mocked(setupOriginalStarter).mockRejectedValueOnce(new ApiError(409, "private conflict"));
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     const confirmation = await screen.findByRole("checkbox", { name: /metadata-only setup is final/i });
@@ -1451,7 +1967,9 @@ describe("CampaignDetailPage", () => {
   });
 
   it("does not trust the PUT body as current detail when post-setup detail refresh fails", async () => {
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockRejectedValueOnce(new Error("private refresh"));
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockRejectedValueOnce(new Error("private refresh"));
     vi.mocked(setupOriginalStarter).mockResolvedValueOnce({ campaign: starterConfigured });
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     fireEvent.click(await screen.findByRole("checkbox", { name: /metadata-only setup is final/i }));
@@ -1464,12 +1982,15 @@ describe("CampaignDetailPage", () => {
     expect(document.body.textContent).not.toContain("private refresh");
     expect(setupOriginalStarter).toHaveBeenCalledOnce();
     expect(getCampaignDetail).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(document.activeElement)
-      .toBe(screen.getByRole("checkbox", { name: /metadata-only setup is final/i })));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("checkbox", { name: /metadata-only setup is final/i })),
+    );
   });
 
   it("keeps generic failed reconciliation stable and never retries the PUT", async () => {
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockRejectedValueOnce(new Error("private refresh"));
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockRejectedValueOnce(new Error("private refresh"));
     vi.mocked(setupOriginalStarter).mockRejectedValueOnce(new Error("private write"));
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     const confirmation = await screen.findByRole("checkbox", { name: /metadata-only setup is final/i });
@@ -1487,7 +2008,9 @@ describe("CampaignDetailPage", () => {
   });
 
   it("keeps failed 409 reconciliation stable and never retries the PUT", async () => {
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockRejectedValueOnce(new Error("private refresh"));
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockRejectedValueOnce(new Error("private refresh"));
     vi.mocked(setupOriginalStarter).mockRejectedValueOnce(new ApiError(409, "private conflict"));
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     const confirmation = await screen.findByRole("checkbox", { name: /metadata-only setup is final/i });
@@ -1505,7 +2028,9 @@ describe("CampaignDetailPage", () => {
   });
 
   it("reconciles ambiguous two-transaction failure without repeating PUT", async () => {
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockResolvedValueOnce({ campaign: ownerUnconfigured });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured });
     vi.mocked(setupOriginalStarter).mockRejectedValue(new Error("private response loss"));
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     fireEvent.click(await screen.findByRole("checkbox", { name: /metadata-only setup is final/i }));
@@ -1520,9 +2045,13 @@ describe("CampaignDetailPage", () => {
   });
 
   it("handles setup conflict through authoritative different configuration and authority 404 without leaks", async () => {
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockResolvedValueOnce({ campaign: configured });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockResolvedValueOnce({ campaign: configured });
     vi.mocked(setupOriginalStarter).mockRejectedValueOnce(new ApiError(409, "private namespace collision"));
-    const first = render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const first = render(
+      <CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />,
+    );
     fireEvent.click(await screen.findByRole("checkbox", { name: /metadata-only setup is final/i }));
     fireEvent.click(screen.getByRole("button", { name: "Set up original starter" }));
     expect((await screen.findByRole("alert")).textContent).toContain("different content configuration");
@@ -1542,7 +2071,9 @@ describe("CampaignDetailPage", () => {
 
   it("ignores stale and unmounted starter setup completions", async () => {
     const staleWrite = deferred<{ campaign: typeof starterConfigured }>();
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured }).mockResolvedValueOnce({ campaign: configured });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockResolvedValueOnce({ campaign: configured });
     vi.mocked(setupOriginalStarter).mockReturnValueOnce(staleWrite.promise);
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const view = render(<CampaignDetailPage campaignId={ownerUnconfigured.id} {...props} />);
@@ -1562,7 +2093,9 @@ describe("CampaignDetailPage", () => {
     vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured });
     vi.mocked(setupOriginalStarter).mockReturnValueOnce(unmountedWrite.promise);
     const unavailable = vi.fn();
-    const late = render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={unavailable} />);
+    const late = render(
+      <CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={unavailable} />,
+    );
     fireEvent.click(await screen.findByRole("checkbox", { name: /metadata-only setup is final/i }));
     fireEvent.click(screen.getByRole("button", { name: "Set up original starter" }));
     late.unmount();
@@ -1575,7 +2108,9 @@ describe("CampaignDetailPage", () => {
 
   it("normalizes, saves same or changed names once, reconciles, announces, and focuses", async () => {
     const renamed = { ...configured, name: "New Road", updatedAt: "2030-04-06T00:00:00.000Z" };
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: configured }).mockResolvedValueOnce({ campaign: renamed });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: configured })
+      .mockResolvedValueOnce({ campaign: renamed });
     const write = deferred<{ campaign: { id: string; name: string; updatedAt: string } }>();
     vi.mocked(renameCampaign).mockReturnValue(write.promise);
     render(<CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
@@ -1586,7 +2121,10 @@ describe("CampaignDetailPage", () => {
     fireEvent.click(submit);
     fireEvent.submit(submit.closest("form")!);
     expect(renameCampaign).toHaveBeenCalledOnce();
-    expect(renameCampaign).toHaveBeenCalledWith(configured.id, { name: "New Road", expectedUpdatedAt: configured.updatedAt });
+    expect(renameCampaign).toHaveBeenCalledWith(configured.id, {
+      name: "New Road",
+      expectedUpdatedAt: configured.updatedAt,
+    });
     expect((input as HTMLInputElement).disabled).toBe(true);
     write.resolve({ campaign: { id: renamed.id, name: renamed.name, updatedAt: renamed.updatedAt } });
     await screen.findByRole("heading", { name: renamed.name });
@@ -1595,8 +2133,12 @@ describe("CampaignDetailPage", () => {
     expect(document.activeElement).toBe(input);
 
     // Equality with the current name remains a permitted timestamp-changing write.
-    vi.mocked(renameCampaign).mockResolvedValueOnce({ campaign: { id: renamed.id, name: renamed.name, updatedAt: "2030-04-07T00:00:00.000Z" } });
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: { ...renamed, updatedAt: "2030-04-07T00:00:00.000Z" } });
+    vi.mocked(renameCampaign).mockResolvedValueOnce({
+      campaign: { id: renamed.id, name: renamed.name, updatedAt: "2030-04-07T00:00:00.000Z" },
+    });
+    vi.mocked(getCampaignDetail).mockResolvedValueOnce({
+      campaign: { ...renamed, updatedAt: "2030-04-07T00:00:00.000Z" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Rename campaign" }));
     await waitFor(() => expect(renameCampaign).toHaveBeenCalledTimes(2));
   });
@@ -1615,7 +2157,9 @@ describe("CampaignDetailPage", () => {
 
   it("retains the draft and authoritatively refreshes after a two-tab stale conflict", async () => {
     const elsewhere = { ...configured, name: "Changed Elsewhere", updatedAt: "2030-04-08T00:00:00.000Z" };
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: configured }).mockResolvedValueOnce({ campaign: elsewhere });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: configured })
+      .mockResolvedValueOnce({ campaign: elsewhere });
     vi.mocked(renameCampaign).mockRejectedValue(new ApiError(409, "private stale"));
     render(<CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     const input = await screen.findByRole("textbox", { name: "Campaign name" });
@@ -1629,9 +2173,13 @@ describe("CampaignDetailPage", () => {
 
   it("reconciles ambiguous failures but never attributes matching names or timestamps to the PATCH", async () => {
     const committed = { ...configured, name: "Recovered Name", updatedAt: "2030-04-09T00:00:00.000Z" };
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: configured }).mockResolvedValueOnce({ campaign: committed });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: configured })
+      .mockResolvedValueOnce({ campaign: committed });
     vi.mocked(renameCampaign).mockRejectedValueOnce(new Error("response lost"));
-    const { unmount } = render(<CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const { unmount } = render(
+      <CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />,
+    );
     const input = await screen.findByRole("textbox", { name: "Campaign name" });
     fireEvent.change(input, { target: { value: committed.name } });
     fireEvent.submit(input.closest("form")!);
@@ -1640,7 +2188,9 @@ describe("CampaignDetailPage", () => {
     expect(renameCampaign).toHaveBeenCalledOnce();
     unmount();
 
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: configured }).mockResolvedValueOnce({ campaign: { ...configured, updatedAt: "2030-04-10T00:00:00.000Z" } });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: configured })
+      .mockResolvedValueOnce({ campaign: { ...configured, updatedAt: "2030-04-10T00:00:00.000Z" } });
     vi.mocked(renameCampaign).mockRejectedValueOnce(new ApiError(500, "private internal"));
     render(<CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     const secondInput = await screen.findByRole("textbox", { name: "Campaign name" });
@@ -1653,7 +2203,9 @@ describe("CampaignDetailPage", () => {
   });
 
   it("keeps transient failures on-page, redacts details, and retries", async () => {
-    vi.mocked(getCampaignDetail).mockRejectedValueOnce(new Error("private failure")).mockResolvedValueOnce({ campaign: unconfigured });
+    vi.mocked(getCampaignDetail)
+      .mockRejectedValueOnce(new Error("private failure"))
+      .mockResolvedValueOnce({ campaign: unconfigured });
     const unavailable = vi.fn();
     render(<CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={unavailable} />);
     await screen.findByText("Campaign could not be loaded.");
@@ -1690,9 +2242,12 @@ describe("CampaignDetailPage", () => {
       const pending = deferred<{ campaign: typeof unconfigured }>();
       vi.mocked(getCampaignDetail).mockReturnValueOnce(pending.promise);
       const unavailable = vi.fn();
-      const { unmount } = render(<CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={unavailable} />);
+      const { unmount } = render(
+        <CampaignDetailPage campaignId={unconfigured.id} onBack={vi.fn()} onUnavailable={unavailable} />,
+      );
       unmount();
-      if (outcome === "success") pending.resolve({ campaign: unconfigured }); else pending.reject(new Error("late"));
+      if (outcome === "success") pending.resolve({ campaign: unconfigured });
+      else pending.reject(new Error("late"));
       await pending.promise.catch(() => undefined);
       await Promise.resolve();
       expect(unavailable).not.toHaveBeenCalled();
@@ -1704,7 +2259,9 @@ describe("CampaignDetailPage", () => {
     const pendingWrite = deferred<{ campaign: { id: string; name: string; updatedAt: string } }>();
     vi.mocked(renameCampaign).mockReturnValueOnce(pendingWrite.promise);
     const unavailable = vi.fn();
-    const first = render(<CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={unavailable} />);
+    const first = render(
+      <CampaignDetailPage campaignId={configured.id} onBack={vi.fn()} onUnavailable={unavailable} />,
+    );
     const input = await screen.findByRole("textbox", { name: "Campaign name" });
     fireEvent.change(input, { target: { value: "Late Name" } });
     fireEvent.submit(input.closest("form")!);
@@ -1716,7 +2273,9 @@ describe("CampaignDetailPage", () => {
     expect(getCampaignDetail).toHaveBeenCalledTimes(1);
 
     const rapidWrite = deferred<{ campaign: { id: string; name: string; updatedAt: string } }>();
-    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: configured }).mockResolvedValueOnce({ campaign: unconfigured });
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: configured })
+      .mockResolvedValueOnce({ campaign: unconfigured });
     vi.mocked(renameCampaign).mockReturnValueOnce(rapidWrite.promise);
     const props = { onBack: vi.fn(), onUnavailable: vi.fn() };
     const rapid = render(<CampaignDetailPage campaignId={configured.id} {...props} />);
@@ -1725,7 +2284,9 @@ describe("CampaignDetailPage", () => {
     fireEvent.submit(rapidInput.closest("form")!);
     rapid.rerender(<CampaignDetailPage campaignId={unconfigured.id} {...props} />);
     await screen.findByRole("heading", { name: unconfigured.name });
-    rapidWrite.resolve({ campaign: { id: configured.id, name: "Stale Selection Name", updatedAt: "2030-04-12T00:00:00.000Z" } });
+    rapidWrite.resolve({
+      campaign: { id: configured.id, name: "Stale Selection Name", updatedAt: "2030-04-12T00:00:00.000Z" },
+    });
     await rapidWrite.promise;
     await waitFor(() => expect(screen.getByRole("heading", { name: unconfigured.name })).toBeTruthy());
     expect(screen.queryByText("Stale Selection Name")).toBeNull();
@@ -1742,10 +2303,33 @@ describe("CampaignDetailPage", () => {
 
 describe("CampaignAdministrationPage role projections", () => {
   const timestamp = "2030-04-05T00:00:00.000Z";
-  const timeline = { id: "timeline-main", parentTimelineId: null, forkedFromRevision: null, revision: 7, createdAt: timestamp, active: true };
-  const receipt: CampaignAdministrationReceipt = { commandId: "command-one", campaignId: "campaign-one", type: "administration_updated",
-    revisionBefore: 4, revisionAfter: 5, occurredAt: timestamp, events: [{ eventId: "event-one", commandId: "command-one",
-      campaignId: "campaign-one", type: "administration_updated", revision: 5, occurredAt: timestamp, data: { settings: {} } }] };
+  const timeline = {
+    id: "timeline-main",
+    parentTimelineId: null,
+    forkedFromRevision: null,
+    revision: 7,
+    createdAt: timestamp,
+    active: true,
+  };
+  const receipt: CampaignAdministrationReceipt = {
+    commandId: "command-one",
+    campaignId: "campaign-one",
+    type: "administration_updated",
+    revisionBefore: 4,
+    revisionAfter: 5,
+    occurredAt: timestamp,
+    events: [
+      {
+        eventId: "event-one",
+        commandId: "command-one",
+        campaignId: "campaign-one",
+        type: "administration_updated",
+        revision: 5,
+        occurredAt: timestamp,
+        data: { settings: {} },
+      },
+    ],
+  };
 
   beforeEach(() => {
     vi.mocked(listCampaignTimelines).mockResolvedValue({ activeTimelineId: timeline.id, timelines: [timeline] });
@@ -1754,12 +2338,25 @@ describe("CampaignAdministrationPage role projections", () => {
   });
 
   it("structurally omits owner and privileged controls from a player projection", async () => {
-    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
-      id: "campaign-one", actorRole: "player", status: "published", activeTimelineId: timeline.id,
-      revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "standard", recapVisibility: "members" },
-    } });
-    render(<CampaignAdministrationPage campaignId="campaign-one" campaignName="The Long Road" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    vi.mocked(getCampaignAdministration).mockResolvedValue({
+      campaign: {
+        id: "campaign-one",
+        actorRole: "player",
+        status: "published",
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "standard", recapVisibility: "members" },
+      },
+    });
+    render(
+      <CampaignAdministrationPage
+        campaignId="campaign-one"
+        campaignName="The Long Road"
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
 
     expect(await screen.findByRole("heading", { name: "Campaign settings" })).toBeTruthy();
     expect(screen.getByText("Allowed")).toBeTruthy();
@@ -1774,10 +2371,23 @@ describe("CampaignAdministrationPage role projections", () => {
   });
 
   it("shows GM notes but structurally omits every owner mutation from a GM projection", async () => {
-    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
-      id: "campaign-one", actorRole: "gm", status: "paused", activeTimelineId: timeline.id, revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "GM-only canon" },
-    } });
+    vi.mocked(getCampaignAdministration).mockResolvedValue({
+      campaign: {
+        id: "campaign-one",
+        actorRole: "gm",
+        status: "paused",
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: false,
+          safetyMode: "strict",
+          recapVisibility: "gm-only",
+          gmNotes: "GM-only canon",
+        },
+      },
+    });
     render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
     expect(await screen.findByText("GM-only canon")).toBeTruthy();
@@ -1789,10 +2399,17 @@ describe("CampaignAdministrationPage role projections", () => {
   });
 
   it("omits privileged notes and every mutation from an observer projection", async () => {
-    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
-      id: "campaign-one", actorRole: "observer", status: "published", activeTimelineId: timeline.id, revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members" },
-    } });
+    vi.mocked(getCampaignAdministration).mockResolvedValue({
+      campaign: {
+        id: "campaign-one",
+        actorRole: "observer",
+        status: "published",
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members" },
+      },
+    });
     render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
     expect(await screen.findByRole("heading", { name: "Campaign settings" })).toBeTruthy();
@@ -1803,18 +2420,39 @@ describe("CampaignAdministrationPage role projections", () => {
   });
 
   it("renders owner-only lifecycle, membership, checkpoint, archive, and transfer navigation", async () => {
-    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
-      id: "campaign-one", actorRole: "owner", status: "published", activeTimelineId: timeline.id,
-      revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "Private canon" },
-    } });
-    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [
-      { principalId: "local-owner", role: "owner", createdAt: timestamp },
-      { principalId: "local-player", role: "player", createdAt: timestamp },
-    ] });
-    render(<CampaignAdministrationPage campaignId="campaign-one" campaignName="The Long Road" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    vi.mocked(getCampaignAdministration).mockResolvedValue({
+      campaign: {
+        id: "campaign-one",
+        actorRole: "owner",
+        status: "published",
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: true,
+          safetyMode: "strict",
+          recapVisibility: "gm-only",
+          gmNotes: "Private canon",
+        },
+      },
+    });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({
+      memberships: [
+        { principalId: "local-owner", role: "owner", createdAt: timestamp },
+        { principalId: "local-player", role: "player", createdAt: timestamp },
+      ],
+    });
+    render(
+      <CampaignAdministrationPage
+        campaignId="campaign-one"
+        campaignName="The Long Road"
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
 
-    const saveSettings = await screen.findByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+    const saveSettings = (await screen.findByRole("button", { name: "Save settings" })) as HTMLButtonElement;
     expect(saveSettings.disabled).toBe(true);
     fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
     expect(saveSettings.disabled).toBe(false);
@@ -1827,17 +2465,38 @@ describe("CampaignAdministrationPage role projections", () => {
   });
 
   it("locks an uncertain write against duplicates until an authoritative refresh", async () => {
-    const administration = { campaign: {
-      id: "campaign-one", actorRole: "owner" as const, status: "published" as const, activeTimelineId: timeline.id,
-      revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict" as const, recapVisibility: "gm-only" as const, gmNotes: "Private canon" },
-    } };
+    const administration = {
+      campaign: {
+        id: "campaign-one",
+        actorRole: "owner" as const,
+        status: "published" as const,
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: true,
+          safetyMode: "strict" as const,
+          recapVisibility: "gm-only" as const,
+          gmNotes: "Private canon",
+        },
+      },
+    };
     vi.mocked(getCampaignAdministration).mockResolvedValue(administration);
-    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({
+      memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }],
+    });
     vi.mocked(updateCampaignAdministration).mockRejectedValueOnce(new Error("connection lost"));
-    render(<CampaignAdministrationPage campaignId="campaign-one" campaignName="The Long Road" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    render(
+      <CampaignAdministrationPage
+        campaignId="campaign-one"
+        campaignName="The Long Road"
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
 
-    const save = await screen.findByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+    const save = (await screen.findByRole("button", { name: "Save settings" })) as HTMLButtonElement;
     fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
     fireEvent.click(save);
     const refresh = await screen.findByRole("button", { name: "Refresh authoritative state" });
@@ -1847,16 +2506,35 @@ describe("CampaignAdministrationPage role projections", () => {
     expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
 
     fireEvent.click(refresh);
-    await waitFor(() => expect((screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled,
+      ).toBe(false),
+    );
     expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
   });
 
   it("keeps restored archive unavailable until an explicit campaign-name retry succeeds", async () => {
-    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
-      id: "campaign-one", actorRole: "owner", status: "published", activeTimelineId: timeline.id, revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "" },
-    } });
-    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(getCampaignAdministration).mockResolvedValue({
+      campaign: {
+        id: "campaign-one",
+        actorRole: "owner",
+        status: "published",
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: true,
+          safetyMode: "strict",
+          recapVisibility: "gm-only",
+          gmNotes: "",
+        },
+      },
+    });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({
+      memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }],
+    });
     vi.mocked(getCampaignDetail).mockRejectedValueOnce(new Error("detail unavailable"));
     render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
@@ -1869,11 +2547,26 @@ describe("CampaignAdministrationPage role projections", () => {
   });
 
   it("requires settings review and treats local invalid input as a certain non-commit", async () => {
-    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
-      id: "campaign-one", actorRole: "owner", status: "published", activeTimelineId: timeline.id, revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "" },
-    } });
-    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(getCampaignAdministration).mockResolvedValue({
+      campaign: {
+        id: "campaign-one",
+        actorRole: "owner",
+        status: "published",
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: true,
+          safetyMode: "strict",
+          recapVisibility: "gm-only",
+          gmNotes: "",
+        },
+      },
+    });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({
+      memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }],
+    });
     vi.mocked(updateCampaignAdministration).mockRejectedValueOnce(new ApiInputError());
     render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
@@ -1888,16 +2581,32 @@ describe("CampaignAdministrationPage role projections", () => {
   });
 
   it("retains a settled write across unmount and blocks reopening until authoritative refresh", async () => {
-    const administration = { campaign: {
-      id: "campaign-one", actorRole: "owner" as const, status: "published" as const, activeTimelineId: timeline.id,
-      revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict" as const, recapVisibility: "gm-only" as const, gmNotes: "" },
-    } };
+    const administration = {
+      campaign: {
+        id: "campaign-one",
+        actorRole: "owner" as const,
+        status: "published" as const,
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: true,
+          safetyMode: "strict" as const,
+          recapVisibility: "gm-only" as const,
+          gmNotes: "",
+        },
+      },
+    };
     const write = deferred<Awaited<ReturnType<typeof updateCampaignAdministration>>>();
     vi.mocked(getCampaignAdministration).mockResolvedValue(administration);
-    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({
+      memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }],
+    });
     vi.mocked(updateCampaignAdministration).mockReturnValue(write.promise);
-    const first = render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const first = render(
+      <CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />,
+    );
     const save = await screen.findByRole("button", { name: "Save settings" });
     fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
     fireEvent.click(save);
@@ -1906,24 +2615,47 @@ describe("CampaignAdministrationPage role projections", () => {
     render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: "Campaign settings" });
     expect(screen.queryByRole("button", { name: "Refresh authoritative state" })).toBeNull();
-    expect((screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled).toBe(true);
-    await act(async () => { write.resolve({ campaign: { ...administration.campaign, revision: 5 }, receipt }); await write.promise; });
+    expect(
+      (screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled,
+    ).toBe(true);
+    await act(async () => {
+      write.resolve({ campaign: { ...administration.campaign, revision: 5 }, receipt });
+      await write.promise;
+    });
     const refresh = await screen.findByRole("button", { name: "Refresh authoritative state" });
     expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
     fireEvent.click(refresh);
-    await waitFor(() => expect((screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled,
+      ).toBe(false),
+    );
     expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
   });
 
   it("unlocks only after a receipt-backed write receives successful authoritative reconciliation", async () => {
-    const before = { campaign: {
-      id: "campaign-one", actorRole: "owner" as const, status: "published" as const, activeTimelineId: timeline.id,
-      revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict" as const, recapVisibility: "gm-only" as const, gmNotes: "" },
-    } };
+    const before = {
+      campaign: {
+        id: "campaign-one",
+        actorRole: "owner" as const,
+        status: "published" as const,
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: true,
+          safetyMode: "strict" as const,
+          recapVisibility: "gm-only" as const,
+          gmNotes: "",
+        },
+      },
+    };
     const after = { campaign: { ...before.campaign, revision: 5, updatedAt: "2030-04-05T00:00:01.000Z" } };
     vi.mocked(getCampaignAdministration).mockResolvedValueOnce(before).mockResolvedValue(after);
-    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({
+      memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }],
+    });
     vi.mocked(updateCampaignAdministration).mockResolvedValue({ campaign: after.campaign, receipt });
     render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
@@ -1931,27 +2663,65 @@ describe("CampaignAdministrationPage role projections", () => {
     fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
     fireEvent.click(save);
     await screen.findByText(/Confirmed by receipt at revision 5/);
-    await waitFor(() => expect((screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled,
+      ).toBe(false),
+    );
     expect(getCampaignAdministration).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("button", { name: "Refresh authoritative state" })).toBeNull();
   });
 
   it("does not let stale cross-campaign loads publish or claim queued heading focus", async () => {
     const campaignA = deferred<Awaited<ReturnType<typeof getCampaignAdministration>>>();
-    const observer = (id: string) => ({ campaign: {
-      id, actorRole: "observer" as const, status: "published" as const, activeTimelineId: timeline.id,
-      revision: 4, updatedAt: timestamp,
-      settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard" as const, recapVisibility: "members" as const },
-    } });
-    vi.mocked(getCampaignAdministration).mockImplementation((id) => id === "campaign-a" ? campaignA.promise : Promise.resolve(observer(id)));
-    vi.mocked(getCampaignDetail).mockImplementation((id) => Promise.resolve({ campaign: { ...unconfigured, id, name: id === "campaign-a" ? "First" : "Second" } }));
+    const observer = (id: string) => ({
+      campaign: {
+        id,
+        actorRole: "observer" as const,
+        status: "published" as const,
+        activeTimelineId: timeline.id,
+        revision: 4,
+        updatedAt: timestamp,
+        settings: {
+          maxPlayers: 6,
+          allowPlayerDice: false,
+          safetyMode: "standard" as const,
+          recapVisibility: "members" as const,
+        },
+      },
+    });
+    vi.mocked(getCampaignAdministration).mockImplementation((id) =>
+      id === "campaign-a" ? campaignA.promise : Promise.resolve(observer(id)),
+    );
+    vi.mocked(getCampaignDetail).mockImplementation((id) =>
+      Promise.resolve({ campaign: { ...unconfigured, id, name: id === "campaign-a" ? "First" : "Second" } }),
+    );
     const focused = vi.fn();
-    const view = render(<CampaignAdministrationPage campaignId="campaign-a" focusHeadingRequest={1} onHeadingFocused={focused} onBack={vi.fn()} onUnavailable={vi.fn()} />);
-    view.rerender(<CampaignAdministrationPage campaignId="campaign-b" focusHeadingRequest={2} onHeadingFocused={focused} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const view = render(
+      <CampaignAdministrationPage
+        campaignId="campaign-a"
+        focusHeadingRequest={1}
+        onHeadingFocused={focused}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
+    view.rerender(
+      <CampaignAdministrationPage
+        campaignId="campaign-b"
+        focusHeadingRequest={2}
+        onHeadingFocused={focused}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
 
     expect(await screen.findByText("Second")).toBeTruthy();
     await waitFor(() => expect(focused).toHaveBeenCalledWith(2));
-    await act(async () => { campaignA.resolve(observer("campaign-a")); await campaignA.promise; });
+    await act(async () => {
+      campaignA.resolve(observer("campaign-a"));
+      await campaignA.promise;
+    });
     expect(screen.getByText("Second")).toBeTruthy();
     expect(screen.queryByText("First")).toBeNull();
     expect(focused).not.toHaveBeenCalledWith(1);

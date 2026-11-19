@@ -39,9 +39,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -262,10 +260,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },
@@ -307,9 +302,7 @@
         }
       },
       "expected": {
-        "selections": [
-          "dm-candidate:7defe8452740d6488a3b0d7ac4c2aaef90af30ef"
-        ]
+        "selections": ["dm-candidate:7defe8452740d6488a3b0d7ac4c2aaef90af30ef"]
       },
       "note": "The state (empty recap, quests and world; no encounter, no legal actions) does not genuinely require a player decision and both advertised beats are pacing, so holding was not required; the director's recorded transition selected the preferred ambient-beat (transition signal 0.66 vs 0.52 for the skip) while the provider committed nothing. [Confirmed by the user against the review sheet on 2026-09-17.]",
       "reason": "human review confirmed the recorded director-selection decision"
@@ -348,9 +341,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -571,10 +562,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },
@@ -616,9 +604,7 @@
         }
       },
       "expected": {
-        "selections": [
-          "dm-candidate:7defe8452740d6488a3b0d7ac4c2aaef90af30ef"
-        ]
+        "selections": ["dm-candidate:7defe8452740d6488a3b0d7ac4c2aaef90af30ef"]
       },
       "note": "The advertised set is only two pacing beats and the recorded state has no pending player decision (recap, legal actions, quests, world and encounter are all empty), so the director should have committed the ambient transition rather than deferring; the provider's single ambient-beat is the preferred empty-world beat. [Confirmed by the user against the review sheet on 2026-09-17.]",
       "reason": "human review rejected the recorded director-selection decision and supplied the corrected answer"
@@ -657,9 +643,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -880,10 +864,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },
@@ -969,9 +950,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -1192,10 +1171,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },
@@ -1281,9 +1257,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -1504,10 +1478,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },
@@ -1549,9 +1520,7 @@
         }
       },
       "expected": {
-        "selections": [
-          "dm-candidate:7defe8452740d6488a3b0d7ac4c2aaef90af30ef"
-        ]
+        "selections": ["dm-candidate:7defe8452740d6488a3b0d7ac4c2aaef90af30ef"]
       },
       "note": "The provider committed only the arbitrary 30-minute time skip while the director's recorded transition chose the ambient-beat (transition signal 0.65 vs 0.50), and the empty state (no recap, quests, encounter or legal actions) offers no reason to advance the clock; the director's call is better grounded. [Confirmed by the user against the review sheet on 2026-09-17.]",
       "reason": "human review confirmed the recorded director-selection decision"
@@ -1590,9 +1559,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -1813,10 +1780,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },
@@ -1858,9 +1822,7 @@
         }
       },
       "expected": {
-        "selections": [
-          "dm-candidate:7defe8452740d6488a3b0d7ac4c2aaef90af30ef"
-        ]
+        "selections": ["dm-candidate:7defe8452740d6488a3b0d7ac4c2aaef90af30ef"]
       },
       "note": "Same empty session-start state (no recap, encounter, quests, world or legal actions) with only the two pacing candidates advertised, so a deferral was not required; the provider's committed ambient-beat is the better answer than the director's hold. [Confirmed by the user against the review sheet on 2026-09-17.]",
       "reason": "human review rejected the recorded director-selection decision and supplied the corrected answer"
@@ -1899,9 +1861,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -2122,10 +2082,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },
@@ -2211,9 +2168,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -2434,10 +2389,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },
@@ -2521,9 +2473,7 @@
             },
             "campaignId": "d422ffb5-e67c-458f-b607-4d3c8cb97cb3",
             "campaignRevision": 3,
-            "committedMechanics": [
-              "No active encounter is committed for this session."
-            ],
+            "committedMechanics": ["No active encounter is committed for this session."],
             "currentActorLocation": null,
             "encounter": null,
             "humanCanon": [],
@@ -2744,10 +2694,7 @@
             "synthesizedSummaryFacts": [],
             "timelineId": "1f9204ef-6cbf-488d-9d01-3f338bceeaf4",
             "timelineRevision": 0,
-            "visibleCast": [
-              "The Emberwake Reach - Lead Investigator.",
-              "The Emberwake Reach - Field Partner."
-            ],
+            "visibleCast": ["The Emberwake Reach - Lead Investigator.", "The Emberwake Reach - Field Partner."],
             "visibleQuests": [],
             "visibleWorld": []
           },

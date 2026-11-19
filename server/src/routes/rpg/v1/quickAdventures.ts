@@ -1,7 +1,4 @@
-import {
-  quickAdventureCreateRequestSchema,
-  quickAdventureCreateResponseSchema,
-} from "@velvet/contracts";
+import { quickAdventureCreateRequestSchema, quickAdventureCreateResponseSchema } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
@@ -27,7 +24,10 @@ const REPLAY_LIMIT = 256;
 
 type CachedSuccess = ReturnType<typeof quickAdventureCreateResponseSchema.parse>;
 
-export const quickAdventureHttpRoutes: FastifyPluginAsync<{ repositoryAccessor: () => Repository }> = async (app, options) => {
+export const quickAdventureHttpRoutes: FastifyPluginAsync<{ repositoryAccessor: () => Repository }> = async (
+  app,
+  options,
+) => {
   const completed = new Map<string, CachedSuccess>();
   const inFlight = new Map<string, Promise<CachedSuccess>>();
 
@@ -65,7 +65,13 @@ export const quickAdventureHttpRoutes: FastifyPluginAsync<{ repositoryAccessor: 
     return true;
   };
 
-  app.post("/quick-adventures", { onRequest: async (request, reply) => { await gate(request, reply); } },
+  app.post(
+    "/quick-adventures",
+    {
+      onRequest: async (request, reply) => {
+        await gate(request, reply);
+      },
+    },
     async (request, reply) => {
       const parsed = quickAdventureCreateRequestSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -89,8 +95,13 @@ export const quickAdventureHttpRoutes: FastifyPluginAsync<{ repositoryAccessor: 
       }
 
       if (inFlight.size > 0) {
-        return sendApiProblem(request, reply, 409, "RPG_QUICK_ADVENTURE_IN_PROGRESS",
-          "Another quick adventure build is already in progress");
+        return sendApiProblem(
+          request,
+          reply,
+          409,
+          "RPG_QUICK_ADVENTURE_IN_PROGRESS",
+          "Another quick adventure build is already in progress",
+        );
       }
 
       const build = (async (): Promise<CachedSuccess> => {
@@ -114,5 +125,6 @@ export const quickAdventureHttpRoutes: FastifyPluginAsync<{ repositoryAccessor: 
       } finally {
         if (inFlight.get(key) === build) inFlight.delete(key);
       }
-    });
+    },
+  );
 };

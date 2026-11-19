@@ -39,10 +39,34 @@ export interface SceneImagePreset {
 
 /** Workflow presets, not quality tiers. The experimental row uses guidance 1. */
 export const SCENE_IMAGE_PRESETS: readonly SceneImagePreset[] = [
-  { id: "preview", label: "Preview 10/3", steps: 10, guidance: 3, description: "Fast workflow default for rough blocking." },
-  { id: "balanced", label: "Balanced 20/3", steps: 20, guidance: 3, description: "Everyday workflow default for a small deliberate batch." },
-  { id: "reference", label: "Reference 50/3", steps: 50, guidance: 3, description: "Slower workflow default for a keeper image." },
-  { id: "experimentalGuidance1", label: "Experimental 20/guidance-1", steps: 20, guidance: 1, description: "Experimental guidance-1 path." },
+  {
+    id: "preview",
+    label: "Preview 10/3",
+    steps: 10,
+    guidance: 3,
+    description: "Fast workflow default for rough blocking.",
+  },
+  {
+    id: "balanced",
+    label: "Balanced 20/3",
+    steps: 20,
+    guidance: 3,
+    description: "Everyday workflow default for a small deliberate batch.",
+  },
+  {
+    id: "reference",
+    label: "Reference 50/3",
+    steps: 50,
+    guidance: 3,
+    description: "Slower workflow default for a keeper image.",
+  },
+  {
+    id: "experimentalGuidance1",
+    label: "Experimental 20/guidance-1",
+    steps: 20,
+    guidance: 1,
+    description: "Experimental guidance-1 path.",
+  },
 ];
 
 export const SCENE_IMAGE_PRESET_NOTE =
@@ -79,16 +103,25 @@ export interface SceneImageComparisonPlan {
 }
 
 /** Expands a confirmed grid. Every combination reuses the same `count` seeds. */
-export function planSceneImageComparison(input: { count: number; steps: readonly number[]; guidance: readonly number[]; baseSeed: number }): SceneImageComparisonPlan {
+export function planSceneImageComparison(input: {
+  count: number;
+  steps: readonly number[];
+  guidance: readonly number[];
+  baseSeed: number;
+}): SceneImageComparisonPlan {
   const { count, steps, guidance, baseSeed } = input;
   if (!Number.isInteger(count) || count < SCENE_IMAGE_VARIATION_MIN || count > SCENE_IMAGE_VARIATION_MAX) {
-    throw new RangeError(`Variation count must be an integer between ${SCENE_IMAGE_VARIATION_MIN} and ${SCENE_IMAGE_VARIATION_MAX}.`);
+    throw new RangeError(
+      `Variation count must be an integer between ${SCENE_IMAGE_VARIATION_MIN} and ${SCENE_IMAGE_VARIATION_MAX}.`,
+    );
   }
   const axis = (values: readonly number[], label: string, min: number, max: number, integer: boolean) => {
     if (values.length === 0) throw new RangeError(`${label} needs at least one value.`);
-    if (values.length > SCENE_IMAGE_BATCH_MAX_AXIS_VALUES) throw new RangeError(`${label} accepts at most ${SCENE_IMAGE_BATCH_MAX_AXIS_VALUES} values.`);
+    if (values.length > SCENE_IMAGE_BATCH_MAX_AXIS_VALUES)
+      throw new RangeError(`${label} accepts at most ${SCENE_IMAGE_BATCH_MAX_AXIS_VALUES} values.`);
     for (const value of values) {
-      if (typeof value !== "number" || !Number.isFinite(value) || (integer && !Number.isInteger(value))) throw new RangeError(`${label} values must be ${integer ? "whole numbers" : "finite numbers"}.`);
+      if (typeof value !== "number" || !Number.isFinite(value) || (integer && !Number.isInteger(value)))
+        throw new RangeError(`${label} values must be ${integer ? "whole numbers" : "finite numbers"}.`);
       if (value < min || value > max) throw new RangeError(`${label} values must be between ${min} and ${max}.`);
     }
   };
@@ -97,30 +130,53 @@ export function planSceneImageComparison(input: { count: number; steps: readonly
   if (!Number.isInteger(baseSeed) || baseSeed < SCENE_IMAGE_MIN_SEED || baseSeed > SCENE_IMAGE_MAX_SEED) {
     throw new RangeError(`Seed must be an integer between ${SCENE_IMAGE_MIN_SEED} and ${SCENE_IMAGE_MAX_SEED}.`);
   }
-  if (baseSeed + count - 1 > SCENE_IMAGE_MAX_SEED) throw new RangeError("The seed leaves the supported range for this many variations.");
+  if (baseSeed + count - 1 > SCENE_IMAGE_MAX_SEED)
+    throw new RangeError("The seed leaves the supported range for this many variations.");
   const total = count * steps.length * guidance.length;
-  if (total > SCENE_IMAGE_BATCH_MAX_TOTAL) throw new RangeError(`A grid of ${total} images exceeds the ${SCENE_IMAGE_BATCH_MAX_TOTAL} image limit.`);
+  if (total > SCENE_IMAGE_BATCH_MAX_TOTAL)
+    throw new RangeError(`A grid of ${total} images exceeds the ${SCENE_IMAGE_BATCH_MAX_TOTAL} image limit.`);
   const requests: SceneImageComparisonRequest[] = [];
-  for (const step of steps) for (const guidanceValue of guidance) {
-    requests.push({ steps: step, guidance: guidanceValue, seed: baseSeed, count });
-  }
+  for (const step of steps)
+    for (const guidanceValue of guidance) {
+      requests.push({ steps: step, guidance: guidanceValue, seed: baseSeed, count });
+    }
   return { total, requests };
 }
 
 /** Parses a comma-separated comparison axis without silently coercing bad input. */
-export function parseSceneImageAxis(text: string, kind: "steps" | "guidance"): { values: number[]; error: string | null } {
-  const parts = text.split(",").map((part) => part.trim()).filter((part) => part.length > 0);
-  if (parts.length === 0) return { values: [], error: kind === "steps" ? "Enter at least one step count." : "Enter at least one guidance value." };
-  if (parts.length > SCENE_IMAGE_BATCH_MAX_AXIS_VALUES) return { values: [], error: `Use at most ${SCENE_IMAGE_BATCH_MAX_AXIS_VALUES} comma-separated values.` };
+export function parseSceneImageAxis(
+  text: string,
+  kind: "steps" | "guidance",
+): { values: number[]; error: string | null } {
+  const parts = text
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0)
+    return {
+      values: [],
+      error: kind === "steps" ? "Enter at least one step count." : "Enter at least one guidance value.",
+    };
+  if (parts.length > SCENE_IMAGE_BATCH_MAX_AXIS_VALUES)
+    return { values: [], error: `Use at most ${SCENE_IMAGE_BATCH_MAX_AXIS_VALUES} comma-separated values.` };
   const values: number[] = [];
   for (const part of parts) {
     const value = Number(part);
     if (!Number.isFinite(value)) return { values: [], error: `${part} is not a number.` };
-    if (kind === "steps" && (!Number.isInteger(value) || value < SCENE_IMAGE_STEPS_MIN || value > SCENE_IMAGE_STEPS_MAX)) {
-      return { values: [], error: `Steps must be whole numbers between ${SCENE_IMAGE_STEPS_MIN} and ${SCENE_IMAGE_STEPS_MAX}.` };
+    if (
+      kind === "steps" &&
+      (!Number.isInteger(value) || value < SCENE_IMAGE_STEPS_MIN || value > SCENE_IMAGE_STEPS_MAX)
+    ) {
+      return {
+        values: [],
+        error: `Steps must be whole numbers between ${SCENE_IMAGE_STEPS_MIN} and ${SCENE_IMAGE_STEPS_MAX}.`,
+      };
     }
     if (kind === "guidance" && (value < SCENE_IMAGE_GUIDANCE_MIN || value > SCENE_IMAGE_GUIDANCE_MAX)) {
-      return { values: [], error: `Guidance must be between ${SCENE_IMAGE_GUIDANCE_MIN} and ${SCENE_IMAGE_GUIDANCE_MAX}.` };
+      return {
+        values: [],
+        error: `Guidance must be between ${SCENE_IMAGE_GUIDANCE_MIN} and ${SCENE_IMAGE_GUIDANCE_MAX}.`,
+      };
     }
     values.push(value);
   }
@@ -137,10 +193,22 @@ export function randomSceneImageSeed(): number {
 }
 
 /** Job statuses that must never be rendered as a finished illustration. */
-const UNFINISHED_SCENE_IMAGE_STATUSES = new Set(["queued", "pending", "running", "generating", "failed", "cancelled", "error"]);
+const UNFINISHED_SCENE_IMAGE_STATUSES = new Set([
+  "queued",
+  "pending",
+  "running",
+  "generating",
+  "failed",
+  "cancelled",
+  "error",
+]);
 
 export function isSceneImageRenderable(item: Pick<SceneImageGalleryItem, "status" | "assetId">): boolean {
-  return typeof item.assetId === "string" && item.assetId.length > 0 && !UNFINISHED_SCENE_IMAGE_STATUSES.has(item.status.toLowerCase());
+  return (
+    typeof item.assetId === "string" &&
+    item.assetId.length > 0 &&
+    !UNFINISHED_SCENE_IMAGE_STATUSES.has(item.status.toLowerCase())
+  );
 }
 
 export function sceneImageStatusLabel(status: string): string {
@@ -163,7 +231,11 @@ export function formatSceneImageCreatedAt(createdAt: string): string {
   return Number.isNaN(parsed) ? createdAt : new Date(parsed).toLocaleString();
 }
 
-export function sceneImageAltText(sceneLabel: string, item: Pick<SceneImageGalleryItem, "prompt"> | null, audience: "gm" | "player"): string {
+export function sceneImageAltText(
+  sceneLabel: string,
+  item: Pick<SceneImageGalleryItem, "prompt"> | null,
+  audience: "gm" | "player",
+): string {
   if (!item) return `Scene illustration for ${sceneLabel}`;
   const prompt = item.prompt.trim();
   // Player alt text never repeats a prompt that may contain GM-only facts.
@@ -203,11 +275,16 @@ function clampThumbnail(value: unknown): number {
 
 export function readSceneImagePreferences(): SceneImagePreferences {
   try {
-    const value = JSON.parse(localStorage.getItem(SCENE_IMAGE_PREFERENCES_KEY) ?? "null") as Partial<SceneImagePreferences> | null;
+    const value = JSON.parse(
+      localStorage.getItem(SCENE_IMAGE_PREFERENCES_KEY) ?? "null",
+    ) as Partial<SceneImagePreferences> | null;
     if (!value || typeof value !== "object") return { ...DEFAULT_SCENE_IMAGE_PREFERENCES };
     return {
       hideImages: typeof value.hideImages === "boolean" ? value.hideImages : DEFAULT_SCENE_IMAGE_PREFERENCES.hideImages,
-      reducedBandwidth: typeof value.reducedBandwidth === "boolean" ? value.reducedBandwidth : DEFAULT_SCENE_IMAGE_PREFERENCES.reducedBandwidth,
+      reducedBandwidth:
+        typeof value.reducedBandwidth === "boolean"
+          ? value.reducedBandwidth
+          : DEFAULT_SCENE_IMAGE_PREFERENCES.reducedBandwidth,
       galleryThumbnailSize: clampThumbnail(value.galleryThumbnailSize),
     };
   } catch {
@@ -216,13 +293,19 @@ export function readSceneImagePreferences(): SceneImagePreferences {
 }
 
 export function writeSceneImagePreferences(value: SceneImagePreferences): void {
-  try { localStorage.setItem(SCENE_IMAGE_PREFERENCES_KEY, JSON.stringify(value)); }
-  catch { /* Display preferences never block play. */ }
+  try {
+    localStorage.setItem(SCENE_IMAGE_PREFERENCES_KEY, JSON.stringify(value));
+  } catch {
+    /* Display preferences never block play. */
+  }
 }
 
 export function useSceneImagePreferences(): [SceneImagePreferences, (next: SceneImagePreferences) => void] {
   const [preferences, setPreferences] = useState(readSceneImagePreferences);
-  const update = (next: SceneImagePreferences) => { setPreferences(next); writeSceneImagePreferences(next); };
+  const update = (next: SceneImagePreferences) => {
+    setPreferences(next);
+    writeSceneImagePreferences(next);
+  };
   return [preferences, update];
 }
 
@@ -235,7 +318,8 @@ export interface SceneImageSceneRecord {
   updatedAt: string;
 }
 
-const registryKey = (campaignId: string, sessionId: string) => `velvet.scene-images.scenes.v1:${campaignId}:${sessionId}`;
+const registryKey = (campaignId: string, sessionId: string) =>
+  `velvet.scene-images.scenes.v1:${campaignId}:${sessionId}`;
 
 export function readSceneImageScenes(campaignId: string, sessionId: string): SceneImageSceneRecord[] {
   try {
@@ -245,27 +329,58 @@ export function readSceneImageScenes(campaignId: string, sessionId: string): Sce
       if (typeof entry !== "object" || entry === null) return [];
       const record = entry as Record<string, unknown>;
       if (typeof record.sceneKey !== "string" || typeof record.label !== "string") return [];
-      const jobIds = Array.isArray(record.jobIds) ? record.jobIds.filter((jobId): jobId is string => typeof jobId === "string") : [];
-      return [{ sceneKey: record.sceneKey, label: record.label, jobIds, updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "" }];
+      const jobIds = Array.isArray(record.jobIds)
+        ? record.jobIds.filter((jobId): jobId is string => typeof jobId === "string")
+        : [];
+      return [
+        {
+          sceneKey: record.sceneKey,
+          label: record.label,
+          jobIds,
+          updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+        },
+      ];
     });
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 /** Remembers the client-side job-to-scene binding the gallery projection omits. */
-export function rememberSceneImageJobs(campaignId: string, sessionId: string, input: { sceneKey: string; label: string; jobIds: readonly string[] }): SceneImageSceneRecord[] {
+export function rememberSceneImageJobs(
+  campaignId: string,
+  sessionId: string,
+  input: { sceneKey: string; label: string; jobIds: readonly string[] },
+): SceneImageSceneRecord[] {
   const records = readSceneImageScenes(campaignId, sessionId);
   const existing = records.find((record) => record.sceneKey === input.sceneKey);
   const jobIds = input.jobIds.filter((jobId) => jobId.length > 0);
   const next: SceneImageSceneRecord = existing
-    ? { ...existing, label: input.label || existing.label, jobIds: [...new Set([...existing.jobIds, ...jobIds])], updatedAt: new Date().toISOString() }
-    : { sceneKey: input.sceneKey, label: input.label, jobIds: [...new Set(jobIds)], updatedAt: new Date().toISOString() };
+    ? {
+        ...existing,
+        label: input.label || existing.label,
+        jobIds: [...new Set([...existing.jobIds, ...jobIds])],
+        updatedAt: new Date().toISOString(),
+      }
+    : {
+        sceneKey: input.sceneKey,
+        label: input.label,
+        jobIds: [...new Set(jobIds)],
+        updatedAt: new Date().toISOString(),
+      };
   const updated = [next, ...records.filter((record) => record.sceneKey !== input.sceneKey)];
-  try { localStorage.setItem(registryKey(campaignId, sessionId), JSON.stringify(updated)); }
-  catch { /* Grouping falls back to the active scene only. */ }
+  try {
+    localStorage.setItem(registryKey(campaignId, sessionId), JSON.stringify(updated));
+  } catch {
+    /* Grouping falls back to the active scene only. */
+  }
   return updated;
 }
 
-export function findSceneImageRecord(records: readonly SceneImageSceneRecord[], jobId: string): SceneImageSceneRecord | null {
+export function findSceneImageRecord(
+  records: readonly SceneImageSceneRecord[],
+  jobId: string,
+): SceneImageSceneRecord | null {
   return records.find((record) => record.jobIds.includes(jobId)) ?? null;
 }
 
@@ -278,12 +393,20 @@ function newestFirst(images: readonly SceneImageGalleryItem[]): SceneImageGaller
 }
 
 /** The selected illustration for one active scene, or null when none is known. */
-export function findActiveSceneImage(images: readonly SceneImageGalleryItem[], sceneKey: string, _records: readonly SceneImageSceneRecord[]): SceneImageGalleryItem | null {
+export function findActiveSceneImage(
+  images: readonly SceneImageGalleryItem[],
+  sceneKey: string,
+  _records: readonly SceneImageSceneRecord[],
+): SceneImageGalleryItem | null {
   const ready = newestFirst(images.filter(isSceneImageRenderable));
   if (ready.length === 0) return null;
-  return ready.find((image) => image.selections !== undefined
-    ? image.selections.some((selection) => selection.sceneKey === sceneKey)
-    : image.selected && image.sceneKey === sceneKey) ?? null;
+  return (
+    ready.find((image) =>
+      image.selections !== undefined
+        ? image.selections.some((selection) => selection.sceneKey === sceneKey)
+        : image.selected && image.sceneKey === sceneKey,
+    ) ?? null
+  );
 }
 
 export interface SceneImageGroup {
@@ -298,16 +421,29 @@ export interface SceneImageGroup {
  * empty) so the DM can select into it; images without any scene binding land
  * in a trailing "Other generated images" group.
  */
-export function groupSceneImages(images: readonly SceneImageGalleryItem[], records: readonly SceneImageSceneRecord[], activeSceneKey: string, activeSceneLabel: string): SceneImageGroup[] {
+export function groupSceneImages(
+  images: readonly SceneImageGalleryItem[],
+  records: readonly SceneImageSceneRecord[],
+  activeSceneKey: string,
+  activeSceneLabel: string,
+): SceneImageGroup[] {
   const groups = new Map<string, SceneImageGroup>();
   groups.set(activeSceneKey, { sceneKey: activeSceneKey, label: activeSceneLabel, images: [], active: true });
   const other: SceneImageGalleryItem[] = [];
   for (const image of newestFirst(images)) {
     const sceneKey = sceneKeyForImage(image, records);
-    if (sceneKey === null) { other.push(image); continue; }
+    if (sceneKey === null) {
+      other.push(image);
+      continue;
+    }
     if (!groups.has(sceneKey)) {
       const record = records.find((entry) => entry.sceneKey === sceneKey);
-      groups.set(sceneKey, { sceneKey, label: record?.label ?? image.sceneKey ?? sceneKey, images: [], active: sceneKey === activeSceneKey });
+      groups.set(sceneKey, {
+        sceneKey,
+        label: record?.label ?? image.sceneKey ?? sceneKey,
+        images: [],
+        active: sceneKey === activeSceneKey,
+      });
     }
     groups.get(sceneKey)!.images.push(image);
   }
@@ -318,6 +454,7 @@ export function groupSceneImages(images: readonly SceneImageGalleryItem[], recor
     const rightTime = right.images[0] ? Date.parse(right.images[0].createdAt) : 0;
     return rightTime - leftTime;
   });
-  if (other.length > 0) ordered.push({ sceneKey: "other", label: "Other generated images", images: other, active: false });
+  if (other.length > 0)
+    ordered.push({ sceneKey: "other", label: "Other generated images", images: other, active: false });
   return ordered;
 }

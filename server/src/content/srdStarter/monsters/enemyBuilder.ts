@@ -8,8 +8,17 @@ import type { StarterReference, StarterReferences } from "../references.js";
  */
 
 export type MonsterDamageType =
-  | "physical" | "bludgeoning" | "piercing" | "slashing" | "fire" | "frost"
-  | "cold" | "force" | "storm" | "radiant" | "shadow";
+  | "physical"
+  | "bludgeoning"
+  | "piercing"
+  | "slashing"
+  | "fire"
+  | "frost"
+  | "cold"
+  | "force"
+  | "storm"
+  | "radiant"
+  | "shadow";
 
 export interface MonsterAttackSpec {
   abilitySlug: string;
@@ -28,8 +37,17 @@ export function monsterAttack(refs: StarterReferences, spec: MonsterAttackSpec) 
     description: `The executable basic melee attack selected from the ${spec.name} entry.`,
     tags: ["srd-5.1", "enemy-basic-attack"],
     mechanics: {
-      actionCost: "action" as const, recovery: "none" as const, uses: 0, target: "enemy" as const,
-      effects: [{ type: "damage" as const, damageType: spec.damageType, dice: { count: spec.count, sides: spec.sides, modifier: spec.modifier } }],
+      actionCost: "action" as const,
+      recovery: "none" as const,
+      uses: 0,
+      target: "enemy" as const,
+      effects: [
+        {
+          type: "damage" as const,
+          damageType: spec.damageType,
+          dice: { count: spec.count, sides: spec.sides, modifier: spec.modifier },
+        },
+      ],
     },
   };
 }
@@ -41,7 +59,13 @@ export function monsterTrait(refs: StarterReferences, slug: string, name: string
     name,
     description,
     tags: ["srd-5.1", "enemy-trait", "bounded", "unsupported-runtime"],
-    mechanics: { actionCost: "passive" as const, recovery: "none" as const, uses: 0, target: "self" as const, effects: [] },
+    mechanics: {
+      actionCost: "passive" as const,
+      recovery: "none" as const,
+      uses: 0,
+      target: "self" as const,
+      effects: [],
+    },
   };
 }
 
@@ -70,7 +94,11 @@ export function monsterTemplate(refs: StarterReferences, spec: MonsterTemplateSp
     description: `${spec.name} is a bounded SRD 5.1 enemy profile; only its basic attack is executable.`,
     tags: ["srd-5.1", "enemy-basic-attack", "bounded", spec.crTag, ...(traitRefs.length > 0 ? ["enemy-trait"] : [])],
     mechanics: {
-      tier, challengeRating: spec.cr, maxHp: spec.maxHp, defense: spec.defense, speed: spec.speed,
+      tier,
+      challengeRating: spec.cr,
+      maxHp: spec.maxHp,
+      defense: spec.defense,
+      speed: spec.speed,
       abilityRefs: [spec.primaryAttack, ...traitRefs],
       resistances: [...(spec.resistances ?? [])],
       vulnerabilities: [...(spec.vulnerabilities ?? [])],

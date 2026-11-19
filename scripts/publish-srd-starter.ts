@@ -37,28 +37,41 @@ function reviewedManifestDigest(version: string, packId: string, rulesProfileId:
     const shim = path.join(directory, "contracts-shim.mts");
     const tsconfig = path.join(directory, "tsconfig.json");
     const probe = path.join(directory, "probe.mts");
-    writeFileSync(shim, [
-      `export * from ${JSON.stringify(pathToFileURL(CONTRACTS_INDEX).href)};`,
-      `export const SRD_5_1_STARTER_PACK_VERSION = ${JSON.stringify(version)} as const;`,
-      `export const SRD_5_1_STARTER_ID = ${JSON.stringify(`${packId}@${version}`)} as const;`,
-      `export const SRD_5_1_STARTER_IDENTITY = Object.freeze({ starterId: SRD_5_1_STARTER_ID, rulesProfileId: ${JSON.stringify(rulesProfileId)}, packId: ${JSON.stringify(packId)}, packVersion: SRD_5_1_STARTER_PACK_VERSION, rulesetId: "dnd-5e", rulesetVersion: "1.0.0" });`,
-      "",
-    ].join("\n"));
-    writeFileSync(tsconfig, `${JSON.stringify({
-      compilerOptions: {
-        target: "ES2022",
-        module: "NodeNext",
-        moduleResolution: "NodeNext",
-        baseUrl: ROOT,
-        paths: { "@velvet/contracts": [shim] },
-        skipLibCheck: true,
-      },
-    }, null, 2)}\n`);
-    writeFileSync(probe, [
-      `const fixture = await import(${JSON.stringify(pathToFileURL(REVIEWED_FIXTURE_FILE).href)});`,
-      "process.stdout.write(fixture.REVIEWED_ADVENTURE_MANIFEST_DIGEST);",
-      "",
-    ].join("\n"));
+    writeFileSync(
+      shim,
+      [
+        `export * from ${JSON.stringify(pathToFileURL(CONTRACTS_INDEX).href)};`,
+        `export const SRD_5_1_STARTER_PACK_VERSION = ${JSON.stringify(version)} as const;`,
+        `export const SRD_5_1_STARTER_ID = ${JSON.stringify(`${packId}@${version}`)} as const;`,
+        `export const SRD_5_1_STARTER_IDENTITY = Object.freeze({ starterId: SRD_5_1_STARTER_ID, rulesProfileId: ${JSON.stringify(rulesProfileId)}, packId: ${JSON.stringify(packId)}, packVersion: SRD_5_1_STARTER_PACK_VERSION, rulesetId: "dnd-5e", rulesetVersion: "1.0.0" });`,
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      tsconfig,
+      `${JSON.stringify(
+        {
+          compilerOptions: {
+            target: "ES2022",
+            module: "NodeNext",
+            moduleResolution: "NodeNext",
+            baseUrl: ROOT,
+            paths: { "@velvet/contracts": [shim] },
+            skipLibCheck: true,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    writeFileSync(
+      probe,
+      [
+        `const fixture = await import(${JSON.stringify(pathToFileURL(REVIEWED_FIXTURE_FILE).href)});`,
+        "process.stdout.write(fixture.REVIEWED_ADVENTURE_MANIFEST_DIGEST);",
+        "",
+      ].join("\n"),
+    );
     const output = execFileSync(process.execPath, ["--import", "tsx", probe], {
       cwd: ROOT,
       encoding: "utf8",
@@ -66,7 +79,8 @@ function reviewedManifestDigest(version: string, packId: string, rulesProfileId:
       stdio: ["ignore", "pipe", "pipe"],
     });
     const digest = output.trim();
-    if (!/^[0-9a-f]{64}$/.test(digest)) throw new Error(`unexpected reviewed manifest digest ${JSON.stringify(output)}`);
+    if (!/^[0-9a-f]{64}$/.test(digest))
+      throw new Error(`unexpected reviewed manifest digest ${JSON.stringify(output)}`);
     return digest;
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -78,7 +92,8 @@ function run(mode: Mode): number {
   const digestPrefix = catalogDigest.slice(0, 12);
   const contractSource = readFileSync(CONTRACT_FILE, "utf8");
   const versionMatch = VERSION_LITERAL.exec(contractSource);
-  if (!versionMatch) throw new Error(`cannot locate SRD_5_1_STARTER_PACK_VERSION in ${path.relative(ROOT, CONTRACT_FILE)}`);
+  if (!versionMatch)
+    throw new Error(`cannot locate SRD_5_1_STARTER_PACK_VERSION in ${path.relative(ROOT, CONTRACT_FILE)}`);
   const oldVersion = versionMatch[2]!;
   const [base, currentSuffix = ""] = oldVersion.split("+");
   const newVersion = `${base}+${digestPrefix}`;
@@ -89,7 +104,9 @@ function run(mode: Mode): number {
       console.log(`SRD 5.1 starter pack in sync: ${oldVersion} (catalog digest ${catalogDigest})`);
       return 0;
     }
-    console.error(`SRD 5.1 starter pack out of sync: ${path.relative(ROOT, CONTRACT_FILE)} pins "${oldVersion}" but the canonical digest requires "+${digestPrefix}" (expected ${newVersion})`);
+    console.error(
+      `SRD 5.1 starter pack out of sync: ${path.relative(ROOT, CONTRACT_FILE)} pins "${oldVersion}" but the canonical digest requires "+${digestPrefix}" (expected ${newVersion})`,
+    );
     return 1;
   }
 
@@ -137,7 +154,8 @@ function parseMode(args: readonly string[]): Mode {
   if (args.length !== flags.length || flags.some((flag) => flag !== "--check" && flag !== "--write")) {
     throw new Error("usage: publish-srd-starter [--check|--write]");
   }
-  if (flags.includes("--write") && flags.includes("--check")) throw new Error("usage: publish-srd-starter [--check|--write]");
+  if (flags.includes("--write") && flags.includes("--check"))
+    throw new Error("usage: publish-srd-starter [--check|--write]");
   return flags.includes("--write") ? "write" : "check";
 }
 

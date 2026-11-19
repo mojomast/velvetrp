@@ -166,7 +166,12 @@ function makeDryRunInput(overrides: Partial<HarnessSessionInput> = {}): HarnessS
     targets: null,
     startedAt: NOW,
     gitCommit: null,
-    generatorIdentity: { provider: "fake", model: "deterministic-fake-generator", baseUrlDigest: null, temperature: null },
+    generatorIdentity: {
+      provider: "fake",
+      model: "deterministic-fake-generator",
+      baseUrlDigest: null,
+      temperature: null,
+    },
     gameProviderModel: "fake",
     campaignId: "camp-1",
     actorId: "actor-1",
@@ -229,7 +234,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function sseResponse(text: string, turnId: string): Response {
-  return new Response(text, { status: 200, headers: { "content-type": "text/event-stream", "x-adventure-turn-id": turnId } });
+  return new Response(text, {
+    status: 200,
+    headers: { "content-type": "text/event-stream", "x-adventure-turn-id": turnId },
+  });
 }
 
 function sseFrame(type: string, payload: unknown, sequence: number): string {
@@ -243,7 +251,10 @@ function sseFrame(type: string, payload: unknown, sequence: number): string {
 test("persona matrix is complete and versioned", () => {
   assert.equal(PERSONA_VERSION, "personas-v1");
   assert.equal(PERSONA_LIST.length, 5);
-  assert.deepEqual(PERSONA_LIST.map(persona => persona.archetype), [...PERSONA_ARCHETYPES]);
+  assert.deepEqual(
+    PERSONA_LIST.map((persona) => persona.archetype),
+    [...PERSONA_ARCHETYPES],
+  );
   assert.deepEqual(Object.keys(PERSONAS).sort(), [...PERSONA_ARCHETYPES].sort());
   for (const persona of PERSONA_LIST) {
     assert.equal(persona.personaVersion, PERSONA_VERSION);
@@ -251,12 +262,16 @@ test("persona matrix is complete and versioned", () => {
     assert.ok(persona.title.length > 0);
     assert.ok(persona.goals.length >= 3, `${persona.personaId} needs goals`);
     assert.ok(persona.mechanicsBias.length >= 2, `${persona.personaId} needs mechanics bias`);
-    for (const family of persona.mechanicsBias) assert.ok(MECHANIC_FAMILIES.includes(family), `unknown family ${family}`);
+    for (const family of persona.mechanicsBias)
+      assert.ok(MECHANIC_FAMILIES.includes(family), `unknown family ${family}`);
     for (const mode of FAILURE_MODES) {
       assert.ok(persona.failureAffinity[mode] > 0, `${persona.personaId} affinity for ${mode}`);
     }
     const policy = persona.confirmationPolicy;
-    assert.ok(Math.abs(policy.approve + policy.reject + policy.stall - 1) < 1e-9, `${persona.personaId} policy must sum to 1`);
+    assert.ok(
+      Math.abs(policy.approve + policy.reject + policy.stall - 1) < 1e-9,
+      `${persona.personaId} policy must sum to 1`,
+    );
     for (const rate of [persona.typoRate, persona.abbreviationRate, persona.oocRate]) {
       assert.ok(rate >= 0 && rate <= 1, `${persona.personaId} rate out of range`);
     }
@@ -321,12 +336,17 @@ test("valid contracts pass and normalize cosmetic fields", () => {
   assert.deepEqual(spaced.references, ["turn-9"]);
 
   // The design doc's contract example labels intended.family with the tool kind; both forms normalize.
-  const toolKindFamily = validateTurnContract(validContract({ intended: { family: "exact_actor_travel.select", failureMode: "ambiguous" } }));
+  const toolKindFamily = validateTurnContract(
+    validContract({ intended: { family: "exact_actor_travel.select", failureMode: "ambiguous" } }),
+  );
   assert.deepEqual(toolKindFamily.intended, { family: "travel", failureMode: "ambiguous" });
   assert.deepEqual(
-    validateTurnContract(validContract({ intended: { family: "exact_actor_travel.select", failureMode: "ambiguous" } }), {
-      target: { family: "travel", failureMode: "ambiguous" },
-    }).intended,
+    validateTurnContract(
+      validContract({ intended: { family: "exact_actor_travel.select", failureMode: "ambiguous" } }),
+      {
+        target: { family: "travel", failureMode: "ambiguous" },
+      },
+    ).intended,
     { family: "travel", failureMode: "ambiguous" },
   );
 });
@@ -335,7 +355,14 @@ test("contract validation reports every bad shape with a clear error", () => {
   const notObject = expectContractError("nope", /contract must be a JSON object/);
   assert.ok(notObject.issues.length > 0);
   expectContractError(validContract({ extra: 1 }), /unknown field "extra"/);
-  expectContractError((() => { const { declaration, ...rest } = validContract(); void declaration; return rest; })(), /missing required field "declaration"/);
+  expectContractError(
+    (() => {
+      const { declaration, ...rest } = validContract();
+      void declaration;
+      return rest;
+    })(),
+    /missing required field "declaration"/,
+  );
   expectContractError(validContract({ runId: "" }), /"runId" must be a nonblank string/);
   expectContractError(validContract({ turnIndex: -1 }), /"turnIndex" must be a non-negative integer/);
   expectContractError(validContract({ turnIndex: 1.5 }), /"turnIndex" must be a non-negative integer/);
@@ -343,9 +370,18 @@ test("contract validation reports every bad shape with a clear error", () => {
   expectContractError(validContract({ declaration: "   " }), /"declaration" must be a nonblank string/);
   expectContractError(validContract({ declaration: "x".repeat(8001) }), /"declaration" exceeds 8000 characters/);
   expectContractError(validContract({ ooc: 7 }), /"ooc" must be a string when present/);
-  expectContractError(validContract({ intended: { family: "teleport", failureMode: "ambiguous" } }), /"intended.family" must be a family id/);
-  expectContractError(validContract({ intended: { family: "travel", failureMode: "spicy" } }), /"intended.failureMode" must be one of/);
-  expectContractError(validContract({ intended: { family: "travel", failureMode: "ambiguous", extra: 1 } }), /unknown field "intended.extra"/);
+  expectContractError(
+    validContract({ intended: { family: "teleport", failureMode: "ambiguous" } }),
+    /"intended.family" must be a family id/,
+  );
+  expectContractError(
+    validContract({ intended: { family: "travel", failureMode: "spicy" } }),
+    /"intended.failureMode" must be one of/,
+  );
+  expectContractError(
+    validContract({ intended: { family: "travel", failureMode: "ambiguous", extra: 1 } }),
+    /unknown field "intended.extra"/,
+  );
   expectContractError(validContract({ intended: null }), /"intended" must be an object/);
   expectContractError(validContract({ noise: ["lowercase", "lowercase"] }), /"noise" repeats "lowercase"/);
   // Unknown perturbation names are advisory: the harness drops and records them instead of failing.
@@ -355,7 +391,10 @@ test("contract validation reports every bad shape with a clear error", () => {
   expectContractError(validContract({ noise: "lowercase" }), /"noise" must be an array/);
   expectContractError(validContract({ references: [""] }), /"references\[0\]" must be a nonblank string/);
   expectContractError(validContract({ references: ["a", "a"] }), /"references" repeats "a"/);
-  expectContractError(validContract({ references: new Array(33).fill("x").map((_, index) => `t-${index}`) }), /"references" exceeds 32 entries/);
+  expectContractError(
+    validContract({ references: new Array(33).fill("x").map((_, index) => `t-${index}`) }),
+    /"references" exceeds 32 entries/,
+  );
 });
 
 test("contract validation enforces harness-owned context and required noise", () => {
@@ -376,8 +415,15 @@ test("contract validation enforces harness-owned context and required noise", ()
   expectContractError(validContract({ personaId: "impatient.v1" }), /personaId mismatch/, context);
   expectContractError(validContract({ seed: "other-0000" }), /seed mismatch/, context);
   expectContractError(validContract({ effort: "low" }), /effort mismatch/, context);
-  expectContractError(validContract({ intended: { family: "rest", failureMode: "direct" } }), /intended target mismatch/, context);
-  const accepted = validateTurnContract(validContract({ sessionId: "11111111-2222-3333-4444-555555555555", noise: ["typo"] }), context);
+  expectContractError(
+    validContract({ intended: { family: "rest", failureMode: "direct" } }),
+    /intended target mismatch/,
+    context,
+  );
+  const accepted = validateTurnContract(
+    validContract({ sessionId: "11111111-2222-3333-4444-555555555555", noise: ["typo"] }),
+    context,
+  );
   assert.deepEqual(accepted.noise, ["typo"]);
 });
 
@@ -404,26 +450,51 @@ test("lowercase and uppercase-first are exact byte transforms", () => {
 });
 
 test("abbreviation replaces exactly one table token from the seed", () => {
-  assert.equal(noiseAbbreviation(DECLARATION_TEXT, "alpha").text, "I try to pry open the gate with my crowbar b4 the fog comes in");
-  assert.equal(noiseAbbreviation(DECLARATION_TEXT, "gamma").text, "I try to pry open the gate w/ my crowbar before the fog comes in");
-  assert.deepEqual(noiseAbbreviation(DECLARATION_TEXT, "alpha"), noiseAbbreviation(DECLARATION_TEXT, "alpha"), "same seed, same bytes");
+  assert.equal(
+    noiseAbbreviation(DECLARATION_TEXT, "alpha").text,
+    "I try to pry open the gate with my crowbar b4 the fog comes in",
+  );
+  assert.equal(
+    noiseAbbreviation(DECLARATION_TEXT, "gamma").text,
+    "I try to pry open the gate w/ my crowbar before the fog comes in",
+  );
+  assert.deepEqual(
+    noiseAbbreviation(DECLARATION_TEXT, "alpha"),
+    noiseAbbreviation(DECLARATION_TEXT, "alpha"),
+    "same seed, same bytes",
+  );
   assert.notEqual(noiseAbbreviation(DECLARATION_TEXT, "alpha").text, noiseAbbreviation(DECLARATION_TEXT, "gamma").text);
   assert.deepEqual(noiseAbbreviation("no table words here", "alpha"), { text: "no table words here" });
   assert.ok(Object.keys(ABBREVIATIONS).length >= 8);
 });
 
 test("typo performs a seeded swap or omit and differs across seeds", () => {
-  assert.equal(noiseTypo(DECLARATION_TEXT, "alpha").text, "I try to pry opne the gate with my crowbar before the fog comes in");
-  assert.equal(noiseTypo(DECLARATION_TEXT, "beta").text, "I try to pry open the gate with my crowbar before the og comes in");
-  assert.equal(noiseTypo(DECLARATION_TEXT, "gamma").text, "I try to pry open the gate with my crowbar befroe the fog comes in");
-  assert.equal(noiseTypo(DECLARATION_TEXT, "test").text, "I try to pry open he gate with my crowbar before the fog comes in");
+  assert.equal(
+    noiseTypo(DECLARATION_TEXT, "alpha").text,
+    "I try to pry opne the gate with my crowbar before the fog comes in",
+  );
+  assert.equal(
+    noiseTypo(DECLARATION_TEXT, "beta").text,
+    "I try to pry open the gate with my crowbar before the og comes in",
+  );
+  assert.equal(
+    noiseTypo(DECLARATION_TEXT, "gamma").text,
+    "I try to pry open the gate with my crowbar befroe the fog comes in",
+  );
+  assert.equal(
+    noiseTypo(DECLARATION_TEXT, "test").text,
+    "I try to pry open he gate with my crowbar before the fog comes in",
+  );
   for (const seed of ["alpha", "beta", "gamma", "test"]) {
     const mutated = noiseTypo(DECLARATION_TEXT, seed).text;
     assert.notEqual(mutated, DECLARATION_TEXT);
     assert.ok(Math.abs(mutated.length - DECLARATION_TEXT.length) <= 1, "typo changes one swap or one omission");
   }
   assert.ok(noiseTypo(DECLARATION_TEXT, "alpha").text.length === DECLARATION_TEXT.length, "swap keeps length");
-  assert.ok(noiseTypo(DECLARATION_TEXT, "beta").text.length === DECLARATION_TEXT.length - 1, "omit drops one character");
+  assert.ok(
+    noiseTypo(DECLARATION_TEXT, "beta").text.length === DECLARATION_TEXT.length - 1,
+    "omit drops one character",
+  );
   assert.notEqual(noiseTypo(DECLARATION_TEXT, "alpha").text, noiseTypo(DECLARATION_TEXT, "gamma").text);
   assert.deepEqual(noiseTypo("ab cd", "seed"), { text: "ab cd" }, "short tokens are untouched");
 });
@@ -445,8 +516,12 @@ test("trailing-question noise splits exact bytes and falls back deterministicall
 });
 
 test("self-correction inserts a seeded correction cue before the declaration", () => {
-  assert.deepEqual(noiseSelfCorrection("I take the north road", "s"), { text: "Hmm, actually no — I take the north road" });
-  assert.deepEqual(noiseSelfCorrection("  I take the north road  ", "s"), { text: "Hmm, actually no — I take the north road" });
+  assert.deepEqual(noiseSelfCorrection("I take the north road", "s"), {
+    text: "Hmm, actually no — I take the north road",
+  });
+  assert.deepEqual(noiseSelfCorrection("  I take the north road  ", "s"), {
+    text: "Hmm, actually no — I take the north road",
+  });
   const prefixes = new Set<string>();
   for (let index = 0; index < 24; index += 1) {
     const result = noiseSelfCorrection("I move.", `cue-${index}`).text;
@@ -573,10 +648,14 @@ test("scheduler honors a custom matrix and reports remaining counts", () => {
 });
 
 test("scheduler weights reflect persona bias", () => {
-  assert.ok(coverageWeight(PERSONAS.explorer, { family: "travel", failureMode: "direct" })
-    > coverageWeight(PERSONAS.explorer, { family: "progression", failureMode: "direct" }));
-  assert.ok(coverageWeight(PERSONAS.impatient, { family: "travel", failureMode: "direct" })
-    > coverageWeight(PERSONAS.explorer, { family: "travel", failureMode: "direct" }));
+  assert.ok(
+    coverageWeight(PERSONAS.explorer, { family: "travel", failureMode: "direct" }) >
+      coverageWeight(PERSONAS.explorer, { family: "progression", failureMode: "direct" }),
+  );
+  assert.ok(
+    coverageWeight(PERSONAS.impatient, { family: "travel", failureMode: "direct" }) >
+      coverageWeight(PERSONAS.explorer, { family: "travel", failureMode: "direct" }),
+  );
   assert.equal(coverageWeight(null, { family: "progression", failureMode: "direct" }), 1);
 });
 
@@ -584,16 +663,30 @@ test("directWeight multiplies direct cells only and never below the floor", () =
   const direct = { family: "travel", failureMode: "direct" } as const;
   const ambiguous = { family: "travel", failureMode: "ambiguous" } as const;
   assert.equal(DEFAULT_DIRECT_WEIGHT, 1);
-  assert.equal(coverageWeight(PERSONAS.explorer, direct, { directWeight: 1 }), coverageWeight(PERSONAS.explorer, direct));
-  assert.equal(coverageWeight(PERSONAS.explorer, direct, { directWeight: 2 }), coverageWeight(PERSONAS.explorer, direct) * 2);
-  assert.equal(coverageWeight(PERSONAS.explorer, ambiguous, { directWeight: 2 }), coverageWeight(PERSONAS.explorer, ambiguous));
-  assert.throws(() => coverageWeight(PERSONAS.explorer, direct, { directWeight: 0 }), /directWeight must be a finite number >= 0.1/);
+  assert.equal(
+    coverageWeight(PERSONAS.explorer, direct, { directWeight: 1 }),
+    coverageWeight(PERSONAS.explorer, direct),
+  );
+  assert.equal(
+    coverageWeight(PERSONAS.explorer, direct, { directWeight: 2 }),
+    coverageWeight(PERSONAS.explorer, direct) * 2,
+  );
+  assert.equal(
+    coverageWeight(PERSONAS.explorer, ambiguous, { directWeight: 2 }),
+    coverageWeight(PERSONAS.explorer, ambiguous),
+  );
+  assert.throws(
+    () => coverageWeight(PERSONAS.explorer, direct, { directWeight: 0 }),
+    /directWeight must be a finite number >= 0.1/,
+  );
   assert.throws(() => new CoverageScheduler({ directWeight: Number.NaN }), /directWeight/);
   assert.equal(new CoverageScheduler({ directWeight: MIN_DIRECT_WEIGHT }).totalTarget, COVERAGE_TOTAL_TARGET);
   // Default and explicit-1 plans are byte-identical: the RNG draw sequence is untouched.
   assert.deepEqual(
-    planRun({ runSeed: "direct", persona: PERSONAS.explorer, turns: 4 }).turns.map(turn => turn.target),
-    planRun({ runSeed: "direct", persona: PERSONAS.explorer, turns: 4, directWeight: DEFAULT_DIRECT_WEIGHT }).turns.map(turn => turn.target),
+    planRun({ runSeed: "direct", persona: PERSONAS.explorer, turns: 4 }).turns.map((turn) => turn.target),
+    planRun({ runSeed: "direct", persona: PERSONAS.explorer, turns: 4, directWeight: DEFAULT_DIRECT_WEIGHT }).turns.map(
+      (turn) => turn.target,
+    ),
   );
 
   // A fixed RNG makes the weighted pick exact. Only travel/direct and travel/ambiguous remain:
@@ -606,23 +699,46 @@ test("directWeight multiplies direct cells only and never below the floor", () =
   }
   targets.travel.direct = 1;
   targets.travel.ambiguous = 1;
-  assert.deepEqual(new CoverageScheduler({ targets, persona: PERSONAS.explorer }).next(fixedRng(0.4)), { family: "travel", failureMode: "ambiguous" });
-  assert.deepEqual(new CoverageScheduler({ targets, persona: PERSONAS.explorer, directWeight: 3 }).next(fixedRng(0.4)), { family: "travel", failureMode: "direct" });
+  assert.deepEqual(new CoverageScheduler({ targets, persona: PERSONAS.explorer }).next(fixedRng(0.4)), {
+    family: "travel",
+    failureMode: "ambiguous",
+  });
+  assert.deepEqual(
+    new CoverageScheduler({ targets, persona: PERSONAS.explorer, directWeight: 3 }).next(fixedRng(0.4)),
+    { family: "travel", failureMode: "direct" },
+  );
 });
 
 test("planRun is seed-deterministic, truncates at exhaustion, and pins effort/noise", () => {
   const first = planRun({ runSeed: "test", persona: PERSONAS.explorer, turns: 3 });
   const second = planRun({ runSeed: "test", persona: PERSONAS.explorer, turns: 3 });
-  assert.deepEqual(first.turns.map(turn => turn.turnSeed), ["test-0000", "test-0001", "test-0002"]);
-  assert.deepEqual(first.turns.map(turn => turn.target), second.turns.map(turn => turn.target));
-  assert.deepEqual(first.turns.map(turn => turn.requiredNoise), second.turns.map(turn => turn.requiredNoise));
+  assert.deepEqual(
+    first.turns.map((turn) => turn.turnSeed),
+    ["test-0000", "test-0001", "test-0002"],
+  );
+  assert.deepEqual(
+    first.turns.map((turn) => turn.target),
+    second.turns.map((turn) => turn.target),
+  );
+  assert.deepEqual(
+    first.turns.map((turn) => turn.requiredNoise),
+    second.turns.map((turn) => turn.requiredNoise),
+  );
   assert.deepEqual(first.turns[0]?.target, { family: "combat-consumable", failureMode: "unsupported" });
   assert.equal(first.turns[0]?.toolKind, "exact_combat_consumable.select");
   assert.deepEqual(first.turns[0]?.requiredNoise, ["typo"]);
   assert.deepEqual(first.turns[0]?.allowedNoise, [...SURFACE_NOISES]);
   const other = planRun({ runSeed: "other-seed", persona: PERSONAS.explorer, turns: 3 });
-  assert.notDeepEqual(first.turns.map(turn => turn.target), other.turns.map(turn => turn.target));
-  const truncated = planRun({ runSeed: "t", persona: PERSONAS.explorer, turns: 500, targets: defaultCoverageTargets(1) });
+  assert.notDeepEqual(
+    first.turns.map((turn) => turn.target),
+    other.turns.map((turn) => turn.target),
+  );
+  const truncated = planRun({
+    runSeed: "t",
+    persona: PERSONAS.explorer,
+    turns: 500,
+    targets: defaultCoverageTargets(1),
+  });
   assert.equal(truncated.turns.length, COVERAGE_CELL_COUNT);
   assert.equal(truncated.truncated, true);
   assert.equal(planRun({ runSeed: "t", persona: PERSONAS.explorer, turns: 0 }).turns.length, 0);
@@ -656,14 +772,24 @@ test("confirmation decisions are seeded and persona-faithful", () => {
 // -------------------------------------------------------------------------------------------------
 
 test("generator prompt carries persona, transcript, sheet, target, noise, and JSON contract", () => {
-  const messages = buildGeneratorMessages(promptInput({
-    turnIndex: 2,
-    seed: "test-0002",
-    target: { family: "travel", failureMode: "unadvertised" },
-    effort: "low",
-    requiredNoise: ["lowercase"],
-    transcript: [{ turnId: "turn-1", actorId: "actor-1", declaration: "I eye the ferry.", narration: "Fog rolls in.", completedAt: NOW }],
-  }));
+  const messages = buildGeneratorMessages(
+    promptInput({
+      turnIndex: 2,
+      seed: "test-0002",
+      target: { family: "travel", failureMode: "unadvertised" },
+      effort: "low",
+      requiredNoise: ["lowercase"],
+      transcript: [
+        {
+          turnId: "turn-1",
+          actorId: "actor-1",
+          declaration: "I eye the ferry.",
+          narration: "Fog rolls in.",
+          completedAt: NOW,
+        },
+      ],
+    }),
+  );
   assert.match(messages.system, /You are role-playing one player/);
   assert.match(messages.system, /Explorer \(explorer\.v1\)/);
   assert.match(messages.system, /never mention being a model/);
@@ -671,7 +797,10 @@ test("generator prompt carries persona, transcript, sheet, target, noise, and JS
   assert.match(messages.user, /\[turn-1\] I eye the ferry\. => Fog rolls in\./);
   assert.match(messages.user, /Sheet summary \(public labels only\): public sheet labels/);
   assert.match(messages.user, /family=travel \(tool exact_actor_travel\.select\) failureMode=unadvertised; effort=low/);
-  assert.match(messages.user, /Allowed surface noise: lowercase, uppercase-first, abbreviation, typo, trailing-question-ooc, self-correction\./);
+  assert.match(
+    messages.user,
+    /Allowed surface noise: lowercase, uppercase-first, abbreviation, typo, trailing-question-ooc, self-correction\./,
+  );
   assert.match(messages.user, /Required noise declarations this turn \(they must appear in "noise"\): lowercase\./);
   assert.match(messages.user, /one strict JSON object and no markdown fences/);
   assert.match(messages.user, /runId=run-1/);
@@ -705,7 +834,10 @@ test("transcriptSlice keeps the newest turns oldest-first", () => {
     narration: null,
     completedAt: NOW,
   }));
-  assert.deepEqual(transcriptSlice(turns, 3).map(turn => turn.turnId), ["turn-5", "turn-6", "turn-7"]);
+  assert.deepEqual(
+    transcriptSlice(turns, 3).map((turn) => turn.turnId),
+    ["turn-5", "turn-6", "turn-7"],
+  );
   assert.deepEqual(transcriptSlice(turns, 0), []);
 });
 
@@ -716,15 +848,18 @@ test("live generator posts to the OpenAI-compatible endpoint and parses fenced J
     const content = `\`\`\`json\n${JSON.stringify(validContract())}\n\`\`\``;
     return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content } }] }), { status: 200 });
   }) as typeof fetch;
-  const generator = createLiveGenerator({
-    provider: "openai-compatible",
-    baseUrl: "http://generator.local/v1",
-    apiKey: "test-key",
-    model: "test-model",
-    temperature: 0.9,
-    maxTokens: 256,
-    timeoutMs: 5_000,
-  }, fetchImpl);
+  const generator = createLiveGenerator(
+    {
+      provider: "openai-compatible",
+      baseUrl: "http://generator.local/v1",
+      apiKey: "test-key",
+      model: "test-model",
+      temperature: 0.9,
+      maxTokens: 256,
+      timeoutMs: 5_000,
+    },
+    fetchImpl,
+  );
   const request = buildGenerationRequest(promptInput());
   const parsed = validateTurnContract(await generator(request));
   assert.equal(parsed.declaration, "I look at the ferry wreck.");
@@ -737,15 +872,37 @@ test("live generator posts to the OpenAI-compatible endpoint and parses fenced J
   assert.match(messages[1]?.content ?? "", /Target this turn/);
 
   const failing = (async () => new Response("bad key", { status: 401 })) as typeof fetch;
-  const failingGenerator = createLiveGenerator({
-    provider: "openai-compatible", baseUrl: "http://generator.local/v1", apiKey: "k", model: "m", temperature: 0.9, maxTokens: 16, timeoutMs: 5_000,
-  }, failing);
-  await assert.rejects(async () => { await failingGenerator(request); }, /HTTP 401/);
+  const failingGenerator = createLiveGenerator(
+    {
+      provider: "openai-compatible",
+      baseUrl: "http://generator.local/v1",
+      apiKey: "k",
+      model: "m",
+      temperature: 0.9,
+      maxTokens: 16,
+      timeoutMs: 5_000,
+    },
+    failing,
+  );
+  await assert.rejects(async () => {
+    await failingGenerator(request);
+  }, /HTTP 401/);
   const empty = (async () => new Response(JSON.stringify({ choices: [] }), { status: 200 })) as typeof fetch;
-  const emptyGenerator = createLiveGenerator({
-    provider: "openai-compatible", baseUrl: "http://generator.local/v1", apiKey: "k", model: "m", temperature: 0.9, maxTokens: 16, timeoutMs: 5_000,
-  }, empty);
-  await assert.rejects(async () => { await emptyGenerator(request); }, /did not include assistant content/);
+  const emptyGenerator = createLiveGenerator(
+    {
+      provider: "openai-compatible",
+      baseUrl: "http://generator.local/v1",
+      apiKey: "k",
+      model: "m",
+      temperature: 0.9,
+      maxTokens: 16,
+      timeoutMs: 5_000,
+    },
+    empty,
+  );
+  await assert.rejects(async () => {
+    await emptyGenerator(request);
+  }, /did not include assistant content/);
 
   // A reasoning model can return empty content on the first attempt; one bounded retry with a
   // larger budget is allowed, and both-empty errors name the finish reason.
@@ -754,14 +911,31 @@ test("live generator posts to the OpenAI-compatible endpoint and parses fenced J
     retryCalls += 1;
     const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
     if (retryCalls === 1) {
-      return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: "" }, finish_reason: "length" }] }), { status: 200 });
+      return new Response(
+        JSON.stringify({ choices: [{ message: { role: "assistant", content: "" }, finish_reason: "length" }] }),
+        { status: 200 },
+      );
     }
     assert.ok(Number(body["max_tokens"]) > 16, "the retry raises the token budget");
-    return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: JSON.stringify(validContract()) }, finish_reason: "stop" }] }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { role: "assistant", content: JSON.stringify(validContract()) }, finish_reason: "stop" }],
+      }),
+      { status: 200 },
+    );
   }) as typeof fetch;
-  const retryGenerator = createLiveGenerator({
-    provider: "openai-compatible", baseUrl: "http://generator.local/v1", apiKey: "k", model: "m", temperature: 0.9, maxTokens: 16, timeoutMs: 5_000,
-  }, retryFetch);
+  const retryGenerator = createLiveGenerator(
+    {
+      provider: "openai-compatible",
+      baseUrl: "http://generator.local/v1",
+      apiKey: "k",
+      model: "m",
+      temperature: 0.9,
+      maxTokens: 16,
+      timeoutMs: 5_000,
+    },
+    retryFetch,
+  );
   assert.equal(validateTurnContract(await retryGenerator(request)).declaration, "I look at the ferry wreck.");
   assert.equal(retryCalls, 2);
 
@@ -771,14 +945,33 @@ test("live generator posts to the OpenAI-compatible endpoint and parses fenced J
     truncatedCalls += 1;
     const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
     if (truncatedCalls === 1) {
-      return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: "{\"runId\":\"r\",\"decl" }, finish_reason: "length" }] }), { status: 200 });
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { role: "assistant", content: '{"runId":"r","decl' }, finish_reason: "length" }],
+        }),
+        { status: 200 },
+      );
     }
     assert.ok(Number(body["max_tokens"]) > 16, "the retry raises the token budget");
-    return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: JSON.stringify(validContract()) }, finish_reason: "stop" }] }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { role: "assistant", content: JSON.stringify(validContract()) }, finish_reason: "stop" }],
+      }),
+      { status: 200 },
+    );
   }) as typeof fetch;
-  const truncatedGenerator = createLiveGenerator({
-    provider: "openai-compatible", baseUrl: "http://generator.local/v1", apiKey: "k", model: "m", temperature: 0.9, maxTokens: 16, timeoutMs: 5_000,
-  }, truncatedFetch);
+  const truncatedGenerator = createLiveGenerator(
+    {
+      provider: "openai-compatible",
+      baseUrl: "http://generator.local/v1",
+      apiKey: "k",
+      model: "m",
+      temperature: 0.9,
+      maxTokens: 16,
+      timeoutMs: 5_000,
+    },
+    truncatedFetch,
+  );
   assert.equal(validateTurnContract(await truncatedGenerator(request)).declaration, "I look at the ferry wreck.");
   assert.equal(truncatedCalls, 2);
 
@@ -786,25 +979,41 @@ test("live generator posts to the OpenAI-compatible endpoint and parses fenced J
   let contractCalls = 0;
   const contractFetch = (async () => {
     contractCalls += 1;
-    const payload = contractCalls === 1
-      ? { ...validContract(), declaration: "" }
-      : validContract();
-    return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: JSON.stringify(payload) }, finish_reason: "stop" }] }), { status: 200 });
+    const payload = contractCalls === 1 ? { ...validContract(), declaration: "" } : validContract();
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { role: "assistant", content: JSON.stringify(payload) }, finish_reason: "stop" }],
+      }),
+      { status: 200 },
+    );
   }) as typeof fetch;
-  const contractGenerator = createLiveGenerator({
-    provider: "openai-compatible", baseUrl: "http://generator.local/v1", apiKey: "k", model: "m", temperature: 0.9, maxTokens: 16, timeoutMs: 5_000,
-  }, contractFetch);
+  const contractGenerator = createLiveGenerator(
+    {
+      provider: "openai-compatible",
+      baseUrl: "http://generator.local/v1",
+      apiKey: "k",
+      model: "m",
+      temperature: 0.9,
+      maxTokens: 16,
+      timeoutMs: 5_000,
+    },
+    contractFetch,
+  );
   assert.equal(validateTurnContract(await contractGenerator(request)).declaration, "I look at the ferry wreck.");
   assert.equal(contractCalls, 2);
 });
 
 test("fake generator echoes the harness identity and honors required noise", () => {
   const generator = createFakeGenerator();
-  const generated = generator(buildGenerationRequest(promptInput({
-    target: { family: "rest", failureMode: "direct" },
-    requiredNoise: ["lowercase"],
-    effort: "low",
-  }))) as Record<string, unknown>;
+  const generated = generator(
+    buildGenerationRequest(
+      promptInput({
+        target: { family: "rest", failureMode: "direct" },
+        requiredNoise: ["lowercase"],
+        effort: "low",
+      }),
+    ),
+  ) as Record<string, unknown>;
   assert.equal(generated["runId"], "run-1");
   assert.equal(generated["sessionId"], "synthetic-player.explorer.test.a");
   assert.equal(generated["turnIndex"], 0);
@@ -821,13 +1030,17 @@ test("fake generator echoes the harness identity and honors required noise", () 
 test("materializeTurn validates, applies noise, and reports exact bytes", () => {
   const plan = planRun({ runSeed: "test", persona: PERSONAS.explorer, turns: 1 }).turns[0];
   assert.ok(plan);
-  const generated = createFakeGenerator()(buildGenerationRequest(promptInput({
-    target: plan.target,
-    requiredNoise: plan.requiredNoise,
-    effort: plan.effort,
-    turnIndex: plan.turnIndex,
-    seed: plan.turnSeed,
-  })));
+  const generated = createFakeGenerator()(
+    buildGenerationRequest(
+      promptInput({
+        target: plan.target,
+        requiredNoise: plan.requiredNoise,
+        effort: plan.effort,
+        turnIndex: plan.turnIndex,
+        seed: plan.turnSeed,
+      }),
+    ),
+  );
   const materialized = materializeTurn(generated, {
     runId: "run-1",
     sessionId: "11111111-2222-3333-4444-555555555555",
@@ -840,14 +1053,18 @@ test("materializeTurn validates, applies noise, and reports exact bytes", () => 
   assert.equal(materialized.contract.turnIndex, plan.turnIndex);
   assert.notEqual(materialized.declaration, materialized.contract.declaration, "required typo changed the bytes");
   assert.equal(materialized.ooc, null);
-  assert.throws(() => materializeTurn(validContract({ turnIndex: 9 }), {
-    runId: "run-1",
-    sessionId: null,
-    sessionTag: "synthetic-player.explorer.test.a",
-    persona: PERSONAS.explorer,
-    turnSeed: plan.turnSeed,
-    plan,
-  }), /turnIndex mismatch/);
+  assert.throws(
+    () =>
+      materializeTurn(validContract({ turnIndex: 9 }), {
+        runId: "run-1",
+        sessionId: null,
+        sessionTag: "synthetic-player.explorer.test.a",
+        persona: PERSONAS.explorer,
+        turnSeed: plan.turnSeed,
+        plan,
+      }),
+    /turnIndex mismatch/,
+  );
 });
 
 // -------------------------------------------------------------------------------------------------
@@ -944,11 +1161,14 @@ test("SSE frames parse leniently and skip noise", () => {
     sseFrame("confirmation_required", { proposalIds: ["p1"], expiresAt: NOW }, 1),
   ].join("\n");
   const events = parseSseText(text);
-  assert.deepEqual(events.map(event => event.type), ["turn_started", "confirmation_required"]);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["turn_started", "confirmation_required"],
+  );
   assert.deepEqual(events[0]?.payload, { turn: { turnId: "turn-1" } });
   assert.equal(events[1]?.sequence, 1);
   assert.equal(parseSseBlock(": heartbeat"), null);
-  assert.equal(parseSseBlock("data: {\"type\":\"terminal\",\"payload\":{\"outcome\":\"done\"}}")?.type, "terminal");
+  assert.equal(parseSseBlock('data: {"type":"terminal","payload":{"outcome":"done"}}')?.type, "terminal");
 });
 
 // -------------------------------------------------------------------------------------------------
@@ -961,25 +1181,45 @@ test("session driver drives stream, confirmation, resume, and transcript without
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
-    const body = typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : null;
+    const body = typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : null;
     requests.push({ method, url, body });
     if (url.includes("play-bootstrap")) {
-      return jsonResponse({ campaignId: "camp-1", sessionId: "sess-1", expectedRevision: 7, playableActors: [{ actorId: "actor-1", name: "Aster" }] });
+      return jsonResponse({
+        campaignId: "camp-1",
+        sessionId: "sess-1",
+        expectedRevision: 7,
+        playableActors: [{ actorId: "actor-1", name: "Aster" }],
+      });
     }
     if (url.endsWith("/adventure-turns/stream")) {
       if (body && typeof body["resumeToken"] === "string") {
-        return sseResponse([
-          sseFrame("agent_status", { status: "narrating" }, 0),
-          sseFrame("mechanics_committed", { receipts: [{ commandId: "cmd-1", proposalId: "p1" }] }, 1),
-          sseFrame("terminal", { outcome: "done", turn: { turnId: "turn-1" }, narrationStatus: { status: "completed", text: "You advance.", source: "provider-assisted" }, receipts: [{ commandId: "cmd-1", proposalId: "p1" }] }, 2),
-        ].join(""), "turn-1");
+        return sseResponse(
+          [
+            sseFrame("agent_status", { status: "narrating" }, 0),
+            sseFrame("mechanics_committed", { receipts: [{ commandId: "cmd-1", proposalId: "p1" }] }, 1),
+            sseFrame(
+              "terminal",
+              {
+                outcome: "done",
+                turn: { turnId: "turn-1" },
+                narrationStatus: { status: "completed", text: "You advance.", source: "provider-assisted" },
+                receipts: [{ commandId: "cmd-1", proposalId: "p1" }],
+              },
+              2,
+            ),
+          ].join(""),
+          "turn-1",
+        );
       }
-      return sseResponse([
-        sseFrame("turn_started", { turn: { turnId: "turn-1", state: "declared" } }, 0),
-        sseFrame("tool_proposed", { proposal: { proposalId: "p1", toolName: "exact_progression_apply.select" } }, 1),
-        sseFrame("confirmation_required", { proposalIds: ["p1"], expiresAt: NOW }, 2),
-        sseFrame("terminal", { outcome: "aborted", turn: { turnId: "turn-1" } }, 3),
-      ].join(""), "turn-1");
+      return sseResponse(
+        [
+          sseFrame("turn_started", { turn: { turnId: "turn-1", state: "declared" } }, 0),
+          sseFrame("tool_proposed", { proposal: { proposalId: "p1", toolName: "exact_progression_apply.select" } }, 1),
+          sseFrame("confirmation_required", { proposalIds: ["p1"], expiresAt: NOW }, 2),
+          sseFrame("terminal", { outcome: "aborted", turn: { turnId: "turn-1" } }, 3),
+        ].join(""),
+        "turn-1",
+      );
     }
     if (url.includes("/adventure-turns/turn-1/confirm")) {
       return jsonResponse({ turn: { turnId: "turn-1", state: "mechanics-committed" }, resumeToken: "resume-1" });
@@ -1007,7 +1247,15 @@ test("session driver drives stream, confirmation, resume, and transcript without
       return jsonResponse({
         campaignId: "camp-1",
         sessionId: "sess-1",
-        turns: [{ turnId: "turn-1", actorId: "actor-1", declaration: "I level up.", narration: "You advance.", completedAt: NOW }],
+        turns: [
+          {
+            turnId: "turn-1",
+            actorId: "actor-1",
+            declaration: "I level up.",
+            narration: "You advance.",
+            completedAt: NOW,
+          },
+        ],
       });
     }
     throw new Error(`unexpected request ${method} ${url}`);
@@ -1037,7 +1285,7 @@ test("session driver drives stream, confirmation, resume, and transcript without
   assert.equal(outcome.error, null, "a completed turn carries no failure reason");
   assert.deepEqual(outcome.events, [{ type: "agent_status", code: "status=narrating" }]);
 
-  const paths = requests.map(request => `${request.method} ${request.url.replace("http://127.0.0.1:8787", "")}`);
+  const paths = requests.map((request) => `${request.method} ${request.url.replace("http://127.0.0.1:8787", "")}`);
   assert.deepEqual(paths, [
     "GET /api/rpg/v1/campaigns/camp-1/rooms/sess-1/play-bootstrap",
     "POST /api/rpg/v1/adventure-turns/stream",
@@ -1070,16 +1318,23 @@ test("session driver stalls, rejects, and reads the bound session without retrie
         return jsonResponse({ campaignId: "camp-1", sessionId: "sess-1", expectedRevision: 1, playableActors: [] });
       }
       if (url.endsWith("/adventure-turns/stream")) {
-        return sseResponse([
-          sseFrame("confirmation_required", { proposalIds: ["p1"], expiresAt: NOW }, 0),
-          sseFrame("terminal", { outcome: "aborted" }, 1),
-        ].join(""), "turn-1");
+        return sseResponse(
+          [
+            sseFrame("confirmation_required", { proposalIds: ["p1"], expiresAt: NOW }, 0),
+            sseFrame("terminal", { outcome: "aborted" }, 1),
+          ].join(""),
+          "turn-1",
+        );
       }
       if (url.includes("/adventure-turns/turn-1/confirm")) {
         return jsonResponse({ turn: { turnId: "turn-1", state: "mechanics-committed" }, resumeToken: "resume-1" });
       }
       if (url.includes("/adventure-turns/turn-1")) {
-        return jsonResponse({ turn: { turnId: "turn-1", state: "awaiting-confirmation", revision: 2 }, receipts: [], narrationStatus: { status: "none", text: null, source: null } });
+        return jsonResponse({
+          turn: { turnId: "turn-1", state: "awaiting-confirmation", revision: 2 },
+          receipts: [],
+          narrationStatus: { status: "none", text: null, source: null },
+        });
       }
       if (url.includes("/adventure-turns/transcript")) return jsonResponse({ turns: [] });
       throw new Error(`unexpected ${url}`);
@@ -1098,13 +1353,21 @@ test("session driver stalls, rejects, and reads the bound session without retrie
     sessionTag: "synthetic-player.impatient.test.a",
     fetchImpl: stallFixture.fetchImpl,
   });
-  const stalled = await stallDriver.submitTurn({ turnIndex: 1, declaration: "I wait.", turnSeed: "stall-me", confirmationDecision: "stall" });
+  const stalled = await stallDriver.submitTurn({
+    turnIndex: 1,
+    declaration: "I wait.",
+    turnSeed: "stall-me",
+    confirmationDecision: "stall",
+  });
   assert.deepEqual(stalled.confirmationDecisions, ["stall"]);
   assert.equal(stalled.turnState, "awaiting-confirmation");
   assert.equal(stalled.terminalOutcome, "aborted");
   assert.equal(stalled.error, "turn did not complete (terminal=aborted)");
   assert.deepEqual(stalled.events, []);
-  assert.ok(stallFixture.requests.every(url => !url.includes("/confirm")), "a stall must not POST a confirmation");
+  assert.ok(
+    stallFixture.requests.every((url) => !url.includes("/confirm")),
+    "a stall must not POST a confirmation",
+  );
 
   const rejectFixture = makeFetch("reject");
   const rejectDriver = new SessionDriver({
@@ -1117,26 +1380,37 @@ test("session driver stalls, rejects, and reads the bound session without retrie
     sessionTag: "synthetic-player.socialiser.test.a",
     fetchImpl: rejectFixture.fetchImpl,
   });
-  const rejected = await rejectDriver.submitTurn({ turnIndex: 2, declaration: "I ask around.", turnSeed: "reject-me", confirmationDecision: "reject" });
+  const rejected = await rejectDriver.submitTurn({
+    turnIndex: 2,
+    declaration: "I ask around.",
+    turnSeed: "reject-me",
+    confirmationDecision: "reject",
+  });
   assert.deepEqual(rejected.confirmationDecisions, ["reject"]);
 });
 
 test("session driver fails closed on ambiguous and definitive errors", async () => {
-  const driver = (fetchImpl: typeof fetch) => new SessionDriver({
-    baseUrl: "http://127.0.0.1:8787",
-    campaignId: "camp-1",
-    sessionId: "sess-1",
-    actorId: "actor-1",
-    runId: "synth-test-a",
-    persona: PERSONAS.explorer,
-    sessionTag: "synthetic-player.explorer.test.a",
-    fetchImpl,
-  });
+  const driver = (fetchImpl: typeof fetch) =>
+    new SessionDriver({
+      baseUrl: "http://127.0.0.1:8787",
+      campaignId: "camp-1",
+      sessionId: "sess-1",
+      actorId: "actor-1",
+      runId: "synth-test-a",
+      persona: PERSONAS.explorer,
+      sessionTag: "synthetic-player.explorer.test.a",
+      fetchImpl,
+    });
 
-  const unreachable = driver((async () => { throw new Error("ECONNREFUSED"); }) as unknown as typeof fetch);
+  const unreachable = driver((async () => {
+    throw new Error("ECONNREFUSED");
+  }) as unknown as typeof fetch);
   await assert.rejects(
     () => unreachable.submitTurn({ turnIndex: 0, declaration: "I wait.", turnSeed: "e-0" }),
-    (error: unknown) => error instanceof SessionTurnError && error.uncertain === true && /play-bootstrap failed: ECONNREFUSED/.test(error.message),
+    (error: unknown) =>
+      error instanceof SessionTurnError &&
+      error.uncertain === true &&
+      /play-bootstrap failed: ECONNREFUSED/.test(error.message),
   );
 
   const serverError = driver((async () => new Response("boom", { status: 500 })) as typeof fetch);
@@ -1148,7 +1422,8 @@ test("session driver fails closed on ambiguous and definitive errors", async () 
   const rejected = driver((async () => new Response("bad", { status: 400 })) as typeof fetch);
   await assert.rejects(
     () => rejected.submitTurn({ turnIndex: 0, declaration: "I wait.", turnSeed: "e-0", expectedRevision: 1 }),
-    (error: unknown) => error instanceof SessionTurnError && error.uncertain === false && /HTTP 400/.test(error.message),
+    (error: unknown) =>
+      error instanceof SessionTurnError && error.uncertain === false && /HTTP 400/.test(error.message),
   );
 
   const missingRevision = driver((async (input: RequestInfo | URL) => {
@@ -1158,33 +1433,40 @@ test("session driver fails closed on ambiguous and definitive errors", async () 
   }) as typeof fetch);
   await assert.rejects(
     () => missingRevision.submitTurn({ turnIndex: 0, declaration: "I wait.", turnSeed: "e-0" }),
-    (error: unknown) => error instanceof SessionTurnError && error.uncertain === false && /expectedRevision/.test(error.message),
+    (error: unknown) =>
+      error instanceof SessionTurnError && error.uncertain === false && /expectedRevision/.test(error.message),
   );
 });
 
 test("session driver diagnoses streams that do not end done", async () => {
-  const makeFetch = (frames: string[], state: string) => (async (input: RequestInfo | URL) => {
-    const url = String(input);
-    if (url.includes("play-bootstrap")) {
-      return jsonResponse({ campaignId: "camp-1", sessionId: "sess-1", expectedRevision: 1, playableActors: [] });
-    }
-    if (url.endsWith("/adventure-turns/stream")) return sseResponse(frames.join(""), "turn-1");
-    if (url.includes("/adventure-turns/turn-1")) {
-      return jsonResponse({ turn: { turnId: "turn-1", state, revision: 2 }, receipts: [], narrationStatus: { status: "none", text: null, source: null } });
-    }
-    if (url.includes("/adventure-turns/transcript")) return jsonResponse({ turns: [] });
-    throw new Error(`unexpected ${url}`);
-  }) as typeof fetch;
-  const driverFor = (frames: string[], state = "failed") => new SessionDriver({
-    baseUrl: "http://127.0.0.1:8787",
-    campaignId: "camp-1",
-    sessionId: "sess-1",
-    actorId: "actor-1",
-    runId: "synth-test-a",
-    persona: PERSONAS.explorer,
-    sessionTag: "synthetic-player.explorer.test.a",
-    fetchImpl: makeFetch(frames, state),
-  });
+  const makeFetch = (frames: string[], state: string) =>
+    (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("play-bootstrap")) {
+        return jsonResponse({ campaignId: "camp-1", sessionId: "sess-1", expectedRevision: 1, playableActors: [] });
+      }
+      if (url.endsWith("/adventure-turns/stream")) return sseResponse(frames.join(""), "turn-1");
+      if (url.includes("/adventure-turns/turn-1")) {
+        return jsonResponse({
+          turn: { turnId: "turn-1", state, revision: 2 },
+          receipts: [],
+          narrationStatus: { status: "none", text: null, source: null },
+        });
+      }
+      if (url.includes("/adventure-turns/transcript")) return jsonResponse({ turns: [] });
+      throw new Error(`unexpected ${url}`);
+    }) as typeof fetch;
+  const driverFor = (frames: string[], state = "failed") =>
+    new SessionDriver({
+      baseUrl: "http://127.0.0.1:8787",
+      campaignId: "camp-1",
+      sessionId: "sess-1",
+      actorId: "actor-1",
+      runId: "synth-test-a",
+      persona: PERSONAS.explorer,
+      sessionTag: "synthetic-player.explorer.test.a",
+      fetchImpl: makeFetch(frames, state),
+    });
 
   // A failed terminal payload carries no error field; the diagnosis comes from the status events
   // that preceded it, never from null.
@@ -1216,9 +1498,11 @@ test("session driver diagnoses streams that do not end done", async () => {
   ]);
 
   // Nothing informative on the stream still yields a non-null, stable reason.
-  const silent = await driverFor([
-    sseFrame("terminal", { outcome: "error" }, 0),
-  ]).submitTurn({ turnIndex: 2, declaration: "I try.", turnSeed: "diag-2" });
+  const silent = await driverFor([sseFrame("terminal", { outcome: "error" }, 0)]).submitTurn({
+    turnIndex: 2,
+    declaration: "I try.",
+    turnSeed: "diag-2",
+  });
   assert.equal(silent.error, "turn did not complete (terminal=error)");
   assert.deepEqual(silent.events, []);
 });
@@ -1257,8 +1541,13 @@ test("dry run produces a planned manifest with the tag mapping and no store writ
   }
   assert.equal(manifest.turns[0]?.idempotencyKey, "synth.synth-test-a.0");
   assert.deepEqual(manifest.turns[0]?.target, { family: "combat-consumable", failureMode: "unsupported" });
-  assert.ok(manifest.notes.some(note => note.includes("synthetic-player.explorer.test.a") && note.includes("11111111-2222-3333-4444-555555555555")));
-  assert.ok(manifest.notes.some(note => note.includes("dry-run")));
+  assert.ok(
+    manifest.notes.some(
+      (note) =>
+        note.includes("synthetic-player.explorer.test.a") && note.includes("11111111-2222-3333-4444-555555555555"),
+    ),
+  );
+  assert.ok(manifest.notes.some((note) => note.includes("dry-run")));
   assert.equal(manifest.coverage.totals.planned, 3);
   assert.equal(manifest.coverage.totals.achieved, 0);
   assert.equal(manifest.coverage.totals.target, COVERAGE_TOTAL_TARGET);
@@ -1278,15 +1567,12 @@ test("dry run is byte-stable and honors a synthetic tag override", async () => {
   const overridden = await runHarnessSession(makeDryRunInput({ syntheticTag: "synthetic-player.custom.abc.a" }));
   assert.equal(overridden.sessions[0]?.sessionTag, "synthetic-player.custom.abc.a");
   const summary = renderManifestSummary(overridden);
-  assert.ok(summary.some(line => line.includes("synthetic-player.custom.abc.a")));
-  assert.ok(summary.some(line => line.includes("coverage: planned 3/308")));
+  assert.ok(summary.some((line) => line.includes("synthetic-player.custom.abc.a")));
+  assert.ok(summary.some((line) => line.includes("coverage: planned 3/308")));
 });
 
 test("manifest serialization is canonical regardless of key order", async () => {
-  assert.equal(
-    stableStringify({ b: 1, a: { d: 2, c: 3 } }),
-    stableStringify({ a: { c: 3, d: 2 }, b: 1 }),
-  );
+  assert.equal(stableStringify({ b: 1, a: { d: 2, c: 3 } }), stableStringify({ a: { c: 3, d: 2 }, b: 1 }));
   const manifest = await runHarnessSession(makeDryRunInput());
   const shuffled = Object.fromEntries(Object.entries(manifest).reverse()) as HarnessManifest;
   assert.equal(serializeManifest(shuffled), serializeManifest(manifest));
@@ -1295,37 +1581,55 @@ test("manifest serialization is canonical regardless of key order", async () => 
 });
 
 test("live session stops as uncertain on ambiguous failures and failed on definitive ones", async () => {
-  const uncertain = await runHarnessSession(makeDryRunInput({
-    mode: "live",
-    generateTurn: createFakeGenerator(),
-    submitTurn: async () => { throw new SessionTurnError("socket died", { uncertain: true }); },
-  }));
+  const uncertain = await runHarnessSession(
+    makeDryRunInput({
+      mode: "live",
+      generateTurn: createFakeGenerator(),
+      submitTurn: async () => {
+        throw new SessionTurnError("socket died", { uncertain: true });
+      },
+    }),
+  );
   assert.equal(uncertain.state, "uncertain");
   assert.equal(uncertain.turns.length, 1);
   assert.equal(uncertain.turns[0]?.outcome, "uncertain");
   assert.match(uncertain.turns[0]?.error ?? "", /socket died/);
-  assert.ok(uncertain.notes.some(note => note.includes("without retry")));
+  assert.ok(uncertain.notes.some((note) => note.includes("without retry")));
 
-  const failed = await runHarnessSession(makeDryRunInput({
-    mode: "live",
-    submitTurn: async () => { throw new SessionTurnError("stale revision", { uncertain: false }); },
-  }));
+  const failed = await runHarnessSession(
+    makeDryRunInput({
+      mode: "live",
+      submitTurn: async () => {
+        throw new SessionTurnError("stale revision", { uncertain: false });
+      },
+    }),
+  );
   assert.equal(failed.state, "failed");
   assert.equal(failed.turns[0]?.outcome, "error");
 
-  const generatorFailure = await runHarnessSession(makeDryRunInput({
-    mode: "live",
-    generateTurn: () => { throw new Error("provider exploded"); },
-    submitTurn: async () => { throw new Error("should not be called"); },
-  }));
+  const generatorFailure = await runHarnessSession(
+    makeDryRunInput({
+      mode: "live",
+      generateTurn: () => {
+        throw new Error("provider exploded");
+      },
+      submitTurn: async () => {
+        throw new Error("should not be called");
+      },
+    }),
+  );
   assert.equal(generatorFailure.state, "failed");
   assert.match(generatorFailure.turns[0]?.error ?? "", /generator failed: provider exploded/);
 
-  const rejectedContract = await runHarnessSession(makeDryRunInput({
-    mode: "live",
-    generateTurn: () => validContract({ turnIndex: 99 }),
-    submitTurn: async () => { throw new Error("should not be called"); },
-  }));
+  const rejectedContract = await runHarnessSession(
+    makeDryRunInput({
+      mode: "live",
+      generateTurn: () => validContract({ turnIndex: 99 }),
+      submitTurn: async () => {
+        throw new Error("should not be called");
+      },
+    }),
+  );
   assert.equal(rejectedContract.state, "failed");
   assert.match(rejectedContract.turns[0]?.error ?? "", /contract rejected/);
 });
@@ -1337,14 +1641,21 @@ test("live session records the stream diagnosis instead of a null error", async 
       return jsonResponse({ campaignId: "camp-1", sessionId: "sess-1", expectedRevision: 1, playableActors: [] });
     }
     if (url.endsWith("/adventure-turns/stream")) {
-      return sseResponse([
-        sseFrame("turn_started", { turn: { turnId: "turn-1", state: "declared" } }, 0),
-        sseFrame("agent_status", { status: "decision-rejected" }, 1),
-        sseFrame("terminal", { outcome: "error" }, 2),
-      ].join(""), "turn-1");
+      return sseResponse(
+        [
+          sseFrame("turn_started", { turn: { turnId: "turn-1", state: "declared" } }, 0),
+          sseFrame("agent_status", { status: "decision-rejected" }, 1),
+          sseFrame("terminal", { outcome: "error" }, 2),
+        ].join(""),
+        "turn-1",
+      );
     }
     if (url.includes("/adventure-turns/turn-1")) {
-      return jsonResponse({ turn: { turnId: "turn-1", state: "failed", revision: 2 }, receipts: [], narrationStatus: { status: "none", text: null, source: null } });
+      return jsonResponse({
+        turn: { turnId: "turn-1", state: "failed", revision: 2 },
+        receipts: [],
+        narrationStatus: { status: "none", text: null, source: null },
+      });
     }
     if (url.includes("/adventure-turns/transcript")) return jsonResponse({ turns: [] });
     throw new Error(`unexpected ${url}`);
@@ -1359,10 +1670,12 @@ test("live session records the stream diagnosis instead of a null error", async 
     sessionTag: "synthetic-player.explorer.test.a",
     fetchImpl,
   });
-  const manifest = await runHarnessSession(makeDryRunInput({
-    mode: "live",
-    submitTurn: request => driver.submitTurn(request),
-  }));
+  const manifest = await runHarnessSession(
+    makeDryRunInput({
+      mode: "live",
+      submitTurn: (request) => driver.submitTurn(request),
+    }),
+  );
   assert.equal(manifest.state, "failed");
   assert.equal(manifest.turns.length, 1);
   const turn = manifest.turns[0];
@@ -1372,32 +1685,37 @@ test("live session records the stream diagnosis instead of a null error", async 
   assert.deepEqual(turn.events, [{ type: "agent_status", code: "status=decision-rejected" }]);
   assert.equal(turn.turnId, "turn-1");
   assert.equal(turn.turnState, "failed");
-  assert.ok(manifest.notes.some(note => note.includes("terminal error")));
+  assert.ok(manifest.notes.some((note) => note.includes("terminal error")));
 });
 
 test("live session records completion and coverage when submitTurn resolves", async () => {
-  const manifest = await runHarnessSession(makeDryRunInput({
-    mode: "live",
-    submitTurn: async input => ({
-      turnId: `turn-${input.turnIndex}`,
-      terminalOutcome: "done",
-      turnState: "completed",
-      confirmationDecisions: [],
-      confirmationBatches: [],
-      receipts: [],
-      narration: { status: "completed", text: "ok", source: "deterministic-fallback" },
-      transcript: null,
-      uncertain: false,
-      events: [],
-      error: null,
+  const manifest = await runHarnessSession(
+    makeDryRunInput({
+      mode: "live",
+      submitTurn: async (input) => ({
+        turnId: `turn-${input.turnIndex}`,
+        terminalOutcome: "done",
+        turnState: "completed",
+        confirmationDecisions: [],
+        confirmationBatches: [],
+        receipts: [],
+        narration: { status: "completed", text: "ok", source: "deterministic-fallback" },
+        transcript: null,
+        uncertain: false,
+        events: [],
+        error: null,
+      }),
     }),
-  }));
+  );
   assert.equal(manifest.state, "complete");
   assert.equal(manifest.sessions[0]?.turns, 3);
   assert.equal(manifest.coverage.totals.achieved, 3);
   assert.equal(manifest.coverage.totals.planned, 3);
-  assert.ok(manifest.turns.every(turn => turn.outcome === "done" && turn.turnId !== null));
-  assert.ok(manifest.turns.every(turn => turn.error === null && turn.events === undefined), "successful turns keep the old schema");
+  assert.ok(manifest.turns.every((turn) => turn.outcome === "done" && turn.turnId !== null));
+  assert.ok(
+    manifest.turns.every((turn) => turn.error === null && turn.events === undefined),
+    "successful turns keep the old schema",
+  );
 });
 
 test("CLI parsing handles defaults, both flag forms, and validation", () => {
@@ -1424,7 +1742,10 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
     help: false,
   });
   // `--data-dir` overrides the VELVET_DATA_DIR default; without the flag the env value survives.
-  assert.equal(parseHarnessArgs(["--data-dir", "/tmp/velvet"], { VELVET_DATA_DIR: "/env/velvet" }).dataDir, "/tmp/velvet");
+  assert.equal(
+    parseHarnessArgs(["--data-dir", "/tmp/velvet"], { VELVET_DATA_DIR: "/env/velvet" }).dataDir,
+    "/tmp/velvet",
+  );
   assert.equal(parseHarnessArgs([], { VELVET_DATA_DIR: "/env/velvet" }).dataDir, "/env/velvet");
   assert.equal(parseHarnessArgs(["--data-dir", "/tmp/velvet"], {}).dataDir, "/tmp/velvet");
   assert.throws(() => parseHarnessArgs(["--data-dir"], {}), /--data-dir requires a value/);
@@ -1436,8 +1757,14 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
   // Recent-menu window and direct-cell weighting.
   assert.equal(parseHarnessArgs(["--menu-window", "5"], {}).menuWindow, 5);
   assert.equal(parseHarnessArgs(["--menu-window=7"], {}).menuWindow, 7);
-  assert.throws(() => parseHarnessArgs(["--menu-window", "0"], {}), /--menu-window must be an integer between 1 and 10/);
-  assert.throws(() => parseHarnessArgs(["--menu-window", "11"], {}), /--menu-window must be an integer between 1 and 10/);
+  assert.throws(
+    () => parseHarnessArgs(["--menu-window", "0"], {}),
+    /--menu-window must be an integer between 1 and 10/,
+  );
+  assert.throws(
+    () => parseHarnessArgs(["--menu-window", "11"], {}),
+    /--menu-window must be an integer between 1 and 10/,
+  );
   assert.throws(() => parseHarnessArgs(["--menu-window"], {}), /--menu-window requires a value/);
   assert.equal(parseHarnessArgs(["--direct-weight", "2.5"], {}).directWeight, 2.5);
   assert.equal(parseHarnessArgs(["--direct-weight=0.1"], {}).directWeight, 0.1);
@@ -1445,32 +1772,60 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
   assert.throws(() => parseHarnessArgs(["--direct-weight", "nope"], {}), /--direct-weight must be a number >= 0.1/);
   assert.throws(() => parseHarnessArgs(["--direct-weight"], {}), /--direct-weight requires a value/);
   // Focused coverage flags: both or neither, each value validated.
-  assert.deepEqual(parseHarnessArgs(["--focus-family", "combat-consumable", "--focus-mode", "direct"], {}).focus, { family: "combat-consumable", failureMode: "direct" });
-  assert.deepEqual(parseHarnessArgs(["--focus-family=travel", "--focus-mode=unsupported"], {}).focus, { family: "travel", failureMode: "unsupported" });
+  assert.deepEqual(parseHarnessArgs(["--focus-family", "combat-consumable", "--focus-mode", "direct"], {}).focus, {
+    family: "combat-consumable",
+    failureMode: "direct",
+  });
+  assert.deepEqual(parseHarnessArgs(["--focus-family=travel", "--focus-mode=unsupported"], {}).focus, {
+    family: "travel",
+    failureMode: "unsupported",
+  });
   assert.equal(parseHarnessArgs([], {}).focus, null);
-  assert.throws(() => parseHarnessArgs(["--focus-family", "travel"], {}), /--focus-family and --focus-mode must be used together/);
-  assert.throws(() => parseHarnessArgs(["--focus-mode", "direct"], {}), /--focus-family and --focus-mode must be used together/);
-  assert.throws(() => parseHarnessArgs(["--focus-family", "wizard", "--focus-mode", "direct"], {}), /--focus-family must be one of/);
-  assert.throws(() => parseHarnessArgs(["--focus-family", "travel", "--focus-mode", "sometimes"], {}), /--focus-mode must be one of/);
+  assert.throws(
+    () => parseHarnessArgs(["--focus-family", "travel"], {}),
+    /--focus-family and --focus-mode must be used together/,
+  );
+  assert.throws(
+    () => parseHarnessArgs(["--focus-mode", "direct"], {}),
+    /--focus-family and --focus-mode must be used together/,
+  );
+  assert.throws(
+    () => parseHarnessArgs(["--focus-family", "wizard", "--focus-mode", "direct"], {}),
+    /--focus-family must be one of/,
+  );
+  assert.throws(
+    () => parseHarnessArgs(["--focus-family", "travel", "--focus-mode", "sometimes"], {}),
+    /--focus-mode must be one of/,
+  );
   assert.throws(() => parseHarnessArgs(["--focus-family"], {}), /--focus-family requires a value/);
   assert.throws(() => parseHarnessArgs(["--focus-mode"], {}), /--focus-mode requires a value/);
-  const parsed = parseHarnessArgs([
-    "--turns=3",
-    "--personas", "explorer.v1,impatient",
-    "--runs", "2",
-    "--seed=test",
-    "--campaign-id", "camp-1",
-    "--session-id", "sess-1,sess-2",
-    "--actor-id=actor-1",
-    "--out", "manifests",
-    "--run-id=run-1",
-    "--sheet-summary", "Bryn the ranger",
-    "--api-base-url", "http://127.0.0.1:9999/",
-    "--max-confirmation-rounds=2",
-    "--menu-window=4",
-    "--direct-weight=2",
-    "--dry-run",
-  ], {});
+  const parsed = parseHarnessArgs(
+    [
+      "--turns=3",
+      "--personas",
+      "explorer.v1,impatient",
+      "--runs",
+      "2",
+      "--seed=test",
+      "--campaign-id",
+      "camp-1",
+      "--session-id",
+      "sess-1,sess-2",
+      "--actor-id=actor-1",
+      "--out",
+      "manifests",
+      "--run-id=run-1",
+      "--sheet-summary",
+      "Bryn the ranger",
+      "--api-base-url",
+      "http://127.0.0.1:9999/",
+      "--max-confirmation-rounds=2",
+      "--menu-window=4",
+      "--direct-weight=2",
+      "--dry-run",
+    ],
+    {},
+  );
   assert.equal(parsed.turns, 3);
   assert.deepEqual(parsed.personas, ["explorer", "impatient"]);
   assert.equal(parsed.runs, 2);
@@ -1485,7 +1840,10 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
   assert.equal(parsed.maxConfirmationRounds, 2);
   assert.equal(parsed.menuWindow, 4);
   assert.equal(parsed.directWeight, 2);
-  assert.equal(parseHarnessArgs(["--runs", "1", "--synthetic-tag", "synthetic-player.custom.x.a"], {}).syntheticTag, "synthetic-player.custom.x.a");
+  assert.equal(
+    parseHarnessArgs(["--runs", "1", "--synthetic-tag", "synthetic-player.custom.x.a"], {}).syntheticTag,
+    "synthetic-player.custom.x.a",
+  );
   assert.throws(() => parseHarnessArgs(["--turns", "0"], {}), /--turns must be an integer between 1 and 200/);
   assert.throws(() => parseHarnessArgs(["--turns", "nope"], {}), /--turns must be an integer between 1 and 200/);
   assert.throws(() => parseHarnessArgs(["--personas", "wizard"], {}), /unknown persona: wizard/);
@@ -1494,48 +1852,71 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
   assert.throws(() => parseHarnessArgs(["--dry-run=yes"], {}), /does not take a value/);
   assert.throws(() => parseHarnessArgs(["--turns"], {}), /--turns requires a value/);
   assert.throws(() => parseHarnessArgs(["--what"], {}), /unknown argument: --what/);
-  assert.throws(() => parseHarnessArgs(["--synthetic-tag", "synthetic-player.custom.x.a", "--runs", "2"], {}), /requires --runs 1/);
+  assert.throws(
+    () => parseHarnessArgs(["--synthetic-tag", "synthetic-player.custom.x.a", "--runs", "2"], {}),
+    /requires --runs 1/,
+  );
   assert.equal(parseHarnessArgs(["--help"], {}).help, true);
 });
 
 test("CLI defaults to dry-run without API config and never touches the network", async () => {
   const lines: string[] = [];
-  const result = await runHarnessCli(["--turns", "2", "--personas", "explorer", "--seed", "test"], {}, {
-    out: line => lines.push(line),
-    err: line => lines.push(`ERR ${line}`),
-    fetchImpl: (() => { throw new Error("network disabled"); }) as unknown as typeof fetch,
-  });
+  const result = await runHarnessCli(
+    ["--turns", "2", "--personas", "explorer", "--seed", "test"],
+    {},
+    {
+      out: (line) => lines.push(line),
+      err: (line) => lines.push(`ERR ${line}`),
+      fetchImpl: (() => {
+        throw new Error("network disabled");
+      }) as unknown as typeof fetch,
+    },
+  );
   assert.equal(result, 0);
-  assert.ok(lines.some(line => line.includes("defaulting to --dry-run")));
-  assert.ok(lines.some(line => line.includes("synthetic-player.explorer.test.a")));
-  assert.ok(lines.some(line => line.includes('"sessionTag": "synthetic-player.explorer.test.a"')));
-  assert.ok(!lines.some(line => line.includes("network disabled")));
-  assert.ok(!lines.some(line => line.startsWith("ERR ")));
+  assert.ok(lines.some((line) => line.includes("defaulting to --dry-run")));
+  assert.ok(lines.some((line) => line.includes("synthetic-player.explorer.test.a")));
+  assert.ok(lines.some((line) => line.includes('"sessionTag": "synthetic-player.explorer.test.a"')));
+  assert.ok(!lines.some((line) => line.includes("network disabled")));
+  assert.ok(!lines.some((line) => line.startsWith("ERR ")));
 });
 
 test("CLI dry-run forwards the focus flags into the first turn", async () => {
   const lines: string[] = [];
-  const result = await runHarnessCli([
-    "--turns", "2",
-    "--personas", "explorer",
-    "--seed", "test",
-    "--focus-family", "combat-consumable",
-    "--focus-mode", "direct",
-  ], {}, {
-    out: line => lines.push(line),
-    err: line => lines.push(`ERR ${line}`),
-    fetchImpl: (() => { throw new Error("network disabled"); }) as unknown as typeof fetch,
-  });
+  const result = await runHarnessCli(
+    [
+      "--turns",
+      "2",
+      "--personas",
+      "explorer",
+      "--seed",
+      "test",
+      "--focus-family",
+      "combat-consumable",
+      "--focus-mode",
+      "direct",
+    ],
+    {},
+    {
+      out: (line) => lines.push(line),
+      err: (line) => lines.push(`ERR ${line}`),
+      fetchImpl: (() => {
+        throw new Error("network disabled");
+      }) as unknown as typeof fetch,
+    },
+  );
   assert.equal(result, 0);
-  assert.ok(lines.some(line => line.includes("turn 0 target=combat-consumable/direct")), lines.join("\n"));
-  const manifestJson = lines.find(line => line.startsWith("{"));
+  assert.ok(
+    lines.some((line) => line.includes("turn 0 target=combat-consumable/direct")),
+    lines.join("\n"),
+  );
+  const manifestJson = lines.find((line) => line.startsWith("{"));
   assert.ok(manifestJson, "the manifest JSON is printed");
   const manifest = JSON.parse(manifestJson) as HarnessManifest;
   assert.equal(manifest.targetSwaps.length, 1);
   assert.equal(manifest.targetSwaps[0]?.turnIndex, 0);
   assert.deepEqual(manifest.targetSwaps[0]?.to, { family: "combat-consumable", failureMode: "direct" });
   assert.deepEqual(manifest.turns[0]?.plannedTarget, manifest.targetSwaps[0]?.from);
-  assert.ok(!lines.some(line => line.startsWith("ERR ")));
+  assert.ok(!lines.some((line) => line.startsWith("ERR ")));
 });
 
 test("CLI live mode requires campaign, session, and actor ids", async () => {
@@ -1543,13 +1924,15 @@ test("CLI live mode requires campaign, session, and actor ids", async () => {
   const io = {
     out: (line: string) => lines.push(line),
     err: (line: string) => lines.push(line),
-    fetchImpl: (() => { throw new Error("network disabled"); }) as unknown as typeof fetch,
+    fetchImpl: (() => {
+      throw new Error("network disabled");
+    }) as unknown as typeof fetch,
   };
   await assert.rejects(
     () => runHarnessCli(["--turns", "1", "--seed", "test"], { OPENROUTER_API_KEY: "k", OPENROUTER_MODEL: "m" }, io),
     /live mode requires --campaign-id, --session-id, --actor-id/,
   );
-  assert.ok(lines.every(line => !line.includes("network disabled")));
+  assert.ok(lines.every((line) => !line.includes("network disabled")));
 });
 
 // -------------------------------------------------------------------------------------------------
@@ -1651,7 +2034,14 @@ test("parseAdventureDecisionRow dedupes advertised kinds/labels and resolves the
 
   assert.equal(parseAdventureDecisionRow({ requestJson: "not json", selectionJson: null, confidenceBand: null }), null);
   assert.equal(parseAdventureDecisionRow({ requestJson: "[1,2]", selectionJson: null, confidenceBand: null }), null);
-  assert.equal(parseAdventureDecisionRow({ requestJson: JSON.stringify({ state: {} }), selectionJson: null, confidenceBand: null }), null);
+  assert.equal(
+    parseAdventureDecisionRow({
+      requestJson: JSON.stringify({ state: {} }),
+      selectionJson: null,
+      confidenceBand: null,
+    }),
+    null,
+  );
   assert.equal(parseAdventureDecisionRow({ requestJson, selectionJson: "not json", confidenceBand: null }), null);
 });
 
@@ -1672,14 +2062,39 @@ test("readTurnAdvertisements reads the newest adventure-selection row and fails 
     const insert = database.prepare(
       "INSERT INTO system_one_decisions_v1 (decision_id, lane, turn_id, request_json, selection_json, confidence_band, created_at) VALUES (?,?,?,?,?,?,?)",
     );
-    const rowJson = (candidateId: string, kind: string, label: string): string => JSON.stringify({
-      state: { declaration: "I move.", candidates: [{ candidateId, digest: "d", kind, label }] },
-      model: "m",
-      questions: {},
-    });
-    insert.run("decision:1", "adventure-selection", "turn-1", rowJson("c1", "exact_rest.select", "Old rest row"), JSON.stringify({ method: "choice", selection: { candidateId: "c1" } }), "act", "2026-01-01T00:00:00.000Z");
-    insert.run("decision:2", "adventure-selection", "turn-1", rowJson("c2", "exact_actor_travel.select", "Newer travel row"), JSON.stringify({ method: "defer", selection: null }), "fallback", "2026-01-02T00:00:00.000Z");
-    insert.run("decision:3", "adventure-selection", "turn-2", rowJson("c3", "exact_actor_travel.select", "Other turn"), JSON.stringify({ method: "choice", selection: { candidateId: "c3" } }), "act", "2026-01-03T00:00:00.000Z");
+    const rowJson = (candidateId: string, kind: string, label: string): string =>
+      JSON.stringify({
+        state: { declaration: "I move.", candidates: [{ candidateId, digest: "d", kind, label }] },
+        model: "m",
+        questions: {},
+      });
+    insert.run(
+      "decision:1",
+      "adventure-selection",
+      "turn-1",
+      rowJson("c1", "exact_rest.select", "Old rest row"),
+      JSON.stringify({ method: "choice", selection: { candidateId: "c1" } }),
+      "act",
+      "2026-01-01T00:00:00.000Z",
+    );
+    insert.run(
+      "decision:2",
+      "adventure-selection",
+      "turn-1",
+      rowJson("c2", "exact_actor_travel.select", "Newer travel row"),
+      JSON.stringify({ method: "defer", selection: null }),
+      "fallback",
+      "2026-01-02T00:00:00.000Z",
+    );
+    insert.run(
+      "decision:3",
+      "adventure-selection",
+      "turn-2",
+      rowJson("c3", "exact_actor_travel.select", "Other turn"),
+      JSON.stringify({ method: "choice", selection: { candidateId: "c3" } }),
+      "act",
+      "2026-01-03T00:00:00.000Z",
+    );
     database.close();
 
     const newest = readTurnAdvertisements(dir, "turn-1");
@@ -1770,22 +2185,30 @@ test("scheduler reserve books a specific cell and release is its floor-zero inve
 
 test("advertised options shape the generator prompt by failure mode", () => {
   const labels = ["Travel: Market → Harbor", "Rest at the inn"];
-  const onMenu = buildGeneratorMessages(promptInput({
-    target: { family: "travel", failureMode: "ambiguous" },
-    advertisedOptions: labels,
-  }));
-  assert.ok(onMenu.user.includes(
-    `The game currently offers these options: ${labels.join(", ")}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`,
-  ));
+  const onMenu = buildGeneratorMessages(
+    promptInput({
+      target: { family: "travel", failureMode: "ambiguous" },
+      advertisedOptions: labels,
+    }),
+  );
+  assert.ok(
+    onMenu.user.includes(
+      `The game currently offers these options: ${labels.join(", ")}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`,
+    ),
+  );
   assert.ok(!onMenu.user.includes("deliberately off-menu"));
 
   for (const mode of OFF_MENU_FAILURE_MODES) {
-    const offMenu = buildGeneratorMessages(promptInput({
-      target: { family: "travel", failureMode: mode },
-      advertisedOptions: labels,
-    }));
+    const offMenu = buildGeneratorMessages(
+      promptInput({
+        target: { family: "travel", failureMode: mode },
+        advertisedOptions: labels,
+      }),
+    );
     assert.ok(offMenu.user.includes(`The game currently offers these options: ${labels.join(", ")}.`));
-    assert.ok(offMenu.user.includes("This turn is deliberately off-menu: do not clearly invoke any of the listed options."));
+    assert.ok(
+      offMenu.user.includes("This turn is deliberately off-menu: do not clearly invoke any of the listed options."),
+    );
     assert.ok(!offMenu.user.includes("clearly invokes one of them"));
   }
 
@@ -1797,34 +2220,45 @@ test("advertised options shape the generator prompt by failure mode", () => {
 test("advertisement-guided run re-targets toward the menu and counts advertised/acted", async () => {
   const requests: GenerationRequest[] = [];
   const fake = createFakeGenerator();
-  const manifest = await runHarnessSession(advertisementRunInput({
-    generateTurn: request => {
-      requests.push(request);
-      return fake(request);
-    },
-  }));
+  const manifest = await runHarnessSession(
+    advertisementRunInput({
+      generateTurn: (request) => {
+        requests.push(request);
+        return fake(request);
+      },
+    }),
+  );
 
   assert.equal(manifest.turns.length, 3);
-  assert.deepEqual(manifest.turns.map(turn => turn.target), [
-    { family: "combat-consumable", failureMode: "unsupported" },
-    { family: "travel", failureMode: "direct" },
-    { family: "travel", failureMode: "unadvertised" },
-  ]);
+  assert.deepEqual(
+    manifest.turns.map((turn) => turn.target),
+    [
+      { family: "combat-consumable", failureMode: "unsupported" },
+      { family: "travel", failureMode: "direct" },
+      { family: "travel", failureMode: "unadvertised" },
+    ],
+  );
   assert.equal(manifest.turns[0]?.plannedTarget, undefined, "an on-plan turn carries no pre-swap cell");
   assert.deepEqual(manifest.turns[1]?.plannedTarget, { family: "rest", failureMode: "direct" });
   assert.equal(manifest.turns[1]?.toolKind, FAMILY_TOOL_KINDS.travel);
-  assert.deepEqual(manifest.targetSwaps, [{
-    turnIndex: 1,
-    from: { family: "rest", failureMode: "direct" },
-    to: { family: "travel", failureMode: "direct" },
-  }]);
+  assert.deepEqual(manifest.targetSwaps, [
+    {
+      turnIndex: 1,
+      from: { family: "rest", failureMode: "direct" },
+      to: { family: "travel", failureMode: "direct" },
+    },
+  ]);
   for (const turn of manifest.turns) assert.deepEqual(turn.advertisements, travelAdvertisement());
 
   assert.equal(manifest.coverage.totals.advertisedTotal, 2);
   assert.equal(manifest.coverage.totals.actedTotal, 2);
   assert.equal(manifest.coverage.advertised.travel.direct, 1);
   assert.equal(manifest.coverage.advertised.travel.unadvertised, 1);
-  assert.equal(manifest.coverage.advertised["combat-consumable"].unsupported, 0, "the off-menu probe is not advertised");
+  assert.equal(
+    manifest.coverage.advertised["combat-consumable"].unsupported,
+    0,
+    "the off-menu probe is not advertised",
+  );
   assert.equal(manifest.coverage.acted.travel.direct, 1);
   assert.equal(manifest.coverage.acted.travel.unadvertised, 1);
   assert.equal(manifest.coverage.byFamily.travel.advertised, 2);
@@ -1834,32 +2268,43 @@ test("advertisement-guided run re-targets toward the menu and counts advertised/
   assert.equal(requests[0]?.target.family, "combat-consumable");
   assert.equal(requests[0]?.advertisedOptions, undefined, "the first turn has no prior menu");
   assert.deepEqual(requests[1]?.advertisedOptions, [TRAVEL_LABEL]);
-  assert.ok(requests[1]?.messages.user.includes(
-    `The game currently offers these options: ${TRAVEL_LABEL}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`,
-  ));
+  assert.ok(
+    requests[1]?.messages.user.includes(
+      `The game currently offers these options: ${TRAVEL_LABEL}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`,
+    ),
+  );
   assert.deepEqual(requests[2]?.advertisedOptions, [TRAVEL_LABEL]);
-  assert.ok(requests[2]?.messages.user.includes("This turn is deliberately off-menu: do not clearly invoke any of the listed options."));
+  assert.ok(
+    requests[2]?.messages.user.includes(
+      "This turn is deliberately off-menu: do not clearly invoke any of the listed options.",
+    ),
+  );
   assert.ok(!(requests[2]?.messages.user.includes("clearly invokes one of them") ?? true));
 });
 
 test("advertisement-guided run keeps the planned cell when no advertised cell is reachable", async () => {
-  const manifest = await runHarnessSession(advertisementRunInput({
-    // `srd-check` has no coverage target in this matrix, so its menu rows are all unreachable.
-    readAdvertisements: () => ({
-      kinds: ["exact_srd_check.select"],
-      families: ["srd-check"],
-      labels: ["Investigate the runes"],
-      band: "confirm",
-      method: "defer",
-      selectedKind: null,
+  const manifest = await runHarnessSession(
+    advertisementRunInput({
+      // `srd-check` has no coverage target in this matrix, so its menu rows are all unreachable.
+      readAdvertisements: () => ({
+        kinds: ["exact_srd_check.select"],
+        families: ["srd-check"],
+        labels: ["Investigate the runes"],
+        band: "confirm",
+        method: "defer",
+        selectedKind: null,
+      }),
     }),
-  }));
+  );
   assert.deepEqual(manifest.targetSwaps, [], "no reachable advertised cell, so the plan is kept");
-  assert.deepEqual(manifest.turns.map(turn => turn.target), [
-    { family: "combat-consumable", failureMode: "unsupported" },
-    { family: "rest", failureMode: "direct" },
-    { family: "travel", failureMode: "unadvertised" },
-  ]);
+  assert.deepEqual(
+    manifest.turns.map((turn) => turn.target),
+    [
+      { family: "combat-consumable", failureMode: "unsupported" },
+      { family: "rest", failureMode: "direct" },
+      { family: "travel", failureMode: "unadvertised" },
+    ],
+  );
   assert.equal(manifest.turns[1]?.plannedTarget, undefined);
   assert.equal(manifest.coverage.totals.advertisedTotal, 0);
   assert.equal(manifest.coverage.totals.actedTotal, 0, "a defer names no acted family");
@@ -1868,8 +2313,14 @@ test("advertisement-guided run keeps the planned cell when no advertised cell is
 test("renderManifestSummary includes the advertisement totals", async () => {
   const manifest = await runHarnessSession(advertisementRunInput());
   const summary = renderManifestSummary(manifest);
-  assert.ok(summary.some(line => line.includes("advertised: 2/3 (67%)")), summary.join("\n"));
-  assert.ok(summary.some(line => line.includes("acted: 2/3 (67%)")), summary.join("\n"));
+  assert.ok(
+    summary.some((line) => line.includes("advertised: 2/3 (67%)")),
+    summary.join("\n"),
+  );
+  assert.ok(
+    summary.some((line) => line.includes("acted: 2/3 (67%)")),
+    summary.join("\n"),
+  );
 });
 
 test("menu window defaults to 3 and clamps to the 1..10 range", async () => {
@@ -1901,11 +2352,12 @@ test("recent-menu union keeps earlier advertised families reachable for re-targe
   const runSeed = "menu-union";
   const planned = planRun({ runSeed, persona: PERSONAS.explorer, turns: 3, targets }).turns;
   assert.equal(planned.length, 3);
-  const plannedFamilies = new Set(planned.map(turn => turn.target.family));
+  const plannedFamilies = new Set(planned.map((turn) => turn.target.family));
   // A reachable family outside the plan, advertised on the first turn; the second turn advertises
   // an unreachable family, which alone would strand the third planned cell.
-  const advertised = MECHANIC_FAMILIES.find(family =>
-    family !== "progression" && family !== "commerce" && !plannedFamilies.has(family));
+  const advertised = MECHANIC_FAMILIES.find(
+    (family) => family !== "progression" && family !== "commerce" && !plannedFamilies.has(family),
+  );
   if (advertised === undefined) throw new Error("no family outside the plan is available for the recent-menu union");
   const unreachable = planned[2]?.target.family === "progression" ? "commerce" : "progression";
   const menuSnapshot = (family: MechanicFamily): TurnAdvertisementSnapshot => ({
@@ -1926,24 +2378,28 @@ test("recent-menu union keeps earlier advertised families reachable for re-targe
 
   const requests: GenerationRequest[] = [];
   const fake = createFakeGenerator();
-  const wide = await runHarnessSession(makeDryRunInput({
-    runSeed,
-    turns: 3,
-    targets,
-    menuWindow: 3,
-    readAdvertisements: makeReads(),
-    generateTurn: request => {
-      requests.push(request);
-      return fake(request);
-    },
-  }));
-  const narrow = await runHarnessSession(makeDryRunInput({
-    runSeed,
-    turns: 3,
-    targets,
-    menuWindow: 1,
-    readAdvertisements: makeReads(),
-  }));
+  const wide = await runHarnessSession(
+    makeDryRunInput({
+      runSeed,
+      turns: 3,
+      targets,
+      menuWindow: 3,
+      readAdvertisements: makeReads(),
+      generateTurn: (request) => {
+        requests.push(request);
+        return fake(request);
+      },
+    }),
+  );
+  const narrow = await runHarnessSession(
+    makeDryRunInput({
+      runSeed,
+      turns: 3,
+      targets,
+      menuWindow: 1,
+      readAdvertisements: makeReads(),
+    }),
+  );
 
   assert.equal(wide.menuWindow, 3);
   assert.deepEqual(wide.menuUnionFamilies, [advertised, unreachable], "oldest advertisement first, deduped");
@@ -1965,8 +2421,11 @@ test("recent-menu union keeps earlier advertised families reachable for re-targe
   // The generator still sees only the latest snapshot's labels, never the stale union.
   assert.deepEqual(requests[2]?.advertisedOptions, [`Menu option ${unreachable}`]);
   const wideSummary = renderManifestSummary(wide);
-  assert.ok(wideSummary.some(line => line.includes("menu window: last 3 advertised snapshots")), wideSummary.join("\n"));
-  assert.ok(!renderManifestSummary(narrow).some(line => line.includes("menu window:")), "window 1 adds no note");
+  assert.ok(
+    wideSummary.some((line) => line.includes("menu window: last 3 advertised snapshots")),
+    wideSummary.join("\n"),
+  );
+  assert.ok(!renderManifestSummary(narrow).some((line) => line.includes("menu window:")), "window 1 adds no note");
 });
 
 // -------------------------------------------------------------------------------------------------
@@ -2014,18 +2473,23 @@ test("focus forces the first plan turn onto the requested cell and records the s
 
   const requests: GenerationRequest[] = [];
   const fake = createFakeGenerator();
-  const manifest = await runHarnessSession(makeDryRunInput({
-    runSeed,
-    turns: 2,
-    targets,
-    focus: focusCell,
-    generateTurn: request => {
-      requests.push(request);
-      return fake(request);
-    },
-  }));
+  const manifest = await runHarnessSession(
+    makeDryRunInput({
+      runSeed,
+      turns: 2,
+      targets,
+      focus: focusCell,
+      generateTurn: (request) => {
+        requests.push(request);
+        return fake(request);
+      },
+    }),
+  );
 
-  assert.deepEqual(manifest.turns.map(turn => turn.target), [focusCell, untouchedSecond]);
+  assert.deepEqual(
+    manifest.turns.map((turn) => turn.target),
+    [focusCell, untouchedSecond],
+  );
   assert.equal(manifest.turns[0]?.toolKind, FAMILY_TOOL_KINDS["combat-consumable"]);
   assert.deepEqual(manifest.turns[0]?.plannedTarget, original, "the replaced cell is recorded on the turn");
   assert.equal(manifest.turns[1]?.plannedTarget, undefined, "only the first turn is forced");
@@ -2037,7 +2501,7 @@ test("focus forces the first plan turn onto the requested cell and records the s
   assert.equal(manifest.coverage.planned[original.family][original.failureMode], 0);
   assert.equal(manifest.coverage.planned[focusCell.family][focusCell.failureMode], 1);
   assert.equal(manifest.coverage.totals.planned, 2);
-  assert.ok(!manifest.notes.some(note => note.includes("already fully planned")));
+  assert.ok(!manifest.notes.some((note) => note.includes("already fully planned")));
 });
 
 test("focus still forces a fully planned cell and notes it", async () => {
@@ -2062,7 +2526,9 @@ test("focus still forces a fully planned cell and notes it", async () => {
   assert.deepEqual(manifest.turns[0]?.target, focusCell, "the requested cell wins even when its target is met");
   assert.equal(manifest.targetSwaps.length, 1);
   assert.ok(
-    manifest.notes.some(note => note.includes("focus combat-consumable/direct") && note.includes("already fully planned")),
+    manifest.notes.some(
+      (note) => note.includes("focus combat-consumable/direct") && note.includes("already fully planned"),
+    ),
     manifest.notes.join("\n"),
   );
 });
@@ -2073,7 +2539,10 @@ test("focus input rejects unknown family and failure-mode values", async () => {
     /focus\.family must be one of/,
   );
   await assert.rejects(
-    () => runHarnessSession(makeDryRunInput({ focus: { family: "travel", failureMode: "sometimes" } as unknown as CoverageCell })),
+    () =>
+      runHarnessSession(
+        makeDryRunInput({ focus: { family: "travel", failureMode: "sometimes" } as unknown as CoverageCell }),
+      ),
     /focus\.failureMode must be one of/,
   );
 });
@@ -2118,12 +2587,19 @@ test("declaration word counts and trigram sets handle empty, identical, and disj
 });
 
 test("computeHumanLikeness derives the pre-registered proxies from recorded declarations", () => {
-  const long = "I look at the ferry wreck near the old harbor light and I study the broken mast and the torn sail and the empty pier and the cold water before dark";
-  const nearLong = "I look at the ferry wreck near the old harbor light and I study the broken mast and the torn sail and the empty pier";
+  const long =
+    "I look at the ferry wreck near the old harbor light and I study the broken mast and the torn sail and the empty pier and the cold water before dark";
+  const nearLong =
+    "I look at the ferry wreck near the old harbor light and I study the broken mast and the torn sail and the empty pier";
   const report = computeHumanLikeness([
     humanLikenessTurn({ turnIndex: 0, declaration: "I go north", noiseApplied: ["typo"] }),
     humanLikenessTurn({ turnIndex: 1, declaration: "I go north" }),
-    humanLikenessTurn({ turnIndex: 2, declaration: "I ask about the boat and then I wait?", failureMode: "multi-family", ooc: "Can I still make it?" }),
+    humanLikenessTurn({
+      turnIndex: 2,
+      declaration: "I ask about the boat and then I wait?",
+      failureMode: "multi-family",
+      ooc: "Can I still make it?",
+    }),
     humanLikenessTurn({ turnIndex: 3, declaration: long, failureMode: "unadvertised", noiseApplied: ["lowercase"] }),
     humanLikenessTurn({ turnIndex: 4, declaration: nearLong, failureMode: "literal-edge" }),
   ]);
@@ -2227,9 +2703,12 @@ test("runs record the human-likeness report and print the near-duplicate share",
   assert.equal(manifest.humanLikeness.turns, 3);
   assert.equal(manifest.humanLikeness.turns, manifest.turns.length);
   const summary = renderManifestSummary(manifest);
-  const block = summary.filter(line => line.includes("human-likeness:") || line.includes("near-duplicate share"));
+  const block = summary.filter((line) => line.includes("human-likeness:") || line.includes("near-duplicate share"));
   assert.equal(block.length, 2, "the human-likeness block stays within three lines");
-  assert.ok(summary.some(line => line.includes("near-duplicate share")), summary.join("\n"));
+  assert.ok(
+    summary.some((line) => line.includes("near-duplicate share")),
+    summary.join("\n"),
+  );
 });
 
 test("renderManifestSummary prints repeated motifs only when present", async () => {
@@ -2244,12 +2723,12 @@ test("renderManifestSummary prints repeated motifs only when present", async () 
   };
   const withMotifs = renderManifestSummary({ ...manifest, humanLikeness: human });
   assert.ok(
-    withMotifs.some(line => line.includes('repeated motifs: "smoke on the water" x3, "waystone sword forms" x2')),
+    withMotifs.some((line) => line.includes('repeated motifs: "smoke on the water" x3, "waystone sword forms" x2')),
     withMotifs.join("\n"),
   );
   const clean = renderManifestSummary({
     ...manifest,
     humanLikeness: { ...human, topRepeatedPhrases: [], repeatedPhraseTurns: 0 },
   });
-  assert.ok(!clean.some(line => line.includes("repeated motifs")), "an empty phrase list prints no line");
+  assert.ok(!clean.some((line) => line.includes("repeated motifs")), "an empty phrase list prints no line");
 });

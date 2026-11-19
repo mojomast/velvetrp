@@ -38,7 +38,12 @@ function readHarness(db: DatabaseDriver.Database): HarnessSettings {
   if (!row) return defaultHarnessSettings();
   try {
     const parsed = JSON.parse(row.payload) as Partial<HarnessSettings>;
-    return { ...defaultHarnessSettings(), ...parsed, promptOverrides: { ...(parsed.promptOverrides ?? {}) }, id: "harness" };
+    return {
+      ...defaultHarnessSettings(),
+      ...parsed,
+      promptOverrides: { ...(parsed.promptOverrides ?? {}) },
+      id: "harness",
+    };
   } catch {
     return defaultHarnessSettings();
   }
@@ -58,19 +63,26 @@ export function updateHarnessSettingsSync(
   if (patch.systemPrompt !== undefined) next.systemPrompt = clampText(patch.systemPrompt, 64_000);
   if (patch.personaPreamble !== undefined) next.personaPreamble = clampText(patch.personaPreamble, 500);
   if (patch.styleGuide !== undefined) next.styleGuide = clampText(patch.styleGuide, 900);
-  if (patch.postHistoryInstructions !== undefined) next.postHistoryInstructions = clampText(patch.postHistoryInstructions, 700);
-  if (patch.recentTurns !== undefined && Number.isFinite(patch.recentTurns)) next.recentTurns = clampInt(patch.recentTurns, 4, 32);
-  if (patch.memoryChars !== undefined && Number.isFinite(patch.memoryChars)) next.memoryChars = clampInt(patch.memoryChars, 200, 3000);
-  if (patch.summaryChars !== undefined && Number.isFinite(patch.summaryChars)) next.summaryChars = clampInt(patch.summaryChars, 200, 2000);
-  if (patch.loreChars !== undefined && Number.isFinite(patch.loreChars)) next.loreChars = clampInt(patch.loreChars, 200, 2000);
+  if (patch.postHistoryInstructions !== undefined)
+    next.postHistoryInstructions = clampText(patch.postHistoryInstructions, 700);
+  if (patch.recentTurns !== undefined && Number.isFinite(patch.recentTurns))
+    next.recentTurns = clampInt(patch.recentTurns, 4, 32);
+  if (patch.memoryChars !== undefined && Number.isFinite(patch.memoryChars))
+    next.memoryChars = clampInt(patch.memoryChars, 200, 3000);
+  if (patch.summaryChars !== undefined && Number.isFinite(patch.summaryChars))
+    next.summaryChars = clampInt(patch.summaryChars, 200, 2000);
+  if (patch.loreChars !== undefined && Number.isFinite(patch.loreChars))
+    next.loreChars = clampInt(patch.loreChars, 200, 2000);
   if (patch.temperature === null) next.temperature = null;
   if (typeof patch.temperature === "number" && Number.isFinite(patch.temperature)) {
     next.temperature = Math.max(0, Math.min(2, patch.temperature));
   }
   if (patch.promptOverrides !== undefined) {
-    next.promptOverrides = Object.fromEntries(Object.entries(patch.promptOverrides)
-      .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-      .map(([id, template]) => [id, template.slice(0, 64_000)]));
+    next.promptOverrides = Object.fromEntries(
+      Object.entries(patch.promptOverrides)
+        .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+        .map(([id, template]) => [id, template.slice(0, 64_000)]),
+    );
   }
   next.updatedAt = clock.now().toISOString();
   db.prepare(
@@ -136,27 +148,42 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
   if (patch.appTitle !== undefined) next.appTitle = clampText(patch.appTitle, 120);
   if (patch.requireParameters !== undefined) next.requireParameters = patch.requireParameters;
   if (patch.allowFallbacks !== undefined) next.allowFallbacks = patch.allowFallbacks;
-  if (patch.routingSort !== undefined && ["default", "price", "throughput", "latency"].includes(patch.routingSort)) next.routingSort = patch.routingSort;
-  if (patch.dataCollection !== undefined && ["default", "allow", "deny"].includes(patch.dataCollection)) next.dataCollection = patch.dataCollection;
+  if (patch.routingSort !== undefined && ["default", "price", "throughput", "latency"].includes(patch.routingSort))
+    next.routingSort = patch.routingSort;
+  if (patch.dataCollection !== undefined && ["default", "allow", "deny"].includes(patch.dataCollection))
+    next.dataCollection = patch.dataCollection;
   if (patch.zdr !== undefined) next.zdr = patch.zdr;
-  if (patch.requestTimeoutSeconds !== undefined && Number.isFinite(patch.requestTimeoutSeconds)) next.requestTimeoutSeconds = clampInt(patch.requestTimeoutSeconds, 15, 300);
+  if (patch.requestTimeoutSeconds !== undefined && Number.isFinite(patch.requestTimeoutSeconds))
+    next.requestTimeoutSeconds = clampInt(patch.requestTimeoutSeconds, 15, 300);
   if (patch.pricing) {
     if (patch.pricing.promptPerMillion === null) next.pricing.promptPerMillion = null;
-    if (typeof patch.pricing.promptPerMillion === "number" && Number.isFinite(patch.pricing.promptPerMillion)) next.pricing.promptPerMillion = Math.max(0, Math.min(1_000_000, patch.pricing.promptPerMillion));
+    if (typeof patch.pricing.promptPerMillion === "number" && Number.isFinite(patch.pricing.promptPerMillion))
+      next.pricing.promptPerMillion = Math.max(0, Math.min(1_000_000, patch.pricing.promptPerMillion));
     if (patch.pricing.completionPerMillion === null) next.pricing.completionPerMillion = null;
-    if (typeof patch.pricing.completionPerMillion === "number" && Number.isFinite(patch.pricing.completionPerMillion)) next.pricing.completionPerMillion = Math.max(0, Math.min(1_000_000, patch.pricing.completionPerMillion));
+    if (typeof patch.pricing.completionPerMillion === "number" && Number.isFinite(patch.pricing.completionPerMillion))
+      next.pricing.completionPerMillion = Math.max(0, Math.min(1_000_000, patch.pricing.completionPerMillion));
   }
   if (patch.adventureTurnBudget) {
-    if (typeof patch.adventureTurnBudget.maxTotalTokens === "number" && Number.isFinite(patch.adventureTurnBudget.maxTotalTokens)) {
+    if (
+      typeof patch.adventureTurnBudget.maxTotalTokens === "number" &&
+      Number.isFinite(patch.adventureTurnBudget.maxTotalTokens)
+    ) {
       next.adventureTurnBudget.maxTotalTokens = clampInt(patch.adventureTurnBudget.maxTotalTokens, 1, 1_000_000_000);
     }
     if (patch.adventureTurnBudget.maxEstimatedCostUsd === null) next.adventureTurnBudget.maxEstimatedCostUsd = null;
-    if (typeof patch.adventureTurnBudget.maxEstimatedCostUsd === "number" && Number.isFinite(patch.adventureTurnBudget.maxEstimatedCostUsd)) {
-      next.adventureTurnBudget.maxEstimatedCostUsd = Math.max(0, Math.min(1_000_000, patch.adventureTurnBudget.maxEstimatedCostUsd));
+    if (
+      typeof patch.adventureTurnBudget.maxEstimatedCostUsd === "number" &&
+      Number.isFinite(patch.adventureTurnBudget.maxEstimatedCostUsd)
+    ) {
+      next.adventureTurnBudget.maxEstimatedCostUsd = Math.max(
+        0,
+        Math.min(1_000_000, patch.adventureTurnBudget.maxEstimatedCostUsd),
+      );
     }
   }
   if (patch.samplers) {
-    if (patch.samplers.maxTokens !== undefined) next.samplers.maxTokens = clampNullableInt(patch.samplers.maxTokens, 1, 32768);
+    if (patch.samplers.maxTokens !== undefined)
+      next.samplers.maxTokens = clampNullableInt(patch.samplers.maxTokens, 1, 32768);
     if (patch.samplers.topP !== undefined) next.samplers.topP = clampNullableNumber(patch.samplers.topP, 0, 1);
     if (patch.samplers.topK !== undefined) next.samplers.topK = clampNullableInt(patch.samplers.topK, 0, 500);
     if (patch.samplers.minP !== undefined) next.samplers.minP = clampNullableNumber(patch.samplers.minP, 0, 1);
@@ -168,7 +195,10 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
       next.samplers.presencePenalty = clampNullableNumber(patch.samplers.presencePenalty, -2, 2);
     if (patch.samplers.seed !== undefined)
       next.samplers.seed = clampNullableInt(patch.samplers.seed, -2147483648, 2147483647);
-    if (patch.samplers.reasoningEffort !== undefined && [null, "none", "high", "xhigh"].includes(patch.samplers.reasoningEffort))
+    if (
+      patch.samplers.reasoningEffort !== undefined &&
+      [null, "none", "high", "xhigh"].includes(patch.samplers.reasoningEffort)
+    )
       next.samplers.reasoningEffort = patch.samplers.reasoningEffort;
     if (patch.samplers.stopStrings !== undefined) {
       next.samplers.stopStrings = patch.samplers.stopStrings
@@ -176,7 +206,8 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
         .filter((stop) => stop.length > 0)
         .slice(0, 12);
     }
-    if (patch.samplers.startReplyWith !== undefined) next.samplers.startReplyWith = clampText(patch.samplers.startReplyWith, 200);
+    if (patch.samplers.startReplyWith !== undefined)
+      next.samplers.startReplyWith = clampText(patch.samplers.startReplyWith, 200);
   }
   next.updatedAt = now();
   db.prepare(
@@ -198,7 +229,8 @@ function migrateSystemOneLaneMode(value: unknown, legacyShadow: unknown): System
 }
 
 export function readSystemOne(db: DatabaseDriver.Database): SystemOneSettings {
-  const row = db.prepare("SELECT payload FROM provider WHERE id = 'system-one'").get() as { payload: string } | undefined;
+  const row = db.prepare("SELECT payload FROM provider WHERE id = 'system-one'").get() as
+    { payload: string } | undefined;
   const defaults = defaultSystemOneSettings();
   if (!row) return defaults;
   try {
@@ -214,20 +246,23 @@ export function readSystemOne(db: DatabaseDriver.Database): SystemOneSettings {
       shadowAdventurePayload: isSystemOneAdventurePayloadVariant(parsed.shadowAdventurePayload)
         ? parsed.shadowAdventurePayload
         : defaults.shadowAdventurePayload,
-      laneModes: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
-        lane,
-        migrateSystemOneLaneMode(parsed.laneModes?.[lane], legacyShadow),
-      ])) as SystemOneSettings["laneModes"],
+      laneModes: Object.fromEntries(
+        SYSTEM_ONE_LANES.map((lane) => [lane, migrateSystemOneLaneMode(parsed.laneModes?.[lane], legacyShadow)]),
+      ) as SystemOneSettings["laneModes"],
       pricing: { ...defaults.pricing, ...(parsed.pricing ?? {}) },
       budget: { ...defaults.budget, ...(parsed.budget ?? {}) },
-      confidencePolicy: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
-        lane,
-        { ...defaults.confidencePolicy[lane], ...(parsed.confidencePolicy?.[lane] ?? {}) },
-      ])) as SystemOneSettings["confidencePolicy"],
-      confidenceCalibration: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
-        lane,
-        { ...defaults.confidenceCalibration[lane], ...(parsed.confidenceCalibration?.[lane] ?? {}) },
-      ])) as SystemOneSettings["confidenceCalibration"],
+      confidencePolicy: Object.fromEntries(
+        SYSTEM_ONE_LANES.map((lane) => [
+          lane,
+          { ...defaults.confidencePolicy[lane], ...(parsed.confidencePolicy?.[lane] ?? {}) },
+        ]),
+      ) as SystemOneSettings["confidencePolicy"],
+      confidenceCalibration: Object.fromEntries(
+        SYSTEM_ONE_LANES.map((lane) => [
+          lane,
+          { ...defaults.confidenceCalibration[lane], ...(parsed.confidenceCalibration?.[lane] ?? {}) },
+        ]),
+      ) as SystemOneSettings["confidenceCalibration"],
     };
   } catch {
     return defaults;
@@ -249,21 +284,27 @@ export async function updateSystemOneSettings(patch: UpdateSystemOneInput): Prom
     ...current,
     pricing: { ...current.pricing, ...(patch.pricing ?? {}) },
     budget: { ...current.budget, ...(patch.budget ?? {}) },
-    confidencePolicy: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
-      lane,
-      { ...current.confidencePolicy[lane], ...(patch.confidencePolicy?.[lane] ?? {}) },
-    ])) as SystemOneSettings["confidencePolicy"],
-    confidenceCalibration: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
-      lane,
-      { ...current.confidenceCalibration[lane], ...(patch.confidenceCalibration?.[lane] ?? {}) },
-    ])) as SystemOneSettings["confidenceCalibration"],
+    confidencePolicy: Object.fromEntries(
+      SYSTEM_ONE_LANES.map((lane) => [
+        lane,
+        { ...current.confidencePolicy[lane], ...(patch.confidencePolicy?.[lane] ?? {}) },
+      ]),
+    ) as SystemOneSettings["confidencePolicy"],
+    confidenceCalibration: Object.fromEntries(
+      SYSTEM_ONE_LANES.map((lane) => [
+        lane,
+        { ...current.confidenceCalibration[lane], ...(patch.confidenceCalibration?.[lane] ?? {}) },
+      ]),
+    ) as SystemOneSettings["confidenceCalibration"],
   };
   if (patch.enabled !== undefined) next.enabled = patch.enabled;
   if (patch.laneModes) {
-    next.laneModes = Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => {
-      const requested = patch.laneModes?.[lane];
-      return [lane, isSystemOneLaneMode(requested) ? requested : next.laneModes[lane]];
-    })) as SystemOneSettings["laneModes"];
+    next.laneModes = Object.fromEntries(
+      SYSTEM_ONE_LANES.map((lane) => {
+        const requested = patch.laneModes?.[lane];
+        return [lane, isSystemOneLaneMode(requested) ? requested : next.laneModes[lane]];
+      }),
+    ) as SystemOneSettings["laneModes"];
   }
   if (patch.shadowAdventurePayload !== undefined) {
     next.shadowAdventurePayload = isSystemOneAdventurePayloadVariant(patch.shadowAdventurePayload)
@@ -302,20 +343,24 @@ export async function updateSystemOneSettings(patch: UpdateSystemOneInput): Prom
     }
   }
   if (patch.confidencePolicy) {
-    next.confidencePolicy = Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => {
-      const thresholds = next.confidencePolicy[lane];
-      const action = clampNullableNumber(thresholds.actionThreshold, 0, 1) ?? 0;
-      const review = clampNullableNumber(thresholds.reviewThreshold, 0, 1) ?? 0;
-      return [lane, { actionThreshold: action, reviewThreshold: Math.min(review, action) }];
-    })) as SystemOneSettings["confidencePolicy"];
+    next.confidencePolicy = Object.fromEntries(
+      SYSTEM_ONE_LANES.map((lane) => {
+        const thresholds = next.confidencePolicy[lane];
+        const action = clampNullableNumber(thresholds.actionThreshold, 0, 1) ?? 0;
+        const review = clampNullableNumber(thresholds.reviewThreshold, 0, 1) ?? 0;
+        return [lane, { actionThreshold: action, reviewThreshold: Math.min(review, action) }];
+      }),
+    ) as SystemOneSettings["confidencePolicy"];
   }
   if (patch.confidenceCalibration) {
-    next.confidenceCalibration = Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => {
-      const calibration = next.confidenceCalibration[lane];
-      const a = clampNullableNumber(calibration.a, 0, 1_000) ?? 1;
-      const b = clampNullableNumber(calibration.b, -1_000, 1_000) ?? 0;
-      return [lane, { a, b }];
-    })) as SystemOneSettings["confidenceCalibration"];
+    next.confidenceCalibration = Object.fromEntries(
+      SYSTEM_ONE_LANES.map((lane) => {
+        const calibration = next.confidenceCalibration[lane];
+        const a = clampNullableNumber(calibration.a, 0, 1_000) ?? 1;
+        const b = clampNullableNumber(calibration.b, -1_000, 1_000) ?? 0;
+        return [lane, { a, b }];
+      }),
+    ) as SystemOneSettings["confidenceCalibration"];
   }
   next.updatedAt = now();
   db.prepare(

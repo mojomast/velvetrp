@@ -92,7 +92,9 @@ describe("scene prompt builder", () => {
     expect(filterSceneFacts(richFacts, "player")).toHaveLength(1);
     expect(filterSceneFacts(richFacts, "dm")).toHaveLength(2);
     expect(filterSceneFacts([{ label: "unknown", visibility: "later" as SceneFactVisibility }], "dm")).toHaveLength(0);
-    expect(filterSceneFacts(richFacts, "dm").map((fact) => fact.label)).not.toContain("a secret door behind the mill wheel hides unrevealed treasure");
+    expect(filterSceneFacts(richFacts, "dm").map((fact) => fact.label)).not.toContain(
+      "a secret door behind the mill wheel hides unrevealed treasure",
+    );
   });
 
   it("hits the word target with a compact scene and enforces the hard character cap", () => {
@@ -135,22 +137,31 @@ describe("scene batch planning", () => {
     expect(seeds.filter((seed) => seed === 100)).toHaveLength(4);
     expect(plan.variants[0]).toEqual({ index: 0, seed: 100, steps: 10, guidance: 1 });
     expect(plan.variants[7]).toEqual({ index: 7, seed: 101, steps: 20, guidance: 3 });
-    expect(new Set(plan.variants.map((variant) => `${variant.seed}:${variant.steps}:${variant.guidance}`)).size).toBe(8);
+    expect(new Set(plan.variants.map((variant) => `${variant.seed}:${variant.steps}:${variant.guidance}`)).size).toBe(
+      8,
+    );
     const defaulted = planSceneBatch({ count: 1, steps: [20], guidance: [3] });
     expect(defaulted.seeds).toEqual([0]);
   });
 
   it("rejects oversized, over-wide, and out-of-bounds plans", () => {
-    expect(() => planSceneBatch({ count: 3, steps: [10, 20, 30, 40, 50, 60, 70, 80], guidance: [1, 3, 5, 6, 7, 8] }))
-      .toThrow(/exceeds the 128 image limit/);
+    expect(() =>
+      planSceneBatch({ count: 3, steps: [10, 20, 30, 40, 50, 60, 70, 80], guidance: [1, 3, 5, 6, 7, 8] }),
+    ).toThrow(/exceeds the 128 image limit/);
     expect(() => planSceneBatch({ count: 33, steps: [20], guidance: [3] })).toThrow(/count/);
-    expect(() => planSceneBatch({ count: 1, steps: Array.from({ length: 9 }, () => 20), guidance: [3] })).toThrow(/at most 8/);
+    expect(() => planSceneBatch({ count: 1, steps: Array.from({ length: 9 }, () => 20), guidance: [3] })).toThrow(
+      /at most 8/,
+    );
     expect(() => planSceneBatch({ count: 1, steps: [5], guidance: [3] })).toThrow(/steps values must be between/);
     expect(() => planSceneBatch({ count: 1, steps: [20.5], guidance: [3] })).toThrow(/steps values must be integers/);
     expect(() => planSceneBatch({ count: 1, steps: [20], guidance: [99] })).toThrow(/guidance values must be between/);
     expect(() => planSceneBatch({ count: 1, steps: [20], guidance: [3], baseSeed: -1 })).toThrow(/baseSeed/);
-    expect(planSceneBatch({ count: 2, steps: [10, 20, 30, 40, 50, 60, 70, 100], guidance: [1, 3, 5, 6, 7, 8] }).total).toBe(96);
-    expect(planSceneBatch({ count: 2, steps: [10, 20, 30, 40, 50, 60, 70, 100], guidance: [1, 2, 3, 4, 5, 6, 7, 8] }).total).toBe(128);
+    expect(
+      planSceneBatch({ count: 2, steps: [10, 20, 30, 40, 50, 60, 70, 100], guidance: [1, 3, 5, 6, 7, 8] }).total,
+    ).toBe(96);
+    expect(
+      planSceneBatch({ count: 2, steps: [10, 20, 30, 40, 50, 60, 70, 100], guidance: [1, 2, 3, 4, 5, 6, 7, 8] }).total,
+    ).toBe(128);
   });
 
   it("keeps automatic mode at one image and asks before larger grids", () => {
@@ -197,14 +208,22 @@ describe("scene image settings", () => {
   });
 
   it("clones and merges without aliasing nested overrides", () => {
-    const base = parseSceneImageSettings({ enabled: true, mode: "manual", promptOverrides: { "scene.prompt": "keep" }, steps: 20 });
+    const base = parseSceneImageSettings({
+      enabled: true,
+      mode: "manual",
+      promptOverrides: { "scene.prompt": "keep" },
+      steps: 20,
+    });
     const clone = cloneSceneImageSettings(base);
     expect(clone).toEqual(base);
     expect(clone.promptOverrides).not.toBe(base.promptOverrides);
     const clonedOverrides = clone.promptOverrides as Record<string, string>;
     clonedOverrides["scene.prompt"] = "changed";
     expect(base.promptOverrides["scene.prompt"]).toBe("keep");
-    const merged = mergeSceneImageSettings(base, { enabled: false, promptOverrides: { "scene.style": "added", "scene.prompt": "replaced" } });
+    const merged = mergeSceneImageSettings(base, {
+      enabled: false,
+      promptOverrides: { "scene.style": "added", "scene.prompt": "replaced" },
+    });
     expect(merged.enabled).toBe(false);
     expect(merged.mode).toBe("manual");
     expect(merged.promptOverrides).toEqual({ "scene.prompt": "replaced", "scene.style": "added" });
@@ -220,7 +239,12 @@ describe("scene image settings", () => {
     expect(SCENE_PROMPT_PRESETS.reference.steps).toBe(50);
     expect(SCENE_IMAGE_PRESETS.experimentalGuidance1.description).toMatch(/weaker/);
     const base = parseSceneImageSettings({ enabled: true, mode: "manual" });
-    expect(applySceneImagePreset(base, "reference")).toMatchObject({ steps: 50, guidance: 3, enabled: true, mode: "manual" });
+    expect(applySceneImagePreset(base, "reference")).toMatchObject({
+      steps: 50,
+      guidance: 3,
+      enabled: true,
+      mode: "manual",
+    });
     expect(applySceneImagePreset(base, "experimentalGuidance1")).toMatchObject({ steps: 20, guidance: 1 });
     expect(() => applySceneImagePreset(base, "turbo")).toThrow(/Unknown scene-image preset/);
   });
@@ -229,9 +253,19 @@ describe("scene image settings", () => {
     const base = sceneImageCacheKey({ prompt: "a ruined mill", seed: 7, steps: 20, guidance: 3 });
     expect(sceneImageCacheKey({ prompt: "a ruined mill", seed: 7, steps: 20, guidance: 3 })).toBe(base);
     expect(sceneImageCacheKey({ prompt: "a ruined mill ", seed: 7, steps: 20, guidance: 3 })).toBe(base);
-    expect(sceneImageCacheKey({ prompt: "a ruined mill", seed: 7, steps: 20, guidance: 3, modelVersion: null })).toBe(base);
-    expect(sceneImageCacheKey({ prompt: "a ruined mill", seed: 7, steps: 20, guidance: 3, modelVersion: "" })).toBe(base);
-    const versioned = sceneImageCacheKey({ prompt: "a ruined mill", seed: 7, steps: 20, guidance: 3, modelVersion: "supra2-img-v3" });
+    expect(sceneImageCacheKey({ prompt: "a ruined mill", seed: 7, steps: 20, guidance: 3, modelVersion: null })).toBe(
+      base,
+    );
+    expect(sceneImageCacheKey({ prompt: "a ruined mill", seed: 7, steps: 20, guidance: 3, modelVersion: "" })).toBe(
+      base,
+    );
+    const versioned = sceneImageCacheKey({
+      prompt: "a ruined mill",
+      seed: 7,
+      steps: 20,
+      guidance: 3,
+      modelVersion: "supra2-img-v3",
+    });
     expect(versioned).not.toBe(base);
     expect(versioned).toMatch(/^scene-image:[0-9a-f]{48}$/);
     expect(sceneImageCacheKey({ prompt: "a ruined mill", seed: 8, steps: 20, guidance: 3 })).not.toBe(base);
@@ -244,26 +278,66 @@ describe("scene image settings", () => {
 
 describe("scene image automatic limits", () => {
   const now = new Date("2030-01-01T12:00:00.000Z");
-  const automatic: SceneImageSettings = parseSceneImageSettings({ enabled: true, mode: "automatic", autoPerSessionLimit: 2, cooldownSeconds: 60 });
+  const automatic: SceneImageSettings = parseSceneImageSettings({
+    enabled: true,
+    mode: "automatic",
+    autoPerSessionLimit: 2,
+    cooldownSeconds: 60,
+  });
 
   it("allows unattended images only inside the per-session limit and cooldown", () => {
-    expect(withinAutoLimits({ imagesThisSession: 0, lastGeneratedAt: null }, automatic, now))
-      .toMatchObject({ allowed: true, reason: "allowed", remaining: 2, cooldownEndsAt: null });
-    expect(withinAutoLimits({ imagesThisSession: 2, lastGeneratedAt: null }, automatic, now))
-      .toMatchObject({ allowed: false, reason: "session-limit", remaining: 0 });
-    const cooling = withinAutoLimits({ imagesThisSession: 1, lastGeneratedAt: "2030-01-01T11:59:30.000Z" }, automatic, now);
-    expect(cooling).toMatchObject({ allowed: false, reason: "cooldown", remaining: 1, cooldownEndsAt: "2030-01-01T12:00:30.000Z" });
-    const warmed = withinAutoLimits({ imagesThisSession: 1, lastGeneratedAt: "2030-01-01T11:58:00.000Z" }, automatic, now);
+    expect(withinAutoLimits({ imagesThisSession: 0, lastGeneratedAt: null }, automatic, now)).toMatchObject({
+      allowed: true,
+      reason: "allowed",
+      remaining: 2,
+      cooldownEndsAt: null,
+    });
+    expect(withinAutoLimits({ imagesThisSession: 2, lastGeneratedAt: null }, automatic, now)).toMatchObject({
+      allowed: false,
+      reason: "session-limit",
+      remaining: 0,
+    });
+    const cooling = withinAutoLimits(
+      { imagesThisSession: 1, lastGeneratedAt: "2030-01-01T11:59:30.000Z" },
+      automatic,
+      now,
+    );
+    expect(cooling).toMatchObject({
+      allowed: false,
+      reason: "cooldown",
+      remaining: 1,
+      cooldownEndsAt: "2030-01-01T12:00:30.000Z",
+    });
+    const warmed = withinAutoLimits(
+      { imagesThisSession: 1, lastGeneratedAt: "2030-01-01T11:58:00.000Z" },
+      automatic,
+      now,
+    );
     expect(warmed).toMatchObject({ allowed: true, reason: "allowed", remaining: 1 });
   });
 
   it("keeps the automatic path closed when disabled, manual, or limited to zero", () => {
-    expect(withinAutoLimits({ imagesThisSession: 0, lastGeneratedAt: null }, parseSceneImageSettings({ enabled: false, mode: "automatic" }), now).reason)
-      .toBe("disabled");
-    expect(withinAutoLimits({ imagesThisSession: 0, lastGeneratedAt: null }, parseSceneImageSettings({ enabled: true, mode: "manual" }), now).reason)
-      .toBe("manual");
-    expect(withinAutoLimits({ imagesThisSession: 0, lastGeneratedAt: null }, parseSceneImageSettings({ enabled: true, mode: "automatic", autoPerSessionLimit: 0 }), now).reason)
-      .toBe("session-limit");
+    expect(
+      withinAutoLimits(
+        { imagesThisSession: 0, lastGeneratedAt: null },
+        parseSceneImageSettings({ enabled: false, mode: "automatic" }),
+        now,
+      ).reason,
+    ).toBe("disabled");
+    expect(
+      withinAutoLimits(
+        { imagesThisSession: 0, lastGeneratedAt: null },
+        parseSceneImageSettings({ enabled: true, mode: "manual" }),
+        now,
+      ).reason,
+    ).toBe("manual");
+    expect(
+      withinAutoLimits(
+        { imagesThisSession: 0, lastGeneratedAt: null },
+        parseSceneImageSettings({ enabled: true, mode: "automatic", autoPerSessionLimit: 0 }),
+        now,
+      ).reason,
+    ).toBe("session-limit");
   });
 
   it("computes cooldown ends purely from the injected state", () => {

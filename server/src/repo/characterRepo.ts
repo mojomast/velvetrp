@@ -20,20 +20,35 @@ interface CharacterRow {
 interface CharacterProfileRow extends PersonaProfile {}
 
 function profileFor(db: DatabaseDriver.Database, characterId: string): PersonaProfile {
-  const row = db.prepare(`SELECT goal, ideal, bond, flaw, history, personality, fears, relationships, appearance, voice
-    FROM character_profiles WHERE character_id = ?`).get(characterId) as CharacterProfileRow | undefined;
+  const row = db
+    .prepare(
+      `SELECT goal, ideal, bond, flaw, history, personality, fears, relationships, appearance, voice
+    FROM character_profiles WHERE character_id = ?`,
+    )
+    .get(characterId) as CharacterProfileRow | undefined;
   return row ? personaProfileSchema.parse(row) : emptyPersonaProfile();
 }
 
 function writeProfile(db: DatabaseDriver.Database, characterId: string, profile: PersonaProfile): void {
-  db.prepare(`INSERT INTO character_profiles
+  db.prepare(
+    `INSERT INTO character_profiles
     (character_id, goal, ideal, bond, flaw, history, personality, fears, relationships, appearance, voice)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(character_id) DO UPDATE SET goal=excluded.goal, ideal=excluded.ideal, bond=excluded.bond,
       flaw=excluded.flaw, history=excluded.history, personality=excluded.personality, fears=excluded.fears,
-      relationships=excluded.relationships, appearance=excluded.appearance, voice=excluded.voice`).run(
-    characterId, profile.goal, profile.ideal, profile.bond, profile.flaw, profile.history,
-    profile.personality, profile.fears, profile.relationships, profile.appearance, profile.voice,
+      relationships=excluded.relationships, appearance=excluded.appearance, voice=excluded.voice`,
+  ).run(
+    characterId,
+    profile.goal,
+    profile.ideal,
+    profile.bond,
+    profile.flaw,
+    profile.history,
+    profile.personality,
+    profile.fears,
+    profile.relationships,
+    profile.appearance,
+    profile.voice,
   );
 }
 
@@ -95,8 +110,7 @@ export async function listCharacters(): Promise<Character[]> {
 
 export async function getCharacter(id: string): Promise<Character | null> {
   const row = getRepositoryDatabase().prepare("SELECT * FROM characters WHERE id = ?").get(id) as
-    | CharacterRow
-    | undefined;
+    CharacterRow | undefined;
   return row ? characterFromRow(row) : null;
 }
 
@@ -109,10 +123,10 @@ export async function updateCharacter(id: string, input: CreateCharacterInput): 
   const profile = personaProfileSchema.parse(input.profile ?? {});
   const exists = db.prepare("SELECT id FROM characters WHERE id = ?").get(id);
   if (!exists) return null;
-  db.prepare(`UPDATE characters SET name = ?, age = ?, archetype = ?, boundaries = ?,
-    fictional_confirmed = ?, is_real_person = 0 WHERE id = ?`).run(
-    input.name, input.age, input.archetype, input.boundaries, input.fictionalConfirmed ? 1 : 0, id,
-  );
+  db.prepare(
+    `UPDATE characters SET name = ?, age = ?, archetype = ?, boundaries = ?,
+    fictional_confirmed = ?, is_real_person = 0 WHERE id = ?`,
+  ).run(input.name, input.age, input.archetype, input.boundaries, input.fictionalConfirmed ? 1 : 0, id);
   writeProfile(db, id, profile);
   return getCharacter(id);
 }
@@ -122,10 +136,14 @@ export async function deleteCharacter(id: string): Promise<"deleted" | "in-use" 
   const db = getRepositoryDatabase();
   const run = db.transaction(() => {
     if (!db.prepare("SELECT id FROM characters WHERE id = ?").get(id)) return "not-found" as const;
-    const used = db.prepare(`SELECT 1 FROM sessions WHERE character_id = ?
+    const used = db
+      .prepare(
+        `SELECT 1 FROM sessions WHERE character_id = ?
       UNION ALL SELECT 1 FROM session_characters WHERE character_id = ?
       UNION ALL SELECT 1 FROM campaign_characters WHERE character_id = ?
-      UNION ALL SELECT 1 FROM character_drafts_v19 WHERE persona_id = ? LIMIT 1`).get(id, id, id, id);
+      UNION ALL SELECT 1 FROM character_drafts_v19 WHERE persona_id = ? LIMIT 1`,
+      )
+      .get(id, id, id, id);
     if (used) return "in-use" as const;
 
     repairLoreForCharacterDeletionSync(db, id);

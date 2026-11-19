@@ -45,11 +45,19 @@ test("corpus covers every handler and forces safety and human-decision cases to 
   }
   const ids = new Set(ROUTER_CORPUS.map((testCase) => testCase.id));
   assert.equal(ids.size, ROUTER_CORPUS.length, "case ids must be unique");
-  const safety = ROUTER_CORPUS.filter((testCase) => testCase.request.safetySensitive || testCase.request.requiresHumanDecision);
+  const safety = ROUTER_CORPUS.filter(
+    (testCase) => testCase.request.safetySensitive || testCase.request.requiresHumanDecision,
+  );
   assert.ok(safety.length >= 2, "expected safety-sensitive and human-decision cases");
   assert.ok(safety.every((testCase) => testCase.expectedHandler === "human-review"));
-  assert.ok(ROUTER_CORPUS.some((testCase) => testCase.holdout), "expected at least one holdout case");
-  assert.ok(ROUTER_CORPUS.some((testCase) => !testCase.holdout), "expected development cases");
+  assert.ok(
+    ROUTER_CORPUS.some((testCase) => testCase.holdout),
+    "expected at least one holdout case",
+  );
+  assert.ok(
+    ROUTER_CORPUS.some((testCase) => !testCase.holdout),
+    "expected development cases",
+  );
 });
 
 test("grades the safety gate and the deterministic-first rule", () => {
@@ -90,7 +98,12 @@ test("grades the safety gate and the deterministic-first rule", () => {
 });
 
 test("grades confident cheaper moves, deferrals, and the no-upgrade rule", () => {
-  const request = { summary: "route", hasDeterministicPath: false, requiresHumanDecision: false, safetySensitive: false };
+  const request = {
+    summary: "route",
+    hasDeterministicPath: false,
+    requiresHumanDecision: false,
+    safetySensitive: false,
+  };
   const cheap = gradeRouterCase(
     { id: "c", holdout: false, expectedHandler: "cheap-generation" },
     request,
@@ -158,7 +171,12 @@ test("fits on development and improves calibration out of sample", () => {
 });
 
 test("proposes a record only for a passing gate", () => {
-  const passing: SystemOnePromotionResult = { lane: "cost-router", promoted: true, reasons: [], gates: { minSamples: 30, minAccuracy: 0.95, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 } };
+  const passing: SystemOnePromotionResult = {
+    lane: "cost-router",
+    promoted: true,
+    reasons: [],
+    gates: { minSamples: 30, minAccuracy: 0.95, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
+  };
   const failing: SystemOnePromotionResult = { ...passing, promoted: false, reasons: ["x"] };
   const metrics = { samples: 30, accuracy: 1, brier: 0, expectedCalibrationError: 0 };
   assert.equal(proposeRecord(failing, metrics, { a: 1, b: 0 }, "2026-09-17"), null);
@@ -172,7 +190,10 @@ test("proposes a record only for a passing gate", () => {
 
 test("parses repeat and out flags with safe defaults", () => {
   assert.deepEqual(parseRouterArgs([]), { repeats: 3, out: "docs/system-one-router-benchmark.md" });
-  assert.deepEqual(parseRouterArgs(["--repeat", "5", "--out", "docs/custom.md"]), { repeats: 5, out: "docs/custom.md" });
+  assert.deepEqual(parseRouterArgs(["--repeat", "5", "--out", "docs/custom.md"]), {
+    repeats: 5,
+    out: "docs/custom.md",
+  });
   assert.deepEqual(parseRouterArgs(["--repeat=2"]), { repeats: 2, out: "docs/system-one-router-benchmark.md" });
   assert.equal(parseRouterArgs(["--repeat", "0"]).repeats, 1);
   assert.equal(parseRouterArgs(["--repeat", "999"]).repeats, 25);

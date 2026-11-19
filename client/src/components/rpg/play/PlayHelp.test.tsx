@@ -8,7 +8,19 @@ describe("PlayHelp", () => {
     render(<PlayHelp />);
     expect(screen.getAllByRole("article")).toHaveLength(18);
     expect(screen.getByRole("heading", { name: "Start here: your next move" })).toBeTruthy();
-    for (const name of ["Local movement: preview, then confirm", "World travel is not a local move", "Dice at the table", "Character, inventory, and powers", "NPCs, quests, and the field journal", "Combat and legal actions", "Rest and recovery", "Rewards and receipts", "Permissions and unavailable controls", "Interrupted or uncertain operations", "What the adventure agents can and cannot do"]) {
+    for (const name of [
+      "Local movement: preview, then confirm",
+      "World travel is not a local move",
+      "Dice at the table",
+      "Character, inventory, and powers",
+      "NPCs, quests, and the field journal",
+      "Combat and legal actions",
+      "Rest and recovery",
+      "Rewards and receipts",
+      "Permissions and unavailable controls",
+      "Interrupted or uncertain operations",
+      "What the adventure agents can and cannot do",
+    ]) {
       expect(screen.getByRole("heading", { name })).toBeTruthy();
     }
     expect(screen.getByText(/no client-side autonomous GM/)).toBeTruthy();

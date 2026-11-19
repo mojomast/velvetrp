@@ -81,15 +81,27 @@ test("renders a deterministic promotion section with not-recorded lanes", () => 
     assert.match(first, new RegExp(`^### ${lane}$`, "m"));
   }
 
-  assert.match(first, /^\| speaker-routing \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-benchmark\.md \| pass \|$/m);
+  assert.match(
+    first,
+    /^\| speaker-routing \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-benchmark\.md \| pass \|$/m,
+  );
   assert.match(first, /^### speaker-routing$/m);
   assert.match(first, /- Metrics: samples=90, accuracy=1\.0000, brier=0\.0000, ece=0\.0033/);
   assert.match(first, /- Calibration: a=2\.5732, b=1\.3973/);
   assert.match(first, /- Gate: pass/);
   assert.match(first, /- Active binding: missing \(historical record cannot authorize active decisions\)/);
-  assert.match(first, /^\| cost-router \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-router-benchmark\.md \| pass \|$/m);
-  assert.match(first, /^\| narration-verification \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-narration-benchmark\.md \| pass \|$/m);
-  assert.match(first, /^\| director-selection \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-director-calibration\.md \| pass \|$/m);
+  assert.match(
+    first,
+    /^\| cost-router \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-router-benchmark\.md \| pass \|$/m,
+  );
+  assert.match(
+    first,
+    /^\| narration-verification \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-narration-benchmark\.md \| pass \|$/m,
+  );
+  assert.match(
+    first,
+    /^\| director-selection \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-director-calibration\.md \| pass \|$/m,
+  );
 
   // Every lane is recorded today, so exercise the not-recorded rendering with a synthetic status.
   const unrecorded = buildPromotionSection([
@@ -108,7 +120,10 @@ test("renders a recorded-but-failing lane as unpromoted with its reasons", () =>
       gate: { ...speaker.gate!, promoted: false, reasons: ["synthetic gate failure"] },
     },
   ]);
-  assert.match(rendered, /^\| speaker-routing \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-benchmark\.md \| fail \|$/m);
+  assert.match(
+    rendered,
+    /^\| speaker-routing \| no \(unbound\) \| 2026-09-17 \| docs\/system-one-benchmark\.md \| fail \|$/m,
+  );
   assert.match(rendered, /- Gate: fail/);
   assert.match(rendered, /  - synthetic gate failure/);
 });

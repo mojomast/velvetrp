@@ -55,14 +55,14 @@ export const DEFAULT_ANNOTATIONS_PATH = path.join(tmpdir(), "velvet-adventure-re
 export const MAX_REVIEW_LIMIT = 1_000;
 
 export const USAGE =
-  "usage: review-adventure-cases.ts --packet [--limit N] [--out <file.md>]\n"
-  + "       review-adventure-cases.ts --apply <annotations.json> [--write-fixture]\n"
-  + "\n"
-  + "--packet renders a markdown review packet plus a sibling annotations JSON skeleton\n"
-  + `--apply validates human verdicts and promotes "correct" cases to provenance review-annotated\n`
-  + `--limit caps the packet at N cases (default: all; max ${MAX_REVIEW_LIMIT})\n`
-  + "--write-fixture rewrites server/test/fixtures/system-one-harvested"
-  + `/${REVIEW_FIXTURE_FILENAME} in place (requires --apply)\n`;
+  "usage: review-adventure-cases.ts --packet [--limit N] [--out <file.md>]\n" +
+  "       review-adventure-cases.ts --apply <annotations.json> [--write-fixture]\n" +
+  "\n" +
+  "--packet renders a markdown review packet plus a sibling annotations JSON skeleton\n" +
+  `--apply validates human verdicts and promotes "correct" cases to provenance review-annotated\n` +
+  `--limit caps the packet at N cases (default: all; max ${MAX_REVIEW_LIMIT})\n` +
+  "--write-fixture rewrites server/test/fixtures/system-one-harvested" +
+  `/${REVIEW_FIXTURE_FILENAME} in place (requires --apply)\n`;
 
 /** Absolute path of the harvested adventure-selection fixture; absent until a harvest run writes one. */
 export function reviewFixturePath(repoRoot: string = REPO_ROOT): string {
@@ -115,17 +115,17 @@ export function parseReviewCaseArgs(argv: readonly string[]): ReviewCaseOptions 
     if (arg === "--packet") {
       packetRequested = true;
     } else if (arg === "--apply" || arg.startsWith("--apply=")) {
-      const value = arg === "--apply" ? argv[index += 1] : arg.slice("--apply=".length);
+      const value = arg === "--apply" ? argv[(index += 1)] : arg.slice("--apply=".length);
       if (!value || value.trim() === "") throw new Error("--apply requires an annotations path");
       applyPath = path.resolve(value);
       applyRequested = true;
     } else if (arg === "--limit" || arg.startsWith("--limit=")) {
-      const raw = arg === "--limit" ? argv[index += 1] : arg.slice("--limit=".length);
+      const raw = arg === "--limit" ? argv[(index += 1)] : arg.slice("--limit=".length);
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) throw new Error(`--limit requires a number, received ${raw ?? "nothing"}`);
       limit = Math.max(1, Math.min(MAX_REVIEW_LIMIT, Math.trunc(parsed)));
     } else if (arg === "--out" || arg.startsWith("--out=")) {
-      const value = arg === "--out" ? argv[index += 1] : arg.slice("--out=".length);
+      const value = arg === "--out" ? argv[(index += 1)] : arg.slice("--out=".length);
       if (!value || value.trim() === "") throw new Error("--out requires a path");
       out = path.resolve(value);
     } else if (arg === "--write-fixture") {
@@ -181,7 +181,9 @@ export function parseReviewFixtureDocument(document: unknown): ReviewFixtureDocu
       throw new Error(`review fixture proposal ${index} is missing a proposalId`);
     }
     if (proposal.lane !== REVIEW_LANE) {
-      throw new Error(`review fixture proposal ${proposal.proposalId} lane is ${String(proposal.lane)}, expected ${REVIEW_LANE}`);
+      throw new Error(
+        `review fixture proposal ${proposal.proposalId} lane is ${String(proposal.lane)}, expected ${REVIEW_LANE}`,
+      );
     }
   });
   return document as unknown as ReviewFixtureDocument;
@@ -209,15 +211,10 @@ const RECORDED_REJECTED = /rejected the recorded/i;
  * is explicitly excluded even though it also mentions the recorded decision.
  */
 export function reasonConfirmsRecordedDecision(reason: unknown): boolean {
-  return typeof reason === "string"
-    && RECORDED_CONFIRMED.test(reason)
-    && !RECORDED_REJECTED.test(reason);
+  return typeof reason === "string" && RECORDED_CONFIRMED.test(reason) && !RECORDED_REJECTED.test(reason);
 }
 
-export type ExpectedPick =
-  | { kind: "pick"; candidateId: string }
-  | { kind: "defer" }
-  | { kind: "missing" };
+export type ExpectedPick = { kind: "pick"; candidateId: string } | { kind: "defer" } | { kind: "missing" };
 
 /** Decodes `expected.candidateId`: a pick, an explicit confirmed defer (null), or unusable. */
 export function expectedPickOf(proposal: Pick<HarvestProposal, "expected">): ExpectedPick {
@@ -339,11 +336,14 @@ function renderExpectedLine(proposal: HarvestProposal): string {
   const expected = expectedPickOf(proposal);
   if (expected.kind === "defer") return "defer (no candidate expected)";
   if (expected.kind === "missing") return "none recorded";
-  const candidate = adventureReviewState(proposal.state).candidates
-    .find((entry) => entry.candidateId === expected.candidateId);
+  const candidate = adventureReviewState(proposal.state).candidates.find(
+    (entry) => entry.candidateId === expected.candidateId,
+  );
   if (!candidate) return `candidate \`${expected.candidateId}\` is NOT among the advertised candidates`;
-  return `\`${candidate.kind}\` — ${trimText(candidate.label, CANDIDATE_LABEL_PREVIEW_LENGTH)}`
-    + ` (${shortCandidateId(candidate.candidateId)})`;
+  return (
+    `\`${candidate.kind}\` — ${trimText(candidate.label, CANDIDATE_LABEL_PREVIEW_LENGTH)}` +
+    ` (${shortCandidateId(candidate.candidateId)})`
+  );
 }
 
 export interface ReviewPacketInput {
@@ -368,10 +368,14 @@ export function renderReviewPacket(input: ReviewPacketInput): string {
   if (input.source) lines.push(`Fixture: ${input.source}`);
   lines.push(`Cases: ${input.fixture.proposals.length} total, ${summary.total} shown`);
   lines.push(`Tiers: ${formatCounts(summary.byTier.map((entry) => ({ label: entry.tier, count: entry.count })))}`);
-  lines.push(`Provenance: ${formatCounts(summary.byProvenance.map((entry) => ({ label: entry.provenance, count: entry.count })))}`);
+  lines.push(
+    `Provenance: ${formatCounts(summary.byProvenance.map((entry) => ({ label: entry.provenance, count: entry.count })))}`,
+  );
   lines.push("");
-  lines.push("> Review order: receipt-backed picks first (the recorded decision is the label),"
-    + " then corrected picks, then cases with no expected pick. Within a tier, `proposalId` order.");
+  lines.push(
+    "> Review order: receipt-backed picks first (the recorded decision is the label)," +
+      " then corrected picks, then cases with no expected pick. Within a tier, `proposalId` order.",
+  );
   lines.push("");
 
   input.cases.forEach((proposal, index) => {
@@ -382,7 +386,9 @@ export function renderReviewPacket(input: ReviewPacketInput): string {
     lines.push(`- lane: \`${proposal.lane}\``);
     lines.push(`- tier: ${tier}`);
     lines.push(`- provenance: \`${proposal.provenance}\``);
-    lines.push(`- declaration: ${state.declaration ? trimText(state.declaration, DECLARATION_PREVIEW_LENGTH) : "(none)"}`);
+    lines.push(
+      `- declaration: ${state.declaration ? trimText(state.declaration, DECLARATION_PREVIEW_LENGTH) : "(none)"}`,
+    );
     lines.push(`- expected pick: ${renderExpectedLine(proposal)}`);
     lines.push(`- candidates (${state.candidates.length}):`);
     if (state.candidates.length === 0) {
@@ -471,7 +477,9 @@ export function parseReviewAnnotations(document: unknown): ParsedReviewAnnotatio
       continue;
     }
     if (!isReviewVerdict(verdict)) {
-      problems.push(`${proposalId}: verdict must be correct, incorrect, or unsure, received ${JSON.stringify(verdict)}`);
+      problems.push(
+        `${proposalId}: verdict must be correct, incorrect, or unsure, received ${JSON.stringify(verdict)}`,
+      );
       continue;
     }
     if (entry.reviewer !== REVIEW_REVIEWER) {
@@ -648,7 +656,9 @@ export function renderApplyReport(input: ApplyReportInput): string {
   lines.push(`Cases: ${input.plan.totalCases}`);
   lines.push(`Promoted: ${input.plan.promoted.length}`);
   for (const entry of input.plan.promoted) {
-    lines.push(`- ${entry.proposalId} (${entry.fromProvenance} -> review-annotated${entry.humanNote ? ", note appended" : ""})`);
+    lines.push(
+      `- ${entry.proposalId} (${entry.fromProvenance} -> review-annotated${entry.humanNote ? ", note appended" : ""})`,
+    );
   }
   lines.push(`Ignored incorrect: ${input.plan.incorrect.length} (not promoted)`);
   for (const proposalId of input.plan.incorrect) lines.push(`- ${proposalId}`);
@@ -660,9 +670,11 @@ export function renderApplyReport(input: ApplyReportInput): string {
   for (const proposalId of input.plan.alreadyReviewed) lines.push(`- ${proposalId}`);
   lines.push(`Unknown proposalIds: ${input.plan.unknownIds.length} (ignored)`);
   for (const proposalId of input.plan.unknownIds) lines.push(`- ${proposalId}`);
-  lines.push(input.written
-    ? `Wrote ${input.fixturePath}`
-    : `Dry run: nothing written (pass --write-fixture to update ${input.fixturePath})`);
+  lines.push(
+    input.written
+      ? `Wrote ${input.fixturePath}`
+      : `Dry run: nothing written (pass --write-fixture to update ${input.fixturePath})`,
+  );
   lines.push("");
   return lines.join("\n");
 }

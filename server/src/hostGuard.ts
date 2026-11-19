@@ -34,10 +34,7 @@ export function isAllowedHostname(hostname: string, env: GuardEnv = process.env)
   return false;
 }
 
-function readHeader(
-  headers: Record<string, string | string[] | undefined>,
-  name: string,
-): string | undefined {
+function readHeader(headers: Record<string, string | string[] | undefined>, name: string): string | undefined {
   for (const [key, value] of Object.entries(headers)) {
     if (key.toLowerCase() !== name) continue;
     return Array.isArray(value) ? value[0] : value;

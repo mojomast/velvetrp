@@ -1,10 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
 import type { Clock, IdGenerator } from "../runtime.js";
 import { LOCAL_OWNER_PRINCIPAL_ID } from "./shared.js";
-import {
-  createQuestReadRepository,
-  type QuestReadRepository,
-} from "./quest/index.js";
+import { createQuestReadRepository, type QuestReadRepository } from "./quest/index.js";
 import { createQuestDomainRepository, type QuestDomainRepository } from "./quest/index.js";
 
 export {
@@ -29,10 +26,19 @@ export {
   type UpdateStorylineInput,
 } from "./quest/index.js";
 export {
-  QuestAuthorizationError, QuestConflictError, QuestDomainUnavailableError, QuestStaleError,
-   type AdventureQuestNarrationReceipt, type AdventureQuestObjectiveCandidate, type AdventureQuestPublicReceipt,
-   type CampaignQuestSnapshot, type QuestMutationResult, type QuestCreateMutationResult,
-   type KnowledgeGatedQuestOfferInput, type KnowledgeGatedQuestOfferResult, type QuestOfferKnowledgeSource,
+  QuestAuthorizationError,
+  QuestConflictError,
+  QuestDomainUnavailableError,
+  QuestStaleError,
+  type AdventureQuestNarrationReceipt,
+  type AdventureQuestObjectiveCandidate,
+  type AdventureQuestPublicReceipt,
+  type CampaignQuestSnapshot,
+  type QuestMutationResult,
+  type QuestCreateMutationResult,
+  type KnowledgeGatedQuestOfferInput,
+  type KnowledgeGatedQuestOfferResult,
+  type QuestOfferKnowledgeSource,
 } from "./quest/index.js";
 type Database = DatabaseDriver.Database;
 
@@ -52,8 +58,15 @@ export function createQuestRepository(
   dependencies?: { clock: Clock; ids: IdGenerator },
 ): QuestRepository {
   const reads = createQuestReadRepository(db, principalId);
-  const domain = createQuestDomainRepository(db, dependencies === undefined ? undefined : {
-    clock: dependencies.clock, ids: dependencies.ids, guard: assertCanMutate,
-  });
+  const domain = createQuestDomainRepository(
+    db,
+    dependencies === undefined
+      ? undefined
+      : {
+          clock: dependencies.clock,
+          ids: dependencies.ids,
+          guard: assertCanMutate,
+        },
+  );
   return { ...reads, ...domain };
 }

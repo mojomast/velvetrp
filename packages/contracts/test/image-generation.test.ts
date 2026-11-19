@@ -11,7 +11,11 @@ import {
 describe("image generation contracts", () => {
   it("applies request defaults and trims the prompt", () => {
     expect(imageGenerationRequestSchema.parse({ prompt: "  a lighthouse  " })).toEqual({
-      prompt: "a lighthouse", seed: 0, steps: 50, guidanceScale: 3, count: 1,
+      prompt: "a lighthouse",
+      seed: 0,
+      steps: 50,
+      guidanceScale: 3,
+      count: 1,
     });
   });
 
@@ -27,9 +31,15 @@ describe("image generation contracts", () => {
     expect(imageGenerationRequestSchema.safeParse({ prompt: "x", guidanceScale: 8.01 }).success).toBe(false);
     expect(imageGenerationRequestSchema.safeParse({ prompt: "x", count: 0 }).success).toBe(false);
     expect(imageGenerationRequestSchema.safeParse({ prompt: "x", count: 5 }).success).toBe(false);
-    expect(imageGenerationRequestSchema.safeParse({
-      prompt: "x", seed: 2_147_483_647, steps: 10, guidanceScale: 8, count: 4,
-    }).success).toBe(true);
+    expect(
+      imageGenerationRequestSchema.safeParse({
+        prompt: "x",
+        seed: 2_147_483_647,
+        steps: 10,
+        guidanceScale: 8,
+        count: 4,
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects unknown request fields instead of forwarding them", () => {
@@ -42,29 +52,52 @@ describe("image generation contracts", () => {
     const result = { images: [image], seed: 0, seconds: 0 };
     expect(imageGenerationResultSchema.parse(result)).toEqual(result);
     expect(imageGenerationResultSchema.safeParse({ ...result, images: [] }).success).toBe(false);
-    expect(imageGenerationResultSchema.safeParse({ ...result, images: Array.from({ length: 5 }, () => image) }).success).toBe(false);
-    expect(imageGenerationResultSchema.safeParse({ ...result, images: [{ format: "gif", base64: "x" }] }).success).toBe(false);
-    expect(imageGenerationResultSchema.safeParse({ ...result, images: [{ format: "webp", base64: "" }] }).success).toBe(false);
-    expect(imageGenerationResultSchema.safeParse({
-      ...result, images: [{ format: "webp", base64: "a".repeat(IMAGE_GENERATION_MAX_BASE64_LENGTH + 1) }],
-    }).success).toBe(false);
+    expect(
+      imageGenerationResultSchema.safeParse({ ...result, images: Array.from({ length: 5 }, () => image) }).success,
+    ).toBe(false);
+    expect(imageGenerationResultSchema.safeParse({ ...result, images: [{ format: "gif", base64: "x" }] }).success).toBe(
+      false,
+    );
+    expect(imageGenerationResultSchema.safeParse({ ...result, images: [{ format: "webp", base64: "" }] }).success).toBe(
+      false,
+    );
+    expect(
+      imageGenerationResultSchema.safeParse({
+        ...result,
+        images: [{ format: "webp", base64: "a".repeat(IMAGE_GENERATION_MAX_BASE64_LENGTH + 1) }],
+      }).success,
+    ).toBe(false);
     expect(imageGenerationResultSchema.safeParse({ ...result, seconds: -0.1 }).success).toBe(false);
     expect(imageGenerationResultSchema.safeParse({ ...result, seconds: Number.NaN }).success).toBe(false);
     expect(imageGenerationResultSchema.safeParse({ ...result, seed: -1 }).success).toBe(false);
     expect(imageGenerationResultSchema.safeParse({ ...result, model: "smuggled" }).success).toBe(false);
-    expect(imageGenerationResultSchema.safeParse({
-      images: Array.from({ length: 4 }, () => image), seed: 2_147_483_647, seconds: 1.5,
-    }).success).toBe(true);
+    expect(
+      imageGenerationResultSchema.safeParse({
+        images: Array.from({ length: 4 }, () => image),
+        seed: 2_147_483_647,
+        seconds: 1.5,
+      }).success,
+    ).toBe(true);
   });
 
   it("keeps health strict and nullable-commit aware", () => {
-    expect(imageGenerationHealthSchema.parse({ status: "ok", model: "supra2-img", commit: null, device: "cuda:0" }))
-      .toEqual({ status: "ok", model: "supra2-img", commit: null, device: "cuda:0" });
-    expect(imageGenerationHealthSchema.safeParse({ status: "degraded", model: "m", commit: null, device: "cpu" }).success).toBe(false);
+    expect(
+      imageGenerationHealthSchema.parse({ status: "ok", model: "supra2-img", commit: null, device: "cuda:0" }),
+    ).toEqual({ status: "ok", model: "supra2-img", commit: null, device: "cuda:0" });
+    expect(
+      imageGenerationHealthSchema.safeParse({ status: "degraded", model: "m", commit: null, device: "cpu" }).success,
+    ).toBe(false);
     expect(imageGenerationHealthSchema.safeParse({ status: "ok", model: "m", device: "cpu" }).success).toBe(false);
-    expect(imageGenerationHealthSchema.safeParse({ status: "ok", model: "m", commit: null, device: "cpu", extra: 1 }).success).toBe(false);
-    expect(imageGenerationHealthSchema.safeParse({ status: "ok", model: "", commit: null, device: "cpu" }).success).toBe(false);
-    expect(imageGenerationHealthSchema.safeParse({ status: "ok", model: "m", commit: "abc123", device: "cpu" }).success).toBe(true);
+    expect(
+      imageGenerationHealthSchema.safeParse({ status: "ok", model: "m", commit: null, device: "cpu", extra: 1 })
+        .success,
+    ).toBe(false);
+    expect(
+      imageGenerationHealthSchema.safeParse({ status: "ok", model: "", commit: null, device: "cpu" }).success,
+    ).toBe(false);
+    expect(
+      imageGenerationHealthSchema.safeParse({ status: "ok", model: "m", commit: "abc123", device: "cpu" }).success,
+    ).toBe(true);
   });
 
   it("bounds provider error bodies", () => {

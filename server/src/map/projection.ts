@@ -14,8 +14,10 @@ export function projectTacticalMap(map: TacticalMap, visibility: ProjectionVisib
   const tiles: MapProjection["tiles"][number][] = [];
   for (const tile of map.tiles) {
     const key = pointKey(tile.position);
-    if (visibility.visible.has(key)) tiles.push({ position: { ...tile.position }, terrain: tile.terrain, visibility: "visible" });
-    else if (visibility.explored.has(key)) tiles.push({ position: { ...tile.position }, terrain: "unknown", visibility: "explored" });
+    if (visibility.visible.has(key))
+      tiles.push({ position: { ...tile.position }, terrain: tile.terrain, visibility: "visible" });
+    else if (visibility.explored.has(key))
+      tiles.push({ position: { ...tile.position }, terrain: "unknown", visibility: "explored" });
   }
   const tokens = map.tokens.flatMap((token) => {
     let footprintVisible = true;
@@ -30,9 +32,17 @@ export function projectTacticalMap(map: TacticalMap, visibility: ProjectionVisib
     return [{ ...projected, position: { ...projected.position }, footprint: { ...projected.footprint } }];
   });
   return {
-    mapId: map.mapId, width: map.width, height: map.height, grid: { ...map.grid }, tiles, tokens,
+    mapId: map.mapId,
+    width: map.width,
+    height: map.height,
+    grid: { ...map.grid },
+    tiles,
+    tokens,
     authoritativePath: visibility.authoritativePath?.every((point) => visibility.visible.has(pointKey(point)))
-      ? visibility.authoritativePath.map((point) => ({ ...point })) : null,
-    reachable: visibility.reachable?.filter((point) => visibility.visible.has(pointKey(point))).map((point) => ({ ...point })) ?? [],
+      ? visibility.authoritativePath.map((point) => ({ ...point }))
+      : null,
+    reachable:
+      visibility.reachable?.filter((point) => visibility.visible.has(pointKey(point))).map((point) => ({ ...point })) ??
+      [],
   };
 }

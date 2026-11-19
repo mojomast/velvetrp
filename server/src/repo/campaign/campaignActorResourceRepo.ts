@@ -45,11 +45,12 @@ const ACTOR_RESOURCE_READ_SELECT = `SELECT
     ON resource.actor_id = actor_identity.actor_id`;
 
 export function createCampaignActorResourceRepository(db: DatabaseDriver.Database) {
-  const actorResourceFromReadRow = (row: ActorResourceReadRow, campaignId: string, actorId: string): ActorResource | null => {
-    if (
-      row.actor_presence === null || row.campaign_character_presence === null
-      || row.sheet_presence === null
-    ) {
+  const actorResourceFromReadRow = (
+    row: ActorResourceReadRow,
+    campaignId: string,
+    actorId: string,
+  ): ActorResource | null => {
+    if (row.actor_presence === null || row.campaign_character_presence === null || row.sheet_presence === null) {
       throw new Error("actor resource root is incomplete");
     }
     if (row.resource_presence === null) return null;
@@ -70,14 +71,23 @@ export function createCampaignActorResourceRepository(db: DatabaseDriver.Databas
       const principalId = resourceIdSchema.parse(actorPrincipalId);
       const normalizedCampaignId = resourceIdSchema.parse(campaignId);
       const normalizedActorId = resourceIdSchema.parse(actorId);
-      const rows = db.prepare(`${ACTOR_RESOURCE_READ_SELECT}
+      const rows = db
+        .prepare(
+          `${ACTOR_RESOURCE_READ_SELECT}
         WHERE membership.principal_id = ? AND membership.campaign_id = ?
           AND (membership.role IN ('gm', 'player', 'observer') OR (
             membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id
           ))
-        ORDER BY resource.name COLLATE BINARY ASC`)
-        .all(normalizedCampaignId, normalizedActorId, normalizedCampaignId, normalizedActorId,
-          principalId, normalizedCampaignId) as ActorResourceReadRow[];
+        ORDER BY resource.name COLLATE BINARY ASC`,
+        )
+        .all(
+          normalizedCampaignId,
+          normalizedActorId,
+          normalizedCampaignId,
+          normalizedActorId,
+          principalId,
+          normalizedCampaignId,
+        ) as ActorResourceReadRow[];
       const resources: ActorResource[] = [];
       for (const row of rows) {
         const resource = actorResourceFromReadRow(row, normalizedCampaignId, normalizedActorId);
@@ -85,19 +95,34 @@ export function createCampaignActorResourceRepository(db: DatabaseDriver.Databas
       }
       return resources;
     },
-    getActorResource(actorPrincipalId: string, campaignId: string, actorId: string, name: string): ActorResource | null {
+    getActorResource(
+      actorPrincipalId: string,
+      campaignId: string,
+      actorId: string,
+      name: string,
+    ): ActorResource | null {
       const principalId = resourceIdSchema.parse(actorPrincipalId);
       const normalizedCampaignId = resourceIdSchema.parse(campaignId);
       const normalizedActorId = resourceIdSchema.parse(actorId);
       const normalizedName = actorResourceNameSchema.parse(name);
-      const row = db.prepare(`${ACTOR_RESOURCE_READ_SELECT}
+      const row = db
+        .prepare(
+          `${ACTOR_RESOURCE_READ_SELECT}
           AND resource.name = ? COLLATE BINARY
         WHERE membership.principal_id = ? AND membership.campaign_id = ?
           AND (membership.role IN ('gm', 'player', 'observer') OR (
             membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id
-          ))`)
-        .get(normalizedCampaignId, normalizedActorId, normalizedCampaignId, normalizedActorId,
-          normalizedName, principalId, normalizedCampaignId) as ActorResourceReadRow | undefined;
+          ))`,
+        )
+        .get(
+          normalizedCampaignId,
+          normalizedActorId,
+          normalizedCampaignId,
+          normalizedActorId,
+          normalizedName,
+          principalId,
+          normalizedCampaignId,
+        ) as ActorResourceReadRow | undefined;
       return row ? actorResourceFromReadRow(row, normalizedCampaignId, normalizedActorId) : null;
     },
   };

@@ -1,8 +1,4 @@
-import {
-  diceExpressionSchema,
-  diceRollResultSchema,
-  type DiceRollResult,
-} from "@velvet/contracts";
+import { diceExpressionSchema, diceRollResultSchema, type DiceRollResult } from "@velvet/contracts";
 
 export const VERIFIABLE_DICE_VERSION = 1;
 export const VERIFIABLE_DICE_MAGIC = new TextEncoder().encode("VLVTDICE");
@@ -28,7 +24,7 @@ export const diceProtocolDomains = {
   proof: "velvet.dice/proof",
 } as const;
 
-export type DiceProtocolDomain = typeof diceProtocolDomains[keyof typeof diceProtocolDomains];
+export type DiceProtocolDomain = (typeof diceProtocolDomains)[keyof typeof diceProtocolDomains];
 
 export type FrameField =
   | Readonly<{ tag: number; type: "bytes"; value: Uint8Array }>
@@ -127,17 +123,14 @@ const encodeField = (field: FrameField): Uint8Array => {
       payload = i32(field.value);
       break;
     case "optionalUtf8":
-      payload = field.value === null
-        ? Uint8Array.of(0)
-        : join([Uint8Array.of(1), encodeUtf8("optional UTF-8 frame field", field.value)]);
+      payload =
+        field.value === null
+          ? Uint8Array.of(0)
+          : join([Uint8Array.of(1), encodeUtf8("optional UTF-8 frame field", field.value)]);
       break;
   }
   if (payload.byteLength > MAX_FRAME_PAYLOAD_BYTES) fail("frame field payload is too large");
-  return join([
-    Uint8Array.of(field.tag, FIELD_TYPES[field.type]),
-    u32(payload.byteLength),
-    payload,
-  ]);
+  return join([Uint8Array.of(field.tag, FIELD_TYPES[field.type]), u32(payload.byteLength), payload]);
 };
 
 /**
@@ -282,10 +275,7 @@ export interface LegacyVerifiableRoll {
 }
 
 export type VerifiableRollLifecycle =
-  | PendingVerifiableRoll
-  | SettledVerifiableRoll
-  | AbandonedVerifiableRoll
-  | LegacyVerifiableRoll;
+  PendingVerifiableRoll | SettledVerifiableRoll | AbandonedVerifiableRoll | LegacyVerifiableRoll;
 
 export interface VerifiableDiceProof {
   readonly version: 1;

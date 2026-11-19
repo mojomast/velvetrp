@@ -1,6 +1,11 @@
 import type {
-  DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution, DiceTerm,
-  DiceTermEvidence, RulesetCapability,
+  DamageAdjustment,
+  DamageAdjustmentPlan,
+  DamageRollInput,
+  DamageRollResolution,
+  DiceTerm,
+  DiceTermEvidence,
+  RulesetCapability,
 } from "../types.js";
 import { frozenList, requireInteger, requireNonNegativeInteger } from "./internal.js";
 
@@ -26,7 +31,12 @@ export function resolveDnd5eDamageRoll(input: DamageRollInput): DamageRollResolu
   });
   const modifier = input.modifier ?? 0;
   requireInteger(modifier, "damage modifier");
-  return Object.freeze({ critical, evidence: frozenList(evidence), modifier, total: Math.max(0, evidence.reduce((sum, term) => sum + term.subtotal, 0) + modifier) });
+  return Object.freeze({
+    critical,
+    evidence: frozenList(evidence),
+    modifier,
+    total: Math.max(0, evidence.reduce((sum, term) => sum + term.subtotal, 0) + modifier),
+  });
 }
 
 export type OnHitRiderDamageInput = Readonly<{
@@ -48,12 +58,28 @@ export type OnHitRiderDamageResolution = Readonly<{
  * hit; an on-hit rider never adds an ability modifier of its own.
  */
 export function resolveDnd5eOnHitRiderDamage(input: OnHitRiderDamageInput): OnHitRiderDamageResolution {
-  const resolution = resolveDnd5eDamageRoll({ dice: input.dice, rolls: input.rolls, critical: input.critical ?? false });
-  return Object.freeze({ critical: resolution.critical, damageType: input.damageType, evidence: resolution.evidence, total: resolution.total });
+  const resolution = resolveDnd5eDamageRoll({
+    dice: input.dice,
+    rolls: input.rolls,
+    critical: input.critical ?? false,
+  });
+  return Object.freeze({
+    critical: resolution.critical,
+    damageType: input.damageType,
+    evidence: resolution.evidence,
+    total: resolution.total,
+  });
 }
 
 export function planDnd5eDamageAdjustment(incoming: number, adjustment: DamageAdjustment): DamageAdjustmentPlan {
   requireNonNegativeInteger(incoming, "incoming damage");
-  const applied = adjustment === "immunity" ? 0 : adjustment === "resistance" ? Math.floor(incoming / 2) : adjustment === "vulnerability" ? incoming * 2 : incoming;
+  const applied =
+    adjustment === "immunity"
+      ? 0
+      : adjustment === "resistance"
+        ? Math.floor(incoming / 2)
+        : adjustment === "vulnerability"
+          ? incoming * 2
+          : incoming;
   return Object.freeze({ incoming, adjustment, applied, hitPointDelta: applied === 0 ? 0 : -applied });
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { druidDefinition, druidLevels, druidSubclasses } from "../src/content/srdStarter/classes/druid.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -36,7 +40,11 @@ describe("SRD 5.1 Druid class", () => {
   it("grants the d8 hit die at level 1", () => {
     const levelOne = classLevelCatalogDefinitionSchema.parse(levels.find((level) => level.mechanics.level === 1)!);
     expect(levelOne.mechanics.hpGain).toBe(8);
-    expect(levelOne.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 });
+    expect(levelOne.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d8",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
   });
 
   it("offers the Circle of the Land subclass choice at level 3", () => {

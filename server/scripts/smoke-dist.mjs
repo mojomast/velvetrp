@@ -145,7 +145,10 @@ async function main() {
     return 0;
   } catch (error) {
     process.stderr.write(`smoke:dist FAILED: ${error instanceof Error ? error.message : String(error)}\n`);
-    if (output.trim()) process.stderr.write(`--- server output (last ${OUTPUT_TAIL_CHARS} chars) ---\n${output}\n--- end server output ---\n`);
+    if (output.trim())
+      process.stderr.write(
+        `--- server output (last ${OUTPUT_TAIL_CHARS} chars) ---\n${output}\n--- end server output ---\n`,
+      );
     return 1;
   } finally {
     await stopChild(child);

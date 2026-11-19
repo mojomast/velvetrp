@@ -16,20 +16,30 @@ function seed(): void {
   const db = new DatabaseDriver(path.join(directory, "velvet.sqlite"));
   db.pragma("foreign_keys = ON");
   db.transaction(() => {
-    db.prepare("INSERT INTO characters VALUES ('persona', ?, 30, 'private', 'private', 1, 0, ?)")
-      .run(`${"A".repeat(199)}😀tail`, at);
+    db.prepare("INSERT INTO characters VALUES ('persona', ?, 30, 'private', 'private', 1, 0, ?)").run(
+      `${"A".repeat(199)}😀tail`,
+      at,
+    );
     for (const [id, title, state, stopped] of [
       [" room/attached ", "  Attached  ", "closed", at],
       ["room/eligible", "", "active", null],
       ["room/stopped", "Stopped", "closed", at],
     ] as const) {
-      db.prepare("INSERT INTO sessions VALUES (?, 'persona', ?, ?, 'private', NULL, ?, ?, ?)")
-        .run(id, title, state, at, stopped, stopped ? "private" : null);
+      db.prepare("INSERT INTO sessions VALUES (?, 'persona', ?, ?, 'private', NULL, ?, ?, ?)").run(
+        id,
+        title,
+        state,
+        at,
+        stopped,
+        stopped ? "private" : null,
+      );
       db.prepare("INSERT INTO session_characters VALUES (?, 'persona', 0)").run(id);
     }
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
-      VALUES ('campaign', 'Campaign', 'timeline', 'local-owner', ?, ?)`).run(at, at);
+      VALUES ('campaign', 'Campaign', 'timeline', 'local-owner', ?, ?)`,
+    ).run(at, at);
     db.prepare("INSERT INTO campaign_timelines VALUES ('timeline', 'campaign', ?, 0)").run(at);
     db.prepare("INSERT INTO campaign_memberships VALUES ('campaign', 'local-owner', 'owner', ?)").run(at);
     db.prepare("INSERT INTO campaign_sessions VALUES (' room/attached ', 'campaign', ?)").run(at);
@@ -60,10 +70,16 @@ describe("campaign room linking snapshot", () => {
     const snapshot = repository.getCampaignRoomLinkingSnapshot("local-owner", "campaign");
     expect(snapshot).toEqual({
       campaignId: "campaign",
-      attached: [{
-        sessionId: " room/attached ", title: "  Attached  ", participantNames: ["A".repeat(199)],
-        createdAt: at, attachedAt: at, stopped: true,
-      }],
+      attached: [
+        {
+          sessionId: " room/attached ",
+          title: "  Attached  ",
+          participantNames: ["A".repeat(199)],
+          createdAt: at,
+          attachedAt: at,
+          stopped: true,
+        },
+      ],
       eligible: [{ sessionId: "room/eligible", title: null, participantNames: ["A".repeat(199)], createdAt: at }],
     });
     expect(repository.getCampaignRoomLinkingSnapshot("missing", "campaign")).toBeNull();
@@ -88,7 +104,9 @@ describe("campaign room linking snapshot", () => {
     expect(sql).toMatch(/FROM authorized\s+JOIN sessions/i);
     expect(sql).toMatch(/FROM selected CROSS JOIN authorized AS authority/i);
     expect(sql).toMatch(/actor_parent_id = \$actorId[\s\S]*actor_role IN \('owner', 'gm', 'player', 'observer'\)/i);
-    expect(sql).toMatch(/owner_count = 1[\s\S]*owner_membership_principal_id COLLATE BINARY = owner_principal_id COLLATE BINARY[\s\S]*owner_parent_id COLLATE BINARY = owner_principal_id COLLATE BINARY/i);
+    expect(sql).toMatch(
+      /owner_count = 1[\s\S]*owner_membership_principal_id COLLATE BINARY = owner_principal_id COLLATE BINARY[\s\S]*owner_parent_id COLLATE BINARY = owner_principal_id COLLATE BINARY/i,
+    );
     for (const ownerId of ["owner_principal_id", "owner_membership_principal_id", "owner_parent_id"]) {
       expect(sql).toContain(`typeof(${ownerId}) = 'text'`);
       expect(sql).toContain(`length(CAST(${ownerId} AS BLOB)) BETWEEN 1 AND 128`);
@@ -103,13 +121,28 @@ describe("campaign room linking snapshot", () => {
 
   it.each([
     ["outsider", "INSERT INTO principals VALUES ('outsider', 'Outsider', 0)", "outsider", "null"],
-    ["unknown role", "UPDATE campaign_memberships SET role = 'future-role' WHERE campaign_id = 'campaign'", "local-owner", "null"],
-    ["stale owner pointer", "UPDATE campaigns SET owner_principal_id = 'stale-owner' WHERE id = 'campaign'", "local-owner", "null"],
+    [
+      "unknown role",
+      "UPDATE campaign_memberships SET role = 'future-role' WHERE campaign_id = 'campaign'",
+      "local-owner",
+      "null",
+    ],
+    [
+      "stale owner pointer",
+      "UPDATE campaigns SET owner_principal_id = 'stale-owner' WHERE id = 'campaign'",
+      "local-owner",
+      "null",
+    ],
     ["missing canonical owner parent", "DELETE FROM principals WHERE id = 'local-owner'", "local-owner", "null"],
     ["malformed actor timestamp", "UPDATE campaign_memberships SET created_at = 'invalid'", "local-owner", "throw"],
-    ["malformed canonical owner timestamp", `INSERT INTO principals VALUES ('gm', 'GM', 0);
+    [
+      "malformed canonical owner timestamp",
+      `INSERT INTO principals VALUES ('gm', 'GM', 0);
       INSERT INTO campaign_memberships VALUES ('campaign', 'gm', 'gm', '${at}');
-      UPDATE campaign_memberships SET created_at = 'invalid' WHERE principal_id = 'local-owner'`, "gm", "throw"],
+      UPDATE campaign_memberships SET created_at = 'invalid' WHERE principal_id = 'local-owner'`,
+      "gm",
+      "throw",
+    ],
     ["empty matching owner IDs", matchingOwnerIdMutation("''"), "gm", "throw"],
     ["overlong matching owner IDs", matchingOwnerIdMutation(`'${"x".repeat(129)}'`), "gm", "throw"],
     ["whitespace matching owner IDs", matchingOwnerIdMutation("'owner id'"), "gm", "throw"],
@@ -125,9 +158,12 @@ describe("campaign room linking snapshot", () => {
       ALTER TABLE characters RENAME TO poisoned_characters;
       CREATE VIEW characters AS SELECT id, poison(name) AS name, age, archetype, boundaries,
         fictional_confirmed, is_real_person, created_at FROM poisoned_characters`);
-    const poison = vi.fn(() => { throw new Error("private presentation evaluated"); });
-    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }))
-      .toThrow(/does not match the current development schema \(unexpected table poisoned_characters\)/);
+    const poison = vi.fn(() => {
+      throw new Error("private presentation evaluated");
+    });
+    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string })).toThrow(
+      /does not match the current development schema \(unexpected table poisoned_characters\)/,
+    );
     expect(poison).not.toHaveBeenCalled();
   });
 
@@ -149,8 +185,11 @@ describe("campaign room linking snapshot", () => {
   it.each([
     ["missing actor principal", "DELETE FROM principals WHERE id = 'local-owner'"],
     ["unknown actor role", "UPDATE campaign_memberships SET role = 'future-role' WHERE campaign_id = 'campaign'"],
-    ["stale owner pointer", `UPDATE campaign_memberships SET created_at = 'invalid';
-      UPDATE campaigns SET owner_principal_id = 'stale-owner' WHERE id = 'campaign'`],
+    [
+      "stale owner pointer",
+      `UPDATE campaign_memberships SET created_at = 'invalid';
+      UPDATE campaigns SET owner_principal_id = 'stale-owner' WHERE id = 'campaign'`,
+    ],
   ])("masks non-authorizing snapshot state before attributable parsing: %s", (_label, mutation) => {
     seed();
     corrupt(mutation);
@@ -165,8 +204,9 @@ describe("campaign room linking snapshot", () => {
       INSERT INTO campaign_memberships VALUES ('campaign', 'gm', 'gm', '${at}');
       UPDATE campaign_memberships SET created_at = 'invalid' WHERE campaign_id = 'campaign' AND principal_id = 'gm'`);
     const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
-    expect(() => repository.getCampaignRoomLinkingSnapshot("gm", "campaign"))
-      .toThrow("campaign room linking authority is malformed");
+    expect(() => repository.getCampaignRoomLinkingSnapshot("gm", "campaign")).toThrow(
+      "campaign room linking authority is malformed",
+    );
     repository.close();
   });
 });

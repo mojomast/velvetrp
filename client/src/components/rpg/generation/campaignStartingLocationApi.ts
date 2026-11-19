@@ -9,7 +9,10 @@ import {
 } from "@velvet/contracts";
 
 export class CampaignStartingLocationHttpError extends Error {
-  constructor(public status: number, public code: string | null) {
+  constructor(
+    public status: number,
+    public code: string | null,
+  ) {
     super(code ?? `Starting-location request failed (${status}).`);
   }
 }
@@ -30,23 +33,38 @@ async function body(response: Response): Promise<unknown> {
 }
 
 export async function getCampaignStartingLocation(campaignId: string) {
-  const result = campaignStartingLocationReadResponseSchema.parse(await body(await fetch(lane(campaignId, "starting-location"), {
-    cache: "no-store",
-  })));
+  const result = campaignStartingLocationReadResponseSchema.parse(
+    await body(
+      await fetch(lane(campaignId, "starting-location"), {
+        cache: "no-store",
+      }),
+    ),
+  );
   if (result.campaignId !== campaignId) throw new Error("Starting-location read identity mismatch");
   return result;
 }
 
-export async function designateCampaignStartingLocation(campaignId: string, input: CampaignStartingLocationDesignationRequest) {
+export async function designateCampaignStartingLocation(
+  campaignId: string,
+  input: CampaignStartingLocationDesignationRequest,
+) {
   const request = campaignStartingLocationDesignationRequestSchema.parse(input);
-  const result = campaignStartingLocationDesignationResponseSchema.parse(await body(await fetch(lane(campaignId, "starting-location-commands"), {
-    method: "POST",
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  })));
-  if (result.campaignId !== campaignId || result.startingLocation.locationId !== request.locationId
-    || result.receipt.idempotencyKey !== request.idempotencyKey || result.receipt.revisionBefore !== request.expectedRevision) {
+  const result = campaignStartingLocationDesignationResponseSchema.parse(
+    await body(
+      await fetch(lane(campaignId, "starting-location-commands"), {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      }),
+    ),
+  );
+  if (
+    result.campaignId !== campaignId ||
+    result.startingLocation.locationId !== request.locationId ||
+    result.receipt.idempotencyKey !== request.idempotencyKey ||
+    result.receipt.revisionBefore !== request.expectedRevision
+  ) {
     throw new Error("Starting-location response did not match the exact command");
   }
   return result;

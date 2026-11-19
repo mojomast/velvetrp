@@ -78,10 +78,12 @@ export function selectDnd5eNpcStatBlocks(input: Dnd5eNpcSelectionInput): Dnd5eNp
     return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
   });
 
-  const selected = ordered.slice(0, input.count).map((candidate) => Object.freeze({
-    id: candidate.id,
-    challengeRating: candidate.challengeRating,
-  }));
+  const selected = ordered.slice(0, input.count).map((candidate) =>
+    Object.freeze({
+      id: candidate.id,
+      challengeRating: candidate.challengeRating,
+    }),
+  );
 
   const reasons: string[] = [];
   const legal = selected.length === input.count;

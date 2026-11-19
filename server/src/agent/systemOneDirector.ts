@@ -59,10 +59,12 @@ export function buildDirectorQuestions(candidates: readonly DirectorCandidatePro
   const questions: SystemOneQuestions = {
     [DIRECTOR_HOLD_KEY]: {
       type: "noul",
-      instructions: "Should the Director hold this beat and require a player decision before committing any advertised candidate?",
+      instructions:
+        "Should the Director hold this beat and require a player decision before committing any advertised candidate?",
       criteria: {
         true: "No advertised candidate is a good next step and a player decision is genuinely required now",
-        false: "At least one advertised candidate can be committed as the next beat, even if it only keeps the world alive",
+        false:
+          "At least one advertised candidate can be committed as the next beat, even if it only keeps the world alive",
       },
     },
   };
@@ -86,7 +88,8 @@ export function buildDirectorQuestions(candidates: readonly DirectorCandidatePro
         instructions: `Is committing this advertised pacing beat a safe, low-risk way to keep the world moving right now, even though it does not advance the story? Candidate: ${candidate.label} (${candidate.action}).`,
         criteria: {
           true: "Committing it now is safe and keeps the world moving without forcing a player decision",
-          false: "Committing it now is unsafe, premature, redundant, or the world should instead wait for a player decision",
+          false:
+            "Committing it now is unsafe, premature, redundant, or the world should instead wait for a player decision",
         },
       };
     }
@@ -96,7 +99,8 @@ export function buildDirectorQuestions(candidates: readonly DirectorCandidatePro
   criteria[DIRECTOR_NONE] = "A player decision is required now and no advertised beat should be forced";
   questions[DIRECTOR_BEST_KEY] = {
     type: "choice",
-    instructions: "Which single advertised beat should the Director commit next, or none? Prefer a beat that makes real progress; if none does, prefer the liveliest low-risk transition (an ambient moment over an arbitrary time skip). Choose none only when a player decision is genuinely required now.",
+    instructions:
+      "Which single advertised beat should the Director commit next, or none? Prefer a beat that makes real progress; if none does, prefer the liveliest low-risk transition (an ambient moment over an arbitrary time skip). Choose none only when a player decision is genuinely required now.",
     criteria,
   };
   return questions;
@@ -161,17 +165,28 @@ export function composeDirectorSelection(
   const scored: ScoredCandidate[] = candidates.flatMap((candidate) => {
     const progress = noulSignal(answers, `${DIRECTOR_PROGRESS_PREFIX}${candidate.candidateId}`);
     if (progress === null) return [];
-    return [{ candidate, progress, priority: normalizedPriority(answers, `${DIRECTOR_PRIORITY_PREFIX}${candidate.candidateId}`) }];
+    return [
+      {
+        candidate,
+        progress,
+        priority: normalizedPriority(answers, `${DIRECTOR_PRIORITY_PREFIX}${candidate.candidateId}`),
+      },
+    ];
   });
 
   const grounded = scored
     .filter((entry) => bandForConfidence(entry.progress, thresholds) === "act")
-    .sort((left, right) => (right.priority - left.priority) || (right.progress - left.progress))
+    .sort((left, right) => right.priority - left.priority || right.progress - left.progress)
     .slice(0, maxBeats);
   if (grounded.length > 0) {
     return {
-      band: "act", method: "candidates", hold: false,
-      selections: grounded.map((entry) => ({ candidateId: entry.candidate.candidateId, digest: entry.candidate.digest })),
+      band: "act",
+      method: "candidates",
+      hold: false,
+      selections: grounded.map((entry) => ({
+        candidateId: entry.candidate.candidateId,
+        digest: entry.candidate.digest,
+      })),
       topSignal: grounded[0]!.progress,
     };
   }
@@ -187,19 +202,26 @@ export function composeDirectorSelection(
   // moving. Requiring every candidate to be pacing means a transition can never displace a
   // preferred mechanical beat; it is a fallback below `progress` and below a confident hold.
   const onlyPacing = candidates.every((candidate) => candidate.pacing === true);
-  const transitioned = !onlyPacing ? [] : scored
-    .filter((entry) => entry.candidate.pacing === true)
-    .flatMap((entry) => {
-      const transition = noulSignal(answers, `${DIRECTOR_TRANSITION_PREFIX}${entry.candidate.candidateId}`);
-      return transition === null ? [] : [{ entry, transition }];
-    })
-    .filter((candidate) => bandForConfidence(candidate.transition, thresholds) === "act")
-    .sort((left, right) => (right.entry.priority - left.entry.priority) || (right.transition - left.transition))
-    .slice(0, maxBeats);
+  const transitioned = !onlyPacing
+    ? []
+    : scored
+        .filter((entry) => entry.candidate.pacing === true)
+        .flatMap((entry) => {
+          const transition = noulSignal(answers, `${DIRECTOR_TRANSITION_PREFIX}${entry.candidate.candidateId}`);
+          return transition === null ? [] : [{ entry, transition }];
+        })
+        .filter((candidate) => bandForConfidence(candidate.transition, thresholds) === "act")
+        .sort((left, right) => right.entry.priority - left.entry.priority || right.transition - left.transition)
+        .slice(0, maxBeats);
   if (transitioned.length > 0) {
     return {
-      band: "act", method: "transition", hold: false,
-      selections: transitioned.map(({ entry }) => ({ candidateId: entry.candidate.candidateId, digest: entry.candidate.digest })),
+      band: "act",
+      method: "transition",
+      hold: false,
+      selections: transitioned.map(({ entry }) => ({
+        candidateId: entry.candidate.candidateId,
+        digest: entry.candidate.digest,
+      })),
       topSignal: transitioned[0]!.transition,
     };
   }
@@ -207,11 +229,17 @@ export function composeDirectorSelection(
   // Director beats mutate campaign state, so the aggregate pick must clear the action
   // threshold; a mere review-level pick defers.
   const best = answers[DIRECTOR_BEST_KEY];
-  const bestTop = best && best.type === "choice" && best.choice !== DIRECTOR_NONE ? topProbability(best.probabilities) : null;
-  const chosen = best && best.type === "choice" && best.choice !== DIRECTOR_NONE ? scored.find((entry) => entry.candidate.candidateId === best.choice) : undefined;
+  const bestTop =
+    best && best.type === "choice" && best.choice !== DIRECTOR_NONE ? topProbability(best.probabilities) : null;
+  const chosen =
+    best && best.type === "choice" && best.choice !== DIRECTOR_NONE
+      ? scored.find((entry) => entry.candidate.candidateId === best.choice)
+      : undefined;
   if (best && best.type === "choice" && chosen && bestTop !== null && bestTop >= thresholds.actionThreshold) {
     return {
-      band: "act", method: "best-pick", hold: false,
+      band: "act",
+      method: "best-pick",
+      hold: false,
       selections: [{ candidateId: chosen.candidate.candidateId, digest: chosen.candidate.digest }],
       topSignal: bestTop,
     };
@@ -225,5 +253,11 @@ export function composeDirectorSelection(
     return { band: "fallback", method: "defer", hold: false, selections: [], topSignal: null };
   }
   const band = bandForConfidence(strongest, thresholds);
-  return { band: band === "act" ? "confirm" : band, method: "defer", hold: false, selections: [], topSignal: strongest };
+  return {
+    band: band === "act" ? "confirm" : band,
+    method: "defer",
+    hold: false,
+    selections: [],
+    topSignal: strongest,
+  };
 }

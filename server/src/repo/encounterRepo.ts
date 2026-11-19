@@ -1,8 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
-import {
-  createEncounterReadRepository,
-  type EncounterReadRepository,
-} from "./encounter/index.js";
+import { createEncounterReadRepository, type EncounterReadRepository } from "./encounter/index.js";
 import {
   createEncounterWriteRepository,
   type EncounterDependencies,

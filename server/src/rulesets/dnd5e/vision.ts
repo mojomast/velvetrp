@@ -48,7 +48,9 @@ export type Dnd5eVisibility = Readonly<{
 const SENSE_ORDER: readonly Dnd5eSpecialSense[] = Object.freeze(["darkvision", "blindsight", "truesight"]);
 
 /** Heavily obscured spaces block sight; lightly obscured spaces impose Perception disadvantage. */
-export function obscurementPenalty(obscurement: Dnd5eObscurement): Readonly<{ blocksSight: boolean; passivePerceptionPenalty: number }> {
+export function obscurementPenalty(
+  obscurement: Dnd5eObscurement,
+): Readonly<{ blocksSight: boolean; passivePerceptionPenalty: number }> {
   if (obscurement === "heavily-obscured") return Object.freeze({ blocksSight: true, passivePerceptionPenalty: 0 });
   if (obscurement === "lightly-obscured") return Object.freeze({ blocksSight: false, passivePerceptionPenalty: 5 });
   return Object.freeze({ blocksSight: false, passivePerceptionPenalty: 0 });
@@ -65,8 +67,8 @@ export function resolveDnd5eVision(input: Dnd5eVisionInput): Dnd5eVisibility {
   requireNonNegativeInteger(input.distanceFeet, "vision distance");
   if (input.senseRangeFeet !== undefined) requireNonNegativeInteger(input.senseRangeFeet, "sense range");
   const senses = input.senses ?? [];
-  const inRange = (sense: Dnd5eSpecialSense): boolean => senses.includes(sense)
-    && (input.senseRangeFeet === undefined || input.distanceFeet <= input.senseRangeFeet);
+  const inRange = (sense: Dnd5eSpecialSense): boolean =>
+    senses.includes(sense) && (input.senseRangeFeet === undefined || input.distanceFeet <= input.senseRangeFeet);
   const truesight = inRange("truesight");
   const blindsight = inRange("blindsight");
   const darkvision = inRange("darkvision");
@@ -77,7 +79,8 @@ export function resolveDnd5eVision(input: Dnd5eVisionInput): Dnd5eVisibility {
   const effectiveObscurement: Dnd5eObscurement = seesThroughObscurement ? "none" : input.obscurement;
   const darknessRevealed = input.light === "darkness" && (truesight || blindsight || darkvision);
   const dimRevealed = input.light === "dim-light" && (truesight || blindsight);
-  if (darknessRevealed) reasons.push(`${truesight ? "truesight" : blindsight ? "blindsight" : "darkvision"} reveals the space in darkness`);
+  if (darknessRevealed)
+    reasons.push(`${truesight ? "truesight" : blindsight ? "blindsight" : "darkvision"} reveals the space in darkness`);
   if (seesThroughObscurement) reasons.push(`${truesight ? "truesight" : "blindsight"} negates obscurement`);
 
   const blockedByLight = input.light === "darkness" && !darknessRevealed;
@@ -107,7 +110,9 @@ export type Dnd5eLightSource = Readonly<{
 }>;
 
 /** The light level at a distance from one or more light sources, brightest wins. */
-export function lightLevelAt(input: Readonly<{ sources: readonly Dnd5eLightSource[]; distanceFeet: number }>): Dnd5eLightLevel {
+export function lightLevelAt(
+  input: Readonly<{ sources: readonly Dnd5eLightSource[]; distanceFeet: number }>,
+): Dnd5eLightLevel {
   requireNonNegativeInteger(input.distanceFeet, "light distance");
   let level: Dnd5eLightLevel = "darkness";
   for (const source of input.sources) {
@@ -125,8 +130,14 @@ export function passivePerceptionObscurementAdjustment(obscurement: Dnd5eObscure
 }
 
 /** Validates a special sense range, returning a frozen bounded descriptor. */
-export function dnd5eSpecialSense(sense: Dnd5eSpecialSense, rangeFeet?: number): Readonly<{ sense: Dnd5eSpecialSense; rangeFeet: number | null }> {
+export function dnd5eSpecialSense(
+  sense: Dnd5eSpecialSense,
+  rangeFeet?: number,
+): Readonly<{ sense: Dnd5eSpecialSense; rangeFeet: number | null }> {
   if (!SENSE_ORDER.includes(sense)) throw new Error(`unknown special sense: ${sense}`);
-  if (rangeFeet !== undefined) { requireInteger(rangeFeet, "sense range"); requireNonNegativeInteger(rangeFeet, "sense range"); }
+  if (rangeFeet !== undefined) {
+    requireInteger(rangeFeet, "sense range");
+    requireNonNegativeInteger(rangeFeet, "sense range");
+  }
   return Object.freeze({ sense, rangeFeet: rangeFeet ?? null });
 }

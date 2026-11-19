@@ -47,10 +47,7 @@ import {
   ORIGINAL_STARTER_PACK_VERSION,
   ORIGINAL_STARTER_RULES_PROFILE_ID,
 } from "../content/originalStarterManifest.js";
-import {
-  MECHANICS_STARTER_CATALOG,
-  MECHANICS_STARTER_RULES_PROFILE_ID,
-} from "../content/mechanicsStarterCatalog.js";
+import { MECHANICS_STARTER_CATALOG, MECHANICS_STARTER_RULES_PROFILE_ID } from "../content/mechanicsStarterCatalog.js";
 import { SRD_5_1_STARTER_CATALOG } from "../content/srdStarterCatalog.js";
 import { SRD_5_1_STARTER_RULES_PROFILE_ID } from "@velvet/contracts";
 import { systemRuntime } from "../runtime.js";
@@ -63,20 +60,17 @@ import {
   createCampaignAdministrationRepository,
   type CampaignAdministrationRepository,
 } from "./campaignAdministrationRepo.js";
-import {
-  createContentCatalogRepository,
-  type ContentCatalogRepository,
-} from "./contentCatalogRepo.js";
+import { createContentCatalogRepository, type ContentCatalogRepository } from "./contentCatalogRepo.js";
 import { validateContentCatalog } from "./contentCatalog/index.js";
 import {
   verifyCatalogVisibilityProjection,
   type PersistedCatalogVisibilityRow,
 } from "./contentCatalog/catalogVisibility.js";
+import { createCharacterBuilderRepository, type CharacterBuilderRepository } from "./characterBuilderRepo.js";
 import {
-  createCharacterBuilderRepository,
-  type CharacterBuilderRepository,
-} from "./characterBuilderRepo.js";
-import { createCharacterProgressionRepository, type CharacterProgressionRepository } from "./characterProgressionRepo.js";
+  createCharacterProgressionRepository,
+  type CharacterProgressionRepository,
+} from "./characterProgressionRepo.js";
 import { createActorResourceRepository, type ActorResourceRepository } from "./actorResourceRepo.js";
 import { createInventoryRepository, type InventoryRepository } from "./inventoryRepo.js";
 import { createEconomyRepository, type EconomyRepository } from "./economyRepo.js";
@@ -101,7 +95,10 @@ import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
 import { createCampaignDmRepository } from "./campaignDmRepo.js";
 import { createExactCandidateProviderBridgeRepository, createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
-import { AgentObservationUnavailableError, createAgentObservationRepository } from "./observations/agentObservationRepo.js";
+import {
+  AgentObservationUnavailableError,
+  createAgentObservationRepository,
+} from "./observations/agentObservationRepo.js";
 import { createAgentObservationReadRepository } from "./observations/agentObservationReadRepo.js";
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
 import { createFreeformTravelRepository } from "./freeform/freeformTravelRepo.js";
@@ -112,7 +109,10 @@ import { createFreeformRumorRepository } from "./freeform/freeformRumorRepo.js";
 import { createFreeformShopRepository } from "./freeform/freeformShopRepo.js";
 import { createFreeformEncounterRepository } from "./freeform/freeformEncounterRepo.js";
 import { createFreeformFactionRepository } from "./freeform/freeformFactionRepo.js";
-import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
+import {
+  createCampaignRoomActivationReadinessInspector,
+  createCampaignRoomActivationRepository,
+} from "./campaignRoomActivationRepo.js";
 import { createCampaignRoomParticipantRepository } from "./campaignRoomParticipantRepo.js";
 import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
 import { createCampaignStartingLocationRepository } from "./campaignStartingLocationRepo.js";
@@ -167,8 +167,9 @@ export type {
   RepositoryUnitOfWork,
 } from "./campaign/index.js";
 
-type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
-  T & (T extends PromiseLike<unknown> ? never : unknown);
+type SynchronousCallback<T> = (
+  repository: RepositoryUnitOfWork,
+) => T & (T extends PromiseLike<unknown> ? never : unknown);
 import { createCampaignCoreRepository } from "./campaign/campaignCoreRepo.js";
 import { createCampaignAccessRepository } from "./campaign/campaignAccessRepo.js";
 import { createCampaignActorRepository } from "./campaign/campaignActorRepo.js";
@@ -241,9 +242,7 @@ export {
   ContentPackInstallationConflictError,
 } from "./campaign/index.js";
 import { projectLegacyPersonaDisplayName } from "./campaign/legacyPersonaDisplayName.js";
-import {
-  createOriginalStarterSetupInspectionRepository,
-} from "./campaign/originalStarterSetupInspectionRepo.js";
+import { createOriginalStarterSetupInspectionRepository } from "./campaign/originalStarterSetupInspectionRepo.js";
 import {
   createCampaignGlobalContentReadRepository,
   CONTENT_PACK_PROJECTION,
@@ -251,12 +250,7 @@ import {
   DEFINITION_PROJECTION,
   RULES_PROFILE_PROJECTION,
 } from "./campaign/campaignGlobalContentReadRepo.js";
-import {
-  sameMetadata,
-  toContentPack,
-  toRpgDefinition,
-  toRulesProfile,
-} from "./campaign/campaignContentRowMappers.js";
+import { sameMetadata, toContentPack, toRpgDefinition, toRulesProfile } from "./campaign/campaignContentRowMappers.js";
 import type {
   AddCampaignMembershipInput,
   ActorResource,
@@ -291,7 +285,6 @@ import type {
   UsageSummary,
 } from "../types.js";
 
-
 /**
  * Optional dependencies and storage location for `createRepository`.
  *
@@ -309,10 +302,7 @@ function createCampaignActorOperations(
   progressionRepository: CharacterProgressionRepository,
 ) {
   const characterCreationOptionsRepository = createCampaignCharacterCreationOptionsRepository(db);
-  const characterRosterRepository = createCampaignCharacterRosterOperations(
-    db,
-    projectLegacyPersonaDisplayName,
-  );
+  const characterRosterRepository = createCampaignCharacterRosterOperations(db, projectLegacyPersonaDisplayName);
   const characterWorkspaceRepository = createCampaignCharacterWorkspaceRepository(db);
   const characterSheetSnapshotRepository = createCampaignCharacterSheetSnapshotRepository(
     db,
@@ -376,7 +366,9 @@ function runTransaction<T>(
     toContentPack,
   });
   const campaignContentDefinitionReadRepository = createCampaignContentDefinitionReadRepository(db, {
-    definitionProjection: DEFINITION_PROJECTION, definitionOrder: DEFINITION_ORDER, toRpgDefinition,
+    definitionProjection: DEFINITION_PROJECTION,
+    definitionOrder: DEFINITION_ORDER,
+    toRpgDefinition,
     verifyCatalogVisibilityProjection,
   });
   const companionRepository = createCompanionRepository(db, dependencies, (operation) => {
@@ -453,7 +445,11 @@ function runTransaction<T>(
     },
     getCampaignSessionAttachment: (actorPrincipalId, campaignId, sessionId) => {
       assertActive();
-      return campaignSessionAttachmentReadRepository.getCampaignSessionAttachment(actorPrincipalId, campaignId, sessionId);
+      return campaignSessionAttachmentReadRepository.getCampaignSessionAttachment(
+        actorPrincipalId,
+        campaignId,
+        sessionId,
+      );
     },
     getCampaignPlayBootstrap: (actorPrincipalId, campaignId, sessionId) => {
       assertActive();
@@ -462,7 +458,10 @@ function runTransaction<T>(
     getCampaignAgentContextSnapshot: (actorPrincipalId, campaignId, sessionId, audience) => {
       assertActive();
       return campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(
-        actorPrincipalId, campaignId, sessionId, audience,
+        actorPrincipalId,
+        campaignId,
+        sessionId,
+        audience,
       );
     },
     getCampaignRoomLinkingSnapshot: (actorPrincipalId, campaignId) => {
@@ -487,7 +486,11 @@ function runTransaction<T>(
     },
     getCampaignCharacterSheetSnapshot: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertActive();
-      return campaignActorRepository.getCampaignCharacterSheetSnapshot(actorPrincipalId, campaignId, campaignCharacterId);
+      return campaignActorRepository.getCampaignCharacterSheetSnapshot(
+        actorPrincipalId,
+        campaignId,
+        campaignCharacterId,
+      );
     },
     listActorResources: (actorPrincipalId, campaignId, actorId) => {
       assertActive();
@@ -503,7 +506,13 @@ function runTransaction<T>(
     },
     listPublicCampaignEvents: (actorPrincipalId, campaignId, timelineId, afterRevision, limit) => {
       assertActive();
-      return campaignEventProjectionRepository.listPublicCampaignEvents(actorPrincipalId, campaignId, timelineId, afterRevision, limit);
+      return campaignEventProjectionRepository.listPublicCampaignEvents(
+        actorPrincipalId,
+        campaignId,
+        timelineId,
+        afterRevision,
+        limit,
+      );
     },
     listRecentCampaignDiceEvents: (actorPrincipalId, campaignId, timelineId) => {
       assertActive();
@@ -559,11 +568,19 @@ function runTransaction<T>(
     },
     listCampaignContentPackDefinitions: (actorPrincipalId, campaignId, identifier) => {
       assertActive();
-      return campaignContentDefinitionReadRepository.listCampaignContentPackDefinitions(actorPrincipalId, campaignId, identifier);
+      return campaignContentDefinitionReadRepository.listCampaignContentPackDefinitions(
+        actorPrincipalId,
+        campaignId,
+        identifier,
+      );
     },
     getCampaignContentPackDefinition: (actorPrincipalId, campaignId, reference) => {
       assertActive();
-      return campaignContentDefinitionReadRepository.getCampaignContentPackDefinition(actorPrincipalId, campaignId, reference);
+      return campaignContentDefinitionReadRepository.getCampaignContentPackDefinition(
+        actorPrincipalId,
+        campaignId,
+        reference,
+      );
     },
     getSession: (id) => {
       assertActive();
@@ -581,8 +598,11 @@ function runTransaction<T>(
   try {
     return db.transaction(() => {
       const result = callback(unitOfWork);
-      if (result !== null && (typeof result === "object" || typeof result === "function")
-        && typeof (result as { then?: unknown }).then === "function") {
+      if (
+        result !== null &&
+        (typeof result === "object" || typeof result === "function") &&
+        typeof (result as { then?: unknown }).then === "function"
+      ) {
         void Promise.resolve(result).catch(() => undefined);
         throw new TypeError("repository transaction callbacks must be synchronous");
       }
@@ -620,11 +640,14 @@ function createRepositoryComposition<T>(
   const db = openDatabase(path.resolve(options.dataDir ?? resolveDataDir()));
   const campaignCommandWriteOperations = createCampaignCommandWriteOperations(db, dependencies);
   const campaignEventReadRepository = createCampaignEventReadRepository(db);
-  const campaignCommandRepository = createCampaignCommandRepository({
-    executeRollActorDice: (actor, input) => campaignCommandWriteOperations.executeRollActorDice(actor, input),
-    executeRollActorDiceForVisibleCharacter: (actor, input, binding) =>
-      campaignCommandWriteOperations.executeRollActorDiceForVisibleCharacter(actor, input, binding),
-  }, campaignEventReadRepository);
+  const campaignCommandRepository = createCampaignCommandRepository(
+    {
+      executeRollActorDice: (actor, input) => campaignCommandWriteOperations.executeRollActorDice(actor, input),
+      executeRollActorDiceForVisibleCharacter: (actor, input, binding) =>
+        campaignCommandWriteOperations.executeRollActorDiceForVisibleCharacter(actor, input, binding),
+    },
+    campaignEventReadRepository,
+  );
   const campaignCharacterWriteRepository = createCampaignCharacterWriteRepository(db, dependencies);
   const diceRepository = createDiceRepository(db, dependencies, campaignCommandRepository);
   const campaignAccessRepository = createCampaignAccessRepository(db);
@@ -660,36 +683,43 @@ function createRepositoryComposition<T>(
     toContentPack,
   });
   const campaignContentDefinitionReadRepository = createCampaignContentDefinitionReadRepository(db, {
-    definitionProjection: DEFINITION_PROJECTION, definitionOrder: DEFINITION_ORDER, toRpgDefinition,
+    definitionProjection: DEFINITION_PROJECTION,
+    definitionOrder: DEFINITION_ORDER,
+    toRpgDefinition,
     verifyCatalogVisibilityProjection,
   });
-  const campaignCoreRepository = createCampaignCoreRepository({
-    createCampaign: (actor, input) => createCampaignCoreWriteSync(db, dependencies, actor, input),
-    renameCampaign: (actor, campaignId, input) => renameCampaignCoreWriteSync(db, dependencies.clock, actor, campaignId, input),
-    renameCampaignIfUnchanged: (actor, campaignId, input) =>
-      renameCampaignIfUnchangedCoreWriteSync(db, dependencies.clock, actor, campaignId, input),
-    addCampaignMembership: (actor, campaignId, input) =>
-      addCampaignMembershipCoreWriteSync(db, dependencies.clock, actor, campaignId, input),
-    attachCampaignSession: (actor, input) => attachCampaignSessionCoreWriteSync(db, dependencies.clock, actor, input),
-    detachCampaignSession: (actor, input) => detachCampaignSessionCoreWriteSync(db, actor, input),
-    listCampaigns: (actor) => campaignAccessRepository.listCampaigns(actor),
-    getCampaign: (actor, campaignId) => campaignAccessRepository.getCampaign(actor, campaignId),
-    listCampaignTimelines: (actor, campaignId) => listCampaignTimelinesReadSync(db, actor, campaignId),
-    getCampaignTimeline: (actor, campaignId, timelineId) => getCampaignTimelineReadSync(db, actor, campaignId, timelineId),
-    listCampaignMemberships: (actor, campaignId) => campaignMembershipReadRepository.listCampaignMemberships(actor, campaignId),
-    getCampaignMembership: (actor, campaignId, principalId) =>
-      campaignMembershipReadRepository.getCampaignMembership(actor, campaignId, principalId),
-    listCampaignSessionAttachments: (actor, campaignId) =>
-      campaignSessionAttachmentReadRepository.listCampaignSessionAttachments(actor, campaignId),
-    getCampaignSessionAttachment: (actor, campaignId, sessionId) =>
-      campaignSessionAttachmentReadRepository.getCampaignSessionAttachment(actor, campaignId, sessionId),
-    getCampaignRoomLinkingSnapshot: (actor, campaignId) =>
-      campaignRoomLinkingSnapshotRepository.getCampaignRoomLinkingSnapshot(actor, campaignId),
-    getCampaignRoomSessionLifecycle: (sessionId) =>
-      campaignRoomSessionLifecycleRepository.getCampaignRoomSessionLifecycle(sessionId),
-  },
+  const campaignCoreRepository = createCampaignCoreRepository(
+    {
+      createCampaign: (actor, input) => createCampaignCoreWriteSync(db, dependencies, actor, input),
+      renameCampaign: (actor, campaignId, input) =>
+        renameCampaignCoreWriteSync(db, dependencies.clock, actor, campaignId, input),
+      renameCampaignIfUnchanged: (actor, campaignId, input) =>
+        renameCampaignIfUnchangedCoreWriteSync(db, dependencies.clock, actor, campaignId, input),
+      addCampaignMembership: (actor, campaignId, input) =>
+        addCampaignMembershipCoreWriteSync(db, dependencies.clock, actor, campaignId, input),
+      attachCampaignSession: (actor, input) => attachCampaignSessionCoreWriteSync(db, dependencies.clock, actor, input),
+      detachCampaignSession: (actor, input) => detachCampaignSessionCoreWriteSync(db, actor, input),
+      listCampaigns: (actor) => campaignAccessRepository.listCampaigns(actor),
+      getCampaign: (actor, campaignId) => campaignAccessRepository.getCampaign(actor, campaignId),
+      listCampaignTimelines: (actor, campaignId) => listCampaignTimelinesReadSync(db, actor, campaignId),
+      getCampaignTimeline: (actor, campaignId, timelineId) =>
+        getCampaignTimelineReadSync(db, actor, campaignId, timelineId),
+      listCampaignMemberships: (actor, campaignId) =>
+        campaignMembershipReadRepository.listCampaignMemberships(actor, campaignId),
+      getCampaignMembership: (actor, campaignId, principalId) =>
+        campaignMembershipReadRepository.getCampaignMembership(actor, campaignId, principalId),
+      listCampaignSessionAttachments: (actor, campaignId) =>
+        campaignSessionAttachmentReadRepository.listCampaignSessionAttachments(actor, campaignId),
+      getCampaignSessionAttachment: (actor, campaignId, sessionId) =>
+        campaignSessionAttachmentReadRepository.getCampaignSessionAttachment(actor, campaignId, sessionId),
+      getCampaignRoomLinkingSnapshot: (actor, campaignId) =>
+        campaignRoomLinkingSnapshotRepository.getCampaignRoomLinkingSnapshot(actor, campaignId),
+      getCampaignRoomSessionLifecycle: (sessionId) =>
+        campaignRoomSessionLifecycleRepository.getCampaignRoomSessionLifecycle(sessionId),
+    },
     (campaignId, actor, type, payload, result, occurredAt) =>
-      recordCompatibilityAdministrationAuditCoreWrite(db, campaignId, actor, type, payload, result, occurredAt));
+      recordCompatibilityAdministrationAuditCoreWrite(db, campaignId, actor, type, payload, result, occurredAt),
+  );
   const campaignLegacyCoreWriteRepository = createCampaignLegacyCoreWriteRepository(db, campaignCoreRepository);
   const campaignEventProjectionRepository = createCampaignEventProjectionRepo(campaignEventReadRepository);
   const campaignActorResourceRepository = createCampaignActorResourceRepository(db);
@@ -699,17 +729,26 @@ function createRepositoryComposition<T>(
   const assertOpen = () => {
     if (closed) throw new Error("repository is closed");
   };
-  const rawAdministrationRepository = createCampaignAdministrationRepository(db, dependencies, () => {
-    assertOpen();
-    if (transactionDepth > 0) throw new Error("campaign administration mutation cannot run inside a repository transaction");
-  }, (sessionId) => {
-    return campaignCoreRepository.getCampaignRoomSessionLifecycle(sessionId);
-  });
+  const rawAdministrationRepository = createCampaignAdministrationRepository(
+    db,
+    dependencies,
+    () => {
+      assertOpen();
+      if (transactionDepth > 0)
+        throw new Error("campaign administration mutation cannot run inside a repository transaction");
+    },
+    (sessionId) => {
+      return campaignCoreRepository.getCampaignRoomSessionLifecycle(sessionId);
+    },
+  );
   const administrationRepository = new Proxy(rawAdministrationRepository, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
       if (typeof value !== "function") return value;
-      return (...args: unknown[]) => { assertOpen(); return value(...args); };
+      return (...args: unknown[]) => {
+        assertOpen();
+        return value(...args);
+      };
     },
   }) as CampaignAdministrationRepository;
   const rawContentCatalogRepository = createContentCatalogRepository(db, dependencies.clock, () => {
@@ -720,7 +759,10 @@ function createRepositoryComposition<T>(
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
       if (typeof value !== "function") return value;
-      return (...args: unknown[]) => { assertOpen(); return value(...args); };
+      return (...args: unknown[]) => {
+        assertOpen();
+        return value(...args);
+      };
     },
   }) as ContentCatalogRepository;
   const attunementRepository = createAttunementRepository(db, {
@@ -729,11 +771,20 @@ function createRepositoryComposition<T>(
       const catalog = contentCatalogRepository.resolveCampaignCatalog(LOCAL_OWNER_PRINCIPAL_ID, campaignId);
       if (!catalog) return null;
       for (const pack of catalog.contentPacks) {
-        const projection = contentCatalogRepository.getCampaignContentCatalog(LOCAL_OWNER_PRINCIPAL_ID, campaignId, pack.packId, pack.packVersion);
+        const projection = contentCatalogRepository.getCampaignContentCatalog(
+          LOCAL_OWNER_PRINCIPAL_ID,
+          campaignId,
+          pack.packId,
+          pack.packVersion,
+        );
         if (!projection) continue;
-        const definition = projection.definitions.find((candidate) => candidate.reference.definitionId === definitionId);
+        const definition = projection.definitions.find(
+          (candidate) => candidate.reference.definitionId === definitionId,
+        );
         if (definition === undefined || definition.reference.kind !== "item") continue;
-        const magic = magicItemDefinitionFromCatalog(definition as unknown as Parameters<typeof magicItemDefinitionFromCatalog>[0]);
+        const magic = magicItemDefinitionFromCatalog(
+          definition as unknown as Parameters<typeof magicItemDefinitionFromCatalog>[0],
+        );
         if (magic !== null) return magic;
       }
       return null;
@@ -747,180 +798,404 @@ function createRepositoryComposition<T>(
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
       if (typeof value !== "function") return value;
-      return (...args: unknown[]) => { assertOpen(); return value(...args); };
+      return (...args: unknown[]) => {
+        assertOpen();
+        return value(...args);
+      };
     },
   }) as CharacterBuilderRepository;
-  const rawCharacterProgressionRepository=createCharacterProgressionRepository(db,dependencies,()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("character progression mutation cannot run inside a repository transaction");
+  const rawCharacterProgressionRepository = createCharacterProgressionRepository(db, dependencies, () => {
+    assertOpen();
+    if (transactionDepth > 0)
+      throw new Error("character progression mutation cannot run inside a repository transaction");
   });
-  const characterProgressionRepository=new Proxy(rawCharacterProgressionRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
-    if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as CharacterProgressionRepository;
+  const characterProgressionRepository = new Proxy(rawCharacterProgressionRepository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => {
+        assertOpen();
+        return value(...args);
+      };
+    },
+  }) as CharacterProgressionRepository;
   const campaignActorRepository = createCampaignActorRepository(
     createCampaignActorOperations(db, characterProgressionRepository),
   );
-  const m15Guard=()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.5 mutation cannot run inside a repository transaction");};
-  const rawActorResourceRepository=createActorResourceRepository(db,dependencies,m15Guard);
-  const actorResourceRepository=new Proxy(rawActorResourceRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
-    if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as ActorResourceRepository;
-  const rawInventoryRepository=createInventoryRepository(db,dependencies,m15Guard);
-  const inventoryRepository=new Proxy(rawInventoryRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
-    if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as InventoryRepository;
-  const rawEconomyRepository=createEconomyRepository(db,dependencies,m15Guard);
-  const economyRepository=new Proxy(rawEconomyRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
-    if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as EconomyRepository;
-  const restRepository=createRestRepository(db,dependencies,m15Guard);
-  const m16Guard=()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.6 mutation cannot run inside a repository transaction");};
-  const checkRepository=createCheckRepository(db,dependencies,m16Guard);
-  const adventureCheckRepository=createAdventureCheckRepository(db,dependencies,m16Guard);
-  const adventureInventoryRepository=createAdventureInventoryRepository(db,dependencies,inventoryRepository,m15Guard);
-  const adventureCommerceRepository=createAdventureCommerceRepository(db,dependencies,economyRepository,m15Guard);
-  const powerRepository=createPowerRepository(db,dependencies,m16Guard);
-  const spellcastingRepository=createSpellcastingRepository(db,powerRepository);
-  const effectRepository=createEffectRepository(db,dependencies,m16Guard);
-  const actorGameplaySheetReadRepository=createActorGameplaySheetReadRepository(db,{
-    campaignActors:campaignActorRepository,resources:actorResourceRepository,inventory:inventoryRepository,
-    powers:powerRepository,effects:effectRepository,
+  const m15Guard = () => {
+    assertOpen();
+    if (transactionDepth > 0) throw new Error("M1.5 mutation cannot run inside a repository transaction");
+  };
+  const rawActorResourceRepository = createActorResourceRepository(db, dependencies, m15Guard);
+  const actorResourceRepository = new Proxy(rawActorResourceRepository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => {
+        assertOpen();
+        return value(...args);
+      };
+    },
+  }) as ActorResourceRepository;
+  const rawInventoryRepository = createInventoryRepository(db, dependencies, m15Guard);
+  const inventoryRepository = new Proxy(rawInventoryRepository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => {
+        assertOpen();
+        return value(...args);
+      };
+    },
+  }) as InventoryRepository;
+  const rawEconomyRepository = createEconomyRepository(db, dependencies, m15Guard);
+  const economyRepository = new Proxy(rawEconomyRepository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => {
+        assertOpen();
+        return value(...args);
+      };
+    },
+  }) as EconomyRepository;
+  const restRepository = createRestRepository(db, dependencies, m15Guard);
+  const m16Guard = () => {
+    assertOpen();
+    if (transactionDepth > 0) throw new Error("M1.6 mutation cannot run inside a repository transaction");
+  };
+  const checkRepository = createCheckRepository(db, dependencies, m16Guard);
+  const adventureCheckRepository = createAdventureCheckRepository(db, dependencies, m16Guard);
+  const adventureInventoryRepository = createAdventureInventoryRepository(
+    db,
+    dependencies,
+    inventoryRepository,
+    m15Guard,
+  );
+  const adventureCommerceRepository = createAdventureCommerceRepository(db, dependencies, economyRepository, m15Guard);
+  const powerRepository = createPowerRepository(db, dependencies, m16Guard);
+  const spellcastingRepository = createSpellcastingRepository(db, powerRepository);
+  const effectRepository = createEffectRepository(db, dependencies, m16Guard);
+  const actorGameplaySheetReadRepository = createActorGameplaySheetReadRepository(db, {
+    campaignActors: campaignActorRepository,
+    resources: actorResourceRepository,
+    inventory: inventoryRepository,
+    powers: powerRepository,
+    effects: effectRepository,
   });
-  const encounterRepository=createEncounterRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0&&atomicGenerationApplyDepth===0)throw new Error("M1.7 mutation cannot run inside a repository transaction");});
-  const tacticalMapRepository=createTacticalMapRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("tactical map operation cannot run inside a repository transaction");});
-  const adventurePowerRestRepository=createAdventurePowerRestRepository(db,dependencies,powerRepository,restRepository,encounterRepository,()=>assertOpen());
-  const worldRepository=createWorldRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("world operation cannot run inside a repository transaction");});
-  const rawQuestRepository = createQuestRepository(db, LOCAL_OWNER_PRINCIPAL_ID, () => {
-    assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 quest operation cannot run inside a repository transaction");
-  }, dependencies);
+  const encounterRepository = createEncounterRepository(db, dependencies, () => {
+    assertOpen();
+    if (transactionDepth > 0 && atomicGenerationApplyDepth === 0)
+      throw new Error("M1.7 mutation cannot run inside a repository transaction");
+  });
+  const tacticalMapRepository = createTacticalMapRepository(db, dependencies, () => {
+    assertOpen();
+    if (transactionDepth > 0) throw new Error("tactical map operation cannot run inside a repository transaction");
+  });
+  const adventurePowerRestRepository = createAdventurePowerRestRepository(
+    db,
+    dependencies,
+    powerRepository,
+    restRepository,
+    encounterRepository,
+    () => assertOpen(),
+  );
+  const worldRepository = createWorldRepository(db, dependencies, () => {
+    assertOpen();
+    if (transactionDepth > 0) throw new Error("world operation cannot run inside a repository transaction");
+  });
+  const rawQuestRepository = createQuestRepository(
+    db,
+    LOCAL_OWNER_PRINCIPAL_ID,
+    () => {
+      assertOpen();
+      if (transactionDepth > 0) throw new Error("M2.10 quest operation cannot run inside a repository transaction");
+    },
+    dependencies,
+  );
   const questRepository = new Proxy(rawQuestRepository, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
       if (typeof value !== "function") return value;
-      return (...args: unknown[]) => { assertOpen(); return value(...args); };
+      return (...args: unknown[]) => {
+        assertOpen();
+        return value(...args);
+      };
     },
   }) as QuestRepository;
-  const adventureQuestProgressionRepository=createAdventureQuestProgressionRepository(db,dependencies,questRepository,
-    characterProgressionRepository,()=>assertOpen());
-  const storyRepository = createStoryRepository(db, { ...dependencies, guard: () => {
-    assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 story operation cannot run inside a repository transaction");
-  } });
+  const adventureQuestProgressionRepository = createAdventureQuestProgressionRepository(
+    db,
+    dependencies,
+    questRepository,
+    characterProgressionRepository,
+    () => assertOpen(),
+  );
+  const storyRepository = createStoryRepository(db, {
+    ...dependencies,
+    guard: () => {
+      assertOpen();
+      if (transactionDepth > 0) throw new Error("M2.10 story operation cannot run inside a repository transaction");
+    },
+  });
   const companionRepository = createCompanionRepository(db, dependencies, (operation) => {
     assertOpen();
     if (operation === "write" && transactionDepth > 0) {
       throw new Error("companion mutation cannot run inside a repository transaction");
     }
   });
-  const adventureTurnRepository = createAdventureTurnRepository(db, { ...dependencies, getActorGameplaySheet: actorGameplaySheetReadRepository.getActorGameplaySheet }, () => {
-    assertOpen(); if (transactionDepth > 0 && atomicGenerationApplyDepth === 0) throw new Error("M1.10 operation cannot run inside a repository transaction");
-  },{
-    executeSetActorAttribute:(principal,input)=>campaignCommandWriteOperations.executeSetActorAttribute(principal,input),
-    executeRollActorDice:(principal,input)=>diceRepository.executeRollActorDice(principal,input),
-    resolveCombatAction:(principal,encounterId,input)=>encounterRepository.resolveCombatAction(principal,encounterId,input),
-    executeInventoryAction:(principal,turnId,proposalId)=>adventureInventoryRepository.executeAdventureInventoryProposal(principal,turnId,proposalId),
-    executeCommerceAction:(principal,turnId,proposalId)=>adventureCommerceRepository.executeAdventureCommerceProposal(principal,turnId,proposalId),
-    executePowerRestAction:(principal,turnId,proposalId)=>adventurePowerRestRepository.executeAdventurePowerRestProposal(principal,turnId,proposalId),
-    executeQuestProgressionAction:(principal,turnId,proposalId)=>adventureQuestProgressionRepository.executeAdventureQuestProgressionProposal(principal,turnId,proposalId),
+  const adventureTurnRepository = createAdventureTurnRepository(
+    db,
+    { ...dependencies, getActorGameplaySheet: actorGameplaySheetReadRepository.getActorGameplaySheet },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0 && atomicGenerationApplyDepth === 0)
+        throw new Error("M1.10 operation cannot run inside a repository transaction");
+    },
+    {
+      executeSetActorAttribute: (principal, input) =>
+        campaignCommandWriteOperations.executeSetActorAttribute(principal, input),
+      executeRollActorDice: (principal, input) => diceRepository.executeRollActorDice(principal, input),
+      resolveCombatAction: (principal, encounterId, input) =>
+        encounterRepository.resolveCombatAction(principal, encounterId, input),
+      executeInventoryAction: (principal, turnId, proposalId) =>
+        adventureInventoryRepository.executeAdventureInventoryProposal(principal, turnId, proposalId),
+      executeCommerceAction: (principal, turnId, proposalId) =>
+        adventureCommerceRepository.executeAdventureCommerceProposal(principal, turnId, proposalId),
+      executePowerRestAction: (principal, turnId, proposalId) =>
+        adventurePowerRestRepository.executeAdventurePowerRestProposal(principal, turnId, proposalId),
+      executeQuestProgressionAction: (principal, turnId, proposalId) =>
+        adventureQuestProgressionRepository.executeAdventureQuestProgressionProposal(principal, turnId, proposalId),
+    },
+  );
+  const exactCandidateRepository = createExactCandidateRepository(db, dependencies, () => {
+    assertOpen();
+    if (transactionDepth > 0) throw new Error("exact candidate operation cannot run inside a repository transaction");
   });
-  const exactCandidateRepository=createExactCandidateRepository(db,dependencies,()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("exact candidate operation cannot run inside a repository transaction");
-  });
-  const exactCandidateProviderBridge=createExactCandidateProviderBridgeRepository(db,dependencies,()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("exact candidate provider bridge cannot run inside a repository transaction");
-  },exactCandidateRepository);
-  const campaignGenerationRepository=createCampaignGenerationRepository(db,dependencies,adventureTurnRepository,()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("campaign generation operation cannot run inside a repository transaction");
-  });
-  const freeformTravelRepository=createFreeformTravelRepository(db,dependencies,{
-    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
-    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
-    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
-    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
-    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
-    travelActor:(principalId,actorId,input)=>worldRepository.travelActor(principalId,actorId,input),
-  },()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("freeform travel operation cannot run inside a repository transaction");
-  });
-  const freeformNpcRepository=createFreeformNpcRepository(db,dependencies,{
-    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
-    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
-    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
-    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
-    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
-  },()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("freeform npc operation cannot run inside a repository transaction");
-  });
-  const freeformLoreRepository=createFreeformLoreRepository(db,dependencies,{
-    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
-    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
-    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
-    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
-    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
-  },()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("freeform lore operation cannot run inside a repository transaction");
-  });
-  const freeformQuestRepository=createFreeformQuestRepository(db,dependencies,{
-    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
-    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
-    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
-    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
-    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
-  },()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("freeform quest operation cannot run inside a repository transaction");
-  });
-  const freeformRumorRepository=createFreeformRumorRepository(db,dependencies,{
-    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
-    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
-    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
-    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
-    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
-  },()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("freeform rumor operation cannot run inside a repository transaction");
-  });
-  const freeformShopRepository=createFreeformShopRepository(db,dependencies,{
-    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
-    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
-    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
-    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
-    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
-  },()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("freeform shop operation cannot run inside a repository transaction");
-  });
-  const freeformEncounterRepository=createFreeformEncounterRepository(db,dependencies,{
-    createEncounter:(principalId,campaignId,input)=>encounterRepository.createEncounter(principalId,campaignId,input),
-    startEncounter:(principalId,encounterId,input)=>encounterRepository.startEncounter(principalId,encounterId,input),
-  },()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("freeform encounter operation cannot run inside a repository transaction");
-  });
-  const freeformFactionRepository=createFreeformFactionRepository(db,dependencies,{
-    getDraftByIdempotencyKey:(principalId,campaignId,idempotencyKey)=>adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId,campaignId,idempotencyKey),
-    createDraft:(principalId,input)=>adventureTurnRepository.createGenerationDraft(principalId,input),
-    getContentRevision:(principalId,campaignId)=>campaignGenerationRepository.getCampaignGenerationContext(principalId,campaignId,[])?.revision??null,
-    recordCandidate:(draftId,content)=>campaignGenerationRepository.recordCampaignGenerationCandidate(draftId,content,[]),
-    applyDraft:(principalId,input)=>campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId,input),
-  },()=>{
-    assertOpen();if(transactionDepth>0)throw new Error("freeform faction operation cannot run inside a repository transaction");
-  });
-  const campaignAdministrationIntegrationRepository = createCampaignAdministrationIntegrationRepository(db, dependencies, () => {
-    assertOpen(); if (transactionDepth > 0) throw new Error("campaign administration integration cannot run inside a repository transaction");
-  });
-  const activationReadinessInspector = createCampaignRoomActivationReadinessInspector(db,
-    (principalId, campaignId) => contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId));
-  const campaignDmReadinessRepository = createCampaignDmReadinessRepository(db, activationReadinessInspector, () => assertOpen());
+  const exactCandidateProviderBridge = createExactCandidateProviderBridgeRepository(
+    db,
+    dependencies,
+    () => {
+      assertOpen();
+      if (transactionDepth > 0)
+        throw new Error("exact candidate provider bridge cannot run inside a repository transaction");
+    },
+    exactCandidateRepository,
+  );
+  const campaignGenerationRepository = createCampaignGenerationRepository(
+    db,
+    dependencies,
+    adventureTurnRepository,
+    () => {
+      assertOpen();
+      if (transactionDepth > 0)
+        throw new Error("campaign generation operation cannot run inside a repository transaction");
+    },
+  );
+  const freeformTravelRepository = createFreeformTravelRepository(
+    db,
+    dependencies,
+    {
+      getDraftByIdempotencyKey: (principalId, campaignId, idempotencyKey) =>
+        adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey),
+      createDraft: (principalId, input) => adventureTurnRepository.createGenerationDraft(principalId, input),
+      getContentRevision: (principalId, campaignId) =>
+        campaignGenerationRepository.getCampaignGenerationContext(principalId, campaignId, [])?.revision ?? null,
+      recordCandidate: (draftId, content) =>
+        campaignGenerationRepository.recordCampaignGenerationCandidate(draftId, content, []),
+      applyDraft: (principalId, input) =>
+        campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId, input),
+      travelActor: (principalId, actorId, input) => worldRepository.travelActor(principalId, actorId, input),
+    },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0) throw new Error("freeform travel operation cannot run inside a repository transaction");
+    },
+  );
+  const freeformNpcRepository = createFreeformNpcRepository(
+    db,
+    dependencies,
+    {
+      getDraftByIdempotencyKey: (principalId, campaignId, idempotencyKey) =>
+        adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey),
+      createDraft: (principalId, input) => adventureTurnRepository.createGenerationDraft(principalId, input),
+      getContentRevision: (principalId, campaignId) =>
+        campaignGenerationRepository.getCampaignGenerationContext(principalId, campaignId, [])?.revision ?? null,
+      recordCandidate: (draftId, content) =>
+        campaignGenerationRepository.recordCampaignGenerationCandidate(draftId, content, []),
+      applyDraft: (principalId, input) =>
+        campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId, input),
+    },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0) throw new Error("freeform npc operation cannot run inside a repository transaction");
+    },
+  );
+  const freeformLoreRepository = createFreeformLoreRepository(
+    db,
+    dependencies,
+    {
+      getDraftByIdempotencyKey: (principalId, campaignId, idempotencyKey) =>
+        adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey),
+      createDraft: (principalId, input) => adventureTurnRepository.createGenerationDraft(principalId, input),
+      getContentRevision: (principalId, campaignId) =>
+        campaignGenerationRepository.getCampaignGenerationContext(principalId, campaignId, [])?.revision ?? null,
+      recordCandidate: (draftId, content) =>
+        campaignGenerationRepository.recordCampaignGenerationCandidate(draftId, content, []),
+      applyDraft: (principalId, input) =>
+        campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId, input),
+    },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0) throw new Error("freeform lore operation cannot run inside a repository transaction");
+    },
+  );
+  const freeformQuestRepository = createFreeformQuestRepository(
+    db,
+    dependencies,
+    {
+      getDraftByIdempotencyKey: (principalId, campaignId, idempotencyKey) =>
+        adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey),
+      createDraft: (principalId, input) => adventureTurnRepository.createGenerationDraft(principalId, input),
+      getContentRevision: (principalId, campaignId) =>
+        campaignGenerationRepository.getCampaignGenerationContext(principalId, campaignId, [])?.revision ?? null,
+      recordCandidate: (draftId, content) =>
+        campaignGenerationRepository.recordCampaignGenerationCandidate(draftId, content, []),
+      applyDraft: (principalId, input) =>
+        campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId, input),
+    },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0) throw new Error("freeform quest operation cannot run inside a repository transaction");
+    },
+  );
+  const freeformRumorRepository = createFreeformRumorRepository(
+    db,
+    dependencies,
+    {
+      getDraftByIdempotencyKey: (principalId, campaignId, idempotencyKey) =>
+        adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey),
+      createDraft: (principalId, input) => adventureTurnRepository.createGenerationDraft(principalId, input),
+      getContentRevision: (principalId, campaignId) =>
+        campaignGenerationRepository.getCampaignGenerationContext(principalId, campaignId, [])?.revision ?? null,
+      recordCandidate: (draftId, content) =>
+        campaignGenerationRepository.recordCampaignGenerationCandidate(draftId, content, []),
+      applyDraft: (principalId, input) =>
+        campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId, input),
+    },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0) throw new Error("freeform rumor operation cannot run inside a repository transaction");
+    },
+  );
+  const freeformShopRepository = createFreeformShopRepository(
+    db,
+    dependencies,
+    {
+      getDraftByIdempotencyKey: (principalId, campaignId, idempotencyKey) =>
+        adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey),
+      createDraft: (principalId, input) => adventureTurnRepository.createGenerationDraft(principalId, input),
+      getContentRevision: (principalId, campaignId) =>
+        campaignGenerationRepository.getCampaignGenerationContext(principalId, campaignId, [])?.revision ?? null,
+      recordCandidate: (draftId, content) =>
+        campaignGenerationRepository.recordCampaignGenerationCandidate(draftId, content, []),
+      applyDraft: (principalId, input) =>
+        campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId, input),
+    },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0) throw new Error("freeform shop operation cannot run inside a repository transaction");
+    },
+  );
+  const freeformEncounterRepository = createFreeformEncounterRepository(
+    db,
+    dependencies,
+    {
+      createEncounter: (principalId, campaignId, input) =>
+        encounterRepository.createEncounter(principalId, campaignId, input),
+      startEncounter: (principalId, encounterId, input) =>
+        encounterRepository.startEncounter(principalId, encounterId, input),
+    },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0)
+        throw new Error("freeform encounter operation cannot run inside a repository transaction");
+    },
+  );
+  const freeformFactionRepository = createFreeformFactionRepository(
+    db,
+    dependencies,
+    {
+      getDraftByIdempotencyKey: (principalId, campaignId, idempotencyKey) =>
+        adventureTurnRepository.getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey),
+      createDraft: (principalId, input) => adventureTurnRepository.createGenerationDraft(principalId, input),
+      getContentRevision: (principalId, campaignId) =>
+        campaignGenerationRepository.getCampaignGenerationContext(principalId, campaignId, [])?.revision ?? null,
+      recordCandidate: (draftId, content) =>
+        campaignGenerationRepository.recordCampaignGenerationCandidate(draftId, content, []),
+      applyDraft: (principalId, input) =>
+        campaignGenerationRepository.applyCampaignContentGenerationDraftAtomically(principalId, input),
+    },
+    () => {
+      assertOpen();
+      if (transactionDepth > 0)
+        throw new Error("freeform faction operation cannot run inside a repository transaction");
+    },
+  );
+  const campaignAdministrationIntegrationRepository = createCampaignAdministrationIntegrationRepository(
+    db,
+    dependencies,
+    () => {
+      assertOpen();
+      if (transactionDepth > 0)
+        throw new Error("campaign administration integration cannot run inside a repository transaction");
+    },
+  );
+  const activationReadinessInspector = createCampaignRoomActivationReadinessInspector(db, (principalId, campaignId) =>
+    contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId),
+  );
+  const campaignDmReadinessRepository = createCampaignDmReadinessRepository(db, activationReadinessInspector, () =>
+    assertOpen(),
+  );
   const campaignContextInspectionRepository = createCampaignContextInspectionReadRepository(db);
   const recallRepository = createCampaignRecallReadRepository(db, {
-    getCampaignAgentContextSnapshot: (...args) => campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(...args),
+    getCampaignAgentContextSnapshot: (...args) =>
+      campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(...args),
     getAdventureCheckPublicReceipt: (...args) => adventureCheckRepository.getAdventureCheckPublicReceipt(...args),
-    getAdventureReceipt: (principal, turn, command, kind) => kind === "inventory-receipt"
-      ? adventureInventoryRepository.getAdventureInventoryNarrationReceipt(principal, turn, command)
-      : kind === "commerce-receipt" ? adventureCommerceRepository.getAdventureCommerceNarrationReceipt(principal, turn, command)
-      : kind === "travel-receipt" ? exactCandidateProviderBridge.getExactCandidateTravelNarrationReceipt(principal, turn, command)
-        ?? ((journey) => journey ? { kind: "journey", destination: journey.destination, currentLocation: journey.currentLocation,
-          status: journey.status, interruption: journey.interruption ? journey.interruption.event.summary : null,
-          legs: journey.path.length, elapsedMinutes: journey.elapsedMinutes } : null)(worldRepository.getActorJourneyNarrationReceipt(principal, turn, command))
-      : kind === "quest-receipt" ? questRepository.getAdventureQuestNarrationReceipt(principal, turn, command)
-      : kind === "combat-receipt" ? adventureTurnRepository.getAgentCombatReceipt(principal,
-        adventureTurnRepository.getAdventureTurn(principal, turn)!.campaignId, command)?.resolution ?? null
-      : adventureQuestProgressionRepository.getAdventureQuestProgressionNarrationReceipt(principal, turn, command)
-        ?? adventurePowerRestRepository.getAdventurePowerRestNarrationReceipt(principal, turn, command),
+    getAdventureReceipt: (principal, turn, command, kind) =>
+      kind === "inventory-receipt"
+        ? adventureInventoryRepository.getAdventureInventoryNarrationReceipt(principal, turn, command)
+        : kind === "commerce-receipt"
+          ? adventureCommerceRepository.getAdventureCommerceNarrationReceipt(principal, turn, command)
+          : kind === "travel-receipt"
+            ? (exactCandidateProviderBridge.getExactCandidateTravelNarrationReceipt(principal, turn, command) ??
+              ((journey) =>
+                journey
+                  ? {
+                      kind: "journey",
+                      destination: journey.destination,
+                      currentLocation: journey.currentLocation,
+                      status: journey.status,
+                      interruption: journey.interruption ? journey.interruption.event.summary : null,
+                      legs: journey.path.length,
+                      elapsedMinutes: journey.elapsedMinutes,
+                    }
+                  : null)(worldRepository.getActorJourneyNarrationReceipt(principal, turn, command)))
+            : kind === "quest-receipt"
+              ? questRepository.getAdventureQuestNarrationReceipt(principal, turn, command)
+              : kind === "combat-receipt"
+                ? (adventureTurnRepository.getAgentCombatReceipt(
+                    principal,
+                    adventureTurnRepository.getAdventureTurn(principal, turn)!.campaignId,
+                    command,
+                  )?.resolution ?? null)
+                : (adventureQuestProgressionRepository.getAdventureQuestProgressionNarrationReceipt(
+                    principal,
+                    turn,
+                    command,
+                  ) ?? adventurePowerRestRepository.getAdventurePowerRestNarrationReceipt(principal, turn, command)),
     getMechanicReceipt: (principal, campaign, command) => {
       const receipt = campaignEventReadRepository.getCommandReceipt(principal, campaign, command);
-      return receipt ? receipt.events.map(event => ({ type: event.type, data: event.data })) : null;
+      return receipt ? receipt.events.map((event) => ({ type: event.type, data: event.data })) : null;
     },
   });
   const agentObservationRepository = createAgentObservationRepository(db, dependencies);
@@ -931,30 +1206,54 @@ function createRepositoryComposition<T>(
     ...recallRepository,
     ...campaignDmReadinessRepository,
     ...campaignContextInspectionRepository,
-    ...createCampaignDmRepository(db, dependencies, {
-      ...encounterRepository, ...storyRepository, ...campaignGenerationRepository, ...adventureTurnRepository, ...adventureCheckRepository,
-      ...campaignAdministrationIntegrationRepository,
-      ...freeformTravelRepository,
-      ...freeformNpcRepository,
-      ...freeformLoreRepository,
-      ...freeformShopRepository,
-      ...freeformEncounterRepository,
-      ...freeformQuestRepository,
-      ...freeformRumorRepository,
-      ...freeformFactionRepository,
-      ...recallRepository,
-      getCampaignAgentContextSnapshot: (principal, campaign, session, audience) =>
-        createCampaignAgentContextReadRepository(db).getCampaignAgentContextSnapshot(principal, campaign, session, audience),
-    }, () => assertOpen()),
+    ...createCampaignDmRepository(
+      db,
+      dependencies,
+      {
+        ...encounterRepository,
+        ...storyRepository,
+        ...campaignGenerationRepository,
+        ...adventureTurnRepository,
+        ...adventureCheckRepository,
+        ...campaignAdministrationIntegrationRepository,
+        ...freeformTravelRepository,
+        ...freeformNpcRepository,
+        ...freeformLoreRepository,
+        ...freeformShopRepository,
+        ...freeformEncounterRepository,
+        ...freeformQuestRepository,
+        ...freeformRumorRepository,
+        ...freeformFactionRepository,
+        ...recallRepository,
+        getCampaignAgentContextSnapshot: (principal, campaign, session, audience) =>
+          createCampaignAgentContextReadRepository(db).getCampaignAgentContextSnapshot(
+            principal,
+            campaign,
+            session,
+            audience,
+          ),
+      },
+      () => assertOpen(),
+    ),
     ...createCampaignStartingLocationRepository(db, dependencies, () => {
-      assertOpen(); if (transactionDepth > 0) throw new Error("starting-location operation cannot run inside a repository transaction");
+      assertOpen();
+      if (transactionDepth > 0)
+        throw new Error("starting-location operation cannot run inside a repository transaction");
     }),
     ...createCampaignStartupRepository(db, dependencies, () => assertOpen()),
-    ...createCampaignRoomActivationRepository(db, dependencies, () => {
-      assertOpen(); if (transactionDepth > 0) throw new Error("room activation cannot run inside a repository transaction");
-    }, (principalId, campaignId) => contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId)),
+    ...createCampaignRoomActivationRepository(
+      db,
+      dependencies,
+      () => {
+        assertOpen();
+        if (transactionDepth > 0) throw new Error("room activation cannot run inside a repository transaction");
+      },
+      (principalId, campaignId) => contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId),
+    ),
     ...createCampaignRoomParticipantRepository(db, dependencies, () => {
-      assertOpen(); if (transactionDepth > 0) throw new Error("room participant operation cannot run inside a repository transaction");
+      assertOpen();
+      if (transactionDepth > 0)
+        throw new Error("room participant operation cannot run inside a repository transaction");
     }),
     ...administrationRepository,
     ...contentCatalogRepository,
@@ -996,39 +1295,64 @@ function createRepositoryComposition<T>(
     ...campaignAdministrationIntegrationRepository,
     applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
       assertOpen();
-      const key = (scope: string) => `${scope}:${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 48)}`;
-      transactionDepth += 1; atomicGenerationApplyDepth += 1;
+      const key = (scope: string) =>
+        `${scope}:${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 48)}`;
+      transactionDepth += 1;
+      atomicGenerationApplyDepth += 1;
       try {
-        return db.transaction(() => {
-          const before = adventureTurnRepository.getGenerationDraft(principalId, input.draftId);
-          if (!before || !("stagedContent" in before)) throw new Error("generation draft is unavailable");
-          if (before.state === "applied") {
-            const appliedCommand = db.prepare(`SELECT idempotency_key FROM adventure_coordination_commands_v36
-              WHERE aggregate_kind='draft' AND campaign_id=? AND aggregate_id=? AND mutation_type='draft-apply'`).get(before.campaignId, before.draftId) as { idempotency_key: string } | undefined;
-            if (appliedCommand?.idempotency_key !== key("encounter-apply")) throw new AdventureTurnConflictError("idempotency key was reused");
-            const encounterId = resourceIdSchema.safeParse((before.applyReceipt?.result as { encounterId?: unknown } | undefined)?.encounterId);
-            if (!encounterId.success) throw new Error("applied encounter draft has no encounter receipt");
-            return { draft: before, encounterId: encounterId.data };
-          }
-          const staged = stagedEncounterGenerationSchema.parse(before.stagedContent);
-          const reviewed = adventureTurnRepository.reviewGenerationDraft(principalId, {
-            draftId: before.draftId, decision: "approved", expectedDraftRevision: input.expectedDraftRevision,
-            expectedCampaignRevision: before.campaignRevision, idempotencyKey: key("encounter-review"),
-          });
-          const encounter = encounterRepository.createEncounter(principalId, before.campaignId, {
-            sessionId: staged.sessionId, name: staged.encounter.name,
-            combatants: [...staged.partyActorIds.map((actorId) => ({ kind: "actor" as const, actorId, team: "allies" as const })), ...staged.encounter.combatants],
-            idempotencyKey: key("encounter-create"),
-          });
-          const draft = adventureTurnRepository.applyGenerationDraft(principalId, {
-            draftId: before.draftId, expectedDraftRevision: reviewed.revision,
-            expectedCampaignRevision: reviewed.campaignRevision, idempotencyKey: key("encounter-apply"),
-            result: { scope: "encounter", encounterId: encounter.encounter.encounterId },
-          });
-          return { draft, encounterId: encounter.encounter.encounterId };
-        }).immediate();
+        return db
+          .transaction(() => {
+            const before = adventureTurnRepository.getGenerationDraft(principalId, input.draftId);
+            if (!before || !("stagedContent" in before)) throw new Error("generation draft is unavailable");
+            if (before.state === "applied") {
+              const appliedCommand = db
+                .prepare(
+                  `SELECT idempotency_key FROM adventure_coordination_commands_v36
+              WHERE aggregate_kind='draft' AND campaign_id=? AND aggregate_id=? AND mutation_type='draft-apply'`,
+                )
+                .get(before.campaignId, before.draftId) as { idempotency_key: string } | undefined;
+              if (appliedCommand?.idempotency_key !== key("encounter-apply"))
+                throw new AdventureTurnConflictError("idempotency key was reused");
+              const encounterId = resourceIdSchema.safeParse(
+                (before.applyReceipt?.result as { encounterId?: unknown } | undefined)?.encounterId,
+              );
+              if (!encounterId.success) throw new Error("applied encounter draft has no encounter receipt");
+              return { draft: before, encounterId: encounterId.data };
+            }
+            const staged = stagedEncounterGenerationSchema.parse(before.stagedContent);
+            const reviewed = adventureTurnRepository.reviewGenerationDraft(principalId, {
+              draftId: before.draftId,
+              decision: "approved",
+              expectedDraftRevision: input.expectedDraftRevision,
+              expectedCampaignRevision: before.campaignRevision,
+              idempotencyKey: key("encounter-review"),
+            });
+            const encounter = encounterRepository.createEncounter(principalId, before.campaignId, {
+              sessionId: staged.sessionId,
+              name: staged.encounter.name,
+              combatants: [
+                ...staged.partyActorIds.map((actorId) => ({
+                  kind: "actor" as const,
+                  actorId,
+                  team: "allies" as const,
+                })),
+                ...staged.encounter.combatants,
+              ],
+              idempotencyKey: key("encounter-create"),
+            });
+            const draft = adventureTurnRepository.applyGenerationDraft(principalId, {
+              draftId: before.draftId,
+              expectedDraftRevision: reviewed.revision,
+              expectedCampaignRevision: reviewed.campaignRevision,
+              idempotencyKey: key("encounter-apply"),
+              result: { scope: "encounter", encounterId: encounter.encounter.encounterId },
+            });
+            return { draft, encounterId: encounter.encounter.encounterId };
+          })
+          .immediate();
       } finally {
-        atomicGenerationApplyDepth -= 1; transactionDepth -= 1;
+        atomicGenerationApplyDepth -= 1;
+        transactionDepth -= 1;
       }
     },
     // Deliberately small, closed command service: generated prose can create only
@@ -1038,10 +1362,12 @@ function createRepositoryComposition<T>(
     configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) => {
       const result = contentCatalogRepository.configureCampaignCatalog(actorPrincipalId, campaignId, {
         rulesProfileId: MECHANICS_STARTER_RULES_PROFILE_ID,
-        contentPacks: [{
-          packId: MECHANICS_STARTER_CATALOG.manifest.packId,
-          packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion,
-        }],
+        contentPacks: [
+          {
+            packId: MECHANICS_STARTER_CATALOG.manifest.packId,
+            packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion,
+          },
+        ],
         expectedRevision: input.expectedRevision,
         idempotencyKey: input.idempotencyKey,
       });
@@ -1053,8 +1379,12 @@ function createRepositoryComposition<T>(
     configureSrdStarterCatalog: (actorPrincipalId, campaignId, input) => {
       const result = contentCatalogRepository.configureCampaignCatalog(actorPrincipalId, campaignId, {
         rulesProfileId: SRD_5_1_STARTER_RULES_PROFILE_ID,
-        contentPacks: [{ packId: SRD_5_1_STARTER_CATALOG.manifest.packId,
-          packVersion: SRD_5_1_STARTER_CATALOG.manifest.packVersion }],
+        contentPacks: [
+          {
+            packId: SRD_5_1_STARTER_CATALOG.manifest.packId,
+            packVersion: SRD_5_1_STARTER_CATALOG.manifest.packVersion,
+          },
+        ],
         expectedRevision: input.expectedRevision,
         idempotencyKey: input.idempotencyKey,
       });
@@ -1065,11 +1395,13 @@ function createRepositoryComposition<T>(
       assertOpen();
       // One SQLite read transaction owns authority, campaign and content state.
       return db.transaction(() =>
-        originalStarterSetupInspectionRepository.inspectOriginalStarterSetup(actorPrincipalId, campaignId))();
+        originalStarterSetupInspectionRepository.inspectOriginalStarterSetup(actorPrincipalId, campaignId),
+      )();
     },
     installOriginalStarterContent: (actorPrincipalId, campaignId) => {
       assertOpen();
-      if (transactionDepth > 0) throw new Error("original starter installation cannot run inside a repository transaction");
+      if (transactionDepth > 0)
+        throw new Error("original starter installation cannot run inside a repository transaction");
       return campaignContentWriteRepository.installOriginalStarterContent(
         actorPrincipalId,
         campaignId,
@@ -1078,7 +1410,8 @@ function createRepositoryComposition<T>(
     },
     configureOriginalStarterContent: (actorPrincipalId, campaignId) => {
       assertOpen();
-      if (transactionDepth > 0) throw new Error("original starter configuration cannot run inside a repository transaction");
+      if (transactionDepth > 0)
+        throw new Error("original starter configuration cannot run inside a repository transaction");
       return campaignContentWriteRepository.configureOriginalStarterContent(actorPrincipalId, campaignId, {
         rulesProfileId: ORIGINAL_STARTER_RULES_PROFILE_ID,
         contentPacks: [{ packId: ORIGINAL_STARTER_PACK_ID, packVersion: ORIGINAL_STARTER_PACK_VERSION }],
@@ -1130,9 +1463,16 @@ function createRepositoryComposition<T>(
       assertOpen();
       // All authorization, target-control, and bounded projection reads share
       // one deferred SQLite snapshot rather than racing across domain reads.
-      return db.transaction(() => campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(
-        actorPrincipalId, campaignId, sessionId, audience,
-      )).deferred();
+      return db
+        .transaction(() =>
+          campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(
+            actorPrincipalId,
+            campaignId,
+            sessionId,
+            audience,
+          ),
+        )
+        .deferred();
     },
     getCampaignRoomLinkingSnapshot: (actorPrincipalId, campaignId) => {
       assertOpen();
@@ -1157,9 +1497,9 @@ function createRepositoryComposition<T>(
     getCampaignCharacterSheetSnapshot: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertOpen();
       // Both reads must see the same authority, ancestry, and progression state.
-      return db.transaction(() => campaignActorRepository.getCampaignCharacterSheetSnapshot(
-        actorPrincipalId, campaignId, campaignCharacterId,
-      ))();
+      return db.transaction(() =>
+        campaignActorRepository.getCampaignCharacterSheetSnapshot(actorPrincipalId, campaignId, campaignCharacterId),
+      )();
     },
     listActorResources: (actorPrincipalId, campaignId, actorId) => {
       assertOpen();
@@ -1175,7 +1515,13 @@ function createRepositoryComposition<T>(
     },
     listPublicCampaignEvents: (actorPrincipalId, campaignId, timelineId, afterRevision, limit) => {
       assertOpen();
-      return campaignEventProjectionRepository.listPublicCampaignEvents(actorPrincipalId, campaignId, timelineId, afterRevision, limit);
+      return campaignEventProjectionRepository.listPublicCampaignEvents(
+        actorPrincipalId,
+        campaignId,
+        timelineId,
+        afterRevision,
+        limit,
+      );
     },
     listRecentCampaignDiceEvents: (actorPrincipalId, campaignId, timelineId) => {
       assertOpen();
@@ -1231,15 +1577,24 @@ function createRepositoryComposition<T>(
     },
     listCampaignContentPackDefinitions: (actorPrincipalId, campaignId, identifier) => {
       assertOpen();
-      return campaignContentDefinitionReadRepository.listCampaignContentPackDefinitions(actorPrincipalId, campaignId, identifier);
+      return campaignContentDefinitionReadRepository.listCampaignContentPackDefinitions(
+        actorPrincipalId,
+        campaignId,
+        identifier,
+      );
     },
     getCampaignContentPackDefinition: (actorPrincipalId, campaignId, reference) => {
       assertOpen();
-      return campaignContentDefinitionReadRepository.getCampaignContentPackDefinition(actorPrincipalId, campaignId, reference);
+      return campaignContentDefinitionReadRepository.getCampaignContentPackDefinition(
+        actorPrincipalId,
+        campaignId,
+        reference,
+      );
     },
     addCampaignMembership: (actorPrincipalId, campaignId, input) => {
       assertOpen();
-      if (transactionDepth > 0) throw new Error("campaign membership addition cannot run inside a repository transaction");
+      if (transactionDepth > 0)
+        throw new Error("campaign membership addition cannot run inside a repository transaction");
       return campaignLegacyCoreWriteRepository.addCampaignMembership(actorPrincipalId, campaignId, input);
     },
     createCampaign: (actorPrincipalId, input) => {
@@ -1261,12 +1616,14 @@ function createRepositoryComposition<T>(
     },
     attachCampaignSession: (actorPrincipalId, input) => {
       assertOpen();
-      if (transactionDepth > 0) throw new Error("campaign session attachment cannot run inside a repository transaction");
+      if (transactionDepth > 0)
+        throw new Error("campaign session attachment cannot run inside a repository transaction");
       return campaignLegacyCoreWriteRepository.attachCampaignSession(actorPrincipalId, input);
     },
     detachCampaignSession: (actorPrincipalId, input) => {
       assertOpen();
-      if (transactionDepth > 0) throw new Error("campaign session detachment cannot run inside a repository transaction");
+      if (transactionDepth > 0)
+        throw new Error("campaign session detachment cannot run inside a repository transaction");
       return campaignLegacyCoreWriteRepository.detachCampaignSession(actorPrincipalId, input);
     },
     installContentPack: (actorPrincipalId, input) => {
@@ -1283,7 +1640,8 @@ function createRepositoryComposition<T>(
     },
     createCampaignCharacter: (actorPrincipalId, input) => {
       assertOpen();
-      if (transactionDepth > 0) throw new Error("campaign character creation cannot run inside a repository transaction");
+      if (transactionDepth > 0)
+        throw new Error("campaign character creation cannot run inside a repository transaction");
       // Preserve the generic repository's established public return shape.
       return campaignCharacterWriteRepository.createCampaignCharacter(actorPrincipalId, input);
     },
@@ -1297,18 +1655,24 @@ function createRepositoryComposition<T>(
     recordAgentObservation: (principalId, input) => {
       assertOpen();
       const authorize = () => {
-        const membership = db.prepare(`SELECT 1 FROM campaign_memberships
-          WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')`).get(input.campaignId, principalId);
+        const membership = db
+          .prepare(
+            `SELECT 1 FROM campaign_memberships
+          WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')`,
+          )
+          .get(input.campaignId, principalId);
         if (!membership) throw new AgentObservationUnavailableError();
       };
       if (transactionDepth > 0) {
         authorize();
         return agentObservationRepository.record(input);
       }
-      return db.transaction(() => {
-        authorize();
-        return agentObservationRepository.record(input);
-      }).immediate();
+      return db
+        .transaction(() => {
+          authorize();
+          return agentObservationRepository.record(input);
+        })
+        .immediate();
     },
     executeSetActorAttribute: (actorPrincipalId, envelope) => {
       assertOpen();
@@ -1417,7 +1781,9 @@ export function createRepositoryTestingComposition(
         const statement = db.prepare(source);
         return {
           get: (...parameters) => statement.get(...parameters),
-          run: (...parameters) => { statement.run(...parameters); },
+          run: (...parameters) => {
+            statement.run(...parameters);
+          },
         };
       },
       immediate(operation) {

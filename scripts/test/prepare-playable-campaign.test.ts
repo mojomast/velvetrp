@@ -24,7 +24,12 @@ test("prepares an SRD 5.1 campaign with two finalized actors and one active room
     setup.configureSrdStarterCatalog(OWNER, campaign.id, { expectedRevision: 0, idempotencyKey: "srd-pins" });
     setup.close();
 
-    const result = await preparePlayableCampaign({ dataDir, campaignId: campaign.id, campaignName: "Emberwake Reach", starter: "srd-5.1" });
+    const result = await preparePlayableCampaign({
+      dataDir,
+      campaignId: campaign.id,
+      campaignName: "Emberwake Reach",
+      starter: "srd-5.1",
+    });
     assert.equal(result.status, "ready");
     assert.equal(result.actorIds.length, 2);
     assert.equal(result.campaignCharacterIds.length, 2);
@@ -38,7 +43,12 @@ test("prepares an SRD 5.1 campaign with two finalized actors and one active room
     assert.equal(verification.getCampaignAdministration(OWNER, campaign.id)?.status, "published");
     verification.close();
 
-    const rerun = await preparePlayableCampaign({ dataDir, campaignId: campaign.id, campaignName: "Emberwake Reach", starter: "srd-5.1" });
+    const rerun = await preparePlayableCampaign({
+      dataDir,
+      campaignId: campaign.id,
+      campaignName: "Emberwake Reach",
+      starter: "srd-5.1",
+    });
     assert.deepEqual([...rerun.actorIds].sort(), [...result.actorIds].sort());
     assert.deepEqual([...rerun.campaignCharacterIds].sort(), [...result.campaignCharacterIds].sort());
     assert.equal(rerun.sessionId, result.sessionId);

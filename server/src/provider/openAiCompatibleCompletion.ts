@@ -1,7 +1,12 @@
 import type { PromptPreset } from "../presets.js";
 import type { HarnessSettings, ProviderSettings } from "../types.js";
 import { buildRequestBody } from "../llm.js";
-import { buildProviderHeaders, canUseProvider, isAuthorizedHttpProviderBaseUrl, validateProviderBaseUrl } from "./providerTransport.js";
+import {
+  buildProviderHeaders,
+  canUseProvider,
+  isAuthorizedHttpProviderBaseUrl,
+  validateProviderBaseUrl,
+} from "./providerTransport.js";
 
 const HTTP_ERROR_DETAIL_LIMIT = 1_000;
 const HTTP_ERROR_READ_LIMIT = 4_096;
@@ -9,7 +14,8 @@ const HTTP_ERROR_READ_LIMIT = 4_096;
 export const PROVIDER_SUCCESS_BODY_BYTE_LIMIT = 262_144;
 
 /** A JSON value accepted in function parameters and response schemas. */
-export type CompletionJsonValue = null | boolean | number | string | CompletionJsonValue[] | { [key: string]: CompletionJsonValue };
+export type CompletionJsonValue =
+  null | boolean | number | string | CompletionJsonValue[] | { [key: string]: CompletionJsonValue };
 
 /** A system instruction sent to the completion provider. */
 export interface CompletionSystemMessage {
@@ -46,7 +52,8 @@ export interface CompletionToolResultMessage {
 }
 
 /** A message accepted by the non-stream completion adapter. */
-export type CompletionMessage = CompletionSystemMessage | CompletionUserMessage | CompletionAssistantMessage | CompletionToolResultMessage;
+export type CompletionMessage =
+  CompletionSystemMessage | CompletionUserMessage | CompletionAssistantMessage | CompletionToolResultMessage;
 
 /** A schema-bound function tool. Callers still validate every returned argument locally. */
 export interface CompletionFunctionTool {
@@ -198,13 +205,16 @@ function toolNameCodec(tools: readonly CompletionFunctionTool[] | undefined): To
   for (const tool of tools ?? []) {
     if (encode.has(tool.name)) continue;
     const base = tool.name.replace(/[^a-zA-Z0-9_-]/g, "_");
-    let candidate = base, suffix = 1;
+    let candidate = base,
+      suffix = 1;
     while (decode.has(candidate) && decode.get(candidate) !== tool.name) candidate = `${base}_${suffix++}`;
     encode.set(tool.name, candidate);
     decode.set(candidate, tool.name);
   }
-  return { encode: (name) => encode.get(name) ?? name.replace(/[^a-zA-Z0-9_-]/g, "_"),
-    decode: (name) => decode.get(name) ?? name };
+  return {
+    encode: (name) => encode.get(name) ?? name.replace(/[^a-zA-Z0-9_-]/g, "_"),
+    decode: (name) => decode.get(name) ?? name,
+  };
 }
 
 interface WiredTranscript {
@@ -223,17 +233,23 @@ function wireMessages(messages: readonly CompletionMessage[], codec: ToolNameCod
     }
     if (message.role === "tool") {
       const toolCallId = requireName(message.toolCallId, `messages[${index}].toolCallId`);
-      if (resolvedCallIds.has(toolCallId)) throw new ProviderConfigurationError(`duplicate tool result for call id: ${toolCallId}`);
-      if (pendingCallIds.length === 0) throw new ProviderConfigurationError(`orphan tool result for call id: ${toolCallId}`);
+      if (resolvedCallIds.has(toolCallId))
+        throw new ProviderConfigurationError(`duplicate tool result for call id: ${toolCallId}`);
+      if (pendingCallIds.length === 0)
+        throw new ProviderConfigurationError(`orphan tool result for call id: ${toolCallId}`);
       if (pendingCallIds[0] !== toolCallId) {
-        throw new ProviderConfigurationError(`out-of-order tool result for call id: ${toolCallId}; expected ${pendingCallIds[0]}`);
+        throw new ProviderConfigurationError(
+          `out-of-order tool result for call id: ${toolCallId}; expected ${pendingCallIds[0]}`,
+        );
       }
       pendingCallIds.shift();
       resolvedCallIds.add(toolCallId);
       return { role: "tool", tool_call_id: toolCallId, content: message.content };
     }
     if (pendingCallIds.length > 0) {
-      throw new ProviderConfigurationError(`unresolved tool call ${pendingCallIds[0]} before messages[${index}] ${message.role} message`);
+      throw new ProviderConfigurationError(
+        `unresolved tool call ${pendingCallIds[0]} before messages[${index}] ${message.role} message`,
+      );
     }
     if (message.role === "system" || message.role === "user") return { role: message.role, content: message.content };
     if (message.role !== "assistant") throw new ProviderConfigurationError(`messages[${index}].role is invalid`);
@@ -243,15 +259,21 @@ function wireMessages(messages: readonly CompletionMessage[], codec: ToolNameCod
       if (callIds.has(call.id)) throw new ProviderConfigurationError(`duplicate message tool call id: ${call.id}`);
       callIds.add(call.id);
       pendingCallIds.push(call.id);
-      if (typeof call.arguments !== "string") throw new ProviderConfigurationError(`messages[${index}].toolCalls[${callIndex}].arguments is invalid`);
+      if (typeof call.arguments !== "string")
+        throw new ProviderConfigurationError(`messages[${index}].toolCalls[${callIndex}].arguments is invalid`);
       return { id: call.id, type: "function", function: { name: codec.encode(call.name), arguments: call.arguments } };
     });
     if (message.content === null && (!toolCalls || toolCalls.length === 0)) {
       throw new ProviderConfigurationError(`messages[${index}] has neither content nor tool calls`);
     }
-    return { role: "assistant", content: message.content, ...(toolCalls && toolCalls.length > 0 ? { tool_calls: toolCalls } : {}) };
+    return {
+      role: "assistant",
+      content: message.content,
+      ...(toolCalls && toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+    };
   });
-  if (pendingCallIds.length > 0) throw new ProviderConfigurationError(`unresolved tool call at end of transcript: ${pendingCallIds[0]}`);
+  if (pendingCallIds.length > 0)
+    throw new ProviderConfigurationError(`unresolved tool call at end of transcript: ${pendingCallIds[0]}`);
   return { messages: wired, priorCallIds: callIds };
 }
 
@@ -263,7 +285,8 @@ function applyTools(body: Record<string, unknown>, input: ProviderCompletionInpu
       requireName(tool.name, `tools[${index}].name`);
       if (names.has(codec.encode(tool.name))) throw new ProviderConfigurationError(`duplicate tool name: ${tool.name}`);
       names.add(codec.encode(tool.name));
-      if (!isObject(tool.parameters)) throw new ProviderConfigurationError(`tools[${index}].parameters must be an object`);
+      if (!isObject(tool.parameters))
+        throw new ProviderConfigurationError(`tools[${index}].parameters must be an object`);
       return {
         type: "function",
         function: {
@@ -277,7 +300,8 @@ function applyTools(body: Record<string, unknown>, input: ProviderCompletionInpu
   if (input.toolChoice !== undefined) {
     if (typeof input.toolChoice === "object") {
       const name = requireName(input.toolChoice.name, "toolChoice.name");
-      if (!tools?.some((tool) => tool.name === name)) throw new ProviderConfigurationError(`toolChoice references unknown tool: ${name}`);
+      if (!tools?.some((tool) => tool.name === name))
+        throw new ProviderConfigurationError(`toolChoice references unknown tool: ${name}`);
       body.tool_choice = { type: "function", function: { name: codec.encode(name) } };
     } else {
       if (input.toolChoice !== "none" && (!tools || tools.length === 0)) {
@@ -372,7 +396,13 @@ function parseToolCalls(value: unknown, policy: ResponseToolPolicy): CompletionT
   if (!Array.isArray(value)) throw new ProviderProtocolError("Provider message tool_calls must be an array");
   const ids = new Set<string>();
   return value.map((candidate, index) => {
-    if (!isObject(candidate) || typeof candidate.id !== "string" || !candidate.id.trim() || candidate.type !== "function" || !isObject(candidate.function)) {
+    if (
+      !isObject(candidate) ||
+      typeof candidate.id !== "string" ||
+      !candidate.id.trim() ||
+      candidate.type !== "function" ||
+      !isObject(candidate.function)
+    ) {
       throw new ProviderProtocolError(`Provider tool_calls[${index}] is malformed`);
     }
     if (ids.has(candidate.id)) throw new ProviderProtocolError("Provider returned a duplicate tool call id");
@@ -398,7 +428,8 @@ function parseUsage(value: unknown): ProviderCompletionUsage | null {
   const prompt = value.prompt_tokens;
   const completion = value.completion_tokens;
   const total = value.total_tokens;
-  const valid = (candidate: unknown): candidate is number => typeof candidate === "number" && Number.isSafeInteger(candidate) && candidate >= 0;
+  const valid = (candidate: unknown): candidate is number =>
+    typeof candidate === "number" && Number.isSafeInteger(candidate) && candidate >= 0;
   if (!valid(prompt) || !valid(completion) || !valid(total) || total < prompt + completion) return null;
   return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
 }
@@ -409,8 +440,12 @@ function providerErrorMessage(error: unknown): string {
 }
 
 function redactSensitiveExcerpt(value: string, apiKey: string): string {
-  let redacted = value.slice(0, HTTP_ERROR_READ_LIMIT)
-    .replace(/\bauthorization\s*["']?\s*[:=]\s*["']?\s*(?:(?:bearer|basic)\s+)?[A-Za-z0-9._~+/=-]+/gi, "Authorization: [REDACTED]")
+  let redacted = value
+    .slice(0, HTTP_ERROR_READ_LIMIT)
+    .replace(
+      /\bauthorization\s*["']?\s*[:=]\s*["']?\s*(?:(?:bearer|basic)\s+)?[A-Za-z0-9._~+/=-]+/gi,
+      "Authorization: [REDACTED]",
+    )
     .replace(/\bbearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]");
   const key = apiKey.trim();
   if (key) redacted = redacted.replaceAll(key, "[REDACTED]");
@@ -441,21 +476,37 @@ async function readBoundedErrorDetail(response: Response): Promise<string> {
 }
 
 async function readBoundedSuccessPayload(response: Response): Promise<unknown> {
-  const declared=response.headers.get("content-length");
-  if(declared!==null&&(/^\d+$/.test(declared)===false||Number(declared)>PROVIDER_SUCCESS_BODY_BYTE_LIMIT))
+  const declared = response.headers.get("content-length");
+  if (declared !== null && (/^\d+$/.test(declared) === false || Number(declared) > PROVIDER_SUCCESS_BODY_BYTE_LIMIT))
     throw new ProviderProtocolError("Provider completion response exceeded the byte limit");
-  if(!response.body)throw new ProviderProtocolError("Provider completion response had no body");
-  const reader=response.body.getReader(),chunks:Uint8Array[]=[];let bytes=0;
-  try{
-    while(true){const {done,value}=await reader.read();if(done)break;if(!value)continue;
-      bytes+=value.byteLength;if(bytes>PROVIDER_SUCCESS_BODY_BYTE_LIMIT)
+  if (!response.body) throw new ProviderProtocolError("Provider completion response had no body");
+  const reader = response.body.getReader(),
+    chunks: Uint8Array[] = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      bytes += value.byteLength;
+      if (bytes > PROVIDER_SUCCESS_BODY_BYTE_LIMIT)
         throw new ProviderProtocolError("Provider completion response exceeded the byte limit");
       chunks.push(value);
     }
-  }finally{await reader.cancel().catch(()=>undefined);}
-  const joined=new Uint8Array(bytes);let offset=0;for(const chunk of chunks){joined.set(chunk,offset);offset+=chunk.byteLength;}
-  try{return JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(joined));}
-  catch(error){throw new ProviderProtocolError("Provider completion response was not valid JSON",{cause:error});}
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  const joined = new Uint8Array(bytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(joined));
+  } catch (error) {
+    throw new ProviderProtocolError("Provider completion response was not valid JSON", { cause: error });
+  }
 }
 
 function parseResponse(
@@ -479,12 +530,18 @@ function parseResponse(
   if (Object.prototype.hasOwnProperty.call(choice, "error") && choice.error !== null) {
     throw new ProviderResponseError(providerErrorMessage(choice.error), apiKey);
   }
-  const finishReason = ["stop", "length", "tool_calls", "content_filter", "error"].includes(String(choice.finish_reason))
-    ? choice.finish_reason as "stop" | "length" | "tool_calls" | "content_filter" | "error" : "unknown";
+  const finishReason = ["stop", "length", "tool_calls", "content_filter", "error"].includes(
+    String(choice.finish_reason),
+  )
+    ? (choice.finish_reason as "stop" | "length" | "tool_calls" | "content_filter" | "error")
+    : "unknown";
   const requiresToolCall = policy.toolChoice === "required" || typeof policy.toolChoice === "object";
-  const hasResponseToolCalls = isObject(choice.message) && Object.prototype.hasOwnProperty.call(choice.message, "tool_calls");
-  if ((requiresToolCall || hasResponseToolCalls)
-    && (finishReason === "error" || finishReason === "length" || finishReason === "content_filter")) {
+  const hasResponseToolCalls =
+    isObject(choice.message) && Object.prototype.hasOwnProperty.call(choice.message, "tool_calls");
+  if (
+    (requiresToolCall || hasResponseToolCalls) &&
+    (finishReason === "error" || finishReason === "length" || finishReason === "content_filter")
+  ) {
     throw new ProviderProtocolError(`Provider did not complete the tool call (finish_reason: ${finishReason})`);
   }
   if (!isObject(choice.message) || (choice.message.role !== undefined && choice.message.role !== "assistant")) {
@@ -495,7 +552,9 @@ function parseResponse(
   if (hasContent && typeof message.content !== "string" && message.content !== null) {
     throw new ProviderProtocolError("Provider assistant content must be a string or null");
   }
-  const parsedToolCalls = Object.prototype.hasOwnProperty.call(message, "tool_calls") ? parseToolCalls(message.tool_calls, policy) : [];
+  const parsedToolCalls = Object.prototype.hasOwnProperty.call(message, "tool_calls")
+    ? parseToolCalls(message.tool_calls, policy)
+    : [];
   const toolCalls = parsedToolCalls.length > 0 ? parsedToolCalls : undefined;
   if ((!hasContent || message.content === null) && !toolCalls) {
     throw new ProviderProtocolError("Provider assistant message has neither content nor tool calls");
@@ -504,15 +563,24 @@ function parseResponse(
     throw new ProviderProtocolError("Provider did not return a required tool call");
   }
   return {
-    message: { role: "assistant", content: hasContent ? message.content as string | null : null, ...(toolCalls ? { toolCalls } : {}) },
+    message: {
+      role: "assistant",
+      content: hasContent ? (message.content as string | null) : null,
+      ...(toolCalls ? { toolCalls } : {}),
+    },
     usage: parseUsage(payload.usage),
     model: {
       requestedModel,
       responseModel: typeof payload.model === "string" && payload.model.trim() ? payload.model : null,
     },
     provenance: {
-      requestId: response.headers.get("x-request-id") ?? (typeof payload.id === "string" && payload.id.trim() ? payload.id : null),
-      systemFingerprint: typeof payload.system_fingerprint === "string" && payload.system_fingerprint.trim() ? payload.system_fingerprint : null,
+      requestId:
+        response.headers.get("x-request-id") ??
+        (typeof payload.id === "string" && payload.id.trim() ? payload.id : null),
+      systemFingerprint:
+        typeof payload.system_fingerprint === "string" && payload.system_fingerprint.trim()
+          ? payload.system_fingerprint
+          : null,
       finishReason,
       latencyMs,
       promptVersion,
@@ -524,7 +592,8 @@ function parseResponse(
 function isRedirectFailure(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; depth < 3 && isObject(current); depth += 1) {
-    if (typeof current.message === "string" && current.message.toLowerCase().includes("unexpected redirect")) return true;
+    if (typeof current.message === "string" && current.message.toLowerCase().includes("unexpected redirect"))
+      return true;
     current = current.cause;
   }
   return false;
@@ -555,7 +624,8 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
     throw new ProviderConfigurationError(!validation.ok ? validation.reason : "Provider is not fully configured");
   }
   const timeoutMs = input.provider.requestTimeoutSeconds * 1_000;
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new ProviderConfigurationError("requestTimeoutSeconds must be positive");
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
+    throw new ProviderConfigurationError("requestTimeoutSeconds must be positive");
   if (input.signal?.aborted) throw new ProviderCallerAbortError("Provider completion aborted by caller");
 
   const body = buildRequestBody(input.provider, input.harness, input.preset, [], false);
@@ -582,21 +652,36 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
       redirect: "error",
       body: JSON.stringify(body),
     });
-    if (response.status >= 300 && response.status < 400) throw new ProviderRedirectError("Provider completion redirect refused");
+    if (response.status >= 300 && response.status < 400)
+      throw new ProviderRedirectError("Provider completion redirect refused");
     if (!response.ok) {
-      throw new ProviderHttpError(response.status, await readBoundedErrorDetail(response), input.provider.apiKey, response.headers.get("retry-after"));
+      throw new ProviderHttpError(
+        response.status,
+        await readBoundedErrorDetail(response),
+        input.provider.apiKey,
+        response.headers.get("retry-after"),
+      );
     }
-    const payload=await readBoundedSuccessPayload(response);
-    return parseResponse(payload, requestedModel, {
-      advertisedNames,
-      decodeName: codec.decode,
-      toolChoice: effectiveToolChoice,
-      priorCallIds: transcript.priorCallIds,
-    }, input.provider.apiKey, response, Math.max(0, Math.round(performance.now() - startedAt)),
-      input.promptVersion ?? "unversioned", input.schemaVersion ?? "unversioned");
+    const payload = await readBoundedSuccessPayload(response);
+    return parseResponse(
+      payload,
+      requestedModel,
+      {
+        advertisedNames,
+        decodeName: codec.decode,
+        toolChoice: effectiveToolChoice,
+        priorCallIds: transcript.priorCallIds,
+      },
+      input.provider.apiKey,
+      response,
+      Math.max(0, Math.round(performance.now() - startedAt)),
+      input.promptVersion ?? "unversioned",
+      input.schemaVersion ?? "unversioned",
+    );
   } catch (error) {
     if (error instanceof ProviderCompletionError) throw error;
-    if (input.signal?.aborted) throw new ProviderCallerAbortError("Provider completion aborted by caller", { cause: error });
+    if (input.signal?.aborted)
+      throw new ProviderCallerAbortError("Provider completion aborted by caller", { cause: error });
     if (timeout.signal.aborted) throw new ProviderTimeoutError("Provider completion timed out", { cause: error });
     if (isRedirectFailure(error)) throw new ProviderRedirectError("Provider completion redirect refused");
     throw new ProviderTransportError("Provider completion transport failed", { cause: error });

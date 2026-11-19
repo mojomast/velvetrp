@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, subclassCatalogDefinitionSchema } from "@velvet/contracts";
+import {
+  classCatalogDefinitionSchema,
+  classLevelCatalogDefinitionSchema,
+  subclassCatalogDefinitionSchema,
+} from "@velvet/contracts";
 import { rogueDefinition, rogueLevels, rogueSubclasses } from "../src/content/srdStarter/classes/rogue.js";
 import { createStarterReferences } from "../src/content/srdStarter/references.js";
 
@@ -35,8 +39,14 @@ describe("SRD 5.1 Rogue class", () => {
 
   it("grants the d8 hit die and preserves the Sneak Attack ability ref at level 1", () => {
     const parsed = classLevelCatalogDefinitionSchema.parse(levels[0]);
-    expect(parsed.mechanics.resourceGrants).toContainEqual({ resourceId: "hit-dice-d8", maxIncrease: 1, currentIncrease: 1 });
-    expect(parsed.mechanics.abilityRefs.map((ability) => ability.definitionId)).toContain("srd-5.1:ability:rogue-sneak-attack");
+    expect(parsed.mechanics.resourceGrants).toContainEqual({
+      resourceId: "hit-dice-d8",
+      maxIncrease: 1,
+      currentIncrease: 1,
+    });
+    expect(parsed.mechanics.abilityRefs.map((ability) => ability.definitionId)).toContain(
+      "srd-5.1:ability:rogue-sneak-attack",
+    );
     expect(levels[0]!.reference.definitionId).toBe("srd-5.1:class-level:rogue-1");
   });
 

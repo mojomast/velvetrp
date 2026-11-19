@@ -17,11 +17,20 @@ function multiclassCatalog(): PublishContentCatalogInput {
   catalog.manifest.digest = "0".repeat(64);
   const { packId, packVersion } = catalog.manifest;
   const ref = (definitionId: string) => ({ packId, packVersion, kind: "class", definitionId });
-  const cleric = ref("srd-5.1:class:cleric"), barbarian = ref("srd-5.1:class:barbarian");
+  const cleric = ref("srd-5.1:class:cleric"),
+    barbarian = ref("srd-5.1:class:barbarian");
   for (const name of ["Wizard Level 2", "Wizard Level 3"]) {
-    const level = catalog.definitions.find((definition) => definition.reference.kind === "class-level" && definition.name === name) as any;
+    const level = catalog.definitions.find(
+      (definition) => definition.reference.kind === "class-level" && definition.name === name,
+    ) as any;
     level.mechanics.progressionChoices = [
-      { choiceId: `velvet:multiclass:choice:class-${level.mechanics.level}`, kind: "class", required: true, count: 1, options: [cleric, barbarian] },
+      {
+        choiceId: `velvet:multiclass:choice:class-${level.mechanics.level}`,
+        kind: "class",
+        required: true,
+        count: 1,
+        options: [cleric, barbarian],
+      },
     ];
   }
   const digest = calculateCatalogDigest(catalog);
@@ -31,7 +40,10 @@ function multiclassCatalog(): PublishContentCatalogInput {
 }
 
 function replaceIdentity(value: unknown, packId: string, packVersion: string): void {
-  if (Array.isArray(value)) { value.forEach((child) => replaceIdentity(child, packId, packVersion)); return; }
+  if (Array.isArray(value)) {
+    value.forEach((child) => replaceIdentity(child, packId, packVersion));
+    return;
+  }
   if (!value || typeof value !== "object") return;
   const record = value as Record<string, unknown>;
   if ("packId" in record) record.packId = packId;
@@ -43,23 +55,65 @@ const multiclassScores = { strength: 8, dexterity: 13, constitution: 14, intelli
 const singleClassScores = { strength: 15, dexterity: 14, constitution: 13, intelligence: 12, wisdom: 10, charisma: 8 };
 
 function finalized(catalog: PublishContentCatalogInput, className: string, scores: Record<string, number>) {
-  const repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR!, clock: { now: () => new Date("2032-01-01T00:00:00.000Z") } });
-  const persona = repo.createCharacter({ name: "Multiclass persona", age: 28, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
+  const repo = createRepository({
+    dataDir: process.env.VELVET_DATA_DIR!,
+    clock: { now: () => new Date("2032-01-01T00:00:00.000Z") },
+  });
+  const persona = repo.createCharacter({
+    name: "Multiclass persona",
+    age: 28,
+    archetype: "Warden",
+    boundaries: "",
+    fictionalConfirmed: true,
+  });
   const campaign = repo.createCampaign("local-owner", { name: "Multiclass progression" });
   repo.publishContentCatalog("local-owner", catalog);
-  repo.configureCampaignCatalog("local-owner", campaign.id, { rulesProfileId: catalog.manifest.compatibility.rulesProfileId,
-    contentPacks: [{ packId: catalog.manifest.packId, packVersion: catalog.manifest.packVersion }], expectedRevision: 0, idempotencyKey: `multiclass-pins-${className}` });
-  const draft = repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: "local-owner",
-    durability: "durable", allocation: { method: "manual", scores: scores as any }, idempotencyKey: `multiclass-draft-${className}` });
+  repo.configureCampaignCatalog("local-owner", campaign.id, {
+    rulesProfileId: catalog.manifest.compatibility.rulesProfileId,
+    contentPacks: [{ packId: catalog.manifest.packId, packVersion: catalog.manifest.packVersion }],
+    expectedRevision: 0,
+    idempotencyKey: `multiclass-pins-${className}`,
+  });
+  const draft = repo.createCharacterDraft("local-owner", campaign.id, {
+    personaId: persona.id,
+    controllerPrincipalId: "local-owner",
+    durability: "durable",
+    allocation: { method: "manual", scores: scores as any },
+    idempotencyKey: `multiclass-draft-${className}`,
+  });
   const definitions = catalog.definitions;
-  const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, { expectedRevision: 0, idempotencyKey: `multiclass-select-${className}`, selections: {
-    race: { ...definitions.find((value) => value.reference.kind === "race" && value.name === "Elf")!.reference, kind: "race" },
-    background: { ...definitions.find((value) => value.reference.kind === "background")!.reference, kind: "background" },
-    class: { ...definitions.find((value) => value.reference.kind === "class" && value.name === className)!.reference, kind: "class" },
-    starterGrant: "kit",
-  } } as any);
-  const result = repo.finalizeCharacterDraft("local-owner", draft.draft.id, { expectedRevision: selected.draft.revision, idempotencyKey: `multiclass-finalize-${className}`, progressionMode: "xp" });
-  return { repo, campaign, id: result.receipt.campaignCharacterId, actorId: result.receipt.actorId, sheetId: result.receipt.sheetId, catalog };
+  const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, {
+    expectedRevision: 0,
+    idempotencyKey: `multiclass-select-${className}`,
+    selections: {
+      race: {
+        ...definitions.find((value) => value.reference.kind === "race" && value.name === "Elf")!.reference,
+        kind: "race",
+      },
+      background: {
+        ...definitions.find((value) => value.reference.kind === "background")!.reference,
+        kind: "background",
+      },
+      class: {
+        ...definitions.find((value) => value.reference.kind === "class" && value.name === className)!.reference,
+        kind: "class",
+      },
+      starterGrant: "kit",
+    },
+  } as any);
+  const result = repo.finalizeCharacterDraft("local-owner", draft.draft.id, {
+    expectedRevision: selected.draft.revision,
+    idempotencyKey: `multiclass-finalize-${className}`,
+    progressionMode: "xp",
+  });
+  return {
+    repo,
+    campaign,
+    id: result.receipt.campaignCharacterId,
+    actorId: result.receipt.actorId,
+    sheetId: result.receipt.sheetId,
+    catalog,
+  };
 }
 
 const digestOf = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -67,7 +121,12 @@ const digestOf = (value: unknown) => createHash("sha256").update(JSON.stringify(
 describe("D&D 5.1 additive multiclass progression", () => {
   it("leaves an existing single-class preview and apply byte-for-byte unchanged", () => {
     const { repo, id } = finalized(SRD_5_1_STARTER_CATALOG as PublishContentCatalogInput, "Fighter", singleClassScores);
-    repo.grantCharacterXp("local-owner", id, { amount: 900, reason: "Single-class baseline", expectedRevision: 0, idempotencyKey: "single-class-xp" });
+    repo.grantCharacterXp("local-owner", id, {
+      amount: 900,
+      reason: "Single-class baseline",
+      expectedRevision: 0,
+      idempotencyKey: "single-class-xp",
+    });
     const preview = repo.previewCharacterProgression("local-owner", id)!;
     const repeatedPreview = repo.previewCharacterProgression("local-owner", id)!;
     expect(digestOf(repeatedPreview.levels)).toBe(digestOf(preview.levels));
@@ -80,12 +139,18 @@ describe("D&D 5.1 additive multiclass progression", () => {
       expect("grantedProficiencies" in level).toBe(false);
     }
     const subclassChoice = preview.pendingChoices.find((choice) => choice.kind === "subclass")!;
-    const applied = repo.applyCharacterProgression("local-owner", id, { previewRevision: preview.revision, previewToken: preview.token,
-      selections: [{ choiceId: subclassChoice.choiceId, kind: "subclass", ability: subclassChoice.options[0]! }], idempotencyKey: "single-class-apply" });
+    const applied = repo.applyCharacterProgression("local-owner", id, {
+      previewRevision: preview.revision,
+      previewToken: preview.token,
+      selections: [{ choiceId: subclassChoice.choiceId, kind: "subclass", ability: subclassChoice.options[0]! }],
+      idempotencyKey: "single-class-apply",
+    });
     expect("classLevelsByClass" in applied.progression).toBe(false);
     expect("knownProficiencies" in applied.progression).toBe(false);
     // Single-class advancement stays deterministic and matches the reviewed preview.
-    expect(applied.receipt.appliedLevels.map((level) => level.level)).toEqual(preview.levels.map((level) => level.level));
+    expect(applied.receipt.appliedLevels.map((level) => level.level)).toEqual(
+      preview.levels.map((level) => level.level),
+    );
     repo.close();
   });
 
@@ -96,34 +161,57 @@ describe("D&D 5.1 additive multiclass progression", () => {
     expect(initial.level).toBe(1);
     const initialMaxHp = initial.derived.maxHp;
 
-    repo.grantCharacterXp("local-owner", id, { amount: 900, reason: "Two completed journeys", expectedRevision: 0, idempotencyKey: "multiclass-xp" });
+    repo.grantCharacterXp("local-owner", id, {
+      amount: 900,
+      reason: "Two completed journeys",
+      expectedRevision: 0,
+      idempotencyKey: "multiclass-xp",
+    });
     const preview = repo.previewCharacterProgression("local-owner", id)!;
     expect(preview.levels.map((level) => level.level)).toEqual([2, 3]);
     const classChoices = preview.pendingChoices.filter((choice) => choice.kind === "class");
     expect(classChoices.map((choice) => choice.level)).toEqual([2, 3]);
-    expect(classChoices[0]!.options.map((option) => option.definitionId)).toEqual(["srd-5.1:class:cleric", "srd-5.1:class:barbarian"]);
+    expect(classChoices[0]!.options.map((option) => option.definitionId)).toEqual([
+      "srd-5.1:class:cleric",
+      "srd-5.1:class:barbarian",
+    ]);
 
     // Prerequisites reject an unmet second class before any write.
     const barbarian = classChoices[0]!.options.find((option) => option.definitionId === "srd-5.1:class:barbarian")!;
-    expect(() => repo.previewCharacterProgression("local-owner", id, [
-      { choiceId: classChoices[0]!.choiceId, kind: "class", ability: barbarian },
-    ] as any)).toThrow(/prerequisite/);
+    expect(() =>
+      repo.previewCharacterProgression("local-owner", id, [
+        { choiceId: classChoices[0]!.choiceId, kind: "class", ability: barbarian },
+      ] as any),
+    ).toThrow(/prerequisite/);
     expect(repo.getCharacterProgression("local-owner", id)!.level).toBe(1);
 
     const cleric = classChoices[0]!.options.find((option) => option.definitionId === "srd-5.1:class:cleric")!;
-    const selections = classChoices.map((choice) => ({ choiceId: choice.choiceId, kind: "class" as const, ability: cleric }));
-    const input = { previewRevision: preview.revision, previewToken: preview.token, selections, idempotencyKey: "multiclass-apply" };
+    const selections = classChoices.map((choice) => ({
+      choiceId: choice.choiceId,
+      kind: "class" as const,
+      ability: cleric,
+    }));
+    const input = {
+      previewRevision: preview.revision,
+      previewToken: preview.token,
+      selections,
+      idempotencyKey: "multiclass-apply",
+    };
     const applied = repo.applyCharacterProgression("local-owner", id, input);
     expect(applied.progression.level).toBe(3);
     // Per-class HP gain uses each class's own hit-die-based level step (Cleric d8 max at 1, then fixed average 5).
     expect(applied.receipt.appliedLevels.map((level) => level.hp.gain)).toEqual([8, 5]);
     expect(applied.receipt.appliedLevels.map((level) => level.classLevel)).toEqual([1, 2]);
-    expect(applied.receipt.appliedLevels.map((level) => level.classRef!.definitionId)).toEqual(["srd-5.1:class:cleric", "srd-5.1:class:cleric"]);
+    expect(applied.receipt.appliedLevels.map((level) => level.classRef!.definitionId)).toEqual([
+      "srd-5.1:class:cleric",
+      "srd-5.1:class:cleric",
+    ]);
     expect(applied.receipt.appliedLevels[0]!.grantedProficiencies).toEqual(["light-armor", "medium-armor", "shields"]);
     expect(applied.receipt.appliedLevels[1]!.grantedProficiencies).toBeUndefined();
     // Wizard 1 (full) + Cleric 2 (full) = combined caster level 3.
     expect(applied.progression.classLevelsByClass!.map((entry) => [entry.classRef.definitionId, entry.level])).toEqual([
-      ["srd-5.1:class:cleric", 2], ["srd-5.1:class:wizard", 1],
+      ["srd-5.1:class:cleric", 2],
+      ["srd-5.1:class:wizard", 1],
     ]);
     expect(applied.progression.knownProficiencies).toEqual(["light-armor", "medium-armor", "shields"]);
     const selectedPreview = repo.previewCharacterProgression("local-owner", id, selections as any)!;
@@ -133,12 +221,19 @@ describe("D&D 5.1 additive multiclass progression", () => {
     expect(applied.receipt.appliedLevels[1]!.derivedAfter.maxHp).toBe(applied.progression.derived.maxHp);
 
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
-    expect(db.prepare("SELECT position,definition_id,level FROM rpg_character_classes WHERE sheet_id=? ORDER BY position").all(sheetId)).toEqual([
+    expect(
+      db
+        .prepare("SELECT position,definition_id,level FROM rpg_character_classes WHERE sheet_id=? ORDER BY position")
+        .all(sheetId),
+    ).toEqual([
       { position: 0, definition_id: "srd-5.1:class:wizard", level: 1 },
       { position: 1, definition_id: "srd-5.1:class:cleric", level: 2 },
     ]);
-    expect(db.prepare("SELECT current,max FROM rpg_actor_resources WHERE actor_id=? AND name='health'").get(actorId)).toEqual({
-      current: applied.progression.derived.maxHp, max: applied.progression.derived.maxHp,
+    expect(
+      db.prepare("SELECT current,max FROM rpg_actor_resources WHERE actor_id=? AND name='health'").get(actorId),
+    ).toEqual({
+      current: applied.progression.derived.maxHp,
+      max: applied.progression.derived.maxHp,
     });
     db.close();
 
@@ -147,7 +242,8 @@ describe("D&D 5.1 additive multiclass progression", () => {
     const reopened = createRepository({ dataDir: process.env.VELVET_DATA_DIR! });
     const surfaced = reopened.getCharacterProgression("local-owner", id)!;
     expect(surfaced.classLevelsByClass!.map((entry) => [entry.classRef.definitionId, entry.level])).toEqual([
-      ["srd-5.1:class:cleric", 2], ["srd-5.1:class:wizard", 1],
+      ["srd-5.1:class:cleric", 2],
+      ["srd-5.1:class:wizard", 1],
     ]);
     expect(surfaced.knownProficiencies).toEqual(["light-armor", "medium-armor", "shields"]);
     reopened.close();

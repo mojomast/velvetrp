@@ -15,8 +15,13 @@ export function requirePositiveInteger(value: number, name: string): void {
 const canonical = (value: unknown): string =>
   JSON.stringify(value, (_key, nested: unknown) =>
     nested && typeof nested === "object" && !Array.isArray(nested)
-      ? Object.fromEntries(Object.keys(nested as Record<string, unknown>).sort().map((key) => [key, (nested as Record<string, unknown>)[key]]))
-      : nested);
+      ? Object.fromEntries(
+          Object.keys(nested as Record<string, unknown>)
+            .sort()
+            .map((key) => [key, (nested as Record<string, unknown>)[key]]),
+        )
+      : nested,
+  );
 
 /** Stable key used for deterministic deduplication and sorting. */
 export function stableKey(value: unknown): string {

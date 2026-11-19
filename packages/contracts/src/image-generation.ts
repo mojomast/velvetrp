@@ -26,37 +26,47 @@ export const IMAGE_GENERATION_DEFAULT_GUIDANCE_SCALE = 3;
 
 export const imageGenerationPromptSchema = z.string().trim().min(1).max(IMAGE_GENERATION_MAX_PROMPT_LENGTH);
 
-export const imageGenerationRequestSchema = z.object({
-  prompt: imageGenerationPromptSchema,
-  seed: z.number().int().min(0).max(IMAGE_GENERATION_MAX_SEED).default(IMAGE_GENERATION_DEFAULT_SEED),
-  steps: z.number().int().min(10).max(100).default(IMAGE_GENERATION_DEFAULT_STEPS),
-  guidanceScale: z.number().min(1).max(8).default(IMAGE_GENERATION_DEFAULT_GUIDANCE_SCALE),
-  count: z.number().int().min(1).max(IMAGE_GENERATION_MAX_IMAGES).default(1),
-}).strict();
+export const imageGenerationRequestSchema = z
+  .object({
+    prompt: imageGenerationPromptSchema,
+    seed: z.number().int().min(0).max(IMAGE_GENERATION_MAX_SEED).default(IMAGE_GENERATION_DEFAULT_SEED),
+    steps: z.number().int().min(10).max(100).default(IMAGE_GENERATION_DEFAULT_STEPS),
+    guidanceScale: z.number().min(1).max(8).default(IMAGE_GENERATION_DEFAULT_GUIDANCE_SCALE),
+    count: z.number().int().min(1).max(IMAGE_GENERATION_MAX_IMAGES).default(1),
+  })
+  .strict();
 
 export const imageGenerationFormatSchema = z.enum(["png", "webp"]);
 
-export const imageGenerationImageSchema = z.object({
-  format: imageGenerationFormatSchema,
-  base64: z.string().min(1).max(IMAGE_GENERATION_MAX_BASE64_LENGTH),
-}).strict();
+export const imageGenerationImageSchema = z
+  .object({
+    format: imageGenerationFormatSchema,
+    base64: z.string().min(1).max(IMAGE_GENERATION_MAX_BASE64_LENGTH),
+  })
+  .strict();
 
-export const imageGenerationResultSchema = z.object({
-  images: z.array(imageGenerationImageSchema).min(1).max(IMAGE_GENERATION_MAX_IMAGES),
-  seed: z.number().int().min(0).max(IMAGE_GENERATION_MAX_SEED),
-  seconds: z.number().min(0),
-}).strict();
+export const imageGenerationResultSchema = z
+  .object({
+    images: z.array(imageGenerationImageSchema).min(1).max(IMAGE_GENERATION_MAX_IMAGES),
+    seed: z.number().int().min(0).max(IMAGE_GENERATION_MAX_SEED),
+    seconds: z.number().min(0),
+  })
+  .strict();
 
-export const imageGenerationHealthSchema = z.object({
-  status: z.literal("ok"),
-  model: z.string().trim().min(1).max(200),
-  commit: z.string().trim().min(1).max(200).nullable(),
-  device: z.string().trim().min(1).max(200),
-}).strict();
+export const imageGenerationHealthSchema = z
+  .object({
+    status: z.literal("ok"),
+    model: z.string().trim().min(1).max(200),
+    commit: z.string().trim().min(1).max(200).nullable(),
+    device: z.string().trim().min(1).max(200),
+  })
+  .strict();
 
-export const imageGenerationErrorSchema = z.object({
-  error: z.string().trim().min(1).max(2_000),
-}).strict();
+export const imageGenerationErrorSchema = z
+  .object({
+    error: z.string().trim().min(1).max(2_000),
+  })
+  .strict();
 
 /** Parsed generation request with every bound and default applied. */
 export type ImageGenerationRequest = z.infer<typeof imageGenerationRequestSchema>;

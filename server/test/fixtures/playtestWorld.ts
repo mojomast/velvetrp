@@ -97,10 +97,12 @@ function starterReference(kind: "race" | "background" | "class", index = 0) {
 }
 
 function acceptedLocationId(db: DatabaseDriver.Database, campaignId: string, key: string): string {
-  const row = db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
-    WHERE campaign_id=? AND artifact_key=? AND artifact_kind='location' AND visibility='public'`).get(campaignId, key) as
-    | { server_resource_id: string | null }
-    | undefined;
+  const row = db
+    .prepare(
+      `SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+    WHERE campaign_id=? AND artifact_key=? AND artifact_kind='location' AND visibility='public'`,
+    )
+    .get(campaignId, key) as { server_resource_id: string | null } | undefined;
   if (!row?.server_resource_id) throw new Error(`playtest location artifact is unavailable: ${key}`);
   return row.server_resource_id;
 }
@@ -113,7 +115,9 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
   const composition = createDeterministicE2ERepository({ dataDir });
   const { repository } = composition;
   try {
-    const existing = repository.listCampaigns(OWNER).filter((campaign) => campaign.name === PLAYTEST_WORLD_CAMPAIGN_NAME);
+    const existing = repository
+      .listCampaigns(OWNER)
+      .filter((campaign) => campaign.name === PLAYTEST_WORLD_CAMPAIGN_NAME);
     if (existing.length > 1) throw new Error(`multiple playtest worlds exist for ${PLAYTEST_WORLD_CAMPAIGN_NAME}`);
     if (existing.length === 1) {
       const result = summarizePlaytestWorld(dataDir, existing[0]!.id);
@@ -121,13 +125,18 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
     }
 
     if (repository.listCampaigns(OWNER).length > 0) {
-      throw new Error("data directory already contains campaigns; use a new empty VELVET_DATA_DIR for the playtest world");
+      throw new Error(
+        "data directory already contains campaigns; use a new empty VELVET_DATA_DIR for the playtest world",
+      );
     }
 
     const content = generatedCampaignContentProviderSchema.parse(PLAYTEST_WORLD_CONTENT);
     const campaign = repository.createCampaign(OWNER, { name: PLAYTEST_WORLD_CAMPAIGN_NAME });
     repository.installSrdStarterCatalog(OWNER);
-    repository.configureSrdStarterCatalog(OWNER, campaign.id, { expectedRevision: 0, idempotencyKey: "playtest.catalog.configure" });
+    repository.configureSrdStarterCatalog(OWNER, campaign.id, {
+      expectedRevision: 0,
+      idempotencyKey: "playtest.catalog.configure",
+    });
 
     // Party sheets: finalized SRD level-one characters.
     const scores = attributeScores();
@@ -137,7 +146,8 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
         name: persona.name,
         age: 27 + index,
         archetype: persona.archetype,
-        boundaries: "Fictional adults. No sexual violence, harm to children, or demeaning portrayals of real communities.",
+        boundaries:
+          "Fictional adults. No sexual violence, harm to children, or demeaning portrayals of real communities.",
         fictionalConfirmed: true,
       });
       const draft = repository.createCharacterDraft(OWNER, campaign.id, {
@@ -177,31 +187,51 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
     });
     repository.transitionSession(session.id, "active", "Hollowford Reach playtest seed started");
     repository.addConsentEvent(session.id, "campaign-safety", true, "Fictional adults; strict respect for boundaries.");
-    repository.updateSessionContextSource(session.id,
-      "The Hollowford Reach, a dnd-5e frontier valley. Begin at the well in Hollowford Village. All places and people are fictional.");
-    await addMessage(session.id, "system", "Hollowford Village, first frost approaching. The harvest fair is quiet and the ward-stone is cracked.");
-    await addMessage(session.id, "user", "Tamsin reads the crack in the ward-stone while the others ask after the overdue miners.");
-    await addMessage(session.id, "character",
+    repository.updateSessionContextSource(
+      session.id,
+      "The Hollowford Reach, a dnd-5e frontier valley. Begin at the well in Hollowford Village. All places and people are fictional.",
+    );
+    await addMessage(
+      session.id,
+      "system",
+      "Hollowford Village, first frost approaching. The harvest fair is quiet and the ward-stone is cracked.",
+    );
+    await addMessage(
+      session.id,
+      "user",
+      "Tamsin reads the crack in the ward-stone while the others ask after the overdue miners.",
+    );
+    await addMessage(
+      session.id,
+      "character",
       "That crack runs against the grain of the stone. We should speak with Warden Thorn before we walk into the wood.",
-      { speakerCharacterId: actors[0]!.personaId });
+      { speakerCharacterId: actors[0]!.personaId },
+    );
     repository.attachCampaignSession(OWNER, { campaignId: campaign.id, sessionId: session.id });
 
     // Provider-free generation: the reviewed world is staged and applied as if a
     // region pack had returned it, with explicit non-provider provenance.
     const administrationAtGeneration = repository.getCampaignAdministration(OWNER, campaign.id);
     const generationContext = repository.getCampaignGenerationContext(OWNER, campaign.id, []);
-    if (!administrationAtGeneration || !generationContext) throw new Error("playtest generation context is unavailable");
+    if (!administrationAtGeneration || !generationContext)
+      throw new Error("playtest generation context is unavailable");
     const generationKey = "playtest.hollowford.generation";
     const requestDigest = "a".repeat(64);
-    const call = repository.beginCampaignGenerationCall(campaign.id, generationKey, requestDigest, {
-      provider: "reviewed-static-seed",
-      model: "none",
-      operation: "campaign-content-generation",
-      stage: "complete-world",
-      promptVersion: PLAYTEST_WORLD_SEED_VERSION,
-      schemaVersion: "v52",
-      jobId: "hollowford-v1-generation-job",
-    }, null);
+    const call = repository.beginCampaignGenerationCall(
+      campaign.id,
+      generationKey,
+      requestDigest,
+      {
+        provider: "reviewed-static-seed",
+        model: "none",
+        operation: "campaign-content-generation",
+        stage: "complete-world",
+        promptVersion: PLAYTEST_WORLD_SEED_VERSION,
+        schemaVersion: "v52",
+        jobId: "hollowford-v1-generation-job",
+      },
+      null,
+    );
     if (!call.acquired) throw new Error("fresh playtest generation call was not acquired");
     const draft = repository.createGenerationDraft(OWNER, {
       campaignId: campaign.id,
@@ -228,9 +258,18 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
       estimatedCostUsd: 0,
     });
     const selectedKeys = [
-      ...content.outlines, ...content.locations, ...content.connections, ...content.factions,
-      ...content.npcs, ...content.quests, ...content.encounters, ...content.clues,
-      ...content.storyNodes, ...content.storyRelationships, ...content.lore, ...content.handouts,
+      ...content.outlines,
+      ...content.locations,
+      ...content.connections,
+      ...content.factions,
+      ...content.npcs,
+      ...content.quests,
+      ...content.encounters,
+      ...content.clues,
+      ...content.storyNodes,
+      ...content.storyRelationships,
+      ...content.lore,
+      ...content.handouts,
       ...content.scenePrompts,
     ].map((artifact) => artifact.key);
     repository.applyCampaignContentGenerationDraftAtomically(OWNER, {
@@ -259,32 +298,47 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
     db.pragma("foreign_keys=ON");
     let result: PlaytestWorldResult;
     try {
-      const locationIds = Object.fromEntries(PLAYTEST_WORLD_LOCATION_KEYS.map((key) => [key, acceptedLocationId(db, campaign.id, key)]));
-      const startRow = db.prepare(`SELECT start.location_id,location.public_name FROM campaign_starting_locations_v51 start
+      const locationIds = Object.fromEntries(
+        PLAYTEST_WORLD_LOCATION_KEYS.map((key) => [key, acceptedLocationId(db, campaign.id, key)]),
+      );
+      const startRow = db
+        .prepare(
+          `SELECT start.location_id,location.public_name FROM campaign_starting_locations_v51 start
         JOIN campaign_locations_v28 location ON location.campaign_id=start.campaign_id AND location.location_id=start.location_id
-        WHERE start.campaign_id=?`).get(campaign.id) as { location_id: string; public_name: string } | undefined;
+        WHERE start.campaign_id=?`,
+        )
+        .get(campaign.id) as { location_id: string; public_name: string } | undefined;
       if (!startRow) throw new Error("playtest starting location was not designated by the outline");
       const startArtifactKey = Object.entries(locationIds).find(([, id]) => id === startRow.location_id)?.[0];
-      if (startArtifactKey !== PLAYTEST_WORLD_START_LOCATION_KEY) throw new Error("playtest starting location does not match the outline");
+      if (startArtifactKey !== PLAYTEST_WORLD_START_LOCATION_KEY)
+        throw new Error("playtest starting location does not match the outline");
 
       // Vendor: bind a deterministic server-authored shop to the smith NPC.
-      const vendorNpcId = (db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
-        WHERE campaign_id=? AND artifact_key=? AND artifact_kind='npc'`).get(campaign.id, PLAYTEST_WORLD_VENDOR_NPC_KEY) as
-        { server_resource_id: string | null } | undefined)?.server_resource_id;
+      const vendorNpcId = (
+        db
+          .prepare(
+            `SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+        WHERE campaign_id=? AND artifact_key=? AND artifact_kind='npc'`,
+          )
+          .get(campaign.id, PLAYTEST_WORLD_VENDOR_NPC_KEY) as { server_resource_id: string | null } | undefined
+      )?.server_resource_id;
       if (!vendorNpcId) throw new Error("playtest vendor NPC is unavailable");
       const shop = repository.materializeFreeformShop(OWNER, campaign.id, session.id, actors[0]!.actorId, vendorNpcId);
-      if (shop.status !== "materialized") throw new Error(`playtest vendor shop could not be materialized: ${shop.reason}`);
+      if (shop.status !== "materialized")
+        throw new Error(`playtest vendor shop could not be materialized: ${shop.reason}`);
 
       // Commerce: fund every party wallet in the shop's priced currency and grant the
       // vendor a positive buy policy on its stock. Without a wallet the commerce lane
       // emits no buy candidate (and the party cannot pay); without a buy policy the
       // vendor cannot buy back from the party. The wallet insert mirrors the in-process
       // deterministic economy fixture (`materializeEconomyGraph`).
-      const walletCurrency = shop.stock.find((line) => line.unitPriceMinor > 0)?.currencyCode ?? shop.stock[0]?.currencyCode;
+      const walletCurrency =
+        shop.stock.find((line) => line.unitPriceMinor > 0)?.currencyCode ?? shop.stock[0]?.currencyCode;
       if (!walletCurrency) throw new Error("playtest vendor shop has no priced stock to fund wallets");
       const walletMinor = Math.max(PLAYTEST_WORLD_PARTY_WALLET_MINOR, ...shop.stock.map((line) => line.unitPriceMinor));
       const fundedAt = new Date().toISOString();
-      const fundWallet = db.prepare(`INSERT INTO rpg_wallets_v25(campaign_id,actor_id,currency_code,balance_minor,updated_at)
+      const fundWallet =
+        db.prepare(`INSERT INTO rpg_wallets_v25(campaign_id,actor_id,currency_code,balance_minor,updated_at)
         VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,currency_code) DO UPDATE
         SET balance_minor=excluded.balance_minor,updated_at=excluded.updated_at`);
       for (const actor of actors) fundWallet.run(campaign.id, actor.actorId, walletCurrency, walletMinor, fundedAt);
@@ -297,8 +351,12 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
       let cast = repository.getNpcCast(OWNER, campaign.id, session.id);
       if (!cast) throw new Error("playtest NPC cast is unavailable");
       const npcResource = (key: string): string => {
-        const row = db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
-          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='npc'`).get(campaign.id, key) as { server_resource_id: string | null } | undefined;
+        const row = db
+          .prepare(
+            `SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+          WHERE campaign_id=? AND artifact_key=? AND artifact_kind='npc'`,
+          )
+          .get(campaign.id, key) as { server_resource_id: string | null } | undefined;
         if (!row?.server_resource_id) throw new Error(`playtest NPC artifact is unavailable: ${key}`);
         return row.server_resource_id;
       };
@@ -310,7 +368,10 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
       ];
       for (const [npcKey, locationKey] of presencePlan) {
         const npcId = npcResource(npcKey);
-        const existingPresence = db.prepare("SELECT location_id FROM campaign_npc_presence_v43 WHERE campaign_id=? AND session_id=? AND npc_id=?")
+        const existingPresence = db
+          .prepare(
+            "SELECT location_id FROM campaign_npc_presence_v43 WHERE campaign_id=? AND session_id=? AND npc_id=?",
+          )
           .get(campaign.id, session.id, npcId) as { location_id: string } | undefined;
         if (existingPresence) continue;
         repository.mutateNpcPresence(OWNER, {
@@ -348,10 +409,15 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
       // each actor has discovered it. The discovery row mirrors
       // `placeFinalizedActorAtCampaignStartV51`; without it the agent context has no
       // authoritative current location and any place-naming declaration is held.
-      const worldRevision = (): number => (db.prepare("SELECT revision FROM world_mutation_revisions_v28 WHERE campaign_id=? AND session_id=?")
-        .get(campaign.id, session.id) as { revision: number } | undefined)?.revision ?? 0;
+      const worldRevision = (): number =>
+        (
+          db
+            .prepare("SELECT revision FROM world_mutation_revisions_v28 WHERE campaign_id=? AND session_id=?")
+            .get(campaign.id, session.id) as { revision: number } | undefined
+        )?.revision ?? 0;
       for (const [index, actor] of actors.entries()) {
-        const existingPlacement = db.prepare("SELECT 1 FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?")
+        const existingPlacement = db
+          .prepare("SELECT 1 FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?")
           .get(campaign.id, actor.actorId);
         if (existingPlacement) continue;
         repository.setActorLocation(OWNER, session.id, {
@@ -402,75 +468,140 @@ export async function buildPlaytestWorld(options: BuildPlaytestWorldOptions): Pr
 export function summarizePlaytestWorld(dataDir: string, campaignId: string): PlaytestWorldResult {
   const db = openReadonly(dataDir);
   try {
-    const campaign = db.prepare("SELECT id,name,lifecycle_status lifeCycle FROM campaigns WHERE id=?").get(campaignId) as
-      | { id: string; name: string; lifeCycle: string }
-      | undefined;
+    const campaign = db
+      .prepare("SELECT id,name,lifecycle_status lifeCycle FROM campaigns WHERE id=?")
+      .get(campaignId) as { id: string; name: string; lifeCycle: string } | undefined;
     if (!campaign) throw new Error(`playtest campaign is absent: ${campaignId}`);
-    const session = db.prepare(`SELECT attached.session_id FROM campaign_sessions attached
-      WHERE attached.campaign_id=? ORDER BY attached.attached_at,session_id LIMIT 1`).get(campaignId) as { session_id: string } | undefined;
+    const session = db
+      .prepare(
+        `SELECT attached.session_id FROM campaign_sessions attached
+      WHERE attached.campaign_id=? ORDER BY attached.attached_at,session_id LIMIT 1`,
+      )
+      .get(campaignId) as { session_id: string } | undefined;
     if (!session) throw new Error("playtest room is unavailable");
     // The persona name is read from the authoritative `characters` row the campaign
     // character points at, never from creation order. Actor ids are generated, so a
     // positional lookup mislabels actors (the reported `name` must track `personaId`).
-    const actors = (db.prepare(`SELECT actor.id actor_id,actor.campaign_character_id,campaign_character.character_id persona_id,
+    const actors = (
+      db
+        .prepare(
+          `SELECT actor.id actor_id,actor.campaign_character_id,campaign_character.character_id persona_id,
         persona.name persona_name
       FROM campaign_actors actor
       JOIN campaign_characters campaign_character
         ON campaign_character.id=actor.campaign_character_id AND campaign_character.campaign_id=actor.campaign_id
       JOIN characters persona ON persona.id=campaign_character.character_id
-      WHERE actor.campaign_id=? ORDER BY persona.name,actor.id`).all(campaignId) as Array<
-        { actor_id: string; campaign_character_id: string; persona_id: string; persona_name: string }>)
-      .map((row) => ({
-        actorId: row.actor_id,
-        campaignCharacterId: row.campaign_character_id,
-        personaId: row.persona_id,
-        name: row.persona_name,
-      }));
+      WHERE actor.campaign_id=? ORDER BY persona.name,actor.id`,
+        )
+        .all(campaignId) as Array<{
+        actor_id: string;
+        campaign_character_id: string;
+        persona_id: string;
+        persona_name: string;
+      }>
+    ).map((row) => ({
+      actorId: row.actor_id,
+      campaignCharacterId: row.campaign_character_id,
+      personaId: row.persona_id,
+      name: row.persona_name,
+    }));
     if (actors.length === 0) throw new Error("playtest party is unavailable");
 
-    const start = db.prepare(`SELECT start.location_id,location.public_name FROM campaign_starting_locations_v51 start
+    const start = db
+      .prepare(
+        `SELECT start.location_id,location.public_name FROM campaign_starting_locations_v51 start
       JOIN campaign_locations_v28 location ON location.campaign_id=start.campaign_id AND location.location_id=start.location_id
-      WHERE start.campaign_id=?`).get(campaignId) as { location_id: string; public_name: string } | undefined;
+      WHERE start.campaign_id=?`,
+      )
+      .get(campaignId) as { location_id: string; public_name: string } | undefined;
     if (!start) throw new Error("playtest starting location is unavailable");
-    const locationIds = Object.fromEntries(PLAYTEST_WORLD_LOCATION_KEYS.map((key) => [key, acceptedLocationId(db, campaignId, key)]));
+    const locationIds = Object.fromEntries(
+      PLAYTEST_WORLD_LOCATION_KEYS.map((key) => [key, acceptedLocationId(db, campaignId, key)]),
+    );
     const startArtifactKey = Object.entries(locationIds).find(([, id]) => id === start.location_id)?.[0];
-    if (startArtifactKey === undefined) throw new Error("starting location is not one of the required playtest locations");
+    if (startArtifactKey === undefined)
+      throw new Error("starting location is not one of the required playtest locations");
 
-    const vendorRow = db.prepare(`SELECT artifact.server_resource_id npc_id,binding.shop_id,shop.name shop_name
+    const vendorRow = db
+      .prepare(
+        `SELECT artifact.server_resource_id npc_id,binding.shop_id,shop.name shop_name
       FROM campaign_generation_accepted_artifacts_v52 artifact
       JOIN campaign_npc_shop_bindings_v57 binding
         ON binding.campaign_id=artifact.campaign_id AND binding.npc_id=artifact.server_resource_id
       JOIN rpg_shop_definitions_v25 shop ON shop.campaign_id=binding.campaign_id AND shop.shop_id=binding.shop_id
-      WHERE artifact.campaign_id=? AND artifact.artifact_key=? AND artifact.artifact_kind='npc'`).get(campaignId, PLAYTEST_WORLD_VENDOR_NPC_KEY) as
-      | { npc_id: string; shop_id: string; shop_name: string }
-      | undefined;
+      WHERE artifact.campaign_id=? AND artifact.artifact_key=? AND artifact.artifact_kind='npc'`,
+      )
+      .get(campaignId, PLAYTEST_WORLD_VENDOR_NPC_KEY) as
+      { npc_id: string; shop_id: string; shop_name: string } | undefined;
     if (!vendorRow) throw new Error("playtest vendor shop is unavailable");
 
-    const count = (sql: string, ...params: unknown[]): number => (db.prepare(sql).get(...params) as { count: number }).count;
+    const count = (sql: string, ...params: unknown[]): number =>
+      (db.prepare(sql).get(...params) as { count: number }).count;
     const counts = {
-      acceptedArtifacts: count("SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=?", campaignId),
-      publicLocationArtifacts: count(`SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
-        WHERE campaign_id=? AND artifact_kind='location' AND visibility='public'`, campaignId),
-      publicFactionArtifacts: count(`SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
-        WHERE campaign_id=? AND artifact_kind='faction' AND visibility='public'`, campaignId),
-      publicNpcArtifacts: count(`SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
-        WHERE campaign_id=? AND artifact_kind='npc' AND visibility='public'`, campaignId),
-      publicQuestArtifacts: count(`SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
-        WHERE campaign_id=? AND artifact_kind='quest' AND visibility='public'`, campaignId),
-      publicRumorArtifacts: count(`SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
-        WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'`, campaignId),
-      publicEncounterArtifacts: count(`SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
-        WHERE campaign_id=? AND artifact_kind='encounter' AND visibility='public'`, campaignId),
-      connections: count("SELECT count(*) count FROM campaign_location_connections_v28 WHERE campaign_id=?", campaignId),
-      shopStock: count("SELECT count(*) count FROM rpg_shop_stock_v25 WHERE campaign_id=? AND shop_id=?", campaignId, vendorRow.shop_id),
-      partyWallets: count(`SELECT count(*) count FROM rpg_wallets_v25 wallet
+      acceptedArtifacts: count(
+        "SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=?",
+        campaignId,
+      ),
+      publicLocationArtifacts: count(
+        `SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
+        WHERE campaign_id=? AND artifact_kind='location' AND visibility='public'`,
+        campaignId,
+      ),
+      publicFactionArtifacts: count(
+        `SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
+        WHERE campaign_id=? AND artifact_kind='faction' AND visibility='public'`,
+        campaignId,
+      ),
+      publicNpcArtifacts: count(
+        `SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
+        WHERE campaign_id=? AND artifact_kind='npc' AND visibility='public'`,
+        campaignId,
+      ),
+      publicQuestArtifacts: count(
+        `SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
+        WHERE campaign_id=? AND artifact_kind='quest' AND visibility='public'`,
+        campaignId,
+      ),
+      publicRumorArtifacts: count(
+        `SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
+        WHERE campaign_id=? AND artifact_kind='lore' AND visibility='public'`,
+        campaignId,
+      ),
+      publicEncounterArtifacts: count(
+        `SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52
+        WHERE campaign_id=? AND artifact_kind='encounter' AND visibility='public'`,
+        campaignId,
+      ),
+      connections: count(
+        "SELECT count(*) count FROM campaign_location_connections_v28 WHERE campaign_id=?",
+        campaignId,
+      ),
+      shopStock: count(
+        "SELECT count(*) count FROM rpg_shop_stock_v25 WHERE campaign_id=? AND shop_id=?",
+        campaignId,
+        vendorRow.shop_id,
+      ),
+      partyWallets: count(
+        `SELECT count(*) count FROM rpg_wallets_v25 wallet
         JOIN campaign_actors actor ON actor.campaign_id=wallet.campaign_id AND actor.id=wallet.actor_id
-        WHERE wallet.campaign_id=? AND wallet.balance_minor>0`, campaignId),
-      shopBuyPolicies: count("SELECT count(*) count FROM rpg_shop_buy_policies_v57 WHERE campaign_id=? AND shop_id=?", campaignId, vendorRow.shop_id),
-      locationDiscoveries: count("SELECT count(*) count FROM campaign_location_discoveries_v28 WHERE campaign_id=?", campaignId),
+        WHERE wallet.campaign_id=? AND wallet.balance_minor>0`,
+        campaignId,
+      ),
+      shopBuyPolicies: count(
+        "SELECT count(*) count FROM rpg_shop_buy_policies_v57 WHERE campaign_id=? AND shop_id=?",
+        campaignId,
+        vendorRow.shop_id,
+      ),
+      locationDiscoveries: count(
+        "SELECT count(*) count FROM campaign_location_discoveries_v28 WHERE campaign_id=?",
+        campaignId,
+      ),
       presenceEvents: count("SELECT count(*) count FROM npc_presence_events_v43 WHERE campaign_id=?", campaignId),
-      npcRelationships: count(`SELECT count(*) count FROM world_narrative_events_v32
-        WHERE campaign_id=? AND event_type='npc_relationship_changed'`, campaignId),
+      npcRelationships: count(
+        `SELECT count(*) count FROM world_narrative_events_v32
+        WHERE campaign_id=? AND event_type='npc_relationship_changed'`,
+        campaignId,
+      ),
     };
 
     return {
@@ -487,7 +618,13 @@ export function summarizePlaytestWorld(dataDir: string, campaignId: string): Pla
         locationId: locationIds["loc-cinder-camp"]!,
         name: "The Cinder Camp",
       },
-      vendor: { npcKey: PLAYTEST_WORLD_VENDOR_NPC_KEY, npcId: vendorRow.npc_id, shopId: vendorRow.shop_id, shopName: vendorRow.shop_name, stockLines: counts.shopStock },
+      vendor: {
+        npcKey: PLAYTEST_WORLD_VENDOR_NPC_KEY,
+        npcId: vendorRow.npc_id,
+        shopId: vendorRow.shop_id,
+        shopName: vendorRow.shop_name,
+        stockLines: counts.shopStock,
+      },
       counts,
     };
   } finally {

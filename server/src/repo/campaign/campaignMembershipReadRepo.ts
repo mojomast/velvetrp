@@ -65,26 +65,30 @@ export interface CampaignMembershipReadRepository {
   ): CampaignMembershipRead | null;
 }
 
-export function createCampaignMembershipReadRepository(
-  db: DatabaseDriver.Database,
-): CampaignMembershipReadRepository {
+export function createCampaignMembershipReadRepository(db: DatabaseDriver.Database): CampaignMembershipReadRepository {
   return {
     listCampaignMemberships(actorPrincipalId, campaignId) {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
       const id = resourceIdSchema.parse(campaignId);
-      const rows = db.prepare(`${CAMPAIGN_MEMBERSHIP_READ_SELECT}
+      const rows = db
+        .prepare(
+          `${CAMPAIGN_MEMBERSHIP_READ_SELECT}
 ORDER BY target_membership.created_at ASC,
-  target_membership.principal_id COLLATE BINARY ASC`).all(actorId, id) as CampaignMembershipReadRow[];
+  target_membership.principal_id COLLATE BINARY ASC`,
+        )
+        .all(actorId, id) as CampaignMembershipReadRow[];
       return rows.map(toCampaignMembershipRead);
     },
     getCampaignMembership(actorPrincipalId, campaignId, principalId) {
       const actorId = resourceIdSchema.parse(actorPrincipalId);
       const id = resourceIdSchema.parse(campaignId);
       const targetPrincipalId = resourceIdSchema.parse(principalId);
-      const row = db.prepare(`${CAMPAIGN_MEMBERSHIP_READ_SELECT}
-  AND target_membership.principal_id = ?`).get(actorId, id, targetPrincipalId) as
-        | CampaignMembershipReadRow
-        | undefined;
+      const row = db
+        .prepare(
+          `${CAMPAIGN_MEMBERSHIP_READ_SELECT}
+  AND target_membership.principal_id = ?`,
+        )
+        .get(actorId, id, targetPrincipalId) as CampaignMembershipReadRow | undefined;
       return row ? toCampaignMembershipRead(row) : null;
     },
   };

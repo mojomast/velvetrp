@@ -11,11 +11,19 @@ const characterInput = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-    fictionalConfirmed: true,
+  fictionalConfirmed: true,
 };
 const emptyProfile = {
-  goal: "", ideal: "", bond: "", flaw: "", history: "", personality: "",
-  fears: "", relationships: "", appearance: "", voice: "",
+  goal: "",
+  ideal: "",
+  bond: "",
+  flaw: "",
+  history: "",
+  personality: "",
+  fears: "",
+  relationships: "",
+  appearance: "",
+  voice: "",
 };
 
 describe("character api compatibility", () => {
@@ -112,25 +120,41 @@ describe("character api compatibility", () => {
   it("normalizes rich profiles and preserves wrapped v1 imports", async () => {
     const app = buildApp();
     const profile = {
-      goal: "  Chart the unknown. ", ideal: "Curiosity", bond: "Her crew", flaw: "Reckless",
-      history: "Raised aboard a survey ship.", personality: "Restless and warm.", fears: "Being stranded.",
-      relationships: "Protective of her navigator.", appearance: "Silver flight jacket.", voice: "Quick, precise sentences.",
+      goal: "  Chart the unknown. ",
+      ideal: "Curiosity",
+      bond: "Her crew",
+      flaw: "Reckless",
+      history: "Raised aboard a survey ship.",
+      personality: "Restless and warm.",
+      fears: "Being stranded.",
+      relationships: "Protective of her navigator.",
+      appearance: "Silver flight jacket.",
+      voice: "Quick, precise sentences.",
     };
-    const createdResponse = await app.inject({ method: "POST", url: "/api/characters", payload: { ...characterInput, profile } });
+    const createdResponse = await app.inject({
+      method: "POST",
+      url: "/api/characters",
+      payload: { ...characterInput, profile },
+    });
     expect(createdResponse.statusCode).toBe(201);
     const created = createdResponse.json() as { id: string; profile: typeof profile };
     expect(created.profile).toEqual({ ...profile, goal: "Chart the unknown." });
     expect((await app.inject({ method: "GET", url: `/api/characters/${created.id}` })).json()).toEqual(created);
 
     const v1 = await app.inject({
-      method: "POST", url: "/api/characters/import",
+      method: "POST",
+      url: "/api/characters/import",
       payload: { formatVersion: "velvet-character@1", character: { ...characterInput, name: "Legacy" } },
     });
     expect(v1.statusCode).toBe(201);
     expect(v1.json()).toMatchObject({ name: "Legacy", profile: emptyProfile });
 
     for (const invalidProfile of [{ hidden: "secret" }, { goal: 4 }, { goal: "x".repeat(501) }]) {
-      const response = await app.inject({ method: "POST", url: "/api/characters", payload: { ...characterInput, profile: invalidProfile } });
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/characters",
+        payload: { ...characterInput, profile: invalidProfile },
+      });
       expect(response.statusCode).toBe(400);
       expect(response.json()).toEqual({ error: "profile is invalid" });
     }
@@ -153,13 +177,19 @@ describe("character api compatibility", () => {
 
   it("preserves patch and import validation responses", async () => {
     const app = buildApp();
-    const created = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput })).json() as { id: string };
+    const created = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput })).json() as {
+      id: string;
+    };
 
     const missingPatch = await app.inject({ method: "PATCH", url: `/api/characters/${created.id}` });
     expect(missingPatch.statusCode).toBe(400);
     expect(missingPatch.json()).toEqual({ error: "character patch is required" });
 
-    const invalidPatch = await app.inject({ method: "PATCH", url: `/api/characters/${created.id}`, payload: { age: "29" } });
+    const invalidPatch = await app.inject({
+      method: "PATCH",
+      url: `/api/characters/${created.id}`,
+      payload: { age: "29" },
+    });
     expect(invalidPatch.statusCode).toBe(400);
     expect(invalidPatch.json()).toEqual({ error: "age must be an integer" });
 
@@ -183,8 +213,12 @@ describe("character api compatibility", () => {
 
   it("preserves guarded deletion and allows deletion after session removal", async () => {
     const app = buildApp();
-    const character = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput })).json() as { id: string };
-    const session = (await app.inject({ method: "POST", url: "/api/sessions", payload: { characterId: character.id } })).json() as { id: string };
+    const character = (
+      await app.inject({ method: "POST", url: "/api/characters", payload: characterInput })
+    ).json() as { id: string };
+    const session = (
+      await app.inject({ method: "POST", url: "/api/sessions", payload: { characterId: character.id } })
+    ).json() as { id: string };
 
     const guarded = await app.inject({ method: "DELETE", url: `/api/characters/${character.id}` });
     expect(guarded.statusCode).toBe(409);

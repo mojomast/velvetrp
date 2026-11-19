@@ -64,14 +64,34 @@ interface PartyMemberPlan {
 }
 
 const PARTY: readonly PartyMemberPlan[] = [
-  { role: "fighter", label: "Fighter", classDefinitionId: "srd-5.1:class:fighter",
-    ancestryDefinitionId: "srd-5.1:race:hill-dwarf", fallbackAncestryDefinitionId: "srd-5.1:race:dwarf" },
-  { role: "wizard", label: "Wizard", classDefinitionId: "srd-5.1:class:wizard",
-    ancestryDefinitionId: "srd-5.1:race:high-elf", fallbackAncestryDefinitionId: "srd-5.1:race:elf" },
-  { role: "rogue", label: "Rogue", classDefinitionId: "srd-5.1:class:rogue",
-    ancestryDefinitionId: "srd-5.1:race:lightfoot-halfling", fallbackAncestryDefinitionId: "srd-5.1:race:halfling" },
-  { role: "cleric", label: "Cleric", classDefinitionId: "srd-5.1:class:cleric",
-    ancestryDefinitionId: "srd-5.1:race:rock-gnome", fallbackAncestryDefinitionId: "srd-5.1:race:gnome" },
+  {
+    role: "fighter",
+    label: "Fighter",
+    classDefinitionId: "srd-5.1:class:fighter",
+    ancestryDefinitionId: "srd-5.1:race:hill-dwarf",
+    fallbackAncestryDefinitionId: "srd-5.1:race:dwarf",
+  },
+  {
+    role: "wizard",
+    label: "Wizard",
+    classDefinitionId: "srd-5.1:class:wizard",
+    ancestryDefinitionId: "srd-5.1:race:high-elf",
+    fallbackAncestryDefinitionId: "srd-5.1:race:elf",
+  },
+  {
+    role: "rogue",
+    label: "Rogue",
+    classDefinitionId: "srd-5.1:class:rogue",
+    ancestryDefinitionId: "srd-5.1:race:lightfoot-halfling",
+    fallbackAncestryDefinitionId: "srd-5.1:race:halfling",
+  },
+  {
+    role: "cleric",
+    label: "Cleric",
+    classDefinitionId: "srd-5.1:class:cleric",
+    ancestryDefinitionId: "srd-5.1:race:rock-gnome",
+    fallbackAncestryDefinitionId: "srd-5.1:race:gnome",
+  },
 ];
 
 export interface HydrateSrdReferenceCampaignOptions {
@@ -196,54 +216,83 @@ function countWhere(db: Database.Database, table: string, where: string, ...para
   return row.count;
 }
 
-function readReservedRuleset(db: Database.Database, campaignId: string): { rulesetId: string | null; rulesetVersion: string | null } {
+function readReservedRuleset(
+  db: Database.Database,
+  campaignId: string,
+): { rulesetId: string | null; rulesetVersion: string | null } {
   if (!hasTable(db, "campaign_administration_integrations_v59")) return { rulesetId: null, rulesetVersion: null };
-  const row = db.prepare(
-    "SELECT ruleset_id AS rulesetId, ruleset_version AS rulesetVersion FROM campaign_administration_integrations_v59 WHERE campaign_id=?",
-  ).get(campaignId) as { rulesetId: string | null; rulesetVersion: string | null } | undefined;
+  const row = db
+    .prepare(
+      "SELECT ruleset_id AS rulesetId, ruleset_version AS rulesetVersion FROM campaign_administration_integrations_v59 WHERE campaign_id=?",
+    )
+    .get(campaignId) as { rulesetId: string | null; rulesetVersion: string | null } | undefined;
   return row ?? { rulesetId: null, rulesetVersion: null };
 }
 
-async function inspectAndBackup(databasePath: string, campaignId: string, backupPath: string | null): Promise<RawInspection> {
+async function inspectAndBackup(
+  databasePath: string,
+  campaignId: string,
+  backupPath: string | null,
+): Promise<RawInspection> {
   const db = new Database(databasePath, { readonly: true, fileMustExist: true });
   try {
     const quickCheck = (db.pragma("quick_check") as Array<{ quick_check: string }>)[0]?.quick_check ?? "unknown";
     const foreignKeyFindings = (db.pragma("foreign_key_check") as unknown[]).length;
 
-    const campaign = db.prepare(
-      "SELECT name, lifecycle_status, administration_revision, owner_principal_id FROM campaigns WHERE id=?",
-    ).get(campaignId) as {
-      name: string; lifecycle_status: string; administration_revision: number; owner_principal_id: string;
-    } | undefined;
+    const campaign = db
+      .prepare("SELECT name, lifecycle_status, administration_revision, owner_principal_id FROM campaigns WHERE id=?")
+      .get(campaignId) as
+      | {
+          name: string;
+          lifecycle_status: string;
+          administration_revision: number;
+          owner_principal_id: string;
+        }
+      | undefined;
 
     const catalogRulesProfileId = hasTable(db, "campaign_catalog_current_selections")
-      ? (db.prepare("SELECT rules_profile_id FROM campaign_catalog_current_selections WHERE campaign_id=?")
-        .get(campaignId) as { rules_profile_id: string } | undefined)?.rules_profile_id ?? null
+      ? ((
+          db
+            .prepare("SELECT rules_profile_id FROM campaign_catalog_current_selections WHERE campaign_id=?")
+            .get(campaignId) as { rules_profile_id: string } | undefined
+        )?.rules_profile_id ?? null)
       : null;
 
     const catalogPins = hasTable(db, "campaign_catalog_current_pins")
-      ? (db.prepare("SELECT pack_id, pack_version FROM campaign_catalog_current_pins WHERE campaign_id=? ORDER BY position")
-        .all(campaignId) as Array<{ pack_id: string; pack_version: string }>)
-        .map((row) => ({ packId: row.pack_id, packVersion: row.pack_version }))
+      ? (
+          db
+            .prepare(
+              "SELECT pack_id, pack_version FROM campaign_catalog_current_pins WHERE campaign_id=? ORDER BY position",
+            )
+            .all(campaignId) as Array<{ pack_id: string; pack_version: string }>
+        ).map((row) => ({ packId: row.pack_id, packVersion: row.pack_version }))
       : [];
 
     const legacyRulesProfileId = hasTable(db, "campaign_rules_profiles")
-      ? (db.prepare("SELECT rules_profile_id FROM campaign_rules_profiles WHERE campaign_id=?")
-        .get(campaignId) as { rules_profile_id: string } | undefined)?.rules_profile_id ?? null
+      ? ((
+          db.prepare("SELECT rules_profile_id FROM campaign_rules_profiles WHERE campaign_id=?").get(campaignId) as
+            { rules_profile_id: string } | undefined
+        )?.rules_profile_id ?? null)
       : null;
 
     const rulesetBinding = hasTable(db, "campaign_ruleset_bindings_v60")
-      ? (db.prepare("SELECT ruleset_id, ruleset_version FROM campaign_ruleset_bindings_v60 WHERE campaign_id=?")
-        .get(campaignId) as { ruleset_id: string; ruleset_version: string } | undefined)
+      ? (db
+          .prepare("SELECT ruleset_id, ruleset_version FROM campaign_ruleset_bindings_v60 WHERE campaign_id=?")
+          .get(campaignId) as { ruleset_id: string; ruleset_version: string } | undefined)
       : undefined;
 
-    const attachedSessions = hasTable(db, "campaign_sessions") && hasTable(db, "sessions")
-      ? (db.prepare(`SELECT attachment.session_id, session.state, attachment.attached_at
+    const attachedSessions =
+      hasTable(db, "campaign_sessions") && hasTable(db, "sessions")
+        ? (
+            db
+              .prepare(
+                `SELECT attachment.session_id, session.state, attachment.attached_at
           FROM campaign_sessions attachment JOIN sessions session ON session.id=attachment.session_id
-          WHERE attachment.campaign_id=? ORDER BY attachment.attached_at, attachment.session_id`)
-        .all(campaignId) as Array<{ session_id: string; state: string; attached_at: string }>)
-        .map((row) => ({ sessionId: row.session_id, state: row.state, attachedAt: row.attached_at }))
-      : [];
+          WHERE attachment.campaign_id=? ORDER BY attachment.attached_at, attachment.session_id`,
+              )
+              .all(campaignId) as Array<{ session_id: string; state: string; attached_at: string }>
+          ).map((row) => ({ sessionId: row.session_id, state: row.state, attachedAt: row.attached_at }))
+        : [];
 
     if (backupPath) await db.backup(backupPath);
 
@@ -254,13 +303,19 @@ async function inspectAndBackup(databasePath: string, campaignId: string, backup
       ownerPrincipalId: campaign?.owner_principal_id ?? null,
       campaignCharacterCount: countWhere(db, "campaign_characters", "campaign_id=?", campaignId),
       campaignActorCount: countWhere(db, "campaign_actors", "campaign_id=?", campaignId),
-      activeDraftCount: countWhere(db, "character_drafts_v19",
-        "campaign_id=? AND status='active' AND durability='durable'", campaignId),
+      activeDraftCount: countWhere(
+        db,
+        "character_drafts_v19",
+        "campaign_id=? AND status='active' AND durability='durable'",
+        campaignId,
+      ),
       catalogRulesProfileId,
       catalogPins,
       legacyRulesProfileId,
       legacyContentPackCount: countWhere(db, "campaign_content_packs", "campaign_id=?", campaignId),
-      rulesetBinding: rulesetBinding ? { rulesetId: rulesetBinding.ruleset_id, rulesetVersion: rulesetBinding.ruleset_version } : null,
+      rulesetBinding: rulesetBinding
+        ? { rulesetId: rulesetBinding.ruleset_id, rulesetVersion: rulesetBinding.ruleset_version }
+        : null,
       reservedRuleset: readReservedRuleset(db, campaignId),
       attachedSessions,
       quickCheck,
@@ -298,10 +353,12 @@ function expectedCatalogVersion(): string {
 }
 
 function isExpectedCatalogConfiguration(configuration: CampaignContentConfiguration): boolean {
-  return configuration.rulesProfileId === SRD_5_1_STARTER_RULES_PROFILE_ID
-    && configuration.contentPacks.some(
+  return (
+    configuration.rulesProfileId === SRD_5_1_STARTER_RULES_PROFILE_ID &&
+    configuration.contentPacks.some(
       (pack) => pack.packId === SRD_5_1_STARTER_PACK_ID && pack.packVersion === expectedCatalogVersion(),
-    );
+    )
+  );
 }
 
 function personaName(campaignName: string, campaignId: string, label: string): string {
@@ -334,7 +391,9 @@ export async function hydrateSrdReferenceCampaign(
 
   // 1. Read-only inspection followed by an online backup of the pre-mutation database.
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const backupPath = options.validateOnly ? null : path.join(dataDir, "hydration-backups", `before-srd-reference-${stamp}.sqlite`);
+  const backupPath = options.validateOnly
+    ? null
+    : path.join(dataDir, "hydration-backups", `before-srd-reference-${stamp}.sqlite`);
   if (backupPath) mkdirSync(path.dirname(backupPath), { recursive: true });
   const raw = await inspectAndBackup(databasePath, campaignId, backupPath);
   assert.equal(raw.quickCheck, "ok", `database quick_check failed: ${raw.quickCheck}`);
@@ -346,18 +405,28 @@ export async function hydrateSrdReferenceCampaign(
   if (raw.ownerPrincipalId !== OWNER) {
     fail(`campaign owner is ${raw.ownerPrincipalId}; this operator script requires ${OWNER}`);
   }
-  if (raw.rulesetBinding && (raw.rulesetBinding.rulesetId !== DND_5E || raw.rulesetBinding.rulesetVersion !== DND_5E_VERSION)) {
-    fail(`campaign has an existing ${raw.rulesetBinding.rulesetId}@${raw.rulesetBinding.rulesetVersion} ruleset binding; refusing to rebind`);
+  if (
+    raw.rulesetBinding &&
+    (raw.rulesetBinding.rulesetId !== DND_5E || raw.rulesetBinding.rulesetVersion !== DND_5E_VERSION)
+  ) {
+    fail(
+      `campaign has an existing ${raw.rulesetBinding.rulesetId}@${raw.rulesetBinding.rulesetVersion} ruleset binding; refusing to rebind`,
+    );
   }
   if (raw.reservedRuleset.rulesetId && raw.reservedRuleset.rulesetId !== DND_5E) {
     fail(`campaign reserved ruleset ${raw.reservedRuleset.rulesetId}; refusing to reconfigure to dnd-5e`);
   }
-  if (raw.reservedRuleset.rulesetId === DND_5E
-    && raw.reservedRuleset.rulesetVersion !== null && raw.reservedRuleset.rulesetVersion !== DND_5E_VERSION) {
+  if (
+    raw.reservedRuleset.rulesetId === DND_5E &&
+    raw.reservedRuleset.rulesetVersion !== null &&
+    raw.reservedRuleset.rulesetVersion !== DND_5E_VERSION
+  ) {
     fail(`campaign reserved dnd-5e@${raw.reservedRuleset.rulesetVersion}; expected ${DND_5E_VERSION}`);
   }
   if (raw.legacyRulesProfileId && !raw.catalogRulesProfileId) {
-    fail(`campaign has a legacy ${raw.legacyRulesProfileId} content configuration without a catalog selection; refusing to rebind`);
+    fail(
+      `campaign has a legacy ${raw.legacyRulesProfileId} content configuration without a catalog selection; refusing to rebind`,
+    );
   }
 
   process.env.VELVET_DATA_DIR = dataDir;
@@ -374,25 +443,38 @@ export async function hydrateSrdReferenceCampaign(
     const expectedNameSet = new Set(expectedNames.values());
     for (const character of rosterBefore.characters) {
       if (!expectedNameSet.has(character.name)) {
-        fail(`campaign already contains an unexpected campaign character ${JSON.stringify(character.name)}; refusing to add reference duplicates`);
+        fail(
+          `campaign already contains an unexpected campaign character ${JSON.stringify(character.name)}; refusing to add reference duplicates`,
+        );
       }
     }
-    const allPresentBefore = PARTY.every((plan) => rosterBefore.characters.some(
-      (character) => character.name === expectedNames.get(plan.role),
-    ));
+    const allPresentBefore = PARTY.every((plan) =>
+      rosterBefore.characters.some((character) => character.name === expectedNames.get(plan.role)),
+    );
     const catalogConfiguredBefore = configurationBefore !== null;
     if (catalogConfiguredBefore && !isExpectedCatalogConfiguration(configurationBefore!)) {
-      fail(`campaign is already configured with rules profile ${configurationBefore!.rulesProfileId} (${configurationBefore!.contentPacks
-        .map((pack) => `${pack.packId}@${pack.packVersion}`).join(", ")}); refusing to rebind an existing catalog selection`);
+      fail(
+        `campaign is already configured with rules profile ${configurationBefore!.rulesProfileId} (${configurationBefore!.contentPacks
+          .map((pack) => `${pack.packId}@${pack.packVersion}`)
+          .join(", ")}); refusing to rebind an existing catalog selection`,
+      );
     }
 
     if (options.validateOnly) {
       if (!catalogConfiguredBefore) fail("validate-only: campaign has no catalog configuration to validate");
       if (!allPresentBefore) fail("validate-only: the expected reference party is incomplete");
     } else if (!catalogConfiguredBefore) {
-      assert.equal(raw.campaignCharacterCount, 0, "campaign must have no campaign characters before first catalog configuration");
+      assert.equal(
+        raw.campaignCharacterCount,
+        0,
+        "campaign must have no campaign characters before first catalog configuration",
+      );
       assert.equal(raw.campaignActorCount, 0, "campaign must have no actors before first catalog configuration");
-      assert.equal(raw.activeDraftCount, 0, "campaign must have no active durable character drafts before first catalog configuration");
+      assert.equal(
+        raw.activeDraftCount,
+        0,
+        "campaign must have no active durable character drafts before first catalog configuration",
+      );
       repository.installSrdStarterCatalog(OWNER);
       const revision = repository.getCampaignAdministration(OWNER, campaignId)!.revision;
       repository.configureSrdStarterCatalog(OWNER, campaignId, {
@@ -420,22 +502,30 @@ export async function hydrateSrdReferenceCampaign(
       if (!selectedAncestry) fail(`no SRD ancestry is available for ${plan.label}`);
       const ancestryFallback = requested === null;
       if (ancestryFallback) {
-        warnings.push(`Requested ancestry ${plan.ancestryDefinitionId} is not published; ${plan.label} uses base ${plan.fallbackAncestryDefinitionId}. Subrace-only traits were not applied.`);
+        warnings.push(
+          `Requested ancestry ${plan.ancestryDefinitionId} is not published; ${plan.label} uses base ${plan.fallbackAncestryDefinitionId}. Subrace-only traits were not applied.`,
+        );
       }
       const ancestryDefinition = SRD_5_1_STARTER_CATALOG.definitions.find(
-        (candidate) => candidate.reference.kind === "race" && candidate.reference.definitionId === selectedAncestry.definitionId,
+        (candidate) =>
+          candidate.reference.kind === "race" && candidate.reference.definitionId === selectedAncestry.definitionId,
       );
       if (ancestryDefinition && ancestryDefinition.tags.includes("unsupported-runtime")) {
-        warnings.push(`${plan.label} ancestry ${selectedAncestry.definitionId} records subrace traits as metadata only (unsupported-runtime); those traits are not automated.`);
+        warnings.push(
+          `${plan.label} ancestry ${selectedAncestry.definitionId} records subrace traits as metadata only (unsupported-runtime); those traits are not automated.`,
+        );
       }
       const existingPersona = personae.find((character) => character.name === name);
-      const persona = existingPersona ?? repository.createCharacter({
-        name,
-        age: 30 + index,
-        archetype: `${selectedAncestry.definitionId.replace("srd-5.1:race:", "")} ${plan.label} reference adventurer`,
-        boundaries: "Fictional adults. No sexual violence, harm to children, or demeaning portrayals of real communities.",
-        fictionalConfirmed: true,
-      });
+      const persona =
+        existingPersona ??
+        repository.createCharacter({
+          name,
+          age: 30 + index,
+          archetype: `${selectedAncestry.definitionId.replace("srd-5.1:race:", "")} ${plan.label} reference adventurer`,
+          boundaries:
+            "Fictional adults. No sexual violence, harm to children, or demeaning portrayals of real communities.",
+          fictionalConfirmed: true,
+        });
       if (!existingPersona) personae.push(persona);
       resolved.push({
         plan,
@@ -455,7 +545,9 @@ export async function hydrateSrdReferenceCampaign(
     const sessions = await listSessions();
     const attachedSessions = sessions.filter((candidate) => attachedIds.has(candidate.id));
     // A stopped attached room cannot anchor placement; only active/setup rooms are reusable.
-    const reusableSessions = attachedSessions.filter((candidate) => candidate.state !== "closed" && candidate.stoppedAt === null);
+    const reusableSessions = attachedSessions.filter(
+      (candidate) => candidate.state !== "closed" && candidate.stoppedAt === null,
+    );
     let roomTitleMatched = false;
     let createdSession = false;
     let session = reusableSessions.find((candidate) => candidate.title === preferredTitle);
@@ -464,15 +556,26 @@ export async function hydrateSrdReferenceCampaign(
     } else if (reusableSessions.length === 0) {
       if (options.validateOnly) fail("validate-only: campaign has no reusable active attached room");
       if (attachedSessions.length > 0) {
-        warnings.push(`All ${attachedSessions.length} attached room(s) are stopped; creating a fresh active room ${JSON.stringify(preferredTitle)}.`);
+        warnings.push(
+          `All ${attachedSessions.length} attached room(s) are stopped; creating a fresh active room ${JSON.stringify(preferredTitle)}.`,
+        );
       }
-      session = await createSession({ characterIds: personaIds, primaryCharacterId: personaIds[0]!, title: preferredTitle, presetId: "default" });
+      session = await createSession({
+        characterIds: personaIds,
+        primaryCharacterId: personaIds[0]!,
+        title: preferredTitle,
+        presetId: "default",
+      });
       createdSession = true;
     } else if (reusableSessions.length === 1) {
       session = reusableSessions[0]!;
-      warnings.push(`Reusing the only reusable room ${session.id} titled ${JSON.stringify(session.title)} instead of creating ${JSON.stringify(preferredTitle)}.`);
+      warnings.push(
+        `Reusing the only reusable room ${session.id} titled ${JSON.stringify(session.title)} instead of creating ${JSON.stringify(preferredTitle)}.`,
+      );
     } else {
-      fail(`${reusableSessions.length} active rooms are attached to the campaign; pass --room-title naming exactly one to avoid an ambiguous world session`);
+      fail(
+        `${reusableSessions.length} active rooms are attached to the campaign; pass --room-title naming exactly one to avoid an ambiguous world session`,
+      );
     }
     const sessionId = session.id;
     if (session.state !== "active" && !options.validateOnly) {
@@ -482,8 +585,13 @@ export async function hydrateSrdReferenceCampaign(
     if (!attachedIds.has(sessionId) && !options.validateOnly) {
       repository.attachCampaignSession(OWNER, { campaignId, sessionId });
     }
-    if (!createdSession && !personaIds.every((id) => session.participants.some((participant) => participant.id === id))) {
-      warnings.push(`Reused room ${sessionId} does not list every reference persona as a legacy session participant; campaign characters remain playable.`);
+    if (
+      !createdSession &&
+      !personaIds.every((id) => session.participants.some((participant) => participant.id === id))
+    ) {
+      warnings.push(
+        `Reused room ${sessionId} does not list every reference persona as a legacy session participant; campaign characters remain playable.`,
+      );
     }
 
     // Original reference-world hubs provide a usable location for the party.
@@ -493,11 +601,27 @@ export async function hydrateSrdReferenceCampaign(
       if (world.visibleLocations.length === 0) {
         const suffix = createHash("sha256").update(campaignId).digest("hex").slice(0, 16);
         const locations = [
-          { locationId: `srd-ref-camp-${suffix}`, name: "Bramps Camp · Expedition Hall", description: "An original fictional expedition base. Four adventurers prepare a first journey together; the library records the current reviewed SRD catalog. This hub carries no automatic healing, equipment or rewards." },
-          { locationId: `srd-ref-trail-${suffix}`, name: "Old Quarry Trail", description: "An original fictional walking route between camp and a disused quarry. Footprints, weather and the travellers' decisions provide scene hooks; no encounter is automatically triggered." },
-          { locationId: `srd-ref-quarry-${suffix}`, name: "Lantern Quarry", description: "An original fictional quarry with a sheltered overlook. A good scene for discussing the next expedition or preparing an encounter from pinned creature definitions; no enemies or treasure are materialized here." },
+          {
+            locationId: `srd-ref-camp-${suffix}`,
+            name: "Bramps Camp · Expedition Hall",
+            description:
+              "An original fictional expedition base. Four adventurers prepare a first journey together; the library records the current reviewed SRD catalog. This hub carries no automatic healing, equipment or rewards.",
+          },
+          {
+            locationId: `srd-ref-trail-${suffix}`,
+            name: "Old Quarry Trail",
+            description:
+              "An original fictional walking route between camp and a disused quarry. Footprints, weather and the travellers' decisions provide scene hooks; no encounter is automatically triggered.",
+          },
+          {
+            locationId: `srd-ref-quarry-${suffix}`,
+            name: "Lantern Quarry",
+            description:
+              "An original fictional quarry with a sheltered overlook. A good scene for discussing the next expedition or preparing an encounter from pinned creature definitions; no enemies or treasure are materialized here.",
+          },
         ];
-        for (const location of locations) repository.createLocation(OWNER, { campaignId, ...location, visibility: "public" });
+        for (const location of locations)
+          repository.createLocation(OWNER, { campaignId, ...location, visibility: "public" });
         for (let index = 1; index < locations.length; index += 1) {
           const from = locations[index - 1]!.locationId;
           const to = locations[index]!.locationId;
@@ -508,8 +632,11 @@ export async function hydrateSrdReferenceCampaign(
       const starting = repository.getCampaignStartingLocation(OWNER, campaignId)!;
       if (!starting.startingLocation) {
         const locationId = repository.getCampaignWorld(OWNER, campaignId, sessionId)!.visibleLocations[0]!.locationId;
-        repository.designateCampaignStartingLocation(OWNER, campaignId, { locationId, expectedRevision: starting.revision,
-          idempotencyKey: `${operationPrefix(campaignId)}.start` });
+        repository.designateCampaignStartingLocation(OWNER, campaignId, {
+          locationId,
+          expectedRevision: starting.revision,
+          idempotencyKey: `${operationPrefix(campaignId)}.start`,
+        });
       }
     }
 
@@ -526,14 +653,32 @@ export async function hydrateSrdReferenceCampaign(
         idempotencyKey: `${operationPrefix(campaignId)}.${actor.plan.role}.draft`,
       });
       const wanted: UpdateCharacterDraftInput["selections"] = {
-        race: { packId: actor.selectedAncestry.packId, packVersion: actor.selectedAncestry.packVersion, kind: "race", definitionId: actor.selectedAncestry.definitionId },
-        background: { packId: referenceAcolyte.packId, packVersion: referenceAcolyte.packVersion, kind: "background", definitionId: ACOLYTE_BACKGROUND_ID },
-        class: { packId: classReference.packId, packVersion: classReference.packVersion, kind: "class", definitionId: actor.plan.classDefinitionId },
+        race: {
+          packId: actor.selectedAncestry.packId,
+          packVersion: actor.selectedAncestry.packVersion,
+          kind: "race",
+          definitionId: actor.selectedAncestry.definitionId,
+        },
+        background: {
+          packId: referenceAcolyte.packId,
+          packVersion: referenceAcolyte.packVersion,
+          kind: "background",
+          definitionId: ACOLYTE_BACKGROUND_ID,
+        },
+        class: {
+          packId: classReference.packId,
+          packVersion: classReference.packVersion,
+          kind: "class",
+          definitionId: actor.plan.classDefinitionId,
+        },
         starterGrant: "kit",
       };
       const persisted = draft.draft.selections;
-      const alreadySelected = persisted.race !== null && persisted.background !== null
-        && persisted.class !== null && persisted.starterGrant !== null;
+      const alreadySelected =
+        persisted.race !== null &&
+        persisted.background !== null &&
+        persisted.class !== null &&
+        persisted.starterGrant !== null;
       let expectedRevision = draft.draft.revision;
       if (alreadySelected) {
         // A resumed run already committed the selection command at an earlier draft
@@ -542,7 +687,11 @@ export async function hydrateSrdReferenceCampaign(
         assert.deepEqual(persisted.race, wanted.race, `${actor.personaName} persisted ancestry differs`);
         assert.deepEqual(persisted.background, wanted.background, `${actor.personaName} persisted background differs`);
         assert.deepEqual(persisted.class, wanted.class, `${actor.personaName} persisted class differs`);
-        assert.equal(persisted.starterGrant, wanted.starterGrant, `${actor.personaName} persisted starter grant differs`);
+        assert.equal(
+          persisted.starterGrant,
+          wanted.starterGrant,
+          `${actor.personaName} persisted starter grant differs`,
+        );
       } else {
         const selections: UpdateCharacterDraftInput = {
           expectedRevision,
@@ -566,13 +715,17 @@ export async function hydrateSrdReferenceCampaign(
       const finalRosterForPlacement = repository.getCampaignCharacterRoster(OWNER, campaignId);
       if (!finalRosterForPlacement) fail("campaign character roster disappeared after character creation");
       const charactersForPlacement = repository.listCampaignCharacters(OWNER, campaignId);
-      const actorByCampaignCharacterId = new Map(charactersForPlacement.map((character) => [
-        character.projection.campaignCharacter.id,
-        character.projection.actor.id,
-      ]));
+      const actorByCampaignCharacterId = new Map(
+        charactersForPlacement.map((character) => [
+          character.projection.campaignCharacter.id,
+          character.projection.actor.id,
+        ]),
+      );
       if (bootstrapLocationId) {
         for (const actor of resolved) {
-          const rosterEntry = finalRosterForPlacement.characters.find((character) => character.name === actor.personaName);
+          const rosterEntry = finalRosterForPlacement.characters.find(
+            (character) => character.name === actor.personaName,
+          );
           if (!rosterEntry) fail(`finalized campaign character ${actor.personaName} is missing from the roster`);
           const actorId = actorByCampaignCharacterId.get(rosterEntry.id);
           if (!actorId) fail(`actor for ${actor.personaName} is missing`);
@@ -591,16 +744,24 @@ export async function hydrateSrdReferenceCampaign(
             });
             initialLocationIds.set(actor.personaName, bootstrapLocationId);
           } catch (error) {
-            warnings.push(`Initial placement for ${actor.personaName} failed: ${error instanceof Error ? error.message : String(error)}`);
+            warnings.push(
+              `Initial placement for ${actor.personaName} failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
         }
       } else {
-        warnings.push("No campaign location is available for bootstrap placement; actors remain without an initial location.");
+        warnings.push(
+          "No campaign location is available for bootstrap placement; actors remain without an initial location.",
+        );
       }
 
       // 6. Publish the campaign once the party and room exist.
       const administrationBeforePublish = repository.getCampaignAdministration(OWNER, campaignId);
-      if (administrationBeforePublish && administrationBeforePublish.status !== "published" && administrationBeforePublish.status !== "completed") {
+      if (
+        administrationBeforePublish &&
+        administrationBeforePublish.status !== "published" &&
+        administrationBeforePublish.status !== "completed"
+      ) {
         repository.updateCampaignAdministration(OWNER, campaignId, {
           expectedRevision: administrationBeforePublish.revision,
           status: "published",
@@ -633,11 +794,17 @@ export async function hydrateSrdReferenceCampaign(
     for (const actor of resolved) {
       const rosterEntry = byName.get(actor.personaName);
       if (!rosterEntry) fail(`missing campaign character ${actor.personaName}`);
-      const projection = charactersAfter.find((character) => character.projection.campaignCharacter.id === rosterEntry.id);
+      const projection = charactersAfter.find(
+        (character) => character.projection.campaignCharacter.id === rosterEntry.id,
+      );
       if (!projection) fail(`missing projection for ${actor.personaName}`);
       const sheet = projection.projection.sheet;
       assert.equal(sheet.background.definitionId, ACOLYTE_BACKGROUND_ID, `${actor.personaName} background mismatch`);
-      assert.equal(sheet.race.definitionId, actor.selectedAncestry.definitionId, `${actor.personaName} ancestry mismatch`);
+      assert.equal(
+        sheet.race.definitionId,
+        actor.selectedAncestry.definitionId,
+        `${actor.personaName} ancestry mismatch`,
+      );
       const classEntry = sheet.classes[0];
       assert.ok(classEntry, `${actor.personaName} has no class`);
       assert.equal(classEntry.class.definitionId, actor.plan.classDefinitionId, `${actor.personaName} class mismatch`);
@@ -648,8 +815,9 @@ export async function hydrateSrdReferenceCampaign(
       assert.ok(health, `${actor.personaName} has no health resource`);
       assert.equal(health.current, health.max);
       assert.ok(health.max >= 1);
-      const located = repository.getCampaignWorld(OWNER, campaignId, sessionId)?.currentLocations
-        .find((location) => location.actorId === progression.actorId);
+      const located = repository
+        .getCampaignWorld(OWNER, campaignId, sessionId)
+        ?.currentLocations.find((location) => location.actorId === progression.actorId);
       actorReports.push({
         role: actor.plan.role,
         name: actor.personaName,
@@ -690,7 +858,11 @@ export async function hydrateSrdReferenceCampaign(
     assert.ok(pinnedExecutableDefinitionCount > 0, "no executable ability/spell definitions were pinned");
     const postIntegrity = withReadonlyIntegrity(databasePath);
     assert.equal(postIntegrity.quickCheck, "ok", `post-mutation quick_check failed: ${postIntegrity.quickCheck}`);
-    assert.equal(postIntegrity.foreignKeyFindings, 0, `post-mutation foreign keys have ${postIntegrity.foreignKeyFindings} finding(s)`);
+    assert.equal(
+      postIntegrity.foreignKeyFindings,
+      0,
+      `post-mutation foreign keys have ${postIntegrity.foreignKeyFindings} finding(s)`,
+    );
     const campaignActorCount = withReadonlyCount(
       databasePath,
       "SELECT COUNT(*) AS count FROM campaign_actors WHERE campaign_id=?",
@@ -699,13 +871,17 @@ export async function hydrateSrdReferenceCampaign(
     assert.equal(campaignActorCount, PARTY.length, "reference party must materialize exactly four actors");
 
     const report: HydrateSrdReferenceCampaignReport = {
-      status: options.validateOnly ? "validated" : (catalogConfiguredBefore && allPresentBefore ? "existing" : "ready"),
+      status: options.validateOnly ? "validated" : catalogConfiguredBefore && allPresentBefore ? "existing" : "ready",
       dataDir,
       databasePath,
       backupPath,
       campaignId,
       campaignName,
-      catalog: { packId: SRD_5_1_STARTER_PACK_ID, packVersion: expectedCatalogVersion(), rulesProfileId: SRD_5_1_STARTER_RULES_PROFILE_ID },
+      catalog: {
+        packId: SRD_5_1_STARTER_PACK_ID,
+        packVersion: expectedCatalogVersion(),
+        rulesProfileId: SRD_5_1_STARTER_RULES_PROFILE_ID,
+      },
       roomTitle: session.title,
       roomTitleMatched,
       sessionId,

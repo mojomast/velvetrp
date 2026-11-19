@@ -1,7 +1,5 @@
 import type { CampaignAdministration, CampaignDetail, CampaignCatalogResolutionReport } from "@velvet/contracts";
-import {
-  MECHANICS_STARTER_IDENTITY,
-} from "@velvet/contracts";
+import { MECHANICS_STARTER_IDENTITY } from "@velvet/contracts";
 import {
   ContentCatalogAuthorizationError,
   ContentCatalogConflictError,
@@ -48,11 +46,13 @@ type SetupState =
   | { status: "unconfigured"; campaign: CampaignDetail; administrationRevision: number };
 
 function hasExactDetailIdentity(campaign: CampaignDetail): boolean {
-  return campaign.content.status === "configured"
-    && campaign.content.rulesProfileId === MECHANICS_STARTER_IDENTITY.rulesProfileId
-    && campaign.content.contentPacks.length === 1
-    && campaign.content.contentPacks[0]?.packId === MECHANICS_STARTER_IDENTITY.packId
-    && campaign.content.contentPacks[0]?.packVersion === MECHANICS_STARTER_IDENTITY.packVersion;
+  return (
+    campaign.content.status === "configured" &&
+    campaign.content.rulesProfileId === MECHANICS_STARTER_IDENTITY.rulesProfileId &&
+    campaign.content.contentPacks.length === 1 &&
+    campaign.content.contentPacks[0]?.packId === MECHANICS_STARTER_IDENTITY.packId &&
+    campaign.content.contentPacks[0]?.packVersion === MECHANICS_STARTER_IDENTITY.packVersion
+  );
 }
 
 /**
@@ -66,15 +66,17 @@ function inspectSnapshot(repository: MechanicsStarterSetupSnapshotRepository, ca
   if (campaign.content.status === "configured") {
     if (!hasExactDetailIdentity(campaign)) return { status: "conflict" };
     const resolved = repository.resolveCampaignCatalog(LOCAL_OWNER, campaignId);
-    if (!resolved
-      || resolved.campaignId !== campaignId
-      || !resolved.compatible
-      || resolved.issues.length !== 0
-      || resolved.rulesProfileId !== MECHANICS_STARTER_IDENTITY.rulesProfileId
-      || resolved.contentPacks.length !== 1
-      || resolved.contentPacks[0]?.packId !== MECHANICS_STARTER_IDENTITY.packId
-      || resolved.contentPacks[0]?.packVersion !== MECHANICS_STARTER_IDENTITY.packVersion
-      || resolved.contentPacks[0]?.digest !== MECHANICS_STARTER_CATALOG.manifest.digest) {
+    if (
+      !resolved ||
+      resolved.campaignId !== campaignId ||
+      !resolved.compatible ||
+      resolved.issues.length !== 0 ||
+      resolved.rulesProfileId !== MECHANICS_STARTER_IDENTITY.rulesProfileId ||
+      resolved.contentPacks.length !== 1 ||
+      resolved.contentPacks[0]?.packId !== MECHANICS_STARTER_IDENTITY.packId ||
+      resolved.contentPacks[0]?.packVersion !== MECHANICS_STARTER_IDENTITY.packVersion ||
+      resolved.contentPacks[0]?.digest !== MECHANICS_STARTER_CATALOG.manifest.digest
+    ) {
       return { status: "conflict" };
     }
     return { status: "exact", campaign };

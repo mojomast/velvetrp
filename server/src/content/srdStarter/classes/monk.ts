@@ -31,7 +31,13 @@ function monkSubclassRef(refs: StarterReferences) {
 }
 
 function buildMonkLevel(refs: StarterReferences, level: number) {
-  const base = buildUnsupportedClassLevel(classRef(refs, "monk"), classLevelRef(refs, `monk-${level}`), "Monk", level, 8);
+  const base = buildUnsupportedClassLevel(
+    classRef(refs, "monk"),
+    classLevelRef(refs, `monk-${level}`),
+    "Monk",
+    level,
+    8,
+  );
   return {
     ...base,
     description: `SRD Monk level ${level} progression metadata. ${MONK_FEATURES[level - 1]}`,
@@ -41,9 +47,30 @@ function buildMonkLevel(refs: StarterReferences, level: number) {
       hpGain: level === 1 ? 8 : 5,
       resourceGrants: [
         ...base.mechanics.resourceGrants,
-        ...(level >= 2 ? [{ resourceId: "ki", maxIncrease: level === 2 ? 2 : 1, currentIncrease: level === 2 ? 2 : 1, recovery: "short-rest" as const }] : []),
+        ...(level >= 2
+          ? [
+              {
+                resourceId: "ki",
+                maxIncrease: level === 2 ? 2 : 1,
+                currentIncrease: level === 2 ? 2 : 1,
+                recovery: "short-rest" as const,
+              },
+            ]
+          : []),
       ],
-      ...(level === 3 ? { progressionChoices: [{ choiceId: "monk-subclass", required: true, count: 1, kind: "subclass", options: [monkSubclassRef(refs)] }] } : {}),
+      ...(level === 3
+        ? {
+            progressionChoices: [
+              {
+                choiceId: "monk-subclass",
+                required: true,
+                count: 1,
+                kind: "subclass",
+                options: [monkSubclassRef(refs)],
+              },
+            ],
+          }
+        : {}),
     },
   };
 }
@@ -52,9 +79,15 @@ export function monkDefinition(refs: StarterReferences) {
   return {
     reference: classRef(refs, "monk"),
     name: "Monk",
-    description: "Bounded SRD Monk progression includes levels 1-20 as metadata. Ki, Martial Arts, and the Way of the Open Hand are tracked as bounded feature metadata and are not executable.",
+    description:
+      "Bounded SRD Monk progression includes levels 1-20 as metadata. Ki, Martial Arts, and the Way of the Open Hand are tracked as bounded feature metadata and are not executable.",
     tags: ["srd-5.1", "monk-1-20", "unsupported-runtime"],
-    mechanics: { hitDie: 8, primaryAttribute: "dexterity", savingAttributes: ["strength", "dexterity"], levelRefs: Array.from({ length: 20 }, (_, index) => classLevelRef(refs, `monk-${index + 1}`)) },
+    mechanics: {
+      hitDie: 8,
+      primaryAttribute: "dexterity",
+      savingAttributes: ["strength", "dexterity"],
+      levelRefs: Array.from({ length: 20 }, (_, index) => classLevelRef(refs, `monk-${index + 1}`)),
+    },
   };
 }
 
@@ -67,7 +100,8 @@ export function monkSubclasses(refs: StarterReferences) {
     {
       reference: monkSubclassRef(refs),
       name: "Way of the Open Hand",
-      description: "The Way of the Open Hand is a Monastic Tradition introduced at Monk level 3. Open Hand Technique, Wholeness of Body, Tranquility, and Quivering Palm remain bounded metadata and are not executable.",
+      description:
+        "The Way of the Open Hand is a Monastic Tradition introduced at Monk level 3. Open Hand Technique, Wholeness of Body, Tranquility, and Quivering Palm remain bounded metadata and are not executable.",
       tags: ["srd-5.1", "subclass", "monk"],
       mechanics: { classRef: classRef(refs, "monk"), level: 3, abilityRefs: [] },
     },

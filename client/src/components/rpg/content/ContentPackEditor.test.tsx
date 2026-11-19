@@ -11,7 +11,9 @@ describe("ContentPackEditor", () => {
   it("starts with strict definitions for every required server kind", () => {
     render(<ContentPackEditor draft={draft} onChange={vi.fn()} onValidate={vi.fn()} />);
     expect(contentCatalogHttpValidationRequestSchema.safeParse(draft).success).toBe(true);
-    expect(new Set(draft.definitions.map((definition) => definition.reference.kind))).toEqual(new Set(CONTENT_DEFINITION_KINDS));
+    expect(new Set(draft.definitions.map((definition) => definition.reference.kind))).toEqual(
+      new Set(CONTENT_DEFINITION_KINDS),
+    );
     for (const kind of CONTENT_DEFINITION_KINDS) {
       expect(screen.getByRole("button", { name: `Add ${kind} definition` })).toBeTruthy();
     }
@@ -33,21 +35,36 @@ describe("ContentPackEditor", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Local race" }));
     const removed = onChange.mock.calls.at(-1)?.[0];
-    expect(removed.definitions.some((definition: { reference: { kind: string } }) => definition.reference.kind === "race")).toBe(false);
+    expect(
+      removed.definitions.some((definition: { reference: { kind: string } }) => definition.reference.kind === "race"),
+    ).toBe(false);
     view.unmount();
   });
 
   it("maps real index, missing-kind, and kind:id issue paths to exact controls", () => {
-    const view = render(<ContentPackEditor draft={draft} focusPath="definitions.0.reference" onChange={vi.fn()} onValidate={vi.fn()} />);
+    const view = render(
+      <ContentPackEditor draft={draft} focusPath="definitions.0.reference" onChange={vi.fn()} onValidate={vi.fn()} />,
+    );
     expect(document.activeElement).toBe(screen.getAllByLabelText("Definition ID")[0]);
 
-    view.rerender(<ContentPackEditor draft={draft} focusPath="definitions.spell" onChange={vi.fn()} onValidate={vi.fn()} />);
+    view.rerender(
+      <ContentPackEditor draft={draft} focusPath="definitions.spell" onChange={vi.fn()} onValidate={vi.fn()} />,
+    );
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add spell definition" }));
 
-    view.rerender(<ContentPackEditor draft={draft} focusPath="definitions.race:local-race.references.ability:local-ability" onChange={vi.fn()} onValidate={vi.fn()} />);
+    view.rerender(
+      <ContentPackEditor
+        draft={draft}
+        focusPath="definitions.race:local-race.references.ability:local-ability"
+        onChange={vi.fn()}
+        onValidate={vi.fn()}
+      />,
+    );
     expect(document.activeElement).toBe(screen.getByLabelText("Mechanics JSON for Local race"));
 
-    view.rerender(<ContentPackEditor draft={draft} focusPath="manifest.digest" onChange={vi.fn()} onValidate={vi.fn()} />);
+    view.rerender(
+      <ContentPackEditor draft={draft} focusPath="manifest.digest" onChange={vi.fn()} onValidate={vi.fn()} />,
+    );
     expect(document.activeElement).toBe(screen.getByLabelText("Derived canonical digest"));
   });
 

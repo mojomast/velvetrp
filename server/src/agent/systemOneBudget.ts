@@ -19,7 +19,8 @@ export interface SystemOneBudgetReservationRequest {
 
 export type SystemOneBudgetDenialReason = "rate-limit" | "token-budget" | "dollar-budget";
 
-export type SystemOneBudgetDecision = { allowed: true; reservationId: number } | { allowed: false; reason: SystemOneBudgetDenialReason };
+export type SystemOneBudgetDecision =
+  { allowed: true; reservationId: number } | { allowed: false; reason: SystemOneBudgetDenialReason };
 
 export interface SystemOneBudgetSnapshot {
   reservedInputTokens: number;
@@ -72,14 +73,16 @@ function createLaneState(): SystemOneLaneState {
 
 function validatePolicy(policy: SystemOneBudgetPolicy): void {
   if (
-    !Number.isFinite(policy.maxTotalTokens)
-    || !Number.isFinite(policy.maxRequestsPerWindow)
-    || !Number.isFinite(policy.rateWindowMs)
-    || !positiveSafeInteger(policy.maxTotalTokens)
-    || !positiveSafeInteger(policy.maxRequestsPerWindow)
-    || !(policy.rateWindowMs > 0)
+    !Number.isFinite(policy.maxTotalTokens) ||
+    !Number.isFinite(policy.maxRequestsPerWindow) ||
+    !Number.isFinite(policy.rateWindowMs) ||
+    !positiveSafeInteger(policy.maxTotalTokens) ||
+    !positiveSafeInteger(policy.maxRequestsPerWindow) ||
+    !(policy.rateWindowMs > 0)
   ) {
-    throw new RangeError("system one budget limits must be positive finite values and request counts must be positive safe integers");
+    throw new RangeError(
+      "system one budget limits must be positive finite values and request counts must be positive safe integers",
+    );
   }
   if (policy.maxEstimatedCostUsd !== null && !finiteNonNegative(policy.maxEstimatedCostUsd)) {
     throw new RangeError("maxEstimatedCostUsd must be null or a non-negative finite number");
@@ -88,20 +91,20 @@ function validatePolicy(policy: SystemOneBudgetPolicy): void {
 
 function validateReservation(request: SystemOneBudgetReservationRequest): void {
   if (
-    !Number.isFinite(request.estimatedInputTokens)
-    || !Number.isFinite(request.maxOutputTokens)
-    || !nonNegativeSafeInteger(request.estimatedInputTokens)
-    || !nonNegativeSafeInteger(request.maxOutputTokens)
+    !Number.isFinite(request.estimatedInputTokens) ||
+    !Number.isFinite(request.maxOutputTokens) ||
+    !nonNegativeSafeInteger(request.estimatedInputTokens) ||
+    !nonNegativeSafeInteger(request.maxOutputTokens)
   ) {
     throw new RangeError("token estimates must be non-negative safe integers");
   }
   const { pricing } = request;
   if (
-    !pricing
-    || !Number.isFinite(pricing.inputPerMillionUsd)
-    || !Number.isFinite(pricing.outputPerMillionUsd)
-    || pricing.inputPerMillionUsd < 0
-    || pricing.outputPerMillionUsd < 0
+    !pricing ||
+    !Number.isFinite(pricing.inputPerMillionUsd) ||
+    !Number.isFinite(pricing.outputPerMillionUsd) ||
+    pricing.inputPerMillionUsd < 0 ||
+    pricing.outputPerMillionUsd < 0
   ) {
     throw new RangeError("token pricing must be non-negative finite numbers");
   }
@@ -119,7 +122,11 @@ export class SystemOneLaneBudgetManager {
   private readonly lanes = new Map<string, SystemOneLaneState>();
   private nextReservationId = 1;
 
-  reserve(lane: string, policy: SystemOneBudgetPolicy, request: SystemOneBudgetReservationRequest): SystemOneBudgetDecision {
+  reserve(
+    lane: string,
+    policy: SystemOneBudgetPolicy,
+    request: SystemOneBudgetReservationRequest,
+  ): SystemOneBudgetDecision {
     validatePolicy(policy);
     validateReservation(request);
     const state = this.lanes.get(lane) ?? createLaneState();
@@ -130,19 +137,25 @@ export class SystemOneLaneBudgetManager {
     }
     const projectedCostUsd = projectCostUsd(request.estimatedInputTokens, request.maxOutputTokens, request.pricing);
     if (
-      state.settledInputTokens
-        + state.settledOutputTokens
-        + state.reservedInputTokens
-        + state.reservedOutputTokens
-        + request.estimatedInputTokens
-        + request.maxOutputTokens
-      > policy.maxTotalTokens
+      state.settledInputTokens +
+        state.settledOutputTokens +
+        state.reservedInputTokens +
+        state.reservedOutputTokens +
+        request.estimatedInputTokens +
+        request.maxOutputTokens >
+      policy.maxTotalTokens
     ) {
       return { allowed: false, reason: "token-budget" };
     }
-    const reservedCostUsd = [...state.reservations.values()].reduce((sum, reservation) =>
-      sum + projectCostUsd(reservation.estimatedInputTokens, reservation.maxOutputTokens, reservation.pricing), 0);
-    if (policy.maxEstimatedCostUsd !== null && state.costUsd + reservedCostUsd + projectedCostUsd > policy.maxEstimatedCostUsd) {
+    const reservedCostUsd = [...state.reservations.values()].reduce(
+      (sum, reservation) =>
+        sum + projectCostUsd(reservation.estimatedInputTokens, reservation.maxOutputTokens, reservation.pricing),
+      0,
+    );
+    if (
+      policy.maxEstimatedCostUsd !== null &&
+      state.costUsd + reservedCostUsd + projectedCostUsd > policy.maxEstimatedCostUsd
+    ) {
       return { allowed: false, reason: "dollar-budget" };
     }
     state.reservedInputTokens += request.estimatedInputTokens;

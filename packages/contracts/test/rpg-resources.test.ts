@@ -40,7 +40,9 @@ describe("v13 RPG actor-resource contracts", () => {
   it("defines strict state and permits the empty zero-capacity resource", () => {
     expect(actorResourceStateSchema.parse(state)).toEqual(state);
     expect(actorResourceStateSchema.parse({ name: "empty", current: 0, max: 0 })).toEqual({
-      name: "empty", current: 0, max: 0,
+      name: "empty",
+      current: 0,
+      max: 0,
     });
     for (const field of ["name", "current", "max"] as const) {
       expect(actorResourceStateSchema.safeParse(without(state, field)).success).toBe(false);

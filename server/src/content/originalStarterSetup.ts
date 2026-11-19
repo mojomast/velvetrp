@@ -1,8 +1,5 @@
 import type { CampaignDetail } from "@velvet/contracts";
-import type {
-  OriginalStarterSetupInspection,
-  Repository,
-} from "../repo/index.js";
+import type { OriginalStarterSetupInspection, Repository } from "../repo/index.js";
 import {
   CampaignContentConfigurationAuthorizationError,
   CampaignContentConfigurationConflictError,
@@ -62,12 +59,16 @@ export function createOriginalStarterSetupService(
         repository.installOriginalStarterContent(LOCAL_OWNER, campaignId);
         repository.configureOriginalStarterContent(LOCAL_OWNER, campaignId);
       } catch (error) {
-        if (error instanceof ContentPackInstallationAuthorizationError
-          || error instanceof CampaignContentConfigurationAuthorizationError) {
+        if (
+          error instanceof ContentPackInstallationAuthorizationError ||
+          error instanceof CampaignContentConfigurationAuthorizationError
+        ) {
           throw new OriginalStarterSetupUnavailableError();
         }
-        if (error instanceof ContentPackInstallationConflictError
-          || error instanceof CampaignContentConfigurationConflictError) {
+        if (
+          error instanceof ContentPackInstallationConflictError ||
+          error instanceof CampaignContentConfigurationConflictError
+        ) {
           throw new OriginalStarterSetupConflictError();
         }
         throw error;

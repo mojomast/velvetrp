@@ -39,27 +39,62 @@ test("the frozen corpus is broad, labelled, and digest-pinned", () => {
   const corpus = FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS;
   assert.ok(corpus.length >= 40, `expected at least 40 cases, got ${corpus.length}`);
   assert.equal(new Set(corpus.map((entry) => entry.id)).size, corpus.length, "case ids must be unique");
-  assert.ok(corpus.some((entry) => entry.holdout), "a holdout split is required");
-  assert.ok(corpus.some((entry) => !entry.holdout), "a development split is required");
+  assert.ok(
+    corpus.some((entry) => entry.holdout),
+    "a holdout split is required",
+  );
+  assert.ok(
+    corpus.some((entry) => !entry.holdout),
+    "a development split is required",
+  );
   const categories = new Set(corpus.map((entry) => entry.category));
-  for (const category of ["materialize-location", "materialize-npc", "hostile-encounter", "shop-stock", "new-clue", "materialize-faction", "materialize-quest", "materialize-rumor", "hold", "illegal", "duplicate"]) {
+  for (const category of [
+    "materialize-location",
+    "materialize-npc",
+    "hostile-encounter",
+    "shop-stock",
+    "new-clue",
+    "materialize-faction",
+    "materialize-quest",
+    "materialize-rumor",
+    "hold",
+    "illegal",
+    "duplicate",
+  ]) {
     assert.ok(categories.has(category as never), `missing corpus category ${category}`);
   }
-  assert.ok(corpus.some((entry) => entry.expected.band === "act"), "positive cases are required");
-  assert.ok(corpus.some((entry) => entry.expected.band === "fallback"), "hard negative cases are required");
+  assert.ok(
+    corpus.some((entry) => entry.expected.band === "act"),
+    "positive cases are required",
+  );
+  assert.ok(
+    corpus.some((entry) => entry.expected.band === "fallback"),
+    "hard negative cases are required",
+  );
   // Every positive names a candidate that is actually advertised in its own state.
   for (const entry of corpus) {
     if (entry.expected.band !== "act") continue;
-    assert.ok(entry.candidates.some((candidate) => candidate.candidateId === entry.expected.candidateId),
-      `${entry.id} does not advertise its expected candidate`);
+    assert.ok(
+      entry.candidates.some((candidate) => candidate.candidateId === entry.expected.candidateId),
+      `${entry.id} does not advertise its expected candidate`,
+    );
     assert.ok(entry.candidates.length >= 2, `${entry.id} should carry a distractor candidate`);
   }
   // The corpus and both splits are frozen: any drift changes the digest.
-  assert.equal(FREEFORM_MATERIALIZATION_CORPUS_DIGEST, "791e1f03c93dbdfd7707bbc1cb3f41851a33d990e26e16b93a264e0fa33d76b2");
+  assert.equal(
+    FREEFORM_MATERIALIZATION_CORPUS_DIGEST,
+    "791e1f03c93dbdfd7707bbc1cb3f41851a33d990e26e16b93a264e0fa33d76b2",
+  );
   assert.equal(FREEFORM_MATERIALIZATION_DEV_DIGEST, "196637d02fd99d5ecf07b625c3e084e78c293ceca42ccabfea937a1bc579e8c9");
-  assert.equal(FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST, "879a1c7e989e117cf6a8e604b53a64f809e4b98904cb9fba30aa613710f7cca6");
+  assert.equal(
+    FREEFORM_MATERIALIZATION_HOLDOUT_DIGEST,
+    "879a1c7e989e117cf6a8e604b53a64f809e4b98904cb9fba30aa613710f7cca6",
+  );
   // The grid is fixed and ascending.
-  assert.deepEqual([...FREEFORM_MATERIALIZATION_THRESHOLD_GRID], [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75]);
+  assert.deepEqual(
+    [...FREEFORM_MATERIALIZATION_THRESHOLD_GRID],
+    [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75],
+  );
 });
 
 const answers = (options: {
@@ -81,7 +116,10 @@ const answers = (options: {
   };
 };
 
-const compose = (entry: (typeof FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS)[number], scripted: Record<string, SystemOneAnswer>): FreeformMaterializationDecision =>
+const compose = (
+  entry: (typeof FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS)[number],
+  scripted: Record<string, SystemOneAnswer>,
+): FreeformMaterializationDecision =>
   composeFreeformMaterializationDecision(
     { campaignId: "c", sessionId: "s", attempt: entry.attempt, candidates: entry.candidates },
     scripted,
@@ -177,8 +215,22 @@ test("fits the Platt map on development acts and promotes only when the calibrat
 
 test("counts a false act as an acted error and a deferral as coverage", () => {
   const acted = Array.from({ length: 31 }, (_, index) => sample({ caseId: `a${index}` }));
-  acted[30] = sample({ caseId: "false-act", expectedAct: false, category: "hold", candidateId: "ffc-x", correct: false });
-  const deferred = sample({ caseId: "deferred", expectedAct: true, acted: false, band: "fallback", candidateId: null, kind: null, correct: false });
+  acted[30] = sample({
+    caseId: "false-act",
+    expectedAct: false,
+    category: "hold",
+    candidateId: "ffc-x",
+    correct: false,
+  });
+  const deferred = sample({
+    caseId: "deferred",
+    expectedAct: true,
+    acted: false,
+    band: "fallback",
+    candidateId: null,
+    kind: null,
+    correct: false,
+  });
   const evaluation = evaluateFreeformBenchmark([...acted, deferred]);
 
   assert.equal(evaluation.totalSamples, 32);
@@ -201,7 +253,17 @@ test("rolls up per-case counts, bands, and signals in corpus order", () => {
   const samples = [
     sample({ caseId: "loc-1", acted: true, correct: true, band: "act", topSignal: 1 }),
     sample({ caseId: "loc-1", acted: true, correct: false, band: "act", topSignal: 0.8 }),
-    sample({ caseId: "hold-1", category: "hold", expectedAct: false, acted: false, correct: true, band: "fallback", candidateId: null, kind: null, topSignal: 0.2 }),
+    sample({
+      caseId: "hold-1",
+      category: "hold",
+      expectedAct: false,
+      acted: false,
+      correct: true,
+      band: "fallback",
+      candidateId: null,
+      kind: null,
+      topSignal: 0.2,
+    }),
   ];
   const summaries = summarizeFreeformCases(samples);
   const loc1 = summaries.find((entry) => entry.id === "loc-1")!;
@@ -215,17 +277,30 @@ test("rolls up per-case counts, bands, and signals in corpus order", () => {
   assert.equal(hold1.category, "hold");
   assert.equal(hold1.deferred, 1);
   assert.equal(hold1.bands.fallback, 1);
-  assert.deepEqual(summaries.map((entry) => entry.id), ["loc-1", "hold-1"]);
+  assert.deepEqual(
+    summaries.map((entry) => entry.id),
+    ["loc-1", "hold-1"],
+  );
 });
 
 test("carries no unbounded fields: a selected decision exposes only populated routing fields", () => {
   const positive = FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.find((entry) => entry.id === "clue-1")!;
   const composed = compose(positive, answers({ choice: positive.expected.candidateId! }));
-  const candidate: FreeformMaterializationCandidate | undefined =
-    positive.candidates.find((entry) => entry.candidateId === composed.candidateId);
+  const candidate: FreeformMaterializationCandidate | undefined = positive.candidates.find(
+    (entry) => entry.candidateId === composed.candidateId,
+  );
   assert.ok(candidate);
   assert.equal(composed.kind, "new-clue");
-  assert.deepEqual(Object.keys(composed).sort(), ["band", "candidateId", "kind", "legal", "needsContent", "reason", "signals", "topSignal"]);
+  assert.deepEqual(Object.keys(composed).sort(), [
+    "band",
+    "candidateId",
+    "kind",
+    "legal",
+    "needsContent",
+    "reason",
+    "signals",
+    "topSignal",
+  ]);
 });
 
 /** Builds retained observations with a per-case signal and repeat count, for selection tests. */
@@ -240,7 +315,12 @@ function observationSet(
     const signal = signalFor(entry);
     const choice = entry.expected.candidateId ?? entry.candidates[0]!.candidateId;
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
-      out.push({ caseId: entry.id, repeat, answers: answers({ choice, choiceProbability: signal, needsContent: signal, legal: signal }), latencyMs: 1 });
+      out.push({
+        caseId: entry.id,
+        repeat,
+        answers: answers({ choice, choiceProbability: signal, needsContent: signal, legal: signal }),
+        latencyMs: 1,
+      });
     }
   }
   return out;
@@ -266,7 +346,10 @@ test("selects on development and promotes only when the frozen holdout gate pass
   const expectedSettings = {
     ...settings,
     confidenceCalibration: { ...settings.confidenceCalibration, [LANE]: record.calibration! },
-    confidencePolicy: { ...settings.confidencePolicy, [LANE]: { actionThreshold: 0.3, reviewThreshold: Math.min(FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD, 0.3) } },
+    confidencePolicy: {
+      ...settings.confidencePolicy,
+      [LANE]: { actionThreshold: 0.3, reviewThreshold: Math.min(FREEFORM_MATERIALIZATION_REVIEW_THRESHOLD, 0.3) },
+    },
   };
   assert.deepEqual(record.evaluatedBindings, [
     systemOneEvaluationBinding(LANE, expectedSettings, "jev-1.13.0", FREEFORM_MATERIALIZATION_ACTION_FAMILY),
@@ -286,21 +369,28 @@ test("does not promote when the frozen holdout fails even though development pas
   assert.ok(selection.selected);
   assert.equal(selection.selected!.holdout.gate.promoted, false);
   assert.ok(selection.selected!.holdout.accuracy < 0.9);
-  assert.equal(proposeSelectionPromotionRecord(selection, defaultSystemOneSettings(), "jev-1.13.0", "2026-09-28"), null);
+  assert.equal(
+    proposeSelectionPromotionRecord(selection, defaultSystemOneSettings(), "jev-1.13.0", "2026-09-28"),
+    null,
+  );
 });
 
 test("never promotes a descriptive selection that no development threshold qualified", () => {
   // Few development positives act, so every development gate fails the sample floor.
-  const omit = new Set(FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS
-    .filter((entry) => !entry.holdout && entry.expected.band === "act")
-    .slice(2)
-    .map((entry) => entry.id));
+  const omit = new Set(
+    FREEFORM_MATERIALIZATION_BENCHMARK_CORPUS.filter((entry) => !entry.holdout && entry.expected.band === "act")
+      .slice(2)
+      .map((entry) => entry.id),
+  );
   const observations = observationSet((entry) => (entry.expected.band === "act" ? 0.9 : 0.1), 5, omit);
   const selection = evaluateFreeformDevSelection(observations);
   assert.equal(selection.devGateQualified, false);
   assert.equal(selection.selectedBy, "dev-best");
   assert.ok(selection.reasons.some((reason) => reason.includes("no development threshold passed")));
-  assert.equal(proposeSelectionPromotionRecord(selection, defaultSystemOneSettings(), "jev-1.13.0", "2026-09-28"), null);
+  assert.equal(
+    proposeSelectionPromotionRecord(selection, defaultSystemOneSettings(), "jev-1.13.0", "2026-09-28"),
+    null,
+  );
 });
 
 test("recomposes a retained answer at a lower threshold without changing composition semantics", () => {

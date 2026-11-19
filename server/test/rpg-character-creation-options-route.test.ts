@@ -40,12 +40,18 @@ function repository(result: CampaignCharacterCreationOptionsResponse | null = cr
   return {
     listCampaigns: vi.fn((): CampaignAccess[] => []),
     getCampaignDetail: vi.fn((): CampaignDetail | null => null),
-    createCampaign: vi.fn((): Campaign => { throw new Error("unused"); }),
-    renameCampaignIfUnchanged: vi.fn((): Campaign => { throw new Error("unused"); }),
+    createCampaign: vi.fn((): Campaign => {
+      throw new Error("unused");
+    }),
+    renameCampaignIfUnchanged: vi.fn((): Campaign => {
+      throw new Error("unused");
+    }),
     getCampaignCharacterCreationOptions: vi.fn(() => result),
     getCampaignCharacterRoster: vi.fn(() => null),
     getCampaignCharacterWorkspace: vi.fn(() => null),
-    createOriginalStarterCampaignCharacter: vi.fn(() => { throw new Error("unused"); }),
+    createOriginalStarterCampaignCharacter: vi.fn(() => {
+      throw new Error("unused");
+    }),
     close: vi.fn(),
   };
 }
@@ -112,18 +118,23 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
       const address = app.server.address();
       if (!address || typeof address === "string") throw new Error("no server address");
       const response = await new Promise<{ body: string; statusCode: number }>((resolve, reject) => {
-        const request = httpRequest({
-          host: "127.0.0.1",
-          port: address.port,
-          method: "GET",
-          path: `${route}?`,
-          headers: { "x-request-id": requestId },
-        }, (incoming) => {
-          let body = "";
-          incoming.setEncoding("utf8");
-          incoming.on("data", (chunk: string) => { body += chunk; });
-          incoming.on("end", () => resolve({ body, statusCode: incoming.statusCode ?? 0 }));
-        });
+        const request = httpRequest(
+          {
+            host: "127.0.0.1",
+            port: address.port,
+            method: "GET",
+            path: `${route}?`,
+            headers: { "x-request-id": requestId },
+          },
+          (incoming) => {
+            let body = "";
+            incoming.setEncoding("utf8");
+            incoming.on("data", (chunk: string) => {
+              body += chunk;
+            });
+            incoming.on("end", () => resolve({ body, statusCode: incoming.statusCode ?? 0 }));
+          },
+        );
         request.on("error", reject);
         request.end();
       });
@@ -157,14 +168,26 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
     expect(response.statusCode).toBe(200);
     expect(response.headers["x-request-id"]).toBe("options-success");
     expect(response.json()).toEqual(creationOptions);
-    expect(response.json().personas.map((persona: { characterId: string }) => persona.characterId))
-      .toEqual(["persona-z", "persona-a"]);
+    expect(response.json().personas.map((persona: { characterId: string }) => persona.characterId)).toEqual([
+      "persona-z",
+      "persona-a",
+    ]);
     expect(repo.getCampaignCharacterCreationOptions).toHaveBeenCalledOnce();
     expect(repo.getCampaignCharacterCreationOptions).toHaveBeenCalledWith("local-owner", "campaign-one");
     for (const privateField of [
-      "age", "archetype", "boundaries", "fictionalConfirmed", "isRealPerson",
-      "controllerPrincipalId", "privateNotes", "sheet", "actor", "ownerPrincipalId", "activeTimelineId",
-    ]) expect(response.body).not.toContain(privateField);
+      "age",
+      "archetype",
+      "boundaries",
+      "fictionalConfirmed",
+      "isRealPerson",
+      "controllerPrincipalId",
+      "privateNotes",
+      "sheet",
+      "actor",
+      "ownerPrincipalId",
+      "activeTimelineId",
+    ])
+      expect(response.body).not.toContain(privateField);
     await app.close();
   });
 
@@ -198,7 +221,10 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
       expect(response.headers["content-type"]).toContain("application/problem+json");
       expect(response.headers["x-request-id"]).toBe(requestId);
       expect(response.json()).toMatchObject({
-        status: 404, code: "RPG_CAMPAIGN_NOT_FOUND", requestId, error: "Campaign not found",
+        status: 404,
+        code: "RPG_CAMPAIGN_NOT_FOUND",
+        requestId,
+        error: "Campaign not found",
       });
     }
     expect(factory).not.toHaveBeenCalled();
@@ -276,11 +302,12 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
     ] as const) {
       const response = await app.inject({ method: method as never, url: `${path}?token=${secret}` });
       expect(response.statusCode).toBe(404);
-      const instance = path === `${route}/extra`
-        ? "/api/rpg/v1/campaigns/:campaignId/*"
-        : path.startsWith("/api/rpg/v1/campaigns/")
-          ? path.replace(/\/campaigns\/[^/]+/, "/campaigns/:campaignId")
-          : path;
+      const instance =
+        path === `${route}/extra`
+          ? "/api/rpg/v1/campaigns/:campaignId/*"
+          : path.startsWith("/api/rpg/v1/campaigns/")
+            ? path.replace(/\/campaigns\/[^/]+/, "/campaigns/:campaignId")
+            : path;
       expect(response.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND", instance });
       expect(response.body).not.toContain(secret);
     }
@@ -293,11 +320,15 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
     const repo = repository(null);
     const app = buildApp({ campaignRepositoryFactory: () => repo });
     const response = await app.inject({
-      method: "GET", url: route, headers: { "x-request-id": "options-missing" },
+      method: "GET",
+      url: route,
+      headers: { "x-request-id": "options-missing" },
     });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({
-      code: "RPG_CAMPAIGN_NOT_FOUND", requestId: "options-missing", error: "Campaign not found",
+      code: "RPG_CAMPAIGN_NOT_FOUND",
+      requestId: "options-missing",
+      error: "Campaign not found",
     });
     await app.close();
   });
@@ -312,7 +343,9 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
       );
       const app = buildApp({ campaignRepositoryFactory: () => repo });
       const response = await app.inject({
-        method: "GET", url: route, headers: { "x-request-id": "options-falsey-output" },
+        method: "GET",
+        url: route,
+        headers: { "x-request-id": "options-falsey-output" },
       });
       expect(response.statusCode).toBe(500);
       expect(response.json()).toMatchObject({
@@ -331,7 +364,9 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
       const secret = `private ${kind} detail`;
       const repo = repository();
       if (kind === "repository") {
-        repo.getCampaignCharacterCreationOptions.mockImplementation(() => { throw new Error(secret); });
+        repo.getCampaignCharacterCreationOptions.mockImplementation(() => {
+          throw new Error(secret);
+        });
       } else if (kind === "malformed output") {
         repo.getCampaignCharacterCreationOptions.mockReturnValue({
           ...creationOptions,
@@ -339,12 +374,15 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
         } as unknown as CampaignCharacterCreationOptionsResponse);
       } else {
         repo.getCampaignCharacterCreationOptions.mockReturnValue({
-          ...creationOptions, campaignId: "private-other-campaign",
+          ...creationOptions,
+          campaignId: "private-other-campaign",
         });
       }
       const app = buildApp({ campaignRepositoryFactory: () => repo });
       const response = await app.inject({
-        method: "GET", url: route, headers: { "x-request-id": "options-failure" },
+        method: "GET",
+        url: route,
+        headers: { "x-request-id": "options-failure" },
       });
       expect(response.statusCode).toBe(500);
       expect(response.headers["content-type"]).toContain("application/problem+json");
@@ -405,13 +443,21 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
 
   it("shares and redacts the exact cached repository-open failure without retry or close", async () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
-    const factory = vi.fn(() => { throw new Error("private database filename"); });
+    const factory = vi.fn(() => {
+      throw new Error("private database filename");
+    });
     const app = buildApp({ campaignRepositoryFactory: factory });
     const first = await app.inject({ method: "GET", url: route, headers: { "x-request-id": "options-open-one" } });
-    const second = await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns", headers: { "x-request-id": "options-open-two" } });
+    const second = await app.inject({
+      method: "GET",
+      url: "/api/rpg/v1/campaigns",
+      headers: { "x-request-id": "options-open-two" },
+    });
     const third = await app.inject({ method: "GET", url: route, headers: { "x-request-id": "options-open-three" } });
     for (const [response, requestId] of [
-      [first, "options-open-one"], [second, "options-open-two"], [third, "options-open-three"],
+      [first, "options-open-one"],
+      [second, "options-open-two"],
+      [third, "options-open-three"],
     ] as const) {
       expect(response.statusCode).toBe(500);
       expect(response.json()).toMatchObject({ code: "RPG_INTERNAL_ERROR", requestId });

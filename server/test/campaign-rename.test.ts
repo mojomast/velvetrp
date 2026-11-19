@@ -32,25 +32,32 @@ function seed(): void {
   ]) {
     db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(id, name);
   }
-  db.prepare(`INSERT INTO characters VALUES
-    ('character-one', 'Character', 30, 'captain', 'fictional', 1, 0, ?)`).run(createdAt);
-  db.prepare(`INSERT INTO sessions VALUES
-    ('session-one', 'character-one', 'Session', 'setup', 'default', NULL, ?, NULL, NULL)`).run(createdAt);
+  db.prepare(
+    `INSERT INTO characters VALUES
+    ('character-one', 'Character', 30, 'captain', 'fictional', 1, 0, ?)`,
+  ).run(createdAt);
+  db.prepare(
+    `INSERT INTO sessions VALUES
+    ('session-one', 'character-one', 'Session', 'setup', 'default', NULL, ?, NULL, NULL)`,
+  ).run(createdAt);
   db.prepare("INSERT INTO session_characters VALUES ('session-one', 'character-one', 0)").run();
   db.transaction(() => {
-    db.prepare(`INSERT INTO campaigns
+    db.prepare(
+      `INSERT INTO campaigns
       (id, name, active_timeline_id, owner_principal_id, created_at, updated_at)
-      VALUES ('campaign-one', 'Original', 'timeline-one', 'local-owner', ?, ?)`).run(createdAt, createdAt);
-    db.prepare(`INSERT INTO campaign_timelines (id, campaign_id, created_at)
-      VALUES ('timeline-one', 'campaign-one', ?)`).run(createdAt);
+      VALUES ('campaign-one', 'Original', 'timeline-one', 'local-owner', ?, ?)`,
+    ).run(createdAt, createdAt);
+    db.prepare(
+      `INSERT INTO campaign_timelines (id, campaign_id, created_at)
+      VALUES ('timeline-one', 'campaign-one', ?)`,
+    ).run(createdAt);
     db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-one', 'local-owner', 'owner', ?)").run(createdAt);
     for (const [principalId, role] of [
       ["principal-gm", "gm"],
       ["principal-player", "player"],
       ["principal-observer", "observer"],
     ]) {
-      db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-one', ?, ?, ?)")
-        .run(principalId, role, createdAt);
+      db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-one', ?, ?, ?)").run(principalId, role, createdAt);
     }
     db.prepare("INSERT INTO campaign_sessions VALUES ('session-one', 'campaign-one', ?)").run(createdAt);
   }).immediate();
@@ -88,25 +95,33 @@ describe("factory campaign rename", () => {
       updatedAt: renamedAt,
     });
     expect(Object.keys(campaign)).toEqual([
-      "id", "name", "activeTimelineId", "ownerPrincipalId", "createdAt", "updatedAt",
+      "id",
+      "name",
+      "activeTimelineId",
+      "ownerPrincipalId",
+      "createdAt",
+      "updatedAt",
     ]);
     expect(clockNow).toHaveBeenCalledOnce();
     expect(nextId).not.toHaveBeenCalled();
     repository.close();
 
     const after = snapshot();
-    expect(after.campaigns).toEqual([{
-      id: "campaign-one",
-      name: "Renamed",
-      active_timeline_id: "timeline-one",
-      owner_principal_id: "local-owner",
-      owner_role: "owner",
-      created_at: createdAt,
-      updated_at: renamedAt,
-      lifecycle_status: "draft",
-      settings: '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
-      administration_revision: 1,
-    }]);
+    expect(after.campaigns).toEqual([
+      {
+        id: "campaign-one",
+        name: "Renamed",
+        active_timeline_id: "timeline-one",
+        owner_principal_id: "local-owner",
+        owner_role: "owner",
+        created_at: createdAt,
+        updated_at: renamedAt,
+        lifecycle_status: "draft",
+        settings:
+          '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
+        administration_revision: 1,
+      },
+    ]);
     expect(after.timelines).toEqual(before.timelines);
     expect(after.memberships).toEqual(before.memberships);
     expect(after.attachments).toEqual(before.attachments);
@@ -137,8 +152,9 @@ describe("factory campaign rename", () => {
     const clockNow = vi.fn(() => new Date(renamedAt));
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    expect(() => repository.renameCampaign("principal-app-owner", "campaign-one", { name: "Denied" }))
-      .toThrow("requires the campaign owner");
+    expect(() => repository.renameCampaign("principal-app-owner", "campaign-one", { name: "Denied" })).toThrow(
+      "requires the campaign owner",
+    );
     expect(repository.renameCampaign("local-owner", "campaign-one", { name: "Allowed" }).name).toBe("Allowed");
     expect(clockNow).toHaveBeenCalledOnce();
     repository.close();
@@ -155,8 +171,9 @@ describe("factory campaign rename", () => {
     const clockNow = vi.fn(() => new Date(renamedAt));
     const repository = createRepository({ dataDir: dataDir(), ids: { nextId }, clock: { now: clockNow } });
 
-    expect(() => repository.renameCampaign(actor, "campaign-one", { name: "Denied" }))
-      .toThrow("requires the campaign owner");
+    expect(() => repository.renameCampaign(actor, "campaign-one", { name: "Denied" })).toThrow(
+      "requires the campaign owner",
+    );
     expect(clockNow).not.toHaveBeenCalled();
     expect(nextId).not.toHaveBeenCalled();
     repository.close();
@@ -168,10 +185,12 @@ describe("factory campaign rename", () => {
     const clockNow = vi.fn(() => new Date(renamedAt));
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    expect(() => repository.renameCampaign("principal-nonmember", "campaign-missing", { name: "Valid" }))
-      .toThrow("campaign not found");
-    expect(() => repository.renameCampaign("principal-nonmember", "campaign-one", { name: "Valid" }))
-      .toThrow("requires the campaign owner");
+    expect(() => repository.renameCampaign("principal-nonmember", "campaign-missing", { name: "Valid" })).toThrow(
+      "campaign not found",
+    );
+    expect(() => repository.renameCampaign("principal-nonmember", "campaign-one", { name: "Valid" })).toThrow(
+      "requires the campaign owner",
+    );
     expect(clockNow).not.toHaveBeenCalled();
     repository.close();
   });
@@ -197,7 +216,13 @@ describe("factory campaign rename", () => {
   });
 
   it.each([
-    ["clock failure", vi.fn(() => { throw new Error("clock unavailable"); }), "clock unavailable"],
+    [
+      "clock failure",
+      vi.fn(() => {
+        throw new Error("clock unavailable");
+      }),
+      "clock unavailable",
+    ],
     ["malformed clock", vi.fn(() => ({ toISOString: () => "not-a-time" }) as Date), undefined],
     ["backward clock", vi.fn(() => new Date("2030-04-05T06:07:08.008Z")), "cannot precede"],
   ])("rolls back on %s", (_label, clockNow, message) => {
@@ -230,8 +255,9 @@ describe("factory campaign rename", () => {
     const clockNow = vi.fn(() => new Date(renamedAt));
     const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
-    expect(() => repository.renameCampaign("local-owner", "campaign-one", { name: "Renamed" }))
-      .toThrow("rename rejected");
+    expect(() => repository.renameCampaign("local-owner", "campaign-one", { name: "Renamed" })).toThrow(
+      "rename rejected",
+    );
     expect(clockNow).toHaveBeenCalledOnce();
     repository.close();
     expect(snapshot()).toEqual(before);
@@ -243,12 +269,17 @@ describe("factory campaign rename", () => {
     const clockNow = vi.fn(() => new Date(renamedAt));
     const repository = createRepository({ dataDir: dataDir(), ids: { nextId }, clock: { now: clockNow } });
 
-    expect(() => repository.transaction(() => repository.renameCampaign("invalid actor", "invalid campaign", {
-      name: "",
-    }))).toThrow("campaign rename cannot run inside a repository transaction");
+    expect(() =>
+      repository.transaction(() =>
+        repository.renameCampaign("invalid actor", "invalid campaign", {
+          name: "",
+        }),
+      ),
+    ).toThrow("campaign rename cannot run inside a repository transaction");
     repository.close();
-    expect(() => repository.renameCampaign("invalid actor", "invalid campaign", { name: "" }))
-      .toThrow("repository is closed");
+    expect(() => repository.renameCampaign("invalid actor", "invalid campaign", { name: "" })).toThrow(
+      "repository is closed",
+    );
     expect(nextId).not.toHaveBeenCalled();
     expect(clockNow).not.toHaveBeenCalled();
   });

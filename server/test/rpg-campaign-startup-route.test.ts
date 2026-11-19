@@ -54,8 +54,15 @@ function createFakeSceneImages(enabled = true) {
   const calls: Array<{ key: string; sceneKey: string }> = [];
   const service = {
     getSettings: vi.fn(() => ({
-      settings: { enabled, mode: "automatic", stylePresetId: "campaign-default", stylePhrase: "ink and rain",
-        promptOverrides: {}, steps: 20, guidance: 3 },
+      settings: {
+        enabled,
+        mode: "automatic",
+        stylePresetId: "campaign-default",
+        stylePhrase: "ink and rain",
+        promptOverrides: {},
+        steps: 20,
+        guidance: 3,
+      },
       revision: 0,
     })),
     updateSettings: vi.fn(),
@@ -79,9 +86,21 @@ function createFakeSceneImages(enabled = true) {
 }
 
 /** Applies reviewed public + GM-only preparation so only public material is eligible. */
-function applyPreparation(repo: Awaited<ReturnType<typeof dmFixture>>["repo"], campaign: Campaign, clock: { now(): Date }) {
+function applyPreparation(
+  repo: Awaited<ReturnType<typeof dmFixture>>["repo"],
+  campaign: Campaign,
+  clock: { now(): Date },
+) {
   const content = generatedCampaignContentProviderSchema.parse({
-    outlines: [{ key: "opening", opening: "The harbor wakes under grey rain.", premise: "Find what the tide hid.", startLocationKey: "harbor", visibility: "public" }],
+    outlines: [
+      {
+        key: "opening",
+        opening: "The harbor wakes under grey rain.",
+        premise: "Find what the tide hid.",
+        startLocationKey: "harbor",
+        visibility: "public",
+      },
+    ],
     locations: [
       { key: "harbor", name: "Rain Harbor", description: "A public harbor under grey rain.", visibility: "public" },
       { key: "market", name: "Fish Market", description: "Stalls under dripping awnings.", visibility: "public" },
@@ -98,15 +117,25 @@ function applyPreparation(repo: Awaited<ReturnType<typeof dmFixture>>["repo"], c
   });
   const context = repo.getCampaignGenerationContext(OWNER, campaign.id, [])!;
   const draft = repo.createGenerationDraft(OWNER, {
-    campaignId: campaign.id, timelineId: campaign.activeTimelineId, kind: "content-pack",
-    stagedContent: { kind: "campaign-content", requestDigest: "c".repeat(64), baseContentRevision: context.revision, dependencyDigests: {}, ...content },
+    campaignId: campaign.id,
+    timelineId: campaign.activeTimelineId,
+    kind: "content-pack",
+    stagedContent: {
+      kind: "campaign-content",
+      requestDigest: "c".repeat(64),
+      baseContentRevision: context.revision,
+      dependencyDigests: {},
+      ...content,
+    },
     validation: { valid: true, issues: [], validatedAt: clock.now().toISOString() },
     expectedCampaignRevision: repo.getCampaignAdministration(OWNER, campaign.id)!.revision,
     idempotencyKey: "startup-content",
   });
   repo.recordCampaignGenerationCandidate(draft.draftId, content, []);
   repo.applyCampaignContentGenerationDraftAtomically(OWNER, {
-    draftId: draft.draftId, expectedDraftRevision: 0, expectedCampaignRevision: draft.campaignRevision,
+    draftId: draft.draftId,
+    expectedDraftRevision: 0,
+    expectedCampaignRevision: draft.campaignRevision,
     idempotencyKey: "startup-content-apply",
     selectedArtifactKeys: ["opening", "harbor", "market", "vault", "welcome", "gm-notes", "arrival", "gm-scene"],
   });
@@ -133,13 +162,25 @@ describe("campaign startup route", () => {
   it("switches to AI, publishes public materials, opens the beat, and images each public location", async () => {
     const f = await startupFixture();
     // Human mode is the durable default before the command.
-    expect(f.repo.getDmControl(OWNER, f.campaign.id)).toEqual({ campaignId: f.campaign.id, mode: "human", revision: 0 });
+    expect(f.repo.getDmControl(OWNER, f.campaign.id)).toEqual({
+      campaignId: f.campaign.id,
+      mode: "human",
+      revision: 0,
+    });
 
-    const result = await f.app.inject({ method: "POST", url: f.url, payload: {}, headers: { "content-type": "application/json" } });
+    const result = await f.app.inject({
+      method: "POST",
+      url: f.url,
+      payload: {},
+      headers: { "content-type": "application/json" },
+    });
     expect(result.statusCode, result.body).toBe(200);
     const body = result.json() as {
-      dmMode: string; published: string[]; beat: { state: string; runId: string | null };
-      imagesEnqueued: Array<{ locationId: string; jobId: string | null; deduped: boolean }>; blockers: string[];
+      dmMode: string;
+      published: string[];
+      beat: { state: string; runId: string | null };
+      imagesEnqueued: Array<{ locationId: string; jobId: string | null; deduped: boolean }>;
+      blockers: string[];
     };
 
     // (a) The campaign is now AI-directed at the post-set revision.
@@ -160,7 +201,9 @@ describe("campaign startup route", () => {
     expect(body.published.sort()).toEqual(["arrival", "welcome"]);
 
     // (c) Exactly one image per public location, none for the GM-only location.
-    const publicLocationIds = f.repo.getCampaignStartupRead(OWNER, f.campaign.id, f.session.id)!.locations.map((location) => location.locationId);
+    const publicLocationIds = f.repo
+      .getCampaignStartupRead(OWNER, f.campaign.id, f.session.id)!
+      .locations.map((location) => location.locationId);
     expect(publicLocationIds).toHaveLength(2);
     expect(body.imagesEnqueued.map((image) => image.locationId).sort()).toEqual([...publicLocationIds].sort());
     expect(body.imagesEnqueued.every((image) => image.jobId !== null)).toBe(true);
@@ -176,16 +219,27 @@ describe("campaign startup route", () => {
 
   it("is idempotent on a second identical call", async () => {
     const f = await startupFixture();
-    const first = await f.app.inject({ method: "POST", url: f.url, payload: {}, headers: { "content-type": "application/json" } });
+    const first = await f.app.inject({
+      method: "POST",
+      url: f.url,
+      payload: {},
+      headers: { "content-type": "application/json" },
+    });
     expect(first.statusCode, first.body).toBe(200);
     const providerCallsAfterFirst = f.complete.mock.calls.length;
     const deliveriesAfterFirst = f.repo.getCampaignPublishedMaterials(OWNER, f.campaign.id)!.materials.length;
     const jobsAfterFirst = f.scene.jobsByKey.size;
 
-    const second = await f.app.inject({ method: "POST", url: f.url, payload: {}, headers: { "content-type": "application/json" } });
+    const second = await f.app.inject({
+      method: "POST",
+      url: f.url,
+      payload: {},
+      headers: { "content-type": "application/json" },
+    });
     expect(second.statusCode, second.body).toBe(200);
     const secondBody = second.json() as {
-      beat: { state: string; runId: string | null }; published: string[];
+      beat: { state: string; runId: string | null };
+      published: string[];
       imagesEnqueued: Array<{ deduped: boolean }>;
     };
 
@@ -211,21 +265,34 @@ describe("campaign startup route", () => {
     // No starting location plus a GM-only story node reproduces the hard-blocked
     // opening: every candidate is private, so the planning gate cannot proceed.
     const content = generatedCampaignContentProviderSchema.parse({
-      locations: [{ key: "harbor", name: "Rain Harbor", description: "A public harbor under grey rain.", visibility: "public" }],
+      locations: [
+        { key: "harbor", name: "Rain Harbor", description: "A public harbor under grey rain.", visibility: "public" },
+      ],
       storyNodes: [{ key: "secret", title: "SECRET_TITLE", description: "SECRET_BODY", visibility: "gm" }],
     });
     const context = f.repo.getCampaignGenerationContext(OWNER, f.campaign.id, [])!;
     const draft = f.repo.createGenerationDraft(OWNER, {
-      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, kind: "content-pack",
-      stagedContent: { kind: "campaign-content", requestDigest: "d".repeat(64), baseContentRevision: context.revision, dependencyDigests: {}, ...content },
+      campaignId: f.campaign.id,
+      timelineId: f.campaign.activeTimelineId,
+      kind: "content-pack",
+      stagedContent: {
+        kind: "campaign-content",
+        requestDigest: "d".repeat(64),
+        baseContentRevision: context.revision,
+        dependencyDigests: {},
+        ...content,
+      },
       validation: { valid: true, issues: [], validatedAt: f.options.clock.now().toISOString() },
       expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision,
       idempotencyKey: "gm-only-content",
     });
     f.repo.recordCampaignGenerationCandidate(draft.draftId, content, []);
     f.repo.applyCampaignContentGenerationDraftAtomically(OWNER, {
-      draftId: draft.draftId, expectedDraftRevision: 0, expectedCampaignRevision: draft.campaignRevision,
-      idempotencyKey: "gm-only-apply", selectedArtifactKeys: ["harbor", "secret"],
+      draftId: draft.draftId,
+      expectedDraftRevision: 0,
+      expectedCampaignRevision: draft.campaignRevision,
+      idempotencyKey: "gm-only-apply",
+      selectedArtifactKeys: ["harbor", "secret"],
     });
 
     const scene = createFakeSceneImages();
@@ -237,7 +304,12 @@ describe("campaign startup route", () => {
     });
     const url = `/api/rpg/v1/campaigns/${f.campaign.id}/rooms/${f.session.id}/startup-commands`;
 
-    const blocked = await app.inject({ method: "POST", url, payload: {}, headers: { "content-type": "application/json" } });
+    const blocked = await app.inject({
+      method: "POST",
+      url,
+      payload: {},
+      headers: { "content-type": "application/json" },
+    });
     expect(blocked.statusCode, blocked.body).toBe(200);
     expect(blocked.json().beat.state).toBe("blocked");
     expect(blocked.json().blockers).toContain("story-public-rendering-required");
@@ -252,7 +324,12 @@ describe("campaign startup route", () => {
       idempotencyKey: "fix-starting-location",
     });
 
-    const fixed = await app.inject({ method: "POST", url, payload: {}, headers: { "content-type": "application/json" } });
+    const fixed = await app.inject({
+      method: "POST",
+      url,
+      payload: {},
+      headers: { "content-type": "application/json" },
+    });
     expect(fixed.statusCode, fixed.body).toBe(200);
     expect(fixed.json().beat.state).toBe("completed");
     expect(fixed.json().beat.runId).not.toBe(blocked.json().beat.runId);
@@ -273,7 +350,12 @@ describe("campaign startup route", () => {
       sceneImageService: disabled.service,
       sceneImageInstallationEnabled: () => true,
     });
-    const result = await app.inject({ method: "POST", url: f.url, payload: {}, headers: { "content-type": "application/json" } });
+    const result = await app.inject({
+      method: "POST",
+      url: f.url,
+      payload: {},
+      headers: { "content-type": "application/json" },
+    });
     expect(result.statusCode, result.body).toBe(200);
     expect(result.json().imagesEnqueued).toEqual([]);
     expect(disabled.service.enqueue).not.toHaveBeenCalled();

@@ -110,7 +110,10 @@ export type MonsterAttackResolution = Readonly<{
  * bounded to the pinned scimitar ability the starter catalog actually ships.
  */
 const MONSTER_MULTIATTACK_SHAPES: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  "srd-5.1:enemy-template:goblin": Object.freeze(["srd-5.1:ability:goblin-scimitar", "srd-5.1:ability:goblin-scimitar"]),
+  "srd-5.1:enemy-template:goblin": Object.freeze([
+    "srd-5.1:ability:goblin-scimitar",
+    "srd-5.1:ability:goblin-scimitar",
+  ]),
 });
 
 /**
@@ -131,9 +134,10 @@ const MONSTER_SAVE_RIDERS: Readonly<Record<string, Omit<MonsterSavePlan, "kind" 
  * has a recharge entry yet; the closed test-fixture key exercises the engine
  * without inventing SRD content.
  */
-const MONSTER_RECHARGE_RANGES: Readonly<Record<string, Omit<MonsterRechargePlan, "kind" | "abilityId">>> = Object.freeze({
-  "velvet:test-fixture:ability:recharge-5-6": Object.freeze({ min: 5, max: 6 }),
-});
+const MONSTER_RECHARGE_RANGES: Readonly<Record<string, Omit<MonsterRechargePlan, "kind" | "abilityId">>> =
+  Object.freeze({
+    "velvet:test-fixture:ability:recharge-5-6": Object.freeze({ min: 5, max: 6 }),
+  });
 
 /** The ordered ability ids of a monster's multiattack, or null when it has none. */
 export function monsterMultiattackShape(enemyDefinitionId: string): readonly string[] | null {
@@ -141,7 +145,10 @@ export function monsterMultiattackShape(enemyDefinitionId: string): readonly str
 }
 
 /** Builds the ordered multiattack plan from the monster's available attack steps. */
-export function planMonsterMultiattack(enemyDefinitionId: string, attackSteps: readonly MonsterAttackStep[]): MonsterMultiattackPlan | null {
+export function planMonsterMultiattack(
+  enemyDefinitionId: string,
+  attackSteps: readonly MonsterAttackStep[],
+): MonsterMultiattackPlan | null {
   const shape = monsterMultiattackShape(enemyDefinitionId);
   if (!shape) return null;
   const byAbility = new Map(attackSteps.map((step) => [step.abilityId, step] as const));
@@ -170,7 +177,11 @@ export function planMonsterRecharge(abilityId: string): MonsterRechargePlan | nu
  * when the roll lands inside its inclusive range; an unspent ability stays
  * ready. The roll is supplied (not drawn) so the resolution is deterministic.
  */
-export function resolveMonsterRecharge(plan: MonsterRechargePlan, spent: boolean, roll: number): MonsterRechargeResolution {
+export function resolveMonsterRecharge(
+  plan: MonsterRechargePlan,
+  spent: boolean,
+  roll: number,
+): MonsterRechargeResolution {
   requireInteger(roll, "recharge roll");
   if (plan.min < 1 || plan.max < plan.min || roll < 1 || roll > plan.max) {
     throw new RangeError("recharge roll must be inside the die range");
@@ -187,9 +198,14 @@ export function resolveMonsterRecharge(plan: MonsterRechargePlan, spent: boolean
 }
 
 /** Draws a recharge die through the injected RNG and resolves it. */
-export function rollMonsterRecharge(plan: MonsterRechargePlan, spent: boolean, rng: MonsterRng): MonsterRechargeResolution {
+export function rollMonsterRecharge(
+  plan: MonsterRechargePlan,
+  spent: boolean,
+  rng: MonsterRng,
+): MonsterRechargeResolution {
   const roll = rng.integer(1, plan.max + 1);
-  if (!Number.isInteger(roll) || roll < 1 || roll > plan.max) throw new Error("monster recharge RNG returned an out-of-range die");
+  if (!Number.isInteger(roll) || roll < 1 || roll > plan.max)
+    throw new Error("monster recharge RNG returned an out-of-range die");
   return resolveMonsterRecharge(plan, spent, roll);
 }
 
@@ -199,12 +215,15 @@ export function rollMonsterRecharge(plan: MonsterRechargePlan, spent: boolean, r
  * applies every on-fail rider ("full"); success applies the on-success riders,
  * which is "partial" when riders exist and "none" otherwise.
  */
-export function resolveMonsterSave(plan: MonsterSavePlan, input: Readonly<{
-  rolls: readonly number[];
-  saveBonus: number;
-  advantageSources?: number;
-  disadvantageSources?: number;
-}>): MonsterSaveResolution {
+export function resolveMonsterSave(
+  plan: MonsterSavePlan,
+  input: Readonly<{
+    rolls: readonly number[];
+    saveBonus: number;
+    advantageSources?: number;
+    disadvantageSources?: number;
+  }>,
+): MonsterSaveResolution {
   requireInteger(input.saveBonus, "save bonus");
   const test: D20TestResolution = resolveDnd5eD20Test({
     rolls: input.rolls,
@@ -232,11 +251,14 @@ export function resolveMonsterSave(plan: MonsterSavePlan, input: Readonly<{
  * a critical doubles the damage dice (not the modifier) through the shared
  * attack/damage machinery.
  */
-export function resolveMonsterAttackStep(step: MonsterAttackStep, input: Readonly<{
-  armorClass: number;
-  attackRoll: number;
-  damageRolls: readonly number[];
-}>): MonsterAttackResolution {
+export function resolveMonsterAttackStep(
+  step: MonsterAttackStep,
+  input: Readonly<{
+    armorClass: number;
+    attackRoll: number;
+    damageRolls: readonly number[];
+  }>,
+): MonsterAttackResolution {
   requireInteger(input.attackRoll, "attack roll");
   if (input.attackRoll < 1 || input.attackRoll > 20) throw new RangeError("attack roll must be between 1 and 20");
   const attack = resolveDnd5eAttack({
@@ -247,7 +269,12 @@ export function resolveMonsterAttackStep(step: MonsterAttackStep, input: Readonl
     ...(step.criticalThreshold !== undefined ? { criticalThreshold: step.criticalThreshold } : {}),
   });
   const damageResolution = attack.hit
-    ? resolveDnd5eDamageRoll({ dice: [step.damageDie], rolls: [input.damageRolls], modifier: step.damageModifier, critical: attack.critical })
+    ? resolveDnd5eDamageRoll({
+        dice: [step.damageDie],
+        rolls: [input.damageRolls],
+        modifier: step.damageModifier,
+        critical: attack.critical,
+      })
     : null;
   return Object.freeze({
     step,
@@ -264,9 +291,13 @@ export function resolveMonsterAttackStep(step: MonsterAttackStep, input: Readonl
 }
 
 /** Draws an attack d20 and its damage dice through the injected RNG. */
-export function resolveMonsterAttack(step: MonsterAttackStep, input: Readonly<{ armorClass: number; rng: MonsterRng }>): MonsterAttackResolution {
+export function resolveMonsterAttack(
+  step: MonsterAttackStep,
+  input: Readonly<{ armorClass: number; rng: MonsterRng }>,
+): MonsterAttackResolution {
   const attackRoll = input.rng.integer(1, 21);
-  if (!Number.isInteger(attackRoll) || attackRoll < 1 || attackRoll > 20) throw new Error("monster attack RNG returned an out-of-range d20");
+  if (!Number.isInteger(attackRoll) || attackRoll < 1 || attackRoll > 20)
+    throw new Error("monster attack RNG returned an out-of-range d20");
   const attack = resolveDnd5eAttack({
     rolls: [attackRoll],
     abilityScore: 10,
@@ -277,11 +308,17 @@ export function resolveMonsterAttack(step: MonsterAttackStep, input: Readonly<{ 
   const expected = attack.hit ? step.damageDie.count * (attack.critical ? 2 : 1) : 0;
   const damageRolls = Array.from({ length: expected }, () => {
     const roll = input.rng.integer(1, step.damageDie.sides + 1);
-    if (!Number.isInteger(roll) || roll < 1 || roll > step.damageDie.sides) throw new Error("monster damage RNG returned an out-of-range die");
+    if (!Number.isInteger(roll) || roll < 1 || roll > step.damageDie.sides)
+      throw new Error("monster damage RNG returned an out-of-range die");
     return roll;
   });
   const damageResolution = attack.hit
-    ? resolveDnd5eDamageRoll({ dice: [step.damageDie], rolls: [damageRolls], modifier: step.damageModifier, critical: attack.critical })
+    ? resolveDnd5eDamageRoll({
+        dice: [step.damageDie],
+        rolls: [damageRolls],
+        modifier: step.damageModifier,
+        critical: attack.critical,
+      })
     : null;
   return Object.freeze({
     step,

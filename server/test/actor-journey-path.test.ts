@@ -52,7 +52,9 @@ class Harness {
   }
 
   addLocation(id: string, visibility: Visibility = "public"): this {
-    if (!this.db.prepare("SELECT 1 FROM campaign_locations_v28 WHERE campaign_id=? AND location_id=?").get(CAMPAIGN, id))
+    if (
+      !this.db.prepare("SELECT 1 FROM campaign_locations_v28 WHERE campaign_id=? AND location_id=?").get(CAMPAIGN, id)
+    )
       this.db.prepare("INSERT INTO campaign_locations_v28 VALUES(?,?,?)").run(CAMPAIGN, id, visibility);
     return this;
   }
@@ -70,21 +72,31 @@ class Harness {
 
   place(actorId: string, locationId: string, revision = 0): this {
     this.addLocation(locationId);
-    this.db.prepare("DELETE FROM campaign_actor_locations_v28 WHERE campaign_id=? AND session_id=? AND actor_id=?")
+    this.db
+      .prepare("DELETE FROM campaign_actor_locations_v28 WHERE campaign_id=? AND session_id=? AND actor_id=?")
       .run(CAMPAIGN, SESSION, actorId);
-    this.db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,?)").run(CAMPAIGN, SESSION, actorId, locationId, revision);
+    this.db
+      .prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,?)")
+      .run(CAMPAIGN, SESSION, actorId, locationId, revision);
     return this;
   }
 
   addEdge(edge: EdgeInput): this {
     this.addLocation(edge.from);
     this.addLocation(edge.to);
-    this.db.prepare("INSERT INTO campaign_location_connections_v28 VALUES(?,?,?,?,?,?,?,?,?)").run(
-      CAMPAIGN, edge.id, edge.from, edge.to, edge.visibility ?? "public", edge.state ?? "open",
-      edge.requirement ?? "none",
-      edge.requirement === "faction_reputation" ? edge.factionId ?? "faction" : null,
-      edge.requirement === "faction_reputation" ? edge.minimum ?? 0 : null,
-    );
+    this.db
+      .prepare("INSERT INTO campaign_location_connections_v28 VALUES(?,?,?,?,?,?,?,?,?)")
+      .run(
+        CAMPAIGN,
+        edge.id,
+        edge.from,
+        edge.to,
+        edge.visibility ?? "public",
+        edge.state ?? "open",
+        edge.requirement ?? "none",
+        edge.requirement === "faction_reputation" ? (edge.factionId ?? "faction") : null,
+        edge.requirement === "faction_reputation" ? (edge.minimum ?? 0) : null,
+      );
     return this;
   }
 
@@ -94,18 +106,27 @@ class Harness {
   }
 
   repute(actorId: string, factionId: string, delta: number): this {
-    this.db.prepare("INSERT INTO campaign_reputation_ledger_v28 VALUES(?,?,?,?)").run(CAMPAIGN, actorId, factionId, delta);
+    this.db
+      .prepare("INSERT INTO campaign_reputation_ledger_v28 VALUES(?,?,?,?)")
+      .run(CAMPAIGN, actorId, factionId, delta);
     return this;
   }
 
   setRole(role: string): this {
-    this.db.prepare("UPDATE campaign_memberships SET role=? WHERE campaign_id=? AND principal_id=?").run(role, CAMPAIGN, PRINCIPAL);
+    this.db
+      .prepare("UPDATE campaign_memberships SET role=? WHERE campaign_id=? AND principal_id=?")
+      .run(role, CAMPAIGN, PRINCIPAL);
     return this;
   }
 
   resolve(
     targetLocationId: string,
-    override: Partial<{ actorId: string; principalId: string; partyActorIds: string[]; audienceMode: "principal" | "player" }> = {},
+    override: Partial<{
+      actorId: string;
+      principalId: string;
+      partyActorIds: string[];
+      audienceMode: "principal" | "player";
+    }> = {},
   ): ActorJourneyPath | null {
     return resolveActorJourneyPath(this.db, {
       campaignId: CAMPAIGN,

@@ -20,7 +20,8 @@ export class RulesetRegistry {
 
   get(id: string, version?: string): RulesetModule {
     const matches = [...this.#rulesets.values()].filter((candidate) => candidate.descriptor.id === id);
-    const ruleset = version === undefined ? (matches.length === 1 ? matches[0] : undefined) : this.#rulesets.get(`${id}@${version}`);
+    const ruleset =
+      version === undefined ? (matches.length === 1 ? matches[0] : undefined) : this.#rulesets.get(`${id}@${version}`);
     if (ruleset === undefined) throw new Error(`unknown ruleset identity: ${id}@${version ?? "unspecified"}`);
     return ruleset;
   }

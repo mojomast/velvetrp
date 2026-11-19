@@ -27,8 +27,12 @@ export {
 /** Public actor-resource facade combining M1.5 projections and commands. */
 export interface ActorResourceRepository extends ActorResourceReadRepository, ActorResourceWriteRepository {}
 
-export function createActorResourceRepository(db:DatabaseDriver.Database,deps:M15Dependencies,assertMutation:()=>void):ActorResourceRepository {
-  const reads=createActorResourceReadRepository(db);
-  const writes=createActorResourceWriteRepository(db,deps,assertMutation,reads);
-  return {...reads,...writes};
+export function createActorResourceRepository(
+  db: DatabaseDriver.Database,
+  deps: M15Dependencies,
+  assertMutation: () => void,
+): ActorResourceRepository {
+  const reads = createActorResourceReadRepository(db);
+  const writes = createActorResourceWriteRepository(db, deps, assertMutation, reads);
+  return { ...reads, ...writes };
 }

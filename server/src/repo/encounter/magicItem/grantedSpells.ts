@@ -31,12 +31,20 @@ export type PlanGrantedPowersInput = Readonly<{
 }>;
 
 /** True when a granted power is available from an equipped (and attuned) item. */
-export function grantedPowerActive(item: MagicEquippedPowerItem, granted: MagicGrantedPower, attunement: MagicAttunementState): boolean {
+export function grantedPowerActive(
+  item: MagicEquippedPowerItem,
+  granted: MagicGrantedPower,
+  attunement: MagicAttunementState,
+): boolean {
   return item.equipped && (!granted.requireAttunement || isAttuned(attunement, item.key));
 }
 
 /** Resolves one granted power to a bounded plan, or null when unavailable. */
-export function resolveGrantedPower(item: MagicEquippedPowerItem, granted: MagicGrantedPower, attunement: MagicAttunementState): MagicGrantedPowerPlan | null {
+export function resolveGrantedPower(
+  item: MagicEquippedPowerItem,
+  granted: MagicGrantedPower,
+  attunement: MagicAttunementState,
+): MagicGrantedPowerPlan | null {
   if (!grantedPowerActive(item, granted, attunement)) return null;
   return Object.freeze({
     kind: "granted-power",

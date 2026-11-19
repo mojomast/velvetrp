@@ -12,10 +12,7 @@ import type {
   SystemOneCompletionInput,
   SystemOneCompletionResult,
 } from "../../server/src/provider/systemOneCompletion.js";
-import {
-  ADVENTURE_EVAL_CASES,
-  type AdventureEvalCase,
-} from "../../server/test/fixtures/adventure-evals/corpus.js";
+import { ADVENTURE_EVAL_CASES, type AdventureEvalCase } from "../../server/test/fixtures/adventure-evals/corpus.js";
 import {
   buildAdventureBenchmarkRequest,
   loadHarvestedAdventureCases,
@@ -86,7 +83,8 @@ const byteRow = (caseId: string, legacyBytes: number | null, sharedBytes: number
     legacyBytes,
     sharedBytes,
     deltaBytes,
-    deltaPercent: deltaBytes === null || legacyBytes === null || legacyBytes === 0 ? null : (deltaBytes / legacyBytes) * 100,
+    deltaPercent:
+      deltaBytes === null || legacyBytes === null || legacyBytes === 0 ? null : (deltaBytes / legacyBytes) * 100,
     legacyDigest: null,
     sharedDigest: null,
   };
@@ -163,7 +161,13 @@ async function fakeCompletion(input: SystemOneCompletionInput): Promise<SystemOn
       continue;
     }
     if (question.type === "score") {
-      answers[key] = { type: "score", score: 3, confidence: 0.9, legend: {}, probabilities: { "0": 0.02, "1": 0.03, "2": 0.05, "3": 0.9 } };
+      answers[key] = {
+        type: "score",
+        score: 3,
+        confidence: 0.9,
+        legend: {},
+        probabilities: { "0": 0.02, "1": 0.03, "2": 0.05, "3": 0.9 },
+      };
       continue;
     }
     const options = Object.keys(question.criteria ?? {});
@@ -173,7 +177,9 @@ async function fakeCompletion(input: SystemOneCompletionInput): Promise<SystemOn
       type: "choice",
       choice: pick,
       confidence: 0.9,
-      probabilities: Object.fromEntries(options.map((option): [string, number] => [option, option === pick ? 0.9 : rest])),
+      probabilities: Object.fromEntries(
+        options.map((option): [string, number] => [option, option === pick ? 0.9 : rest]),
+      ),
     };
   }
   return {
@@ -193,19 +199,41 @@ test("parses CLI flags with safe defaults and validates the budget flag shape", 
     repeats: 1,
     maxCalls: null,
   });
-  assert.deepEqual(parseCompareArgs(["--live", "--max-calls", "300", "--repeat=2", "--top", "5", "--out", "docs/x.md", "--json", "/tmp/x.json"]), {
-    live: true,
-    out: "docs/x.md",
-    json: "/tmp/x.json",
-    top: 5,
-    repeats: 2,
-    maxCalls: 300,
-  });
+  assert.deepEqual(
+    parseCompareArgs([
+      "--live",
+      "--max-calls",
+      "300",
+      "--repeat=2",
+      "--top",
+      "5",
+      "--out",
+      "docs/x.md",
+      "--json",
+      "/tmp/x.json",
+    ]),
+    {
+      live: true,
+      out: "docs/x.md",
+      json: "/tmp/x.json",
+      top: 5,
+      repeats: 2,
+      maxCalls: 300,
+    },
+  );
   assert.equal(parseCompareArgs(["--top", "999"]).top, 100);
   assert.equal(parseCompareArgs(["--top", "0"]).top, 1);
   assert.equal(parseCompareArgs(["--repeat", "404"]).repeats, 25);
-  assert.equal(parseCompareArgs(["--out", "custom"]).json, "custom.json", "the JSON sidecar defaults alongside the markdown");
-  assert.equal(parseCompareArgs(["--live", "--max-calls=10", "--payload", "legacy"]).live, true, "--payload is ignored: both variants always run");
+  assert.equal(
+    parseCompareArgs(["--out", "custom"]).json,
+    "custom.json",
+    "the JSON sidecar defaults alongside the markdown",
+  );
+  assert.equal(
+    parseCompareArgs(["--live", "--max-calls=10", "--payload", "legacy"]).live,
+    true,
+    "--payload is ignored: both variants always run",
+  );
   for (const args of [["--max-calls"], ["--max-calls", "nope"], ["--max-calls", "0"], ["--max-calls", "3.5"]]) {
     assert.throws(() => parseCompareArgs(args), /positive integer/, `expected a refusal for ${args.join(" ")}`);
   }
@@ -243,18 +271,41 @@ test("derives deterministic request and corpus digests", () => {
   const legacy = buildAdventureBenchmarkRequest(testCase, "legacy");
   const shared = buildAdventureBenchmarkRequest(testCase, "shared-context");
   const settings = defaultSystemOneSettings();
-  const base = { settings, caseId: testCase.id, repeat: 1, candidates: testCase.candidates, corpus: ADVENTURE_EVAL_CASES };
+  const base = {
+    settings,
+    caseId: testCase.id,
+    repeat: 1,
+    candidates: testCase.candidates,
+    corpus: ADVENTURE_EVAL_CASES,
+  };
   const legacyEvidence = beginAdventureEvidence({ ...base, ...legacy })("model");
-  const sharedEvidence = beginAdventureEvidence({ ...base, ...shared, payloadVersions: ADVENTURE_SHARED_CONTEXT_VERSIONS })("model");
+  const sharedEvidence = beginAdventureEvidence({
+    ...base,
+    ...shared,
+    payloadVersions: ADVENTURE_SHARED_CONTEXT_VERSIONS,
+  })("model");
 
   assert.equal(adventureRequestDigest(legacy), legacyEvidence.requestDigest);
   assert.equal(adventureRequestDigest(shared), sharedEvidence.requestDigest);
   assert.notEqual(adventureRequestDigest(legacy), adventureRequestDigest(shared));
-  assert.equal(adventureRequestDigest(legacy), adventureRequestDigest(buildAdventureBenchmarkRequest(testCase, "legacy")), "digests are stable across identical builds");
+  assert.equal(
+    adventureRequestDigest(legacy),
+    adventureRequestDigest(buildAdventureBenchmarkRequest(testCase, "legacy")),
+    "digests are stable across identical builds",
+  );
 
-  assert.equal(adventureCorpusDigest(ADVENTURE_EVAL_CASES), createHash("sha256").update(JSON.stringify(ADVENTURE_EVAL_CASES.map((entry) => entry.id))).digest("hex"));
+  assert.equal(
+    adventureCorpusDigest(ADVENTURE_EVAL_CASES),
+    createHash("sha256")
+      .update(JSON.stringify(ADVENTURE_EVAL_CASES.map((entry) => entry.id)))
+      .digest("hex"),
+  );
   assert.equal(adventureCorpusDigest(ADVENTURE_EVAL_CASES), adventureCorpusDigest(ADVENTURE_EVAL_CASES));
-  assert.notEqual(adventureCorpusDigest(ADVENTURE_EVAL_CASES), adventureCorpusDigest([...ADVENTURE_EVAL_CASES].reverse()), "case order is part of the corpus identity");
+  assert.notEqual(
+    adventureCorpusDigest(ADVENTURE_EVAL_CASES),
+    adventureCorpusDigest([...ADVENTURE_EVAL_CASES].reverse()),
+    "case order is part of the corpus identity",
+  );
 });
 
 test("accounts payload bytes and counts shrink, grow, and equality", () => {
@@ -265,12 +316,20 @@ test("accounts payload bytes and counts shrink, grow, and equality", () => {
     expected: { preferred: "a", acceptable: ["a"] },
   });
   const small = evalCase({ id: "small" });
-  const empty = evalCase({ id: "empty", candidates: [], declaration: "I look around.", expected: { preferred: null, acceptable: [null] } });
+  const empty = evalCase({
+    id: "empty",
+    candidates: [],
+    declaration: "I look around.",
+    expected: { preferred: null, acceptable: [null] },
+  });
 
   const { rows, structural, corpusDigest } = buildPayloadComparisons([large, small, empty]);
   assert.equal(rows.length, 3);
   assert.equal(structural.length, 3);
-  assert.ok(structural.every((result) => result.ok), structural.flatMap((result) => result.mismatches).join("; "));
+  assert.ok(
+    structural.every((result) => result.ok),
+    structural.flatMap((result) => result.mismatches).join("; "),
+  );
   assert.equal(corpusDigest, adventureCorpusDigest([large, small, empty]));
   for (const row of rows) {
     assert.ok((row.legacyBytes ?? 0) > 0);
@@ -278,16 +337,30 @@ test("accounts payload bytes and counts shrink, grow, and equality", () => {
     assert.equal(row.deltaBytes, (row.sharedBytes ?? 0) - (row.legacyBytes ?? 0));
   }
   const largeRow = rows.find((row) => row.caseId === "large")!;
-  assert.ok((largeRow.sharedBytes ?? 0) < (largeRow.legacyBytes ?? 0), "a many-candidate long declaration shrinks under shared context");
+  assert.ok(
+    (largeRow.sharedBytes ?? 0) < (largeRow.legacyBytes ?? 0),
+    "a many-candidate long declaration shrinks under shared context",
+  );
 
   const summary = summarizePayloadBytes(rows);
   assert.equal(summary.cases, 3);
   assert.equal(summary.shrink + summary.grow + summary.equal, 3);
-  assert.equal(summary.legacyBytes, rows.reduce((total, row) => total + (row.legacyBytes ?? 0), 0));
-  assert.equal(summary.sharedBytes, rows.reduce((total, row) => total + (row.sharedBytes ?? 0), 0));
+  assert.equal(
+    summary.legacyBytes,
+    rows.reduce((total, row) => total + (row.legacyBytes ?? 0), 0),
+  );
+  assert.equal(
+    summary.sharedBytes,
+    rows.reduce((total, row) => total + (row.sharedBytes ?? 0), 0),
+  );
   assert.equal(summary.deltaBytes, summary.sharedBytes - summary.legacyBytes);
 
-  const counted = summarizePayloadBytes([byteRow("shrink", 100, 50), byteRow("grow", 100, 150), byteRow("equal", 20, 20), byteRow("missing", 10, null)]);
+  const counted = summarizePayloadBytes([
+    byteRow("shrink", 100, 50),
+    byteRow("grow", 100, 150),
+    byteRow("equal", 20, 20),
+    byteRow("missing", 10, null),
+  ]);
   assert.deepEqual(
     {
       cases: counted.cases,
@@ -300,17 +373,43 @@ test("accounts payload bytes and counts shrink, grow, and equality", () => {
       grow: counted.grow,
       equal: counted.equal,
     },
-    { cases: 3, incomplete: 1, legacyBytes: 220, sharedBytes: 220, deltaBytes: 0, deltaPercent: 0, shrink: 1, grow: 1, equal: 1 },
+    {
+      cases: 3,
+      incomplete: 1,
+      legacyBytes: 220,
+      sharedBytes: 220,
+      deltaBytes: 0,
+      deltaPercent: 0,
+      shrink: 1,
+      grow: 1,
+      equal: 1,
+    },
   );
-  assert.equal(summarizePayloadBytes([byteRow("zero", 0, 5)]).deltaPercent, null, "a zero legacy size has no percentage");
+  assert.equal(
+    summarizePayloadBytes([byteRow("zero", 0, 5)]).deltaPercent,
+    null,
+    "a zero legacy size has no percentage",
+  );
 
-  const bounded = boundedDeltaRows([byteRow("a", 100, 50), byteRow("b", 100, 60), byteRow("c", 100, 90), byteRow("d", 100, 0)], 1);
-  assert.deepEqual(bounded.shown.map((row) => row.caseId), ["d", "c"]);
+  const bounded = boundedDeltaRows(
+    [byteRow("a", 100, 50), byteRow("b", 100, 60), byteRow("c", 100, 90), byteRow("d", 100, 0)],
+    1,
+  );
+  assert.deepEqual(
+    bounded.shown.map((row) => row.caseId),
+    ["d", "c"],
+  );
   assert.equal(bounded.omitted, 2);
 });
 
 test("reports structural pairing mismatches instead of dropping them", () => {
-  const testCase = evalCase({ id: "paired", candidates: [candidate("a", "Travel to the mill"), candidate("b", "Travel to the harbor", "exact_srd_check.select")] });
+  const testCase = evalCase({
+    id: "paired",
+    candidates: [
+      candidate("a", "Travel to the mill"),
+      candidate("b", "Travel to the harbor", "exact_srd_check.select"),
+    ],
+  });
   const legacy = buildAdventureBenchmarkRequest(testCase, "legacy");
   const shared = buildAdventureBenchmarkRequest(testCase, "shared-context");
 
@@ -328,12 +427,25 @@ test("reports structural pairing mismatches instead of dropping them", () => {
   );
   const truncated = checkPayloadStructure(testCase, legacy, truncatedShared);
   assert.equal(truncated.ok, false);
-  assert.ok(truncated.mismatches.some((message) => message.includes("shared state advertises 1")), truncated.mismatches.join("; "));
-  assert.ok(truncated.mismatches.some((message) => message.includes("lost candidate")), truncated.mismatches.join("; "));
+  assert.ok(
+    truncated.mismatches.some((message) => message.includes("shared state advertises 1")),
+    truncated.mismatches.join("; "),
+  );
+  assert.ok(
+    truncated.mismatches.some((message) => message.includes("lost candidate")),
+    truncated.mismatches.join("; "),
+  );
 
-  const miscounted = checkPayloadStructure(testCase, { state: { declaration: "x", candidateCount: 1 }, questions: legacy.questions }, shared);
+  const miscounted = checkPayloadStructure(
+    testCase,
+    { state: { declaration: "x", candidateCount: 1 }, questions: legacy.questions },
+    shared,
+  );
   assert.equal(miscounted.ok, false);
-  assert.ok(miscounted.mismatches.some((message) => message.includes("legacy state advertises 1")), miscounted.mismatches.join("; "));
+  assert.ok(
+    miscounted.mismatches.some((message) => message.includes("legacy state advertises 1")),
+    miscounted.mismatches.join("; "),
+  );
 });
 
 test("reports a variant build failure as a structural failure with a null side", () => {
@@ -347,7 +459,10 @@ test("reports a variant build failure as a structural failure with a null side",
   assert.equal(row.sharedBytes, null);
   assert.equal(row.deltaBytes, null);
   assert.equal(structural[0]?.ok, false);
-  assert.ok(structural[0]?.mismatches.some((message) => message.includes("shared-context build failed")), structural[0]?.mismatches.join("; "));
+  assert.ok(
+    structural[0]?.mismatches.some((message) => message.includes("shared-context build failed")),
+    structural[0]?.mismatches.join("; "),
+  );
 
   const summary = summarizePayloadBytes(rows);
   assert.equal(summary.cases, 0);
@@ -394,7 +509,11 @@ test("computes within-case and cross-variant agreement", () => {
   assert.ok(Math.abs(summary.meanCrossVariantAgreement - (1 + 0 + 0.5) / 3) < 1e-9);
 
   const unpaired = summarizeVariantAgreement([{ caseId: "only-legacy", variant: "legacy", decision: "defer" }]);
-  assert.equal(unpaired.cases[0]?.crossVariantAgreement, null, "a case without both variants has no cross-variant figure");
+  assert.equal(
+    unpaired.cases[0]?.crossVariantAgreement,
+    null,
+    "a case without both variants has no cross-variant figure",
+  );
   assert.equal(unpaired.meanCrossVariantAgreement, 0);
   assert.equal(unpaired.crossVariantConflictCases, 0);
 });
@@ -429,7 +548,16 @@ test("reports provider measurements only when provided", () => {
       totalLatencyMs: summary.totalLatencyMs,
       meanLatencyMs: summary.meanLatencyMs,
     },
-    { attempts: 3, usageReported: 2, inputTokens: 12, outputTokens: 8, totalTokens: 20, costUsd: 0.5, totalLatencyMs: 30, meanLatencyMs: 15 },
+    {
+      attempts: 3,
+      usageReported: 2,
+      inputTokens: 12,
+      outputTokens: 8,
+      totalTokens: 20,
+      costUsd: 0.5,
+      totalLatencyMs: 30,
+      meanLatencyMs: 15,
+    },
   );
 
   const nothing = summarizeAttemptUsage([attemptRecord()]);
@@ -453,7 +581,14 @@ test("refuses a live run whose projection exceeds the budget before any call", a
     throw new Error("must not be called");
   };
   await assert.rejects(
-    () => runLiveComparison({ cases: [evalCase()], repeats: 3, maxCalls: 5, settings: defaultSystemOneSettings(), complete }),
+    () =>
+      runLiveComparison({
+        cases: [evalCase()],
+        repeats: 3,
+        maxCalls: 5,
+        settings: defaultSystemOneSettings(),
+        complete,
+      }),
     /budget/,
   );
   assert.equal(calls, 0);
@@ -463,12 +598,25 @@ test("assembles paired live metrics and renders them without network access", as
   const cases = [
     evalCase({
       id: "two",
-      candidates: [candidate("a", "Travel to the mill"), candidate("b", "Travel to the harbor", "exact_srd_check.select")],
+      candidates: [
+        candidate("a", "Travel to the mill"),
+        candidate("b", "Travel to the harbor", "exact_srd_check.select"),
+      ],
       expected: { preferred: "a", acceptable: ["a", "b"] },
     }),
-    evalCase({ id: "one", candidates: [candidate("s", "Travel to the mill")], expected: { preferred: "s", acceptable: ["s"] } }),
+    evalCase({
+      id: "one",
+      candidates: [candidate("s", "Travel to the mill")],
+      expected: { preferred: "s", acceptable: ["s"] },
+    }),
   ];
-  const live = await runLiveComparison({ cases, repeats: 2, maxCalls: 100, settings: defaultSystemOneSettings(), complete: fakeCompletion });
+  const live = await runLiveComparison({
+    cases,
+    repeats: 2,
+    maxCalls: 100,
+    settings: defaultSystemOneSettings(),
+    complete: fakeCompletion,
+  });
 
   assert.equal(live.projectedCalls, 8);
   assert.equal(live.attempts.length, 8);
@@ -480,8 +628,14 @@ test("assembles paired live metrics and renders them without network access", as
     const testCase = cases.find((entry) => entry.id === attempt.caseId)!;
     assert.equal(attempt.model, "fake-model");
     assert.equal(attempt.decision, attempt.readout.candidateId ?? "defer");
-    assert.equal(attempt.payloadBytes, serializedRequestBytes(buildAdventureBenchmarkRequest(testCase, attempt.variant)));
-    assert.equal(attempt.requestDigest, adventureRequestDigest(buildAdventureBenchmarkRequest(testCase, attempt.variant)));
+    assert.equal(
+      attempt.payloadBytes,
+      serializedRequestBytes(buildAdventureBenchmarkRequest(testCase, attempt.variant)),
+    );
+    assert.equal(
+      attempt.requestDigest,
+      adventureRequestDigest(buildAdventureBenchmarkRequest(testCase, attempt.variant)),
+    );
     assert.equal(attempt.corpusDigest, adventureCorpusDigest(cases));
     assert.equal(attempt.bindingVersions.questionVersion, adventurePayloadVersions(attempt.variant).questionVersion);
     assert.ok(attempt.readout.evidence, "every attempt carries its frozen evidence");
@@ -545,7 +699,11 @@ test("offline comparison never sends a network call and reports structural statu
   try {
     const cases = [
       evalCase({ id: "one", candidates: [candidate("a", "Travel to the mill")] }),
-      evalCase({ id: "two", candidates: [candidate("b", "Travel to the harbor")], expected: { preferred: "b", acceptable: ["b"] } }),
+      evalCase({
+        id: "two",
+        candidates: [candidate("b", "Travel to the harbor")],
+        expected: { preferred: "b", acceptable: ["b"] },
+      }),
     ];
     const result = compareAdventurePayloadsOffline({
       cases,
@@ -563,7 +721,10 @@ test("offline comparison never sends a network call and reports structural statu
     assert.ok(result.markdown.includes("provider-free (offline; no network calls)"));
     assert.ok(result.markdown.includes("## Structural pairing"));
     assert.ok(result.markdown.includes("## Payload bytes"));
-    assert.ok(result.markdown.includes("## Grading metrics per action family"), "offline renders the family section too");
+    assert.ok(
+      result.markdown.includes("## Grading metrics per action family"),
+      "offline renders the family section too",
+    );
     assert.equal(result.json.familyGrading.variants.legacy.families.length, ACTION_FAMILY_ORDER.length);
     assert.equal(result.json.familyGrading.variants["shared-context"].families.length, ACTION_FAMILY_ORDER.length);
   } finally {
@@ -608,7 +769,11 @@ test("resolves every canonical family plus defer and unknown", () => {
       candidates: [candidate("pick", "Pick", kind)],
       expected: { preferred: "pick", acceptable: ["pick"] },
     });
-    assert.deepEqual(resolveAdventureFamily(testCase, { candidateId: "pick" }), { family, kind }, `${family} resolves its exact candidate kind`);
+    assert.deepEqual(
+      resolveAdventureFamily(testCase, { candidateId: "pick" }),
+      { family, kind },
+      `${family} resolves its exact candidate kind`,
+    );
   }
 
   // Family ids and production proposal tool names resolve too; unknown strings stay unmapped.
@@ -630,10 +795,14 @@ test("resolves every canonical family plus defer and unknown", () => {
     candidates: [candidate("t", "Travel to the mill"), candidate("c", "Climb the wall", "exact_srd_check.select")],
     expected: { preferred: "t", acceptable: ["t"] },
   });
-  assert.deepEqual(resolveAdventureFamily(mixed, { candidateId: "c" }), {
-    family: "travel",
-    kind: "exact_actor_travel.select",
-  }, "the case label owns the family even when the call pick disagrees");
+  assert.deepEqual(
+    resolveAdventureFamily(mixed, { candidateId: "c" }),
+    {
+      family: "travel",
+      kind: "exact_actor_travel.select",
+    },
+    "the case label owns the family even when the call pick disagrees",
+  );
 
   const deferExpected = evalCase({
     id: "defer-expected",
@@ -641,10 +810,14 @@ test("resolves every canonical family plus defer and unknown", () => {
     expected: { preferred: null, acceptable: [null] },
   });
   assert.deepEqual(resolveAdventureFamily(deferExpected, { candidateId: null }), { family: "defer", kind: null });
-  assert.deepEqual(resolveAdventureFamily(deferExpected, { candidateId: "c" }), {
-    family: "srd-check",
-    kind: "exact_srd_check.select",
-  }, "an expected deferral falls back to the pick the call named");
+  assert.deepEqual(
+    resolveAdventureFamily(deferExpected, { candidateId: "c" }),
+    {
+      family: "srd-check",
+      kind: "exact_srd_check.select",
+    },
+    "an expected deferral falls back to the pick the call named",
+  );
 
   // Unmapped kinds are reported, never dropped, whether they come from a call or a case label.
   const unmappedPick = evalCase({
@@ -652,16 +825,23 @@ test("resolves every canonical family plus defer and unknown", () => {
     candidates: [candidate("u", "Mystery", "exact_mystery.select")],
     expected: { preferred: null, acceptable: [null] },
   });
-  assert.deepEqual(resolveAdventureFamily(unmappedPick, { candidateId: "u" }), { family: "unknown", kind: "exact_mystery.select" });
+  assert.deepEqual(resolveAdventureFamily(unmappedPick, { candidateId: "u" }), {
+    family: "unknown",
+    kind: "exact_mystery.select",
+  });
   const unmappedLabel = evalCase({
     id: "unmapped-label",
     candidates: [candidate("u", "Mystery", "exact_mystery.select"), candidate("t", "Travel to the mill")],
     expected: { preferred: "u", acceptable: ["u"] },
   });
-  assert.deepEqual(resolveAdventureFamily(unmappedLabel, { candidateId: "t" }), {
-    family: "unknown",
-    kind: "exact_mystery.select",
-  }, "an unmapped label kind stays unknown even when the call picked a mapped kind");
+  assert.deepEqual(
+    resolveAdventureFamily(unmappedLabel, { candidateId: "t" }),
+    {
+      family: "unknown",
+      kind: "exact_mystery.select",
+    },
+    "an unmapped label kind stays unknown even when the call picked a mapped kind",
+  );
   assert.deepEqual(resolveAdventureFamily(unmappedPick, { candidateId: null }), { family: "defer", kind: null });
 });
 
@@ -700,88 +880,129 @@ test("rolls up per-family grading math over synthetic readouts", () => {
 
   const report = summarizeFamilyGrading(attempts, [travelCase, checkCase, deferCase, unmappedCase]);
   for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
-    assert.deepEqual(report.variants[variant].families.map((row) => row.family), ACTION_FAMILY_ORDER);
+    assert.deepEqual(
+      report.variants[variant].families.map((row) => row.family),
+      ACTION_FAMILY_ORDER,
+    );
     assert.equal(report.variants[variant].families.length, ACTION_FAMILY_ORDER.length);
   }
 
-  assert.deepEqual(report.variants.legacy.families.find((row) => row.family === "travel"), {
-    family: "travel",
-    calls: 2,
-    cases: 1,
-    acted: 1,
-    coverage: 0.5,
-    actedCorrect: 1,
-    actedAccuracy: 1,
-    exact: 1,
-    correct: 1,
-    accuracy: 0.5,
-  });
-  assert.deepEqual(report.variants.legacy.families.find((row) => row.family === "srd-check"), {
-    family: "srd-check",
-    calls: 1,
-    cases: 1,
-    acted: 1,
-    coverage: 1,
-    actedCorrect: 1,
-    actedAccuracy: 1,
-    exact: 1,
-    correct: 1,
-    accuracy: 1,
-  });
-  assert.deepEqual(report.variants.legacy.families.find((row) => row.family === "defer"), {
-    family: "defer",
-    calls: 1,
-    cases: 1,
-    acted: 0,
-    coverage: 0,
-    actedCorrect: 0,
-    actedAccuracy: 0,
-    exact: 1,
-    correct: 1,
-    accuracy: 1,
-  });
-  assert.deepEqual(report.variants.legacy.families.find((row) => row.family === "unknown"), {
-    family: "unknown",
-    calls: 1,
-    cases: 1,
-    acted: 1,
-    coverage: 1,
-    actedCorrect: 1,
-    actedAccuracy: 1,
-    exact: 1,
-    correct: 1,
-    accuracy: 1,
-  });
-  assert.equal(report.variants.legacy.families.find((row) => row.family === "rest")?.calls, 0, "shared-only calls stay out of the legacy row");
+  assert.deepEqual(
+    report.variants.legacy.families.find((row) => row.family === "travel"),
+    {
+      family: "travel",
+      calls: 2,
+      cases: 1,
+      acted: 1,
+      coverage: 0.5,
+      actedCorrect: 1,
+      actedAccuracy: 1,
+      exact: 1,
+      correct: 1,
+      accuracy: 0.5,
+    },
+  );
+  assert.deepEqual(
+    report.variants.legacy.families.find((row) => row.family === "srd-check"),
+    {
+      family: "srd-check",
+      calls: 1,
+      cases: 1,
+      acted: 1,
+      coverage: 1,
+      actedCorrect: 1,
+      actedAccuracy: 1,
+      exact: 1,
+      correct: 1,
+      accuracy: 1,
+    },
+  );
+  assert.deepEqual(
+    report.variants.legacy.families.find((row) => row.family === "defer"),
+    {
+      family: "defer",
+      calls: 1,
+      cases: 1,
+      acted: 0,
+      coverage: 0,
+      actedCorrect: 0,
+      actedAccuracy: 0,
+      exact: 1,
+      correct: 1,
+      accuracy: 1,
+    },
+  );
+  assert.deepEqual(
+    report.variants.legacy.families.find((row) => row.family === "unknown"),
+    {
+      family: "unknown",
+      calls: 1,
+      cases: 1,
+      acted: 1,
+      coverage: 1,
+      actedCorrect: 1,
+      actedAccuracy: 1,
+      exact: 1,
+      correct: 1,
+      accuracy: 1,
+    },
+  );
+  assert.equal(
+    report.variants.legacy.families.find((row) => row.family === "rest")?.calls,
+    0,
+    "shared-only calls stay out of the legacy row",
+  );
 
-  assert.deepEqual(report.variants["shared-context"].families.find((row) => row.family === "travel"), {
-    family: "travel",
-    calls: 1,
-    cases: 1,
-    acted: 1,
-    coverage: 1,
-    actedCorrect: 0,
-    actedAccuracy: 0,
-    exact: 0,
-    correct: 0,
-    accuracy: 0,
-  });
-  assert.deepEqual(report.variants["shared-context"].families.find((row) => row.family === "rest"), {
-    family: "rest",
-    calls: 1,
-    cases: 1,
-    acted: 0,
-    coverage: 0,
-    actedCorrect: 0,
-    actedAccuracy: 0,
-    exact: 0,
-    correct: 0,
-    accuracy: 0,
-  });
-  assert.equal(report.variants["shared-context"].families.find((row) => row.family === "defer")?.calls, 0, "the shared deferral recovered a rest pick");
-  for (const family of ["inventory", "commerce", "power", "combat-consumable", "combat-power", "quest-lifecycle", "quest-objective", "progression"] as const) {
+  assert.deepEqual(
+    report.variants["shared-context"].families.find((row) => row.family === "travel"),
+    {
+      family: "travel",
+      calls: 1,
+      cases: 1,
+      acted: 1,
+      coverage: 1,
+      actedCorrect: 0,
+      actedAccuracy: 0,
+      exact: 0,
+      correct: 0,
+      accuracy: 0,
+    },
+  );
+  assert.deepEqual(
+    report.variants["shared-context"].families.find((row) => row.family === "rest"),
+    {
+      family: "rest",
+      calls: 1,
+      cases: 1,
+      acted: 0,
+      coverage: 0,
+      actedCorrect: 0,
+      actedAccuracy: 0,
+      exact: 0,
+      correct: 0,
+      accuracy: 0,
+    },
+  );
+  assert.equal(
+    report.variants["shared-context"].families.find((row) => row.family === "defer")?.calls,
+    0,
+    "the shared deferral recovered a rest pick",
+  );
+  for (const family of [
+    "inventory",
+    "commerce",
+    "power",
+    "combat-consumable",
+    "combat-power",
+    "quest-lifecycle",
+    "quest-objective",
+    "progression",
+  ] as const) {
     const row = report.variants.legacy.families.find((entry) => entry.family === family)!;
-    assert.deepEqual({ calls: row.calls, cases: row.cases, coverage: row.coverage, accuracy: row.accuracy }, { calls: 0, cases: 0, coverage: 0, accuracy: 0 });
+    assert.deepEqual(
+      { calls: row.calls, cases: row.cases, coverage: row.coverage, accuracy: row.accuracy },
+      { calls: 0, cases: 0, coverage: 0, accuracy: 0 },
+    );
   }
 
   assert.deepEqual(report.unmappedKinds, [{ kind: "exact_mystery.select", calls: 2, expectedCases: 1 }]);
@@ -789,11 +1010,19 @@ test("rolls up per-family grading math over synthetic readouts", () => {
 
   const offline = summarizeFamilyGrading([], [travelCase, checkCase, deferCase, unmappedCase]);
   assert.ok(offline.variants.legacy.families.every((row) => row.calls === 0 && row.cases === 0));
-  assert.deepEqual(offline.unmappedKinds, [{ kind: "exact_mystery.select", calls: 0, expectedCases: 1 }], "a labeled unmapped kind is reported even without calls");
+  assert.deepEqual(
+    offline.unmappedKinds,
+    [{ kind: "exact_mystery.select", calls: 0, expectedCases: 1 }],
+    "a labeled unmapped kind is reported even without calls",
+  );
 
   const orphaned = summarizeFamilyGrading([gradedCall("legacy", "missing-case", "t1")], [travelCase]);
   assert.deepEqual(orphaned.unresolvedCaseIds, ["missing-case"]);
-  assert.equal(orphaned.variants.legacy.families.find((row) => row.family === "unknown")?.calls, 1, "a call without its case row is attributed to unknown, not dropped");
+  assert.equal(
+    orphaned.variants.legacy.families.find((row) => row.family === "unknown")?.calls,
+    1,
+    "a call without its case row is attributed to unknown, not dropped",
+  );
 });
 
 test("rolls up per-family agreement and conflicts", () => {
@@ -812,17 +1041,23 @@ test("rolls up per-family agreement and conflicts", () => {
     candidates: [candidate("p", "Cast Mending Light", "exact_power_use.select")],
     expected: { preferred: null, acceptable: [null] },
   });
-  const agreement = summarizeFamilyAgreement([
-    gradedCall("legacy", "agree-travel", "a"),
-    gradedCall("legacy", "agree-travel", "a"),
-    gradedCall("shared-context", "agree-travel", "b"),
-    gradedCall("legacy", "agree-check", "c"),
-    gradedCall("shared-context", "agree-check", "c"),
-    gradedCall("legacy", "agree-split", null),
-    gradedCall("shared-context", "agree-split", "p"),
-  ], [travelCase, checkCase, splitCase]);
+  const agreement = summarizeFamilyAgreement(
+    [
+      gradedCall("legacy", "agree-travel", "a"),
+      gradedCall("legacy", "agree-travel", "a"),
+      gradedCall("shared-context", "agree-travel", "b"),
+      gradedCall("legacy", "agree-check", "c"),
+      gradedCall("shared-context", "agree-check", "c"),
+      gradedCall("legacy", "agree-split", null),
+      gradedCall("shared-context", "agree-split", "p"),
+    ],
+    [travelCase, checkCase, splitCase],
+  );
 
-  assert.deepEqual(agreement.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+  assert.deepEqual(
+    agreement.families.map((row) => row.family),
+    ACTION_FAMILY_ORDER,
+  );
   const travel = agreement.families.find((row) => row.family === "travel")!;
   assert.equal(travel.calls, 3);
   assert.equal(travel.cases, 1);
@@ -861,7 +1096,11 @@ test("rolls up per-family agreement and conflicts", () => {
     crossVariantConflictCases: 0,
     meanCrossVariantAgreement: 0,
   });
-  assert.equal(agreement.families.find((row) => row.family === "power")?.sharedCalls, 1, "the recovered pick lands in its own family");
+  assert.equal(
+    agreement.families.find((row) => row.family === "power")?.sharedCalls,
+    1,
+    "the recovered pick lands in its own family",
+  );
   assert.deepEqual(agreement.splitCases, ["agree-split"]);
 });
 
@@ -869,12 +1108,25 @@ test("renders the per-family section deterministically with a stable JSON shape"
   const cases = [
     evalCase({
       id: "two",
-      candidates: [candidate("a", "Travel to the mill"), candidate("b", "Travel to the harbor", "exact_srd_check.select")],
+      candidates: [
+        candidate("a", "Travel to the mill"),
+        candidate("b", "Travel to the harbor", "exact_srd_check.select"),
+      ],
       expected: { preferred: "a", acceptable: ["a", "b"] },
     }),
-    evalCase({ id: "one", candidates: [candidate("s", "Travel to the mill")], expected: { preferred: "s", acceptable: ["s"] } }),
+    evalCase({
+      id: "one",
+      candidates: [candidate("s", "Travel to the mill")],
+      expected: { preferred: "s", acceptable: ["s"] },
+    }),
   ];
-  const live = await runLiveComparison({ cases, repeats: 1, maxCalls: 100, settings: defaultSystemOneSettings(), complete: fakeCompletion });
+  const live = await runLiveComparison({
+    cases,
+    repeats: 1,
+    maxCalls: 100,
+    settings: defaultSystemOneSettings(),
+    complete: fakeCompletion,
+  });
   const view = buildComparisonView({
     mode: "live",
     generatedAt: "2026-09-22T00:00:00.000Z",
@@ -902,7 +1154,10 @@ test("renders the per-family section deterministically with a stable JSON shape"
   for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
     const grading = json.familyGrading.variants[variant];
     assert.equal(grading.variant, variant);
-    assert.deepEqual(grading.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+    assert.deepEqual(
+      grading.families.map((row) => row.family),
+      ACTION_FAMILY_ORDER,
+    );
     assert.equal(grading.families.length, 13);
     const travel = grading.families.find((row) => row.family === "travel")!;
     assert.deepEqual(travel, {
@@ -918,7 +1173,10 @@ test("renders the per-family section deterministically with a stable JSON shape"
       accuracy: 1,
     });
   }
-  assert.deepEqual(json.familyGrading.agreement.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+  assert.deepEqual(
+    json.familyGrading.agreement.families.map((row) => row.family),
+    ACTION_FAMILY_ORDER,
+  );
   assert.ok(json.familyGrading.source.includes("MECHANIC_FAMILIES"));
   assert.deepEqual(json.familyGrading.unmappedKinds, []);
   assert.deepEqual(json.familyGrading.unresolvedCaseIds, []);
@@ -927,7 +1185,11 @@ test("renders the per-family section deterministically with a stable JSON shape"
 test("renders zeroed family grading offline and reports labeled unmapped kinds", () => {
   const cases = [
     evalCase({ id: "one", candidates: [candidate("a", "Travel to the mill")] }),
-    evalCase({ id: "weird", candidates: [candidate("u", "Mystery", "exact_mystery.select")], expected: { preferred: "u", acceptable: ["u"] } }),
+    evalCase({
+      id: "weird",
+      candidates: [candidate("u", "Mystery", "exact_mystery.select")],
+      expected: { preferred: "u", acceptable: ["u"] },
+    }),
   ];
   const result = compareAdventurePayloadsOffline({
     cases,
@@ -946,11 +1208,22 @@ test("renders zeroed family grading offline and reports labeled unmapped kinds",
 
   for (const variant of ADVENTURE_PAYLOAD_VARIANTS) {
     const grading = result.json.familyGrading.variants[variant];
-    assert.deepEqual(grading.families.map((row) => row.family), ACTION_FAMILY_ORDER);
-    assert.ok(grading.families.every((row) => row.calls === 0 && row.cases === 0), "offline grades no calls");
+    assert.deepEqual(
+      grading.families.map((row) => row.family),
+      ACTION_FAMILY_ORDER,
+    );
+    assert.ok(
+      grading.families.every((row) => row.calls === 0 && row.cases === 0),
+      "offline grades no calls",
+    );
     assert.ok(grading.families.every((row) => row.coverage === 0 && row.accuracy === 0));
   }
-  assert.deepEqual(result.json.familyGrading.unmappedKinds, [{ kind: "exact_mystery.select", calls: 0, expectedCases: 1 }]);
-  assert.deepEqual(result.json.familyGrading.agreement.families.map((row) => row.family), ACTION_FAMILY_ORDER);
+  assert.deepEqual(result.json.familyGrading.unmappedKinds, [
+    { kind: "exact_mystery.select", calls: 0, expectedCases: 1 },
+  ]);
+  assert.deepEqual(
+    result.json.familyGrading.agreement.families.map((row) => row.family),
+    ACTION_FAMILY_ORDER,
+  );
   assert.ok(result.json.familyGrading.agreement.families.every((row) => row.calls === 0 && row.cases === 0));
 });

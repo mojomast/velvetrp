@@ -49,7 +49,11 @@ describe("planDnd5eEncounter", () => {
       Object.freeze({ id: "ogre", challengeRating: 3 }),
       Object.freeze({ id: "goblin", challengeRating: 1 }),
     ]);
-    const input: Dnd5eEncounterInput = Object.freeze({ partyLevels: Object.freeze([3, 3, 3, 3]), targetDifficulty: "hard", candidates });
+    const input: Dnd5eEncounterInput = Object.freeze({
+      partyLevels: Object.freeze([3, 3, 3, 3]),
+      targetDifficulty: "hard",
+      candidates,
+    });
     const before = JSON.stringify(input);
     planDnd5eEncounter(input);
     expect(JSON.stringify(input)).toBe(before);

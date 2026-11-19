@@ -72,10 +72,12 @@ export function createOriginalStarterCharacterCreationService(
       const rawOptions = repository.getCampaignCharacterCreationOptions(LOCAL_OWNER, id);
       if (rawOptions === null) throw new OriginalStarterCharacterCreationUnavailableError();
       const options = campaignCharacterCreationOptionsResponseSchema.parse(rawOptions);
-      if (options.campaignId !== id
-        || options.starter.rulesProfile.rulesProfileId !== ORIGINAL_STARTER_RULES_PROFILE.rulesProfileId
-        || options.starter.pack.packId !== ORIGINAL_STARTER_PACK.packId
-        || options.starter.pack.packVersion !== ORIGINAL_STARTER_PACK.packVersion) {
+      if (
+        options.campaignId !== id ||
+        options.starter.rulesProfile.rulesProfileId !== ORIGINAL_STARTER_RULES_PROFILE.rulesProfileId ||
+        options.starter.pack.packId !== ORIGINAL_STARTER_PACK.packId ||
+        options.starter.pack.packVersion !== ORIGINAL_STARTER_PACK.packVersion
+      ) {
         throw new Error("original starter character creation preflight is malformed");
       }
       const personas = options.personas.filter((persona) => persona.characterId === reduced.characterId);
@@ -114,16 +116,25 @@ export function createOriginalStarterCharacterCreationService(
 
       const projection = privilegedCampaignCharacterProjectionSchema.parse(rawProjection);
       const { campaignCharacter, sheet, actor } = projection;
-      if (campaignCharacter.campaignId !== id || campaignCharacter.characterId !== reduced.characterId
-        || sheet.campaignId !== id || actor.campaignId !== id
-        || actor.controllerPrincipalId !== LOCAL_OWNER || actor.privateNotes !== null
-        || JSON.stringify(sheet.race) !== JSON.stringify(input.race)
-        || JSON.stringify(sheet.background) !== JSON.stringify(input.background)
-        || JSON.stringify(sheet.classes) !== JSON.stringify(input.classes)
-        || sheet.attributes.length !== 0 || sheet.proficiencies.length !== 0 || sheet.choices.length !== 0
-        || campaignCharacter.createdAt !== campaignCharacter.updatedAt
-        || sheet.createdAt !== campaignCharacter.createdAt || sheet.updatedAt !== campaignCharacter.createdAt
-        || actor.createdAt !== campaignCharacter.createdAt || actor.updatedAt !== campaignCharacter.createdAt) {
+      if (
+        campaignCharacter.campaignId !== id ||
+        campaignCharacter.characterId !== reduced.characterId ||
+        sheet.campaignId !== id ||
+        actor.campaignId !== id ||
+        actor.controllerPrincipalId !== LOCAL_OWNER ||
+        actor.privateNotes !== null ||
+        JSON.stringify(sheet.race) !== JSON.stringify(input.race) ||
+        JSON.stringify(sheet.background) !== JSON.stringify(input.background) ||
+        JSON.stringify(sheet.classes) !== JSON.stringify(input.classes) ||
+        sheet.attributes.length !== 0 ||
+        sheet.proficiencies.length !== 0 ||
+        sheet.choices.length !== 0 ||
+        campaignCharacter.createdAt !== campaignCharacter.updatedAt ||
+        sheet.createdAt !== campaignCharacter.createdAt ||
+        sheet.updatedAt !== campaignCharacter.createdAt ||
+        actor.createdAt !== campaignCharacter.createdAt ||
+        actor.updatedAt !== campaignCharacter.createdAt
+      ) {
         throw new Error("original starter character creation output is malformed");
       }
       return campaignCharacterCreateResponseSchema.parse({

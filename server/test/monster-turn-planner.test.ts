@@ -5,16 +5,24 @@ import { isMonsterKnockdown, monsterBehavior } from "../src/repo/encounter/monst
 describe("monster turn policies", () => {
   it("keeps supported traits deterministic and bounded by the combat model", () => {
     expect(monsterBehavior("srd-5.1:enemy-template:wolf")).toEqual({
-      targetPriority: "lowest-hit-points", packTactics: true, knockdown: true, nimbleEscape: false,
+      targetPriority: "lowest-hit-points",
+      packTactics: true,
+      knockdown: true,
+      nimbleEscape: false,
     });
     expect(monsterBehavior("srd-5.1:enemy-template:goblin")).toMatchObject({
-      targetPriority: "lowest-hit-points", nimbleEscape: true,
+      targetPriority: "lowest-hit-points",
+      nimbleEscape: true,
     });
     expect(monsterBehavior("srd-5.1:enemy-template:bandit")).toMatchObject({
-      targetPriority: "lowest-hit-points", packTactics: false,
+      targetPriority: "lowest-hit-points",
+      packTactics: false,
     });
     expect(monsterBehavior("velvet:test-fixture:enemy-template:training-dummy")).toEqual({
-      targetPriority: "first-legal", packTactics: false, knockdown: false, nimbleEscape: false,
+      targetPriority: "first-legal",
+      packTactics: false,
+      knockdown: false,
+      nimbleEscape: false,
     });
   });
 
@@ -24,13 +32,19 @@ describe("monster turn policies", () => {
   });
 
   it("pins alternate monster profiles without changing the Training Dummy", () => {
-    const enemy = (name: string) => SRD_5_1_STARTER_CATALOG.definitions.find((entry) => entry.reference.kind === "enemy-template" && entry.name === name)! as any;
+    const enemy = (name: string) =>
+      SRD_5_1_STARTER_CATALOG.definitions.find(
+        (entry) => entry.reference.kind === "enemy-template" && entry.name === name,
+      )! as any;
     expect(enemy("Training Dummy").mechanics.abilityRefs).toHaveLength(1);
     expect(enemy("Goblin").mechanics.abilityRefs.map((ref: any) => ref.definitionId)).toEqual([
-      "srd-5.1:ability:goblin-scimitar", "srd-5.1:ability:goblin-nimble-escape",
+      "srd-5.1:ability:goblin-scimitar",
+      "srd-5.1:ability:goblin-nimble-escape",
     ]);
     expect(enemy("Wolf").mechanics.abilityRefs.map((ref: any) => ref.definitionId)).toEqual([
-      "srd-5.1:ability:wolf-bite", "srd-5.1:ability:wolf-pack-tactics", "srd-5.1:ability:wolf-knockdown",
+      "srd-5.1:ability:wolf-bite",
+      "srd-5.1:ability:wolf-pack-tactics",
+      "srd-5.1:ability:wolf-knockdown",
     ]);
   });
 

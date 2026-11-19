@@ -6,19 +6,63 @@ import { buildReplayTimeline, CampaignReplay, type ReplayTraceApi } from "./Camp
 const early = "2030-01-01T00:00:00.000Z";
 const late = "2030-01-01T00:05:00.000Z";
 const transcript: AdventureTurnTranscriptEntry[] = [
-  { turnId: "turn", actorId: "actor", declaration: "I draw my blade.", narration: "The blade hums.", completedAt: early },
+  {
+    turnId: "turn",
+    actorId: "actor",
+    declaration: "I draw my blade.",
+    narration: "The blade hums.",
+    completedAt: early,
+  },
 ];
-const dmHistory = { control: { campaignId: "campaign", mode: "ai", revision: 1 }, runs: [
-  { runId: "run", campaignId: "campaign", sessionId: "session", intent: "open", mode: "ai", modeRevision: 1, revision: 2, state: "completed",
-    narration: "The ember crown awakens.", receipts: [{ action: "reveal-node", summary: "A sealed scene is revealed." }], blockers: [], createdAt: late },
-] } as CampaignDmHistory;
-const checkReceipt = { kind: "check", checkKind: "skill", skill: "Investigation", ability: "intelligence",
-  rolls: [{ value: 1, kept: true }], mode: "normal", abilityModifier: 1, proficiencyBonus: 2, total: 4,
-  difficulty: "medium", dc: 15, outcome: "failure", revisionBefore: 3, revisionAfter: 4, occurredAt: late };
+const dmHistory = {
+  control: { campaignId: "campaign", mode: "ai", revision: 1 },
+  runs: [
+    {
+      runId: "run",
+      campaignId: "campaign",
+      sessionId: "session",
+      intent: "open",
+      mode: "ai",
+      modeRevision: 1,
+      revision: 2,
+      state: "completed",
+      narration: "The ember crown awakens.",
+      receipts: [{ action: "reveal-node", summary: "A sealed scene is revealed." }],
+      blockers: [],
+      createdAt: late,
+    },
+  ],
+} as CampaignDmHistory;
+const checkReceipt = {
+  kind: "check",
+  checkKind: "skill",
+  skill: "Investigation",
+  ability: "intelligence",
+  rolls: [{ value: 1, kept: true }],
+  mode: "normal",
+  abilityModifier: 1,
+  proficiencyBonus: 2,
+  total: 4,
+  difficulty: "medium",
+  dc: 15,
+  outcome: "failure",
+  revisionBefore: 3,
+  revisionAfter: 4,
+  occurredAt: late,
+};
 
 function renderReplay(trace?: ReplayTraceApi) {
-  return render(<CampaignReplay campaignId="campaign" sessionId="session" dmHistory={dmHistory} transcript={transcript}
-    actorNames={new Map([["actor", "Aria"]])} trace={trace} onExit={() => undefined} />);
+  return render(
+    <CampaignReplay
+      campaignId="campaign"
+      sessionId="session"
+      dmHistory={dmHistory}
+      transcript={transcript}
+      actorNames={new Map([["actor", "Aria"]])}
+      trace={trace}
+      onExit={() => undefined}
+    />,
+  );
 }
 
 describe("CampaignReplay", () => {
@@ -56,17 +100,31 @@ describe("CampaignReplay", () => {
 
   it("attaches the authoritative committed mechanics to a replayed player turn", async () => {
     const trace = {
-      getAdventureTurn: vi.fn().mockResolvedValue({ receipts: [{ commandId: "cmd", proposalId: null, linkedAt: late }] }),
+      getAdventureTurn: vi
+        .fn()
+        .mockResolvedValue({ receipts: [{ commandId: "cmd", proposalId: null, linkedAt: late }] }),
       getCampaignCommandReceipt: vi.fn().mockResolvedValue({ receipt: checkReceipt }),
     } as unknown as ReplayTraceApi;
     renderReplay(trace);
     expect(await screen.findByText("Committed mechanics")).toBeTruthy();
     expect(screen.getByText(/DC 15/)).toBeTruthy();
-    expect(trace.getAdventureTurn).toHaveBeenCalledWith("turn", expect.objectContaining({ campaignId: "campaign", sessionId: "session", actorId: "actor" }));
+    expect(trace.getAdventureTurn).toHaveBeenCalledWith(
+      "turn",
+      expect.objectContaining({ campaignId: "campaign", sessionId: "session", actorId: "actor" }),
+    );
   });
 
   it("reports an empty replayable history without fabricating a scene", () => {
-    render(<CampaignReplay campaignId="campaign" sessionId="session" dmHistory={null} transcript={[]} actorNames={new Map()} onExit={() => undefined} />);
+    render(
+      <CampaignReplay
+        campaignId="campaign"
+        sessionId="session"
+        dmHistory={null}
+        transcript={[]}
+        actorNames={new Map()}
+        onExit={() => undefined}
+      />,
+    );
     expect(screen.getByText(/No replayable history yet/)).toBeTruthy();
   });
 });

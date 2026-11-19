@@ -1,8 +1,19 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { beginNpcPresenceMutation, clearNpcPresenceMutation, markNpcPresenceAmbiguous, markNpcPresenceReconciliation, reconcileNpcPresenceMutation, releaseNpcPresenceMutation, resetNpcPresenceMutationRegistryForTests } from "./narrativeMutationRegistry";
+import {
+  beginNpcPresenceMutation,
+  clearNpcPresenceMutation,
+  markNpcPresenceAmbiguous,
+  markNpcPresenceReconciliation,
+  reconcileNpcPresenceMutation,
+  releaseNpcPresenceMutation,
+  resetNpcPresenceMutationRegistryForTests,
+} from "./narrativeMutationRegistry";
 
 describe("NPC presence mutation registry", () => {
-  afterEach(() => { resetNpcPresenceMutationRegistryForTests(); localStorage.clear(); });
+  afterEach(() => {
+    resetNpcPresenceMutationRegistryForTests();
+    localStorage.clear();
+  });
 
   it("locks campaign and opaque session independently without persistence", () => {
     expect(beginNpcPresenceMutation("campaign", "room/a", "npc-a")).not.toBeNull();
@@ -13,7 +24,8 @@ describe("NPC presence mutation registry", () => {
   });
 
   it("clears receipt-backed writes at or after the resulting revision", () => {
-    const lock = beginNpcPresenceMutation("campaign", "room", "npc")!; markNpcPresenceReconciliation(lock, 8);
+    const lock = beginNpcPresenceMutation("campaign", "room", "npc")!;
+    markNpcPresenceReconciliation(lock, 8);
     expect(reconcileNpcPresenceMutation("campaign", "room", 7)).toBe(false);
     expect(beginNpcPresenceMutation("campaign", "room", "other")).toBeNull();
     expect(reconcileNpcPresenceMutation("campaign", "room", 9)).toBe(true);
@@ -21,7 +33,8 @@ describe("NPC presence mutation registry", () => {
   });
 
   it("requires an explicit authoritative refresh to release an ambiguous write", () => {
-    const lock = beginNpcPresenceMutation("campaign", "room", "npc")!; markNpcPresenceAmbiguous(lock);
+    const lock = beginNpcPresenceMutation("campaign", "room", "npc")!;
+    markNpcPresenceAmbiguous(lock);
     expect(reconcileNpcPresenceMutation("campaign", "room", 5)).toBe(false);
     expect(reconcileNpcPresenceMutation("campaign", "room", 5, true)).toBe(true);
   });

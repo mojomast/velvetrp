@@ -119,39 +119,99 @@ export interface RepositoryUnitOfWork extends CompanionReadRepository {
     actorPrincipalId: string,
     input: import("../contentCatalogRepo.js").ContentCatalogPublicationPageInput,
   ): import("../contentCatalogRepo.js").ContentCatalogPublicationPage;
-  getContentCatalogForOwner(actorPrincipalId: string, packId: string, packVersion: string): import("@velvet/contracts").OwnerCatalogProjection | null;
-  getCampaignContentCatalog(actorPrincipalId: string, campaignId: string, packId: string, packVersion: string):
-    import("@velvet/contracts").GmCatalogProjection | import("@velvet/contracts").PlayerCatalogProjection | import("@velvet/contracts").ObserverCatalogProjection | null;
-  resolveCampaignCatalog(actorPrincipalId: string, campaignId: string): import("@velvet/contracts").CampaignCatalogResolutionReport | null;
-  getCampaignCatalogReceipt(actorPrincipalId: string, campaignId: string, commandId: string): import("@velvet/contracts").CampaignCatalogReceipt | null;
+  getContentCatalogForOwner(
+    actorPrincipalId: string,
+    packId: string,
+    packVersion: string,
+  ): import("@velvet/contracts").OwnerCatalogProjection | null;
+  getCampaignContentCatalog(
+    actorPrincipalId: string,
+    campaignId: string,
+    packId: string,
+    packVersion: string,
+  ):
+    | import("@velvet/contracts").GmCatalogProjection
+    | import("@velvet/contracts").PlayerCatalogProjection
+    | import("@velvet/contracts").ObserverCatalogProjection
+    | null;
+  resolveCampaignCatalog(
+    actorPrincipalId: string,
+    campaignId: string,
+  ): import("@velvet/contracts").CampaignCatalogResolutionReport | null;
+  getCampaignCatalogReceipt(
+    actorPrincipalId: string,
+    campaignId: string,
+    commandId: string,
+  ): import("@velvet/contracts").CampaignCatalogReceipt | null;
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   getCampaign(actorPrincipalId: string, campaignId: string): CampaignAccess | null;
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   listCampaignTimelines(actorPrincipalId: string, campaignId: string): CampaignTimeline[];
   getCampaignTimeline(actorPrincipalId: string, campaignId: string, timelineId: string): CampaignTimeline | null;
   listCampaignMemberships(actorPrincipalId: string, campaignId: string): CampaignMembershipRead[];
-  getCampaignMembership(actorPrincipalId: string, campaignId: string, principalId: string): CampaignMembershipRead | null;
+  getCampaignMembership(
+    actorPrincipalId: string,
+    campaignId: string,
+    principalId: string,
+  ): CampaignMembershipRead | null;
   listCampaignSessionAttachments(actorPrincipalId: string, campaignId: string): CampaignSessionAttachment[];
-  getCampaignSessionAttachment(actorPrincipalId: string, campaignId: string, sessionId: string): CampaignSessionAttachment | null;
-  getCampaignPlayBootstrap(actorPrincipalId: string, campaignId: string, sessionId: string): CampaignPlayBootstrap | null;
+  getCampaignSessionAttachment(
+    actorPrincipalId: string,
+    campaignId: string,
+    sessionId: string,
+  ): CampaignSessionAttachment | null;
+  getCampaignPlayBootstrap(
+    actorPrincipalId: string,
+    campaignId: string,
+    sessionId: string,
+  ): CampaignPlayBootstrap | null;
   /** Reads one role-derived, audience-filtered agent snapshot from the active repository snapshot. */
-  getCampaignAgentContextSnapshot(actorPrincipalId: string, campaignId: string, sessionId: string,
-    audience: CampaignAgentAudience): CampaignAgentContextSnapshot | null;
+  getCampaignAgentContextSnapshot(
+    actorPrincipalId: string,
+    campaignId: string,
+    sessionId: string,
+    audience: CampaignAgentAudience,
+  ): CampaignAgentContextSnapshot | null;
   getCampaignRoomLinkingSnapshot(actorPrincipalId: string, campaignId: string): CampaignRoomLinkingSnapshot | null;
   getCampaignContentConfiguration(actorPrincipalId: string, campaignId: string): CampaignContentConfiguration | null;
-  getCampaignCharacterCreationOptions(actorPrincipalId: string, campaignId: string): CampaignCharacterCreationOptionsResponse | null;
+  getCampaignCharacterCreationOptions(
+    actorPrincipalId: string,
+    campaignId: string,
+  ): CampaignCharacterCreationOptionsResponse | null;
   getCampaignCharacterRoster(actorPrincipalId: string, campaignId: string): CampaignCharacterRosterSnapshot | null;
-  getCampaignCharacterWorkspace(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterWorkspaceSnapshot | null;
-  getCampaignCharacterSheetSnapshot(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterSheetSnapshot | null;
+  getCampaignCharacterWorkspace(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterWorkspaceSnapshot | null;
+  getCampaignCharacterSheetSnapshot(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterSheetSnapshot | null;
   listActorResources(actorPrincipalId: string, campaignId: string, actorId: string): ActorResource[];
   getActorResource(actorPrincipalId: string, campaignId: string, actorId: string, name: string): ActorResource | null;
   listCampaignEvents(actorPrincipalId: string, campaignId: string, timelineId: string): RpgEvent[];
-  listPublicCampaignEvents(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
+  listPublicCampaignEvents(
+    actorPrincipalId: string,
+    campaignId: string,
+    timelineId: string,
+    afterRevision: number,
+    limit: number,
+  ): CampaignEventPage;
   listRecentCampaignDiceEvents(actorPrincipalId: string, campaignId: string, timelineId: string): CampaignDiceEvent[];
   getCommandReceipt(actorPrincipalId: string, campaignId: string, commandId: string): CommandReceipt | null;
   listCampaignCharacters(actorPrincipalId: string, campaignId: string): CampaignCharacterRead[];
-  getCampaignCharacter(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterRead | null;
-  getCampaignCharacterByActorId(actorPrincipalId: string, campaignId: string, actorId: string): CampaignCharacterRead | null;
+  getCampaignCharacter(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterRead | null;
+  getCampaignCharacterByActorId(
+    actorPrincipalId: string,
+    campaignId: string,
+    actorId: string,
+  ): CampaignCharacterRead | null;
   listRulesProfiles(actorPrincipalId: string): RulesProfile[];
   getRulesProfile(actorPrincipalId: string, identifier: RulesProfileIdentifier): RulesProfile | null;
   listContentPacks(actorPrincipalId: string): ContentPack[];
@@ -160,8 +220,16 @@ export interface RepositoryUnitOfWork extends CompanionReadRepository {
   getContentPackDefinition(actorPrincipalId: string, reference: DefinitionReference): RpgDefinition | null;
   getCampaignRulesProfile(actorPrincipalId: string, campaignId: string): RulesProfile | null;
   listCampaignContentPacks(actorPrincipalId: string, campaignId: string): ContentPack[];
-  listCampaignContentPackDefinitions(actorPrincipalId: string, campaignId: string, identifier: ContentPackIdentifier): RpgDefinition[];
-  getCampaignContentPackDefinition(actorPrincipalId: string, campaignId: string, reference: DefinitionReference): RpgDefinition | null;
+  listCampaignContentPackDefinitions(
+    actorPrincipalId: string,
+    campaignId: string,
+    identifier: ContentPackIdentifier,
+  ): RpgDefinition[];
+  getCampaignContentPackDefinition(
+    actorPrincipalId: string,
+    campaignId: string,
+    reference: DefinitionReference,
+  ): RpgDefinition | null;
   getSession(id: string): Session | null;
   transitionSession(id: string, state: SceneState, reason: string): Session | null;
   addConsentEvent(sessionId: string, scope: string, granted: boolean, note: string): ConsentEvent | null;
@@ -208,36 +276,108 @@ export interface OriginalStarterCampaignCharacterCreationResult {
   personaDisplayName: string;
 }
 
-type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
-  T & (T extends PromiseLike<unknown> ? never : unknown);
+type SynchronousCallback<T> = (
+  repository: RepositoryUnitOfWork,
+) => T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork, CampaignDmRepository, CampaignDmReadinessRepository, CampaignContextInspectionReadRepository, CampaignRoomActivationRepository, CampaignRoomParticipantRepository, CampaignStartingLocationRepository, CampaignStartupRepository, CampaignAdministrationRepository, CampaignAdministrationIntegrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, AdventureCheckRepository, AdventureInventoryRepository, AdventureCommerceRepository, AdventurePowerRestRepository, AdventureQuestProgressionRepository, PowerRepository, SpellcastingRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository, ExactCandidateRepository, ExactCandidateProviderBridgeRepository, CampaignGenerationRepository, TacticalMapRepository, FreeformTravelRepository, FreeformNpcRepository, FreeformLoreRepository, FreeformQuestRepository, FreeformRumorRepository, FreeformShopRepository, FreeformEncounterRepository, FreeformFactionRepository {
+export interface Repository
+  extends
+    RepositoryUnitOfWork,
+    CampaignDmRepository,
+    CampaignDmReadinessRepository,
+    CampaignContextInspectionReadRepository,
+    CampaignRoomActivationRepository,
+    CampaignRoomParticipantRepository,
+    CampaignStartingLocationRepository,
+    CampaignStartupRepository,
+    CampaignAdministrationRepository,
+    CampaignAdministrationIntegrationRepository,
+    ContentCatalogRepository,
+    CharacterBuilderRepository,
+    CharacterProgressionRepository,
+    ActorResourceRepository,
+    InventoryRepository,
+    EconomyRepository,
+    RestRepository,
+    CheckRepository,
+    AdventureCheckRepository,
+    AdventureInventoryRepository,
+    AdventureCommerceRepository,
+    AdventurePowerRestRepository,
+    AdventureQuestProgressionRepository,
+    PowerRepository,
+    SpellcastingRepository,
+    EffectRepository,
+    EncounterRepository,
+    WorldRepository,
+    QuestRepository,
+    StoryRepository,
+    AdventureTurnRepository,
+    CompanionRepository,
+    ExactCandidateRepository,
+    ExactCandidateProviderBridgeRepository,
+    CampaignGenerationRepository,
+    TacticalMapRepository,
+    FreeformTravelRepository,
+    FreeformNpcRepository,
+    FreeformLoreRepository,
+    FreeformQuestRepository,
+    FreeformRumorRepository,
+    FreeformShopRepository,
+    FreeformEncounterRepository,
+    FreeformFactionRepository {
   getCampaignRecall: import("./campaignRecallReadRepo.js").CampaignRecallReadRepository["getCampaignRecall"];
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
-  configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: { expectedRevision: number; idempotencyKey: string }): import("@velvet/contracts").CampaignCatalogConfigurationResult;
+  configureMechanicsStarterCatalog(
+    actorPrincipalId: string,
+    campaignId: string,
+    input: { expectedRevision: number; idempotencyKey: string },
+  ): import("@velvet/contracts").CampaignCatalogConfigurationResult;
   installSrdStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
-  configureSrdStarterCatalog(actorPrincipalId: string, campaignId: string, input: { expectedRevision: number; idempotencyKey: string }): import("@velvet/contracts").CampaignCatalogConfigurationResult;
+  configureSrdStarterCatalog(
+    actorPrincipalId: string,
+    campaignId: string,
+    input: { expectedRevision: number; idempotencyKey: string },
+  ): import("@velvet/contracts").CampaignCatalogConfigurationResult;
   /** Specialized trusted-local snapshot; it accepts no caller-supplied content identities. */
   inspectOriginalStarterSetup(actorPrincipalId: string, campaignId: string): OriginalStarterSetupInspection;
   /** Specialized setup write; manifest identity and content are fixed by the repository. */
   installOriginalStarterContent(actorPrincipalId: string, campaignId: string): ContentPack;
   /** Specialized setup write; profile and pack selection are fixed by the repository. */
   configureOriginalStarterContent(actorPrincipalId: string, campaignId: string): CampaignContentConfiguration;
-  addCampaignMembership(actorPrincipalId: string, campaignId: string, input: AddCampaignMembershipInput): CampaignMembership;
+  addCampaignMembership(
+    actorPrincipalId: string,
+    campaignId: string,
+    input: AddCampaignMembershipInput,
+  ): CampaignMembership;
   attachCampaignSession(actorPrincipalId: string, input: AttachCampaignSessionInput): CampaignSessionAttachment;
   detachCampaignSession(actorPrincipalId: string, input: DetachCampaignSessionInput): CampaignSessionAttachment | null;
   installContentPack(actorPrincipalId: string, input: InstallContentPackInput): ContentPack;
-  configureCampaignContent(actorPrincipalId: string, campaignId: string, input: ConfigureCampaignContentInput): CampaignContentConfiguration;
-  createCampaignCharacter(actorPrincipalId: string, input: CreateCampaignCharacterInput): PrivilegedCampaignCharacterProjection;
+  configureCampaignContent(
+    actorPrincipalId: string,
+    campaignId: string,
+    input: ConfigureCampaignContentInput,
+  ): CampaignContentConfiguration;
+  createCampaignCharacter(
+    actorPrincipalId: string,
+    input: CreateCampaignCharacterInput,
+  ): PrivilegedCampaignCharacterProjection;
   /** Factory-only fixed-content creation; never exposed on a unit of work or legacy wrapper. */
-  createOriginalStarterCampaignCharacter(actorPrincipalId: string, input: CreateCampaignCharacterInput): OriginalStarterCampaignCharacterCreationResult;
+  createOriginalStarterCampaignCharacter(
+    actorPrincipalId: string,
+    input: CreateCampaignCharacterInput,
+  ): OriginalStarterCampaignCharacterCreationResult;
   executeInitializeActorResource(actorPrincipalId: string, envelope: CommandEnvelope): CommandReceipt;
   recordAgentObservation(principalId: string, input: AgentObservationInput): AgentObservation;
   listAgentKnowledge(principalId: string, input: AgentKnowledgeQuery): AgentKnowledgeEntry[];
   executeRollActorDice(actorPrincipalId: string, envelope: CommandEnvelope): CommandReceipt;
   /** Factory-only locked revalidation for the ID-free campaign-dice boundary. */
-  executeRollActorDiceForVisibleCharacter(actorPrincipalId: string, envelope: CommandEnvelope, binding: CampaignDiceVisibleCharacterBinding): CommandReceipt;
+  executeRollActorDiceForVisibleCharacter(
+    actorPrincipalId: string,
+    envelope: CommandEnvelope,
+    binding: CampaignDiceVisibleCharacterBinding,
+  ): CommandReceipt;
   executeSetActorAttribute(actorPrincipalId: string, envelope: CommandEnvelope): CommandReceipt;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
   renameCampaign(actorPrincipalId: string, campaignId: string, input: RenameCampaignInput): Campaign;

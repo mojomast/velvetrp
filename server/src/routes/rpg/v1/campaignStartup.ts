@@ -5,7 +5,11 @@ import { orchestrateCampaignDmBeat } from "../../../agent/campaignDmOrchestrator
 import type { AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
-import { CampaignDmConflictError, CampaignDmUnavailableError, type CampaignDmRepository } from "../../../repo/campaignDmRepo.js";
+import {
+  CampaignDmConflictError,
+  CampaignDmUnavailableError,
+  type CampaignDmRepository,
+} from "../../../repo/campaignDmRepo.js";
 import type { CampaignGenerationRepository } from "../../../repo/campaignGenerationRepo.js";
 import type { CampaignStartupRepository } from "../../../repo/campaignStartupRepo.js";
 import {
@@ -41,9 +45,9 @@ const emptyBodySchema = z.object({}).strict();
 
 type Params = { campaignId: string; sessionId: string };
 
-export type CampaignStartupRepositoryPort = CampaignDmRepository
-  & Pick<CampaignGenerationRepository, "getCampaignGeneratedPlanning" | "publishCampaignMaterial">
-  & Pick<CampaignStartupRepository, "getCampaignStartupRead">;
+export type CampaignStartupRepositoryPort = CampaignDmRepository &
+  Pick<CampaignGenerationRepository, "getCampaignGeneratedPlanning" | "publishCampaignMaterial"> &
+  Pick<CampaignStartupRepository, "getCampaignStartupRead">;
 
 export interface CampaignStartupHttpOptions {
   repositoryAccessor: () => CampaignStartupRepositoryPort;
@@ -52,22 +56,38 @@ export interface CampaignStartupHttpOptions {
   agentDependencies?: AdventureAgentDependencies;
 }
 
-const startupBeatStateSchema = z.enum(["completed", "blocked", "planning", "awaiting-approval", "cancelled", "unknown", "none"]);
-const campaignStartupResponseSchema = z.object({
-  campaignId: resourceIdSchema,
-  sessionId: resourceIdSchema,
-  dmMode: z.enum(["human", "ai"]),
-  dmModeRevision: z.number().int().min(0),
-  published: z.array(z.string().min(1).max(200)).max(64),
-  beat: z.object({ runId: resourceIdSchema.nullable(), state: startupBeatStateSchema }).strict(),
-  imagesEnqueued: z.array(z.object({
-    locationId: resourceIdSchema,
-    jobId: resourceIdSchema.nullable(),
-    deduped: z.boolean(),
-    skipped: z.string().max(64).nullable(),
-  }).strict()).max(64),
-  blockers: z.array(z.string().max(200)).max(16),
-}).strict();
+const startupBeatStateSchema = z.enum([
+  "completed",
+  "blocked",
+  "planning",
+  "awaiting-approval",
+  "cancelled",
+  "unknown",
+  "none",
+]);
+const campaignStartupResponseSchema = z
+  .object({
+    campaignId: resourceIdSchema,
+    sessionId: resourceIdSchema,
+    dmMode: z.enum(["human", "ai"]),
+    dmModeRevision: z.number().int().min(0),
+    published: z.array(z.string().min(1).max(200)).max(64),
+    beat: z.object({ runId: resourceIdSchema.nullable(), state: startupBeatStateSchema }).strict(),
+    imagesEnqueued: z
+      .array(
+        z
+          .object({
+            locationId: resourceIdSchema,
+            jobId: resourceIdSchema.nullable(),
+            deduped: z.boolean(),
+            skipped: z.string().max(64).nullable(),
+          })
+          .strict(),
+      )
+      .max(64),
+    blockers: z.array(z.string().max(200)).max(16),
+  })
+  .strict();
 
 export const campaignStartupHttpRoutes: FastifyPluginAsync<CampaignStartupHttpOptions> = async (app, options) => {
   const gate = async (request: FastifyRequest, reply: FastifyReply): Promise<boolean> => {
@@ -89,23 +109,53 @@ export const campaignStartupHttpRoutes: FastifyPluginAsync<CampaignStartupHttpOp
   };
 
   const failure = (request: FastifyRequest, reply: FastifyReply, error: unknown): FastifyReply => {
-    if (error instanceof CampaignStartupUnavailableError || error instanceof CampaignDmUnavailableError
-      || error instanceof AdventureTurnUnavailableError) {
-      return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_STARTUP_NOT_FOUND", "Campaign startup resource is unavailable");
+    if (
+      error instanceof CampaignStartupUnavailableError ||
+      error instanceof CampaignDmUnavailableError ||
+      error instanceof AdventureTurnUnavailableError
+    ) {
+      return sendApiProblem(
+        request,
+        reply,
+        404,
+        "RPG_CAMPAIGN_STARTUP_NOT_FOUND",
+        "Campaign startup resource is unavailable",
+      );
     }
-    if (error instanceof CampaignStartupConflictError || error instanceof CampaignDmConflictError
-      || error instanceof AdventureTurnConflictError || error instanceof AdventureTurnStaleError) {
-      return sendApiProblem(request, reply, 409, "RPG_CAMPAIGN_STARTUP_CONFLICT",
-        "Campaign startup conflicts with current durable state; read campaign state before retrying");
+    if (
+      error instanceof CampaignStartupConflictError ||
+      error instanceof CampaignDmConflictError ||
+      error instanceof AdventureTurnConflictError ||
+      error instanceof AdventureTurnStaleError
+    ) {
+      return sendApiProblem(
+        request,
+        reply,
+        409,
+        "RPG_CAMPAIGN_STARTUP_CONFLICT",
+        "Campaign startup conflicts with current durable state; read campaign state before retrying",
+      );
     }
-    request.log.error({ operation: "campaign-startup", method: request.method, route: request.routeOptions.url },
-      "campaign startup failed");
-    return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR",
-      "Campaign startup outcome is unknown; reconcile the identical request before retrying");
+    request.log.error(
+      { operation: "campaign-startup", method: request.method, route: request.routeOptions.url },
+      "campaign startup failed",
+    );
+    return sendApiProblem(
+      request,
+      reply,
+      500,
+      "RPG_INTERNAL_ERROR",
+      "Campaign startup outcome is unknown; reconcile the identical request before retrying",
+    );
   };
 
-  app.post<{ Params: Params; Body: unknown }>("/campaigns/:campaignId/rooms/:sessionId/startup-commands",
-    { onRequest: async (request, reply) => { await gate(request, reply); } },
+  app.post<{ Params: Params; Body: unknown }>(
+    "/campaigns/:campaignId/rooms/:sessionId/startup-commands",
+    {
+      onRequest: async (request, reply) => {
+        await gate(request, reply);
+      },
+    },
     async (request, reply) => {
       const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
       const sessionId = resourceIdSchema.safeParse(request.params.sessionId);
@@ -123,7 +173,8 @@ export const campaignStartupHttpRoutes: FastifyPluginAsync<CampaignStartupHttpOp
             dm: repository,
             generation: repository,
             startup: repository,
-            orchestrate: (principalId, runId) => orchestrateCampaignDmBeat(repository, principalId, runId, options.agentDependencies),
+            orchestrate: (principalId, runId) =>
+              orchestrateCampaignDmBeat(repository, principalId, runId, options.agentDependencies),
             sceneImages: {
               installationEnabled: options.sceneImageInstallationEnabled,
               service: options.sceneImageServiceAccessor,
@@ -133,10 +184,16 @@ export const campaignStartupHttpRoutes: FastifyPluginAsync<CampaignStartupHttpOp
         return reply.send(campaignStartupResponseSchema.parse(summary));
       } catch (error) {
         if (error instanceof Error && error.name === "ZodError") {
-          return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR",
-            "Campaign startup produced an invalid summary; reconcile the identical request");
+          return sendApiProblem(
+            request,
+            reply,
+            500,
+            "RPG_INTERNAL_ERROR",
+            "Campaign startup produced an invalid summary; reconcile the identical request",
+          );
         }
         return failure(request, reply, error);
       }
-    });
+    },
+  );
 };

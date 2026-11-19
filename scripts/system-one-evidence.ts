@@ -21,7 +21,9 @@ export function beginSpeakerEvidence(input: {
   binding.calibrationA = 1;
   binding.calibrationB = 0;
   const snapshot = {
-    schemaVersion: 1 as const, caseId: input.caseId, repeat: input.repeat,
+    schemaVersion: 1 as const,
+    caseId: input.caseId,
+    repeat: input.repeat,
     capturedAt: new Date().toISOString(),
     requestDigest: digest({ state: input.state, questions: input.questions }),
     corpusDigest: digest(input.corpus),
@@ -45,11 +47,12 @@ export function beginAdventureEvidence(input: {
   payloadVersions?: { questionVersion: string; stateVersion: string };
 }) {
   const digest = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-  const bindings = [...new Set(input.candidates.map(candidate => candidate.kind))].sort().map(kind =>
+  const bindings = [...new Set(input.candidates.map((candidate) => candidate.kind))].sort().map((kind) =>
     systemOneEvaluationBinding("adventure-selection", input.settings, null, kind, {
       ...input.payloadVersions,
       candidateStrategy: "benchmark-curated-candidates-v1",
-    }));
+    }),
+  );
   const snapshot = {
     schemaVersion: 1 as const,
     caseId: input.caseId,
@@ -58,12 +61,14 @@ export function beginAdventureEvidence(input: {
     requestDigest: digest({ state: input.state, questions: input.questions }),
     corpusDigest: digest(input.corpus),
   };
-  return (responseModel: string | null | undefined): typeof snapshot & {
+  return (
+    responseModel: string | null | undefined,
+  ): typeof snapshot & {
     bindings: SystemOneEvaluationBinding[];
     approvalEligible: false;
   } => ({
     ...snapshot,
-    bindings: bindings.map(binding => ({ ...binding, responseModel: responseModel ?? "" })),
+    bindings: bindings.map((binding) => ({ ...binding, responseModel: responseModel ?? "" })),
     // Curated candidates do not exercise production retrieval/shortlisting. Family presence
     // is not kind-specific accuracy; these observations alone cannot authorize execution.
     approvalEligible: false,

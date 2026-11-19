@@ -19,12 +19,7 @@ export type ProviderPermanentFailureCode =
   | "provider-rejected";
 
 export type ProviderTransientFailureCode =
-  | "rate-limit"
-  | "timeout"
-  | "overloaded"
-  | "server-error"
-  | "transport"
-  | "conflict";
+  "rate-limit" | "timeout" | "overloaded" | "server-error" | "transport" | "conflict";
 
 export interface ProviderPermanentFailure {
   permanence: "permanent";
@@ -68,10 +63,7 @@ export function parseRetryAfterMs(value: string | null | undefined, nowMs: numbe
 }
 
 /** Classifies only retry-safe failure categories as transient. Unknown failures fail closed. */
-export function classifyProviderFailure(
-  observation: ProviderFailureObservation,
-  nowMs = Date.now(),
-): ProviderFailure {
+export function classifyProviderFailure(observation: ProviderFailureObservation, nowMs = Date.now()): ProviderFailure {
   const status = observation.httpStatus ?? null;
   const providerCode = observation.providerCode?.trim().toLowerCase() ?? "";
   if (observation.callerAborted) return { permanence: "permanent", code: "caller-aborted", httpStatus: status };
@@ -80,22 +72,52 @@ export function classifyProviderFailure(
   }
   if (observation.protocolFailed) return { permanence: "permanent", code: "protocol", httpStatus: status };
   if (observation.timedOut || status === 408 || status === 504) {
-    return { permanence: "transient", code: "timeout", httpStatus: status, retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs) };
+    return {
+      permanence: "transient",
+      code: "timeout",
+      httpStatus: status,
+      retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs),
+    };
   }
   if (observation.transportFailed) {
-    return { permanence: "transient", code: "transport", httpStatus: status, retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs) };
+    return {
+      permanence: "transient",
+      code: "transport",
+      httpStatus: status,
+      retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs),
+    };
   }
   if (status === 429) {
-    return { permanence: "transient", code: "rate-limit", httpStatus: status, retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs) };
+    return {
+      permanence: "transient",
+      code: "rate-limit",
+      httpStatus: status,
+      retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs),
+    };
   }
   if (status === 409 || status === 425) {
-    return { permanence: "transient", code: "conflict", httpStatus: status, retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs) };
+    return {
+      permanence: "transient",
+      code: "conflict",
+      httpStatus: status,
+      retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs),
+    };
   }
   if (status === 502 || status === 503) {
-    return { permanence: "transient", code: "overloaded", httpStatus: status, retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs) };
+    return {
+      permanence: "transient",
+      code: "overloaded",
+      httpStatus: status,
+      retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs),
+    };
   }
   if (status !== null && status >= 500) {
-    return { permanence: "transient", code: "server-error", httpStatus: status, retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs) };
+    return {
+      permanence: "transient",
+      code: "server-error",
+      httpStatus: status,
+      retryAfterMs: parseRetryAfterMs(observation.retryAfter, nowMs),
+    };
   }
   if (status === 401) return { permanence: "permanent", code: "authentication", httpStatus: status };
   if (status === 403) return { permanence: "permanent", code: "authorization", httpStatus: status };
@@ -134,15 +156,23 @@ export function recommendProviderRetry(input: {
   if (!Number.isSafeInteger(input.attempt) || input.attempt < 1 || input.attempt >= policy.maxAttempts) {
     return { retry: false, reason: "attempt-limit" };
   }
-  if (![policy.maxAttempts, policy.baseDelayMs, policy.maxDelayMs].every(Number.isFinite)
-      || policy.maxAttempts < 1 || policy.baseDelayMs < 0 || policy.maxDelayMs < 0) {
+  if (
+    ![policy.maxAttempts, policy.baseDelayMs, policy.maxDelayMs].every(Number.isFinite) ||
+    policy.maxAttempts < 1 ||
+    policy.baseDelayMs < 0 ||
+    policy.maxDelayMs < 0
+  ) {
     return { retry: false, reason: "delay-limit" };
   }
-  const exponential = policy.baseDelayMs * (2 ** (input.attempt - 1));
+  const exponential = policy.baseDelayMs * 2 ** (input.attempt - 1);
   const requested = Math.max(exponential, failure.retryAfterMs ?? 0);
   if (!Number.isSafeInteger(requested) || requested > policy.maxDelayMs) return { retry: false, reason: "delay-limit" };
-  if (!Number.isFinite(input.nowMs) || !Number.isFinite(input.deadlineAtMs)
-      || input.nowMs + requested >= input.deadlineAtMs) return { retry: false, reason: "deadline" };
+  if (
+    !Number.isFinite(input.nowMs) ||
+    !Number.isFinite(input.deadlineAtMs) ||
+    input.nowMs + requested >= input.deadlineAtMs
+  )
+    return { retry: false, reason: "deadline" };
   return { retry: true, delayMs: requested, nextAttempt: input.attempt + 1 };
 }
 
@@ -156,8 +186,7 @@ export interface ProviderCapabilityProbeRequest {
 }
 
 export type ProviderCapabilityProbeOutcome =
-  | { ok: true; result: ProviderCompletionResult }
-  | { ok: false; failure: ProviderFailure };
+  { ok: true; result: ProviderCompletionResult } | { ok: false; failure: ProviderFailure };
 
 export type ProviderCapabilityProbe = (
   request: ProviderCapabilityProbeRequest,
@@ -199,15 +228,17 @@ export function createProviderCapabilityProbeRequest(
       capability,
       model,
       messages,
-      tools: [{
-        name: "velvet_capability_probe",
-        parameters: {
-          type: "object",
-          properties: { marker: { type: "string", const: PROBE_NONCE } },
-          required: ["marker"],
-          additionalProperties: false,
+      tools: [
+        {
+          name: "velvet_capability_probe",
+          parameters: {
+            type: "object",
+            properties: { marker: { type: "string", const: PROBE_NONCE } },
+            required: ["marker"],
+            additionalProperties: false,
+          },
         },
-      }],
+      ],
       toolChoice: "required",
     };
   }
@@ -233,9 +264,13 @@ function validProbeResponse(capability: ProviderCapability, result: ProviderComp
     if (calls?.length !== 1 || calls[0]?.name !== "velvet_capability_probe") return false;
     try {
       const value = JSON.parse(calls[0].arguments) as unknown;
-      return typeof value === "object" && value !== null && !Array.isArray(value)
-        && (value as Record<string, unknown>).marker === PROBE_NONCE
-        && Object.keys(value).length === 1;
+      return (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value) &&
+        (value as Record<string, unknown>).marker === PROBE_NONCE &&
+        Object.keys(value).length === 1
+      );
     } catch {
       return false;
     }
@@ -243,9 +278,13 @@ function validProbeResponse(capability: ProviderCapability, result: ProviderComp
   if (result.message.toolCalls?.length || typeof result.message.content !== "string") return false;
   try {
     const value = JSON.parse(result.message.content) as unknown;
-    return typeof value === "object" && value !== null && !Array.isArray(value)
-      && (value as Record<string, unknown>).marker === PROBE_NONCE
-      && Object.keys(value).length === 1;
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      (value as Record<string, unknown>).marker === PROBE_NONCE &&
+      Object.keys(value).length === 1
+    );
   } catch {
     return false;
   }
@@ -255,11 +294,15 @@ function validProbeResponse(capability: ProviderCapability, result: ProviderComp
 export async function runProviderCapabilityPreflight(
   input: ProviderCapabilityPreflightRequest,
 ): Promise<ProviderCapabilityPreflightResult> {
-  const capabilities = [...new Set(input.capabilities ?? ["function-tools", "strict-json-schema"] as const)];
+  const capabilities = [...new Set(input.capabilities ?? (["function-tools", "strict-json-schema"] as const))];
   const classifications: ProviderCapabilityClassification[] = [];
   for (const capability of capabilities) {
     if (input.signal?.aborted) {
-      classifications.push({ capability, status: "unavailable", failure: classifyProviderFailure({ callerAborted: true }) });
+      classifications.push({
+        capability,
+        status: "unavailable",
+        failure: classifyProviderFailure({ callerAborted: true }),
+      });
       continue;
     }
     let outcome: ProviderCapabilityProbeOutcome;
@@ -272,22 +315,26 @@ export async function runProviderCapabilityPreflight(
       classifications.push({ capability, status: "supported" });
       continue;
     }
-    const failure = outcome.ok
-      ? classifyProviderFailure({ protocolFailed: true })
-      : outcome.failure;
-    if (failure.permanence === "permanent"
-        && ["unsupported-capability", "invalid-request", "protocol", "provider-rejected"].includes(failure.code)) {
+    const failure = outcome.ok ? classifyProviderFailure({ protocolFailed: true }) : outcome.failure;
+    if (
+      failure.permanence === "permanent" &&
+      ["unsupported-capability", "invalid-request", "protocol", "provider-rejected"].includes(failure.code)
+    ) {
       classifications.push({ capability, status: "unsupported", failure });
     } else {
       classifications.push({ capability, status: "unavailable", failure });
     }
   }
-  const supported = (capability: ProviderCapability) => classifications
-    .some((result) => result.capability === capability && result.status === "supported");
+  const supported = (capability: ProviderCapability) =>
+    classifications.some((result) => result.capability === capability && result.status === "supported");
   const dmPlayCompatible = supported("function-tools");
   const campaignGenerationCompatible = supported("strict-json-schema");
-  return { dmPlayCompatible, campaignGenerationCompatible,
-    ok: classifications.every((result) => result.status === "supported"), capabilities: classifications };
+  return {
+    dmPlayCompatible,
+    campaignGenerationCompatible,
+    ok: classifications.every((result) => result.status === "supported"),
+    capabilities: classifications,
+  };
 }
 
 export type ProviderFinishReason = "stop" | "length" | "tool_calls" | "content_filter" | "error" | "unknown";

@@ -27,7 +27,13 @@ export const actorGameplaySheetHttpRoutes: FastifyPluginAsync<ActorGameplaySheet
           return;
         }
         if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
-          await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Actor gameplay sheet does not accept query parameters");
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Actor gameplay sheet does not accept query parameters",
+          );
         }
       },
     },
@@ -41,7 +47,10 @@ export const actorGameplaySheetHttpRoutes: FastifyPluginAsync<ActorGameplaySheet
         if (parsed.identity.actorId !== actorId.data) throw new Error("actor gameplay sheet binding is invalid");
         return reply.code(200).send(parsed);
       } catch {
-        request.log.error({ operation: "actor-gameplay-sheet-read", method: request.method, route: request.routeOptions.url }, "RPG actor gameplay sheet read failed");
+        request.log.error(
+          { operation: "actor-gameplay-sheet-read", method: request.method, route: request.routeOptions.url },
+          "RPG actor gameplay sheet read failed",
+        );
         return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Actor gameplay sheet could not be loaded");
       }
     },

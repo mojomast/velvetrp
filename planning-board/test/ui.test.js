@@ -5,23 +5,37 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { CARD_IDS, defaultState } = require("../state");
-const { buildBrief, detailsIndicator, escapeHtml, features, groupedFeatureIds, health, matchesFeature, summarize } = require("../public/app");
+const {
+  buildBrief,
+  detailsIndicator,
+  escapeHtml,
+  features,
+  groupedFeatureIds,
+  health,
+  matchesFeature,
+  summarize,
+} = require("../public/app");
 
 test("roadmap metadata forms stable domain groups without changing state order", () => {
-  assert.deepEqual(groupedFeatureIds().map(([name]) => name), [
-    "Characters & Combat",
-    "Agents, Rules & Content",
-    "Simulation & Trust",
-    "Platform, Integrations & Autonomy"
-  ]);
+  assert.deepEqual(
+    groupedFeatureIds().map(([name]) => name),
+    ["Characters & Combat", "Agents, Rules & Content", "Simulation & Trust", "Platform, Integrations & Autonomy"],
+  );
   const displayedIds = groupedFeatureIds().flatMap(([, ids]) => ids);
   assert.equal(new Set(displayedIds).size, 20);
   assert.deepEqual(new Set([...health, ...features].map(([id]) => id)), new Set(CARD_IDS));
   const state = defaultState();
   const originalOrder = state.cards.map(({ id }) => id);
   summarize(state);
-  matchesFeature(features[0], state.cards.find(({ id }) => id === features[0][0]), { search: "npc", inclusion: "All", priority: "All" });
-  assert.deepEqual(state.cards.map(({ id }) => id), originalOrder);
+  matchesFeature(
+    features[0],
+    state.cards.find(({ id }) => id === features[0][0]),
+    { search: "npc", inclusion: "All", priority: "All" },
+  );
+  assert.deepEqual(
+    state.cards.map(({ id }) => id),
+    originalOrder,
+  );
 });
 
 test("details indicators and escaping safely represent user content", () => {
@@ -29,7 +43,10 @@ test("details indicators and escaping safely represent user content", () => {
   assert.equal(detailsIndicator({ scope: "bounded", dependencies: "" }), "Scope added");
   assert.equal(detailsIndicator({ scope: "", dependencies: "risk" }), "Risk/dependency added");
   assert.equal(detailsIndicator({ scope: "bounded", dependencies: "risk" }), "Scope and risk/dependency added");
-  assert.equal(escapeHtml(`<img src=x onerror="bad()"> & 'quoted'`), "&lt;img src=x onerror=&quot;bad()&quot;&gt; &amp; &#39;quoted&#39;");
+  assert.equal(
+    escapeHtml(`<img src=x onerror="bad()"> & 'quoted'`),
+    "&lt;img src=x onerror=&quot;bad()&quot;&gt; &amp; &#39;quoted&#39;",
+  );
 });
 
 test("feature filtering covers description, inclusion, and current priority", () => {

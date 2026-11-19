@@ -1,7 +1,10 @@
 import type { CampaignCatalogResolutionReport } from "@velvet/contracts";
 import {
-  planDnd5eEncounter, planDnd5eEncounterRewards, selectDnd5eNpcStatBlocks,
-  type Dnd5eEncounterPlan, type EncounterRewardsPlan,
+  planDnd5eEncounter,
+  planDnd5eEncounterRewards,
+  selectDnd5eNpcStatBlocks,
+  type Dnd5eEncounterPlan,
+  type EncounterRewardsPlan,
 } from "../../rulesets/index.js";
 
 /**
@@ -21,7 +24,12 @@ export interface EncounterCatalogDefinition {
 
 export interface EncounterPlanningDependencies {
   resolveCampaignCatalog(actorPrincipalId: string, campaignId: string): CampaignCatalogResolutionReport | null;
-  getCampaignContentCatalog(actorPrincipalId: string, campaignId: string, packId: string, packVersion: string): { definitions: readonly EncounterCatalogDefinition[] } | null;
+  getCampaignContentCatalog(
+    actorPrincipalId: string,
+    campaignId: string,
+    packId: string,
+    packVersion: string,
+  ): { definitions: readonly EncounterCatalogDefinition[] } | null;
 }
 
 export interface EncounterCandidate {
@@ -84,17 +92,28 @@ export function createEncounterPlanningService(dependencies: EncounterPlanningDe
     if (!catalog) return [];
     const candidates: EncounterCandidate[] = [];
     for (const pack of catalog.contentPacks) {
-      const projection = dependencies.getCampaignContentCatalog(actorPrincipalId, campaignId, pack.packId, pack.packVersion);
+      const projection = dependencies.getCampaignContentCatalog(
+        actorPrincipalId,
+        campaignId,
+        pack.packId,
+        pack.packVersion,
+      );
       if (!projection) continue;
       for (const definition of projection.definitions) {
         if (definition.reference.kind !== "enemy-template") continue;
         const challengeRating = definition.mechanics.challengeRating;
         if (typeof challengeRating !== "number") continue;
-        candidates.push({ id: definition.reference.definitionId, name: definition.name, challengeRating, tags: Object.freeze([...(definition.tags ?? [])]) });
+        candidates.push({
+          id: definition.reference.definitionId,
+          name: definition.name,
+          challengeRating,
+          tags: Object.freeze([...(definition.tags ?? [])]),
+        });
       }
     }
-    return candidates.sort((left, right) => left.challengeRating - right.challengeRating
-      || left.id.localeCompare(right.id, "en-US"));
+    return candidates.sort(
+      (left, right) => left.challengeRating - right.challengeRating || left.id.localeCompare(right.id, "en-US"),
+    );
   };
 
   return Object.freeze({
@@ -104,11 +123,16 @@ export function createEncounterPlanningService(dependencies: EncounterPlanningDe
     listEncounterCandidates(actorPrincipalId: string, campaignId: string): readonly EncounterCandidate[] {
       return Object.freeze(candidatesFor(actorPrincipalId, campaignId));
     },
-    planEncounter(actorPrincipalId: string, campaignId: string, request: CampaignEncounterRequest): CampaignEncounterPlan {
+    planEncounter(
+      actorPrincipalId: string,
+      campaignId: string,
+      request: CampaignEncounterRequest,
+    ): CampaignEncounterPlan {
       const all = candidatesFor(actorPrincipalId, campaignId);
-      const selected = request.candidateIds === undefined
-        ? all
-        : all.filter((candidate) => request.candidateIds!.includes(candidate.id));
+      const selected =
+        request.candidateIds === undefined
+          ? all
+          : all.filter((candidate) => request.candidateIds!.includes(candidate.id));
       const plan = planDnd5eEncounter({
         partyLevels: [...request.partyLevels],
         targetDifficulty: request.targetDifficulty,
@@ -116,12 +140,22 @@ export function createEncounterPlanningService(dependencies: EncounterPlanningDe
         ...(request.maxMonsters === undefined ? {} : { maxMonsters: request.maxMonsters }),
       });
       return Object.freeze({
-        candidates: Object.freeze(all.map((candidate) => Object.freeze({ id: candidate.id, name: candidate.name, challengeRating: candidate.challengeRating }))),
+        candidates: Object.freeze(
+          all.map((candidate) =>
+            Object.freeze({ id: candidate.id, name: candidate.name, challengeRating: candidate.challengeRating }),
+          ),
+        ),
         plan,
       });
     },
-    previewEncounterRewards(actorPrincipalId: string, campaignId: string, request: EncounterRewardPreviewRequest): EncounterRewardPreview {
-      const byId = new Map(candidatesFor(actorPrincipalId, campaignId).map((candidate) => [candidate.id, candidate] as const));
+    previewEncounterRewards(
+      actorPrincipalId: string,
+      campaignId: string,
+      request: EncounterRewardPreviewRequest,
+    ): EncounterRewardPreview {
+      const byId = new Map(
+        candidatesFor(actorPrincipalId, campaignId).map((candidate) => [candidate.id, candidate] as const),
+      );
       const defeated = request.defeatedEnemyIds.map((id) => {
         const candidate = byId.get(id);
         if (!candidate) throw new Error(`defeated enemy is not a pinned campaign enemy: ${id}`);
@@ -137,7 +171,12 @@ export function createEncounterPlanningService(dependencies: EncounterPlanningDe
     selectNpcs(actorPrincipalId: string, campaignId: string, request: NpcSelectionRequest): NpcSelectionResult {
       const candidates = candidatesFor(actorPrincipalId, campaignId);
       const result = selectDnd5eNpcStatBlocks({
-        candidates: candidates.map((candidate) => ({ id: candidate.id, challengeRating: candidate.challengeRating, roles: candidate.tags, tags: candidate.tags })),
+        candidates: candidates.map((candidate) => ({
+          id: candidate.id,
+          challengeRating: candidate.challengeRating,
+          roles: candidate.tags,
+          tags: candidate.tags,
+        })),
         ...(request.role === undefined ? {} : { role: request.role }),
         ...(request.minChallengeRating === undefined ? {} : { minChallengeRating: request.minChallengeRating }),
         ...(request.maxChallengeRating === undefined ? {} : { maxChallengeRating: request.maxChallengeRating }),
@@ -145,7 +184,9 @@ export function createEncounterPlanningService(dependencies: EncounterPlanningDe
         ...(request.excludeIds === undefined ? {} : { excludeIds: request.excludeIds }),
       });
       const byId = new Map(candidates.map((candidate) => [candidate.id, candidate] as const));
-      const selected = result.selected.map((entry) => Object.freeze({ id: entry.id, name: byId.get(entry.id)!.name, challengeRating: entry.challengeRating }));
+      const selected = result.selected.map((entry) =>
+        Object.freeze({ id: entry.id, name: byId.get(entry.id)!.name, challengeRating: entry.challengeRating }),
+      );
       return Object.freeze({ selected: Object.freeze(selected), legal: result.legal, reasons: result.reasons });
     },
   });

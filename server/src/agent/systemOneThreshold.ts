@@ -157,7 +157,9 @@ export function selectActionThreshold(
 
   const qualifying = points.filter((point) => point.acted >= minActed && point.actedAccuracy >= minAccuracy);
   if (qualifying.length < points.length) {
-    reasons.push(`filtered ${points.length - qualifying.length} of ${points.length} threshold(s) for failing ${floors}`);
+    reasons.push(
+      `filtered ${points.length - qualifying.length} of ${points.length} threshold(s) for failing ${floors}`,
+    );
   }
 
   if (qualifying.length === 0) {
@@ -176,11 +178,15 @@ export function selectActionThreshold(
     }
     reasons.push(`no qualifying threshold reached coverage >= ${targetCoverage}`);
     const selected = greatestCoverage(qualifying);
-    reasons.push(`fell back to greatest-coverage qualifying threshold ${selected.threshold} (coverage ${selected.coverage})`);
+    reasons.push(
+      `fell back to greatest-coverage qualifying threshold ${selected.threshold} (coverage ${selected.coverage})`,
+    );
     return { selected, points, reasons };
   }
 
   const selected = greatestCoverage(qualifying);
-  reasons.push(`selected greatest-coverage threshold ${selected.threshold} (coverage ${selected.coverage}) meeting ${floors}`);
+  reasons.push(
+    `selected greatest-coverage threshold ${selected.threshold} (coverage ${selected.coverage}) meeting ${floors}`,
+  );
   return { selected, points, reasons };
 }

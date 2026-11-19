@@ -7,8 +7,12 @@ export interface RoleplaySessionLifecycleRoutesOptions {
   abortActiveGeneration?: (sessionId: string) => void;
 }
 
-export const roleplaySessionLifecycleRoutes: FastifyPluginAsync<RoleplaySessionLifecycleRoutesOptions> = async (app, options) => {
-  const abortActiveGeneration = options.abortActiveGeneration ?? ((sessionId: string) => generationRegistry.abort(sessionId));
+export const roleplaySessionLifecycleRoutes: FastifyPluginAsync<RoleplaySessionLifecycleRoutesOptions> = async (
+  app,
+  options,
+) => {
+  const abortActiveGeneration =
+    options.abortActiveGeneration ?? ((sessionId: string) => generationRegistry.abort(sessionId));
 
   app.delete<{ Params: { id: string } }>("/sessions/:id", async (request, reply) => {
     const session = await getSession(request.params.id);

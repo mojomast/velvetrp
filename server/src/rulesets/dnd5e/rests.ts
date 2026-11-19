@@ -15,7 +15,8 @@ export function planDnd5eRest(input: RestInput): RecoveryPlan {
   if (input.currentHitPoints > input.maxHitPoints) reasons.push("current hit points exceed maximum hit points");
   if (input.hitDiceRemaining > input.level) reasons.push("hit dice remaining exceed level");
   const spends = input.hitDiceSpent ?? [];
-  if (input.kind === "long" && spends.length > 0) reasons.push("hit dice cannot be spent as part of this long-rest plan");
+  if (input.kind === "long" && spends.length > 0)
+    reasons.push("hit dice cannot be spent as part of this long-rest plan");
   if (spends.length > input.hitDiceRemaining) reasons.push("not enough hit dice remain");
   let recovered = 0;
   spends.forEach((spend) => {
@@ -26,11 +27,16 @@ export function planDnd5eRest(input: RestInput): RecoveryPlan {
   });
   if (input.kind === "long") recovered = Math.max(0, input.maxHitPoints - input.currentHitPoints);
   const legal = reasons.length === 0;
-  const hitDiceRecovered = input.kind === "long" ? Math.min(input.level - input.hitDiceRemaining, Math.max(1, Math.floor(input.level / 2))) : 0;
+  const hitDiceRecovered =
+    input.kind === "long"
+      ? Math.min(input.level - input.hitDiceRemaining, Math.max(1, Math.floor(input.level / 2)))
+      : 0;
   return Object.freeze({
     kind: input.kind,
     hitPointsRecovered: legal ? Math.min(recovered, Math.max(0, input.maxHitPoints - input.currentHitPoints)) : 0,
-    resultingHitPoints: legal ? Math.min(input.maxHitPoints, input.currentHitPoints + recovered) : input.currentHitPoints,
+    resultingHitPoints: legal
+      ? Math.min(input.maxHitPoints, input.currentHitPoints + recovered)
+      : input.currentHitPoints,
     hitDiceSpent: legal && input.kind === "short" ? spends.length : 0,
     hitDiceRecovered: legal ? Math.max(0, hitDiceRecovered) : 0,
     clearExhaustionLevels: legal && input.kind === "long" && input.exhausted ? 1 : 0,

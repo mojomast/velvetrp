@@ -12,12 +12,16 @@ const ability = { ...pack, kind: "ability" as const, definitionId: "velvet:advan
 const klass = { ...pack, kind: "class" as const, definitionId: "velvet:advancement:class:lantern" };
 const feat = {
   reference: { ...pack, kind: "feat" as const, definitionId: "velvet:advancement:feat:tough" },
-  name: "Tough", description: "A bounded feat definition.", tags: ["velvet:original"],
+  name: "Tough",
+  description: "A bounded feat definition.",
+  tags: ["velvet:original"],
   mechanics: { abilityBonuses: { resolve: 2 }, grantedAbilityRefs: [ability] },
 };
 const subclass = {
   reference: { ...pack, kind: "subclass" as const, definitionId: "velvet:advancement:subclass:champion" },
-  name: "Champion", description: "A bounded subclass definition.", tags: ["velvet:original"],
+  name: "Champion",
+  description: "A bounded subclass definition.",
+  tags: ["velvet:original"],
   mechanics: { classRef: klass, level: 3, abilityRefs: [ability], spellRefs: [] },
 };
 
@@ -30,11 +34,22 @@ describe("advancement catalog definitions", () => {
   });
 
   it("rejects unbounded mechanics and cross-kind references", () => {
-    expect(() => featCatalogDefinitionSchema.parse({ ...feat, mechanics: { ...feat.mechanics, abilityBonuses: { resolve: 9 } } })).toThrow();
+    expect(() =>
+      featCatalogDefinitionSchema.parse({ ...feat, mechanics: { ...feat.mechanics, abilityBonuses: { resolve: 9 } } }),
+    ).toThrow();
     expect(() => featCatalogDefinitionSchema.parse({ ...feat, mechanics: { grantedAbilityRefs: [klass] } })).toThrow();
-    expect(() => subclassCatalogDefinitionSchema.parse({ ...subclass, mechanics: { ...subclass.mechanics, classRef: ability } })).toThrow();
-    expect(() => subclassCatalogDefinitionSchema.parse({ ...subclass, mechanics: { ...subclass.mechanics, spellRefs: [ability] } })).toThrow();
-    expect(() => subclassCatalogDefinitionSchema.parse({ ...subclass, mechanics: { ...subclass.mechanics, level: 21 } })).toThrow();
+    expect(() =>
+      subclassCatalogDefinitionSchema.parse({ ...subclass, mechanics: { ...subclass.mechanics, classRef: ability } }),
+    ).toThrow();
+    expect(() =>
+      subclassCatalogDefinitionSchema.parse({
+        ...subclass,
+        mechanics: { ...subclass.mechanics, spellRefs: [ability] },
+      }),
+    ).toThrow();
+    expect(() =>
+      subclassCatalogDefinitionSchema.parse({ ...subclass, mechanics: { ...subclass.mechanics, level: 21 } }),
+    ).toThrow();
   });
 
   it("treats feat and subclass as optional kinds over the required set", () => {

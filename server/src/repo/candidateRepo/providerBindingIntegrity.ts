@@ -47,43 +47,95 @@ function assertBoundRow(db: DatabaseDriver.Database, row: any): void {
     const issuance = verifyExactCandidateIssuanceBatch(db, row.batch_id);
     expectedProjection = providerSafeExactCandidateListSchema.parse({
       version: "v1",
-      candidates: issuance.candidates.map((candidate) => projectExactCandidateForProvider(candidate, candidate.issuedAt)),
+      candidates: issuance.candidates.map((candidate) =>
+        projectExactCandidateForProvider(candidate, candidate.issuedAt),
+      ),
     });
   } catch {
     throw new Error("exact-candidate authoritative provider projection is malformed");
   }
   const schema = request.advertisedToolSchemas?.find((tool: any) => tool?.name === row.tool_name);
-  const legacy=projection.candidates.every((candidate:any)=>candidate.semanticLabel===undefined);
-  if(legacy)expectedProjection={...expectedProjection,candidates:expectedProjection.candidates.map(({semanticLabel:_label,...candidate}:any)=>candidate)};
-  const exactParameters = agentJsonObjectSchema.parse(legacy ? { type: "object", properties: {
-    candidateId: { type: "string", enum: projection.candidates.map((candidate: any) => candidate.candidateId) },
-    kind: { type: "string", enum: ["actor.travel"] }, version: { type: "string", enum: ["v1"] }, choices: { type: "array", maxItems: 0 },
-  }, required: ["candidateId", "kind", "version", "choices"], additionalProperties: false } : { type:"object",properties:{
-    candidateId:{type:"string",enum:projection.candidates.map((candidate:any)=>candidate.candidateId)},kind:{type:"string",enum:["actor.travel"]},
-    version:{type:"string",enum:["v1"]},choices:{type:"array",maxItems:0}},required:["candidateId","kind","version","choices"],additionalProperties:false,
-    oneOf: projection.candidates.map((candidate: any) => ({ type: "object",
-    description: "Select this exact server-issued travel binding.", properties: {
-      candidateId: { type: "string", const: candidate.candidateId }, kind: { type: "string", const: "actor.travel" },
-      version: { type: "string", const: "v1" }, choices: { type: "array", maxItems: 0 },
-    }, required: ["candidateId", "kind", "version", "choices"], additionalProperties: false })) });
-  if (frame !== canonicalAgentJson(expectedProjection) || frame !== row.provider_projection_json
-    || createHash("sha256").update(frame).digest("hex") !== row.provider_projection_digest
-    || canonicalAgentJson(request.exactCandidateProjection) !== frame || selectionFrame !== row.selection_json
-    || computeExactCandidateSelectionDigest(selection, { sha256: (value) => createHash("sha256").update(value).digest("hex") }) !== row.selection_digest
-    || selection.candidateId !== row.candidate_id || row.context_round !== row.round_number || row.response_status !== "succeeded"
-    || response.result !== "tool-calls" || response.calls?.length !== 1 || response.calls[0]?.providerToolCallId !== row.provider_tool_call_id
-    || response.calls[0]?.toolName !== row.tool_name || response.calls[0]?.kind !== "mutation"
-    || canonicalAgentJson(response.calls[0]?.arguments) !== selectionFrame
-    || !Array.isArray(request.advertisedTools) || request.advertisedTools.filter((name: any) => name === row.tool_name).length !== 1
-    || !schema || canonicalAgentJson(schema.parameters) !== canonicalAgentJson(exactParameters)
-    || row.execution_candidate_id !== row.candidate_id || row.execution_campaign_id !== row.campaign_id || row.execution_turn_id !== row.turn_id
-    || row.execution_selection_digest !== row.selection_digest || row.execution_world_command_id !== row.world_command_id
-    || row.execution_linked_at !== row.linked_at || row.candidate_batch_id !== row.batch_id
-    || row.candidate_campaign_id !== row.campaign_id || row.candidate_turn_id !== row.turn_id
-    || row.candidate_action_digest !== row.execution_action_digest || row.command_expected_revision !== row.world_expected_revision
-    || row.command_revision !== row.world_revision || row.command_created_at !== row.linked_at
-    || row.start_execution_revision !== row.expected_execution_revision
-    || row.resulting_execution_revision !== row.expected_execution_revision + 1) {
+  const legacy = projection.candidates.every((candidate: any) => candidate.semanticLabel === undefined);
+  if (legacy)
+    expectedProjection = {
+      ...expectedProjection,
+      candidates: expectedProjection.candidates.map(({ semanticLabel: _label, ...candidate }: any) => candidate),
+    };
+  const exactParameters = agentJsonObjectSchema.parse(
+    legacy
+      ? {
+          type: "object",
+          properties: {
+            candidateId: { type: "string", enum: projection.candidates.map((candidate: any) => candidate.candidateId) },
+            kind: { type: "string", enum: ["actor.travel"] },
+            version: { type: "string", enum: ["v1"] },
+            choices: { type: "array", maxItems: 0 },
+          },
+          required: ["candidateId", "kind", "version", "choices"],
+          additionalProperties: false,
+        }
+      : {
+          type: "object",
+          properties: {
+            candidateId: { type: "string", enum: projection.candidates.map((candidate: any) => candidate.candidateId) },
+            kind: { type: "string", enum: ["actor.travel"] },
+            version: { type: "string", enum: ["v1"] },
+            choices: { type: "array", maxItems: 0 },
+          },
+          required: ["candidateId", "kind", "version", "choices"],
+          additionalProperties: false,
+          oneOf: projection.candidates.map((candidate: any) => ({
+            type: "object",
+            description: "Select this exact server-issued travel binding.",
+            properties: {
+              candidateId: { type: "string", const: candidate.candidateId },
+              kind: { type: "string", const: "actor.travel" },
+              version: { type: "string", const: "v1" },
+              choices: { type: "array", maxItems: 0 },
+            },
+            required: ["candidateId", "kind", "version", "choices"],
+            additionalProperties: false,
+          })),
+        },
+  );
+  if (
+    frame !== canonicalAgentJson(expectedProjection) ||
+    frame !== row.provider_projection_json ||
+    createHash("sha256").update(frame).digest("hex") !== row.provider_projection_digest ||
+    canonicalAgentJson(request.exactCandidateProjection) !== frame ||
+    selectionFrame !== row.selection_json ||
+    computeExactCandidateSelectionDigest(selection, {
+      sha256: (value) => createHash("sha256").update(value).digest("hex"),
+    }) !== row.selection_digest ||
+    selection.candidateId !== row.candidate_id ||
+    row.context_round !== row.round_number ||
+    row.response_status !== "succeeded" ||
+    response.result !== "tool-calls" ||
+    response.calls?.length !== 1 ||
+    response.calls[0]?.providerToolCallId !== row.provider_tool_call_id ||
+    response.calls[0]?.toolName !== row.tool_name ||
+    response.calls[0]?.kind !== "mutation" ||
+    canonicalAgentJson(response.calls[0]?.arguments) !== selectionFrame ||
+    !Array.isArray(request.advertisedTools) ||
+    request.advertisedTools.filter((name: any) => name === row.tool_name).length !== 1 ||
+    !schema ||
+    canonicalAgentJson(schema.parameters) !== canonicalAgentJson(exactParameters) ||
+    row.execution_candidate_id !== row.candidate_id ||
+    row.execution_campaign_id !== row.campaign_id ||
+    row.execution_turn_id !== row.turn_id ||
+    row.execution_selection_digest !== row.selection_digest ||
+    row.execution_world_command_id !== row.world_command_id ||
+    row.execution_linked_at !== row.linked_at ||
+    row.candidate_batch_id !== row.batch_id ||
+    row.candidate_campaign_id !== row.campaign_id ||
+    row.candidate_turn_id !== row.turn_id ||
+    row.candidate_action_digest !== row.execution_action_digest ||
+    row.command_expected_revision !== row.world_expected_revision ||
+    row.command_revision !== row.world_revision ||
+    row.command_created_at !== row.linked_at ||
+    row.start_execution_revision !== row.expected_execution_revision ||
+    row.resulting_execution_revision !== row.expected_execution_revision + 1
+  ) {
     throw new Error("exact-candidate provider binding is malformed");
   }
 }

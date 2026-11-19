@@ -59,9 +59,7 @@
           "id": "wider-locations",
           "sections": ["locations"],
           "brief": "Add two public locations away from the town centre: a boreal lake and outfitter camp reachable only in winter, and the northern highway depot where trucks stage for the long road inland. Add two public connections linking them to the accepted town locations. Keep the geography plausible for the North Shore: spruce, rock, ice, long dark, snowmobile trails, and a highway that closes.",
-          "expandFrom": [
-            { "jobId": "town-foundation", "fields": ["locations"], "limit": 3 }
-          ],
+          "expandFrom": [{ "jobId": "town-foundation", "fields": ["locations"], "limit": 3 }],
           "desiredCounts": { "locations": 2, "connections": 2 }
         }
       ]
@@ -122,9 +120,7 @@
           "id": "grounded-hazards",
           "sections": ["monster-concepts"],
           "brief": "Create two public hazard concepts grounded in the North Shore rather than fantasy monsters: a flooded-forest and ice hazard at the reservoir shoreline, and a fog-and-current marine hazard at the estuary. Each needs a role, a short tactics list, and inert mechanics (state inert with a short reason) because no catalog enemy binds them. Frame them as environmental and social dangers, not creatures to kill.",
-          "expandFrom": [
-            { "jobId": "town-foundation", "fields": ["locations"], "limit": 2 }
-          ],
+          "expandFrom": [{ "jobId": "town-foundation", "fields": ["locations"], "limit": 2 }],
           "desiredCounts": { "monsterConcepts": 2 }
         }
       ]
@@ -137,9 +133,7 @@
           "id": "quest-items",
           "sections": ["quest-items"],
           "brief": "Create two public narrative quest items: a waterlogged company ledger from the drowned boom, and a brass ferry or dam-engineering token tied to the river-flow negotiation. Both must use inert mechanics with a short reason, and each should link to one accepted quest or location. They are leads and leverage, not magical artifacts.",
-          "expandFrom": [
-            { "jobId": "opening-quests", "fields": ["quests"], "limit": 2 }
-          ],
+          "expandFrom": [{ "jobId": "opening-quests", "fields": ["quests"], "limit": 2 }],
           "desiredCounts": { "questItems": 2 }
         }
       ]

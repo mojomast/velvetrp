@@ -8,14 +8,24 @@ const cureWounds = { kind: "spell" as const, packId: "srd-5.1", packVersion: "1.
 describe("ChoiceGroupEditor prepared spells", () => {
   it("renders exact server options as a multi-select patch", () => {
     const onSelect = vi.fn();
-    render(<ChoiceGroupEditor
-      groups={[{ id: "prepared-spells", required: true, options: [
-        { reference: bless, name: "Bless", description: "A blessing." },
-        { reference: cureWounds, name: "Cure Wounds", description: "Healing." },
-      ] }] as any}
-      selections={{ preparedSpells: [bless] } as any}
-      onSelect={onSelect}
-    />);
+    render(
+      <ChoiceGroupEditor
+        groups={
+          [
+            {
+              id: "prepared-spells",
+              required: true,
+              options: [
+                { reference: bless, name: "Bless", description: "A blessing." },
+                { reference: cureWounds, name: "Cure Wounds", description: "Healing." },
+              ],
+            },
+          ] as any
+        }
+        selections={{ preparedSpells: [bless] } as any}
+        onSelect={onSelect}
+      />,
+    );
 
     expect((screen.getByRole("checkbox", { name: /Bless/ }) as HTMLInputElement).checked).toBe(true);
     const cure = screen.getByRole("checkbox", { name: /Cure Wounds/ });

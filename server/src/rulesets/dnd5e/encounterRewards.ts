@@ -15,27 +15,29 @@ export const DND_5E_ENCOUNTER_REWARD_CAPABILITIES: readonly RulesetCapability[] 
 ]);
 
 /** Cumulative XP required to reach each character level 2-20 in SRD 5.1. */
-export const SRD_LEVEL_XP_THRESHOLDS: readonly { level: number; xp: number }[] = Object.freeze([
-  { level: 2, xp: 300 },
-  { level: 3, xp: 900 },
-  { level: 4, xp: 2700 },
-  { level: 5, xp: 6500 },
-  { level: 6, xp: 14000 },
-  { level: 7, xp: 23000 },
-  { level: 8, xp: 34000 },
-  { level: 9, xp: 48000 },
-  { level: 10, xp: 64000 },
-  { level: 11, xp: 85000 },
-  { level: 12, xp: 100000 },
-  { level: 13, xp: 120000 },
-  { level: 14, xp: 140000 },
-  { level: 15, xp: 165000 },
-  { level: 16, xp: 195000 },
-  { level: 17, xp: 225000 },
-  { level: 18, xp: 265000 },
-  { level: 19, xp: 305000 },
-  { level: 20, xp: 355000 },
-].map((entry) => Object.freeze(entry)));
+export const SRD_LEVEL_XP_THRESHOLDS: readonly { level: number; xp: number }[] = Object.freeze(
+  [
+    { level: 2, xp: 300 },
+    { level: 3, xp: 900 },
+    { level: 4, xp: 2700 },
+    { level: 5, xp: 6500 },
+    { level: 6, xp: 14000 },
+    { level: 7, xp: 23000 },
+    { level: 8, xp: 34000 },
+    { level: 9, xp: 48000 },
+    { level: 10, xp: 64000 },
+    { level: 11, xp: 85000 },
+    { level: 12, xp: 100000 },
+    { level: 13, xp: 120000 },
+    { level: 14, xp: 140000 },
+    { level: 15, xp: 165000 },
+    { level: 16, xp: 195000 },
+    { level: 17, xp: 225000 },
+    { level: 18, xp: 265000 },
+    { level: 19, xp: 305000 },
+    { level: 20, xp: 355000 },
+  ].map((entry) => Object.freeze(entry)),
+);
 
 export type EncounterRewardDefeated = Readonly<{ challengeRating: number; count: number }>;
 export type ExperienceThreshold = Readonly<{ level: number; xp: number }>;
@@ -82,7 +84,9 @@ export function planDnd5eEncounterRewards(input: EncounterRewardsInput): Encount
   );
   const nextLevelXp = next ? next.xp : null;
   const levelUpEligible = nextLevelXp !== null && totalXp >= nextLevelXp;
-  const levelsGained = thresholds.filter((threshold) => threshold.level > input.currentLevel && threshold.xp <= totalXp).length;
+  const levelsGained = thresholds.filter(
+    (threshold) => threshold.level > input.currentLevel && threshold.xp <= totalXp,
+  ).length;
   return Object.freeze({
     xpAwarded,
     totalXp,

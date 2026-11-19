@@ -4,9 +4,7 @@ import path from "node:path";
 import { upgradeTacticalMapSchema } from "../../map/schemaUpgrade.js";
 import { upgradeCampaignDmSchema } from "./campaignDmUpgrade.js";
 import { upgradeFactionRelationsSchema } from "./factionRelationUpgrade.js";
-import {
-  BASELINE_SCHEMA_VERSION, MIGRATIONS, SCHEMA_VERSION, applyMigrations,
-} from "./migrations/index.js";
+import { BASELINE_SCHEMA_VERSION, MIGRATIONS, SCHEMA_VERSION, applyMigrations } from "./migrations/index.js";
 
 /**
  * The exact turn-economy update guard published before Dash could extend the
@@ -53,10 +51,8 @@ export const CATALOG_ATTESTATION_LIMIT_PREDECESSOR_CHECK =
  * state, and its exact predecessor that predates abandonable prepared
  * encounters.
  */
-export const ENCOUNTER_STATUS_CHECK =
-  "CHECK(status IN ('preparing','active','completed','escaped','cancelled'))";
-export const ENCOUNTER_STATUS_PREDECESSOR_CHECK =
-  "CHECK(status IN ('preparing','active','completed','escaped'))";
+export const ENCOUNTER_STATUS_CHECK = "CHECK(status IN ('preparing','active','completed','escaped','cancelled'))";
+export const ENCOUNTER_STATUS_PREDECESSOR_CHECK = "CHECK(status IN ('preparing','active','completed','escaped'))";
 
 /** Objects added by the durable character known-option table. */
 export const CHARACTER_KNOWN_OPTIONS_OBJECT_NAMES: ReadonlySet<string> = new Set([
@@ -171,17 +167,28 @@ export const ADVENTURE_COMMERCE_EXECUTION_PREDECESSOR_SQL = `CREATE TABLE advent
   FOREIGN KEY(campaign_id,actor_id,command_id,revision_after) REFERENCES rpg_m15_receipts_v25(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT
 )`;
 
-const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./combatMarkerSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./attunementSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./combatReadyActionSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./combatantLabelSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./actorJourneySchema.sql", import.meta.url), "utf8");
+const currentSchemaSql =
+  readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./combatMarkerSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./attunementSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./combatReadyActionSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./combatantLabelSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./actorJourneySchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
@@ -195,8 +202,12 @@ let expectedSchemaObjects: SchemaObject[] | undefined;
 class CurrentSchemaError extends Error {}
 
 function schemaObjects(db: DatabaseDriver.Database): SchemaObject[] {
-  return db.prepare(`SELECT type,name,tbl_name,sql FROM sqlite_master
-    WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type,name`).all() as SchemaObject[];
+  return db
+    .prepare(
+      `SELECT type,name,tbl_name,sql FROM sqlite_master
+    WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type,name`,
+    )
+    .all() as SchemaObject[];
 }
 
 function expectedObjects(): SchemaObject[] {
@@ -231,9 +242,9 @@ function schemaError(databasePath: string, reason: string): Error {
   const dir = path.dirname(databasePath);
   return new CurrentSchemaError(
     `Database ${databasePath} does not match the current development schema (${reason}). ` +
-    "Velvet did not modify it. Back it up and export its data with " +
-    `\`npm --workspace velvet-mvp-server run db:export -- --data-dir "${dir}"\`, ` +
-    "then start Velvet with an empty data directory.",
+      "Velvet did not modify it. Back it up and export its data with " +
+      `\`npm --workspace velvet-mvp-server run db:export -- --data-dir "${dir}"\`, ` +
+      "then start Velvet with an empty data directory.",
   );
 }
 
@@ -248,11 +259,17 @@ function assertCurrentDatabase(db: DatabaseDriver.Database, databasePath: string
   const foreignKeyIssue = db.prepare("PRAGMA foreign_key_check").get() as { table: string } | undefined;
   if (foreignKeyIssue) throw schemaError(databasePath, `foreign-key violation in ${foreignKeyIssue.table}`);
 
-  const applicationOwnerCount = (db.prepare("SELECT count(*) count FROM application_owner WHERE singleton=1").get() as { count: number }).count;
+  const applicationOwnerCount = (
+    db.prepare("SELECT count(*) count FROM application_owner WHERE singleton=1").get() as { count: number }
+  ).count;
   const localOwner = db.prepare("SELECT 1 FROM principals WHERE id='local-owner'").get();
-  if (applicationOwnerCount !== 1 || !localOwner) throw schemaError(databasePath, "required local ownership data is missing");
-  const modifierKinds = (db.prepare("SELECT modifier_kind FROM rpg_effect_modifier_vocabulary_v26 ORDER BY modifier_kind").all() as Array<{ modifier_kind: string }>)
-    .map(({ modifier_kind }) => modifier_kind);
+  if (applicationOwnerCount !== 1 || !localOwner)
+    throw schemaError(databasePath, "required local ownership data is missing");
+  const modifierKinds = (
+    db.prepare("SELECT modifier_kind FROM rpg_effect_modifier_vocabulary_v26 ORDER BY modifier_kind").all() as Array<{
+      modifier_kind: string;
+    }>
+  ).map(({ modifier_kind }) => modifier_kind);
   const expectedModifierKinds = ["advantage", "flat", "immunity", "proficiency", "resistance", "vulnerability"];
   if (JSON.stringify(modifierKinds) !== JSON.stringify(expectedModifierKinds)) {
     throw schemaError(databasePath, "required effect modifier vocabulary is invalid");
@@ -268,19 +285,24 @@ export function upgradeStartingGrantsSchema(
 ): boolean {
   const grantsTable = "character_starting_grants_v19";
   const materializationsTable = "character_starter_materializations_v51";
-  const predecessor = expected.map((object) => object.name === grantsTable && object.type === "table"
-    ? { ...object, sql: object.sql.replace(
-      "source IN ('background-kit','background-currency','class-starter-kit')",
-      "source IN ('background-kit','background-currency')",
-    ) }
-    : object);
+  const predecessor = expected.map((object) =>
+    object.name === grantsTable && object.type === "table"
+      ? {
+          ...object,
+          sql: object.sql.replace(
+            "source IN ('background-kit','background-currency','class-starter-kit')",
+            "source IN ('background-kit','background-currency')",
+          ),
+        }
+      : object,
+  );
   if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
   if (db.inTransaction) throw new Error("starting grants upgrade requires an independent transaction");
 
   const affectedTables = new Set([grantsTable, materializationsTable]);
-  const affected = expected.filter((object) => object.type !== "table" && (
-    affectedTables.has(object.tbl_name) || object.sql.includes(grantsTable)
-  ));
+  const affected = expected.filter(
+    (object) => object.type !== "table" && (affectedTables.has(object.tbl_name) || object.sql.includes(grantsTable)),
+  );
   const definition = (name: string) => expected.find((object) => object.type === "table" && object.name === name)!;
   db.transaction(() => {
     db.exec(`CREATE TEMP TABLE ${grantsTable}_upgrade AS SELECT * FROM ${grantsTable}`);
@@ -370,9 +392,11 @@ export function upgradeCombatConditionsSchema(
   validate: () => void,
 ): boolean {
   const conditionsTable = "combat_conditions_v62";
-  const predecessor = expected.map((object) => object.name === conditionsTable && object.type === "table"
-    ? { ...object, sql: object.sql.replace(COMBAT_CONDITIONS_CHECK, COMBAT_CONDITIONS_PREDECESSOR_CHECK) }
-    : object);
+  const predecessor = expected.map((object) =>
+    object.name === conditionsTable && object.type === "table"
+      ? { ...object, sql: object.sql.replace(COMBAT_CONDITIONS_CHECK, COMBAT_CONDITIONS_PREDECESSOR_CHECK) }
+      : object,
+  );
   if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
   if (db.inTransaction) throw new Error("combat conditions upgrade requires an independent transaction");
 
@@ -403,13 +427,20 @@ export function upgradeAdvancementCatalogSchema(
   const definitionsTable = "rpg_catalog_definitions";
   const predecessor = expected
     .filter((object) => !CHARACTER_KNOWN_OPTIONS_OBJECT_NAMES.has(object.name))
-    .map((object) => object.name === definitionsTable && object.type === "table"
-      ? { ...object, sql: object.sql.replace(CATALOG_DEFINITION_KINDS_CHECK, CATALOG_DEFINITION_KINDS_PREDECESSOR_CHECK) }
-      : object);
+    .map((object) =>
+      object.name === definitionsTable && object.type === "table"
+        ? {
+            ...object,
+            sql: object.sql.replace(CATALOG_DEFINITION_KINDS_CHECK, CATALOG_DEFINITION_KINDS_PREDECESSOR_CHECK),
+          }
+        : object,
+    );
   if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
   if (db.inTransaction) throw new Error("advancement catalog upgrade requires an independent transaction");
   const definition = expected.find((object) => object.type === "table" && object.name === definitionsTable)!;
-  const definitionObjects = expected.filter((object) => object.type !== "table" && object.tbl_name === definitionsTable);
+  const definitionObjects = expected.filter(
+    (object) => object.type !== "table" && object.tbl_name === definitionsTable,
+  );
   const optionObjects = expected.filter((object) => CHARACTER_KNOWN_OPTIONS_OBJECT_NAMES.has(object.name));
   const foreignKeys = db.pragma("foreign_keys", { simple: true }) as number;
   db.pragma("foreign_keys = OFF");
@@ -422,7 +453,8 @@ export function upgradeAdvancementCatalogSchema(
       db.exec(`DROP TABLE ${definitionsTable}_upgrade`);
       for (const object of definitionObjects) db.exec(object.sql);
       for (const object of optionObjects) db.exec(object.sql);
-      if (db.prepare("PRAGMA foreign_key_check").get()) throw new Error("advancement catalog upgrade violates foreign keys");
+      if (db.prepare("PRAGMA foreign_key_check").get())
+        throw new Error("advancement catalog upgrade violates foreign keys");
       validate();
     }).immediate();
     return true;
@@ -444,9 +476,14 @@ export function upgradeCatalogAttestationLimitSchema(
   validate: () => void,
 ): boolean {
   const table = "rpg_catalog_publication_attestations";
-  const predecessor = expected.map((object) => object.name === table && object.type === "table"
-    ? { ...object, sql: object.sql.replace(CATALOG_ATTESTATION_LIMIT_CHECK, CATALOG_ATTESTATION_LIMIT_PREDECESSOR_CHECK) }
-    : object);
+  const predecessor = expected.map((object) =>
+    object.name === table && object.type === "table"
+      ? {
+          ...object,
+          sql: object.sql.replace(CATALOG_ATTESTATION_LIMIT_CHECK, CATALOG_ATTESTATION_LIMIT_PREDECESSOR_CHECK),
+        }
+      : object,
+  );
   if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
   if (db.inTransaction) throw new Error("catalog attestation limit upgrade requires an independent transaction");
   const definition = expected.find((object) => object.type === "table" && object.name === table)!;
@@ -476,9 +513,11 @@ export function upgradeAdventureCheckExecutionOriginSchema(
   validate: () => void,
 ): boolean {
   const table = "adventure_check_executions_v54";
-  const predecessor = expected.map((object) => object.name === table && object.type === "table"
-    ? { ...object, sql: ADVENTURE_CHECK_EXECUTION_PREDECESSOR_SQL }
-    : object);
+  const predecessor = expected.map((object) =>
+    object.name === table && object.type === "table"
+      ? { ...object, sql: ADVENTURE_CHECK_EXECUTION_PREDECESSOR_SQL }
+      : object,
+  );
   if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
   if (db.inTransaction) throw new Error("adventure check execution origin upgrade requires an independent transaction");
   const definition = expected.find((object) => object.type === "table" && object.name === table)!;
@@ -619,9 +658,11 @@ export function upgradeEncounterCancelledStatusSchema(
   validate: () => void,
 ): boolean {
   const table = "encounter";
-  const predecessor = expected.map((object) => object.name === table && object.type === "table"
-    ? { ...object, sql: object.sql.replace(ENCOUNTER_STATUS_CHECK, ENCOUNTER_STATUS_PREDECESSOR_CHECK) }
-    : object);
+  const predecessor = expected.map((object) =>
+    object.name === table && object.type === "table"
+      ? { ...object, sql: object.sql.replace(ENCOUNTER_STATUS_CHECK, ENCOUNTER_STATUS_PREDECESSOR_CHECK) }
+      : object,
+  );
   if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
   if (db.inTransaction) throw new Error("encounter status upgrade requires an independent transaction");
   const definition = expected.find((object) => object.type === "table" && object.name === table)!;
@@ -636,7 +677,8 @@ export function upgradeEncounterCancelledStatusSchema(
       db.exec(`INSERT INTO ${table} SELECT * FROM ${table}_upgrade`);
       db.exec(`DROP TABLE ${table}_upgrade`);
       for (const object of tableObjects) db.exec(object.sql);
-      if (db.prepare("PRAGMA foreign_key_check").get()) throw new Error("encounter status upgrade violates foreign keys");
+      if (db.prepare("PRAGMA foreign_key_check").get())
+        throw new Error("encounter status upgrade violates foreign keys");
       validate();
     }).immediate();
     return true;
@@ -696,7 +738,11 @@ function schemaDiffNames(actual: SchemaObject[], expected: SchemaObject[]): Set<
  * object absent from the store removes it, because that is exactly what a predecessor generation
  * looked like in the store. Order is preserved from the ordered current inventory.
  */
-function expectedWithMaskedObjects(expected: SchemaObject[], actual: SchemaObject[], masked: ReadonlySet<string>): SchemaObject[] {
+function expectedWithMaskedObjects(
+  expected: SchemaObject[],
+  actual: SchemaObject[],
+  masked: ReadonlySet<string>,
+): SchemaObject[] {
   const actualByName = new Map(actual.map((object) => [object.name, object]));
   const result: SchemaObject[] = [];
   for (const object of expected) {
@@ -793,7 +839,8 @@ function planCompoundUpgrade(
 /** Integrity checks that must hold after every generation, before the final complete-schema gate. */
 function assertIntermediateDatabase(db: DatabaseDriver.Database): void {
   const quickCheck = db.prepare("PRAGMA quick_check").all() as Array<Record<string, unknown>>;
-  if (quickCheck.length !== 1 || Object.values(quickCheck[0] ?? {})[0] !== "ok") throw new Error("SQLite quick_check failed");
+  if (quickCheck.length !== 1 || Object.values(quickCheck[0] ?? {})[0] !== "ok")
+    throw new Error("SQLite quick_check failed");
   const foreignKeyIssue = db.prepare("PRAGMA foreign_key_check").get() as { table: string } | undefined;
   if (foreignKeyIssue) throw new Error(`foreign-key violation in ${foreignKeyIssue.table}`);
 }
@@ -814,22 +861,32 @@ function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): 
       return;
     }
     // Exact-predecessor trigger upgrade: only the known pre-Dash guard is replaced.
-    const guardSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='combat_turn_economy_v60_guard'").get() as { sql: string } | undefined)?.sql;
+    const guardSql = (
+      db
+        .prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='combat_turn_economy_v60_guard'")
+        .get() as { sql: string } | undefined
+    )?.sql;
     if (guardSql === TURN_ECONOMY_GUARD_PREDECESSOR_SQL) {
       const upgraded = expectedObjects().find((object) => object.name === "combat_turn_economy_v60_guard");
-      if (upgraded) db.transaction(() => {
-        db.exec("DROP TRIGGER combat_turn_economy_v60_guard");
-        db.exec(upgraded.sql);
-      }).immediate();
+      if (upgraded)
+        db.transaction(() => {
+          db.exec("DROP TRIGGER combat_turn_economy_v60_guard");
+          db.exec(upgraded.sql);
+        }).immediate();
     }
     // Exact-predecessor trigger upgrade: only the known campaign-deletion cleanup trigger is replaced.
-    const deleteTriggerSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='campaigns_delete_character_drafts_v20'").get() as { sql: string } | undefined)?.sql;
+    const deleteTriggerSql = (
+      db
+        .prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='campaigns_delete_character_drafts_v20'")
+        .get() as { sql: string } | undefined
+    )?.sql;
     if (deleteTriggerSql === CAMPAIGN_DELETE_TRIGGER_PREDECESSOR_SQL) {
       const upgraded = expectedObjects().find((object) => object.name === "campaigns_delete_character_drafts_v20");
-      if (upgraded) db.transaction(() => {
-        db.exec("DROP TRIGGER campaigns_delete_character_drafts_v20");
-        db.exec(upgraded.sql);
-      }).immediate();
+      if (upgraded)
+        db.transaction(() => {
+          db.exec("DROP TRIGGER campaigns_delete_character_drafts_v20");
+          db.exec(upgraded.sql);
+        }).immediate();
     }
     const recallSql = readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8");
     const inspectionSql = readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8");
@@ -848,27 +905,46 @@ function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): 
     try {
       for (let pass = 0; pass <= MAX_SCHEMA_UPGRADE_PASSES; pass += 1) {
         const actual = schemaObjects(db);
-        const missingRecall = !actual.some(object => object.name === "adventure_narration_contexts");
-        const missingInspection = !actual.some(object => object.name === "campaign_context_inspection_headers_v61");
-        const missingKnowledge = !actual.some(object => object.name.startsWith("agent_observations"));
-        const missingMarkers = !actual.some(object => object.name.startsWith("combat_markers_"));
-        const missingAttunements = !actual.some(object => object.name.startsWith("actor_item_attunements_"));
-        const missingReadyActions = !actual.some(object => object.name.startsWith("combat_ready_actions_"));
-        const missingSystemOne = !actual.some(object => object.name.startsWith("system_one_"));
-        const missingCombatantLabels = !actual.some(object => object.name.startsWith("encounter_combatant_label_"));
-        const missingActorJourneys = !actual.some(object => object.name.startsWith("world_actor_journey_")
-          || object.name.startsWith("world_route_event_profiles_"));
-        const missingLateSchema = missingRecall || missingInspection || missingKnowledge || missingMarkers || missingAttunements || missingReadyActions || missingSystemOne || missingCombatantLabels || missingActorJourneys;
-        const expected = expectedObjects().filter(object =>
-          !(missingRecall && object.name.startsWith("adventure_narration_contexts"))
-          && !(missingInspection && object.name.startsWith("campaign_context_inspection_"))
-          && !(missingKnowledge && object.name.startsWith("agent_observations"))
-          && !(missingMarkers && object.name.startsWith("combat_markers_"))
-          && !(missingAttunements && object.name.startsWith("actor_item_attunements_"))
-          && !(missingReadyActions && object.name.startsWith("combat_ready_actions_"))
-          && !(missingSystemOne && (object.name.startsWith("system_one_") || object.tbl_name === "system_one_decisions_v1"))
-          && !(missingCombatantLabels && object.name.startsWith("encounter_combatant_label_"))
-          && !(missingActorJourneys && (object.name.startsWith("world_actor_journey_") || object.name.startsWith("world_route_event_profiles_"))));
+        const missingRecall = !actual.some((object) => object.name === "adventure_narration_contexts");
+        const missingInspection = !actual.some((object) => object.name === "campaign_context_inspection_headers_v61");
+        const missingKnowledge = !actual.some((object) => object.name.startsWith("agent_observations"));
+        const missingMarkers = !actual.some((object) => object.name.startsWith("combat_markers_"));
+        const missingAttunements = !actual.some((object) => object.name.startsWith("actor_item_attunements_"));
+        const missingReadyActions = !actual.some((object) => object.name.startsWith("combat_ready_actions_"));
+        const missingSystemOne = !actual.some((object) => object.name.startsWith("system_one_"));
+        const missingCombatantLabels = !actual.some((object) => object.name.startsWith("encounter_combatant_label_"));
+        const missingActorJourneys = !actual.some(
+          (object) =>
+            object.name.startsWith("world_actor_journey_") || object.name.startsWith("world_route_event_profiles_"),
+        );
+        const missingLateSchema =
+          missingRecall ||
+          missingInspection ||
+          missingKnowledge ||
+          missingMarkers ||
+          missingAttunements ||
+          missingReadyActions ||
+          missingSystemOne ||
+          missingCombatantLabels ||
+          missingActorJourneys;
+        const expected = expectedObjects().filter(
+          (object) =>
+            !(missingRecall && object.name.startsWith("adventure_narration_contexts")) &&
+            !(missingInspection && object.name.startsWith("campaign_context_inspection_")) &&
+            !(missingKnowledge && object.name.startsWith("agent_observations")) &&
+            !(missingMarkers && object.name.startsWith("combat_markers_")) &&
+            !(missingAttunements && object.name.startsWith("actor_item_attunements_")) &&
+            !(missingReadyActions && object.name.startsWith("combat_ready_actions_")) &&
+            !(
+              missingSystemOne &&
+              (object.name.startsWith("system_one_") || object.tbl_name === "system_one_decisions_v1")
+            ) &&
+            !(missingCombatantLabels && object.name.startsWith("encounter_combatant_label_")) &&
+            !(
+              missingActorJourneys &&
+              (object.name.startsWith("world_actor_journey_") || object.name.startsWith("world_route_event_profiles_"))
+            ),
+        );
         const installMissingLateSchema = () => {
           if (missingRecall) db.exec(recallSql);
           if (missingInspection) db.exec(inspectionSql);
@@ -896,9 +972,9 @@ function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): 
         // installed inside that same transaction and validated before commit.
         const validate = missingLateSchema
           ? () => {
-            installMissingLateSchema();
-            assertCurrentDatabase(db, databasePath);
-          }
+              installMissingLateSchema();
+              assertCurrentDatabase(db, databasePath);
+            }
           : () => assertCurrentDatabase(db, databasePath);
         let progressed = false;
         for (const recognizer of schemaRecognizers) {
@@ -962,7 +1038,10 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
   try {
     const version = db.pragma("user_version", { simple: true }) as number;
     if (version > SCHEMA_VERSION) {
-      throw schemaError(databasePath, `database schema version ${version} is newer than this Velvet supports (${SCHEMA_VERSION})`);
+      throw schemaError(
+        databasePath,
+        `database schema version ${version} is newer than this Velvet supports (${SCHEMA_VERSION})`,
+      );
     }
     if (schemaObjects(db).length === 0) {
       db.transaction(() => {

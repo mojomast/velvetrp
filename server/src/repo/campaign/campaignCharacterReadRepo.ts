@@ -262,8 +262,14 @@ function toCampaignCharacterRead(row: CampaignCharacterReadRow): CampaignCharact
     role: row.requesting_role,
     createdAt: row.requesting_created_at,
   });
-  if (!row.campaign_character_id || !row.legacy_character_presence || !row.sheet_presence
-      || !row.actor_presence || !row.private_state_presence || row.integrity_error_count !== 0) {
+  if (
+    !row.campaign_character_id ||
+    !row.legacy_character_presence ||
+    !row.sheet_presence ||
+    !row.actor_presence ||
+    !row.private_state_presence ||
+    row.integrity_error_count !== 0
+  ) {
     throw new Error("campaign character aggregate is incomplete");
   }
   const actor = {
@@ -275,10 +281,12 @@ function toCampaignCharacterRead(row: CampaignCharacterReadRow): CampaignCharact
     control: row.actor_control,
     createdAt: row.actor_created_at,
     updatedAt: row.actor_updated_at,
-    ...(row.access === "privileged" ? {
-      controllerPrincipalId: row.controller_principal_id,
-      privateNotes: row.private_notes,
-    } : {}),
+    ...(row.access === "privileged"
+      ? {
+          controllerPrincipalId: row.controller_principal_id,
+          privateNotes: row.private_notes,
+        }
+      : {}),
   };
   return campaignCharacterReadSchema.parse({
     access: row.access,
@@ -295,12 +303,16 @@ function toCampaignCharacterRead(row: CampaignCharacterReadRow): CampaignCharact
         campaignId: row.campaign_id,
         campaignCharacterId: row.campaign_character_id,
         race: {
-          packId: row.race_pack_id, packVersion: row.race_pack_version,
-          kind: row.race_kind, definitionId: row.race_definition_id,
+          packId: row.race_pack_id,
+          packVersion: row.race_pack_version,
+          kind: row.race_kind,
+          definitionId: row.race_definition_id,
         },
         background: {
-          packId: row.background_pack_id, packVersion: row.background_pack_version,
-          kind: row.background_kind, definitionId: row.background_definition_id,
+          packId: row.background_pack_id,
+          packVersion: row.background_pack_version,
+          kind: row.background_kind,
+          definitionId: row.background_definition_id,
         },
         classes: JSON.parse(row.classes) as unknown,
         attributes: JSON.parse(row.attributes) as unknown,
@@ -321,8 +333,12 @@ function listCampaignCharactersSyncInternal(
 ): CampaignCharacterRead[] {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const id = resourceIdSchema.parse(campaignId);
-  const rows = db.prepare(`${CAMPAIGN_CHARACTER_READ_SELECT}
-    ORDER BY cc.created_at ASC, cc.id ASC`).all(actorId, actorId, actorId, actorId, id) as CampaignCharacterReadRow[];
+  const rows = db
+    .prepare(
+      `${CAMPAIGN_CHARACTER_READ_SELECT}
+    ORDER BY cc.created_at ASC, cc.id ASC`,
+    )
+    .all(actorId, actorId, actorId, actorId, id) as CampaignCharacterReadRow[];
   return rows.map(toCampaignCharacterRead);
 }
 
@@ -335,8 +351,12 @@ function getCampaignCharacterSyncInternal(
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const id = resourceIdSchema.parse(campaignId);
   const characterId = resourceIdSchema.parse(campaignCharacterId);
-  const row = db.prepare(`${CAMPAIGN_CHARACTER_READ_SELECT}
-    AND cc.id = ?`).get(actorId, actorId, actorId, actorId, id, characterId) as CampaignCharacterReadRow | undefined;
+  const row = db
+    .prepare(
+      `${CAMPAIGN_CHARACTER_READ_SELECT}
+    AND cc.id = ?`,
+    )
+    .get(actorId, actorId, actorId, actorId, id, characterId) as CampaignCharacterReadRow | undefined;
   return row ? toCampaignCharacterRead(row) : null;
 }
 
@@ -349,24 +369,18 @@ function getCampaignCharacterByActorIdSyncInternal(
   const requestingId = resourceIdSchema.parse(actorPrincipalId);
   const id = resourceIdSchema.parse(campaignId);
   const targetActorId = resourceIdSchema.parse(actorId);
-  const row = db.prepare(CAMPAIGN_CHARACTER_BY_ACTOR_READ_SELECT).get(
-    requestingId,
-    requestingId,
-    requestingId,
-    id,
-    targetActorId,
-    id,
-    targetActorId,
-    requestingId,
-    id,
-  ) as CampaignCharacterReadRow | undefined;
+  const row = db
+    .prepare(CAMPAIGN_CHARACTER_BY_ACTOR_READ_SELECT)
+    .get(requestingId, requestingId, requestingId, id, targetActorId, id, targetActorId, requestingId, id) as
+    CampaignCharacterReadRow | undefined;
   if (!row || (row.actor_presence === null && row.private_state_presence === null)) return null;
   return toCampaignCharacterRead(row);
 }
 
 export function createCampaignCharacterReadOperations(db: DatabaseDriver.Database) {
   return {
-    listCampaignCharacters: (actor: string, campaignId: string) => listCampaignCharactersSyncInternal(db, actor, campaignId),
+    listCampaignCharacters: (actor: string, campaignId: string) =>
+      listCampaignCharactersSyncInternal(db, actor, campaignId),
     getCampaignCharacter: (actor: string, campaignId: string, campaignCharacterId: string) =>
       getCampaignCharacterSyncInternal(db, actor, campaignId, campaignCharacterId),
     getCampaignCharacterByActorId: (actor: string, campaignId: string, actorId: string) =>

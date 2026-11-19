@@ -1,8 +1,21 @@
 import { loreBlock } from "./lore.js";
 import type { PromptPreset } from "./presets.js";
-import type { Character, EpisodeSummary, HarnessSettings, LoreEntry, MemoryFact, Message, MessageRole, Session } from "./types.js";
+import type {
+  Character,
+  EpisodeSummary,
+  HarnessSettings,
+  LoreEntry,
+  MemoryFact,
+  Message,
+  MessageRole,
+  Session,
+} from "./types.js";
 import { resolvePromptTemplate } from "./promptTemplates.js";
-import { bindCampaignAgentContextToTurn, campaignContextBasketText, type CampaignAgentContextBasket } from "./context.js";
+import {
+  bindCampaignAgentContextToTurn,
+  campaignContextBasketText,
+  type CampaignAgentContextBasket,
+} from "./context.js";
 
 type OpenAIRole = "system" | "user" | "assistant";
 
@@ -76,25 +89,35 @@ export function buildOrchestratedMessages(input: {
   const system = resolvePromptTemplate("character.safety", overrides, { "session.state": session.state });
 
   const participantById = new Map(participants.map((participant) => [participant.id, participant]));
-  const participantCards = participants.map((participant) => [
-      `Name: ${participant.name}${participant.id === targetCharacter.id ? " (TARGET SPEAKER)" : ""}`,
-      `Age statement: ${participant.age}`,
-      `Archetype/vibe: ${participant.archetype}`,
-      `Boundaries and hard limits: ${participant.boundaries}`,
-    ].join("\n")).join("\n");
+  const participantCards = participants
+    .map((participant) =>
+      [
+        `Name: ${participant.name}${participant.id === targetCharacter.id ? " (TARGET SPEAKER)" : ""}`,
+        `Age statement: ${participant.age}`,
+        `Archetype/vibe: ${participant.archetype}`,
+        `Boundaries and hard limits: ${participant.boundaries}`,
+      ].join("\n"),
+    )
+    .join("\n");
   const persona = resolvePromptTemplate("character.persona", overrides, {
-    "persona.preamble": harness.personaPreamble.trim() ? `User persona preamble: ${clip(harness.personaPreamble.trim(), 500)}` : "",
+    "persona.preamble": harness.personaPreamble.trim()
+      ? `User persona preamble: ${clip(harness.personaPreamble.trim(), 500)}`
+      : "",
     "participants.cards": participantCards,
   });
 
-  const constraints = resolvePromptTemplate("character.constraints", overrides, { "target.name": targetCharacter.name });
+  const constraints = resolvePromptTemplate("character.constraints", overrides, {
+    "target.name": targetCharacter.name,
+  });
 
   const customSystem = harness.systemPrompt.trim()
-      ? resolvePromptTemplate("character.customSystem", overrides, { "custom.system": clip(harness.systemPrompt.trim(), 64_000) })
+    ? resolvePromptTemplate("character.customSystem", overrides, {
+        "custom.system": clip(harness.systemPrompt.trim(), 64_000),
+      })
     : "";
 
   const editableStyle = harness.styleGuide.trim()
-      ? resolvePromptTemplate("character.style", overrides, { "style.guide": clip(harness.styleGuide.trim(), 900) })
+    ? resolvePromptTemplate("character.style", overrides, { "style.guide": clip(harness.styleGuide.trim(), 900) })
     : "";
 
   const loreText = resolvePromptTemplate("character.lore", overrides, { "lore.triggered": loreBlock(lore) });
@@ -102,20 +125,28 @@ export function buildOrchestratedMessages(input: {
     throw new Error("campaign context target speaker does not match generation character");
   }
   const campaignContext = input.campaignContext
-    ? campaignContextBasketText(bindCampaignAgentContextToTurn(input.campaignContext, session.id, character.id, userContent))
+    ? campaignContextBasketText(
+        bindCampaignAgentContextToTurn(input.campaignContext, session.id, character.id, userContent),
+      )
     : "";
 
   const memory = resolvePromptTemplate("character.memory", overrides, {
     "memory.approved": memoryBlock(memories, harness.memoryChars),
     "summary.text": summary ? clip(summary.summary, harness.summaryChars) : "none yet",
   });
-  const sharedContext = resolvePromptTemplate("character.context", overrides, { "context.basket": input.sharedContext ?? "No shared context available." });
+  const sharedContext = resolvePromptTemplate("character.context", overrides, {
+    "context.basket": input.sharedContext ?? "No shared context available.",
+  });
 
   const postHistory = harness.postHistoryInstructions.trim()
-      ? resolvePromptTemplate("character.postHistory", overrides, { "postHistory.instructions": clip(harness.postHistoryInstructions.trim(), 700) })
+    ? resolvePromptTemplate("character.postHistory", overrides, {
+        "postHistory.instructions": clip(harness.postHistoryInstructions.trim(), 700),
+      })
     : "";
 
-  const finalTurnContract = resolvePromptTemplate("character.final", overrides, { "target.name": targetCharacter.name });
+  const finalTurnContract = resolvePromptTemplate("character.final", overrides, {
+    "target.name": targetCharacter.name,
+  });
   const targetProfile = targetProfileBlock(targetCharacter);
 
   const messages: OrchestratedMessage[] = [
@@ -126,15 +157,19 @@ export function buildOrchestratedMessages(input: {
     ...(editableStyle ? [{ role: "system" as const, content: editableStyle }] : []),
     ...(campaignContext
       ? [{ role: "system" as const, content: campaignContext }]
-      : [{ role: "system" as const, content: loreText }, { role: "system" as const, content: memory },
-        { role: "system" as const, content: sharedContext }]),
+      : [
+          { role: "system" as const, content: loreText },
+          { role: "system" as const, content: memory },
+          { role: "system" as const, content: sharedContext },
+        ]),
     ...(postHistory ? [{ role: "system" as const, content: postHistory }] : []),
     { role: "system", content: finalTurnContract },
     ...history.slice(-harness.recentTurns).map((m) => ({
       role: toOpenAIRole(m.role),
-      content: m.role === "character"
-        ? `[${participantById.get(m.speakerCharacterId ?? "")?.name ?? "Character"}] ${cleanCharacterReply(m.content, participants)}`
-        : m.content,
+      content:
+        m.role === "character"
+          ? `[${participantById.get(m.speakerCharacterId ?? "")?.name ?? "Character"}] ${cleanCharacterReply(m.content, participants)}`
+          : m.content,
     })),
     ...(targetProfile ? [{ role: "user" as const, content: targetProfile }] : []),
     { role: "user", content: userContent },

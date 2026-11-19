@@ -5,19 +5,32 @@ import { createCampaign, getCampaignAdministration, listCampaigns } from "../api
 import { CampaignLibraryPage } from "./CampaignLibraryPage";
 
 vi.mock("../api", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../api")>(),
+  ...(await importOriginal<typeof import("../api")>()),
   listCampaigns: vi.fn(),
   createCampaign: vi.fn(),
   getCampaignAdministration: vi.fn(),
 }));
 
 vi.mock("../components/rpg/campaign/WorldbuildingAgentPanel", () => ({
-  WorldbuildingAgentPanel: ({ onCampaignCreated, onManageWorld, onStartPlaying }: { onCampaignCreated: (result: unknown) => void; onManageWorld?: (id: string) => void; onStartPlaying?: (id: string) => void }) => <div>
-    <label>Generation draft<input defaultValue="Keep my world premise" /></label>
-    <button onClick={() => onCampaignCreated({ campaign })}>Simulate campaign created</button>
-    <button onClick={() => onManageWorld?.(campaign.id)}>Manage world</button>
-    <button onClick={() => onStartPlaying?.(campaign.id)}>Prepare to play</button>
-  </div>,
+  WorldbuildingAgentPanel: ({
+    onCampaignCreated,
+    onManageWorld,
+    onStartPlaying,
+  }: {
+    onCampaignCreated: (result: unknown) => void;
+    onManageWorld?: (id: string) => void;
+    onStartPlaying?: (id: string) => void;
+  }) => (
+    <div>
+      <label>
+        Generation draft
+        <input defaultValue="Keep my world premise" />
+      </label>
+      <button onClick={() => onCampaignCreated({ campaign })}>Simulate campaign created</button>
+      <button onClick={() => onManageWorld?.(campaign.id)}>Manage world</button>
+      <button onClick={() => onStartPlaying?.(campaign.id)}>Prepare to play</button>
+    </div>
+  ),
 }));
 
 // Existing creation regressions exercise the explicitly disclosed blank path.
@@ -47,16 +60,33 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-afterEach(() => { cleanup(); vi.resetAllMocks(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.resetAllMocks();
+  vi.restoreAllMocks();
+});
 
 describe("CampaignLibraryPage", () => {
   it("searches, combines role and lifecycle filters, and clears a no-match result", async () => {
-    const second = { ...campaign, id: "second", name: "Amber Isles", actorRole: "player" as const, updatedAt: "2030-01-01T00:00:00.000Z" };
+    const second = {
+      ...campaign,
+      id: "second",
+      name: "Amber Isles",
+      actorRole: "player" as const,
+      updatedAt: "2030-01-01T00:00:00.000Z",
+    };
     vi.mocked(listCampaigns).mockResolvedValue({ campaigns: [second, campaign] });
-    vi.mocked(getCampaignAdministration).mockImplementation(async (id) => ({ campaign: {
-      id, status: id === campaign.id ? "draft" : "published", actorRole: "player", activeTimelineId: "timeline", revision: 1,
-      updatedAt: campaign.updatedAt, settings: { maxPlayers: 4, allowPlayerDice: true, safetyMode: "standard", recapVisibility: "members" },
-    } }));
+    vi.mocked(getCampaignAdministration).mockImplementation(async (id) => ({
+      campaign: {
+        id,
+        status: id === campaign.id ? "draft" : "published",
+        actorRole: "player",
+        activeTimelineId: "timeline",
+        revision: 1,
+        updatedAt: campaign.updatedAt,
+        settings: { maxPlayers: 4, allowPlayerDice: true, safetyMode: "standard", recapVisibility: "members" },
+      },
+    }));
     renderView(<CampaignLibraryPage onBack={vi.fn()} onOpen={vi.fn()} />);
     await screen.findByRole("heading", { name: campaign.name });
     expect(screen.getAllByRole("listitem")[0].textContent).toContain(campaign.name);
@@ -109,7 +139,11 @@ describe("CampaignLibraryPage", () => {
 
   it("shows loading, then an accessible creation form and empty state", async () => {
     let resolve!: (value: { campaigns: [] }) => void;
-    vi.mocked(listCampaigns).mockReturnValue(new Promise((done) => { resolve = done; }));
+    vi.mocked(listCampaigns).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
     render(<CampaignLibraryPage onBack={vi.fn()} />);
     expect(screen.getByRole("status").textContent).toContain("Loading campaigns");
     resolve({ campaigns: [] });
@@ -139,7 +173,9 @@ describe("CampaignLibraryPage", () => {
   });
 
   it("shows a generic error and retries", async () => {
-    vi.mocked(listCampaigns).mockRejectedValueOnce(new Error("private server detail")).mockResolvedValueOnce({ campaigns: [] });
+    vi.mocked(listCampaigns)
+      .mockRejectedValueOnce(new Error("private server detail"))
+      .mockResolvedValueOnce({ campaigns: [] });
     render(<CampaignLibraryPage onBack={vi.fn()} />);
     await screen.findByText("Campaigns could not be loaded.");
     expect(screen.queryByText("private server detail")).toBeNull();
@@ -158,8 +194,14 @@ describe("CampaignLibraryPage", () => {
 
   it("locks duplicate submits, clears after POST success, refreshes authoritatively, and focuses the created card", async () => {
     let resolveCreate!: (value: { campaign: typeof campaign }) => void;
-    vi.mocked(listCampaigns).mockResolvedValueOnce({ campaigns: [] }).mockResolvedValueOnce({ campaigns: [campaign] });
-    vi.mocked(createCampaign).mockReturnValue(new Promise((resolve) => { resolveCreate = resolve; }));
+    vi.mocked(listCampaigns)
+      .mockResolvedValueOnce({ campaigns: [] })
+      .mockResolvedValueOnce({ campaigns: [campaign] });
+    vi.mocked(createCampaign).mockReturnValue(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
     render(<CampaignLibraryPage onBack={vi.fn()} />);
     await screen.findByText("No campaigns yet.");
     const input = screen.getByLabelText("Campaign name") as HTMLInputElement;
@@ -192,7 +234,10 @@ describe("CampaignLibraryPage", () => {
   });
 
   it("does not retry a successful POST when its authoritative refresh fails", async () => {
-    vi.mocked(listCampaigns).mockResolvedValueOnce({ campaigns: [] }).mockRejectedValueOnce(new Error("refresh detail")).mockResolvedValueOnce({ campaigns: [campaign] });
+    vi.mocked(listCampaigns)
+      .mockResolvedValueOnce({ campaigns: [] })
+      .mockRejectedValueOnce(new Error("refresh detail"))
+      .mockResolvedValueOnce({ campaigns: [campaign] });
     vi.mocked(createCampaign).mockResolvedValue({ campaign });
     render(<CampaignLibraryPage onBack={vi.fn()} />);
     await screen.findByText("No campaigns yet.");
@@ -268,23 +313,20 @@ describe("CampaignLibraryPage", () => {
     expect(screen.queryByText("No campaigns yet.")).toBeNull();
   });
 
-  it.each(["success", "failure"] as const)(
-    "ignores an unmounted initial GET %s",
-    async (outcome) => {
-      const initial = deferred<{ campaigns: [] }>();
-      vi.mocked(listCampaigns).mockReturnValue(initial.promise);
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-      const { unmount } = render(<CampaignLibraryPage onBack={vi.fn()} />);
-      unmount();
+  it.each(["success", "failure"] as const)("ignores an unmounted initial GET %s", async (outcome) => {
+    const initial = deferred<{ campaigns: [] }>();
+    vi.mocked(listCampaigns).mockReturnValue(initial.promise);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { unmount } = render(<CampaignLibraryPage onBack={vi.fn()} />);
+    unmount();
 
-      if (outcome === "success") initial.resolve({ campaigns: [] });
-      else initial.reject(new Error("unmounted GET"));
-      await initial.promise.catch(() => undefined);
-      await Promise.resolve();
-      expect(listCampaigns).toHaveBeenCalledOnce();
-      expect(consoleError).not.toHaveBeenCalled();
-    },
-  );
+    if (outcome === "success") initial.resolve({ campaigns: [] });
+    else initial.reject(new Error("unmounted GET"));
+    await initial.promise.catch(() => undefined);
+    await Promise.resolve();
+    expect(listCampaigns).toHaveBeenCalledOnce();
+    expect(consoleError).not.toHaveBeenCalled();
+  });
 
   it("does not refresh, retry, or update after unmount during POST", async () => {
     const post = deferred<{ campaign: typeof campaign }>();

@@ -1,70 +1,196 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { commandCampaignDmBeat, commandCampaignDmDecision, commandCampaignDmMode, getCampaignDmControl, getCampaignDmHistory, getCampaignDmPreparationReadiness, getCampaignDmProposal, getCampaignDmRun, resumeCampaignDmRun } from "./api";
+import {
+  commandCampaignDmBeat,
+  commandCampaignDmDecision,
+  commandCampaignDmMode,
+  getCampaignDmControl,
+  getCampaignDmHistory,
+  getCampaignDmPreparationReadiness,
+  getCampaignDmProposal,
+  getCampaignDmRun,
+  resumeCampaignDmRun,
+} from "./api";
 import { commandCampaignDmSceneBinding } from "./api";
 
-const run = { runId: "run", campaignId: "campaign", sessionId: "room", intent: "open", mode: "ai", modeRevision: 2, revision: 0, state: "completed", narration: "The harbor wakes.", receipts: [], blockers: [], createdAt: "2030-01-01T00:00:00.000Z" };
+const run = {
+  runId: "run",
+  campaignId: "campaign",
+  sessionId: "room",
+  intent: "open",
+  mode: "ai",
+  modeRevision: 2,
+  revision: 0,
+  state: "completed",
+  narration: "The harbor wakes.",
+  receipts: [],
+  blockers: [],
+  createdAt: "2030-01-01T00:00:00.000Z",
+};
 const control = { campaignId: "campaign", mode: "ai", revision: 2 };
 const readiness = {
   version: "1.0" as const,
-  identity: { campaignId: "campaign", sessionId: "room", timelineId: "timeline", campaignRevision: 3, timelineRevision: 4 },
-  activationReadiness: { campaignId: "campaign", sessionId: "room", expectedRevision: 3, active: true, ready: true, blockers: [], actorIds: [] },
-  mode: "ai" as const, issues: [],
-  coverage: { state: "complete" as const, families: ["locations", "connections", "actors", "quests", "encounters", "story", "clues", "artifacts", "bindings", "evidence"].map(family => ({ family, state: "complete" as const, inspected: [], omitted: [] })) },
+  identity: {
+    campaignId: "campaign",
+    sessionId: "room",
+    timelineId: "timeline",
+    campaignRevision: 3,
+    timelineRevision: 4,
+  },
+  activationReadiness: {
+    campaignId: "campaign",
+    sessionId: "room",
+    expectedRevision: 3,
+    active: true,
+    ready: true,
+    blockers: [],
+    actorIds: [],
+  },
+  mode: "ai" as const,
+  issues: [],
+  coverage: {
+    state: "complete" as const,
+    families: [
+      "locations",
+      "connections",
+      "actors",
+      "quests",
+      "encounters",
+      "story",
+      "clues",
+      "artifacts",
+      "bindings",
+      "evidence",
+    ].map((family) => ({ family, state: "complete" as const, inspected: [], omitted: [] })),
+  },
   manualReviewLimitations: [],
 };
-const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+const response = (value: unknown, status = 200) =>
+  new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
 afterEach(() => vi.unstubAllGlobals());
 describe("Campaign DM API", () => {
   it("requires an exact scene binding echo and sends only the accepted contract", async () => {
-    const binding = { nodeId: "scene", evidence: { kind: "quest-objective" as const, targetId: "objective" }, expectedStoryRevision: 42, idempotencyKey: "binding-key" };
-    const fetch = vi.fn().mockResolvedValueOnce(response(binding)).mockResolvedValueOnce(response({ ...binding, expectedStoryRevision: 43 })); vi.stubGlobal("fetch", fetch);
+    const binding = {
+      nodeId: "scene",
+      evidence: { kind: "quest-objective" as const, targetId: "objective" },
+      expectedStoryRevision: 42,
+      idempotencyKey: "binding-key",
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(response(binding))
+      .mockResolvedValueOnce(response({ ...binding, expectedStoryRevision: 43 }));
+    vi.stubGlobal("fetch", fetch);
     await expect(commandCampaignDmSceneBinding("campaign", binding)).resolves.toEqual(binding);
-    expect(fetch).toHaveBeenCalledWith("/api/rpg/v1/campaigns/campaign/dm/scene-binding-commands", expect.objectContaining({ method: "POST", body: JSON.stringify(binding) }));
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/rpg/v1/campaigns/campaign/dm/scene-binding-commands",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(binding) }),
+    );
     await expect(commandCampaignDmSceneBinding("campaign", binding)).rejects.toThrow(/exact request/);
-    await expect(commandCampaignDmSceneBinding("campaign", { ...binding, evidence: { ...binding.evidence, success: true } } as never)).rejects.toThrow();
+    await expect(
+      commandCampaignDmSceneBinding("campaign", {
+        ...binding,
+        evidence: { ...binding.evidence, success: true },
+      } as never),
+    ).rejects.toThrow();
     expect(fetch).toHaveBeenCalledTimes(2);
   });
   it("uses exact public and private GET paths without triggering writes", async () => {
-    const fetch = vi.fn().mockResolvedValueOnce(response(control)).mockResolvedValueOnce(response({ control, runs: [run] })).mockResolvedValueOnce(response(run)).mockResolvedValueOnce(response({ run, proposal: null })); vi.stubGlobal("fetch", fetch);
-    await getCampaignDmControl("campaign"); await getCampaignDmHistory("campaign", "room"); await getCampaignDmRun("campaign", "room", "run"); await getCampaignDmProposal("campaign", "room", "run");
-    expect(fetch.mock.calls.map(call => call[0])).toEqual(["/api/rpg/v1/campaigns/campaign/dm", "/api/rpg/v1/campaigns/campaign/rooms/room/dm", "/api/rpg/v1/campaigns/campaign/rooms/room/dm/runs/run", "/api/rpg/v1/campaigns/campaign/rooms/room/dm/runs/run/proposal"]);
-    expect(fetch.mock.calls.every(call => call[1].cache === "no-store" && !call[1].body)).toBe(true);
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(response(control))
+      .mockResolvedValueOnce(response({ control, runs: [run] }))
+      .mockResolvedValueOnce(response(run))
+      .mockResolvedValueOnce(response({ run, proposal: null }));
+    vi.stubGlobal("fetch", fetch);
+    await getCampaignDmControl("campaign");
+    await getCampaignDmHistory("campaign", "room");
+    await getCampaignDmRun("campaign", "room", "run");
+    await getCampaignDmProposal("campaign", "room", "run");
+    expect(fetch.mock.calls.map((call) => call[0])).toEqual([
+      "/api/rpg/v1/campaigns/campaign/dm",
+      "/api/rpg/v1/campaigns/campaign/rooms/room/dm",
+      "/api/rpg/v1/campaigns/campaign/rooms/room/dm/runs/run",
+      "/api/rpg/v1/campaigns/campaign/rooms/room/dm/runs/run/proposal",
+    ]);
+    expect(fetch.mock.calls.every((call) => call[1].cache === "no-store" && !call[1].body)).toBe(true);
   });
   it("fetches strict, path-bound readiness without a body or retry", async () => {
-    const encodedReadiness = { ...readiness, identity: { ...readiness.identity, campaignId: "campaign:id", sessionId: "room:id" }, activationReadiness: { ...readiness.activationReadiness, campaignId: "campaign:id", sessionId: "room:id" } };
-    const fetch = vi.fn().mockResolvedValueOnce(response(encodedReadiness)); vi.stubGlobal("fetch", fetch);
+    const encodedReadiness = {
+      ...readiness,
+      identity: { ...readiness.identity, campaignId: "campaign:id", sessionId: "room:id" },
+      activationReadiness: { ...readiness.activationReadiness, campaignId: "campaign:id", sessionId: "room:id" },
+    };
+    const fetch = vi.fn().mockResolvedValueOnce(response(encodedReadiness));
+    vi.stubGlobal("fetch", fetch);
     await expect(getCampaignDmPreparationReadiness("campaign:id", "room:id")).resolves.toEqual(encodedReadiness);
-    expect(fetch).toHaveBeenCalledWith("/api/rpg/v1/campaigns/campaign%3Aid/rooms/room%3Aid/dm/preparation-readiness", expect.objectContaining({ cache: "no-store" }));
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/rpg/v1/campaigns/campaign%3Aid/rooms/room%3Aid/dm/preparation-readiness",
+      expect.objectContaining({ cache: "no-store" }),
+    );
     expect(fetch.mock.calls[0]![1]).not.toHaveProperty("body");
 
-    vi.mocked(fetch).mockResolvedValueOnce(response({ ...readiness, identity: { ...readiness.identity, sessionId: "other" } }));
+    vi.mocked(fetch).mockResolvedValueOnce(
+      response({ ...readiness, identity: { ...readiness.identity, sessionId: "other" } }),
+    );
     await expect(getCampaignDmPreparationReadiness("campaign", "room")).rejects.toThrow(/match/);
     vi.mocked(fetch).mockResolvedValueOnce(response({ ...readiness, unexpected: true }));
     await expect(getCampaignDmPreparationReadiness("campaign", "room")).rejects.toThrow();
     expect(fetch).toHaveBeenCalledTimes(3);
   });
   it("sends exact closed command bodies with JSON media type", async () => {
-    const fetch = vi.fn().mockResolvedValueOnce(response(control)).mockImplementation(async () => response({ ...run, revision: 1 })); vi.stubGlobal("fetch", fetch);
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(response(control))
+      .mockImplementation(async () => response({ ...run, revision: 1 }));
+    vi.stubGlobal("fetch", fetch);
     const mode = { mode: "ai" as const, expectedRevision: 1, idempotencyKey: "mode-key" };
     const beat = { intent: "open" as const, expectedModeRevision: 2, idempotencyKey: "beat-key" };
     const decision = { decision: "approved" as const, expectedRevision: 0, idempotencyKey: "decision-key" };
-    await commandCampaignDmMode("campaign", mode); await commandCampaignDmBeat("campaign", "room", beat);
-    await commandCampaignDmDecision("campaign", "room", "run", decision); await resumeCampaignDmRun("campaign", "room", "run");
-    expect(fetch.mock.calls.map(call => JSON.parse(call[1].body))).toEqual([mode, beat, decision, {}]);
-    expect(fetch.mock.calls.every(call => call[1].method === "POST" && call[1].headers.get("content-type") === "application/json")).toBe(true);
-    expect(fetch.mock.calls.map(call => call[0].split("/").at(-1))).toEqual(["mode-commands", "beat-commands", "decision-commands", "resume-commands"]);
+    await commandCampaignDmMode("campaign", mode);
+    await commandCampaignDmBeat("campaign", "room", beat);
+    await commandCampaignDmDecision("campaign", "room", "run", decision);
+    await resumeCampaignDmRun("campaign", "room", "run");
+    expect(fetch.mock.calls.map((call) => JSON.parse(call[1].body))).toEqual([mode, beat, decision, {}]);
+    expect(
+      fetch.mock.calls.every(
+        (call) => call[1].method === "POST" && call[1].headers.get("content-type") === "application/json",
+      ),
+    ).toBe(true);
+    expect(fetch.mock.calls.map((call) => call[0].split("/").at(-1))).toEqual([
+      "mode-commands",
+      "beat-commands",
+      "decision-commands",
+      "resume-commands",
+    ]);
   });
   it("rejects unbound and private public responses and non-200 success", async () => {
-    const fetch = vi.fn().mockResolvedValueOnce(response({ ...run, sessionId: "other" })).mockResolvedValueOnce(response({ control, runs: [{ ...run, proposal: {} }] })).mockResolvedValueOnce(response(run, 202)); vi.stubGlobal("fetch", fetch);
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(response({ ...run, sessionId: "other" }))
+      .mockResolvedValueOnce(response({ control, runs: [{ ...run, proposal: {} }] }))
+      .mockResolvedValueOnce(response(run, 202));
+    vi.stubGlobal("fetch", fetch);
     await expect(getCampaignDmRun("campaign", "room", "run")).rejects.toThrow(/match/);
     await expect(getCampaignDmHistory("campaign", "room")).rejects.toThrow();
-    await expect(commandCampaignDmBeat("campaign", "room", { intent: "open", expectedModeRevision: 2, idempotencyKey: "key" })).rejects.toThrow(/status/);
+    await expect(
+      commandCampaignDmBeat("campaign", "room", { intent: "open", expectedModeRevision: 2, idempotencyKey: "key" }),
+    ).rejects.toThrow(/status/);
   });
   it("rejects invented mechanics before fetch and does not retry a network failure", async () => {
-    const fetch = vi.fn().mockRejectedValue(new Error("lost response")); vi.stubGlobal("fetch", fetch);
-    await expect(commandCampaignDmBeat("campaign", "room", { intent: "open", expectedModeRevision: 2, idempotencyKey: "key", declaration: "fake" } as never)).rejects.toThrow();
+    const fetch = vi.fn().mockRejectedValue(new Error("lost response"));
+    vi.stubGlobal("fetch", fetch);
+    await expect(
+      commandCampaignDmBeat("campaign", "room", {
+        intent: "open",
+        expectedModeRevision: 2,
+        idempotencyKey: "key",
+        declaration: "fake",
+      } as never),
+    ).rejects.toThrow();
     expect(fetch).not.toHaveBeenCalled();
-    await expect(commandCampaignDmBeat("campaign", "room", { intent: "open", expectedModeRevision: 2, idempotencyKey: "key" })).rejects.toThrow("lost response");
+    await expect(
+      commandCampaignDmBeat("campaign", "room", { intent: "open", expectedModeRevision: 2, idempotencyKey: "key" }),
+    ).rejects.toThrow("lost response");
     expect(fetch).toHaveBeenCalledOnce();
   });
 });

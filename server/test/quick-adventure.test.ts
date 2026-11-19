@@ -26,10 +26,14 @@ function openRaw(): Database.Database {
 function campaignSnapshot(campaignId: string): Record<string, unknown[]> {
   const db = openRaw();
   try {
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as Array<{ name: string }>;
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+      .all() as Array<{ name: string }>;
     const snapshot: Record<string, unknown[]> = {};
     for (const { name } of tables) {
-      const columns = (db.prepare(`PRAGMA table_info("${name}")`).all() as Array<{ name: string }>).map((column) => column.name);
+      const columns = (db.prepare(`PRAGMA table_info("${name}")`).all() as Array<{ name: string }>).map(
+        (column) => column.name,
+      );
       if (columns.includes("campaign_id")) {
         const rows = db.prepare(`SELECT * FROM "${name}" WHERE campaign_id=? ORDER BY rowid`).all(campaignId);
         if (rows.length > 0) snapshot[name] = rows;
@@ -45,7 +49,10 @@ function campaignSnapshot(campaignId: string): Record<string, unknown[]> {
 function integrity(): { quick: unknown; foreignKeys: unknown[] } {
   const db = openRaw();
   try {
-    return { quick: db.pragma("quick_check", { simple: true }), foreignKeys: db.pragma("foreign_key_check") as unknown[] };
+    return {
+      quick: db.pragma("quick_check", { simple: true }),
+      foreignKeys: db.pragma("foreign_key_check") as unknown[],
+    };
   } finally {
     db.close();
   }
@@ -54,7 +61,11 @@ function integrity(): { quick: unknown; foreignKeys: unknown[] } {
 function publicLocations(campaignId: string): number {
   const db = openRaw();
   try {
-    return (db.prepare("SELECT count(*) n FROM campaign_locations_v28 WHERE campaign_id=? AND visibility='public'").get(campaignId) as { n: number }).n;
+    return (
+      db
+        .prepare("SELECT count(*) n FROM campaign_locations_v28 WHERE campaign_id=? AND visibility='public'")
+        .get(campaignId) as { n: number }
+    ).n;
   } finally {
     db.close();
   }
@@ -66,8 +77,17 @@ describe("createQuickAdventure", () => {
     try {
       const existing = repository.createCampaign(OWNER, { name: "My own campaign" });
       repository.installSrdStarterCatalog(OWNER);
-      repository.configureSrdStarterCatalog(OWNER, existing.id, { expectedRevision: 0, idempotencyKey: "user-catalog" });
-      await createCharacter({ name: "Existing Hero", age: 30, archetype: "ranger", boundaries: "", fictionalConfirmed: true });
+      repository.configureSrdStarterCatalog(OWNER, existing.id, {
+        expectedRevision: 0,
+        idempotencyKey: "user-catalog",
+      });
+      await createCharacter({
+        name: "Existing Hero",
+        age: 30,
+        archetype: "ranger",
+        boundaries: "",
+        fictionalConfirmed: true,
+      });
       const charactersBefore = await listCharacters();
       const before = campaignSnapshot(existing.id);
 
@@ -127,7 +147,9 @@ describe("createQuickAdventure", () => {
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(process.env.VELVET_DATA_DIR).toBe(dataDir);
       // No report or scratch files are written next to the user's database.
-      const added = readdirSync(dataDir!).filter((name) => !filesBefore.has(name) && !/^velvet\.sqlite(-wal|-shm|-journal)?$/.test(name));
+      const added = readdirSync(dataDir!).filter(
+        (name) => !filesBefore.has(name) && !/^velvet\.sqlite(-wal|-shm|-journal)?$/.test(name),
+      );
       expect(added).toEqual([]);
     } finally {
       repository.close();
@@ -139,12 +161,20 @@ describe("createQuickAdventure", () => {
     const repository = createRepository();
     try {
       const existing = repository.createCampaign(OWNER, { name: "Keep me" });
-      const visible = () => repository.listCampaigns(OWNER).map((campaign) => campaign.id)
-        .filter((id) => repository.getCampaignAdministration(OWNER, id)?.status !== "archived");
+      const visible = () =>
+        repository
+          .listCampaigns(OWNER)
+          .map((campaign) => campaign.id)
+          .filter((id) => repository.getCampaignAdministration(OWNER, id)?.status !== "archived");
       const listedBefore = visible();
-      vi.spyOn(repository, "activateCampaignRoom").mockImplementation(() => { throw new Error("simulated storage failure"); });
+      vi.spyOn(repository, "activateCampaignRoom").mockImplementation(() => {
+        throw new Error("simulated storage failure");
+      });
 
-      const failure = await createQuickAdventure({ repository, ownerId: OWNER }).then(() => null, (error: unknown) => error);
+      const failure = await createQuickAdventure({ repository, ownerId: OWNER }).then(
+        () => null,
+        (error: unknown) => error,
+      );
       expect(failure).toBeInstanceOf(QuickAdventureError);
       expect((failure as QuickAdventureError).step).toMatch(/^[a-z][a-z-]+$/);
       expect((failure as QuickAdventureError).message).toContain((failure as QuickAdventureError).step);
