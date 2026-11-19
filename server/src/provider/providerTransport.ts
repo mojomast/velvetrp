@@ -6,7 +6,25 @@ const SUPPORTED_HOSTED_PROVIDER_HOSTS = new Set([
   "router.requesty.ai",
   "requesty.ai",
 ]);
-const AUTHORIZED_HTTP_PROVIDER = { hostname: "100.72.41.9", port: "8787", pathname: "/v1" } as const;
+/**
+ * Default is an RFC 5737 documentation address, so no real host is special-cased. Operators who run a private
+ * plain-HTTP provider for live validation set VELVET_LIVE_PROVIDER_HTTP_URL to its exact base URL.
+ */
+const DEFAULT_AUTHORIZED_HTTP_PROVIDER = { hostname: "192.0.2.9", port: "8787", pathname: "/v1" } as const;
+
+function authorizedHttpProvider(): { hostname: string; port: string; pathname: string } {
+  const configured = process.env.VELVET_LIVE_PROVIDER_HTTP_URL?.trim();
+  if (!configured) return DEFAULT_AUTHORIZED_HTTP_PROVIDER;
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "http:" || url.search || url.hash || url.username || url.password) {
+      return DEFAULT_AUTHORIZED_HTTP_PROVIDER;
+    }
+    return { hostname: url.hostname, port: url.port, pathname: url.pathname.replace(/\/+$/, "") };
+  } catch {
+    return DEFAULT_AUTHORIZED_HTTP_PROVIDER;
+  }
+}
 /**
  * The single hosted host that may receive the System One credential. Unlike the
  * OpenAI-compatible allowlist, this is deliberately not extended with a loopback
@@ -24,6 +42,7 @@ function providerHostname(baseUrl: string): string | null {
 
 /** The sole non-loopback HTTP provider endpoint authorized for live validation. */
 function isAuthorizedHttpProvider(url: URL): boolean {
+  const AUTHORIZED_HTTP_PROVIDER = authorizedHttpProvider();
   return (
     url.protocol === "http:" &&
     url.hostname === AUTHORIZED_HTTP_PROVIDER.hostname &&

@@ -14,7 +14,7 @@ The Director threshold is **0.6**, the operating point the calibration selected.
 
 | Setting | Jev arm | LLM arm |
 | --- | --- | --- |
-| Endpoint | `https://api.typesafe.ai/v1` (`/systemone`) | `http://100.72.41.9:8787/v1` (`/chat/completions`) |
+| Endpoint | `https://api.typesafe.ai/v1` (`/systemone`) | `http://192.0.2.9:8787/v1` (`/chat/completions`) |
 | Model | jev-latest | deepseek-v4-flash |
 | Price in / out (USD per million) | 0.042 / 0 | 0.07784 / 0.15568 |
 
@@ -60,7 +60,7 @@ Jev coverage (how often the fast path answers): 80.0%; when Jev acts its accepte
 ```bash
 set -a; . /tmp/opencode/jev/jev.env; set +a   # TYPESAFE_API_KEY
 export PROXY_API_KEY="$(rg -o '^PROXY_API_KEY=.*' /home/mojo/projects/agentrouterrouter/.env | cut -d= -f2-)"
-export OPENROUTER_BASE_URL=http://100.72.41.9:8787/v1 OPENROUTER_MODEL=deepseek-v4-flash
+export OPENROUTER_BASE_URL=http://192.0.2.9:8787/v1 OPENROUTER_MODEL=deepseek-v4-flash
 npx tsx scripts/benchmark-system-one-director-lane.ts
 ```
 

@@ -68,7 +68,7 @@ lanes working:
 Required environment for a live thinking-mode gateway:
 
 ```
-OPENROUTER_BASE_URL=http://100.72.41.9:8787/v1
+OPENROUTER_BASE_URL=http://192.0.2.9:8787/v1
 OPENROUTER_API_KEY=<gateway key>
 OPENROUTER_MODEL=deepseek-v4-flash
 ```

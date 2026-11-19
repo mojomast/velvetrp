@@ -265,7 +265,7 @@ and regenerate the committed reports (`docs/system-one-*.md`) plus their raw JSO
 # Room routing before/after benchmark (100 calls per arm) -> docs/system-one-benchmark.md
 set -a; . /tmp/opencode/jev/jev.env; set +a
 export PROXY_API_KEY="$(rg -o '^PROXY_API_KEY=.*' /home/mojo/projects/agentrouterrouter/.env | cut -d= -f2-)"
-export OPENROUTER_BASE_URL=http://100.72.41.9:8787/v1 OPENROUTER_MODEL=deepseek-v4-flash
+export OPENROUTER_BASE_URL=http://192.0.2.9:8787/v1 OPENROUTER_MODEL=deepseek-v4-flash
 BENCH_REPEATS=5 npx tsx scripts/benchmark-system-one-lanes.ts
 
 # Director before/after benchmark (25 decisions per arm) -> docs/system-one-director-benchmark.md

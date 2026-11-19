@@ -21,7 +21,7 @@ const OWNER = "local-owner";
 
 // RouteTok proxy in `projects/agentrouterrouter`, serving AgentRouter `deepseek-v4-flash`.
 const PROXY_ENV_PATH = "/home/mojo/projects/agentrouterrouter/.env";
-const PROXY_BASE_URL = "http://100.72.41.9:8787/v1";
+const PROXY_BASE_URL = "http://192.0.2.9:8787/v1";
 const PROXY_MODEL = "deepseek-v4-flash";
 
 export async function readProxyKey(): Promise<string> {

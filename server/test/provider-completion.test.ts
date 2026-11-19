@@ -861,19 +861,19 @@ describe("provider credential and OpenRouter header scope", () => {
   });
 
   it("allows and scopes the one authorized HTTP live-validation endpoint only", () => {
-    const settings = provider("http://100.72.41.9:8787/v1/");
+    const settings = provider("http://192.0.2.9:8787/v1/");
     expect(validateProviderBaseUrl(settings.baseUrl)).toEqual({ ok: true });
     expect(canUseProvider(settings)).toBe(true);
     expect(buildProviderHeaders(settings.baseUrl, settings).Authorization).toBe("Bearer local-secret");
     settings.apiKey = "";
     expect(canUseProvider(settings)).toBe(false);
     for (const url of [
-      "http://100.72.41.8:8787/v1",
-      "http://100.72.41.9:8788/v1",
-      "http://100.72.41.9:8787/v2",
-      "http://100.72.41.9:8787/v1?next=1",
-      "http://100.72.41.9:8787/v1#fragment",
-      "http://user:password@100.72.41.9:8787/v1",
+      "http://192.0.2.8:8787/v1",
+      "http://192.0.2.9:8788/v1",
+      "http://192.0.2.9:8787/v2",
+      "http://192.0.2.9:8787/v1?next=1",
+      "http://192.0.2.9:8787/v1#fragment",
+      "http://user:password@192.0.2.9:8787/v1",
     ]) {
       expect(validateProviderBaseUrl(url).ok).toBe(false);
       const neighboring = provider(url);

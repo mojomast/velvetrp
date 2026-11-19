@@ -42,7 +42,7 @@ describe("image generation base URL policy", () => {
       "http://10.1.2.3:8123",
       "http://172.20.0.4:8123",
       "http://192.168.1.20:8123",
-      "http://100.101.102.103:8123",
+      "http://100.64.0.1:8123",
       "http://gpu-host.tailnet.ts.net:8123",
     ]) {
       expect(validateImageGenerationBaseUrl(allowed), allowed).toEqual({ ok: true });

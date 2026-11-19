@@ -239,7 +239,7 @@ describe("grounded director planning loop", () => {
     });
     const provider = {
       ...defaultProviderSettings(),
-      baseUrl: "http://100.72.41.9:8787/v1",
+      baseUrl: "http://192.0.2.9:8787/v1",
       model: "deepseek-v4-flash",
     };
     const deps = {

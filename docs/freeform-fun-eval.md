@@ -67,7 +67,7 @@ Provider configuration is read from the environment (no secret is committed):
 
 | Variable | Fallback | Default |
 | --- | --- | --- |
-| `FREEFORM_FUN_EVAL_BASE_URL` | `PROXY_BASE_URL` | `http://100.72.41.9:8787/v1` |
+| `FREEFORM_FUN_EVAL_BASE_URL` | `PROXY_BASE_URL` | `http://192.0.2.9:8787/v1` |
 | `FREEFORM_FUN_EVAL_API_KEY` | `PROXY_API_KEY`, then `/home/mojo/projects/agentrouterrouter/.env` | required |
 | `FREEFORM_FUN_EVAL_MODEL` | `PROXY_MODEL` | `deepseek-v4-flash` |
 

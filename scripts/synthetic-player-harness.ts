@@ -1640,7 +1640,7 @@ export type GeneratorEnvConfig = {
 export function readGeneratorEnvConfig(env: NodeJS.ProcessEnv = process.env): GeneratorEnvConfig | null {
   const apiKey = (env.PROXY_API_KEY ?? env.OPENROUTER_API_KEY ?? "").trim();
   if (apiKey.length === 0) return null;
-  const baseUrl = (env.OPENROUTER_BASE_URL ?? "http://100.72.41.9:8787/v1").trim().replace(/\/+$/, "");
+  const baseUrl = (env.OPENROUTER_BASE_URL ?? "http://192.0.2.9:8787/v1").trim().replace(/\/+$/, "");
   const model = (env.OPENROUTER_MODEL ?? "deepseek-v4-flash").trim();
   if (baseUrl.length === 0 || model.length === 0) return null;
   return {

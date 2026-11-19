@@ -27,7 +27,7 @@ import {
 import { readProxyKey } from "./evaluate-live-director-grounding.js";
 
 const OWNER = "local-owner";
-const PROXY_BASE_URL = "http://100.72.41.9:8787/v1";
+const PROXY_BASE_URL = "http://192.0.2.9:8787/v1";
 const PROXY_MODEL = "deepseek-v4-flash";
 
 export interface PlaytestOptions {
