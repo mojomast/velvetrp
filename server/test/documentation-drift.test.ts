@@ -405,9 +405,9 @@ function documentedEnvironment(): Map<string, string> {
 describe("documentation drift guards", () => {
   it("keeps designated disposable-schema and operation claims aligned", () => {
     const schemaClaims: Array<[string, string]> = [
-      ["README.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
+      ["README.md", "Development databases are kept, not deleted, when the schema changes"],
       ["docs/api.md", "Development databases use one current schema and are disposable"],
-      ["docs/operations.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
+      ["docs/operations.md", "Development databases are kept, not deleted, when the schema changes"],
       ["docs/repo-architecture.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
       ["docs/ROADMAP.md", "Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
       ["devplan.md", "Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
