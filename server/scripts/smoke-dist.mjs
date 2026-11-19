@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const serverDir = path.resolve(scriptDir, "..");
+const OUTPUT_TAIL_CHARS = 8000;
 
 function parseArgs(argv) {
   const options = {
@@ -92,6 +93,7 @@ async function main() {
 
   const dataDir = mkdtempSync(path.join(tmpdir(), "velvet-smoke-data-"));
   let child = null;
+  let output = "";
   try {
     const port = await freePort();
     child = spawn(process.execPath, [options.entry], {
@@ -101,8 +103,15 @@ async function main() {
         HOST: "127.0.0.1",
         VELVET_DATA_DIR: dataDir,
       },
-      stdio: "ignore",
+      stdio: ["ignore", "pipe", "pipe"],
     });
+    // Keep the tail of the server's output so a failed start explains itself in CI logs.
+    const keep = (chunk) => {
+      output += chunk.toString("utf8");
+      if (output.length > OUTPUT_TAIL_CHARS) output = output.slice(-OUTPUT_TAIL_CHARS);
+    };
+    child.stdout.on("data", keep);
+    child.stderr.on("data", keep);
 
     let exited = false;
     let exitCode = null;
@@ -136,6 +145,7 @@ async function main() {
     return 0;
   } catch (error) {
     process.stderr.write(`smoke:dist FAILED: ${error instanceof Error ? error.message : String(error)}\n`);
+    if (output.trim()) process.stderr.write(`--- server output (last ${OUTPUT_TAIL_CHARS} chars) ---\n${output}\n--- end server output ---\n`);
     return 1;
   } finally {
     await stopChild(child);
