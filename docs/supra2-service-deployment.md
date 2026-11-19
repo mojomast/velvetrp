@@ -6,7 +6,7 @@ service is reachable only from the Tailscale tailnet. The Velvet side that consu
 described in [Scene image integration](scene-image-integration.md); the original design
 rationale is [Image generation integration (proposed)](image-generation-integration.md); the
 historical handoff prompt that first stood the service up is
-[Supra2-IMG inference setup prompt](supra2-inference-setup-prompt.md).
+[Supra2-IMG inference setup prompt](archive/supra2-inference-setup-prompt.md).
 
 The API section below matches the current service implementation, and the Velvet adapter
 (`server/src/provider/supra2ImageService.ts`) is built to it. Where this runbook and the older
@@ -402,7 +402,7 @@ Two practical consequences:
   developer guide.
 - [Image generation integration (proposed)](image-generation-integration.md) - model facts,
   hosting options, and the phased plan.
-- [Supra2-IMG inference setup prompt](supra2-inference-setup-prompt.md) - the historical
+- [Supra2-IMG inference setup prompt](archive/supra2-inference-setup-prompt.md) - the historical
   bring-up handoff and report template.
 - [Operations](operations.md#environment) - Velvet environment setup and the
   `VELVET_SCENE_IMAGES_*` keys.

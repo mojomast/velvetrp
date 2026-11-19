@@ -25,7 +25,7 @@ results. A fluent ending is not evidence of quest completion or reward settlemen
 - [Ink runtime integration](https://github.com/inkle/ink/blob/master/Documentation/RunningYourInk.md)
   illustrates explicit content/choice phases, save/load, and branch visitation.
   Borrow a branch manifest and replay oracle; do not add Ink as a dependency.
-- The [AI-DM research](ai-dungeon-master.md#research-and-evidence) supports separate
+- The [AI-DM research](../ai-dungeon-master.md#research-and-evidence) supports separate
   planning, verified execution, and narration. Report live quality observationally;
   one successful run is not a reliability estimate.
 

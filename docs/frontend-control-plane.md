@@ -41,7 +41,7 @@ play regions, and `?` outside text fields opens Help. Native dialogs and modal t
 drawers support Escape/Close. Tool closure restores the invoking control;
 **Back to draft** selects Story and focuses the composer.
 
-See the [Adventure Table design audit](adventure-table-design-2026-10-03.md) for
+See the [Adventure Table design audit](archive/adventure-table-design-2026-10-03.md) for
 implementation references, research, accessibility review criteria, and current
 [play screenshots](../README.md#screenshots).
 
@@ -226,9 +226,9 @@ the visible drawer, and Escape/Close restores the trigger. Tools reached through
 Table tools return focus to that visible menu button. **Back to draft** focuses the
 composer in Story. Narrow layouts wrap the primary tool row and keep the composer in
 page flow. The legacy Atlas dock remains non-modal. See the
-[sheet-context audit](play-sheet-context-audit-2026-10-02.md) for the attachment
+[sheet-context audit](archive/play-sheet-context-audit-2026-10-02.md) for the attachment
 contract and earlier evidence, and the
-[Adventure Table audit](adventure-table-design-2026-10-03.md) for the current shell.
+[Adventure Table audit](archive/adventure-table-design-2026-10-03.md) for the current shell.
 
 ## Director
 
@@ -275,11 +275,11 @@ and [AI dungeon master](ai-dungeon-master.md) for authority, budgets, and limita
 ## Validation
 
 Current Adventure Table results belong in the
-[2026-10-03 validation record](adventure-table-design-2026-10-03.md#validation-record).
+[2026-10-03 validation record](archive/adventure-table-design-2026-10-03.md#validation-record).
 Implementation descriptions and screenshots do not establish test passes or
 accessibility conformance. Earlier executed results remain in the
-[2026-10-02 implementation audit](roleplay-worldbuilding-audit-2026-10-02.md#validation)
-and [sheet-context audit](play-sheet-context-audit-2026-10-02.md).
+[2026-10-02 implementation audit](archive/roleplay-worldbuilding-audit-2026-10-02.md#validation)
+and [sheet-context audit](archive/play-sheet-context-audit-2026-10-02.md).
 
 Relevant checks include the owning client tests for App, CampaignShell,
 CampaignOverviewPage, CampaignPlayPage, CampaignConversation, AdventureActionComposer,
@@ -342,7 +342,7 @@ Research informing the design includes
 [human-AI interaction guidelines](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/),
 [server-side authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html),
 and [accessible dialog behavior](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
-Adventure Table's [design audit](adventure-table-design-2026-10-03.md) records the
+Adventure Table's [design audit](archive/adventure-table-design-2026-10-03.md) records the
 observed Owlbear, Foundry, D&D Beyond, Alchemy, and AI Dungeon patterns separately from
 Velvet recommendations and implementation. It also links the W3C tab, modal-dialog,
 reflow, and focus criteria used for review. Tactical tools additionally draw on

@@ -10,7 +10,7 @@ bridge, a first-class faction-reaction command type, and a dedicated browser
 knowledge-read E2E are deliberately deferred with blockers recorded below.
 Researched against current `main` after Plan 3 closeout. Design research and
 sources:
-[docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
+[docs/npc-knowledge-rumors.md](../npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
 
@@ -21,7 +21,7 @@ actor's authoritative location. Location-bound NPCs must match that actor rather
 than another split-party member; null-location NPCs retain session-level presence.
 Faction witnesses use the same eligible set. Existing observations are not rewritten.
 Public adventure narration now also receives explicit local NPC presence and bounded
-disclosable knowledge. See [campaign memory](campaign-memory.md) and the
+disclosable knowledge. See [campaign memory](../campaign-memory.md) and the
 [implementation audit](roleplay-worldbuilding-audit-2026-10-02.md).
 
 One bounded, attributable, privacy-safe observation ledger shared across the

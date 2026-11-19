@@ -167,7 +167,7 @@ Optional features default off. `FEATURE_VOICE` and `FEATURE_IMAGES` report avail
 
 ## Screenshots
 
-The four Adventure Table images are real application captures from a **fictional local demonstration campaign**, cloned from the Baie-Comeau fixture with historical narration. The capture script blocks API writes and makes no provider dispatch. See the [design and validation record](docs/adventure-table-design-2026-10-03.md) for research, provenance, and reproduction details.
+The four Adventure Table images are real application captures from a **fictional local demonstration campaign**, cloned from the Baie-Comeau fixture with historical narration. The capture script blocks API writes and makes no provider dispatch. See the [design and validation record](docs/archive/adventure-table-design-2026-10-03.md) for research, provenance, and reproduction details.
 
 ### Adventure Table — current play experience
 
@@ -290,7 +290,7 @@ Velvet is an actively developed MVP with real playable systems and explicit limi
 - **Memory and recovery are bounded.** Recall is source-filtered and size-limited, not an omniscient semantic memory. Worldbuilding journals survive same-tab reloads, not cross-device recovery. Legacy chat recovery uses transcript snapshots rather than a durable operation-status endpoint.
 - **Some product scope remains open.** Delegated companion grant exercise/dismissal, Discord/VTT adapters, and simultaneous encounters remain follow-up work. The current policy layer is limited and is not a comprehensive moderation system.
 
-The [roadmap](docs/ROADMAP.md) tracks remaining scope. The [2026-10-02 implementation audit](docs/roleplay-worldbuilding-audit-2026-10-02.md) records a live 125-artifact world build, an 18-turn before/after play comparison, focused follow-up probes, and the exact validation limits.
+The [roadmap](docs/ROADMAP.md) tracks remaining scope. The [2026-10-02 implementation audit](docs/archive/roleplay-worldbuilding-audit-2026-10-02.md) records a live 125-artifact world build, an 18-turn before/after play comparison, focused follow-up probes, and the exact validation limits.
 
 ## Development and validation
 
@@ -329,7 +329,7 @@ npm ci && npm run build && npm --workspace velvet-mvp-server start
 
 See [Operations](docs/operations.md) for environment and deployment guidance.
 
-Contributions should preserve strict contracts, authoritative mechanics, and exact recovery. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [engineering handoff](handoff.md).
+Contributions should preserve strict contracts, authoritative mechanics, and exact recovery. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [documentation index](docs/README.md).
 
 ## Documentation
 
@@ -338,7 +338,7 @@ Contributions should preserve strict contracts, authoritative mechanics, and exa
 | [Documentation index](docs/README.md) | Complete guide inventory and authority hierarchy |
 | [Campaign generation](docs/campaign-generation.md) | Prompt-to-world workflow, staged plans, review, coverage, and recovery |
 | [Campaign control plane](docs/frontend-control-plane.md) | Preparation, room activation, Adventure Table, and session recovery |
-| [Adventure Table design audit](docs/adventure-table-design-2026-10-03.md) | Implemented play flow, comparable-product research, accessibility criteria, and screenshot provenance |
+| [Adventure Table design audit](docs/archive/adventure-table-design-2026-10-03.md) | Implemented play flow, comparable-product research, accessibility criteria, and screenshot provenance |
 | [AI Dungeon Master](docs/ai-dungeon-master.md) | Director controls, proposals, narration, and scene progression |
 | [Campaign memory](docs/campaign-memory.md) | Recall sources, NPC knowledge, branch continuity, and bounds |
 | [SRD 5.1 coverage](docs/srd-5.1-coverage.md) | Rules, catalog, runtime evidence, and unsupported mechanics |
@@ -346,8 +346,8 @@ Contributions should preserve strict contracts, authoritative mechanics, and exa
 | [Operations](docs/operations.md) | Environment, local deployment, storage, testing, and troubleshooting |
 | [API reference](docs/api.md) · [Streaming](docs/streaming.md) | HTTP contracts, SSE families, and reconciliation |
 | [DM harness](docs/dm-harness-architecture.md) · [Repository architecture](docs/repo-architecture.md) | Context, tools, authority, persistence, and module ownership |
-| [Live evaluation and audit](docs/roleplay-worldbuilding-audit-2026-10-02.md) | Implementation evidence, measurements, and known limits |
-| [Roadmap](docs/ROADMAP.md) · [Development ledger](devplan.md) | Delivered work and remaining scope |
+| [Live evaluation and audit](docs/archive/roleplay-worldbuilding-audit-2026-10-02.md) | Implementation evidence, measurements, and known limits |
+| [Roadmap](docs/ROADMAP.md) · [Archive](docs/archive/README.md) | Delivered work and remaining scope; historical plans |
 
 ## SRD attribution
 

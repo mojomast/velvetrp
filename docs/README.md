@@ -9,9 +9,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Operations](operations.md) owns setup, configuration classification, development data, and release-gate guidance.
 - [Repository architecture](repo-architecture.md) owns current persistence structure, schema ownership, module ownership, and transaction conventions.
 - [RPG roadmap](ROADMAP.md) alone owns current milestone status and remaining product scope.
-- Root [`devplan.md`](../devplan.md) is a compact delivered/pending ledger; it cannot override the roadmap.
-- Root [`handoff.md`](../handoff.md) owns the immediate engineering baseline and next task.
-- Historical and dated plans preserve rationale and checkpoints but never override these current authorities.
+- Agent-era plans, handoffs, progress ledgers and dated audits live in [the archive](archive/README.md). They preserve rationale and checkpoints but never override these current authorities.
 
 ## Normative reference
 
@@ -35,8 +33,6 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [System One Director disagreement report](system-one-disagreement-report.md) - Read-only, deterministic comparison of the shadow Director lane's would-be selections against the authoritative provider composition, producing a review queue of divergent cases.
 - [Administration UX](administration-ux.md) - Campaign administration interaction guidance.
 - [Adventure Table and campaign control plane](frontend-control-plane.md) - Story-first gameplay, editable first moves, character attachments, Story/Map navigation, automatic readiness reads, preparation, and recovery.
-- [Adventure Table design audit (2026-10-03)](adventure-table-design-2026-10-03.md) - Comparable-product research, implemented interaction model, accessibility criteria, new gameplay screenshots, and serialized validation.
-- [Play surface and character context audit (2026-10-02)](play-sheet-context-audit-2026-10-02.md) - Complete sheet-reference coverage, exact DM attachments, accessible drawer/composer interaction, October 2026 research, and focused validation.
 - [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.
 - [SRD 5.1 hydration review](srd-5.1-hydration.md) - Source-checked equipment, composite ancestry and spell additions, compatible campaign hydration, and remaining source gaps.
 - [The Sintermark campaign](sintermark-campaign.md) - Original D&D industrial-ecology sandbox, two overpowered heroes, reviewed hydration, playable toys and research basis.
@@ -55,17 +51,11 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 ## Planning and historical records
 
-- [Roleplay and worldbuilding audit (2026-10-02)](roleplay-worldbuilding-audit-2026-10-02.md) - Implementation results, isolated live evaluations, and observed limits for free-form play and complete world generation.
 - [World-generation backend research](world-generation-backend-research.md) - Source-grounded generation design, count/reference validation, directed travel and catalog-context decisions.
 - [Worldbuilding workflow research](worldbuilding-workflow-research.md) - Staged generation, coverage, exact recovery, navigation and preparation handoffs.
 - [World library workflow research](world-library-workflow-research.md) - Saved-world discovery, inline generation and library usability decisions.
-- [Playability execution protocol](playability-execution.md) - Ordered three-plan program, small-context subagent workflow, API budget, milestone commits, and reusable execution trigger.
-- [Playability progress](playability-progress.md) - Durable execution ledger with committed milestone handoffs, validation results, and remaining live budget.
-- [Plan 1: Campaign readiness](plan-1-campaign-readiness.md) - Private provider-free preparation diagnostics and actionable GM remedies; planned, not an activation replacement.
 - [Campaign readiness contract](campaign-readiness.md) - Versioned strict DTO, issue taxonomy, and bounded inspection coverage for GM preparation diagnostics.
-- [Plan 2: Complete reviewed adventure](plan-2-reviewed-adventure.md) - Supported human/AI branch completion, deterministic recovery, bounded configured-provider evaluation, and source-bound observations.
 - [The Last Harbor Light](reviewed-adventure.md) - Provider-free reviewed fixture, exact branch oracle, readiness observations, and P2 journey constraints.
-- [Plan 3: Measured memory improvements](plan-3-memory-evaluation.md) - Persisted-context inspection, golden recall evaluation, and evidence-selected runtime improvements.
 - [Context inspection contract](context-inspection.md) - GM-only bounded persisted-dispatch inspection lanes, withholding policy, and byte/token units.
 - [Reviewed adventure runner](reviewed-adventure-runner.md) - Bounded provider-free and explicitly authorized live execution policy.
 - [Reviewed adventure report template](reviewed-adventure-report-template.md) - Stable evidence and observation format for matched branches.
@@ -73,13 +63,10 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [RPG memory framework evaluation](memory-framework-evaluation.md) - Research comparison of SQLite, LangGraph, Mem0, Graphiti/Zep, and Letta, with proposed evaluation gates rather than implementation claims.
 - [Free-form generation research](freeform-generation-research.md) - Research and design record for bounded free-form materialization (locations, NPCs, hostiles, shops, factions/quests/clues) plus the Jev lane plan; a design record, not runtime behavior.
 - [Bounded NPC knowledge and rumors](npc-knowledge-rumors.md) - Research design and evaluation plan for per-agent observation ledgers, rumor propagation, and attribution/privacy/false-memory gates; the ledger and its gates are now shipped, the per-agent belief projection is not.
-- [Plan 4: Living knowledge and rumors](plan-4-living-knowledge.md) - Implemented observation ledger across NPC dialogue, factions, gossip, quest offers, and evaluated attribution/privacy gates; the clue-source bridge is deferred with its schema blocker recorded.
-- [Plan 5: A living-world Director](plan-5-living-director.md) - Ordered plan to give the AI Director ordered beat composition, bounded read grounding, world time/ambient beats, knowledge narration, and evaluation.
 - [Jev (TypeSafe System One) integration](jev-integration.md) - Design for an optional typed-decision provider lane (choice/score/noul) with confidence-gated routing, deterministic fallback, and evaluation. The live API is verified and the W0 transport/settings/policy scaffolding plus the gated room-routing lane are implemented; disabled by default.
 - [Version-bound Jev promotion](jev-promotion-binding.md) - Separates the promotion metrics gate from runtime authority: evaluated bindings freeze the lane, provider endpoint, requested and returned model, question/composition revisions, candidate strategy, action family, thresholds, and calibration, while historical records stay deliberately unbound and active lanes retain the provider fallback.
 - [Adventure shared-context experiment](jev-shared-context-experiment.md) - Evaluation-only shared-context request builder plus the benchmark `--payload shared-context` variant, with distinct state/question binding versions, fail-closed duplicate/empty candidate handling, and offline payload-byte evidence; not wired into runtime traffic.
 - [Image generation integration (proposed)](image-generation-integration.md) - Proposed optional provider lane for generated images: Supra2-IMG model facts and hosting options, a provider-agnostic adapter, sidecar asset storage with review/publication on existing campaign artifacts, and offline-first phases with explicit budget and moderation gates.
-- [Supra2-IMG inference setup prompt](supra2-inference-setup-prompt.md) - Paste-ready handoff for an agent on another tailnet machine to self-host a private token-authenticated Supra2-IMG text-to-image service, with the exact service contract, verification steps, and report block the Velvet adapter expects.
 - [System One harvest loop](system-one-harvest-loop.md) - Harvest loop that turns reviewed live shadow decisions and deterministic Director disagreements into provenance-tagged, human-confirmed corpus cases: the harvest/stability modules and CLI are implemented, adventure-selection merges confirmed fixtures, and the gate-v2 changes are planned.
 - [Synthetic player simulation](synthetic-player-simulation.md) - Research and proposed harness design for persona-driven, seeded synthetic play sessions that produce provenance-tagged, error-rich shadow decisions for the harvest loop: coverage tool only, never real-player evidence, and never promotion-record weight without human confirmation.
 - [System One (Jev) room-routing benchmark](system-one-benchmark.md) - Generated Jev-vs-DeepSeek results for the room-routing lane: reliability, exact-set accuracy, latency, tokens in/out, and cost.
@@ -97,12 +84,13 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [System One (Jev) guardrails benchmark](system-one-guardrails-benchmark.md) - Generated live evaluation of the L6 advisory guardrail lane over a labeled hazard corpus, with the confusion matrix, false-positive analysis, calibration, and the strict-gate verdict (passing after the criteria redesign).
 - [AI dungeon master design](ai-dungeon-master.md) - Implemented human/AI director controls, bounded provider phases, campaign preparation, research, authority and secret boundaries, and current limitations.
 - [RPG roadmap](ROADMAP.md) - Current milestone sequencing plus preserved milestone history. Planned behavior is not a shipped contract.
-- [Harness Wars campaign report](harness-wars-campaign-report.md) - Recorded campaign hydration outcomes, canon inventory, and provider probes; not a runtime contract.
-- [Revision 2 integration plan](revision-2-integration-plan.md) - Preserved approved post-M4 execution design at its saved checkpoint; historical rather than current next-work authority.
-- [RPG integration plan](rpg-integration-plan.md) - Original integration design and historical operation ledgers; current implementation can be newer.
 - [Roleplay architecture notes (2026)](roleplay-architecture-2026.md) - Dated architecture decisions and historical checkpoints; current status statements may age.
 - [Roleplay product/feature snapshot (2026)](trending-roleplay-features-2026.md) - Dated internal planning snapshot, not external research, provenance, a commitment, or a contract.
 - [SRD 5.1 parity plan](srd-5.1-parity-plan.md) - Gap map and phased plan for full SRD 5.1 rules and content coverage; planning only.
 - [Optional OmniVoice support](omnivoice-support-plan.md) - Implemented opt-in narration playback, persistent narrator/NPC casting, captions, bounded presentation storage, configuration, and remaining voice roadmap.
 
 For behavior conflicts, prefer shared runtime contracts and current code, then the [API reference](api.md), [Streaming](streaming.md), and normative repository architecture where applicable. Use dated planning records only for historical rationale.
+
+## Archive
+
+- [Archive index](archive/README.md) - Historical plans, handoffs, progress ledgers and dated audits kept for provenance; not current guidance.

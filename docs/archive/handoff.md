@@ -18,7 +18,7 @@
 - Branch-aware chat context, complete Director receipt history, preserved negation, event-time NPC/faction witnessing, and interrupted single-speaker stream reconciliation improve continuity.
 - Shadow/unpromoted room routing and record-only advisory calls are asynchronous; corrected selected-option confidence uses a new speaker composition binding.
 - Live evidence: a complete 125-artifact world; an 18-turn before/after comparison with 3/3 probes and 6/6 Director beats; separate final observation/presence probes. The full comparison predates the final narrow refinements.
-- The [implementation audit](docs/roleplay-worldbuilding-audit-2026-10-02.md) owns detailed counts, artifact paths, validation results and remaining limits. The full serial server checkpoint exposed eight failures, all corrected with focused passing runs; it was not repeated in full afterward.
+- The [implementation audit](roleplay-worldbuilding-audit-2026-10-02.md) owns detailed counts, artifact paths, validation results and remaining limits. The full serial server checkpoint exposed eight failures, all corrected with focused passing runs; it was not repeated in full afterward.
 
 ### SRD 5.1 parity program (Waves 0-4)
 
