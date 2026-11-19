@@ -1,5 +1,6 @@
 import DatabaseDriver from "better-sqlite3";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { upgradeTacticalMapSchema } from "../../map/schemaUpgrade.js";
 import { upgradeCampaignDmSchema } from "./campaignDmUpgrade.js";
 import { upgradeFactionRelationsSchema } from "./factionRelationUpgrade.js";
@@ -224,9 +225,12 @@ function mismatchReason(actual: SchemaObject[], expected: SchemaObject[]): strin
 }
 
 function schemaError(databasePath: string, reason: string): Error {
+  const dir = path.dirname(databasePath);
   return new CurrentSchemaError(
     `Database ${databasePath} does not match the current development schema (${reason}). ` +
-    "Delete the local database and restart Velvet to recreate it.",
+    "Velvet did not modify it. Back it up and export its data with " +
+    `\`npm --workspace velvet-mvp-server run db:export -- --data-dir "${dir}"\`, ` +
+    "then start Velvet with an empty data directory.",
   );
 }
 
