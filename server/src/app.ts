@@ -5,6 +5,7 @@ import { campaignSessionAttachmentSchema, npcIdSchema, requestIdSchema, resource
 import Fastify from "fastify";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "./features.js";
+import { hostGuardProblem } from "./hostGuard.js";
 import { createApiProblem, sendApiProblem } from "./http/problem.js";
 import { createRepository } from "./repo/index.js";
 import { roleplayCharacterRoutes } from "./routes/roleplay/characters.js";
@@ -708,6 +709,17 @@ export function buildApp(options: {
         ? incoming
         : runtime.ids.nextId();
     },
+  });
+
+  app.addHook("onRequest", async (request, reply) => {
+    const problem = hostGuardProblem(request.method, request.headers);
+    if (!problem) return;
+    reply.raw.setHeader("cache-control", "no-store");
+    return reply.code(problem.statusCode).send({
+      error: "Forbidden",
+      code: problem.code,
+      message: problem.message,
+    });
   });
 
   app.addHook("onRequest", async (request, reply) => {
