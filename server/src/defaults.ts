@@ -87,13 +87,29 @@ export const DEFAULT_SAMPLERS: SamplerSettings = {
   startReplyWith: "",
 };
 
+/** The provider key supplied by the server environment, read at call time. */
+export function providerEnvironmentApiKey(): string {
+  return (process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY ?? "").trim();
+}
+
+/** Whether the operator opted in to storing the provider key in the database. */
+export function isProviderKeyStorageEnabled(): boolean {
+  return process.env.VELVET_PROVIDER_KEY_STORAGE === "database";
+}
+
+export const PROVIDER_KEY_STORAGE_DISABLED_MESSAGE =
+  "Set OPENROUTER_API_KEY or OPENAI_API_KEY in the server environment, or set VELVET_PROVIDER_KEY_STORAGE=database to store it in the database.";
+
+export const PROVIDER_KEY_PLAINTEXT_WARNING =
+  "This key is stored in plain text in the database. Move it to OPENROUTER_API_KEY in the server environment, or set VELVET_PROVIDER_KEY_STORAGE=database to keep storing it.";
+
 export function defaultProviderSettings(updatedAt = now()): ProviderSettings {
   return {
     id: "provider",
     providerType: "openai-compatible",
     baseUrl: process.env.OPENROUTER_BASE_URL ?? process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
     model: process.env.OPENROUTER_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-    apiKey: process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY ?? "",
+    apiKey: providerEnvironmentApiKey(),
     streaming: false,
     httpReferer: process.env.OPENROUTER_HTTP_REFERER ?? "",
     appTitle: process.env.OPENROUTER_APP_TITLE ?? "Velvet",
@@ -185,12 +201,20 @@ export function clampText(value: string, max: number): string {
 }
 
 export function toPublicProvider(provider: ProviderSettings): PublicProviderSettings {
+  const environmentKey = providerEnvironmentApiKey();
+  const apiKeySource: PublicProviderSettings["apiKeySource"] = provider.apiKey.length === 0
+    ? "none"
+    : environmentKey !== "" && provider.apiKey === environmentKey
+      ? "environment"
+      : "database";
   return {
     id: "provider",
     providerType: provider.providerType,
     baseUrl: provider.baseUrl,
     model: provider.model,
     hasApiKey: provider.apiKey.length > 0,
+    apiKeySource,
+    apiKeyWarning: apiKeySource === "database" && !isProviderKeyStorageEnabled() ? PROVIDER_KEY_PLAINTEXT_WARNING : "",
     streaming: provider.streaming,
     httpReferer: provider.httpReferer,
     appTitle: provider.appTitle,

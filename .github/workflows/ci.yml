@@ -36,3 +36,13 @@ jobs:
       - name: Test e2e
         if: ${{ !cancelled() }}
         run: npm run test:e2e
+      # Keep Playwright's retained traces and page snapshots (fake provider and fixture data only)
+      # so an intermittent e2e failure can be diagnosed from the run instead of guessed at.
+      - name: Upload e2e failure evidence
+        if: ${{ failure() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14

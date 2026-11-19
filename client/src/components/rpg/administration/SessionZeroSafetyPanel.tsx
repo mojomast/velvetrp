@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { canAdminister, type AdministrationMutationState, type AdministrationRole } from "./types";
 
 export type SafetyPolicy = "disallowed" | "fade-to-black" | "explicit-consent" | "allowed";
@@ -52,7 +52,12 @@ export function SessionZeroSafetyPanel({ actorRole, settings, mutation = { phase
   const dirty = hardLimits !== settings.hardLimits.join("\n") || veils !== settings.veils.join("\n") || pvpPolicy !== settings.pvpPolicy || romancePolicy !== settings.romancePolicy || lethalityPolicy !== settings.lethalityPolicy;
   const edit = (change: () => void) => { change(); setReviewing(false); setConfirmed(false); };
 
-  useEffect(() => { setHardLimits(settings.hardLimits.join("\n")); setVeils(settings.veils.join("\n")); setPvpPolicy(settings.pvpPolicy); setRomancePolicy(settings.romancePolicy); setLethalityPolicy(settings.lethalityPolicy); setReviewing(false); setConfirmed(false); }, [settings]);
+  // Reset the draft only when authoritative settings actually change, and do it during render rather than in an
+  // effect: a mount-time effect could run after the first edit and silently discard it.
+  const [syncedSettings, setSyncedSettings] = useState(settings);
+  if (syncedSettings !== settings) {
+    setSyncedSettings(settings); setHardLimits(settings.hardLimits.join("\n")); setVeils(settings.veils.join("\n")); setPvpPolicy(settings.pvpPolicy); setRomancePolicy(settings.romancePolicy); setLethalityPolicy(settings.lethalityPolicy); setReviewing(false); setConfirmed(false);
+  }
 
   return <section className="admin-section" aria-labelledby="session-zero-heading">
     <div className="admin-section-heading"><div><p className="eyebrow">SESSION-ZERO AGREEMENT</p><h2 id="session-zero-heading">Safety controls</h2></div><span className="status-pill">revision {settings.revision}</span></div>
