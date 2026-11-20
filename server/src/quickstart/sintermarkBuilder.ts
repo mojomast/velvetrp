@@ -878,6 +878,7 @@ async function applyWaves(
       continue;
     }
 
+    await yieldToEventLoop();
     const current =
       repository.getCampaignAdministration(ownerId, campaignId) ??
       fail("campaign administration is unavailable during generation");
@@ -886,6 +887,7 @@ async function applyWaves(
       .update(JSON.stringify({ seed: keyPrefix, wave: wave.label, content: candidate }))
       .digest("hex");
     const jobId = createHash("sha256").update(`${keyPrefix}:${campaignId}:${wave.label}`).digest("hex");
+    await yieldToEventLoop();
     const call = repository.beginCampaignGenerationCall(
       campaignId,
       idempotencyKey,
@@ -903,6 +905,7 @@ async function applyWaves(
     );
     if (!call.acquired) fail(`generation call for wave ${wave.label} was not acquired`);
 
+    await yieldToEventLoop();
     const draft = repository.stageCampaignGenerationAtomically(
       ownerId,
       {
@@ -933,6 +936,7 @@ async function applyWaves(
       },
     );
 
+    await yieldToEventLoop();
     repository.applyCampaignContentGenerationDraftAtomically(ownerId, {
       draftId: draft.draftId,
       expectedDraftRevision: draft.revision,
@@ -980,7 +984,7 @@ interface AcceptedArtifactLike {
   serverResourceId: string | null;
 }
 
-function authorCampaignRouteProfiles(
+async function authorCampaignRouteProfiles(
   ownerId: string,
   campaignId: string,
   sessionId: string,
@@ -989,7 +993,7 @@ function authorCampaignRouteProfiles(
   artifacts: readonly AcceptedArtifactLike[],
   authoredConnections: readonly { key: string; connectionId: string; visibility: "public" | "gm"; open: boolean }[],
   warnings: string[],
-): number {
+): Promise<number> {
   const world = repository.getCampaignWorld(ownerId, campaignId, sessionId);
   if (!world) return 0;
   const openIds = new Set(world.visibleConnections.map((connection) => connection.connectionId));
@@ -1035,6 +1039,7 @@ function authorCampaignRouteProfiles(
     if (!usedOverrides.has(key) && !intentionallyClosed)
       warnings.push(`route profile ${key} did not match an open public connection`);
   }
+  await yieldToEventLoop();
   return authorRouteProfiles(campaignId, rows);
 }
 
@@ -1205,8 +1210,9 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
   const { repository, ownerId, campaignId, keyPrefix } = input;
   const { recipe, content, warnings } = prepareSintermarkRecipe(input.recipe ?? readSintermarkRecipe());
 
-  await buildStep("catalog", () => {
+  await buildStep("catalog", async () => {
     ensureStarterCatalog(repository, ownerId);
+    await yieldToEventLoop();
     repository.configureSrdStarterCatalog(ownerId, campaignId, {
       expectedRevision: 0,
       idempotencyKey: `${keyPrefix}.catalog`,
@@ -1222,21 +1228,27 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
       title: `${recipe.name} - Opening Table`,
       presetId: "default",
     });
+    await yieldToEventLoop();
     repository.transitionSession(session.id, "active", "Sintermark campaign opened");
+    await yieldToEventLoop();
     repository.addConsentEvent(
       session.id,
       "campaign-safety",
       true,
       "Fictional adults. Follow the reviewed Sintermark safety policy and boundaries.",
     );
+    await yieldToEventLoop();
     repository.updateSessionContextSource(session.id, recipe.premise ?? `The opening of ${recipe.name}.`);
+    await yieldToEventLoop();
     await addMessage(session.id, "system", recipe.opening ?? recipe.premise ?? `${recipe.name} begins.`);
+    await yieldToEventLoop();
     await addMessage(
       session.id,
       "character",
       "Those readings disagree. Orra, keep the street clear while I compare the raw log with the gauge.",
       { speakerCharacterId: heroes[0]!.personaId },
     );
+    await yieldToEventLoop();
     repository.attachCampaignSession(ownerId, { campaignId, sessionId: session.id });
     return session.id;
   });
@@ -1253,7 +1265,7 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
   for (const artifact of context.artifacts)
     if (artifact.serverResourceId) resourceIdByArtifactKey.set(artifact.key, artifact.serverResourceId);
 
-  const authoredConnections = await buildStep("starting-location", () => {
+  const authoredConnections = await buildStep("starting-location", async () => {
     // Authored closed / reputation-gated shortcuts (never close generated routes).
     const authored: Array<{ key: string; connectionId: string; visibility: "public" | "gm"; open: boolean }> = [];
     for (const [index, lock] of recipe.routeLocks.entries()) {
@@ -1279,6 +1291,7 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
       }
       const visibility = lock.visibility === "gm" ? "gm" : lock.visibility === "hidden" ? "hidden" : "public";
       const routeState = lock.routeState === "closed" ? "closed" : "open";
+      await yieldToEventLoop();
       const created = repository.createLocationConnection(ownerId, {
         campaignId,
         locationConnectionId: connectionKey,
@@ -1299,6 +1312,7 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
     }
 
     // Starting location: outline sets it during apply; otherwise designate the fallback.
+    await yieldToEventLoop();
     let starting = repository.getCampaignStartingLocation(ownerId, campaignId);
     if (!starting?.startingLocation) {
       const fallbackKey =
@@ -1306,11 +1320,13 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
         recipe.content.locations.find((location) => location.visibility === "public")?.key;
       const fallbackId = fallbackKey ? resourceIdByArtifactKey.get(fallbackKey) : undefined;
       if (!fallbackId) fail("no public starting location is available to designate");
+      await yieldToEventLoop();
       repository.designateCampaignStartingLocation(ownerId, campaignId, {
         locationId: fallbackId,
         expectedRevision: starting?.revision ?? 0,
         idempotencyKey: `${keyPrefix}.starting-location`,
       });
+      await yieldToEventLoop();
       starting = repository.getCampaignStartingLocation(ownerId, campaignId);
     }
     return authored;
@@ -1322,10 +1338,11 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
   );
 
   // Publish campaign with the reviewed Sintermark policy before activation.
-  await buildStep("publish", () => {
+  await buildStep("publish", async () => {
     const administration =
       repository.getCampaignAdministration(ownerId, campaignId) ?? fail("campaign administration is unavailable");
     if (administration.status !== "published" && administration.status !== "completed") {
+      await yieldToEventLoop();
       repository.updateCampaignAdministration(ownerId, campaignId, {
         expectedRevision: administration.revision,
         status: "published",
@@ -1341,18 +1358,20 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
     }
   });
 
-  await buildStep("activate-room", () => {
+  await buildStep("activate-room", async () => {
     const readiness = repository.getCampaignRoomActivationReadiness(ownerId, campaignId, sessionId);
     if (!readiness.ready) fail(`Sintermark room is not activation-ready: ${readiness.blockers.join(", ")}`);
+    await yieldToEventLoop();
     repository.activateCampaignRoom(ownerId, campaignId, sessionId, {
       expectedRevision: readiness.expectedRevision,
       idempotencyKey: `${keyPrefix}.activate-room`,
     });
   });
 
-  await buildStep("tactical-map", () => {
+  await buildStep("tactical-map", async () => {
     const openingWorld = repository.getCampaignWorld(ownerId, campaignId, sessionId)!;
     const anchor = openingWorld.currentLocations.find((location) => location.actorId === heroes[0]!.actorId)!;
+    await yieldToEventLoop();
     repository.generateTacticalMapForSession(ownerId, campaignId, sessionId, {
       mode: "exploration",
       encounterId: null,
@@ -1381,8 +1400,8 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
 
   // Reviewed route event profiles for every open public edge (defaults safe / 30,
   // overridden only by reviewed recipe entries).
-  await buildStep("route-profiles", () => {
-    authorCampaignRouteProfiles(
+  await buildStep("route-profiles", async () => {
+    await authorCampaignRouteProfiles(
       ownerId,
       campaignId,
       sessionId,
@@ -1466,8 +1485,10 @@ async function createOperationalQuests(
       }
   }
   if (!storylineId) {
+    await yieldToEventLoop();
     const story = repository.getCampaignStory(ownerId, campaignId);
     storylineId = scopedId(keyPrefix, "storyline");
+    await yieldToEventLoop();
     repository.createCampaignStorylineGraph(ownerId, campaignId, {
       storyline: {
         storylineId,
@@ -1509,6 +1530,7 @@ async function createOperationalQuests(
       (objective) => objective.objectiveId ?? `sintermark-objective-${index + 1}-${objectives.indexOf(objective) + 1}`,
     );
     const revision = repository.listCampaignQuests(ownerId, campaignId)?.revision ?? 0;
+    await yieldToEventLoop();
     repository.createCampaignQuest(ownerId, campaignId, {
       expectedRevision: revision,
       idempotencyKey: `${keyPrefix}.operational.${index + 1}`,
@@ -1560,7 +1582,7 @@ function resolveEnemyDefinitionId(slug: string, available: Set<string>): { defin
   return { definitionId: first, fallback: true };
 }
 
-function createPreparedEncounters(
+async function createPreparedEncounters(
   repository: Repository,
   ownerId: string,
   campaignId: string,
@@ -1570,7 +1592,7 @@ function createPreparedEncounters(
   resourceIdByArtifactKey: Map<string, string>,
   heroes: readonly SintermarkHeroSummary[],
   warnings: string[],
-): string[] {
+): Promise<string[]> {
   const available = new Set(
     SRD_5_1_STARTER_CATALOG.definitions
       .filter((definition) => definition.reference.kind === "enemy-template")
@@ -1591,6 +1613,7 @@ function createPreparedEncounters(
     });
     const locationId = matched ? resourceIdByArtifactKey.get(matched.key) : undefined;
     if (!locationId) warnings.push(`encounter "${spec.name}" had no thematic location; it is not location-bound`);
+    await yieldToEventLoop();
     const encounter = repository.createEncounter(ownerId, campaignId, {
       sessionId,
       name: spec.name,
@@ -1626,7 +1649,7 @@ export interface ShopLike {
   stock: ShopLineLike[];
 }
 
-function materializeVendors(
+async function materializeVendors(
   repository: Repository,
   ownerId: string,
   campaignId: string,
@@ -1642,7 +1665,7 @@ function materializeVendors(
     }>;
   },
   warnings: string[],
-): ShopLike[] {
+): Promise<ShopLike[]> {
   const vendorHints = /merchant|smith|trader|vendor|shop|market|inn|provision|quarter|store|outfitt/i;
   const candidates = context.artifacts
     .filter((artifact) => artifact.kind === "npc" && artifact.visibility === "public" && artifact.serverResourceId)
@@ -1662,6 +1685,7 @@ function materializeVendors(
   const shops: ShopLike[] = [];
   for (const npc of chosen) {
     try {
+      await yieldToEventLoop();
       const materialization = repository.materializeFreeformShop(
         ownerId,
         campaignId,
@@ -1705,17 +1729,18 @@ async function fundPartyWallets(
   });
 }
 
-function publishPublicMaterials(
+async function publishPublicMaterials(
   repository: Repository,
   ownerId: string,
   campaignId: string,
   keyPrefix: string,
   warnings: string[],
-): void {
+): Promise<void> {
   let planning = repository.getCampaignGeneratedPlanning(ownerId, campaignId);
   if (!planning) return;
   for (const material of planning.deliverables.filter((candidate) => candidate.visibility === "public")) {
     try {
+      await yieldToEventLoop();
       const published = repository.publishCampaignMaterial(ownerId, campaignId, {
         artifactKey: material.artifactKey,
         expectedRevision: planning.deliveryRevision,
