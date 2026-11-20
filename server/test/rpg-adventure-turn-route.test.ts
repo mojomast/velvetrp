@@ -3041,15 +3041,25 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
     await app.close();
   });
 
-  it("aborts provider orchestration when the SSE client disconnects", async () => {
+  it("keeps provider orchestration running when the SSE client disconnects", async () => {
+    // Behaviour change (playtest kink #2): a disconnect only stops event delivery. Aborting the
+    // in-flight provider call stranded the durable turn in "declared" with no narration; docs/api.md
+    // promises that delivery disconnect never cancels durable orchestration.
     enable();
     const campaign = seed();
     let completeStarted = false;
     let completeAborted = false;
+    let finishComplete!: () => void;
     const dependencies: AdventureAgentDependencies = {
       complete: async ({ signal }) =>
-        new Promise((_resolve, reject) => {
+        new Promise((resolve, reject) => {
           completeStarted = true;
+          finishComplete = () =>
+            resolve({
+              message: { role: "assistant", content: "complete", toolCalls: [] },
+              usage: null,
+              model: { requestedModel: "fake", responseModel: "fake" },
+            });
           signal?.addEventListener(
             "abort",
             () => {
@@ -3095,14 +3105,21 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
       await new Promise((resolve) => setTimeout(resolve, 10));
     expect(completeStarted).toBe(true);
     controller.abort();
-    for (let attempts = 0; !completeAborted && attempts < 100; attempts += 1)
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(completeAborted).toBe(true);
-    const reconciled = await app.inject({
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(completeAborted).toBe(false);
+    finishComplete();
+    let reconciled = await app.inject({
       method: "GET",
       url: `/api/rpg/v1/adventure-turns/${started.payload.turn.turnId}`,
     });
-    expect(reconciled.json()).toMatchObject({ turn: { state: "declared" }, narrationStatus: { status: "none" } });
+    for (let attempts = 0; reconciled.json().turn.state !== "completed" && attempts < 100; attempts += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      reconciled = await app.inject({
+        method: "GET",
+        url: `/api/rpg/v1/adventure-turns/${started.payload.turn.turnId}`,
+      });
+    }
+    expect(reconciled.json()).toMatchObject({ turn: { state: "completed" }, narrationStatus: { status: "completed" } });
     await app.close();
   });
 
