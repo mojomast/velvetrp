@@ -136,7 +136,7 @@ describe("narrator receives compact authoritative actor state", () => {
         .quests as Array<{ title: string }>;
       expect(quests.length).toBeGreaterThan(0);
 
-      const turn = await playTurn(app, ids, `I look at the ${ids.enemy.toLowerCase()} and check my wounds.`);
+      const turn = await playTurn(app, ids, "What do I see around me right now, and how hurt am I?");
       expect(turn.turn.state).toBe("completed");
       expect(fake.narrationInputs.length).toBeGreaterThan(0);
       const blocks = stateMessages(fake.narrationInputs[0]!);
@@ -170,7 +170,7 @@ describe("narrator receives compact authoritative actor state", () => {
     try {
       const ids = await quickWithLiveCombat(app);
       enemyName = ids.enemy;
-      const turn = await playTurn(app, ids, `I swing at the ${ids.enemy.toLowerCase()}.`);
+      const turn = await playTurn(app, ids, "What do I see around me right now?");
       expect(turn.turn.state).toBe("completed");
       expect(turn.narrationStatus.status).toBe("completed");
       expect((turn.narrationStatus.text ?? "").toLowerCase()).not.toContain(`no ${ids.enemy.toLowerCase()}`);
