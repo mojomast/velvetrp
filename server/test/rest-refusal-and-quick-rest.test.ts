@@ -103,7 +103,7 @@ describe("rests in a Quick adventure", () => {
     const read = async () =>
       (await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaignId}/actors/${actorId}/resources` })).json() as {
         revision: number;
-        resources: Array<{ resourceId: string; current: number; max: number }>;
+        resources: Array<{ name: string; current: number; max: number }>;
       };
     return { app, campaignId, actorId, read };
   }
@@ -112,7 +112,7 @@ describe("rests in a Quick adventure", () => {
     const { app, campaignId, actorId, read } = await hurtQuickHero();
     try {
       const before = await read();
-      const hp = before.resources.find((r) => r.resourceId === "health")!;
+      const hp = before.resources.find((r) => r.name === "health")!;
       const rest = await app.inject({
         method: "POST",
         url: `/api/rpg/v1/campaigns/${campaignId}/actors/${actorId}/rest-commands`,
@@ -120,7 +120,7 @@ describe("rests in a Quick adventure", () => {
         payload: { type: "take_short_rest", hitDiceToSpend: 1, expectedRevision: before.revision, idempotencyKey: "quick-short" },
       });
       expect(rest.statusCode, rest.body).toBe(200);
-      const after = (await read()).resources.find((r) => r.resourceId === "health")!;
+      const after = (await read()).resources.find((r) => r.name === "health")!;
       expect(after.current).toBeGreaterThan(hp.current);
       expect(after.current).toBeLessThanOrEqual(after.max);
     } finally {
@@ -139,7 +139,7 @@ describe("rests in a Quick adventure", () => {
         payload: { type: "take_long_rest", expectedRevision: before.revision, idempotencyKey: "quick-long" },
       });
       expect(rest.statusCode, rest.body).toBe(200);
-      const after = (await read()).resources.find((r) => r.resourceId === "health")!;
+      const after = (await read()).resources.find((r) => r.name === "health")!;
       expect(after.current).toBe(after.max);
     } finally {
       await app.close();
