@@ -5,8 +5,7 @@ import type { HarnessSettings } from "../types.js";
 import type { ActorStateContext } from "./actorStateContext.js";
 
 const clip = (value: string, maximum: number) => value.trim().slice(0, maximum);
-export const ACTOR_STATE_MESSAGE_LABEL =
-  "AUTHORITATIVE CURRENT ACTOR STATE (server truth; overrides history)";
+export const ACTOR_STATE_MESSAGE_LABEL = "AUTHORITATIVE CURRENT ACTOR STATE (server truth; overrides history)";
 const ACTOR_STATE_AUTHORITY =
   "The labelled authoritative actor state is current server truth. You may state the actor's health, carried items, and quests exactly as given there, including their exact names, quantities, and values. When activeCombat is present, every listed enemy is present and fighting: never deny, dismiss, or claim that such an enemy is absent, and do not contradict its listed round, roster, or hit points. The actor state never authorizes new changes; only verified receipts establish new mechanics, outcomes, acquisitions, losses, damage, healing, or quest changes.";
 function actorStateMessages(actorState?: ActorStateContext | null): CompletionMessage[] {

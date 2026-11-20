@@ -68,7 +68,11 @@ async function quickWithLiveCombat(app: App) {
     payload: { idempotencyKey: `state-context-${Math.random()}` },
   });
   expect(created.statusCode, created.body).toBe(201);
-  const { campaignId, sessionId, actorId } = created.json() as { campaignId: string; sessionId: string; actorId: string };
+  const { campaignId, sessionId, actorId } = created.json() as {
+    campaignId: string;
+    sessionId: string;
+    actorId: string;
+  };
   const encounters = (await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaignId}/encounters` })).json()
     .encounters as Array<{ encounterId: string; revision?: number }>;
   expect(encounters.length).toBeGreaterThan(0);
@@ -90,7 +94,11 @@ async function quickWithLiveCombat(app: App) {
   return { campaignId, sessionId, actorId, enemy };
 }
 
-async function playTurn(app: App, ids: { campaignId: string; sessionId: string; actorId: string }, declaration: string) {
+async function playTurn(
+  app: App,
+  ids: { campaignId: string; sessionId: string; actorId: string },
+  declaration: string,
+) {
   const boot = await app.inject({
     method: "GET",
     url: `/api/rpg/v1/campaigns/${ids.campaignId}/rooms/${encodeURIComponent(ids.sessionId)}/play-bootstrap`,
@@ -128,7 +136,10 @@ describe("narrator receives compact authoritative actor state", () => {
     try {
       const ids = await quickWithLiveCombat(app);
       const resources = (
-        await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${ids.campaignId}/actors/${ids.actorId}/resources` })
+        await app.inject({
+          method: "GET",
+          url: `/api/rpg/v1/campaigns/${ids.campaignId}/actors/${ids.actorId}/resources`,
+        })
       ).json();
       const health = JSON.stringify(resources).match(/"health"[^}]*?"current":(\d+)[^}]*?"max":(\d+)/);
       expect(health, JSON.stringify(resources).slice(0, 400)).toBeTruthy();
@@ -158,7 +169,8 @@ describe("narrator receives compact authoritative actor state", () => {
   it("never commits narration that denies a live combat enemy", async () => {
     let enemyName = "creature";
     const fake = provider("");
-    const denial = () => `But no ${enemyName.toLowerCase()} shows itself here; the crossing is only road-worn stone and coal smoke.`;
+    const denial = () =>
+      `But no ${enemyName.toLowerCase()} shows itself here; the crossing is only road-worn stone and coal smoke.`;
     const complete = fake.dependencies.complete;
     fake.dependencies.complete = async (input) => {
       const result = await complete(input);
