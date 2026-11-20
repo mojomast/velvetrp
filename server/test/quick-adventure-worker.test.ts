@@ -33,6 +33,9 @@ describe("Quick adventure build runs off the main thread", () => {
     const app = buildApp();
     try {
       expect((await app.inject({ method: "GET", url: "/api/health" })).statusCode).toBe(200);
+      // Warm the campaign repository outside the measured window: the first RPG request opens and
+      // schema-validates it on the main thread (~250-450ms locally), which is not build work.
+      expect((await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns" })).statusCode).toBe(200);
 
       let maxStall = 0;
       let last = performance.now();
