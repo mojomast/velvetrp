@@ -101,6 +101,7 @@ export const campaignPlayBootstrapSchema = z
     principal: campaignPlayPrincipalSchema,
     capabilities: campaignPlayCapabilitiesSchema,
     playableActors: z.array(campaignPlayActorSchema).max(MAX_CAMPAIGN_PLAY_ACTORS),
+    declaring: z.array(campaignPlayActorSchema).max(MAX_CAMPAIGN_PLAY_ACTORS).optional(),
   })
   .strict()
   .superRefine((value, context) => {
