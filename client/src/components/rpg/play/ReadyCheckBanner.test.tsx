@@ -14,7 +14,7 @@ describe("ReadyCheckBanner", () => {
     const { container } = render(
       <ReadyCheckBanner enabled={false} check={null} canManage canReady={false} onEnable={vi.fn()} />,
     );
-    expect(container).toBeEmptyDOMElement();
+    expect(container.innerHTML).toBe("");
     expect(screen.queryByRole("button", { name: "Start ready check" })).toBeNull();
   });
 
