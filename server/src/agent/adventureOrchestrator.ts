@@ -1237,18 +1237,24 @@ const QUEST_WORDS =
   /\b(?:quest|quests|accept|accepts|accepted|accepting|abandon|abandons|abandoned|abandoning|objective|objectives|reward|rewards|claim|claims|claimed|claiming)\b/u;
 const PROGRESSION_WORDS = /\b(?:level|levels|progression|multiclass|advance|advances|advanced|advancing)\b/u;
 
+/** A compound whose parts are joined by a hyphen, such as a hyphenated place name. */
+const HYPHENATED_COMPOUND = /\b[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)+\b/gu;
+
 function clauseIntent(text: string): DeclarationIntentStep {
   const check = mapDeclarationToCheck(text) !== null;
+  // A family word joined to another word by a hyphen is part of a compound, not an action word:
+  // drop the whole compound before matching so "head" in "Slake-Head" is never travel.
+  const actionText = text.replace(HYPHENATED_COMPOUND, " ");
   return {
     text,
-    commerce: COMMERCE_WORDS.test(text),
-    rest: REST_WORDS.test(text),
+    commerce: COMMERCE_WORDS.test(actionText),
+    rest: REST_WORDS.test(actionText),
     check,
-    combat: COMBAT_WORDS.test(text),
-    travel: TRAVEL_WORDS.test(text) || TRAVEL_PHRASES.test(text),
-    give: GIVE_WORDS.test(text),
-    quest: QUEST_WORDS.test(text),
-    progression: PROGRESSION_WORDS.test(text),
+    combat: COMBAT_WORDS.test(actionText),
+    travel: TRAVEL_WORDS.test(actionText) || TRAVEL_PHRASES.test(actionText),
+    give: GIVE_WORDS.test(actionText),
+    quest: QUEST_WORDS.test(actionText),
+    progression: PROGRESSION_WORDS.test(actionText),
   };
 }
 
@@ -1338,31 +1344,65 @@ export function prioritizeCandidateOptions<T extends { toolName: string }>(
     .map(({ option }) => option);
 }
 
-/** Whole-word (with a light shared-prefix stem) mention of one location name. */
-function mentionsLocationWord(intentWords: readonly string[], word: string): boolean {
-  return intentWords.some((candidate) => {
-    const length = Math.min(word.length, candidate.length);
-    if (length < 4) return word === candidate;
-    for (let index = 0; index < length; index += 1) if (word[index] !== candidate[index]) return index >= 4;
-    return true;
-  });
+/** Connectors that never distinguish one location name from another. */
+const LOCATION_CONNECTORS = new Set(["the", "of", "and", "a", "an"]);
+const WHOLE_WORD_SPLIT = /[^A-Za-z0-9]+/u;
+
+/** True only for the same word or its plural: "dock" matches "Docks", arbitrary stems do not. */
+function locationWordMatches(left: string, right: string): boolean {
+  return (
+    left === right || left === `${right}s` || left === `${right}es` || right === `${left}s` || right === `${left}es`
+  );
+}
+/** The words that actually identify a location, in normalized order. */
+function locationSignificantWords(name: string): string[] {
+  return normalized(name)
+    .split(" ")
+    .filter((word) => word.length >= 3 && !LOCATION_CONNECTORS.has(word));
+}
+/** Whole-word containment of one normalized phrase inside a normalized token list. */
+function containsWholePhrase(words: readonly string[], phrase: readonly string[]): boolean {
+  if (phrase.length === 0) return false;
+  for (let index = 0; index + phrase.length <= words.length; index += 1) {
+    let matched = true;
+    for (let offset = 0; offset < phrase.length; offset += 1) {
+      if (words[index + offset] !== phrase[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return true;
+  }
+  return false;
 }
 /**
- * Whole-phrase or distinctive multi-word mention of one location name. A single-word place such as
- * "Docks" matches on its stem ("dock"), but a multi-word place needs every significant word (at
- * least two) present, so a person or object sharing one word — "Keeper Maren" versus the
- * destination "Keeper House" — never counts as naming the place.
+ * Whole-phrase or significant-word mention of one location name. A single-word place such as
+ * "Docks" matches on its plural stem ("dock"), but a multi-word place needs every significant word
+ * present, so a person or object sharing one word — "Keeper Maren" versus the destination
+ * "Keeper House" — never counts as naming the place. A single-word name beginning with "The"
+ * ("The Steps", "The Throttle") additionally needs "the <word>" or the word capitalized in the
+ * declaration, so an ordinary lowercase verb never names the place.
  */
 function mentionsLocation(declaration: string, name: string): boolean {
   const value = normalized(name);
   if (!value) return false;
-  const intent = normalized(declaration);
-  if (intent.includes(value)) return true;
-  const intentWords = intent.split(" ").filter(Boolean);
-  const words = [...new Set(normalizedWords(name))];
+  const intentWords = normalized(declaration).split(" ").filter(Boolean);
+  if (containsWholePhrase(intentWords, value.split(" ").filter(Boolean))) return true;
+  const words = [...new Set(locationSignificantWords(name))];
   if (words.length === 0) return false;
-  const matched = words.filter((word) => mentionsLocationWord(intentWords, word)).length;
-  return matched >= Math.min(2, words.length);
+  const mentionsWord = (word: string) => intentWords.some((candidate) => locationWordMatches(candidate, word));
+  if (words.length >= 2) return words.every(mentionsWord);
+  const word = words[0]!;
+  if (!mentionsWord(word)) return false;
+  if (!value.startsWith("the ")) return true;
+  const hasThePhrase = intentWords.some(
+    (candidate, index) =>
+      candidate === "the" && index + 1 < intentWords.length && locationWordMatches(intentWords[index + 1]!, word),
+  );
+  if (hasThePhrase) return true;
+  return declaration
+    .split(WHOLE_WORD_SPLIT)
+    .some((token) => /^[A-Z]/.test(token) && locationWordMatches(token.toLocaleLowerCase("en-US"), word));
 }
 
 /**
