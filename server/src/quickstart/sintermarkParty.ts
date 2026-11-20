@@ -239,6 +239,10 @@ const DEFINITIONS = new Map<string, CatalogDefinition>(
   ]),
 );
 
+function yieldToEventLoop(): Promise<void> {
+  return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 /** Keeps composed command keys inside the repository's 128-character limit. */
 function scopedKey(prefix: string, ...parts: string[]): string {
   const raw = [prefix, ...parts].join(".");
@@ -743,6 +747,7 @@ export async function createSintermarkParty(
   const party: Array<{ personaId: string; actorId: string; campaignCharacterId: string; name: string }> = [];
 
   for (const hero of HEROES) {
+    await yieldToEventLoop();
     const existing = findExisting(repository, ownerId, campaignId, hero.name);
     if (existing) {
       party.push(existing);
@@ -784,6 +789,7 @@ export async function createSintermarkParty(
   // GM overlay after leveling: absolute targets, so ancestry is never double-applied.
   // Deterministic command keys make this loop idempotent across re-runs.
   for (const hero of HEROES) {
+    await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
     for (const attributeId of SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS) {
       setActorAttribute(
@@ -805,6 +811,7 @@ export async function createSintermarkParty(
 
   // Inventory authoring through scoped repository-database transactions.
   for (const hero of HEROES) {
+    await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
 
     for (const item of hero.instancedItems) {
@@ -835,6 +842,7 @@ export async function createSintermarkParty(
 
   // Equip only real-profile equipment through the public inventory command.
   for (const hero of HEROES) {
+    await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
     for (const item of hero.instancedItems) {
       if (!item.equip) continue;

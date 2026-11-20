@@ -852,6 +852,7 @@ async function applyWaves(
   const waves = buildWaves(content, warnings);
   const appliedKeys: string[] = [];
   for (const [index, wave] of waves.entries()) {
+    await yieldToEventLoop();
     const context =
       repository.getCampaignGenerationContext(ownerId, campaignId, appliedKeys) ??
       fail("campaign generation context is unavailable");
@@ -1167,8 +1168,13 @@ export function prepareSintermarkRecipe(recipe: SintermarkRecipe = readSintermar
   return { recipe, content, warnings };
 }
 
+function yieldToEventLoop(): Promise<void> {
+  return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 async function buildStep<T>(step: string, action: () => T | Promise<T>): Promise<T> {
   try {
+    await yieldToEventLoop();
     return await action();
   } catch (error) {
     throw new SintermarkBuildStepError(step, error);
