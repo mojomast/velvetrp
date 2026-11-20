@@ -20,7 +20,9 @@ export interface SessionCommandApi {
   getCombatCommandResult?: typeof getCombatCommandResult;
 }
 type Review = { target: string; label: string; revision: number } & (
-  { kind: "start" } | { kind: "end" } | { kind: "rest"; type: RestHttpRequest["type"] }
+  | { kind: "start" }
+  | { kind: "end" }
+  | { kind: "rest"; type: RestHttpRequest["type"]; hitDiceToSpend?: number }
 );
 type Pending = { review: Review; idempotencyKey: string; confirmed: boolean };
 const storageKey = (campaignId: string, sessionId: string) => `velvet.session-controls.v1:${campaignId}:${sessionId}`;
@@ -63,6 +65,7 @@ export function SessionControls({
               type: r.type,
               expectedRevision: r.revision,
               idempotencyKey: value.idempotencyKey,
+              ...(r.hitDiceToSpend === undefined ? {} : { hitDiceToSpend: r.hitDiceToSpend }),
             }).success))
       )
         throw new Error("Invalid recovery record");
@@ -167,8 +170,18 @@ export function SessionControls({
         if (rows.some((e) => e.status === "active") || !latest.playableActors.some((a) => a.actorId === target))
           throw new Error("Actor not eligible");
         const resources = await api.getActorResources(campaignId, target);
+        const hasHitDie = resources.resources.some(
+          (resource) => /^hit-dice-d\d+$/.test(resource.name) && resource.current >= 1,
+        );
         if (alive.current && authority.current.allowed && !authority.current.blocked)
-          setReview({ kind: "rest", target, label, revision: resources.revision, type: kind });
+          setReview({
+            kind: "rest",
+            target,
+            label,
+            revision: resources.revision,
+            type: kind,
+            ...(kind === "take_short_rest" && hasHitDie ? { hitDiceToSpend: 1 } : {}),
+          });
       }
     } catch {
       if (alive.current) setNotice("Readiness or permission changed. No command was sent; refresh and review again.");
@@ -229,10 +242,13 @@ export function SessionControls({
         } else {
           if (!bootstrap.playableActors.some((a) => a.actorId === r.target))
             throw new Error("Actor control unavailable");
-          const response = await (api.commandActorRest ?? commandActorRest)(campaignId, r.target, {
-            ...request,
-            type: r.type,
-          });
+          const restRequest: RestHttpRequest =
+            r.type === "take_short_rest"
+              ? r.hitDiceToSpend === undefined
+                ? { ...request, type: "take_short_rest" }
+                : { ...request, type: "take_short_rest", hitDiceToSpend: r.hitDiceToSpend }
+              : { ...request, type: "take_long_rest" };
+          const response = await (api.commandActorRest ?? commandActorRest)(campaignId, r.target, restRequest);
           if (
             response.receipt.idempotencyKey !== request.idempotencyKey ||
             response.receipt.revisionBefore !== r.revision ||
