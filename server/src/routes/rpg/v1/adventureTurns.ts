@@ -48,6 +48,7 @@ import type { Repository } from "../../../repo/index.js";
 import { completeWithProvider, ProviderHttpError } from "../../../provider/index.js";
 import { getPromptPreset } from "../../../presets.js";
 import { adventureNarrationMessages, conversationNarrationMessages } from "../../../agent/adventurePrompt.js";
+import { buildActorStateContext, type ActorStateContext } from "../../../agent/actorStateContext.js";
 import { isRoutineObservationDeclaration } from "../../../agent/declarationAttempt.js";
 import { adventureTurnBudgets } from "../../../agent/turnBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "../../../agent/directToolReasoning.js";
@@ -727,6 +728,24 @@ const includesAny = (text: string, values: readonly string[]) =>
 const includesNumber = (text: string, value: number) =>
   new RegExp(`(^|\\D)${String(value).replace("-", "\\-")}(?=\\D|$)`).test(text);
 const regexEscape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * A committed encounter makes its listed enemies present. Provider prose that
+ * denies one of them contradicts authoritative current state, so it is treated
+ * exactly like any other grounding-gate failure.
+ */
+function deniesActiveCombatEnemy(text: string, actorState: ActorStateContext | null): boolean {
+  const enemies = actorState?.activeCombat?.enemies ?? [];
+  if (!enemies.length) return false;
+  const normalized = normalizedNarration(text);
+  return enemies.some(({ name }) => {
+    const label = regexEscape(normalizedNarration(name)).replace(/ /g, "\\s+");
+    if (!label) return false;
+    return new RegExp(
+      `\\bno\\s+(?:(?:sign|trace)\\s+of\\s+)?(?:the\\s+|a\\s+|an\\s+)?${label}\\b|\\b${label}\\s+is\\s+(?:nowhere|not\\s+here|absent)\\b`,
+    ).test(normalized);
+  });
+}
 
 // Internal server labels (for example a seeded quest title such as "Guard the s11 market") are not
 // player-visible prose. Strip bracketed markers and short identifier tokens before matching so a
@@ -1416,6 +1435,13 @@ async function performNarration(
   }
   const publicContext = publicNarrationContext(repo, turn);
   if (!publicContext) return { turn, text: fallbackText, source: "deterministic-fallback" };
+  const actorState = buildActorStateContext({
+    repo,
+    principal: OWNER,
+    campaignId: turn.campaignId,
+    sessionId: turn.sessionId,
+    actorId: turn.actorId,
+  });
   fallbackText = narrationFallback(turn.declaration, safeReceipts, { currentLocation: publicContext.currentLocation });
   // An original nonmechanical exchange also needs conversation narration on its first response,
   // including a resume after planning where the transient hold object is no longer available.
@@ -1464,6 +1490,7 @@ async function performNarration(
           currentLocation: publicContext.currentLocation,
           currentActorName: publicContext.currentActorName,
           publicContext: publicContext.context,
+          actorState,
           harness,
           history,
           rulesetDescriptor: publicContext.ruleset.descriptor,
@@ -1476,6 +1503,7 @@ async function performNarration(
           currentLocation: publicContext.currentLocation,
           currentActorName: publicContext.currentActorName,
           publicContext: publicContext.context,
+          actorState,
           harness,
           history,
           rulesetDescriptor: publicContext.ruleset.descriptor,
@@ -1593,9 +1621,10 @@ async function performNarration(
   const consumed: ProviderCompletionResult[] = [];
   try {
     const gateAgainst = (text: string): boolean =>
-      conversation
+      !deniesActiveCombatEnemy(text, actorState) &&
+      (conversation
         ? conversationNarrationMatches(text, publicContext.currentLocation)
-        : providerNarrationMatchesReceipts(text, safeReceipts, publicContext.currentLocation);
+        : providerNarrationMatchesReceipts(text, safeReceipts, publicContext.currentLocation));
     let result = await completeNarrationDispatch(dispatch, completionInput, consumed);
     let providerText = narrationTextFromResult(result);
     // One bounded repair only. A syntactically valid narration that fails the local grounding gate
