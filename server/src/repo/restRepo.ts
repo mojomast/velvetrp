@@ -429,11 +429,7 @@ export function createRestRepository(
           const expedition = activeExpedition(command.campaignId, command.actorId);
           if (expedition && !expedition.atCamp)
             throw new RestIllegalStateError("rest requires an established camp at the actor location");
-          if (
-            command.type === "take_long_rest" &&
-            (!longRestAvailable(command.campaignId, command.actorId) ||
-              (!expedition && resolveCampaignRuleset(db, command.campaignId).rulesetId === "dnd-5e"))
-          )
+          if (command.type === "take_long_rest" && !longRestAvailable(command.campaignId, command.actorId))
             throw new RestIllegalStateError(
               expedition
                 ? "long rest requires an active GM-established camp and 1,440 elapsed in-game minutes since the prior long rest"

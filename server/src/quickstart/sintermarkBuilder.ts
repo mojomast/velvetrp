@@ -221,13 +221,15 @@ interface EncounterSpec {
   enemySlug: string;
   name: string;
   keywords: string[];
+  count?: number;
 }
 
 const ENCOUNTER_SPECS: readonly EncounterSpec[] = [
   {
-    enemySlug: "salamander",
-    name: "Ember Salamander Vigil",
+    enemySlug: "giant-fire-beetle",
+    name: "Ember Beetle Vigil",
     keywords: ["forge", "furnace", "kiln", "ember", "cinder", "lava", "magma", "crag"],
+    count: 3,
   },
   {
     enemySlug: "water-elemental",
@@ -1622,7 +1624,7 @@ async function createPreparedEncounters(
       name: spec.name,
       combatants: [
         ...heroes.map((hero) => ({ kind: "actor" as const, actorId: hero.actorId, team: "allies" as const })),
-        {
+        ...Array.from({ length: spec.count ?? 1 }, () => ({
           kind: "enemy" as const,
           template: {
             kind: "enemy-template" as const,
@@ -1631,7 +1633,7 @@ async function createPreparedEncounters(
             definitionId: resolved.definitionId,
           },
           team: "enemies" as const,
-        },
+        })),
       ],
       idempotencyKey: `${keyPrefix}.encounter.${index + 1}`,
     });
@@ -1827,11 +1829,16 @@ export function summarizeSintermarkCampaign(
     if (!progression) fail(`missing progression for ${hero.name}`);
     partyLevel = partyLevel === 0 ? progression.level : Math.min(partyLevel, progression.level);
     const health = repository.getActorResource(ownerId, campaignId, hero.actorId, "health");
-    if (!health) warnings.push(`${hero.name} has no health resource`);
-    else {
+    if (!health) {
+      heroHealthMin = 0;
+      warnings.push(`${hero.name} has no health resource`);
+    } else {
       heroHealthMin = Math.min(heroHealthMin, health.max);
-      if (health.max < 1_000)
-        warnings.push(`${hero.name} baseline health is ${health.max}, below the reviewed 1000 target`);
+      // The reviewed 1000-health target was removed after round-2 playtest balance.
+      if (health.max < 1 || health.current !== health.max) {
+        heroHealthMin = 0;
+        warnings.push(`${hero.name} health is ${health.current}/${health.max}; expected a full health resource`);
+      }
     }
     const inventory = repository.getActorInventorySnapshot(ownerId, campaignId, hero.actorId);
     if (!inventory) warnings.push(`${hero.name} has no inventory snapshot`);
@@ -1894,8 +1901,10 @@ export function assertSintermarkSummary(summary: SintermarkSummary): void {
   if (summary.counts.materialDeliveries < 1) fail("Sintermark requires at least one published public material");
   if (summary.counts.partyLevel < 3)
     fail(`Sintermark requires level-3 heroes; highest level is ${summary.counts.partyLevel}`);
-  if (summary.counts.heroHealthMin < 1_000)
-    fail(`Sintermark requires baseline health 1000 for every hero; minimum is ${summary.counts.heroHealthMin}`);
+  if (summary.counts.heroHealthMin < 1)
+    fail(
+      `Sintermark requires a full health resource for every hero; minimum maximum is ${summary.counts.heroHealthMin}`,
+    );
   if (summary.counts.heroesWithInventory !== 2)
     fail(`Sintermark requires an inventory snapshot for both heroes; found ${summary.counts.heroesWithInventory}`);
   if (summary.publicGraph.unreachablePublicLocations.length > 0) {

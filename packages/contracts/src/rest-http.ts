@@ -9,6 +9,7 @@ export const restHttpShortRequestSchema = z
     type: takeShortRestCommandSchema.shape.type,
     expectedRevision: takeShortRestCommandSchema.shape.expectedRevision,
     idempotencyKey: takeShortRestCommandSchema.shape.idempotencyKey,
+    hitDiceToSpend: takeShortRestCommandSchema.shape.hitDiceToSpend,
   })
   .strict();
 
