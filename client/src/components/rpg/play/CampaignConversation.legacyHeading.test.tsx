@@ -1,6 +1,7 @@
 // Approved test (playtest kink #3b): a Quick adventure room starts with an authored opening (a system
 // scene-setter plus a hero line). That is not "pre-campaign history", so the read-only legacy banner
-// must only appear when the room holds real pre-campaign chat (at least one player "user" message).
+// must not appear for an authored opening: legacy messages that start with a "system" message and
+// contain no player ("user") message. Any other legacy room history keeps the banner.
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "../../../api";
@@ -65,5 +66,10 @@ describe("CampaignConversation legacy heading", () => {
     ]);
     expect(screen.getByText("Read-only pre-campaign history")).toBeTruthy();
     expect(screen.getByText(/I order a drink/)).toBeTruthy();
+  });
+
+  it("keeps the read-only banner for legacy room history that is not an authored opening", () => {
+    renderWith([message("m1", "character", "Campaign room history", "hero")]);
+    expect(screen.getByText("Read-only pre-campaign history")).toBeTruthy();
   });
 });
