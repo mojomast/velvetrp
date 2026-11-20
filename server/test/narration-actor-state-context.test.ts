@@ -78,7 +78,16 @@ async function quickWithLiveCombat(app: App) {
     payload: { expectedRevision: encounters[0]!.revision ?? 0, idempotencyKey: `start-${Math.random()}` },
   });
   expect(started.statusCode, started.body).toBe(200);
-  return { campaignId, sessionId, actorId };
+  const combatId =
+    (started.json().combat?.combatId as string | undefined) ??
+    ((await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaignId}/encounters` })).json().encounters[0]
+      .combatId as string);
+  const combat = (await app.inject({ method: "GET", url: `/api/rpg/v1/combats/${combatId}` })).json() as {
+    combatants: Array<{ team: string; displayName: string }>;
+  };
+  const enemy = combat.combatants.find((c) => c.team === "enemies")!.displayName;
+  expect(enemy).toBeTruthy();
+  return { campaignId, sessionId, actorId, enemy };
 }
 
 async function playTurn(app: App, ids: { campaignId: string; sessionId: string; actorId: string }, declaration: string) {
@@ -114,7 +123,7 @@ function stateMessages(input: ProviderCompletionInput): string[] {
 
 describe("narrator receives compact authoritative actor state", () => {
   it("includes HP, inventory labels, quests and the live combat enemy without raw ids", async () => {
-    const fake = provider("You keep your eyes on the Salamander and take stock of your wounds.");
+    const fake = provider("You keep your eyes on the creature and take stock of your wounds.");
     const app = buildApp({ adventureAgentDependencies: fake.dependencies });
     try {
       const ids = await quickWithLiveCombat(app);
@@ -127,13 +136,13 @@ describe("narrator receives compact authoritative actor state", () => {
         .quests as Array<{ title: string }>;
       expect(quests.length).toBeGreaterThan(0);
 
-      const turn = await playTurn(app, ids, "I look at the salamander and check my wounds.");
+      const turn = await playTurn(app, ids, `I look at the ${ids.enemy.toLowerCase()} and check my wounds.`);
       expect(turn.turn.state).toBe("completed");
       expect(fake.narrationInputs.length).toBeGreaterThan(0);
       const blocks = stateMessages(fake.narrationInputs[0]!);
       expect(blocks, "a message labelled with the actor-state label").toHaveLength(1);
       const block = blocks[0]!;
-      expect(block).toMatch(/salamander/i);
+      expect(block.toLowerCase()).toContain(ids.enemy.toLowerCase());
       expect(block).toContain(health![1]!);
       expect(block).toContain(health![2]!);
       expect(block).toMatch(/Potion of (Greater|Superior|Supreme) Healing/);
@@ -147,14 +156,24 @@ describe("narrator receives compact authoritative actor state", () => {
   });
 
   it("never commits narration that denies a live combat enemy", async () => {
-    const fake = provider("But no salamander shows itself here; the crossing is only road-worn stone and coal smoke.");
+    let enemyName = "creature";
+    const fake = provider("");
+    const denial = () => `But no ${enemyName.toLowerCase()} shows itself here; the crossing is only road-worn stone and coal smoke.`;
+    const complete = fake.dependencies.complete;
+    fake.dependencies.complete = async (input) => {
+      const result = await complete(input);
+      const call = result.message.toolCalls?.[0];
+      if (call?.name === "submit_adventure_narration") call.arguments = JSON.stringify({ narration: denial() });
+      return result;
+    };
     const app = buildApp({ adventureAgentDependencies: fake.dependencies });
     try {
       const ids = await quickWithLiveCombat(app);
-      const turn = await playTurn(app, ids, "I swing at the salamander.");
+      enemyName = ids.enemy;
+      const turn = await playTurn(app, ids, `I swing at the ${ids.enemy.toLowerCase()}.`);
       expect(turn.turn.state).toBe("completed");
       expect(turn.narrationStatus.status).toBe("completed");
-      expect(turn.narrationStatus.text ?? "").not.toMatch(/no salamander/i);
+      expect((turn.narrationStatus.text ?? "").toLowerCase()).not.toContain(`no ${ids.enemy.toLowerCase()}`);
     } finally {
       await app.close();
     }
@@ -174,7 +193,7 @@ describe("narrator receives compact authoritative actor state", () => {
       expect(turn.turn.state).toBe("completed");
       const block = stateMessages(fake.narrationInputs[0]!)[0] ?? "";
       expect(block).toMatch(/Potion of (Greater|Superior|Supreme) Healing/);
-      expect(block).not.toMatch(/salamander/i);
+      expect(block).not.toMatch(/"enemies"/);
     } finally {
       await app.close();
     }
