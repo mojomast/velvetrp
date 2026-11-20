@@ -39,7 +39,10 @@ describe("genuine place names still match", () => {
   });
 
   it("keeps the plural stem match for a one-word place", () => {
-    const reference = declarationLocationReference("I search the crates along the dock.", "Market", ["Docks", "Market"]);
+    const reference = declarationLocationReference("I search the crates along the dock.", "Market", [
+      "Docks",
+      "Market",
+    ]);
     expect(reference.mismatchedDestination).toBe("Docks");
   });
 });
