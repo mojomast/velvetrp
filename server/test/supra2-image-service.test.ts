@@ -83,14 +83,14 @@ function statusPayload(jobs: unknown[], overrides: Record<string, unknown> = {})
 describe("Supra2 image configuration", () => {
   it("allows https anywhere and http only on private or tailnet hosts", () => {
     for (const allowed of [
-      "https://kimi.tailec998.ts.net:4363",
+      "https://host.example-tailnet.ts.net:4363",
       "https://images.example.com/api",
       "http://127.0.0.1:4363",
       "http://localhost:4363",
       "http://10.1.2.3:4363",
       "http://172.20.0.4:4363",
       "http://192.168.1.20:4363",
-      "http://100.101.102.103:4363",
+      "http://100.64.0.1:4363",
       "http://gpu-host.tailnet.ts.net:4363",
     ]) {
       expect(validateSupra2ImageBaseUrl(allowed), allowed).toEqual({ ok: true });
@@ -109,13 +109,13 @@ describe("Supra2 image configuration", () => {
 
   it("stays disabled unless the flag is exact-true and the base URL is valid", () => {
     expect(readSupra2ImageConfig({}).enabled).toBe(false);
-    expect(readSupra2ImageConfig({ VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363" }).enabled).toBe(
-      false,
-    );
+    expect(
+      readSupra2ImageConfig({ VELVET_SCENE_IMAGES_BASE_URL: "https://host.example-tailnet.ts.net:4363" }).enabled,
+    ).toBe(false);
     expect(
       readSupra2ImageConfig({
         VELVET_SCENE_IMAGES_ENABLED: "TRUE",
-        VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363",
+        VELVET_SCENE_IMAGES_BASE_URL: "https://host.example-tailnet.ts.net:4363",
       }).enabled,
     ).toBe(false);
     expect(
@@ -128,12 +128,12 @@ describe("Supra2 image configuration", () => {
     expect(
       readSupra2ImageConfig({
         VELVET_SCENE_IMAGES_ENABLED: "true",
-        VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363/",
+        VELVET_SCENE_IMAGES_BASE_URL: "https://host.example-tailnet.ts.net:4363/",
       }),
     ).toEqual({
       enabled: true,
-      baseUrl: "https://kimi.tailec998.ts.net:4363",
-      origin: "https://kimi.tailec998.ts.net:4363",
+      baseUrl: "https://host.example-tailnet.ts.net:4363",
+      origin: "https://host.example-tailnet.ts.net:4363",
       timeoutMs: 120_000,
       maxBytes: 8_388_608,
     });
@@ -147,10 +147,10 @@ describe("Supra2 image configuration", () => {
     expect(derived.origin).toBe("http://100.64.0.9:4363");
     const override = readSupra2ImageConfig({
       VELVET_SCENE_IMAGES_ENABLED: "true",
-      VELVET_SCENE_IMAGES_BASE_URL: "https://kimi.tailec998.ts.net:4363",
-      VELVET_SCENE_IMAGES_ORIGIN: "https://kimi.tailec998.ts.net:4363/",
+      VELVET_SCENE_IMAGES_BASE_URL: "https://host.example-tailnet.ts.net:4363",
+      VELVET_SCENE_IMAGES_ORIGIN: "https://host.example-tailnet.ts.net:4363/",
     });
-    expect(override.origin).toBe("https://kimi.tailec998.ts.net:4363");
+    expect(override.origin).toBe("https://host.example-tailnet.ts.net:4363");
     expect(() => readSupra2ImageConfig({ VELVET_SCENE_IMAGES_ORIGIN: "not a url" })).toThrow();
     expect(() => readSupra2ImageConfig({ VELVET_SCENE_IMAGES_ORIGIN: "https://host/some/path" })).toThrow();
     expect(() => readSupra2ImageConfig({ VELVET_SCENE_IMAGES_ORIGIN: "ftp://host" })).toThrow();

@@ -80,6 +80,7 @@ Velvet loads `.env` itself at startup: `VELVET_ENV_FILE` when set, otherwise `.e
 | `VELVET_IMAGES_ENABLED` | server-runtime | Disabled | Exact `true` opts into optional image generation; separate from discovery-only `FEATURE_IMAGES`. Enabled only when a valid `VELVET_IMAGES_BASE_URL` is also configured. |
 | `VELVET_IMAGES_BASE_URL` | server-runtime | Unset | Operator-configured image-generation HTTP(S) root; `http:` is accepted only for loopback, RFC1918 private, or Tailscale CGNAT/`*.ts.net` hosts. |
 | `VELVET_IMAGES_TOKEN` | server-runtime | Blank | Optional bearer credential sent only to the configured image-generation base URL. Keep empty in examples. |
+| `VELVET_LIVE_PROVIDER_HTTP_URL` | server-runtime | Unset | Optional exact `http://host:port/path` base URL of one private plain-HTTP provider authorized for live validation; unset keeps the built-in documentation address, so no real host is special-cased. |
 | `VELVET_IMAGES_MODEL` | server-runtime | Unset | Operator-declared image model identifier used for health reporting; server-side only. |
 | `VELVET_IMAGES_TIMEOUT_MS` | server-runtime | `120000` | Per-generation request deadline, bounded to 1000–600000 ms; a failed or ambiguous call is never retried automatically. |
 | `VELVET_IMAGES_MAX_BYTES` | server-runtime | `8388608` | Decoded byte budget per generated image, bounded to 1024–67108864 bytes. |

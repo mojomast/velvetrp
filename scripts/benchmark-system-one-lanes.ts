@@ -355,7 +355,7 @@ async function main(): Promise<void> {
   const thresholds = jevSettings.confidencePolicy["speaker-routing"];
   const llmProvider = {
     ...defaultProviderSettings(),
-    baseUrl: process.env.OPENROUTER_BASE_URL ?? "http://100.72.41.9:8787/v1",
+    baseUrl: process.env.OPENROUTER_BASE_URL ?? "http://192.0.2.9:8787/v1",
     model: process.env.OPENROUTER_MODEL ?? "deepseek-v4-flash",
     apiKey: llmKey,
     requestTimeoutSeconds: 60,
@@ -919,7 +919,7 @@ function renderReport(input: {
   lines.push(
     "export PROXY_API_KEY=\"$(rg -o '^PROXY_API_KEY=.*' /home/mojo/projects/agentrouterrouter/.env | cut -d= -f2-)\"",
   );
-  lines.push("export OPENROUTER_BASE_URL=http://100.72.41.9:8787/v1 OPENROUTER_MODEL=deepseek-v4-flash");
+  lines.push("export OPENROUTER_BASE_URL=http://192.0.2.9:8787/v1 OPENROUTER_MODEL=deepseek-v4-flash");
   lines.push("npx tsx scripts/benchmark-system-one-lanes.ts");
   lines.push("```");
   lines.push("");

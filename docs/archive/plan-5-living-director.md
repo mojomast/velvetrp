@@ -183,7 +183,7 @@ databases missing only `dm_planning_rounds`.
 
 Live evidence (owner-authorized): two capped runs through the RouteTok proxy
 (`projects/agentrouterrouter`, the already-authorized endpoint
-`http://100.72.41.9:8787/v1`) using AgentRouter `deepseek-v4-flash` issued real
+`http://192.0.2.9:8787/v1`) using AgentRouter `deepseek-v4-flash` issued real
 grounding reads in both runs — `read_campaign_recall`, `read_present_npcs`, and
 `read_quest_summary`. The runner is `scripts/evaluate-live-director-grounding.ts`
 (3 beats / 15 calls / 60k tokens / USD 0.05 hard sub-cap, sanitized audit; key

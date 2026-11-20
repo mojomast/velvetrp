@@ -23,7 +23,7 @@
  *     --campaign-id=... --session-id=... --actor-id=... --out=/tmp/opencode/eval.json
  *
  * Provider configuration is read from the environment:
- *   FREEFORM_FUN_EVAL_BASE_URL / PROXY_BASE_URL   (default http://100.72.41.9:8787/v1)
+ *   FREEFORM_FUN_EVAL_BASE_URL / PROXY_BASE_URL   (default http://192.0.2.9:8787/v1)
  *   FREEFORM_FUN_EVAL_API_KEY  / PROXY_API_KEY    (required for a live run)
  *   FREEFORM_FUN_EVAL_MODEL    / PROXY_MODEL      (default deepseek-v4-flash)
  *
@@ -59,7 +59,7 @@ export interface ProviderConfig {
   model: string;
 }
 
-export const DEFAULT_PROVIDER_BASE_URL = "http://100.72.41.9:8787/v1";
+export const DEFAULT_PROVIDER_BASE_URL = "http://192.0.2.9:8787/v1";
 export const DEFAULT_PROVIDER_MODEL = "deepseek-v4-flash";
 const PROXY_ENV_PATH = "/home/mojo/projects/agentrouterrouter/.env";
 

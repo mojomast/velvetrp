@@ -89,7 +89,7 @@ workshops, with Place La Salle reachable in two steps via Parc des Pionniers.
 
 At the owner's request, the stored demo provider now uses RouteTok/AgentRouter's
 `deepseek-v4-flash` route. `/tmp/opencode/velvet-routetok-loopback.py` relays
-`127.0.0.1:18890` to the existing tailnet gateway at `100.72.41.9:8787`; the saved
+`127.0.0.1:18890` to the existing tailnet gateway at `192.0.2.9:8787`; the saved
 provider base is `http://127.0.0.1:18890/v1`. This keeps the application's existing
 loopback URL/credential behavior. Credentials were configured through the API
 and are not included in these docs. Restart the relay with:

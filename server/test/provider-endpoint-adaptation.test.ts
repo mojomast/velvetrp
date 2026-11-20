@@ -9,7 +9,7 @@ import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults
 import { getPromptPreset } from "../src/presets.js";
 import type { ProviderSettings } from "../src/types.js";
 
-const ROUTER = "http://100.72.41.9:8787/v1";
+const ROUTER = "http://192.0.2.9:8787/v1";
 const LOOPBACK = "http://127.0.0.1:8799/v1";
 
 function settings(baseUrl: string, model = "deepseek-v4-flash"): ProviderSettings {
@@ -58,10 +58,27 @@ describe("authorized live-validation endpoint detection", () => {
   it("matches the exact router URL and rejects everything else", () => {
     expect(isAuthorizedHttpProviderBaseUrl(ROUTER)).toBe(true);
     expect(isAuthorizedHttpProviderBaseUrl(`${ROUTER}/`)).toBe(true);
-    expect(isAuthorizedHttpProviderBaseUrl("http://100.72.41.9:8787/v2")).toBe(false);
-    expect(isAuthorizedHttpProviderBaseUrl("https://100.72.41.9:8787/v1")).toBe(false);
+    expect(isAuthorizedHttpProviderBaseUrl("http://192.0.2.9:8787/v2")).toBe(false);
+    expect(isAuthorizedHttpProviderBaseUrl("https://192.0.2.9:8787/v1")).toBe(false);
     expect(isAuthorizedHttpProviderBaseUrl(LOOPBACK)).toBe(false);
     expect(isAuthorizedHttpProviderBaseUrl("not-a-url")).toBe(false);
+  });
+
+  it("lets an operator authorize one private endpoint through VELVET_LIVE_PROVIDER_HTTP_URL", () => {
+    const original = process.env.VELVET_LIVE_PROVIDER_HTTP_URL;
+    try {
+      process.env.VELVET_LIVE_PROVIDER_HTTP_URL = "http://192.0.2.77:9000/api";
+      expect(isAuthorizedHttpProviderBaseUrl("http://192.0.2.77:9000/api")).toBe(true);
+      expect(isAuthorizedHttpProviderBaseUrl("http://192.0.2.77:9000/api/")).toBe(true);
+      expect(isAuthorizedHttpProviderBaseUrl(ROUTER)).toBe(false);
+      expect(isAuthorizedHttpProviderBaseUrl("http://192.0.2.77:9001/api")).toBe(false);
+      process.env.VELVET_LIVE_PROVIDER_HTTP_URL = "https://192.0.2.77:9000/api";
+      expect(isAuthorizedHttpProviderBaseUrl("https://192.0.2.77:9000/api")).toBe(false);
+      expect(isAuthorizedHttpProviderBaseUrl(ROUTER)).toBe(true);
+    } finally {
+      if (original === undefined) delete process.env.VELVET_LIVE_PROVIDER_HTTP_URL;
+      else process.env.VELVET_LIVE_PROVIDER_HTTP_URL = original;
+    }
   });
 });
 
