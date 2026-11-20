@@ -1359,6 +1359,7 @@ async function performNarration(
   dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal,
   hold?: AdventureHold,
+  providerDisconnected = false,
 ): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, turn);
   // A deliberate mechanical hold is the turn's own deterministic narration. It is computed from
@@ -1376,6 +1377,21 @@ async function performNarration(
   const callId = key("narration-provider", turn.turnId);
   const recovered = repo.getNarrationProviderDispatch(OWNER, turn.turnId, callId);
   if (recovered?.state === "settled") return finalizeNarrationDispatch(repo, turn.turnId, callId, recovered);
+  // A client that disconnected before this narration started has no delivery target, so settle its
+  // durable narration with the deterministic fallback instead of starting an undeliverable provider
+  // call. A provider call already in flight for this turn is still awaited exactly as before.
+  if (providerDisconnected && !recovered) {
+    const publicContext = publicNarrationContext(repo, turn);
+    return {
+      turn,
+      text: narrationFallback(
+        turn.declaration,
+        safeReceipts,
+        publicContext ? { currentLocation: publicContext.currentLocation } : undefined,
+      ),
+      source: "deterministic-fallback",
+    };
+  }
   let settings;
   try {
     settings = await Promise.all([
@@ -1786,8 +1802,9 @@ async function narrate(
   dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal,
   hold?: AdventureHold,
+  providerDisconnected = false,
 ): Promise<NarrationResult> {
-  return performNarration(repo, turn, dependencies, signal, hold);
+  return performNarration(repo, turn, dependencies, signal, hold, providerDisconnected);
 }
 
 function projectTurn(turn: PrivateAdventureTurn) {
@@ -2059,8 +2076,9 @@ async function stream(
   try {
     writer = openSse(reply, "private, no-store, no-transform");
     reply.raw.on("close", () => {
+      // A delivery disconnect only stops event delivery; it never cancels the
+      // durable orchestration or narration provider call.
       closed = true;
-      abort.abort();
     });
     const configuredHeartbeat = Number(process.env.VELVET_SSE_HEARTBEAT_MS ?? 15_000);
     heartbeat = setInterval(
@@ -2078,12 +2096,10 @@ async function stream(
       });
       await yieldToEventLoop();
     }
-    if (closed) return;
     if (streamKind !== "resume") {
       send({ type: "turn_started", payload: { turn: projectTurn(turn) } });
       await yieldToEventLoop();
     }
-    if (closed) return;
     if (turn.state === "completed") {
       const narration = repo.getAdventureTurnNarration(OWNER, turn.turnId);
       if (narration) {
@@ -2110,7 +2126,6 @@ async function stream(
       payload: { status: turn.state === "awaiting-confirmation" ? "awaiting-confirmation" : "planning" },
     });
     await yieldToEventLoop();
-    if (closed) return;
     if (
       (streamKind === "initial" || streamKind === "resume") &&
       (["declared", "proposed"].includes(turn.state) || turn.toolCalls.some((call) => call.status === "approved"))
@@ -2125,13 +2140,11 @@ async function stream(
       turn = agent.turn;
       hold = agent.hold;
       await yieldToEventLoop();
-      if (closed) return;
       // An exclusive dispatch owner may be running in another resume. Wait for
       // its durable response and reconcile it; never emit a false aborted
       // terminal that suggests the already-dispatched request was cancelled.
-      while (!closed && agent.outcome === "in-progress") {
+      while (agent.outcome === "in-progress") {
         await new Promise<void>((resolve) => setTimeout(resolve, 10));
-        if (closed) return;
         turn = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
         agent = await orchestrateAdventureTurn(
           repo as Repo & Repository,
@@ -2144,7 +2157,6 @@ async function stream(
         hold = agent.hold;
       }
     }
-    if (closed) return;
 
     const visibleProposals =
       streamKind === "initial"
@@ -2200,7 +2212,8 @@ async function stream(
     if (turn.narrationStatus !== "completed") {
       send({ type: "agent_status", payload: { status: "narrating" } });
       await yieldToEventLoop();
-      if (turn.state !== "narrating")
+      const startedNarrationHere = turn.state !== "narrating";
+      if (startedNarrationHere)
         turn = repo.updateAdventureTurnNarration(OWNER, {
           turnId: turn.turnId,
           expectedTurnRevision: turn.revision,
@@ -2209,7 +2222,14 @@ async function stream(
           narrationStatus: "in-progress",
         });
       await yieldToEventLoop();
-      const narrated = await narrate(repo as Repo & Repository, turn, agentDependencies, abort.signal, hold);
+      const narrated = await narrate(
+        repo as Repo & Repository,
+        turn,
+        agentDependencies,
+        abort.signal,
+        hold,
+        closed && startedNarrationHere,
+      );
       turn = narrated.turn;
       narration = narrated.text;
       if (turn.state !== "completed")
