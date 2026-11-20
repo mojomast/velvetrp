@@ -24,6 +24,7 @@ type Turn = {
   sessionId: string;
   actorId: string;
   principalId: string;
+  declaration: string;
   revision: number;
 };
 
@@ -49,7 +50,7 @@ export interface AdventureInventoryRepository {
 function turnScope(db: DatabaseDriver.Database, principalId: string, turnId: string): Turn | null {
   const row = db
     .prepare(
-      `SELECT turn.campaign_id campaignId,turn.id turnId,turn.session_id sessionId,turn.actor_id actorId,turn.principal_id principalId
+      `SELECT turn.campaign_id campaignId,turn.id turnId,turn.session_id sessionId,turn.actor_id actorId,turn.principal_id principalId,turn.declaration
     FROM adventure_turns turn JOIN campaigns campaign ON campaign.id=turn.campaign_id AND campaign.active_timeline_id=turn.timeline_id
     JOIN campaign_sessions attached ON attached.campaign_id=turn.campaign_id AND attached.session_id=turn.session_id
     JOIN sessions session ON session.id=attached.session_id AND session.state='active' AND session.stopped_at IS NULL
@@ -85,6 +86,12 @@ function publicItem(
     : null;
 }
 
+const declarationWords = (value: string) => ` ${value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+const hasIntent = (declaration: string, intents: readonly string[]) =>
+  intents.some((intent) => declaration.includes(` ${intent} `));
+const DISCARD_INTENTS = ["drop", "discard", "leave", "toss", "throw away", "set down", "put down", "abandon", "ditch"];
+const GIVE_INTENTS = ["give", "gift", "hand", "pass", "offer", "lend", "trade"];
+
 function specs(
   db: DatabaseDriver.Database,
   scope: Turn,
@@ -103,6 +110,15 @@ function specs(
     WHERE actor.campaign_id=? AND actor.id<>? AND actor.kind='player-character' ORDER BY character.name,actor.id`,
     )
     .all(scope.sessionId, scope.campaignId, scope.actorId) as any[];
+  const declaration = declarationWords(scope.declaration),
+    namedRecipient = recipients.some((recipient) => {
+      const name = declarationWords(recipient.display_name).trim();
+      return name.length > 0 && declaration.includes(` ${name} `);
+    }),
+    giftRecipients =
+      hasIntent(declaration, DISCARD_INTENTS) && !hasIntent(declaration, GIVE_INTENTS) && !namedRecipient
+        ? []
+        : recipients;
   const rows = db
     .prepare("SELECT * FROM rpg_inventory_entries_v25 WHERE campaign_id=? AND actor_id=? ORDER BY created_at,entry_id")
     .all(scope.campaignId, scope.actorId) as any[];
@@ -170,7 +186,7 @@ function specs(
         },
         plan: { kind: "consume", entryId: row.entry_id, item: reference, quantity },
       } as any);
-    for (const recipient of recipients) {
+    for (const recipient of giftRecipients) {
       const same = Boolean(
         db
           .prepare(
