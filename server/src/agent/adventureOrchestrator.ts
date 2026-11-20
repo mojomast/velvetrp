@@ -1485,6 +1485,7 @@ export interface AdventureHold {
   message: string;
   suggestedNextStep: string | null;
   suggestedCandidateId: string | null;
+  reachablePlaces?: string[];
 }
 
 export interface HeldDeclarationContext {
@@ -1601,6 +1602,14 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
     context.destinationNames,
   );
   const intent = declarationIntent(context.declaration);
+  const reachablePlaces = [
+    ...new Map(
+      context.travelCandidates
+        .flatMap((candidate) => (candidate.semanticLabel?.target ? [candidate.semanticLabel.target] : []))
+        .filter((name) => !context.currentLocation || normalized(name) !== normalized(context.currentLocation))
+        .map((name) => [normalized(name), name] as const),
+    ).values(),
+  ].slice(0, 5);
   const namesCurrentAsSource =
     context.currentLocation !== null &&
     [`from ${normalized(context.currentLocation)}`, `from the ${normalized(context.currentLocation)}`].some((source) =>
@@ -1613,15 +1622,16 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
   if (reference.mismatchedDestination) {
     const travel = suggestedTravelCandidate(context.travelCandidates, reference.mismatchedDestination);
     const pending = compoundPending
-      ? ` ${compoundPending.commerce ? "A purchase or sale" : compoundPending.rest ? "A rest" : compoundPending.check ? "A check" : compoundPending.combat ? "An attack" : "A later step"} remains pending after the move.`
+      ? ` ${compoundPending.commerce ? "A purchase or sale" : compoundPending.rest ? "A rest" : compoundPending.check ? "A check" : compoundPending.combat ? "An attack" : "A later step"} still waits after the move.`
       : "";
     return {
       reason: "location-mismatch",
       suggestedCandidateId: travel?.candidateId ?? null,
-      message: `The declaration names ${reference.mismatchedDestination}, but the actor is at ${context.currentLocation ?? "an unknown place"}.${pending}`,
+      message: `You are still at ${context.currentLocation ?? "your last known place"}, not ${reference.mismatchedDestination}.${pending}`,
       suggestedNextStep: travel
         ? `Travel to ${reference.mismatchedDestination}`
         : `Move to ${reference.mismatchedDestination} first`,
+      reachablePlaces,
     };
   }
   const rest = selectHeldRestCandidate(context.declaration, context.restCandidates);
@@ -1638,8 +1648,9 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
     return {
       reason: "already-at-location",
       suggestedCandidateId: null,
-      message: `The actor is already at ${context.currentLocation ?? "the declared place"}.`,
+      message: `You are already at ${context.currentLocation ?? "the place you named"}; you have not gone anywhere yet.`,
       suggestedNextStep: destination ? `Travel to ${destination}` : "Name a different destination",
+      reachablePlaces,
     };
   }
   if (compoundPending) {
@@ -1672,24 +1683,27 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
     return {
       reason: "pending-compound-step",
       suggestedCandidateId: firstCommerce?.candidateId ?? firstRest?.candidateId ?? firstCheck?.candidateId ?? null,
-      message: `No step of this compound declaration was committed; ${pending} remains pending after the first step.`,
+      message: `No step of this opening move has happened yet; ${pending} still waits after the first step.`,
       suggestedNextStep: suggestion ?? "Clarify or restate the first step before continuing",
+      reachablePlaces,
     };
   }
   if (rest) {
     return {
       reason: "no-advertised-match",
       suggestedCandidateId: rest.candidateId,
-      message: "No mechanics were committed; the declared rest is advertised and ready to confirm.",
+      message: "The rest is yours to take, but nothing has begun yet.",
       suggestedNextStep: `Take a ${rest.restName.toLowerCase()}`,
+      reachablePlaces,
     };
   }
   if (commerce) {
     return {
       reason: "no-advertised-match",
       suggestedCandidateId: commerce.candidateId,
-      message: "No mechanics were committed; the declared transaction is advertised and ready to confirm.",
+      message: "The trade is yours to make, but nothing has changed hands yet.",
       suggestedNextStep: `${commerce.action === "buy" ? "Buy" : commerce.action === "sell" ? "Sell" : "Give"} ${commerce.itemLabel} with ${commerce.vendorLabel}`,
+      reachablePlaces,
     };
   }
   // A rest or transaction the current state does not advertise stays a clear decline, never a
@@ -1699,7 +1713,8 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
       reason: "no-advertised-match",
       suggestedCandidateId: null,
       suggestedNextStep: null,
-      message: "The declared rest is not advertised from the current state; no rest candidate is available.",
+      message: "That rest is not advertised from where you are; nothing has begun yet.",
+      reachablePlaces,
     };
   }
   if (intent.commerce || intent.give) {
@@ -1708,8 +1723,8 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
         reason: "no-advertised-match",
         suggestedCandidateId: null,
         suggestedNextStep: null,
-        message:
-          "The declaration tries to give or take something for the actor rather than trade with an advertised vendor; no mechanics were committed.",
+        message: "Nothing you try passes for the actor rather than trade with a vendor here; nothing has changed yet.",
+        reachablePlaces,
       };
     }
     // A vendor row may well be advertised; the declaration simply does not name its item and
@@ -1721,8 +1736,9 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
       suggestedNextStep: null,
       message:
         context.commerceCandidates.length > 0
-          ? "The declared transaction does not name an advertised item and vendor; no mechanics were committed."
-          : "The declared transaction is not advertised from the current state; no vendor candidate is available.",
+          ? "You have not named wares and a vendor for that trade; nothing has changed yet."
+          : "That transaction is not advertised from where you are; nothing has changed yet.",
+      reachablePlaces,
     };
   }
   const travel = intent.travel
@@ -1733,9 +1749,10 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
     suggestedCandidateId: travel?.candidateId ?? null,
     message:
       intent.travel && !travel
-        ? "No matching travel route is advertised for the requested destination; no journey was committed."
-        : "The declaration names no advertised exact action that can be committed from the current state.",
+        ? "No matching travel route opens from where you are yet; you stay where you stand."
+        : "You find no exact move you can make from here yet; nothing has changed.",
     suggestedNextStep: travel ? `Travel to ${travel.semanticLabel?.target ?? "an advertised destination"}` : null,
+    reachablePlaces,
   };
 }
 export function initializeAdventureTurnBudget(turn: PrivateAdventureTurn, policy: TurnBudgetPolicy): void {

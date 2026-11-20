@@ -328,7 +328,7 @@ describe("deterministic held-attempt resolution", () => {
       });
 
       // The deterministic receipt, not the empty hold line, grounds the turn's narration.
-      expect(narrationFallback(declaration, [])).toContain("The scene holds");
+      expect(narrationFallback(declaration, [])).toContain("You stay where you are");
       expect(
         narrationFallback(declaration, [
           {

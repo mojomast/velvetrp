@@ -112,7 +112,7 @@ describe("unsupported travel narration without a receipt", () => {
   it("rejects a walking claim, settles on the fallback, and accepts the same claim with a travel receipt", () => {
     const rejected = settleNarration("You walk to the market square.", []);
     expect(rejected.source).toBe("deterministic-fallback");
-    expect(rejected.text).toContain("no movement or other campaign change is established");
+    expect(rejected.text).toContain("You stay where you are");
     expect(settleNarration("You walk to the market square.", [travel("the market square")])).toEqual({
       text: "You walk to the market square.",
       source: "provider-assisted",
@@ -217,7 +217,7 @@ describe("context-aware deterministic fallbacks", () => {
       ["travel-to-current-place", narrationFallback("I walk back to the Market.", [], { currentLocation: "Market" })],
     ];
     for (const [kind, text] of samples) {
-      expect(text, kind).toContain("movement or other campaign change is established");
+      expect(text, kind).toMatch(/\b(?:nothing|no|not)\b[^.]*\byet\b/i);
     }
     expect(samples.find(([kind]) => kind === "hold")![1]).not.toBe(
       samples.find(([kind]) => kind === "conversation")![1],

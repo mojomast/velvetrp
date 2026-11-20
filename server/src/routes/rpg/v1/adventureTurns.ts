@@ -443,17 +443,19 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
   return values;
 }
 const NARRATION_HOLD_TEXT =
-  "The scene holds. Your intended action remains pending; no movement or other campaign change is established.";
+  "You stay where you are; nothing has changed yet. Whatever you meant to do is still ahead of you.";
 const NARRATION_CONVERSATION_FALLBACK =
-  "The exchange holds. Words are offered but nothing is resolved; no movement or other campaign change is established.";
+  "You trade words with those nearby, but nothing is settled yet. You are still where you were, and the moment waits on you.";
 const NARRATION_ILLEGAL_FALLBACK =
-  "That action cannot be established from the current state. It remains unresolved; no movement or other campaign change is established.";
+  "You cannot do that from where you are; nothing has changed yet. You are still where you were, and the road ahead is not taken.";
 const NARRATION_REST_FALLBACK =
-  "The rest is not yet committed. No recovery, time skip, or movement or other campaign change is established.";
+  "You settle in to rest, but the rest has not begun yet. Nothing is restored, and you are still where you were.";
 const NARRATION_COMBAT_FALLBACK =
-  "The fight holds where it stands. Your next move is not resolved; no damage, turn change, or movement or other campaign change is established.";
+  "You ready yourself for a fight, but no blow has landed yet. The moment is still yours to decide.";
 const NARRATION_TRAVEL_CURRENT_FALLBACK =
-  "You are already there. No journey, arrival, or movement or other campaign change is established.";
+  "You are already here; no journey has begun yet. You are still where you stand.";
+const NARRATION_TRAVEL_ELSEWHERE_FALLBACK =
+  "You set your sights on the road, but you have not left yet. You are still where you were.";
 // Deterministic per-turn context classification for receipt-free fallbacks. Distinct contexts get
 // distinct, stable prose instead of one byte-identical hold line, so replaying a turn still reads
 // the same while a dialogue, rest, combat, or illegal declaration no longer collapses together.
@@ -469,20 +471,58 @@ const NARRATION_TRAVEL_SIGNAL =
   /\b(?:travel|travels|traveled|journey|journeys|journeyed|walk|walks|walked|ride|rides|rode|march|marches|marched|return|returns|returned|leave|leaves|left|depart|departs|departed|move|moves|moved|enter|enters|entered|arrive|arrives|arrived|reach|reaches|reached|head|heads|headed|go|goes|went|path|road|route)\b/;
 export interface NarrationFallbackContext {
   currentLocation?: string | null;
+  reachablePlaces?: readonly string[];
 }
-function zeroReceiptFallback(declaration: string, currentLocation: string | null): string {
+
+function reachablePlaceSentence(places: readonly string[] | undefined, currentLocation: string | null): string {
+  if (!places?.length) return "";
+  const current = currentLocation ? normalizedNarration(currentLocation) : null;
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const place of places) {
+    const name = place.trim();
+    if (!name) continue;
+    const key = normalizedNarration(name);
+    if (!key || (current !== null && key === current) || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+    if (names.length >= 5) break;
+  }
+  if (names.length === 0) return "";
+  const list = names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]!}`;
+  return ` From here you can reach ${list}.`;
+}
+
+function withReachablePlaces(
+  text: string,
+  context: NarrationFallbackContext | undefined,
+  currentLocation: string | null,
+): string {
+  return `${text}${reachablePlaceSentence(context?.reachablePlaces, currentLocation)}`;
+}
+
+function zeroReceiptFallback(
+  declaration: string,
+  currentLocation: string | null,
+  context?: NarrationFallbackContext,
+): string {
   const text = normalizedNarration(declaration);
-  if (!text) return NARRATION_HOLD_TEXT;
+  if (!text) return withReachablePlaces(NARRATION_HOLD_TEXT, context, currentLocation);
   if (NARRATION_REST_SIGNAL.test(text)) return NARRATION_REST_FALLBACK;
   if (NARRATION_COMBAT_SIGNAL.test(text)) return NARRATION_COMBAT_FALLBACK;
-  if (NARRATION_META_SIGNAL.test(text)) return NARRATION_ILLEGAL_FALLBACK;
+  if (NARRATION_META_SIGNAL.test(text))
+    return withReachablePlaces(NARRATION_ILLEGAL_FALLBACK, context, currentLocation);
   if (NARRATION_CONVERSATION_SIGNAL.test(text)) return NARRATION_CONVERSATION_FALLBACK;
   if (NARRATION_TRAVEL_SIGNAL.test(text) || /\bset (?:out|off)\b|\bmake for\b/.test(text)) {
-    return currentLocation && mentionsFact(declaration, currentLocation)
-      ? NARRATION_TRAVEL_CURRENT_FALLBACK
-      : NARRATION_ILLEGAL_FALLBACK;
+    return withReachablePlaces(
+      currentLocation && mentionsFact(declaration, currentLocation)
+        ? NARRATION_TRAVEL_CURRENT_FALLBACK
+        : NARRATION_TRAVEL_ELSEWHERE_FALLBACK,
+      context,
+      currentLocation,
+    );
   }
-  return NARRATION_HOLD_TEXT;
+  return withReachablePlaces(NARRATION_HOLD_TEXT, context, currentLocation);
 }
 /**
  * Receipt-bound fallback prose. With committed receipts the composition is already fact-specific;
@@ -495,7 +535,7 @@ export function narrationFallback(
   context?: NarrationFallbackContext,
 ): string {
   if (values.length > 0) return composeNarration(values);
-  return zeroReceiptFallback(declaration, context?.currentLocation ?? null);
+  return zeroReceiptFallback(declaration, context?.currentLocation ?? null, context);
 }
 
 /**
@@ -507,8 +547,10 @@ export function narrationFallback(
  */
 export function holdNarration(hold: AdventureHold): string {
   const message = hold.message.trim();
-  const step = hold.suggestedNextStep?.trim();
-  return `${message}${step ? ` Suggested next step: ${step}.` : ""} Nothing is resolved; no movement or other campaign change is established.`;
+  const step = hold.suggestedNextStep?.trim().replace(/\.$/, "");
+  const suggestion = step ? ` You could ${step.charAt(0).toLowerCase()}${step.slice(1)}.` : "";
+  const guard = " Nothing has changed yet; you are still where you were.";
+  return `${message}${suggestion}${guard}${reachablePlaceSentence(hold.reachablePlaces, null)}`;
 }
 
 /**
@@ -593,7 +635,9 @@ export function deliberateHoldNarration(
 ): string | null {
   if (!hold || !declarationNamesConcreteAction(declaration, presentNpcNames)) return null;
   if (holdNarrationIsWarranted(hold, declaration, presentNpcNames)) return holdNarration(hold);
-  return values.length > 0 ? narrationFallback(declaration, []) : null;
+  return values.length > 0
+    ? narrationFallback(declaration, [], hold.reachablePlaces ? { reachablePlaces: hold.reachablePlaces } : undefined)
+    : null;
 }
 
 /** Receipt-only prose retained for every provider and settings failure lane. */
@@ -715,7 +759,7 @@ function composeNarration(values: readonly NarrationReceipt[]): string {
     const data = value.event.data as { current: number; max: number };
     return `The committed resource is ${data.current} of ${data.max}.`;
   });
-  return `The authoritative result is clear. ${facts.join(" ")}`.slice(0, 8_000);
+  return facts.join(" ").slice(0, 8_000);
 }
 
 const normalizedNarration = (value: string) =>
@@ -1372,6 +1416,34 @@ function narrationRepairMessage(input: {
     ].join("\n\n"),
   };
 }
+/**
+ * Advertised public destinations from the acting hero's current place, in stable candidate order.
+ * Reuses the travel candidate generator's exact, transactionally bounded read; any refusal or
+ * malformed batch degrades to no suggestion so narration never invents a road.
+ */
+function narrationReachablePlaces(repo: Repo & Repository, turn: PrivateAdventureTurn): string[] {
+  try {
+    const batch = repo.generateActorTravelCandidates(OWNER, {
+      turnId: turn.turnId,
+      idempotencyKey: `provider-player:${createHash("sha256").update(turn.turnId).digest("hex").slice(0, 48)}`,
+      audienceMode: "player",
+    });
+    const origins = new Set(batch.candidates.map((candidate) => normalizedNarration(candidate.label.origin ?? "")));
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const candidate of batch.candidates) {
+      const destination = candidate.label.destination?.trim();
+      const key = destination ? normalizedNarration(destination) : "";
+      if (!destination || !key || origins.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      names.push(destination);
+      if (names.length >= 5) break;
+    }
+    return names;
+  } catch {
+    return [];
+  }
+}
 async function performNarration(
   repo: Repo & Repository,
   turn: PrivateAdventureTurn,
@@ -1381,6 +1453,7 @@ async function performNarration(
   providerDisconnected = false,
 ): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, turn);
+  const reachablePlaces = narrationReachablePlaces(repo, turn);
   // A deliberate mechanical hold is the turn's own deterministic narration. It is computed from
   // the orchestrator's bounded reason, never from provider output. Social/routine declarations
   // instead continue to bounded conversation narration. A held declaration does not resolve its own mechanics, so any receipt
@@ -1389,9 +1462,14 @@ async function performNarration(
   // question, or meta hold is not a concrete action and keeps the provider-backed path unchanged.
   const presentNpcNames =
     safeReceipts?.length === 0 ? repo.getAdventureNarrationPresentNpcs(OWNER, turn.turnId).map((npc) => npc.name) : [];
-  const heldText = deliberateHoldNarration(hold, turn.declaration, safeReceipts ?? [], presentNpcNames);
+  const heldText = deliberateHoldNarration(
+    hold && reachablePlaces.length && !hold.reachablePlaces?.length ? { ...hold, reachablePlaces } : hold,
+    turn.declaration,
+    safeReceipts ?? [],
+    presentNpcNames,
+  );
   if (heldText) return { turn, text: heldText, source: "deterministic-fallback" };
-  let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? []);
+  let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? [], { reachablePlaces });
   if (!safeReceipts) return { turn, text: fallbackText, source: "deterministic-fallback" };
   const callId = key("narration-provider", turn.turnId);
   const recovered = repo.getNarrationProviderDispatch(OWNER, turn.turnId, callId);
@@ -1403,11 +1481,10 @@ async function performNarration(
     const publicContext = publicNarrationContext(repo, turn);
     return {
       turn,
-      text: narrationFallback(
-        turn.declaration,
-        safeReceipts,
-        publicContext ? { currentLocation: publicContext.currentLocation } : undefined,
-      ),
+      text: narrationFallback(turn.declaration, safeReceipts, {
+        currentLocation: publicContext?.currentLocation ?? null,
+        reachablePlaces,
+      }),
       source: "deterministic-fallback",
     };
   }
@@ -1442,7 +1519,10 @@ async function performNarration(
     sessionId: turn.sessionId,
     actorId: turn.actorId,
   });
-  fallbackText = narrationFallback(turn.declaration, safeReceipts, { currentLocation: publicContext.currentLocation });
+  fallbackText = narrationFallback(turn.declaration, safeReceipts, {
+    currentLocation: publicContext.currentLocation,
+    reachablePlaces,
+  });
   // An original nonmechanical exchange also needs conversation narration on its first response,
   // including a resume after planning where the transient hold object is no longer available.
   // Derivatives retain the settled-original guard; receipts and proposals never enter this lane.
@@ -1737,10 +1817,14 @@ function finalizeNarrationDispatch(
 ): NarrationResult {
   const currentTurn = requirePrivate(repo.getAdventureTurn(OWNER, turnId));
   const frozen = repo.getNarrationProviderContext(OWNER, turnId, callId);
-  if (frozen && JSON.stringify(frozen) !== JSON.stringify(publicNarrationContext(repo, currentTurn))) {
+  const publicContext = publicNarrationContext(repo, currentTurn);
+  if (frozen && JSON.stringify(frozen) !== JSON.stringify(publicContext)) {
     return {
       turn: currentTurn,
-      text: narrationFallback(currentTurn.declaration, narrationReceipts(repo, currentTurn) ?? []),
+      text: narrationFallback(currentTurn.declaration, narrationReceipts(repo, currentTurn) ?? [], {
+        currentLocation: publicContext?.currentLocation ?? null,
+        reachablePlaces: narrationReachablePlaces(repo, currentTurn),
+      }),
       source: "deterministic-fallback",
     };
   }

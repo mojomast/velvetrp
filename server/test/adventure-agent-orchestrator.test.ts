@@ -2068,7 +2068,7 @@ describe("bounded adventure orchestrator", () => {
         narrationStatus: {
           status: "completed",
           source: "deterministic-fallback",
-          text: narrationFallback(declaration, []),
+          text: expect.stringContaining(narrationFallback(declaration, [])),
         },
       },
     });
