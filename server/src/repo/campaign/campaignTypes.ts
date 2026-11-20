@@ -388,5 +388,7 @@ export interface Repository
   updateSessionContextSource(sessionId: string, sourceOfTruth: string): { sourceOfTruth: string; updatedAt: string };
   transaction<T>(callback: SynchronousCallback<T>): T;
   stopSession(id: string, reason: string): Session | null;
+  /** Directory holding the SQLite database this repository opened. */
+  databaseDirectory(): string;
   close(): void;
 }

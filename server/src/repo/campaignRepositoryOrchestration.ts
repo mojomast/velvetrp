@@ -637,7 +637,8 @@ function createRepositoryComposition<T>(
     rng: options.rng ?? systemRuntime.rng,
     contextInspectionProvenance: options.contextInspectionProvenance ?? "normal",
   };
-  const db = openDatabase(path.resolve(options.dataDir ?? resolveDataDir()));
+  const resolvedDataDir = path.resolve(options.dataDir ?? resolveDataDir());
+  const db = openDatabase(resolvedDataDir);
   const campaignCommandWriteOperations = createCampaignCommandWriteOperations(db, dependencies);
   const campaignEventReadRepository = createCampaignEventReadRepository(db);
   const campaignCommandRepository = createCampaignCommandRepository(
@@ -1743,6 +1744,7 @@ function createRepositoryComposition<T>(
       assertOpen();
       return runTransaction(db, dependencies, (unitOfWork) => stopSessionSync(unitOfWork, id, reason));
     },
+    databaseDirectory: () => resolvedDataDir,
     close: () => {
       if (closed) return;
       db.close();

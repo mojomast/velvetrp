@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -95,6 +95,10 @@ async function main() {
   let child = null;
   let output = "";
   try {
+    // The quick adventure build runs on this worker entry; it must ship with dist.
+    if (!existsSync(path.join(serverDir, "dist", "quickstart", "quickAdventureWorker.js"))) {
+      throw new Error("dist is missing quickstart/quickAdventureWorker.js");
+    }
     const port = await freePort();
     child = spawn(process.execPath, [options.entry], {
       env: {

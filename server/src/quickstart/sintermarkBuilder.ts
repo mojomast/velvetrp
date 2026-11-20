@@ -1179,6 +1179,9 @@ function yieldToEventLoop(): Promise<void> {
 
 async function buildStep<T>(step: string, action: () => T | Promise<T>): Promise<T> {
   try {
+    if (process.env.NODE_ENV === "test" && process.env.VELVET_QUICK_ADVENTURE_FAIL_AT_STEP === step) {
+      throw new Error(`injected failure at ${step}`);
+    }
     await yieldToEventLoop();
     return await action();
   } catch (error) {
