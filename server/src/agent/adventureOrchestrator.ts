@@ -1351,11 +1351,7 @@ const WHOLE_WORD_SPLIT = /[^A-Za-z0-9]+/u;
 /** True only for the same word or its plural: "dock" matches "Docks", arbitrary stems do not. */
 function locationWordMatches(left: string, right: string): boolean {
   return (
-    left === right ||
-    left === `${right}s` ||
-    left === `${right}es` ||
-    right === `${left}s` ||
-    right === `${left}es`
+    left === right || left === `${right}s` || left === `${right}es` || right === `${left}s` || right === `${left}es`
   );
 }
 /** The words that actually identify a location, in normalized order. */
