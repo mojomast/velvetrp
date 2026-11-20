@@ -1902,7 +1902,9 @@ export function assertSintermarkSummary(summary: SintermarkSummary): void {
   if (summary.counts.partyLevel < 3)
     fail(`Sintermark requires level-3 heroes; highest level is ${summary.counts.partyLevel}`);
   if (summary.counts.heroHealthMin < 1)
-    fail(`Sintermark requires a full health resource for every hero; minimum maximum is ${summary.counts.heroHealthMin}`);
+    fail(
+      `Sintermark requires a full health resource for every hero; minimum maximum is ${summary.counts.heroHealthMin}`,
+    );
   if (summary.counts.heroesWithInventory !== 2)
     fail(`Sintermark requires an inventory snapshot for both heroes; found ${summary.counts.heroesWithInventory}`);
   if (summary.publicGraph.unreachablePublicLocations.length > 0) {

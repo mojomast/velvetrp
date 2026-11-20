@@ -19,7 +19,14 @@ afterEach(() => {
 });
 
 type App = ReturnType<typeof buildApp>;
-type Combatant = { combatantId: string; kind: string; team: string; status: string; hitPoints: number; maximumHitPoints: number };
+type Combatant = {
+  combatantId: string;
+  kind: string;
+  team: string;
+  status: string;
+  hitPoints: number;
+  maximumHitPoints: number;
+};
 type Combat = {
   round: number;
   currentCombatant: string;
@@ -29,7 +36,11 @@ type Combat = {
 };
 
 async function quick(app: App, key: string) {
-  const created = await app.inject({ method: "POST", url: "/api/rpg/v1/quick-adventures", payload: { idempotencyKey: key } });
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/rpg/v1/quick-adventures",
+    payload: { idempotencyKey: key },
+  });
   expect(created.statusCode, created.body).toBe(201);
   return created.json() as { campaignId: string; sessionId: string; actorId: string };
 }
@@ -55,7 +66,8 @@ async function fight(app: App, campaignId: string): Promise<{ rounds: number; en
     const combat = (await app.inject({ method: "GET", url: `/api/rpg/v1/combats/${combatId}` })).json() as Combat;
     const enemies = combat.combatants.filter((c) => c.team === "enemies");
     const allies = combat.combatants.filter((c) => c.team === "allies");
-    if (enemies.every(down) || allies.every(down)) return { rounds: combat.round, ended: true, final: combat.combatants };
+    if (enemies.every(down) || allies.every(down))
+      return { rounds: combat.round, ended: true, final: combat.combatants };
     if (combat.round > 12) return { rounds: combat.round, ended: false, final: combat.combatants };
     const current = combat.combatants.find((c) => c.combatantId === combat.currentCombatant);
     let response;
@@ -102,7 +114,10 @@ describe("Quick adventure balance", () => {
       expect(boot.playableActors.length).toBeGreaterThanOrEqual(2);
       for (const actor of boot.playableActors) {
         const resources = (
-          await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${ids.campaignId}/actors/${actor.actorId}/resources` })
+          await app.inject({
+            method: "GET",
+            url: `/api/rpg/v1/campaigns/${ids.campaignId}/actors/${actor.actorId}/resources`,
+          })
         ).json() as { resources: Array<{ name: string; current: number; max: number }> };
         const health = resources.resources.find((r) => r.name === "health");
         expect(health, actor.name).toBeDefined();
