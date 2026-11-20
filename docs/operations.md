@@ -100,6 +100,7 @@ Velvet loads `.env` itself at startup: `VELVET_ENV_FILE` when set, otherwise `.e
 | `TYPESAFE_MODEL` | server-runtime | `jev-latest` | Initial System One model; pin an exact version such as `jev-1.13.0` for evaluations. |
 | `TYPESAFE_API_KEY` | server-runtime | Blank | Initial System One credential; sent only to the allowlisted `api.typesafe.ai` host or loopback. Keep empty in examples. |
 | `NODE_ENV` | internal | Unset | Exact `test` disables automatic Fastify logging; ordinary operators should not use it as a privacy control. |
+| `VELVET_QUICK_ADVENTURE_FAIL_AT_STEP` | internal | Unset | Test-only fault injection: when `NODE_ENV` is exactly `test`, a matching Quick adventure build step name makes the background build fail at that step. Ignored otherwise; never set it in production. |
 | `VELVET_E2E_LIVE` | live-test | Disabled | Exact `1` opts into paid/live provider tests. Not a production setting. |
 | `VELVET_E2E_SOURCE_DATA_DIR` | live-test | `<repository>/server/data` | Source directory checked by live E2E for `velvet.sqlite`. Not a production data-directory override. |
 | `ROUTETOK_BASE_URL` | live-test | `http://127.0.0.1:8787/v1` | Optional RouteTok endpoint used only by the explicit `probe:routetok` command. |
