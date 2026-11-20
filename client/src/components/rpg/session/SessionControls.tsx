@@ -20,9 +20,7 @@ export interface SessionCommandApi {
   getCombatCommandResult?: typeof getCombatCommandResult;
 }
 type Review = { target: string; label: string; revision: number } & (
-  | { kind: "start" }
-  | { kind: "end" }
-  | { kind: "rest"; type: RestHttpRequest["type"]; hitDiceToSpend?: number }
+  { kind: "start" } | { kind: "end" } | { kind: "rest"; type: RestHttpRequest["type"]; hitDiceToSpend?: number }
 );
 type Pending = { review: Review; idempotencyKey: string; confirmed: boolean };
 const storageKey = (campaignId: string, sessionId: string) => `velvet.session-controls.v1:${campaignId}:${sessionId}`;

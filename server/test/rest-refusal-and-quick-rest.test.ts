@@ -23,7 +23,10 @@ afterEach(() => {
 
 async function routeApp(takeRest: ReturnType<typeof vi.fn>) {
   const app = Fastify({ logger: false });
-  await app.register(actorRestHttpRoutes, { prefix: "/api/rpg/v1", restRepositoryAccessor: () => ({ takeRest }) as never });
+  await app.register(actorRestHttpRoutes, {
+    prefix: "/api/rpg/v1",
+    restRepositoryAccessor: () => ({ takeRest }) as never,
+  });
   return app;
 }
 
@@ -87,13 +90,21 @@ describe("rests in a Quick adventure", () => {
     const repository = createRepository();
     try {
       const snapshot = repository.getActorResourceSnapshot("local-owner", campaignId, actorId)!;
-      const health = repository.getM15ActorResources("local-owner", campaignId, actorId).find((r) => r.resourceId === "health")!;
+      const health = repository
+        .getM15ActorResources("local-owner", campaignId, actorId)
+        .find((r) => r.resourceId === "health")!;
       repository.mutateActorResource("local-owner", {
         type: "set_actor_resource",
         campaignId,
         actorId,
         resourceId: "health",
-        current: Math.max(1, Math.floor(((health as { max?: number; capacity?: number }).max ?? (health as { capacity?: number }).capacity ?? 2) / 2)),
+        current: Math.max(
+          1,
+          Math.floor(
+            ((health as { max?: number; capacity?: number }).max ?? (health as { capacity?: number }).capacity ?? 2) /
+              2,
+          ),
+        ),
         expectedRevision: snapshot.revision,
         idempotencyKey: `hurt-${Math.random()}`,
       } as never);
@@ -101,7 +112,9 @@ describe("rests in a Quick adventure", () => {
       repository.close();
     }
     const read = async () =>
-      (await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaignId}/actors/${actorId}/resources` })).json() as {
+      (
+        await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaignId}/actors/${actorId}/resources` })
+      ).json() as {
         revision: number;
         resources: Array<{ name: string; current: number; max: number }>;
       };
@@ -117,7 +130,12 @@ describe("rests in a Quick adventure", () => {
         method: "POST",
         url: `/api/rpg/v1/campaigns/${campaignId}/actors/${actorId}/rest-commands`,
         headers: { "content-type": "application/json" },
-        payload: { type: "take_short_rest", hitDiceToSpend: 1, expectedRevision: before.revision, idempotencyKey: "quick-short" },
+        payload: {
+          type: "take_short_rest",
+          hitDiceToSpend: 1,
+          expectedRevision: before.revision,
+          idempotencyKey: "quick-short",
+        },
       });
       expect(rest.statusCode, rest.body).toBe(200);
       const after = (await read()).resources.find((r) => r.name === "health")!;

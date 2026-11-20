@@ -16,8 +16,11 @@ describe("rest HTTP request hit dice", () => {
   });
   it("still accepts a short rest without hit dice", () => {
     expect(
-      restHttpRequestSchema.safeParse({ type: "take_short_rest", expectedRevision: 3, idempotencyKey: "short-rest-plain" })
-        .success,
+      restHttpRequestSchema.safeParse({
+        type: "take_short_rest",
+        expectedRevision: 3,
+        idempotencyKey: "short-rest-plain",
+      }).success,
     ).toBe(true);
   });
   it("rejects invalid hit dice and hit dice on a long rest", () => {
