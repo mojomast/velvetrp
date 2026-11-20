@@ -48,7 +48,7 @@ function mapFailure(request: FastifyRequest, reply: Parameters<typeof sendApiPro
       reply,
       409,
       "RPG_ACTOR_REST_CONFLICT",
-      "Actor rest command conflicts with current state",
+      `Actor rest command conflicts with current state: ${error.message}`,
     );
   }
   request.log.error(
@@ -106,7 +106,13 @@ export const actorRestHttpRoutes: FastifyPluginAsync<ActorRestHttpOptions> = asy
           campaignId: campaignId.data,
           actorId: actorId.data,
         });
-        const { restId: _restId, campaignId: _campaignId, actorId: _actorId, ...receipt } = result.rest;
+        const {
+          restId: _restId,
+          campaignId: _campaignId,
+          actorId: _actorId,
+          hitDice: _hitDice,
+          ...receipt
+        } = result.rest;
         return reply.code(200).send(
           restHttpResponseSchema.parse({
             actorState: result.actorState,

@@ -1,7 +1,8 @@
 import type { ActorResourcesHttpGetResponse, RestHttpRequest } from "@velvet/contracts";
 import { useEffect, useRef, useState } from "react";
 
-export type RestIntent = Omit<RestHttpRequest, "expectedRevision" | "idempotencyKey">;
+type RestCommandIntent<T> = T extends RestHttpRequest ? Omit<T, "expectedRevision" | "idempotencyKey"> : never;
+export type RestIntent = RestCommandIntent<RestHttpRequest>;
 
 export interface RestDialogProps {
   open: boolean;
@@ -15,8 +16,15 @@ export function RestDialog({ open, disabled = false, resources, onClose, onSubmi
   const dialogRef = useRef<HTMLDialogElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const [type, setType] = useState<RestIntent["type"]>("take_short_rest");
+  const [hitDiceToSpend, setHitDiceToSpend] = useState(1);
   const [confirmedSnapshot, setConfirmedSnapshot] = useState<string | null>(null);
-  const exactIntent: RestIntent = { type };
+  const hitDieResource = resources.resources.find((resource) => /^hit-dice-d\d+$/.test(resource.name));
+  const exactIntent: RestIntent =
+    type === "take_short_rest"
+      ? hitDieResource
+        ? { type: "take_short_rest", hitDiceToSpend }
+        : { type: "take_short_rest" }
+      : { type: "take_long_rest" };
   const exactSnapshot = JSON.stringify({ intent: exactIntent, resourceContext: resources });
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -81,6 +89,21 @@ export function RestDialog({ open, disabled = false, resources, onClose, onSubmi
             />{" "}
             Short rest
           </label>
+          {type === "take_short_rest" && hitDieResource && (
+            <label className="actor-option">
+              Hit dice to spend{" "}
+              <input
+                type="number"
+                min={1}
+                max={hitDieResource.current}
+                value={hitDiceToSpend}
+                onChange={(event) => {
+                  setHitDiceToSpend(Number(event.target.value));
+                  setConfirmedSnapshot(null);
+                }}
+              />
+            </label>
+          )}
           <label className="actor-option">
             <input
               type="radio"
