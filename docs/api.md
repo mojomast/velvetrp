@@ -243,6 +243,9 @@ non-JSON media type, or an invalid body returns `400 RPG_INVALID_REQUEST`; a
 disabled feature flag returns `404 RPG_ROUTE_NOT_FOUND`; a build failure returns
 `500 RPG_QUICK_ADVENTURE_FAILED` with the step-named message as `detail`.
 
+The build runs in a worker thread with its own database connection, so the
+server keeps answering other requests while the starter world is installed.
+
 ### Scene images
 
 The seven scene-image operations under

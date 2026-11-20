@@ -239,6 +239,10 @@ const DEFINITIONS = new Map<string, CatalogDefinition>(
   ]),
 );
 
+function yieldToEventLoop(): Promise<void> {
+  return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 /** Keeps composed command keys inside the repository's 128-character limit. */
 function scopedKey(prefix: string, ...parts: string[]): string {
   const raw = [prefix, ...parts].join(".");
@@ -337,18 +341,19 @@ function createPersona(repository: Repository, ownerId: string, hero: HeroSpec):
 }
 
 /** Advances the character to the SRD starter cap (level 3) through real progression commands. */
-function advanceToTargetLevel(
+async function advanceToTargetLevel(
   repository: Repository,
   ownerId: string,
   campaignCharacterId: string,
   keyPrefix: string,
   key: string,
-): void {
+): Promise<void> {
   let state = requireValue(
     repository.getCharacterProgression(ownerId, campaignCharacterId),
     `Sintermark: ${key} progression is unavailable`,
   );
   if (state.totalXp < TARGET_XP) {
+    await yieldToEventLoop();
     repository.grantCharacterXp(ownerId, campaignCharacterId, {
       amount: TARGET_XP - state.totalXp,
       reason: "Sintermark seed: advance to the supported SRD starter level cap",
@@ -357,15 +362,18 @@ function advanceToTargetLevel(
     });
   }
   for (let guard = 0; guard < 8; guard += 1) {
+    await yieldToEventLoop();
     state = requireValue(
       repository.getCharacterProgression(ownerId, campaignCharacterId),
       `Sintermark: ${key} progression is unavailable`,
     );
     if (state.level >= TARGET_LEVEL) return;
+    await yieldToEventLoop();
     const preview = requireValue(
       repository.previewCharacterProgression(ownerId, campaignCharacterId),
       `Sintermark: ${key} progression preview is unavailable`,
     );
+    await yieldToEventLoop();
     repository.applyCharacterProgression(ownerId, campaignCharacterId, {
       previewRevision: preview.revision,
       previewToken: preview.token,
@@ -373,6 +381,7 @@ function advanceToTargetLevel(
       idempotencyKey: `${keyPrefix}.${key}.apply.${guard}`,
     });
   }
+  await yieldToEventLoop();
   const finalState = requireValue(
     repository.getCharacterProgression(ownerId, campaignCharacterId),
     `Sintermark: ${key} progression is unavailable`,
@@ -743,6 +752,7 @@ export async function createSintermarkParty(
   const party: Array<{ personaId: string; actorId: string; campaignCharacterId: string; name: string }> = [];
 
   for (const hero of HEROES) {
+    await yieldToEventLoop();
     const existing = findExisting(repository, ownerId, campaignId, hero.name);
     if (existing) {
       party.push(existing);
@@ -751,6 +761,7 @@ export async function createSintermarkParty(
 
     const personaId = createPersona(repository, ownerId, hero);
 
+    await yieldToEventLoop();
     const draft = repository.createCharacterDraft(ownerId, campaignId, {
       personaId,
       controllerPrincipalId: ownerId,
@@ -765,11 +776,13 @@ export async function createSintermarkParty(
       starterGrant: "kit",
       preparedSpells: hero.preparedSpells.map(spellRefFor),
     };
+    await yieldToEventLoop();
     const selected = repository.updateCharacterDraft(ownerId, draft.draft.id, {
       expectedRevision: draft.draft.revision,
       idempotencyKey: `${keyPrefix}.${hero.key}.select`,
       selections,
     });
+    await yieldToEventLoop();
     const finalized = repository.finalizeCharacterDraft(ownerId, draft.draft.id, {
       expectedRevision: selected.draft.revision,
       idempotencyKey: `${keyPrefix}.${hero.key}.finalize`,
@@ -777,15 +790,18 @@ export async function createSintermarkParty(
     const campaignCharacterId = finalized.receipt.campaignCharacterId;
     const actorId = finalized.receipt.actorId;
 
-    advanceToTargetLevel(repository, ownerId, campaignCharacterId, keyPrefix, hero.key);
+    await yieldToEventLoop();
+    await advanceToTargetLevel(repository, ownerId, campaignCharacterId, keyPrefix, hero.key);
     party.push({ personaId, actorId, campaignCharacterId, name: hero.name });
   }
 
   // GM overlay after leveling: absolute targets, so ancestry is never double-applied.
   // Deterministic command keys make this loop idempotent across re-runs.
   for (const hero of HEROES) {
+    await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
     for (const attributeId of SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS) {
+      await yieldToEventLoop();
       setActorAttribute(
         repository,
         ownerId,
@@ -797,19 +813,25 @@ export async function createSintermarkParty(
         hero.targetScores[attributeId],
       );
     }
+    await yieldToEventLoop();
     ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "health", 1000);
+    await yieldToEventLoop();
     ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "focus", 100);
+    await yieldToEventLoop();
     ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "slot-1", 100);
+    await yieldToEventLoop();
     ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "slot-2", 100);
   }
 
   // Inventory authoring through scoped repository-database transactions.
   for (const hero of HEROES) {
+    await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
 
     for (const item of hero.instancedItems) {
       const definition = itemDefinitionOf(item.definitionId);
       const entryId = `${keyPrefix}.${hero.key}.item.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
+      await yieldToEventLoop();
       materializeInstancedEntry({
         ownerId,
         campaignId,
@@ -822,6 +844,7 @@ export async function createSintermarkParty(
     for (const item of hero.stackableItems) {
       const reference = itemRefFor(item.definitionId);
       const entryId = `${keyPrefix}.${hero.key}.stack.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
+      await yieldToEventLoop();
       materializeStackableEntry({
         ownerId,
         campaignId,
@@ -835,6 +858,7 @@ export async function createSintermarkParty(
 
   // Equip only real-profile equipment through the public inventory command.
   for (const hero of HEROES) {
+    await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
     for (const item of hero.instancedItems) {
       if (!item.equip) continue;
@@ -843,6 +867,7 @@ export async function createSintermarkParty(
         throw new Error(`Sintermark: ${item.definitionId} has no SRD equipment profile and cannot be equipped`);
       }
       const entryId = `${keyPrefix}.${hero.key}.item.${item.definitionId.replace(/^srd-5\.1:item:/, "")}`;
+      await yieldToEventLoop();
       equipItem(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, entryId, item.equip);
     }
   }

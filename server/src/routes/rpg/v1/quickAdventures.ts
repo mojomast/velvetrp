@@ -4,6 +4,7 @@ import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
 import type { Repository } from "../../../repo/index.js";
 import { QuickAdventureError, createQuickAdventure } from "../../../quickstart/quickAdventure.js";
+import { runQuickAdventureInWorker } from "../../../quickstart/quickAdventureWorkerClient.js";
 
 /**
  * Quick adventure command.
@@ -23,6 +24,16 @@ const JSON_MEDIA_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.
 const REPLAY_LIMIT = 256;
 
 type CachedSuccess = ReturnType<typeof quickAdventureCreateResponseSchema.parse>;
+
+/**
+ * The composed repository exposes its SQLite directory so the build can run in
+ * a worker against the same file. Fake/mock repositories in tests do not, and
+ * keep using the in-process build.
+ */
+function databaseDirectoryOf(repository: Repository): string | null {
+  const candidate = (repository as { databaseDirectory?: unknown }).databaseDirectory;
+  return typeof candidate === "function" ? (candidate as () => string).call(repository) : null;
+}
 
 export const quickAdventureHttpRoutes: FastifyPluginAsync<{ repositoryAccessor: () => Repository }> = async (
   app,
@@ -105,7 +116,12 @@ export const quickAdventureHttpRoutes: FastifyPluginAsync<{ repositoryAccessor: 
       }
 
       const build = (async (): Promise<CachedSuccess> => {
-        const result = await createQuickAdventure({ repository: options.repositoryAccessor(), ownerId: PRINCIPAL });
+        const repository = options.repositoryAccessor();
+        const databaseDir = databaseDirectoryOf(repository);
+        const result =
+          databaseDir !== null
+            ? await runQuickAdventureInWorker({ databaseDir, ownerId: PRINCIPAL })
+            : await createQuickAdventure({ repository, ownerId: PRINCIPAL });
         return quickAdventureCreateResponseSchema.parse({
           campaignId: result.campaignId,
           campaignName: result.campaignName,
