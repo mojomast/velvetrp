@@ -86,7 +86,11 @@ function publicItem(
     : null;
 }
 
-const declarationWords = (value: string) => ` ${value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+const declarationWords = (value: string) =>
+  ` ${value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()} `;
 const hasIntent = (declaration: string, intents: readonly string[]) =>
   intents.some((intent) => declaration.includes(` ${intent} `));
 const DISCARD_INTENTS = ["drop", "discard", "leave", "toss", "throw away", "set down", "put down", "abandon", "ditch"];
