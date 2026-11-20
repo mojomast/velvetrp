@@ -65,6 +65,10 @@ export function CampaignConversation({
   const confirmation = [...liveEvents].reverse().find((event) => event.type === "confirmation_required");
   const terminal = [...liveEvents].reverse().find((event) => event.type === "terminal");
   const latestStatus = [...liveEvents].reverse().find((event) => event.type === "agent_status");
+  const authoredOpening =
+    legacyMessages.length > 0 &&
+    legacyMessages[0].role === "system" &&
+    !legacyMessages.some((message) => message.role === "user");
   const legacySpeaker = (message: ChatMessage) =>
     message.role === "user"
       ? "Player"
@@ -149,8 +153,16 @@ export function CampaignConversation({
       >
         {legacyMessages.length > 0 && (
           <section className="legacy-campaign-history" aria-labelledby="legacy-campaign-history-heading">
-            <h3 id="legacy-campaign-history-heading">Read-only pre-campaign history</h3>
-            <p>These legacy room messages are historical context only. Continue play with the action composer below.</p>
+            {authoredOpening ? (
+              <h3 id="legacy-campaign-history-heading">Opening</h3>
+            ) : (
+              <>
+                <h3 id="legacy-campaign-history-heading">Read-only pre-campaign history</h3>
+                <p>
+                  These legacy room messages are historical context only. Continue play with the action composer below.
+                </p>
+              </>
+            )}
             {legacyMessages.map((message) => (
               <article className="conversation-exchange legacy" key={message.id}>
                 <SpeakerName identity={message.speakerCharacterId ?? message.role} name={legacySpeaker(message)} />
