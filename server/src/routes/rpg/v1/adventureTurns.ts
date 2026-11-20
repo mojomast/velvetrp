@@ -2049,6 +2049,16 @@ function resumeToken(turn: PrivateAdventureTurn): string | null {
       .digest("base64url");
     return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
   }
+  if (
+    turn.state === "cancelled" &&
+    turn.receiptLinks.length === 0 &&
+    !turn.toolCalls.some(({ proposal }) => proposal.confirmation.state === "pending")
+  ) {
+    const digest = createHash("sha256")
+      .update(JSON.stringify([turn.turnId, OWNER, turn.createdAt, "automatic-planning"]))
+      .digest("base64url");
+    return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
+  }
   if (!["confirmed", "mechanics-committed", "narrating", "cancelled"].includes(turn.state)) return null;
   const decisionDigest = resumableDecisionDigest(turn);
   if (decisionDigest)
@@ -2186,6 +2196,20 @@ async function stream(
       payload: { outcome, turn: view.turn, narrationStatus: view.narrationStatus, receipts: view.receipts },
     });
   };
+  // A resume can observe an approved or replanned proposal that has no receipt and can never
+  // commit. Settle that stranded turn through the ordinary cancellation transition so it does
+  // not remain "declared" forever.
+  const settleStrandedTurn = (turn: PrivateAdventureTurn): PrivateAdventureTurn => {
+    if (["completed", "cancelled", "failed"].includes(turn.state) || turn.receiptLinks.length > 0) return turn;
+    return repo.updateAdventureTurnNarration(OWNER, {
+      turnId: turn.turnId,
+      expectedTurnRevision: turn.revision,
+      expectedCampaignRevision: turn.campaignRevision,
+      idempotencyKey: key("http-stranded", turn.turnId, String(turn.revision)),
+      narrationStatus: "none",
+      terminalState: "cancelled",
+    });
+  };
   try {
     writer = openSse(reply, "private, no-store, no-transform");
     reply.raw.on("close", () => {
@@ -2304,14 +2328,15 @@ async function stream(
     if (turn.toolCalls.some((call) => call.status === "approved") && turn.receiptLinks.length === 0) {
       send({ type: "agent_status", payload: { status: "pending-mechanics" } });
       await yieldToEventLoop();
-      finish(turn, "aborted");
+      finish(settleStrandedTurn(turn), "error");
       return;
     }
     if (
       turn.toolCalls.length > 0 &&
       turn.toolCalls.every((call) => ["rejected", "expired", "cancelled"].includes(call.status))
     ) {
-      finish(turn, "aborted");
+      const replanned = turn.state === "declared" && turn.toolCalls.some((call) => call.status === "cancelled");
+      finish(replanned ? settleStrandedTurn(turn) : turn, replanned ? "error" : "aborted");
       return;
     }
     if (turn.receiptLinks.length > 0) {
