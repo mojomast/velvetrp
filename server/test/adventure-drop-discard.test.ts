@@ -315,7 +315,7 @@ describe("drop is a discard, and approved mechanics never strand a turn", () => 
     }
     const read = await restarted.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/${selected.turn.turnId}` });
     expect(["completed", "failed", "cancelled"]).toContain(read.json().turn.state);
-    expect(read.json().turn.receiptLinks).toHaveLength(0);
+    expect(read.json().receipts).toHaveLength(0);
     await restarted.close();
     restore();
   });
