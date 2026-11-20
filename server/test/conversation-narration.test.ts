@@ -611,7 +611,7 @@ describe("conversation narration for held turns", () => {
       },
     });
     if (terminal?.type !== "terminal") throw new Error("terminal missing");
-    expect(terminal.payload.narrationStatus.text).toContain("The authoritative result is clear. The dice come up");
+    expect(terminal.payload.narrationStatus.text).toContain("The dice come up");
     await app.close();
   });
 

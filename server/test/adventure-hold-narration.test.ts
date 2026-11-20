@@ -109,9 +109,9 @@ describe("player-visible deliberate holds", () => {
     for (const { name, hold, step } of everydayHolds) {
       const text = holdNarration(hold);
       expect(text, name).toContain(hold.message);
-      if (step) expect(text, name).toContain(`Suggested next step: ${step}.`);
-      else expect(text, name).not.toContain("Suggested next step:");
-      expect(text, name).toContain("Nothing is resolved; no movement or other campaign change is established.");
+      if (step) expect(text, name).toContain(`You could ${step.charAt(0).toLowerCase()}${step.slice(1)}.`);
+      expect(text, name).not.toContain("Suggested next step:");
+      expect(text, name).toContain("Nothing has changed yet; you are still where you were.");
     }
   });
 

@@ -176,7 +176,7 @@ function completedReceiptTurn(override: CompletedTurnOverride = {}): AdventureTu
 /** Authoritative hold line returned when an original turn commits no mechanics. */
 const heldNarration = {
   status: "completed" as const,
-  text: "The scene holds. Your intended action remains pending; no movement or other campaign change is established.",
+  text: "You stay where you are; nothing has changed yet. Whatever you meant to do is still ahead of you.",
   source: "deterministic-fallback" as const,
 };
 /** Completed held turn: an original deterministic turn that committed no receipt. */

@@ -861,7 +861,7 @@ describe("M2.11 adventure turn routes", () => {
       payload: {
         narrationStatus: {
           source: "deterministic-fallback",
-          text: "The scene holds. Your intended action remains pending; no movement or other campaign change is established.",
+          text: expect.stringContaining("nothing has changed yet"),
         },
       },
     });
@@ -1690,13 +1690,13 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
         narrationStatus: {
           status: "completed",
           source: "deterministic-fallback",
-          text: expect.stringContaining("The declaration names Black Berth, but the actor is at Ferry Deck."),
+          text: expect.stringContaining("You are still at Ferry Deck, not Black Berth."),
         },
       },
     });
     if (terminal?.type !== "terminal") throw new Error("hold terminal missing");
-    expect(terminal.payload.narrationStatus.text).toContain("Suggested next step: Travel to Black Berth.");
-    expect(terminal.payload.narrationStatus.text).toContain("no movement or other campaign change is established");
+    expect(terminal.payload.narrationStatus.text).toContain("You could travel to Black Berth.");
+    expect(terminal.payload.narrationStatus.text).toContain("Nothing has changed yet");
     // Replaying the same turn keeps the same player-visible hold text.
     const replay = await app.inject({
       method: "POST",
@@ -1900,7 +1900,7 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
         receipts: [expect.any(Object)],
         narrationStatus: {
           source: "deterministic-fallback",
-          text: "The authoritative result is clear. You arrive at Parc des Pionniers.",
+          text: "You arrive at Parc des Pionniers.",
         },
       },
     });
@@ -2251,7 +2251,7 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
         receipts: [expect.any(Object)],
         narrationStatus: {
           source: "deterministic-fallback",
-          text: "The authoritative result is clear. Quest objective advanced for Survey the Park: Complete the park survey (1 of 1). The objective is complete. The quest is complete.",
+          text: "Quest objective advanced for Survey the Park: Complete the park survey (1 of 1). The objective is complete. The quest is complete.",
         },
       },
     });
@@ -2734,7 +2734,7 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
       receipts: [],
       narrationStatus: {
         status: "completed",
-        text: expect.stringContaining("remains pending"),
+        text: expect.stringContaining("nothing has changed yet"),
         source: "deterministic-fallback",
       },
     });
@@ -2983,7 +2983,7 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
       type: "narration_delta",
       payload: {
         text: expect.stringMatching(
-          /^The authoritative result is clear\. The dice come up \d+\. The attempt is made and the moment is still open; no success or failure is recorded yet\.$/,
+          /^The dice come up \d+\. The attempt is made and the moment is still open; no success or failure is recorded yet\.$/,
         ),
       },
     });

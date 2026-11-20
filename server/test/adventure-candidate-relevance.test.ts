@@ -298,7 +298,7 @@ describe("hold descriptions", () => {
     );
     expect(hold.reason).toBe("location-mismatch");
     expect(hold.message).toContain("Docks");
-    expect(hold.message).toContain("the actor is at Market");
+    expect(hold.message).toContain("You are still at Market");
   });
 
   it("states the pending later step of a compound declaration that cannot chain", () => {
@@ -312,7 +312,7 @@ describe("hold descriptions", () => {
       }),
     );
     expect(hold.reason).toBe("pending-compound-step");
-    expect(hold.message).toContain("the rest remains pending");
+    expect(hold.message).toContain("the rest still waits");
     expect(hold.suggestedNextStep).toBe("Buy Longsword from Mara");
   });
 
