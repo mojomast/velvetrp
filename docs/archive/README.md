@@ -14,3 +14,4 @@ Current guidance lives in the [documentation index](../README.md), starting with
 | [supra2-inference-setup-prompt.md](supra2-inference-setup-prompt.md) | Agent prompt for self-hosting the image service |
 | [jev-next-agent-handoff.txt](jev-next-agent-handoff.txt), [jev-deadline-shadow-followup.txt](jev-deadline-shadow-followup.txt), [jev-shortlist-coverage.txt](jev-shortlist-coverage.txt) | System One working notes |
 | [adventure-table-design-2026-10-03.md](adventure-table-design-2026-10-03.md), [play-sheet-context-audit-2026-10-02.md](play-sheet-context-audit-2026-10-02.md), [roleplay-worldbuilding-audit-2026-10-02.md](roleplay-worldbuilding-audit-2026-10-02.md) | Dated design and implementation audits |
+| [roadmap-milestones-m1-m4.md](roadmap-milestones-m1-m4.md) | Per-milestone acceptance detail for the delivered M1–M4 and the original D1–D5 deferred baseline, split out of the roadmap |
