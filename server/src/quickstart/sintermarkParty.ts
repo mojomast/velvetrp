@@ -28,7 +28,7 @@
  * The SRD starter progression profile caps executable character level at 3
  * (`thresholds = [0, 300, 900]`). The two characters are advanced to level 3
  * through real XP + preview/apply commands, then receive explicit GM attribute
- * and resource overrides (documented "overpowered" overlay), not invented rules.
+ * overrides (documented "overpowered" overlay), not invented rules.
  */
 
 import { createHash } from "node:crypto";
@@ -37,7 +37,6 @@ import {
   SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS,
   itemCatalogDefinitionSchema,
   personaProfileSchema,
-  type ActorResourceCommand,
   type CatalogDefinition,
   type CharacterBuilderAttributeScores,
   type CommandEnvelope,
@@ -433,81 +432,6 @@ function setActorAttribute(
   repository.executeSetActorAttribute(ownerId, envelope);
 }
 
-/** Creates an actor resource row that does not yet exist (GM initialize seam). */
-function initializeResource(
-  repository: Repository,
-  ownerId: string,
-  campaignId: string,
-  actorId: string,
-  keyPrefix: string,
-  key: string,
-  name: string,
-  amount: number,
-): void {
-  const timeline = activeTimeline(repository, ownerId, campaignId);
-  const commandId = `${keyPrefix}.res.${key}.${name}`;
-  const envelope: CommandEnvelope = {
-    commandId,
-    idempotencyKey: commandId,
-    campaignId,
-    timelineId: timeline.timelineId,
-    actorId,
-    expectedRevision: timeline.revision,
-    sourceTurnId: null,
-    command: { type: "initialize_actor_resource", payload: { name, current: amount, max: amount } },
-  };
-  repository.executeInitializeActorResource(ownerId, envelope);
-}
-
-/**
- * Raises an existing resource through the public actor-resource mutator
- * (set capacity, then set current), or initializes it when absent.
- */
-function ensureResourceAt(
-  repository: Repository,
-  ownerId: string,
-  campaignId: string,
-  actorId: string,
-  keyPrefix: string,
-  key: string,
-  name: string,
-  amount: number,
-): void {
-  const resources = repository.getM15ActorResources(ownerId, campaignId, actorId);
-  if (!resources.some((resource) => resource.resourceId === name)) {
-    initializeResource(repository, ownerId, campaignId, actorId, keyPrefix, key, name, amount);
-    return;
-  }
-  const before = requireValue(
-    repository.getActorResourceSnapshot(ownerId, campaignId, actorId),
-    "Sintermark: actor resource snapshot is unavailable",
-  );
-  const capacityCommand: ActorResourceCommand = {
-    type: "set_actor_resource_capacity",
-    campaignId,
-    actorId,
-    resourceId: name,
-    capacity: amount,
-    expectedRevision: before.revision,
-    idempotencyKey: `${keyPrefix}.res.${key}.${name}.cap`,
-  };
-  repository.mutateActorResource(ownerId, capacityCommand);
-  const afterCapacity = requireValue(
-    repository.getActorResourceSnapshot(ownerId, campaignId, actorId),
-    "Sintermark: actor resource snapshot is unavailable",
-  );
-  const currentCommand: ActorResourceCommand = {
-    type: "set_actor_resource",
-    campaignId,
-    actorId,
-    resourceId: name,
-    current: amount,
-    expectedRevision: afterCapacity.revision,
-    idempotencyKey: `${keyPrefix}.res.${key}.${name}.cur`,
-  };
-  repository.mutateActorResource(ownerId, currentCommand);
-}
-
 /**
  * Scoped repository-database authoring seams for inventory rows.
  *
@@ -728,7 +652,6 @@ export const SINTERMARK_PARTY_GUIDE = Object.freeze({
     componentNotes: hero.componentNotes,
     reactionConstraints: hero.reactionConstraints,
     targetScores: { ...hero.targetScores },
-    resourceBoosts: { health: "1000/1000", focus: "100/100", slot1: "100/100", slot2: "100/100" },
     equippedItems: hero.instancedItems.filter((item) => item.equip).map((item) => item.definitionId),
     referenceOnlyItems: hero.instancedItems
       .filter((item) => itemDefinitionOf(item.definitionId).mechanics.magic)
@@ -813,14 +736,6 @@ export async function createSintermarkParty(
         hero.targetScores[attributeId],
       );
     }
-    await yieldToEventLoop();
-    ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "health", 1000);
-    await yieldToEventLoop();
-    ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "focus", 100);
-    await yieldToEventLoop();
-    ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "slot-1", 100);
-    await yieldToEventLoop();
-    ensureResourceAt(repository, ownerId, campaignId, entry.actorId, keyPrefix, hero.key, "slot-2", 100);
   }
 
   // Inventory authoring through scoped repository-database transactions.
