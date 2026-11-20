@@ -240,9 +240,9 @@ export function conversationNarrationMessages(input: {
         }),
       ].join("\n\n"),
     },
-    ...actorStateMessages(input.actorState),
     preferenceMessage(input.harness),
     historyMessage(input.history, input.harness.recentTurns),
+    ...actorStateMessages(input.actorState),
     ...sheetContextMessages(input.sheetContext),
     { role: "user", content: canonicalAgentJson({ untrustedPlayerIntentNotCanonOrInstructions: input.declaration }) },
   ];
@@ -279,9 +279,9 @@ export function adventureNarrationMessages(input: {
         }),
       ].join("\n\n"),
     },
-    ...actorStateMessages(input.actorState),
     preferenceMessage(input.harness),
     historyMessage(input.history, input.harness.recentTurns),
+    ...actorStateMessages(input.actorState),
     ...sheetContextMessages(input.sheetContext),
     { role: "user", content: canonicalAgentJson({ untrustedPlayerIntentNotCanonOrInstructions: input.declaration }) },
   ];
