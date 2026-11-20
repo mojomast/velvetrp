@@ -75,9 +75,39 @@ interface SavedRun {
   createdResult?: CampaignCreateResponse;
 }
 
+function readJournal(key: string): string | null {
+  try {
+    const value = sessionStorage.getItem(key);
+    if (value !== null) return value;
+  } catch {}
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeJournalValue(key: string, json: string): void {
+  try {
+    sessionStorage.setItem(key, json);
+  } catch {}
+  try {
+    localStorage.setItem(key, json);
+  } catch {}
+}
+
+function removeJournal(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {}
+  try {
+    localStorage.removeItem(key);
+  } catch {}
+}
+
 function restoreRun(key: string, interrupted = true): SavedRun | null {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(key) ?? "null") as SavedRun | null;
+    const saved = JSON.parse(readJournal(key) ?? "null") as SavedRun | null;
     if (
       saved?.version !== 1 ||
       typeof saved.prompt !== "string" ||
@@ -93,6 +123,13 @@ function restoreRun(key: string, interrupted = true): SavedRun | null {
       )
     )
       return null;
+    if (saved.stages.length > 0 && saved.stages.every((stage) => stage.status === "applied")) {
+      try {
+        if (sessionStorage.getItem(key) === null) return null;
+      } catch {
+        return null;
+      }
+    }
     if (!interrupted) return saved;
     return {
       ...saved,
@@ -240,8 +277,9 @@ export function WorldbuildingAgentPanel({
   }, []);
 
   function writeJournal(value: SavedRun): void {
-    sessionStorage.setItem(storageKey, JSON.stringify(value));
-    if (value.campaignId) sessionStorage.setItem(`velvet-worldbuilding-v1:${value.campaignId}`, JSON.stringify(value));
+    const json = JSON.stringify(value);
+    writeJournalValue(storageKey, json);
+    if (value.campaignId) writeJournalValue(`velvet-worldbuilding-v1:${value.campaignId}`, json);
   }
 
   function persist(): void {
@@ -847,7 +885,7 @@ export function WorldbuildingAgentPanel({
       return;
     // Preserve the completed campaign journal; only the library's new-world composer is cleared.
     persist();
-    if (!campaignId) sessionStorage.removeItem(storageKey);
+    if (!campaignId) removeJournal(storageKey);
     stagesRef.current = [];
     acceptedRef.current = {};
     campaignIdRef.current = campaignId ?? null;
@@ -885,7 +923,7 @@ export function WorldbuildingAgentPanel({
       <p>
         Build a connected world from one prompt: places, factions, characters, lore, special items, enemies, quests, and
         scenes. Build world authorizes generation and application of all listed stages. Progress is saved in this
-        browser tab; interrupted requests wait for your explicit retry.
+        browser; interrupted requests wait for your explicit retry.
       </p>
       <p>
         Items and monsters are narrative concepts unless bound to a pinned rules catalog. Completing the world prepares

@@ -170,6 +170,7 @@ function previewForRequest(
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  localStorage.clear();
   vi.restoreAllMocks();
 });
 
