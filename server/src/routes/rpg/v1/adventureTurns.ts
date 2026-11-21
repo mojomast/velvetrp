@@ -675,6 +675,12 @@ export function deliberateHoldNarration(
     : null;
 }
 
+function checkReceiptProse(value: Extract<NarrationReceipt, { kind: "check" }>): string {
+  const subject = value.skill ?? value.ability;
+  const difficulty = value.difficulty ? `${value.difficulty} ` : "";
+  return `Your ${subject} check comes to ${value.total} against ${difficulty}DC ${value.dc}: ${value.outcome}.`;
+}
+
 /** Receipt-only prose retained for every provider and settings failure lane. */
 function composeNarration(values: readonly NarrationReceipt[]): string {
   if (values.length === 0) return NARRATION_HOLD_TEXT;
@@ -710,8 +716,7 @@ function composeNarration(values: readonly NarrationReceipt[]): string {
           : `Quest reward claimed from ${value.questTitle}: ${value.reward?.amount === null ? value.reward.label : `${value.reward?.amount} ${value.reward?.kind} (${value.reward?.label})`} for ${value.reward?.recipient}.`;
     if (value.kind === "progression")
       return `${value.className} advances from level ${value.levelBefore} to level ${value.levelAfter}.${value.features.length ? ` Features gained: ${value.features.join(", ")}.` : ""}${value.resources.length ? ` ${value.resources.map((resource) => `${resource.label} capacity changes from ${resource.before} to ${resource.after}.`).join(" ")}` : ""}`;
-    if (value.kind === "check")
-      return `${value.skill ?? value.ability} check: ${value.rolls.map((roll) => roll.value).join(" and ")} rolled ${value.mode}; ${value.modifier >= 0 ? "+" : ""}${value.modifier} modifier gives ${value.total} against ${value.difficulty} DC ${value.dc}: ${value.outcome}.`;
+    if (value.kind === "check") return checkReceiptProse(value);
     if (value.kind === "power")
       return `${value.powerName} affects ${value.targets.join(", ")}.${value.costs.length ? ` ${value.costs.map((cost) => `${cost.label} changes from ${cost.before} to ${cost.after}`).join(" ")}.` : ""}${value.stateDeltas.length ? ` ${value.stateDeltas.map((delta) => (delta.before === null ? `${delta.actor}: ${delta.change}.` : `${delta.actor} ${delta.change} changes from ${delta.before} to ${delta.after}.`)).join(" ")}` : ""}${value.concentration ? " Concentration is active." : ""}`;
     if (value.kind === "combat-consumable") {
