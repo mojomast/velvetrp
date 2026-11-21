@@ -42,13 +42,14 @@ type EncounterRow = {
   session_id: string;
   status: string;
   current_turn_combatant_id: string | null;
+  round_number: number;
   revision: number;
 };
 
 function encounterRow(db: DatabaseDriver.Database, combatId: string): EncounterRow | null {
   const row = db
     .prepare(
-      `SELECT e.encounter_id,e.campaign_id,e.session_id,e.status,e.current_turn_combatant_id,root.revision
+      `SELECT e.encounter_id,e.campaign_id,e.session_id,e.status,e.current_turn_combatant_id,e.round_number,root.revision
       FROM encounter e
       JOIN combat_mutation_revisions_v27 root ON root.encounter_id=e.encounter_id
       WHERE e.encounter_id=? AND e.status NOT IN ('preparing','cancelled')`,
