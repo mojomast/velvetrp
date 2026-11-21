@@ -685,9 +685,8 @@ function BoundCampaignContextDrawer({
               refreshKey={refreshKey + combatRefresh}
               commandsBlocked={
                 commandsBlocked ||
-                (worldValue !== undefined && world.state !== "ready") ||
                 tacticalLocations.length > 1 ||
-                (mapMode === "combat" && encounters.state !== "ready")
+                (mapMode === "combat" && encounters.state !== "ready" && encounterValue === undefined)
               }
               campaignId={campaignId}
               sessionId={sessionId}

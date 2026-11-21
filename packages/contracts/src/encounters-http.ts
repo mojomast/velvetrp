@@ -575,6 +575,43 @@ export const combatEnemyTurnCommandRequestSchema = z
   })
   .strict();
 
+/** The public 90-second turn clock for the combatant currently holding the turn. */
+export const combatTurnClockResponseSchema = z
+  .object({
+    currentCombatant: resourceIdSchema.nullable(),
+    currentTurnStartedAt: utcIsoTimestampSchema.optional(),
+    timeoutSeconds: z.literal(90),
+    playedByGmUntilReturn: z
+      .array(
+        z
+          .object({
+            actorId: resourceIdSchema,
+            displayName: z.string().trim().min(1).max(200).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict();
+
+/** A GM/owner may skip the current player turn; clients never send this automatically. */
+export const combatSkipTurnCommandRequestSchema = z
+  .object({
+    expectedRevision: expectedRevisionSchema,
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .strict();
+
+/** Explicit GM take-over of an absent player's actor, or that player's own reclaim. */
+export const combatHandoffCommandRequestSchema = z
+  .object({
+    action: z.enum(["take-over", "reclaim"]),
+    actorId: resourceIdSchema,
+    expectedRevision: expectedRevisionSchema,
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .strict();
+
 export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -1637,6 +1674,9 @@ export type CombatLogEntryPublic = z.infer<typeof combatLogEntryPublicSchema>;
 export type CombatLogResponse = z.infer<typeof combatLogResponseSchema>;
 export type CombatActionCommandRequest = z.infer<typeof combatActionCommandRequestSchema>;
 export type CombatEnemyTurnCommandRequest = z.infer<typeof combatEnemyTurnCommandRequestSchema>;
+export type CombatTurnClockResponse = z.infer<typeof combatTurnClockResponseSchema>;
+export type CombatSkipTurnCommandRequest = z.infer<typeof combatSkipTurnCommandRequestSchema>;
+export type CombatHandoffCommandRequest = z.infer<typeof combatHandoffCommandRequestSchema>;
 export type CombatActionResolution = z.infer<typeof combatActionResolutionSchema>;
 export type CombatActionCommandResponse = z.infer<typeof combatActionCommandResponseSchema>;
 export type CombatEndCommandRequest = z.infer<typeof combatEndCommandRequestSchema>;
