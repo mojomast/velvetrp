@@ -82,11 +82,34 @@ function latestState(db: DatabaseDriver.Database, campaignId: string, sessionId:
   return { enabled: row.enabled === 1, check: parseCheck(row.check_json), revision: row.revision };
 }
 
-function waitingFor(session: ReadyCheckSession, readyActorIds: readonly string[]) {
+interface ReadyCheckIdentity {
+  actorId: string;
+  name: string;
+}
+
+function identitiesFor(
+  db: DatabaseDriver.Database,
+  campaignId: string,
+  session: ReadyCheckSession,
+): ReadyCheckIdentity[] {
+  const actorForCharacter = db.prepare(
+    `SELECT actor.id FROM campaign_actors actor
+    JOIN campaign_characters character
+      ON character.id=actor.campaign_character_id AND character.campaign_id=actor.campaign_id
+    WHERE actor.campaign_id=? AND character.character_id=?
+    ORDER BY actor.id LIMIT 1`,
+  );
+  return session.participants.map((participant) => {
+    const actor = actorForCharacter.get(campaignId, participant.id) as { id: string } | undefined;
+    return { actorId: actor?.id ?? participant.id, name: participant.name };
+  });
+}
+
+function waitingFor(identities: readonly ReadyCheckIdentity[], readyActorIds: readonly string[]) {
   const ready = new Set(readyActorIds);
-  return session.participants
-    .filter((participant) => !ready.has(participant.id))
-    .map((participant) => ({ actorId: participant.id, name: participant.name }));
+  return identities
+    .filter((identity) => !ready.has(identity.actorId))
+    .map((identity) => ({ actorId: identity.actorId, name: identity.name }));
 }
 
 export function createCampaignReadyCheckRepository(
@@ -169,14 +192,15 @@ export function createCampaignReadyCheckRepository(
         next.check = {
           startedAt: now(),
           readyActorIds: [],
-          waiting: waitingFor(session, []),
+          waiting: waitingFor(identitiesFor(db, campaignId, session), []),
         };
         break;
       }
       case "ready": {
         if (!current.enabled || !current.check) throw new CampaignReadyCheckConflictError("no ready check is active");
         if (input.actorId === undefined) break;
-        if (!session.participants.some((participant) => participant.id === input.actorId))
+        const identities = identitiesFor(db, campaignId, session);
+        if (!identities.some((identity) => identity.actorId === input.actorId))
           throw new CampaignReadyCheckConflictError("actor is not a room participant");
         const readyActorIds = current.check.readyActorIds.includes(input.actorId)
           ? [...current.check.readyActorIds]
@@ -184,7 +208,7 @@ export function createCampaignReadyCheckRepository(
         next.check = {
           startedAt: current.check.startedAt,
           readyActorIds,
-          waiting: waitingFor(session, readyActorIds),
+          waiting: waitingFor(identities, readyActorIds),
         };
         break;
       }
