@@ -28,11 +28,13 @@ const liveContext = {
   },
 } as NarrationFallbackContext;
 
-const unwarrantedHold = {
-  reason: "off-turn",
+const unwarrantedHold: AdventureHold = {
+  reason: "no-advertised-match",
   message: "It is not your turn.",
+  suggestedNextStep: null,
+  suggestedCandidateId: null,
   reachablePlaces: ["Slake Market", "The Steps"],
-} as AdventureHold;
+};
 
 const sideEffectReceipt = {
   kind: "check",
