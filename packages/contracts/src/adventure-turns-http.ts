@@ -139,12 +139,36 @@ export const adventureTurnHttpConfirmationSchema = z.discriminatedUnion("state",
     .strict(),
 ]);
 
+/** Closed hold vocabulary reported by the orchestrator; mirrors its deliberate-hold reasons. */
+export const adventureNarrationHoldReasonSchema = z.enum([
+  "location-mismatch",
+  "already-at-location",
+  "pending-compound-step",
+  "no-advertised-match",
+  "unknown-person",
+]);
+/** Closed narration outcome vocabulary used by playtests to separate holds from gate failures. */
+export const adventureNarrationOutcomeSchema = z.enum([
+  "provider-accepted",
+  "repair-accepted",
+  "gate-rejected",
+  "repair-skipped",
+  "parse-failed",
+  "provider-error",
+  "hold-skipped-provider",
+  "budget",
+  "disconnected",
+]);
 /** Durable narration reconciliation state, including deterministic fallback text when available. */
 export const adventureTurnHttpNarrationStatusSchema = z
   .object({
     status: narrationStatusSchema,
     text: z.string().min(1).max(8_000).nullable(),
     source: z.enum(["provider-assisted", "deterministic-fallback"]).nullable(),
+    holdReason: adventureNarrationHoldReasonSchema.optional(),
+    gateRule: z.string().trim().min(1).max(200).optional(),
+    narrationOutcome: adventureNarrationOutcomeSchema.optional(),
+    repairAttempted: z.boolean().optional(),
   })
   .strict();
 
