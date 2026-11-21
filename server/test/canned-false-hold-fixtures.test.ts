@@ -91,7 +91,9 @@ describe("place names in dialogue or by accident are not staged travel", () => {
     );
     expect(hold.reason).toBe("location-mismatch");
     expect(hold.message.toLowerCase()).not.toMatch(/\bactor\b|\bdeclaration\b|\bcampaign change\b/);
-    expect(hold.suggestedNextStep ?? "").not.toMatch(/Move to Kiln College first/i);
+    expect(hold.suggestedCandidateId).toBeNull();
+    expect(hold.suggestedNextStep).toBe("Move to Kiln College first");
+    expect(hold.suggestedNextStep ?? "").not.toMatch(/Long Reflectory/i);
   });
 });
 

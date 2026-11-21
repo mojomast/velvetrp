@@ -1698,11 +1698,7 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
           .slice(1)
           .find(
             (step) =>
-              stepStagesTrade(step, context.commerceCandidates) ||
-              step.rest ||
-              step.check ||
-              step.combat ||
-              step.quest,
+              stepStagesTrade(step, context.commerceCandidates) || step.rest || step.check || step.combat || step.quest,
           )
       : undefined;
   const compoundPendingTrade = compoundPending ? stepStagesTrade(compoundPending, context.commerceCandidates) : false;
@@ -1718,9 +1714,7 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
       message: `You are still at ${context.currentLocation ?? "your last known place"}, not ${reference.mismatchedDestination}.${noRoad}${pending}`,
       suggestedNextStep: travel
         ? `Travel to ${reference.mismatchedDestination}`
-        : reachablePlaces.length > 0
-          ? `Take the road to ${reachablePlaces[0]} instead`
-          : null,
+        : `Move to ${reference.mismatchedDestination} first`,
       reachablePlaces,
     };
   }
