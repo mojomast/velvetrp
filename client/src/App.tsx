@@ -37,6 +37,9 @@ import {
   commandActorPower,
   commandActorRest,
   commandCombatConsumable,
+  commandCombatHandoff,
+  commandCombatSkipTurn,
+  commandCampaignReadyCheck,
   commandFactionReputation,
   commandFactionRelation,
   commandActorFactionMembership,
@@ -89,6 +92,8 @@ import {
   getCombatConsumableResult,
   getCombatLog,
   getCombatState,
+  getCombatTurnClock,
+  getCampaignReadyCheck,
   getContentPackPublication,
   getFeatures,
   getHarness,
@@ -280,6 +285,10 @@ const combatTrackerApi: CombatTrackerApi = {
   getWallet: getActorWallet,
   startEncounter,
   endCombat,
+  getTurnClock: getCombatTurnClock,
+  skipCurrentTurn: commandCombatSkipTurn,
+  takeOverActor: (combatId, command) => commandCombatHandoff(combatId, { ...command, action: "take-over" }),
+  reclaimActor: (combatId, command) => commandCombatHandoff(combatId, { ...command, action: "reclaim" }),
 };
 const worldExplorerApi: WorldExplorerApi = {
   getWorld: getCampaignWorld,
@@ -339,6 +348,8 @@ const campaignExportApi: CampaignExportApi = { export: getCampaignExport };
 const campaignPlayApi: CampaignPlayApi = {
   dm: { ...campaignDmApi, getCampaignContextInspectionReferences, getCampaignContextInspection },
   getCampaignPlayBootstrap,
+  getReadyCheck: getCampaignReadyCheck,
+  commandReadyCheck: commandCampaignReadyCheck,
   streamAdventureTurn,
   getAdventureTurn,
   getAdventureTurnTranscript,

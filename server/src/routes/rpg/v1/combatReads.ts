@@ -11,11 +11,11 @@ import {
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
+import { getRequestPrincipal } from "../../../http/requestPrincipal.js";
 import { EncounterAuthorizationError, type EncounterRepository } from "../../../repo/index.js";
 import { createCombatTurnClockRepository } from "../../../repo/encounter/combatTurnClock.js";
 import { getRepositoryDatabase } from "../../../repo/repoContext.js";
 
-const LOCAL_OWNER = "local-owner";
 type CombatTurnClockRead = Omit<CombatTurnClockResponse, "timeoutSeconds"> & { timeoutSeconds: number };
 type CombatReadRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards"> &
   Partial<{
@@ -54,8 +54,11 @@ export const combatReadsHttpRoutes: FastifyPluginAsync<CombatReadsHttpOptions> =
           "RPG_INVALID_REQUEST",
           "Combat rewards do not accept query parameters",
         );
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
-        const rewards = options.combatRepositoryAccessor().listCombatRewards(LOCAL_OWNER, combatId.data);
+        const rewards = options.combatRepositoryAccessor().listCombatRewards(principalId, combatId.data);
         if (rewards === null) return notFound(request, reply);
         return reply.code(200).send(combatRewardListResponseSchema.parse({ rewards }));
       } catch {
@@ -84,11 +87,14 @@ export const combatReadsHttpRoutes: FastifyPluginAsync<CombatReadsHttpOptions> =
     async (request, reply) => {
       const combatId = resourceIdSchema.safeParse(request.params.combatId);
       if (!combatId.success) return notFound(request, reply);
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const repository = options.combatRepositoryAccessor();
         const clock = repository.getCombatTurnClock
-          ? repository.getCombatTurnClock(LOCAL_OWNER, combatId.data)
-          : createCombatTurnClockRepository(getRepositoryDatabase()).getCombatTurnClock(LOCAL_OWNER, combatId.data);
+          ? repository.getCombatTurnClock(principalId, combatId.data)
+          : createCombatTurnClockRepository(getRepositoryDatabase()).getCombatTurnClock(principalId, combatId.data);
         if (clock === null) return notFound(request, reply);
         return reply.code(200).send(combatTurnClockResponseSchema.parse(clock));
       } catch (error) {
@@ -124,8 +130,11 @@ export const combatReadsHttpRoutes: FastifyPluginAsync<CombatReadsHttpOptions> =
     async (request, reply) => {
       const combatId = resourceIdSchema.safeParse(request.params.combatId);
       if (!combatId.success) return notFound(request, reply);
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
-        const combat = options.combatRepositoryAccessor().getCombatState(LOCAL_OWNER, combatId.data);
+        const combat = options.combatRepositoryAccessor().getCombatState(principalId, combatId.data);
         if (combat === null) return notFound(request, reply);
         const allowed = new Set([
           "campaignId",
@@ -185,10 +194,13 @@ export const combatReadsHttpRoutes: FastifyPluginAsync<CombatReadsHttpOptions> =
       const query = combatLogQuerySchema.safeParse(request.query);
       if (!query.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Combat log request is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const page = options
           .combatRepositoryAccessor()
-          .listCombatLogPage(LOCAL_OWNER, combatId.data, query.data.afterSequence, query.data.limit);
+          .listCombatLogPage(principalId, combatId.data, query.data.afterSequence, query.data.limit);
         if (page === null) return notFound(request, reply);
         const allowed = new Set(["campaignId", "encounterId", "entries", "nextAfterSequence"]);
         if (

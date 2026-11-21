@@ -18,6 +18,7 @@ import {
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
+import { getRequestPrincipal } from "../../../http/requestPrincipal.js";
 import {
   EncounterAuthorizationError,
   EncounterConflictError,
@@ -32,7 +33,6 @@ import {
 } from "../../../repo/encounter/combatTurnClock.js";
 import { getRepositoryDatabase } from "../../../repo/repoContext.js";
 
-const LOCAL_OWNER = "local-owner";
 const APPLICATION_JSON = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
 type CombatCommandRepository = Pick<
   EncounterRepository,
@@ -142,10 +142,13 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
         identity = idempotencyKeySchema.safeParse(request.params.claimIdentity);
       if (!campaignId.success || !combatId.success || !bundleId.success || !identity.success)
         return notFound(request, reply);
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const result = options
           .combatCommandRepositoryAccessor()
-          .getCombatRewardClaimResult(LOCAL_OWNER, campaignId.data, combatId.data, bundleId.data, identity.data);
+          .getCombatRewardClaimResult(principalId, campaignId.data, combatId.data, bundleId.data, identity.data);
         if (result === null) return notFound(request, reply);
         const response = combatRewardClaimResultResponseSchema.parse(result),
           binding = response.requestBinding;
@@ -213,13 +216,16 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
       if (!combatId.success || !bundleId.success) return notFound(request, reply);
       if (!body.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Combat reward claim request is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const result = options
           .combatCommandRepositoryAccessor()
-          .claimCombatReward(LOCAL_OWNER, combatId.data, bundleId.data, body.data);
+          .claimCombatReward(principalId, combatId.data, bundleId.data, body.data);
         const reward = options
           .combatCommandRepositoryAccessor()
-          .listCombatRewards(LOCAL_OWNER, combatId.data)
+          .listCombatRewards(principalId, combatId.data)
           ?.find((value) => value.rewardBundleId === bundleId.data);
         if (
           !reward ||
@@ -300,10 +306,13 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
         combatId = resourceIdSchema.safeParse(request.params.combatId),
         key = idempotencyKeySchema.safeParse(request.params.idempotencyKey);
       if (!campaignId.success || !combatId.success || !key.success) return notFound(request, reply);
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const result = options
           .combatCommandRepositoryAccessor()
-          .getCombatCommandResult("local-owner", campaignId.data, combatId.data, key.data);
+          .getCombatCommandResult(principalId, campaignId.data, combatId.data, key.data);
         if (result === null) return notFound(request, reply);
         const response = combatCommandResultResponseSchema.parse(result);
         const bound =
@@ -364,10 +373,13 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
       const body = combatActionCommandRequestSchema.safeParse(request.body);
       if (!body.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Combat action request is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const result = options
           .combatCommandRepositoryAccessor()
-          .resolveCombatAction(LOCAL_OWNER, combatId.data, body.data);
+          .resolveCombatAction(principalId, combatId.data, body.data);
         if (
           result.encounterId !== combatId.data ||
           result.combat.encounterId !== combatId.data ||
@@ -469,10 +481,13 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
       if (!combatId.success) return notFound(request, reply);
       if (!body.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Enemy turn request is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const result = options
           .combatCommandRepositoryAccessor()
-          .executeCombatEnemyTurn(LOCAL_OWNER, combatId.data, body.data);
+          .executeCombatEnemyTurn(principalId, combatId.data, body.data);
         if (
           result.encounterId !== combatId.data ||
           result.combat.encounterId !== combatId.data ||
@@ -572,12 +587,15 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
       if (!combatId.success) return notFound(request, reply);
       if (!body.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Skip turn request is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const repository = options.combatCommandRepositoryAccessor();
         const result = repository.skipCurrentTurn
-          ? repository.skipCurrentTurn(LOCAL_OWNER, combatId.data, body.data)
+          ? repository.skipCurrentTurn(principalId, combatId.data, body.data)
           : createCombatTurnClockRepository(getRepositoryDatabase()).skipCurrentTurn(
-              LOCAL_OWNER,
+              principalId,
               combatId.data,
               body.data,
             );
@@ -652,12 +670,15 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
       if (!combatId.success) return notFound(request, reply);
       if (!body.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Combat handoff request is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const repository = options.combatCommandRepositoryAccessor();
         const result = repository.commandCombatHandoff
-          ? repository.commandCombatHandoff(LOCAL_OWNER, combatId.data, body.data)
+          ? repository.commandCombatHandoff(principalId, combatId.data, body.data)
           : createCombatTurnClockRepository(getRepositoryDatabase()).commandCombatHandoff(
-              LOCAL_OWNER,
+              principalId,
               combatId.data,
               body.data,
             );
@@ -738,8 +759,11 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
       const body = combatEndCommandRequestSchema.safeParse(request.body);
       if (!body.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Combat end request is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
-        const result = options.combatCommandRepositoryAccessor().endCombat(LOCAL_OWNER, combatId.data, body.data);
+        const result = options.combatCommandRepositoryAccessor().endCombat(principalId, combatId.data, body.data);
         if (
           result.encounterId !== combatId.data ||
           result.encounter.encounterId !== combatId.data ||

@@ -21,12 +21,16 @@ import type {
   CampaignDiceRollRequest,
   CampaignDiceRollResponse,
   CampaignPlayBootstrap,
+  CampaignReadyCheckCommand,
+  CampaignReadyCheckCommandResponse,
+  CampaignReadyCheckState,
 } from "@velvet/contracts";
 import type { AdventureTurnClientBinding, ChatMessage } from "../../../api";
 import { ApiError } from "../../../api";
 import { AdventureActionComposer } from "./AdventureActionComposer";
 import { CampaignContextDrawer, type CampaignContextDrawerApi } from "./CampaignContextDrawer";
 import { ConfirmationBanner } from "./ConfirmationBanner";
+import { ReadyCheckBanner } from "./ReadyCheckBanner";
 import { MechanicReceiptCard, type MechanicReceiptApi } from "./MechanicReceiptCard";
 import { CampaignConversation } from "./CampaignConversation";
 import { GameplaySheetDrawer } from "./GameplaySheetDrawer";
@@ -125,6 +129,13 @@ export interface CampaignPlayApi extends CampaignContextDrawerApi, MechanicRecei
   seekFreeformFaction?: FreeformSeekApi["seekFaction"];
   seekFreeformQuest?: FreeformSeekApi["seekQuest"];
   seekFreeformRumor?: FreeformSeekApi["seekRumor"];
+  /** Optional coordination-only ready check; never locks the adventure composer. */
+  getReadyCheck?: (campaignId: string, sessionId: string) => Promise<CampaignReadyCheckState>;
+  commandReadyCheck?: (
+    campaignId: string,
+    sessionId: string,
+    input: CampaignReadyCheckCommand,
+  ) => Promise<CampaignReadyCheckCommandResponse>;
 }
 
 /** Props for the authoritative campaign play layout. */
@@ -335,6 +346,8 @@ export function CampaignPlayPage({
   const [preferences, onPreferences] = useCampaignWorkbenchPreferences();
   const [reconciliationRevision, setReconciliationRevision] = useState(0);
   const [liveRefreshRevision, setLiveRefreshRevision] = useState(0);
+  const [readyCheck, setReadyCheck] = useState<CampaignReadyCheckState | null>(null);
+  const [readyCheckPending, setReadyCheckPending] = useState(false);
   const streamRef = useRef<AdventureTurnStreamHandle | null>(null);
   const deliveryTurnIdRef = useRef<string | null>(null);
   // Original turns already handed to the automatic narration retry in this page session.
@@ -617,6 +630,26 @@ export function CampaignPlayPage({
       liveReadRef.current = false;
     };
   }, [refreshBootstrap, refreshTranscript]);
+  useEffect(() => {
+    const read = api.getReadyCheck;
+    if (!read) {
+      setReadyCheck(null);
+      return;
+    }
+    let alive = true;
+    void read(campaignId, sessionId).then(
+      (value) => {
+        if (!alive) return;
+        setReadyCheck(value.campaignId === campaignId && value.sessionId === sessionId ? value : null);
+      },
+      () => {
+        if (alive) setReadyCheck(null);
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [api, campaignId, sessionId, liveRefreshRevision]);
   useEffect(() => {
     if (focusHeading && bootstrap && !headingFocusedRef.current) {
       headingFocusedRef.current = true;
@@ -1219,6 +1252,31 @@ export function CampaignPlayPage({
           : bootstrap.playableActors.length === 0
             ? "No controlled actor is available in this room. Review character finalization, room participants, and campaign control."
             : null;
+  const canManageReadyCheck =
+    authorizationCanAct && (bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm");
+  const canReadyForCheck =
+    authorizationCanAct &&
+    !canManageReadyCheck &&
+    Boolean(selectedActorId) &&
+    Boolean(readyCheck?.check?.waiting.some((actor) => actor.actorId === selectedActorId));
+  async function runReadyCheck(action: CampaignReadyCheckCommand["action"]) {
+    const command = api.commandReadyCheck;
+    if (!command || !readyCheck || readyCheckPending) return;
+    setReadyCheckPending(true);
+    try {
+      const response = await command(campaignId, sessionId, {
+        action,
+        expectedRevision: readyCheck.expectedRevision,
+        idempotencyKey: `ready-check-${createClientId()}`,
+        ...(action === "ready" ? { actorId: selectedActorId } : {}),
+      });
+      if (activeRef.current) setReadyCheck(response);
+    } catch {
+      if (activeRef.current) setError("The ready check could not be updated. Refresh before trying again.");
+    } finally {
+      if (activeRef.current) setReadyCheckPending(false);
+    }
+  }
   function closeTool() {
     setActiveTool(null);
     const origin = toolOriginRef.current;
@@ -1684,6 +1742,19 @@ export function CampaignPlayPage({
       ])}
     />
   );
+  const readyCheckNode =
+    api.getReadyCheck && readyCheck ? (
+      <ReadyCheckBanner
+        enabled={readyCheck.enabled}
+        check={readyCheck.check}
+        canManage={canManageReadyCheck}
+        canReady={canReadyForCheck}
+        onEnable={api.commandReadyCheck ? () => void runReadyCheck("enable") : undefined}
+        onStart={api.commandReadyCheck ? () => void runReadyCheck("start") : undefined}
+        onReady={api.commandReadyCheck ? () => void runReadyCheck("ready") : undefined}
+        onDismiss={api.commandReadyCheck ? () => void runReadyCheck("dismiss") : undefined}
+      />
+    ) : null;
   const combatBarNode =
     actionable && combatAvailable && combatApi ? (
       <CombatCommandBar
@@ -1765,6 +1836,7 @@ export function CampaignPlayPage({
   const centerNode = (
     <>
       <div className="room-top">
+        {readyCheckNode}
         {combatBarNode}
         {noticesNode}
         {reconcileNode}
@@ -1783,6 +1855,7 @@ export function CampaignPlayPage({
   );
   const activityNode = (
     <>
+      {readyCheckNode}
       {combatBarNode}
       {dmNoticeNode}
       {replayToggleNode}
@@ -2253,6 +2326,7 @@ export function CampaignPlayPage({
           }
           notices={
             <>
+              {readyCheckNode}
               {combatBarNode}
               {noticesNode}
               {reconcileNode}

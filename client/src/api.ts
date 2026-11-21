@@ -443,6 +443,9 @@ import {
   adventureTurnTranscriptResponseSchema,
   campaignPlayBootstrapSchema,
   campaignPlaySessionIdSchema,
+  campaignReadyCheckCommandSchema,
+  campaignReadyCheckCommandResponseSchema,
+  campaignReadyCheckStateSchema,
 } from "@velvet/contracts";
 import type {
   AdventureTurnConfirmRequest,
@@ -451,6 +454,9 @@ import type {
   AdventureTurnStreamEvent,
   AdventureTurnTranscriptResponse,
   CampaignPlayBootstrap,
+  CampaignReadyCheckCommand,
+  CampaignReadyCheckCommandResponse,
+  CampaignReadyCheckState,
 } from "@velvet/contracts";
 import {
   actorCheckCommandRequestSchema,
@@ -588,6 +594,9 @@ import {
   combatEnemyTurnCommandRequestSchema,
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
+  combatTurnClockResponseSchema,
+  combatSkipTurnCommandRequestSchema,
+  combatHandoffCommandRequestSchema,
   combatRewardClaimRequestSchema,
   combatRewardClaimResponseSchema,
   combatRewardClaimResultResponseSchema,
@@ -617,6 +626,9 @@ import type {
   CombatEnemyTurnCommandRequest,
   CombatEndCommandRequest,
   CombatEndCommandResponse,
+  CombatTurnClockResponse,
+  CombatSkipTurnCommandRequest,
+  CombatHandoffCommandRequest,
   CombatRewardClaimRequest,
   CombatRewardClaimResponse,
   CombatRewardClaimResultResponse,
@@ -1599,6 +1611,51 @@ export async function getCampaignPlayBootstrap(campaignId: string, sessionId: st
   const response = campaignPlayBootstrapSchema.parse(success.body);
   if (response.campaignId !== campaign || response.sessionId !== room)
     throw new Error("Campaign play bootstrap did not match the request");
+  return response;
+}
+
+function campaignReadyCheckPath(campaignId: string, sessionId: string) {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const room = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
+  return {
+    campaign,
+    room,
+    path: `/rpg/v1/campaigns/${encodeURIComponent(campaign)}/rooms/${encodeURIComponent(room)}/ready-check`,
+  };
+}
+
+/** Reads optional out-of-combat ready-check coordination state for one room. */
+export async function getCampaignReadyCheck(campaignId: string, sessionId: string): Promise<CampaignReadyCheckState> {
+  const target = campaignReadyCheckPath(campaignId, sessionId);
+  const success = await requestResponse<unknown>(target.path, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign ready check");
+  const response = campaignReadyCheckStateSchema.parse(success.body);
+  if (response.campaignId !== target.campaign || response.sessionId !== target.room)
+    throw new Error("Campaign ready check did not match the request");
+  return response;
+}
+
+/** Enables, starts, acknowledges, or dismisses one room's ready check. */
+export async function commandCampaignReadyCheck(
+  campaignId: string,
+  sessionId: string,
+  input: CampaignReadyCheckCommand,
+): Promise<CampaignReadyCheckCommandResponse> {
+  const target = campaignReadyCheckPath(campaignId, sessionId);
+  const body = parseApiInput(() => campaignReadyCheckCommandSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Campaign ready check command");
+  const response = campaignReadyCheckCommandResponseSchema.parse(success.body);
+  if (
+    response.campaignId !== target.campaign ||
+    response.sessionId !== target.room ||
+    response.receipt.idempotencyKey !== body.idempotencyKey
+  )
+    throw new Error("Campaign ready check command did not match the request");
   return response;
 }
 
@@ -3215,6 +3272,37 @@ function combatPath(combatId: string): { id: string; path: string } {
   return { id, path: `/rpg/v1/combats/${encodeURIComponent(id)}` };
 }
 
+const combatSkipTurnCommandResultSchema = z
+  .object({
+    currentCombatant: resourceIdSchema.nullable(),
+    revision: z.number().int().min(0),
+  })
+  .strict();
+
+const combatHandoffCommandResultSchema = z
+  .object({
+    playedByGmUntilReturn: z
+      .array(
+        z
+          .object({
+            actorId: resourceIdSchema,
+            displayName: z.string().trim().min(1).max(200).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
+    revision: z.number().int().min(0),
+  })
+  .strict();
+
+/** The public 90-second clock for the combatant currently holding the turn. */
+export async function getCombatTurnClock(combatId: string): Promise<CombatTurnClockResponse> {
+  const target = combatPath(combatId);
+  const success = await requestResponse<unknown>(`${target.path}/turn-clock`, { cache: "no-store" });
+  requireStatus(success, 200, "Combat turn clock");
+  return combatTurnClockResponseSchema.parse(success.body);
+}
+
 export async function listCampaignEncounters(campaignId: string): Promise<{ encounters: EncounterPublic[] }> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounters`, {
@@ -3632,6 +3720,38 @@ export async function resolveCombatEnemyTurn(
     throw new Error("Combat enemy turn response did not match the request");
   }
   return response;
+}
+
+/** GM/owner-only skip of the combatant currently holding the turn. */
+export async function commandCombatSkipTurn(
+  combatId: string,
+  input: CombatSkipTurnCommandRequest,
+): Promise<z.infer<typeof combatSkipTurnCommandResultSchema>> {
+  const target = combatPath(combatId);
+  const body = parseApiInput(() => combatSkipTurnCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/skip-turn-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Combat skip turn");
+  return combatSkipTurnCommandResultSchema.parse(success.body);
+}
+
+/** Explicit GM take-over of an absent player's actor, or that player's own reclaim. */
+export async function commandCombatHandoff(
+  combatId: string,
+  input: CombatHandoffCommandRequest,
+): Promise<z.infer<typeof combatHandoffCommandResultSchema>> {
+  const target = combatPath(combatId);
+  const body = parseApiInput(() => combatHandoffCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/handoff-commands`, {
+    method: "POST",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Combat handoff");
+  return combatHandoffCommandResultSchema.parse(success.body);
 }
 
 export async function endCombat(combatId: string, input: CombatEndCommandRequest): Promise<CombatEndCommandResponse> {
