@@ -188,7 +188,9 @@ const currentSchemaSql =
   "\n" +
   readFileSync(new URL("./combatantLabelSchema.sql", import.meta.url), "utf8") +
   "\n" +
-  readFileSync(new URL("./actorJourneySchema.sql", import.meta.url), "utf8");
+  readFileSync(new URL("./actorJourneySchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./actorHandoffSchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
