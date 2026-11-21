@@ -437,6 +437,41 @@ describe("TacticalMapPanel", () => {
     expect(screen.queryByText("Authoritative tactical map refreshed.")).toBeNull();
   });
 
+  it("applies a refreshKey movement budget update while combat binding locks commands", async () => {
+    const offTurn = {
+      ...snapshot,
+      mode: "combat" as const,
+      encounterId: "encounter",
+      movement: { policy: "combat-current-turn-speed" as const, budgetFeet: 0 },
+    };
+    const onTurn = { ...offTurn, movement: { ...offTurn.movement, budgetFeet: 30 } };
+    const client = api({
+      getTacticalMap: vi.fn().mockResolvedValueOnce(offTurn).mockResolvedValue(onTurn),
+    });
+    const view = render(
+      <TacticalMapPanel
+        {...props}
+        mode="combat"
+        encounterId="encounter"
+        combatantId="selected-combatant"
+        api={client}
+      />,
+    );
+    await screen.findByText(/0 feet available by combat-current-turn-speed/);
+    view.rerender(
+      <TacticalMapPanel
+        {...props}
+        mode="combat"
+        encounterId="encounter"
+        combatantId="selected-combatant"
+        api={client}
+        commandsBlocked
+        refreshKey={1}
+      />,
+    );
+    expect(await screen.findByText(/30 feet available by combat-current-turn-speed/)).toBeTruthy();
+  });
+
   it("never retries an ambiguous command and recovery performs one GET only", async () => {
     const client = api({ moveTacticalMapToken: vi.fn().mockRejectedValue(new TypeError("network")) });
     render(<TacticalMapPanel {...props} api={client} />);

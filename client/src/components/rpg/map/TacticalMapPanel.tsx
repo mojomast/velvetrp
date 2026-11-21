@@ -117,8 +117,11 @@ function BoundTacticalMapPanel({
   const [notice, setNotice] = useState("");
   const stateRef = useRef(state);
   const snapshotRef = useRef(snapshot);
+  const previewRef = useRef(preview);
+  const syncing = useRef(false);
   stateRef.current = state;
   snapshotRef.current = snapshot;
+  previewRef.current = preview;
   const [seed, setSeed] = useState(() => (locationId ? `velvet-map:${locationId}`.slice(0, 256) : "velvet-map"));
   const [kind, setKind] = useState<"dungeon" | "cave" | "arena" | "underwater">("arena");
   const generation = useRef(0);
@@ -153,14 +156,21 @@ function BoundTacticalMapPanel({
   const refresh = useCallback(
     async (explicit = false, quiet = false) => {
       const quietRefresh =
-        quiet && !explicit && !busy.current && stateRef.current === "ready" && snapshotRef.current !== null;
+        quiet &&
+        !explicit &&
+        !busy.current &&
+        !previewRef.current &&
+        stateRef.current === "ready" &&
+        snapshotRef.current !== null;
+      if (quiet && !quietRefresh) return;
       readController.current?.abort();
       const controller = new AbortController();
       readController.current = controller;
       const request = ++generation.current;
       if (quietRefresh) {
-        // Lock previews and moves without clearing the current notice or canvas.
-        busy.current = true;
+        // Lock new previews without using busy.current: command-bar "Refresh combat
+        // binding" sets commandsBlocked/readOnly, and that effect aborts busy work.
+        syncing.current = true;
       } else {
         busy.current = false;
         setSelection("");
@@ -178,7 +188,7 @@ function BoundTacticalMapPanel({
         const value = await read(campaignId, sessionId, mode, actorId, controller.signal);
         if (request !== generation.current || controller.signal.aborted) return;
         const finishQuiet = () => {
-          if (quietRefresh) busy.current = false;
+          if (quietRefresh) syncing.current = false;
         };
         if (
           value.campaignId !== campaignId ||
@@ -226,7 +236,7 @@ function BoundTacticalMapPanel({
         finishQuiet();
       } catch (error) {
         if (request !== generation.current || controller.signal.aborted) return;
-        if (quietRefresh) busy.current = false;
+        if (quietRefresh) syncing.current = false;
         setSnapshot(null);
         if (error instanceof ApiError && error.status === 409 && error.code === "RPG_TACTICAL_MAP_LOCATION_MISMATCH") {
           locationMismatch();
@@ -260,6 +270,7 @@ function BoundTacticalMapPanel({
     return () => {
       generation.current += 1;
       readController.current?.abort();
+      syncing.current = false;
     };
   }, [refresh]);
   useEffect(() => {
@@ -297,7 +308,7 @@ function BoundTacticalMapPanel({
   }, [readOnly]);
 
   async function select(destination: { x: number; y: number }) {
-    if (!snapshot || busy.current || state !== "ready") return;
+    if (!snapshot || busy.current || syncing.current || state !== "ready") return;
     const token = snapshot.projection.tokens.find(
       (item) =>
         destination.x >= item.position.x &&
