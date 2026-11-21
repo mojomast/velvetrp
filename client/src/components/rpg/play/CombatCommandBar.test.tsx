@@ -132,4 +132,189 @@ describe("CombatCommandBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "End turn" }));
     expect(insert).toHaveBeenCalledWith("I end my turn.");
   });
+
+  it("names the waiting combatant instead of a generic turn hint", async () => {
+    render(
+      <CombatCommandBar
+        {...baseProps}
+        canManage={false}
+        controlledActorId="lead"
+        api={api({
+          currentCombatant: "c-orra",
+          combatants: [
+            livingActor,
+            { ...livingActor, combatantId: "c-orra", actorId: "orra", displayName: "Orra Staple" },
+            { ...defeatedEnemy, hitPoints: 11, status: "active" },
+          ],
+        })}
+      />,
+    );
+    expect(await screen.findByText(/Orra Staple'S TURN/)).toBeTruthy();
+    expect(await screen.findByText(/Waiting on Orra Staple\./)).toBeTruthy();
+    expect(screen.queryByText(/Waiting on the current turn/)).toBeNull();
+  });
+
+  it("does not show a waiting-on hint on the controlled actor's own turn", async () => {
+    render(
+      <CombatCommandBar
+        {...baseProps}
+        controlledActorId="lead"
+        api={api({
+          currentCombatant: "c-lead",
+          combatants: [livingActor, { ...defeatedEnemy, hitPoints: 11, status: "active" }],
+        })}
+      />,
+    );
+    expect(await screen.findByText(/YOUR TURN/)).toBeTruthy();
+    expect(screen.queryByText(/Waiting on /)).toBeNull();
+  });
+
+  it("shows the remaining combat turn time and never auto-skips when it expires", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2035-01-01T00:00:30.000Z"));
+      const skipCurrentTurn = vi.fn();
+      const commandApi = {
+        ...api({
+          currentCombatant: "c-orra",
+          combatants: [
+            livingActor,
+            { ...livingActor, combatantId: "c-orra", actorId: "orra", displayName: "Orra Staple" },
+            { ...defeatedEnemy, hitPoints: 11, status: "active" },
+          ],
+        }),
+        skipCurrentTurn,
+        getTurnClock: vi.fn().mockResolvedValue({
+          currentCombatant: "c-orra",
+          currentTurnStartedAt: "2035-01-01T00:00:00.000Z",
+          timeoutSeconds: 90,
+        }),
+      };
+      const view = render(<CombatCommandBar {...baseProps} canManage controlledActorId="lead" api={commandApi} />);
+      expect(await screen.findByText(/1:00 remaining/)).toBeTruthy();
+      expect(skipCurrentTurn).not.toHaveBeenCalled();
+      view.unmount();
+      vi.setSystemTime(new Date("2035-01-01T00:01:30.000Z"));
+      render(<CombatCommandBar {...baseProps} canManage controlledActorId="lead" api={commandApi} />);
+      expect(await screen.findByText(/0:00 remaining/)).toBeTruthy();
+      expect(skipCurrentTurn).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("lets an owner or GM skip the current player turn", async () => {
+    const skipCurrentTurn = vi.fn().mockResolvedValue({});
+    const commandApi = {
+      ...api({
+        currentCombatant: "c-orra",
+        combatants: [
+          livingActor,
+          { ...livingActor, combatantId: "c-orra", actorId: "orra", displayName: "Orra Staple" },
+          { ...defeatedEnemy, hitPoints: 11, status: "active" },
+        ],
+      }),
+      skipCurrentTurn,
+      getTurnClock: vi.fn().mockResolvedValue({
+        currentCombatant: "c-orra",
+        currentTurnStartedAt: "2035-01-01T00:00:00.000Z",
+        timeoutSeconds: 90,
+      }),
+    };
+    render(<CombatCommandBar {...baseProps} canManage controlledActorId="lead" api={commandApi} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Skip turn" }));
+    await waitFor(() =>
+      expect(skipCurrentTurn).toHaveBeenCalledWith("combat", {
+        expectedRevision: 7,
+        idempotencyKey: expect.any(String),
+      }),
+    );
+  });
+
+  it("marks a handed-off character as played by the GM until they return, and lets them resume", async () => {
+    const takeOverActor = vi.fn().mockResolvedValue({
+      playedByGmUntilReturn: [{ actorId: "orra", displayName: "Orra Staple" }],
+    });
+    const reclaimActor = vi.fn().mockResolvedValue({ playedByGmUntilReturn: [] });
+    const getTurnClock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        currentCombatant: "c-orra",
+        currentTurnStartedAt: "2035-01-01T00:00:00.000Z",
+        timeoutSeconds: 90,
+        playedByGmUntilReturn: [],
+      })
+      .mockResolvedValueOnce({
+        currentCombatant: "c-orra",
+        currentTurnStartedAt: "2035-01-01T00:00:00.000Z",
+        timeoutSeconds: 90,
+        playedByGmUntilReturn: [{ actorId: "orra", displayName: "Orra Staple" }],
+      })
+      .mockResolvedValue({
+        currentCombatant: "c-orra",
+        currentTurnStartedAt: "2035-01-01T00:00:00.000Z",
+        timeoutSeconds: 90,
+        playedByGmUntilReturn: [],
+      });
+    const commandApi = {
+      ...api({
+        currentCombatant: "c-orra",
+        combatants: [
+          livingActor,
+          { ...livingActor, combatantId: "c-orra", actorId: "orra", displayName: "Orra Staple" },
+          { ...defeatedEnemy, hitPoints: 11, status: "active" },
+        ],
+      }),
+      getTurnClock,
+      takeOverActor,
+      reclaimActor,
+    };
+    const { rerender } = render(
+      <CombatCommandBar {...baseProps} canManage controlledActorId="lead" api={commandApi} />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Play as Orra Staple" }));
+    await waitFor(() =>
+      expect(takeOverActor).toHaveBeenCalledWith("combat", {
+        actorId: "orra",
+        expectedRevision: 7,
+        idempotencyKey: expect.any(String),
+      }),
+    );
+    rerender(<CombatCommandBar {...baseProps} canManage controlledActorId="lead" api={commandApi} />);
+    expect(await screen.findByText(/played by GM until they return/)).toBeTruthy();
+    rerender(<CombatCommandBar {...baseProps} canManage={false} controlledActorId="orra" api={commandApi} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Resume play" }));
+    await waitFor(() =>
+      expect(reclaimActor).toHaveBeenCalledWith("combat", {
+        actorId: "orra",
+        expectedRevision: 7,
+        idempotencyKey: expect.any(String),
+      }),
+    );
+  });
+
+  it("hides skip and take-over controls from ordinary players", async () => {
+    const commandApi = {
+      ...api({
+        currentCombatant: "c-orra",
+        combatants: [
+          livingActor,
+          { ...livingActor, combatantId: "c-orra", actorId: "orra", displayName: "Orra Staple" },
+          { ...defeatedEnemy, hitPoints: 11, status: "active" },
+        ],
+      }),
+      skipCurrentTurn: vi.fn(),
+      takeOverActor: vi.fn(),
+      getTurnClock: vi.fn().mockResolvedValue({
+        currentCombatant: "c-orra",
+        currentTurnStartedAt: "2035-01-01T00:00:00.000Z",
+        timeoutSeconds: 90,
+        playedByGmUntilReturn: [],
+      }),
+    };
+    render(<CombatCommandBar {...baseProps} canManage={false} controlledActorId="lead" api={commandApi} />);
+    expect(await screen.findByText(/Waiting on Orra Staple/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Skip turn" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Play as Orra Staple" })).toBeNull();
+  });
 });

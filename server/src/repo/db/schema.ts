@@ -188,7 +188,13 @@ const currentSchemaSql =
   "\n" +
   readFileSync(new URL("./combatantLabelSchema.sql", import.meta.url), "utf8") +
   "\n" +
-  readFileSync(new URL("./actorJourneySchema.sql", import.meta.url), "utf8");
+  readFileSync(new URL("./actorJourneySchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./campaignReadyCheckSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./actorHandoffSchema.sql", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("./campaignInviteSchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
@@ -897,6 +903,9 @@ function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): 
     const systemOneSql = readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8");
     const combatantLabelSql = readFileSync(new URL("./combatantLabelSchema.sql", import.meta.url), "utf8");
     const actorJourneySql = readFileSync(new URL("./actorJourneySchema.sql", import.meta.url), "utf8");
+    const campaignReadyCheckSql = readFileSync(new URL("./campaignReadyCheckSchema.sql", import.meta.url), "utf8");
+    const actorHandoffSql = readFileSync(new URL("./actorHandoffSchema.sql", import.meta.url), "utf8");
+    const campaignInviteSql = readFileSync(new URL("./campaignInviteSchema.sql", import.meta.url), "utf8");
     // A transaction-guarded in-memory database lets the recognizers' exact-predecessor comparisons
     // run as pure predicates: every recognizer throws "requires an independent transaction" before
     // mutating, so no schema changes leak out of the probe.
@@ -917,6 +926,9 @@ function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): 
           (object) =>
             object.name.startsWith("world_actor_journey_") || object.name.startsWith("world_route_event_profiles_"),
         );
+        const missingReadyChecks = !actual.some((object) => object.name.startsWith("campaign_ready_check_"));
+        const missingActorHandoffs = !actual.some((object) => object.name.startsWith("actor_handoff_"));
+        const missingCampaignInvites = !actual.some((object) => object.name.startsWith("campaign_invites_"));
         const missingLateSchema =
           missingRecall ||
           missingInspection ||
@@ -926,7 +938,10 @@ function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): 
           missingReadyActions ||
           missingSystemOne ||
           missingCombatantLabels ||
-          missingActorJourneys;
+          missingActorJourneys ||
+          missingReadyChecks ||
+          missingActorHandoffs ||
+          missingCampaignInvites;
         const expected = expectedObjects().filter(
           (object) =>
             !(missingRecall && object.name.startsWith("adventure_narration_contexts")) &&
@@ -943,7 +958,10 @@ function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): 
             !(
               missingActorJourneys &&
               (object.name.startsWith("world_actor_journey_") || object.name.startsWith("world_route_event_profiles_"))
-            ),
+            ) &&
+            !(missingReadyChecks && object.name.startsWith("campaign_ready_check_")) &&
+            !(missingActorHandoffs && object.name.startsWith("actor_handoff_")) &&
+            !(missingCampaignInvites && object.name.startsWith("campaign_invites_")),
         );
         const installMissingLateSchema = () => {
           if (missingRecall) db.exec(recallSql);
@@ -955,6 +973,9 @@ function ensureLegacySchema(db: DatabaseDriver.Database, databasePath: string): 
           if (missingSystemOne) db.exec(systemOneSql);
           if (missingCombatantLabels) db.exec(combatantLabelSql);
           if (missingActorJourneys) db.exec(actorJourneySql);
+          if (missingReadyChecks) db.exec(campaignReadyCheckSql);
+          if (missingActorHandoffs) db.exec(actorHandoffSql);
+          if (missingCampaignInvites) db.exec(campaignInviteSql);
         };
         if (mismatchReason(actual, expected) === null) {
           if (!missingLateSchema) {

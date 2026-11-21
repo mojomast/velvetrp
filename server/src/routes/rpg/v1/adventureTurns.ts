@@ -778,7 +778,7 @@ const regexEscape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$
  * denies one of them contradicts authoritative current state, so it is treated
  * exactly like any other grounding-gate failure.
  */
-function deniesActiveCombatEnemy(text: string, actorState: ActorStateContext | null): boolean {
+export function deniesActiveCombatEnemy(text: string, actorState: ActorStateContext | null): boolean {
   const enemies = actorState?.activeCombat?.enemies ?? [];
   if (!enemies.length) return false;
   const normalized = normalizedNarration(text);
@@ -1047,11 +1047,18 @@ function assertsTransactionOrAcquisition(normalized: string): boolean {
 
 function acknowledgesCurrentLocation(text: string, currentLocation: string | null): boolean {
   if (!currentLocation) return true;
-  const normalized = normalizedNarration(text),
-    location = regexEscape(normalizedNarration(currentLocation));
-  return new RegExp(
-    `(?:\\b(?:at|in|inside|within)\\s+(?:the\\s+)?${location}\\b|\\b(?:you are|you stand|you remain|you arrive|you reach|you enter)\\b.{0,80}\\b${location}\\b|\\b${location}\\b.{0,80}\\b(?:around you|surrounds you|is your current location)\\b)`,
-  ).test(normalized);
+  // The UI already shows the current location, so prose may omit it. Only a clause that frames a
+  // different place as the actor's present scene contradicts committed state.
+  const presencePatterns = [
+    /\b(?:you are|you stand|you remain)\s+(?:at|in|inside|within)\s+(.+)$/,
+    /\b(?:you arrive|you reach|you enter)\s+(?:at|in|inside|within)?\s*(.+)$/,
+    /^(?:at|in|inside|within)\s+(.+)$/,
+  ];
+  for (const clause of text.split(/[.!?;:\n]+/).map(normalizedNarration)) {
+    const place = presencePatterns.map((pattern) => clause.match(pattern)?.[1]).find(Boolean);
+    if (place && !mentionsFactPartially(place, currentLocation)) return false;
+  }
+  return true;
 }
 
 /** Conservative semantic gate: receipt prose may add atmosphere, but cannot replace or negate committed public facts. */
@@ -1062,6 +1069,13 @@ export function providerNarrationMatchesReceipts(
 ): boolean {
   if (!acknowledgesCurrentLocation(text, currentLocation)) return false;
   const normalized = normalizedNarration(text);
+  // A server placeholder or implementation-language reply is not player-visible fiction. When a
+  // real scene is established, such a draft must settle on the deterministic fallback instead.
+  if (
+    currentLocation &&
+    /\b(?:deterministic|authoritative result|selected character|tool call|provider|prompt)\b/.test(normalized)
+  )
+    return false;
   const hasKind = (...kinds: NarrationReceipt["kind"][]) => values.some((value) => kinds.includes(value.kind));
   const damageClaims = [...normalized.matchAll(/\b(\d+)\s+(?:[a-z]+\s+){0,2}damage\b/g)].map((match) =>
     Number(match[1]),
@@ -1233,13 +1247,15 @@ export function providerNarrationMatchesReceipts(
         includesNumber(text, value.levelAfter) &&
         includesAny(text, ["advance", "advances", "advanced", "level"])
       );
-    if (value.kind === "check")
-      return (
-        mentionsFact(text, value.skill ?? value.ability) &&
-        includesNumber(text, value.total) &&
-        includesNumber(text, value.dc) &&
-        mentionsFact(text, value.outcome)
-      );
+    if (value.kind === "check") {
+      // The sheet already shows the total and DC, so the prose only has to name the check and
+      // narrate the committed result faithfully. A paraphrase of success or failure is enough,
+      // but the opposite outcome is still a contradiction.
+      if (!mentionsFact(text, value.skill ?? value.ability)) return false;
+      const succeeded = includesAny(text, ["success", "succeed", "pays off", "comes through", "does the trick"]);
+      const failed = includesAny(text, ["fail", "falls short", "comes to nothing"]);
+      return value.outcome === "success" ? succeeded && !failed : failed && !succeeded;
+    }
     if (value.kind === "power")
       return (
         mentionsFact(text, value.powerName) &&
@@ -1267,15 +1283,10 @@ export function providerNarrationMatchesReceipts(
                   : includesNumber(text, outcome.after)),
         )
       );
-    // Combat damage must state the exact damage dealt and the resulting hit points. The applied
-    // damage and HP already fix the outcome, so prose need not echo a literal action or status
-    // word (a longsword "bites home" and an enemy "falls" as naturally as they are "attacked" and
-    // "defeated"). Non-damage combat receipts stay subject to the contradiction and unsupported-claim guards above.
-    if (value.kind === "combat")
-      return (
-        value.outcome.kind !== "damage" ||
-        (includesNumber(text, value.outcome.applied) && includesNumber(text, value.outcome.hitPointsAfter))
-      );
+    // Combat damage prose need not restate the applied damage or resulting hit points; the sheet
+    // already shows them. Unsupported damage or healing numbers are still rejected above, and
+    // non-damage combat receipts stay subject to the contradiction and unsupported-claim guards.
+    if (value.kind === "combat") return true;
     if (value.event.type === "actor_dice_rolled")
       return (
         includesNumber(text, (value.event.data as { total: number }).total) &&
