@@ -35,10 +35,7 @@ const ROLL_LOG = /rolled normal|modifier gives|\bcheck:\s*\d+\s+rolled/i;
 
 describe("in-fiction check receipt fallback", () => {
   it("renders a successful Insight check in the second person without a roll log", () => {
-    const text = narrationFallback(
-      "I approach the surveyor and ask whether the ground is still settling.",
-      [success],
-    );
+    const text = narrationFallback("I approach the surveyor and ask whether the ground is still settling.", [success]);
     expect(text).toMatch(/\byou(?:r|'re)?\b/i);
     expect(text).toMatch(/Insight/i);
     expect(text).toMatch(/success/i);
