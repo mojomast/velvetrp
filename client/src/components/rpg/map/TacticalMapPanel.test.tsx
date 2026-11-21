@@ -429,9 +429,9 @@ describe("TacticalMapPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "2, 1" }));
     fireEvent.click(await screen.findByRole("button", { name: "Confirm move" }));
     expect(await screen.findByText("Token moved and exploration refreshed from the server.")).toBeTruthy();
-    const readsBeforePoll = client.getTacticalMap.mock.calls.length;
+    const readsBeforePoll = vi.mocked(client.getTacticalMap).mock.calls.length;
     view.rerender(<TacticalMapPanel {...props} api={client} refreshKey={1} />);
-    await waitFor(() => expect(client.getTacticalMap.mock.calls.length).toBeGreaterThan(readsBeforePoll));
+    await waitFor(() => expect(vi.mocked(client.getTacticalMap).mock.calls.length).toBeGreaterThan(readsBeforePoll));
     expect(screen.getByText("Token moved and exploration refreshed from the server.")).toBeTruthy();
     expect(screen.queryByText("Server-owned movement and visibility.")).toBeNull();
     expect(screen.queryByText("Authoritative tactical map refreshed.")).toBeNull();
