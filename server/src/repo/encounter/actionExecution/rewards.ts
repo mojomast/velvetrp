@@ -162,13 +162,7 @@ export function createEndCombat(db: DatabaseDriver.Database, deps: EncounterWrit
         if (!root || root.revision !== command.expectedRevision)
           throw new EncounterStaleError("combat revision is stale");
         const living = isDndCombat(db, row.campaign_id) ? "IN ('active','unconscious','stable')" : "='active'";
-        const teams = (
-          db
-            .prepare(`SELECT count(DISTINCT team) count FROM combatant WHERE encounter_id=? AND status ${living}`)
-            .get(combatId) as { count: number }
-        ).count;
-        if (row.status !== "active" || row.current_turn_combatant_id !== null || teams >= 2)
-          throw new EncounterConflictError("combat is not terminal");
+        if (row.status !== "active") throw new EncounterConflictError("combat is not active");
 
         const activeTeam =
           (
