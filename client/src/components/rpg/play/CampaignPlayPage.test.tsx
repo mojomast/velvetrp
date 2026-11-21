@@ -894,6 +894,35 @@ describe("CampaignPlayPage", () => {
     expect(localStorage.getItem("velvet.campaign-play-submit.v1:campaign:session")).not.toContain("I listen");
   });
 
+  it("ignores a second declaration click while the initial stream is still starting", async () => {
+    localStorage.clear();
+    const client = api();
+    let release!: (value: typeof bootstrap) => void;
+    const held = new Promise<typeof bootstrap>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(client.getCampaignPlayBootstrap)
+      .mockResolvedValueOnce(bootstrap)
+      .mockImplementationOnce(() => held);
+    render(
+      <CampaignPlayPage
+        campaignId="campaign"
+        sessionId="session"
+        authorizationGeneration={1}
+        api={client}
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
+    await screen.findByText(/first declaration/);
+    fireEvent.change(screen.getByLabelText("What do you do?"), { target: { value: "I listen" } });
+    const send = screen.getByRole("button", { name: "Declare action" });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    release({ ...bootstrap, expectedRevision: 9 });
+    await waitFor(() => expect(client.streamAdventureTurn).toHaveBeenCalledTimes(1));
+  });
+
   it("supports region shortcuts and searchable help without hiding the composer", async () => {
     const client = api();
     render(
