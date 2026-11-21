@@ -105,6 +105,37 @@ describe("MagicItemAttunementPanel", () => {
     expect(await screen.findByText(/Attunement rejected: capacity-exceeded/)).toBeTruthy();
   });
 
+  it("keeps an engine rejection visible when the api object is replaced with the same functions", async () => {
+    const getActorAttunements = vi.fn().mockResolvedValue(empty);
+    const commandActorAttunement = vi
+      .fn()
+      .mockResolvedValue({ ok: false, code: "prerequisite-missing", snapshot: empty } satisfies AttunementResponse);
+    const candidates = [
+      { definitionId: "srd-5.1:item:ring", name: "Ring of Protection", prerequisite: "short-rest" as const },
+    ];
+    const view = render(
+      <MagicItemAttunementPanel
+        campaignId="campaign"
+        actorId="actor"
+        api={{ getActorAttunements, commandActorAttunement }}
+        candidates={candidates}
+      />,
+    );
+    await screen.findByText("No items are attuned.");
+    fireEvent.click(screen.getByRole("button", { name: "Attune" }));
+    expect(await screen.findByText(/Attunement rejected: prerequisite-missing/)).toBeTruthy();
+    view.rerender(
+      <MagicItemAttunementPanel
+        campaignId="campaign"
+        actorId="actor"
+        api={{ getActorAttunements, commandActorAttunement }}
+        candidates={candidates}
+      />,
+    );
+    expect(screen.getByText(/Attunement rejected: prerequisite-missing/)).toBeTruthy();
+    expect(getActorAttunements).toHaveBeenCalledTimes(1);
+  });
+
   it("drops an attunement through the command surface", async () => {
     const api = client({
       getActorAttunements: vi.fn().mockResolvedValue(attuned),

@@ -66,6 +66,7 @@ interface CampaignPlayRow {
   controller_campaign_id: string | null;
   controller_role: string | null;
   controller_created_at: string | null;
+  declaring_json: string | null;
 }
 
 const CAMPAIGN_ROLES = ["owner", "gm", "player", "observer"] as const;
@@ -182,7 +183,24 @@ export function createCampaignPlayReadRepository(db: DatabaseDriver.Database): C
         NULL AS controller_campaign_id, NULL AS controller_role, NULL AS controller_created_at,
         0 AS row_order, 0 AS participant_order,
         (SELECT control.mode FROM dm_control control JOIN authorized ON authorized.campaign_id=control.campaign_id) AS dm_mode,
-        (SELECT control.revision FROM dm_control control JOIN authorized ON authorized.campaign_id=control.campaign_id) AS dm_revision
+        (SELECT control.revision FROM dm_control control JOIN authorized ON authorized.campaign_id=control.campaign_id) AS dm_revision,
+        (SELECT json_group_array(json_object('actorId', live.actor_id, 'name', live.name) ORDER BY live.position)
+          FROM (
+            SELECT DISTINCT turn.actor_id AS actor_id, participant.position AS position, persona.name AS name
+            FROM adventure_turns turn
+            JOIN campaign_actors live_actor
+              ON live_actor.campaign_id = turn.campaign_id AND live_actor.id = turn.actor_id
+            JOIN campaign_characters live_character
+              ON live_character.campaign_id = live_actor.campaign_id
+              AND live_character.id = live_actor.campaign_character_id
+            JOIN session_characters participant
+              ON participant.session_id = turn.session_id
+              AND participant.character_id = live_character.character_id
+            JOIN characters persona ON persona.id = participant.character_id
+            WHERE turn.campaign_id = authority.campaign_id AND turn.session_id = $sessionId
+              AND turn.mode = 'original'
+              AND turn.state IN ('declared', 'proposed', 'awaiting-confirmation', 'mechanics-committed', 'narrating')
+          ) live) AS declaring_json
       FROM authority
       UNION ALL
       SELECT 'participant', target.campaign_id, target.owner_principal_id,
@@ -221,7 +239,7 @@ export function createCampaignPlayReadRepository(db: DatabaseDriver.Database): C
           AND item.actor_id = playable_actor.id),
         private_state.controller_principal_id, controller_parent.id,
         controller_membership.campaign_id, controller_membership.role, controller_membership.created_at,
-        1, participant.position, NULL, NULL
+        1, participant.position, NULL, NULL, NULL AS declaring_json
       FROM target
       LEFT JOIN session_characters participant ON participant.session_id = target.session_id
       LEFT JOIN characters persona ON persona.id = participant.character_id
@@ -406,6 +424,25 @@ export function createCampaignPlayReadRepository(db: DatabaseDriver.Database): C
         const settings = campaignSettingsSchema.parse(JSON.parse(authority.campaign_settings));
         const playerDiceHistory = role === "player" && settings.allowPlayerDice;
         const playerDiceRoll = playerDiceHistory && playableActors.length > 0;
+        const declaringEntries: unknown = JSON.parse(
+          typeof authority.declaring_json === "string" ? authority.declaring_json : "[]",
+        );
+        if (!Array.isArray(declaringEntries)) malformed();
+        const seenDeclaring = new Set<string>();
+        const declaring: Array<{ actorId: string; name: string }> = [];
+        for (const entry of declaringEntries) {
+          if (
+            typeof entry !== "object" ||
+            entry === null ||
+            typeof (entry as { actorId?: unknown }).actorId !== "string" ||
+            typeof (entry as { name?: unknown }).name !== "string"
+          )
+            malformed();
+          const declaringEntry = entry as { actorId: string; name: string };
+          if (seenDeclaring.has(declaringEntry.actorId)) continue;
+          seenDeclaring.add(declaringEntry.actorId);
+          declaring.push({ actorId: declaringEntry.actorId, name: declaringEntry.name });
+        }
         return campaignPlayBootstrapSchema.parse({
           campaignId: id,
           sessionId: roomId,
@@ -432,6 +469,7 @@ export function createCampaignPlayReadRepository(db: DatabaseDriver.Database): C
             actorId: playableActorId,
             name,
           })),
+          ...(declaring.length ? { declaring } : {}),
         });
       } catch (error) {
         if (error instanceof Error && error.message === "campaign play bootstrap is malformed") throw error;
