@@ -132,4 +132,40 @@ describe("CombatCommandBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "End turn" }));
     expect(insert).toHaveBeenCalledWith("I end my turn.");
   });
+
+  it("names the waiting combatant instead of a generic turn hint", async () => {
+    render(
+      <CombatCommandBar
+        {...baseProps}
+        canManage={false}
+        controlledActorId="lead"
+        api={api({
+          currentCombatant: "c-orra",
+          combatants: [
+            livingActor,
+            { ...livingActor, combatantId: "c-orra", actorId: "orra", displayName: "Orra Staple" },
+            { ...defeatedEnemy, hitPoints: 11, status: "active" },
+          ],
+        })}
+      />,
+    );
+    expect(await screen.findByText(/Orra Staple'S TURN/)).toBeTruthy();
+    expect(await screen.findByText(/Waiting on Orra Staple\./)).toBeTruthy();
+    expect(screen.queryByText(/Waiting on the current turn/)).toBeNull();
+  });
+
+  it("does not show a waiting-on hint on the controlled actor's own turn", async () => {
+    render(
+      <CombatCommandBar
+        {...baseProps}
+        controlledActorId="lead"
+        api={api({
+          currentCombatant: "c-lead",
+          combatants: [livingActor, { ...defeatedEnemy, hitPoints: 11, status: "active" }],
+        })}
+      />,
+    );
+    expect(await screen.findByText(/YOUR TURN/)).toBeTruthy();
+    expect(screen.queryByText(/Waiting on /)).toBeNull();
+  });
 });
