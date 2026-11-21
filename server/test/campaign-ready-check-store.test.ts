@@ -2,6 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createCampaignReadyCheckRepository } from "../src/repo/campaignReadyCheckRepo.js";
+import { getRepositoryDatabase } from "../src/repo/repoContext.js";
 import { createRepository } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
@@ -55,7 +56,7 @@ describe("campaign ready-check persistence", () => {
     const campaigns = createRepository({ dataDir: path.dirname(databasePath()), clock: { now: () => new Date(at) } });
     const ready = createCampaignReadyCheckRepository({
       getSession: (id) => campaigns.getSession(id),
-      addConsentEvent: (sessionId, scope, granted, note) => campaigns.addConsentEvent(sessionId, scope, granted, note),
+      database: getRepositoryDatabase(),
     });
     const enabled = ready.commandReadyCheck("local-owner", "campaign-one", "session-one", {
       action: "enable",

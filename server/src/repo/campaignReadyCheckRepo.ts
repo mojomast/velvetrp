@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type DatabaseDriver from "better-sqlite3";
 import {
   campaignReadyCheckCommandResponseSchema,
   campaignReadyCheckCommandSchema,
@@ -28,21 +29,14 @@ interface ReadyCheckParticipant {
   name: string;
 }
 
-interface ReadyCheckConsentEvent {
-  at: string;
-  scope: string;
-  note: string;
-}
-
 interface ReadyCheckSession {
   participants: readonly ReadyCheckParticipant[];
-  consentLog: readonly ReadyCheckConsentEvent[];
 }
 
-/** The narrow repository slice this lane needs; production supplies the same session/consent methods. */
+/** Session participants come from the existing session read; state is stored in campaign_ready_check_state. */
 export interface CampaignReadyCheckStore {
   getSession(id: string): ReadyCheckSession | null;
-  addConsentEvent(sessionId: string, scope: string, granted: boolean, note: string): { at: string } | null;
+  database: DatabaseDriver.Database;
 }
 
 interface StoredReadyCheck {
@@ -51,13 +45,6 @@ interface StoredReadyCheck {
   revision: number;
 }
 
-interface StoredEvent {
-  idempotencyKey: string;
-  requestDigest: string;
-  state: StoredReadyCheck;
-}
-
-const scope = "campaign-ready-check:v1";
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 function isActiveCheck(value: unknown): value is CampaignReadyCheckActiveCheck {
@@ -78,37 +65,21 @@ function isActiveCheck(value: unknown): value is CampaignReadyCheckActiveCheck {
   );
 }
 
-function parseStoredEvent(note: string): StoredEvent | null {
-  try {
-    const parsed = JSON.parse(note) as Partial<StoredEvent>;
-    if (typeof parsed.idempotencyKey !== "string" || typeof parsed.requestDigest !== "string") return null;
-    const state = parsed.state as Partial<StoredReadyCheck> | undefined;
-    if (
-      !state ||
-      typeof state.enabled !== "boolean" ||
-      typeof state.revision !== "number" ||
-      (state.check !== null && !isActiveCheck(state.check))
-    )
-      return null;
-    return {
-      idempotencyKey: parsed.idempotencyKey,
-      requestDigest: parsed.requestDigest,
-      state: { enabled: state.enabled, check: state.check ?? null, revision: state.revision },
-    };
-  } catch {
-    return null;
-  }
+function parseCheck(raw: string | null): CampaignReadyCheckActiveCheck | null {
+  if (raw === null) return null;
+  const parsed: unknown = JSON.parse(raw);
+  if (!isActiveCheck(parsed)) throw new CampaignReadyCheckUnavailableError("ready-check state is malformed");
+  return parsed;
 }
 
-function latestState(session: ReadyCheckSession): StoredReadyCheck {
-  for (let index = session.consentLog.length - 1; index >= 0; index -= 1) {
-    const event = session.consentLog[index];
-    if (!event || event.scope !== scope) continue;
-    const stored = parseStoredEvent(event.note);
-    if (stored) return stored.state;
-  }
-  // Freeform play is the default; nothing is enabled until an owner explicitly opts in.
-  return { enabled: false, check: null, revision: 0 };
+function latestState(db: DatabaseDriver.Database, campaignId: string, sessionId: string): StoredReadyCheck {
+  const row = db
+    .prepare(
+      "SELECT enabled, revision, check_json FROM campaign_ready_check_state WHERE campaign_id=? AND session_id=?",
+    )
+    .get(campaignId, sessionId) as { enabled: number; revision: number; check_json: string | null } | undefined;
+  if (!row) return { enabled: false, check: null, revision: 0 };
+  return { enabled: row.enabled === 1, check: parseCheck(row.check_json), revision: row.revision };
 }
 
 function waitingFor(session: ReadyCheckSession, readyActorIds: readonly string[]) {
@@ -122,6 +93,8 @@ export function createCampaignReadyCheckRepository(
   store: CampaignReadyCheckStore,
   now: () => string = () => new Date().toISOString(),
 ): CampaignReadyCheckRepository {
+  const db = store.database;
+
   function sessionFor(campaignId: string, sessionId: string): ReadyCheckSession {
     resourceIdSchema.parse(campaignId);
     resourceIdSchema.parse(sessionId);
@@ -147,23 +120,32 @@ export function createCampaignReadyCheckRepository(
       input.expectedRevision,
     ]);
 
-    for (let index = session.consentLog.length - 1; index >= 0; index -= 1) {
-      const event = session.consentLog[index];
-      if (!event || event.scope !== scope) continue;
-      const stored = parseStoredEvent(event.note);
-      if (!stored || stored.idempotencyKey !== input.idempotencyKey) continue;
-      if (stored.requestDigest !== requestDigest) throw new CampaignReadyCheckConflictError("idempotency key reuse");
+    const existing = db
+      .prepare(
+        "SELECT request_digest, occurred_at, enabled, revision, check_json FROM campaign_ready_check_receipts WHERE campaign_id=? AND session_id=? AND idempotency_key=?",
+      )
+      .get(campaignId, sessionId, input.idempotencyKey) as
+      | {
+          request_digest: string;
+          occurred_at: string;
+          enabled: number;
+          revision: number;
+          check_json: string | null;
+        }
+      | undefined;
+    if (existing) {
+      if (existing.request_digest !== requestDigest) throw new CampaignReadyCheckConflictError("idempotency key reuse");
       return campaignReadyCheckCommandResponseSchema.parse({
         campaignId,
         sessionId,
-        enabled: stored.state.enabled,
-        expectedRevision: stored.state.revision,
-        check: stored.state.check,
-        receipt: { idempotencyKey: input.idempotencyKey, occurredAt: event.at },
+        enabled: existing.enabled === 1,
+        expectedRevision: existing.revision,
+        check: parseCheck(existing.check_json),
+        receipt: { idempotencyKey: input.idempotencyKey, occurredAt: existing.occurred_at },
       });
     }
 
-    const current = latestState(session);
+    const current = latestState(db, campaignId, sessionId);
     if (input.expectedRevision !== current.revision)
       throw new CampaignReadyCheckConflictError("ready-check revision is stale");
 
@@ -211,13 +193,30 @@ export function createCampaignReadyCheckRepository(
         break;
     }
 
-    const event = store.addConsentEvent(
-      sessionId,
-      scope,
-      true,
-      JSON.stringify({ idempotencyKey: input.idempotencyKey, requestDigest, state: next } satisfies StoredEvent),
-    );
-    if (!event) throw new CampaignReadyCheckUnavailableError();
+    const occurredAt = now();
+    const checkJson = next.check ? JSON.stringify(next.check) : null;
+    db.transaction(() => {
+      db.prepare(
+        `INSERT INTO campaign_ready_check_state(campaign_id, session_id, enabled, revision, check_json, updated_at)
+        VALUES(?,?,?,?,?,?)
+        ON CONFLICT(campaign_id, session_id) DO UPDATE SET
+          enabled=excluded.enabled, revision=excluded.revision, check_json=excluded.check_json, updated_at=excluded.updated_at`,
+      ).run(campaignId, sessionId, next.enabled ? 1 : 0, next.revision, checkJson, occurredAt);
+      db.prepare(
+        `INSERT INTO campaign_ready_check_receipts(
+          campaign_id, session_id, idempotency_key, request_digest, occurred_at, enabled, revision, check_json
+        ) VALUES(?,?,?,?,?,?,?,?)`,
+      ).run(
+        campaignId,
+        sessionId,
+        input.idempotencyKey,
+        requestDigest,
+        occurredAt,
+        next.enabled ? 1 : 0,
+        next.revision,
+        checkJson,
+      );
+    })();
 
     return campaignReadyCheckCommandResponseSchema.parse({
       campaignId,
@@ -225,15 +224,15 @@ export function createCampaignReadyCheckRepository(
       enabled: next.enabled,
       expectedRevision: next.revision,
       check: next.check,
-      receipt: { idempotencyKey: input.idempotencyKey, occurredAt: event.at },
+      receipt: { idempotencyKey: input.idempotencyKey, occurredAt },
     });
   }
 
   return {
     getReadyCheck(principalId, campaignId, sessionId) {
       void principalId;
-      const session = sessionFor(campaignId, sessionId);
-      const state = latestState(session);
+      sessionFor(campaignId, sessionId);
+      const state = latestState(db, campaignId, sessionId);
       return campaignReadyCheckStateSchema.parse({
         campaignId,
         sessionId,

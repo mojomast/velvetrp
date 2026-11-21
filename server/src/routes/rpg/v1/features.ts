@@ -118,6 +118,7 @@ import {
   createCampaignReadyCheckRepository,
   type CampaignReadyCheckRepository,
 } from "../../../repo/campaignReadyCheckRepo.js";
+import { getRepositoryDatabase } from "../../../repo/repoContext.js";
 import { campaignDmHttpRoutes } from "./campaignDm.js";
 import { freeformTravelHttpRoutes } from "./freeformTravel.js";
 import { freeformNpcHttpRoutes } from "./freeformNpc.js";
@@ -1278,12 +1279,10 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   };
   const readyCheckRepositoryAccessor = (): CampaignReadyCheckRepository => {
     const repository = getCampaignRepository();
-    if (typeof repository.getSession !== "function" || typeof repository.addConsentEvent !== "function")
-      throw new Error("ready check repository is unavailable");
+    if (typeof repository.getSession !== "function") throw new Error("ready check repository is unavailable");
     return createCampaignReadyCheckRepository({
       getSession: (id) => repository.getSession!(id),
-      addConsentEvent: (sessionId, scope, granted, note) =>
-        repository.addConsentEvent!(sessionId, scope, granted, note),
+      database: getRepositoryDatabase(),
     });
   };
   const startingLocationRepositoryAccessor = (): CampaignStartingLocationLaneRepository => {
