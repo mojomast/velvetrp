@@ -110,7 +110,9 @@ export function CombatCommandBar({
         ? canManage
           ? "Resolve the enemy turn when you are ready."
           : "The enemy is taking its turn."
-        : "Waiting on the current turn.";
+        : current
+          ? `Waiting on ${current.displayName ?? (current.kind === "actor" ? current.actorId : "ENEMY")}.`
+          : "Waiting on the current turn.";
 
   async function runEnemyTurn(): Promise<void> {
     if (!api?.resolveEnemyTurn || disabled || reviewInTool || pending) return;
