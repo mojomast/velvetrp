@@ -2088,3 +2088,116 @@ it("does not announce the selected actor as declaring-now", async () => {
   await screen.findByText(/first declaration/);
   expect(screen.queryByText(/is declaring now/)).toBeNull();
 });
+
+describe("CampaignPlayPage ready-check wiring", () => {
+  it("lets a GM enable and start a ready check through the play API", async () => {
+    const client = api();
+    vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({
+      ...bootstrap,
+      principal: { role: "gm", control: "all" },
+    });
+    const getReadyCheck = vi.fn().mockResolvedValue({
+      campaignId: "campaign",
+      sessionId: "session",
+      enabled: false,
+      expectedRevision: 7,
+      check: null,
+    });
+    const commandReadyCheck = vi
+      .fn()
+      .mockImplementation(async (_campaignId: string, _sessionId: string, input: { action: string }) => ({
+        campaignId: "campaign",
+        sessionId: "session",
+        enabled: true,
+        expectedRevision: input.action === "enable" ? 8 : 9,
+        check:
+          input.action === "start"
+            ? {
+                startedAt: "2030-01-01T00:00:00.000Z",
+                readyActorIds: [],
+                waiting: [{ actorId: "actor", name: "Aria" }],
+              }
+            : null,
+        receipt: { idempotencyKey: "ready-1", occurredAt: "2030-01-01T00:00:00.000Z" },
+      }));
+    render(
+      <CampaignPlayPage
+        campaignId="campaign"
+        sessionId="session"
+        authorizationGeneration={1}
+        api={{ ...client, getReadyCheck, commandReadyCheck } as CampaignPlayApi}
+        authorizationCanAct
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
+    await screen.findByText(/first declaration/);
+    fireEvent.click(await screen.findByRole("button", { name: "Enable ready checks" }));
+    await waitFor(() =>
+      expect(commandReadyCheck).toHaveBeenCalledWith(
+        "campaign",
+        "session",
+        expect.objectContaining({ action: "enable" }),
+      ),
+    );
+    getReadyCheck.mockResolvedValue({
+      campaignId: "campaign",
+      sessionId: "session",
+      enabled: true,
+      expectedRevision: 8,
+      check: null,
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Start ready check" }));
+    await waitFor(() =>
+      expect(commandReadyCheck).toHaveBeenCalledWith(
+        "campaign",
+        "session",
+        expect.objectContaining({ action: "start" }),
+      ),
+    );
+  });
+
+  it("lets the acting player mark ready and does not show GM enable controls", async () => {
+    const client = api();
+    const getReadyCheck = vi.fn().mockResolvedValue({
+      campaignId: "campaign",
+      sessionId: "session",
+      enabled: true,
+      expectedRevision: 7,
+      check: {
+        startedAt: "2030-01-01T00:00:00.000Z",
+        readyActorIds: [],
+        waiting: [{ actorId: "actor", name: "Aria" }],
+      },
+    });
+    const commandReadyCheck = vi.fn().mockResolvedValue({
+      campaignId: "campaign",
+      sessionId: "session",
+      enabled: true,
+      expectedRevision: 8,
+      check: { startedAt: "2030-01-01T00:00:00.000Z", readyActorIds: ["actor"], waiting: [] },
+      receipt: { idempotencyKey: "ready-2", occurredAt: "2030-01-01T00:00:00.000Z" },
+    });
+    render(
+      <CampaignPlayPage
+        campaignId="campaign"
+        sessionId="session"
+        authorizationGeneration={1}
+        api={{ ...client, getReadyCheck, commandReadyCheck } as CampaignPlayApi}
+        authorizationCanAct
+        onBack={vi.fn()}
+        onUnavailable={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("Waiting on Aria")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Enable ready checks" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "I'm ready" }));
+    await waitFor(() =>
+      expect(commandReadyCheck).toHaveBeenCalledWith(
+        "campaign",
+        "session",
+        expect.objectContaining({ action: "ready", actorId: "actor" }),
+      ),
+    );
+  });
+});
