@@ -1698,7 +1698,11 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
           .slice(1)
           .find(
             (step) =>
-              stepStagesTrade(step, context.commerceCandidates) || step.rest || step.check || step.combat || step.quest,
+              selectHeldCommerceCandidate(step.text, context.commerceCandidates) !== null ||
+              selectHeldRestCandidate(step.text, context.restCandidates) !== null ||
+              mapDeclarationToCheck(step.text)?.confidence === "strong" ||
+              step.combat ||
+              step.quest,
           )
       : undefined;
   const compoundPendingTrade = compoundPending ? stepStagesTrade(compoundPending, context.commerceCandidates) : false;
