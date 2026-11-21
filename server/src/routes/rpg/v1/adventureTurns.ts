@@ -1405,8 +1405,7 @@ export function narrationGateFailure(
   const unsupportedVitals =
     !hasKind("rest", "combat", "combat-consumable", "combat-power", "power", "mechanic") &&
     vitalNumberPattern.test(normalized);
-  const unsupportedCurrencyNumbers =
-    !hasKind("commerce", "quest-lifecycle") && currencyNumberPattern.test(normalized);
+  const unsupportedCurrencyNumbers = !hasKind("commerce", "quest-lifecycle") && currencyNumberPattern.test(normalized);
   const unsupportedLevelNumbers = !hasKind("progression") && levelNumberPattern.test(normalized);
   const unsupportedDcNumbers = !hasKind("check") && dcNumberPattern.test(normalized);
   const transactionText = text
@@ -2028,7 +2027,10 @@ async function performNarration(
       );
     if (!debugOutcome) {
       if (signal.aborted) debugOutcome = "disconnected";
-      else if (error instanceof SyntaxError || (error instanceof Error && /invalid narration response/.test(error.message)))
+      else if (
+        error instanceof SyntaxError ||
+        (error instanceof Error && /invalid narration response/.test(error.message))
+      )
         debugOutcome = "parse-failed";
       else debugOutcome = "provider-error";
     }
