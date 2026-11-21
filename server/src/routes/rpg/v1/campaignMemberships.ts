@@ -14,6 +14,7 @@ import {
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
+import { getRequestPrincipal, resolveCampaignActorRole } from "../../../http/requestPrincipal.js";
 import {
   CampaignAdministrationConflictError,
   CampaignAdministrationForbiddenError,
@@ -21,17 +22,14 @@ import {
   type CampaignAdministrationRepository,
 } from "../../../repo/campaignAdministrationRepo.js";
 
-const LOCAL_OWNER = "local-owner";
 const JSON_MEDIA_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
 
 type MembershipRepository = Pick<
   CampaignAdministrationRepository,
-  | "addAuditedCampaignMembership"
-  | "changeAuditedCampaignMembershipRole"
-  | "removeAuditedCampaignMembership"
-  | "detachAuditedCampaignRoom"
+  "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
 > & {
   listCampaignMemberships(actorPrincipalId: string, campaignId: string): unknown[];
+  detachAuditedCampaignRoom?: CampaignAdministrationRepository["detachAuditedCampaignRoom"];
 };
 
 export interface CampaignMembershipHttpOptions {
@@ -108,10 +106,13 @@ export const campaignMembershipHttpRoutes: FastifyPluginAsync<CampaignMembership
       if (!hasNoQuery(request)) return invalid(request, reply, "Campaign memberships do not accept query parameters");
       const id = campaignId(request);
       if (id === null) return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+      const actor = getRequestPrincipal(request);
+      if (actor === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const memberships = options
           .campaignMembershipRepositoryAccessor()
-          .listCampaignMemberships(LOCAL_OWNER, id)
+          .listCampaignMemberships(actor, id)
           .map((membership) => campaignMembershipReadSchema.parse(membership));
         if (memberships.length === 0 || memberships.some((membership) => membership.campaignId !== id)) {
           throw new CampaignAdministrationForbiddenError();
@@ -145,12 +146,18 @@ export const campaignMembershipHttpRoutes: FastifyPluginAsync<CampaignMembership
         "Campaign membership requires application/json",
       );
     }
+    const actor = getRequestPrincipal(request);
+    if (actor === null)
+      return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
     try {
       const repository = options.campaignMembershipRepositoryAccessor();
+      const role = resolveCampaignActorRole(actor, id, repository.listCampaignMemberships.bind(repository));
+      if (role !== "owner" && role !== "gm")
+        return sendApiProblem(request, reply, 403, "RPG_FORBIDDEN", "Campaign membership change is not permitted");
       if (request.method === "POST") {
         const body = campaignAdministrationHttpMembershipCreateRequestSchema.safeParse(request.body);
         if (!body.success) return invalid(request, reply, "Campaign membership request is invalid");
-        const result = repository.addAuditedCampaignMembership(LOCAL_OWNER, id, body.data);
+        const result = repository.addAuditedCampaignMembership(actor, id, body.data);
         const membership = campaignMembershipReadSchema.parse(result.value);
         if (
           membership.campaignId !== id ||
@@ -178,7 +185,7 @@ export const campaignMembershipHttpRoutes: FastifyPluginAsync<CampaignMembership
       if (request.method === "PATCH") {
         const body = campaignAdministrationHttpMembershipUpdateRequestSchema.safeParse(request.body);
         if (!body.success) return invalid(request, reply, "Campaign membership request is invalid");
-        const result = repository.changeAuditedCampaignMembershipRole(LOCAL_OWNER, id, target, body.data);
+        const result = repository.changeAuditedCampaignMembershipRole(actor, id, target, body.data);
         const membership = campaignMembershipReadSchema.parse(result.value);
         if (membership.campaignId !== id || membership.principalId !== target || result.receipt.campaignId !== id)
           throw new Error("membership response does not match request");
@@ -192,7 +199,7 @@ export const campaignMembershipHttpRoutes: FastifyPluginAsync<CampaignMembership
       }
       const body = campaignAdministrationHttpMembershipDeleteRequestSchema.safeParse(request.body);
       if (!body.success) return invalid(request, reply, "Campaign membership request is invalid");
-      const result = repository.removeAuditedCampaignMembership(LOCAL_OWNER, id, target, body.data);
+      const result = repository.removeAuditedCampaignMembership(actor, id, target, body.data);
       const membership = campaignMembershipReadSchema.parse(result.value);
       if (membership.campaignId !== id || membership.principalId !== target || result.receipt.campaignId !== id)
         throw new Error("membership response does not match request");
@@ -243,14 +250,20 @@ export const campaignMembershipHttpRoutes: FastifyPluginAsync<CampaignMembership
       );
     const body = campaignAdministrationHttpRoomDetachRequestSchema.safeParse(request.body);
     if (!body.success) return invalid(request, reply, "Campaign room detachment request is invalid");
+    const actor = getRequestPrincipal(request);
+    if (actor === null)
+      return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
     try {
-      const result = options
-        .campaignMembershipRepositoryAccessor()
-        .detachAuditedCampaignRoom(
-          LOCAL_OWNER,
-          id,
-          campaignRoomMutationSchema.parse({ ...body.data, sessionId: room }),
-        );
+      const repository = options.campaignMembershipRepositoryAccessor();
+      const role = resolveCampaignActorRole(actor, id, repository.listCampaignMemberships.bind(repository));
+      if (role !== "owner" && role !== "gm")
+        return sendApiProblem(request, reply, 403, "RPG_FORBIDDEN", "Campaign room change is not permitted");
+      if (typeof repository.detachAuditedCampaignRoom !== "function") throw new CampaignAdministrationForbiddenError();
+      const result = repository.detachAuditedCampaignRoom(
+        actor,
+        id,
+        campaignRoomMutationSchema.parse({ ...body.data, sessionId: room }),
+      );
       const attachment = campaignSessionAttachmentSchema.parse(result.value);
       if (attachment.campaignId !== id || attachment.sessionId !== room || result.receipt.campaignId !== id)
         throw new Error("room response does not match request");

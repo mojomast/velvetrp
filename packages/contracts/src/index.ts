@@ -30,6 +30,7 @@ export * from "./campaign-administration-http.js";
 export * from "./campaign-administration-integrations.js";
 export * from "./campaign-history-http.js";
 export * from "./campaign-play-http.js";
+export * from "./campaign-invite-http.js";
 export * from "./campaign-room-activation-http.js";
 export * from "./campaign-room-participant-http.js";
 export * from "./campaign-starting-location-http.js";
