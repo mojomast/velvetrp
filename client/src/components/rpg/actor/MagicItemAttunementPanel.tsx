@@ -47,12 +47,15 @@ export function MagicItemAttunementPanel({
   const [completedRest, setCompletedRest] = useState<CompletedRest>("none");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const getAttunements = api.getActorAttunements;
+
+  useEffect(() => {
+    setMessage("");
+  }, [campaignId, actorId]);
 
   useEffect(() => {
     let active = true;
-    setMessage("");
-    api
-      .getActorAttunements(campaignId, actorId)
+    getAttunements(campaignId, actorId)
       .then((value) => {
         if (active) setSnapshot(value);
       })
@@ -65,7 +68,7 @@ export function MagicItemAttunementPanel({
     return () => {
       active = false;
     };
-  }, [api, campaignId, actorId]);
+  }, [getAttunements, campaignId, actorId]);
 
   const apply = useCallback(
     async (command: AttunementCommand) => {

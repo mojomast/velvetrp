@@ -2,6 +2,8 @@ import {
   combatActionCommandRequestSchema,
   combatActionCommandResponseSchema,
   combatEnemyTurnCommandRequestSchema,
+  combatHandoffCommandRequestSchema,
+  combatSkipTurnCommandRequestSchema,
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
   combatCommandResultResponseSchema,
@@ -24,6 +26,11 @@ import {
   EncounterUnavailableError,
   type EncounterRepository,
 } from "../../../repo/index.js";
+import {
+  createCombatTurnClockRepository,
+  type CombatTurnClockRepository,
+} from "../../../repo/encounter/combatTurnClock.js";
+import { getRepositoryDatabase } from "../../../repo/repoContext.js";
 
 const LOCAL_OWNER = "local-owner";
 const APPLICATION_JSON = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
@@ -36,7 +43,8 @@ type CombatCommandRepository = Pick<
   | "claimCombatReward"
   | "listCombatRewards"
   | "getCombatRewardClaimResult"
->;
+> &
+  Partial<Pick<CombatTurnClockRepository, "skipCurrentTurn" | "commandCombatHandoff">>;
 export interface CombatCommandsHttpOptions {
   combatCommandRepositoryAccessor: () => CombatCommandRepository;
 }
@@ -517,6 +525,172 @@ export const combatCommandsHttpRoutes: FastifyPluginAsync<CombatCommandsHttpOpti
           500,
           "RPG_INTERNAL_ERROR",
           "Enemy turn outcome could not be confirmed; reconcile combat state before retrying and do not automatically retry",
+        );
+      }
+    },
+  );
+
+  app.post<{ Params: { combatId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
+    "/combats/:combatId/skip-turn-commands",
+    {
+      onRequest: async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        if (!enabled()) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
+        }
+        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Skip turn does not accept query parameters",
+          );
+          return;
+        }
+        if (!resourceIdSchema.safeParse(request.params.combatId).success) {
+          await notFound(request, reply);
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType))
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Skip turn requires application/json",
+          );
+      },
+      errorHandler: (_error, request, reply) =>
+        sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Skip turn request is invalid"),
+    },
+    async (request, reply) => {
+      const combatId = resourceIdSchema.safeParse(request.params.combatId),
+        body = combatSkipTurnCommandRequestSchema.safeParse(request.body);
+      if (!combatId.success) return notFound(request, reply);
+      if (!body.success)
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Skip turn request is invalid");
+      try {
+        const repository = options.combatCommandRepositoryAccessor();
+        const result = repository.skipCurrentTurn
+          ? repository.skipCurrentTurn(LOCAL_OWNER, combatId.data, body.data)
+          : createCombatTurnClockRepository(getRepositoryDatabase()).skipCurrentTurn(
+              LOCAL_OWNER,
+              combatId.data,
+              body.data,
+            );
+        return reply.code(200).send(result);
+      } catch (error) {
+        if (error instanceof EncounterAuthorizationError || error instanceof EncounterUnavailableError)
+          return notFound(request, reply);
+        if (error instanceof EncounterStaleError)
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_COMBAT_STALE",
+            "Combat state is stale; refresh before trying again",
+          );
+        if (error instanceof EncounterConflictError || error instanceof EncounterTurnError)
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_SKIP_TURN_CONFLICT",
+            "Turn cannot be skipped in its current state",
+          );
+        request.log.error(
+          { operation: "combat-skip-turn", method: request.method, route: request.routeOptions.url },
+          "RPG combat skip turn failed",
+        );
+        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Turn skip outcome could not be confirmed");
+      }
+    },
+  );
+
+  app.post<{ Params: { combatId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
+    "/combats/:combatId/handoff-commands",
+    {
+      onRequest: async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        if (!enabled()) {
+          await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+          return;
+        }
+        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Combat handoff does not accept query parameters",
+          );
+          return;
+        }
+        if (!resourceIdSchema.safeParse(request.params.combatId).success) {
+          await notFound(request, reply);
+          return;
+        }
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType))
+          await sendApiProblem(
+            request,
+            reply,
+            415,
+            "RPG_UNSUPPORTED_MEDIA_TYPE",
+            "Combat handoff requires application/json",
+          );
+      },
+      errorHandler: (_error, request, reply) =>
+        sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Combat handoff request is invalid"),
+    },
+    async (request, reply) => {
+      const combatId = resourceIdSchema.safeParse(request.params.combatId),
+        body = combatHandoffCommandRequestSchema.safeParse(request.body);
+      if (!combatId.success) return notFound(request, reply);
+      if (!body.success)
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Combat handoff request is invalid");
+      try {
+        const repository = options.combatCommandRepositoryAccessor();
+        const result = repository.commandCombatHandoff
+          ? repository.commandCombatHandoff(LOCAL_OWNER, combatId.data, body.data)
+          : createCombatTurnClockRepository(getRepositoryDatabase()).commandCombatHandoff(
+              LOCAL_OWNER,
+              combatId.data,
+              body.data,
+            );
+        return reply.code(200).send(result);
+      } catch (error) {
+        if (error instanceof EncounterAuthorizationError || error instanceof EncounterUnavailableError)
+          return notFound(request, reply);
+        if (error instanceof EncounterStaleError)
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_COMBAT_STALE",
+            "Combat state is stale; refresh before trying again",
+          );
+        if (error instanceof EncounterConflictError || error instanceof EncounterTurnError)
+          return sendApiProblem(
+            request,
+            reply,
+            409,
+            "RPG_HANDOFF_CONFLICT",
+            "Combat handoff conflicts with current state",
+          );
+        request.log.error(
+          { operation: "combat-handoff", method: request.method, route: request.routeOptions.url },
+          "RPG combat handoff failed",
+        );
+        return sendApiProblem(
+          request,
+          reply,
+          500,
+          "RPG_INTERNAL_ERROR",
+          "Combat handoff outcome could not be confirmed",
         );
       }
     },

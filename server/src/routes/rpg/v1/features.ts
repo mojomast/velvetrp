@@ -115,6 +115,12 @@ import { campaignInviteHttpRoutes } from "./campaignInvites.js";
 import { getCampaignInviteRepository } from "../../../repo/campaignInviteRepo.js";
 import { campaignRoomActivationHttpRoutes } from "./campaignRoomActivation.js";
 import { campaignRoomParticipantHttpRoutes } from "./campaignRoomParticipant.js";
+import { campaignReadyCheckHttpRoutes } from "./campaignReadyCheck.js";
+import {
+  createCampaignReadyCheckRepository,
+  type CampaignReadyCheckRepository,
+} from "../../../repo/campaignReadyCheckRepo.js";
+import { getRepositoryDatabase } from "../../../repo/repoContext.js";
 import { campaignDmHttpRoutes } from "./campaignDm.js";
 import { freeformTravelHttpRoutes } from "./freeformTravel.js";
 import { freeformNpcHttpRoutes } from "./freeformNpc.js";
@@ -293,6 +299,8 @@ export interface CampaignListRepository
   activateCampaignRoom?: Repository["activateCampaignRoom"];
   getCampaignRoomActivationReadiness?: Repository["getCampaignRoomActivationReadiness"];
   addCampaignRoomParticipant?: Repository["addCampaignRoomParticipant"];
+  getSession?: Repository["getSession"];
+  addConsentEvent?: Repository["addConsentEvent"];
   inspectCampaignContext?: CampaignContextInspectionReadRepository["inspectCampaignContext"];
   resolveCampaignContextInspectionDispatchReferences?: CampaignContextInspectionReadRepository["resolveCampaignContextInspectionDispatchReferences"];
   getAdventureTurnNarration?: AdventureTurnRepository["getAdventureTurnNarration"];
@@ -1271,6 +1279,14 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCampaignPlayRepository(repository);
     return repository;
   };
+  const readyCheckRepositoryAccessor = (): CampaignReadyCheckRepository => {
+    const repository = getCampaignRepository();
+    if (typeof repository.getSession !== "function") throw new Error("ready check repository is unavailable");
+    return createCampaignReadyCheckRepository({
+      getSession: (id) => repository.getSession!(id),
+      database: getRepositoryDatabase(),
+    });
+  };
   const campaignInviteRepositoryAccessor = () => getCampaignInviteRepository();
   const startingLocationRepositoryAccessor = (): CampaignStartingLocationLaneRepository => {
     const repository = getCampaignRepository();
@@ -1351,6 +1367,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}),
   });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
+  await app.register(campaignReadyCheckHttpRoutes, { readyCheckRepositoryAccessor });
   await app.register(campaignInviteHttpRoutes, { campaignInviteRepositoryAccessor });
   await app.register(campaignDmHttpRoutes, {
     repositoryAccessor: () => getCampaignRepository() as Repository,

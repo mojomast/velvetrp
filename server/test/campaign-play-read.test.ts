@@ -261,4 +261,26 @@ describe("campaign play bootstrap repository", () => {
     transaction.mockRestore();
     repo.close();
   });
+
+  it("omits declaring when no original turn is in flight and lists a live declarer by name", () => {
+    const seeded = seed();
+    const idle = createRepository();
+    const before = idle.getCampaignPlayBootstrap("local-owner", seeded.campaignId, seeded.sessionId)!;
+    expect(before.declaring).toBeUndefined();
+    idle.close();
+    const db = new DatabaseDriver(databasePath());
+    db.pragma("foreign_keys = ON");
+    const timeline = db.prepare("SELECT active_timeline_id AS id FROM campaigns WHERE id=?").get(seeded.campaignId) as {
+      id: string;
+    };
+    db.prepare(
+      `INSERT INTO adventure_turns(id,campaign_id,timeline_id,session_id,actor_id,principal_id,declaration,mode,prior_turn_id,state,narration_status,revision,campaign_revision,idempotency_key,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,'I look around.','original',NULL,'declared','none',0,1,'declaring-now',?,?)`,
+    ).run("turn-live", seeded.campaignId, timeline.id, seeded.sessionId, seeded.firstActor, "player", at, at);
+    db.close();
+    const repo = createRepository();
+    const owner = repo.getCampaignPlayBootstrap("local-owner", seeded.campaignId, seeded.sessionId)!;
+    expect(owner.declaring).toEqual([{ actorId: seeded.firstActor, name: "First in room" }]);
+    repo.close();
+  });
 });
