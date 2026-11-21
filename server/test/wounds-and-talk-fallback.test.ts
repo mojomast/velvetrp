@@ -34,7 +34,7 @@ describe("wound status questions report current and max HP", () => {
 describe("social declarations are not travel fallbacks", () => {
   it("does not use the 'have not left yet' line when a toast mentions the road and walking in blind", () => {
     const declaration =
-      'I accept the cup with both hands and a small bow over it. "You\'re kind. This is the first warmth I\'ve had since the road." I sip, then glance toward the far end. "What manner of man is Orl Tace? I\'d not walk in blind.';
+      "I accept the cup with both hands and a small bow over it. \"You're kind. This is the first warmth I've had since the road.\" I sip, then glance toward the far end. \"What manner of man is Orl Tace? I'd not walk in blind.";
     const text = narrationFallback(declaration, [], fallbackContext);
     expect(text).toMatch(/\byou(?:r|'re)?\b/i);
     expect(text).not.toMatch(/have not left yet/i);
