@@ -353,6 +353,7 @@ export function CampaignPlayPage({
   const bootstrapReadRef = useRef(0);
   const transcriptReadRef = useRef(0);
   const liveReadRef = useRef(false);
+  const submitInFlightRef = useRef(false);
   unavailableRef.current = onUnavailable;
   selectedChangeRef.current = onSelectedActorChange;
   turnChangeRef.current = onTurnIdChange;
@@ -951,6 +952,7 @@ export function CampaignPlayPage({
 
   async function submit(declaration: string) {
     if (
+      submitInFlightRef.current ||
       sessionLocked ||
       roomToolsLocked ||
       !authorizationCanAct ||
@@ -960,6 +962,7 @@ export function CampaignPlayPage({
       phase === "awaiting-confirmation"
     )
       return;
+    submitInFlightRef.current = true;
     setPhase("streaming");
     const references = sheetContext.map((entry) => entry.reference);
     try {
@@ -995,10 +998,15 @@ export function CampaignPlayPage({
         expectedRevision: latest.expectedRevision,
       });
     } catch {
+      submitInFlightRef.current = false;
       setPhase("idle");
       setError("Latest campaign play state could not be loaded. Nothing was submitted.");
     }
   }
+
+  useEffect(() => {
+    if (phase !== "streaming") submitInFlightRef.current = false;
+  }, [phase]);
 
   async function reconcilePendingInitial() {
     const locator = pendingInitial ?? readPendingInitial(campaignId, sessionId);

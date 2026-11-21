@@ -4,15 +4,23 @@ import {
   combatLogResponseSchema,
   combatReadResponseSchema,
   combatRewardListResponseSchema,
+  combatTurnClockResponseSchema,
   resourceIdSchema,
+  type CombatTurnClockResponse,
 } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
 import { EncounterAuthorizationError, type EncounterRepository } from "../../../repo/index.js";
+import { createCombatTurnClockRepository } from "../../../repo/encounter/combatTurnClock.js";
+import { getRepositoryDatabase } from "../../../repo/repoContext.js";
 
 const LOCAL_OWNER = "local-owner";
-type CombatReadRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">;
+type CombatTurnClockRead = Omit<CombatTurnClockResponse, "timeoutSeconds"> & { timeoutSeconds: number };
+type CombatReadRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards"> &
+  Partial<{
+    getCombatTurnClock(principal: string, combatId: string): CombatTurnClockRead | null;
+  }>;
 export interface CombatReadsHttpOptions {
   combatRepositoryAccessor: () => CombatReadRepository;
 }
@@ -53,6 +61,43 @@ export const combatReadsHttpRoutes: FastifyPluginAsync<CombatReadsHttpOptions> =
       } catch {
         request.log.error({ operation: "combat-rewards-read" }, "RPG combat rewards read failed");
         return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Combat rewards could not be loaded");
+      }
+    },
+  );
+  app.get<{ Params: { combatId: string }; Querystring: Record<string, unknown> }>(
+    "/combats/:combatId/turn-clock",
+    {
+      exposeHeadRoute: false,
+      onRequest: async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        if (!enabled()) await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+        if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0)
+          await sendApiProblem(
+            request,
+            reply,
+            400,
+            "RPG_INVALID_REQUEST",
+            "Combat turn clock does not accept query parameters",
+          );
+      },
+    },
+    async (request, reply) => {
+      const combatId = resourceIdSchema.safeParse(request.params.combatId);
+      if (!combatId.success) return notFound(request, reply);
+      try {
+        const repository = options.combatRepositoryAccessor();
+        const clock = repository.getCombatTurnClock
+          ? repository.getCombatTurnClock(LOCAL_OWNER, combatId.data)
+          : createCombatTurnClockRepository(getRepositoryDatabase()).getCombatTurnClock(LOCAL_OWNER, combatId.data);
+        if (clock === null) return notFound(request, reply);
+        return reply.code(200).send(combatTurnClockResponseSchema.parse(clock));
+      } catch (error) {
+        if (error instanceof EncounterAuthorizationError) return notFound(request, reply);
+        request.log.error(
+          { operation: "combat-turn-clock", method: request.method, route: request.routeOptions.url },
+          "RPG combat turn clock read failed",
+        );
+        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Combat turn clock could not be loaded");
       }
     },
   );
