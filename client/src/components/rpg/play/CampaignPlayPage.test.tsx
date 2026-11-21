@@ -2012,3 +2012,50 @@ it("keeps optional voice in Table tools without submitting gameplay", async () =
     vi.unstubAllGlobals();
   }
 });
+
+it("polls live play every few seconds and names another actor who is declaring now", async () => {
+  const setIntervalSpy = vi.spyOn(window, "setInterval");
+  const client = api();
+  vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({
+    ...bootstrap,
+    dm: { mode: "human", revision: 0 },
+    declaring: [{ actorId: "mira", name: "Mira" }],
+  });
+  const view = render(
+    <CampaignPlayPage
+      campaignId="campaign"
+      sessionId="session"
+      authorizationGeneration={1}
+      api={client}
+      onBack={vi.fn()}
+      onUnavailable={vi.fn()}
+    />,
+  );
+  expect(await screen.findByText(/Mira is declaring now/)).toBeTruthy();
+  const delays = setIntervalSpy.mock.calls.map((call) => call[1]);
+  expect(delays.some((delay) => delay === 3000)).toBe(true);
+  expect(delays.every((delay) => delay !== 30_000)).toBe(true);
+  view.unmount();
+  setIntervalSpy.mockRestore();
+});
+
+it("does not announce the selected actor as declaring-now", async () => {
+  const client = api();
+  vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({
+    ...bootstrap,
+    dm: { mode: "human", revision: 0 },
+    declaring: [{ actorId: "actor", name: "Aria" }],
+  });
+  render(
+    <CampaignPlayPage
+      campaignId="campaign"
+      sessionId="session"
+      authorizationGeneration={1}
+      api={client}
+      onBack={vi.fn()}
+      onUnavailable={vi.fn()}
+    />,
+  );
+  await screen.findByText(/first declaration/);
+  expect(screen.queryByText(/is declaring now/)).toBeNull();
+});

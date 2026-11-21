@@ -599,7 +599,7 @@ export function CampaignPlayPage({
     const schedule = () => {
       if (timer !== undefined) window.clearInterval(timer);
       timer = undefined;
-      if (document.visibilityState !== "hidden") timer = window.setInterval(() => void refreshReads(), 30_000);
+      if (document.visibilityState !== "hidden") timer = window.setInterval(() => void refreshReads(), 3_000);
     };
     const focus = () => void refreshReads();
     const visibility = () => {
@@ -1464,8 +1464,14 @@ export function CampaignPlayPage({
   ) : (
     <p className="quick-panel-note">Character services are unavailable in this room.</p>
   );
+  const declaringNotice = bootstrap.declaring?.find((actor) => actor.actorId !== selectedActorId)?.name ?? null;
   const noticesNode = (
     <>
+      {declaringNotice && (
+        <p className="atlas-notice" role="status">
+          {declaringNotice} is declaring now.
+        </p>
+      )}
       {error && (
         <p className="atlas-notice" role="alert">
           {error}
