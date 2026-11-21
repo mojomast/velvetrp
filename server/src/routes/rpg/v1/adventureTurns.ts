@@ -683,6 +683,7 @@ export function deliberateHoldNarration(
   declaration: string,
   values: readonly NarrationReceipt[],
   presentNpcNames: readonly string[] = [],
+  context?: NarrationFallbackContext,
 ): string | null {
   if (!hold || !declarationNamesConcreteAction(declaration, presentNpcNames)) return null;
   if (holdNarrationIsWarranted(hold, declaration, presentNpcNames)) return holdNarration(hold);
