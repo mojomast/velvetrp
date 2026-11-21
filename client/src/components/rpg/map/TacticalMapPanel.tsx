@@ -296,7 +296,10 @@ function BoundTacticalMapPanel({
     };
   }, [refresh, state]);
   useEffect(() => {
-    if (readOnly) {
+    // A stale-preserving world/combat refresh sets commandsBlocked, which is folded
+    // into readOnly. That lock must not discard an outstanding move preview; only an
+    // actual access change (accessReadOnly) ends the preview.
+    if (accessReadOnly) {
       if (busy.current) {
         generation.current += 1;
         readController.current?.abort();
@@ -305,7 +308,7 @@ function BoundTacticalMapPanel({
       busy.current = false;
       setState((value) => (value === "previewing" || value === "moving" ? "ambiguous" : value));
     }
-  }, [readOnly]);
+  }, [accessReadOnly]);
 
   async function select(destination: { x: number; y: number }) {
     if (!snapshot || busy.current || syncing.current || state !== "ready") return;
@@ -576,7 +579,7 @@ function BoundTacticalMapPanel({
               <button
                 type="button"
                 className="primary"
-                disabled={readOnly || state !== "ready"}
+                disabled={accessReadOnly || state !== "ready"}
                 onClick={() => void confirm()}
               >
                 Confirm move
@@ -584,7 +587,7 @@ function BoundTacticalMapPanel({
               <button
                 type="button"
                 className="ghost"
-                disabled={readOnly || state !== "ready"}
+                disabled={accessReadOnly || state !== "ready"}
                 onClick={() => {
                   setPreview(null);
                   setSnapshot({ ...preview, projection: { ...preview.projection, authoritativePath: null } });

@@ -472,6 +472,17 @@ describe("TacticalMapPanel", () => {
     expect(await screen.findByText(/30 feet available by combat-current-turn-speed/)).toBeTruthy();
   });
 
+  it("keeps an outstanding move preview when a live refresh only sets commandsBlocked", async () => {
+    const client = api();
+    const view = render(<TacticalMapPanel {...props} api={client} />);
+    await screen.findByText(/60 feet available/);
+    fireEvent.click(screen.getByRole("button", { name: "2, 1" }));
+    expect(await screen.findByRole("button", { name: "Confirm move" })).toBeTruthy();
+    view.rerender(<TacticalMapPanel {...props} api={client} commandsBlocked />);
+    expect(screen.getByRole("button", { name: "Confirm move" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Confirm move" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("never retries an ambiguous command and recovery performs one GET only", async () => {
     const client = api({ moveTacticalMapToken: vi.fn().mockRejectedValue(new TypeError("network")) });
     render(<TacticalMapPanel {...props} api={client} />);
