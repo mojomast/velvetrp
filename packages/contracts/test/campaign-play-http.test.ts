@@ -114,4 +114,14 @@ describe("campaign play HTTP contract", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("accepts an optional declaring list and still accepts the minimal bootstrap without it", () => {
+    expect(campaignPlayBootstrapSchema.parse(bootstrap)).toEqual(bootstrap);
+    expect(Object.keys(campaignPlayBootstrapSchema.parse(bootstrap))).not.toContain("declaring");
+    const withDeclaring = campaignPlayBootstrapSchema.parse({
+      ...bootstrap,
+      declaring: [{ actorId: "mira", name: "Mira" }],
+    });
+    expect(withDeclaring.declaring).toEqual([{ actorId: "mira", name: "Mira" }]);
+  });
 });
