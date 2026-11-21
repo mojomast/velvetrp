@@ -21,6 +21,7 @@ const currentSql = () =>
     "systemOneSchema.sql",
     "combatantLabelSchema.sql",
     "actorJourneySchema.sql",
+    "actorHandoffSchema.sql",
   ]
     .map(asset)
     .join("\n");
